@@ -685,7 +685,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       onOpenChange={handleModalClose}
     >
       <DialogContent
-        className={modal.className}
+        className={`${modal.className} gap-2`}
         style={modal.style}
         {...mobileProps}
         onInteractOutside={(e) => {
@@ -836,7 +836,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       onFocus={() => console.log(`[EDIT_DEBUG:FOCUS] Input focused, value: "${editInstructionsRef.current?.value}"`)}
                       onBlur={() => console.log(`[EDIT_DEBUG:BLUR] Input blurred, value: "${editInstructionsRef.current?.value}"`)}
                       placeholder={promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit instructions'}
-                      className={`h-7 ${isMobile ? 'w-36' : 'w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
+                      className={`h-7 ${isMobile ? 'flex-1 min-w-0' : 'w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
                       disabled={isAIEditing}
                       clearable
                       onClear={() => setEditInstructionsValue('', 'clear-button')}

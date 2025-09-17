@@ -132,7 +132,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     <div className="p-4">
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Main content - left side on desktop, full width on mobile */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-2">
           {/* Main prompt input - always visible */}
           <div>
           <Label htmlFor="gen_overallPromptText" className="mb-2 block">What prompts would you like to generate?</Label>
@@ -196,7 +196,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   >
                     <Settings className="h-4 w-4" />
                     <span>Advanced Options</span>
-                    {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    {showAdvanced ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </CollapsibleTrigger>
               </Collapsible>
@@ -218,7 +218,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 >
                   <Settings className="h-4 w-4" />
                   <span>Advanced Options</span>
-                  {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {showAdvanced ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
               </CollapsibleTrigger>
             </Collapsible>
