@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2 } from 'lucide-react';
+import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -384,14 +384,10 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           )}
           
           {onComputerChecked && !inCloudChecked && (
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg relative">
-              <div className="absolute top-2 right-2">
-                <span className="bg-green-500 text-white text-xs font-light px-2 py-1 rounded-full">
-                  Free
-                </span>
-              </div>
-              <p className="text-sm text-green-800 dark:text-green-200 font-light">
-                💻 Free to use, requires setup, need a good GPU
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <p className="text-sm text-green-800 dark:text-green-200 font-light flex items-center justify-center gap-2">
+                <span>💻 Free to use, requires setup, need a good GPU</span>
+                <span className="bg-green-500 text-white text-xs font-light px-2 py-1 rounded-full">Free</span>
               </p>
             </div>
           )}
@@ -433,7 +429,7 @@ const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-
         <Coins className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
-        We'll give you $5 if you promise to make something with Reigh
+        We'll give you $5 credit if you promise to make something with Reigh
       </DialogTitle>
     </DialogHeader>
     
@@ -443,7 +439,7 @@ const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-
       </p>
       
       <p className="text-muted-foreground">
-        So let's make a deal: if you promise to use Reigh to make <strong>a tiny music video (&lt;30 sec)</strong> and share it in our Discord, we'll give you $5 free credit.
+        So let's make a deal: if you promise you'll use it to make <strong>a tiny music video (&lt;30 sec)</strong> and share it in our Discord, we'll give you $5 credit.
       </p>
     </div>
     
@@ -478,9 +474,13 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
   useEffect(() => {
     // Only show confetti if user hasn't seen it this session
     const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
+    console.log('[Confetti] hasSeenAnimation:', hasSeenAnimation);
     if (hasSeenAnimation) {
+      console.log('[Confetti] Skipping confetti - already seen this session');
       return; // Skip confetti if already seen
     }
+    
+    console.log('[Confetti] Creating confetti animation');
 
     // Create confetti elements
     const createConfetti = () => {
@@ -533,6 +533,10 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
     }
 
     createConfetti();
+    
+    // Mark that user has seen the animation AFTER creating confetti
+    sessionStorage.setItem('reigh_welcome_animation_seen', 'true');
+    console.log('[Confetti] Animation created and session flag set');
   }, []);
 
   return (
@@ -540,7 +544,7 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
       <DialogHeader className="text-center space-y-4 mb-6">
         <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
           <Sparkles className="w-8 h-8 text-green-600 dark:text-green-400" />
-        </div>
+      </div>
         <DialogTitle className="text-2xl font-bold text-center">
           {choice === 'music-video' ? "Great, here's $5! 🎉" : "No problem! Here's $5 anyway. 💝"}
         </DialogTitle>
@@ -556,7 +560,7 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
       <p className="text-muted-foreground">
         Remember: what you create doesn't need to be exceptional. You're learning how to use a tool. Take this as an opportunity to have fun learning, start creating, and get over your fear of sharing!
       </p>
-      
+
       <p className="text-muted-foreground">
         We'll never check if you actually made something. We trust you &lt;3
       </p>
@@ -575,7 +579,7 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
       </Button>
     </div>
   </>
-  );
+);
 };
 
 // Step 7: Setup Complete
@@ -593,10 +597,10 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     <>
       <DialogHeader className="text-center space-y-4 mb-6">
         <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-          <Check className="w-8 h-8 text-green-600 dark:text-green-400" />
+        <MoreHorizontal className="w-8 h-8 text-green-600 dark:text-green-400" />
         </div>
         <DialogTitle className="text-2xl font-bold text-center">
-          One more thing...
+          One more thing
         </DialogTitle>
       </DialogHeader>
       
@@ -658,12 +662,15 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   };
 
   const handleGambitChoice = async (choice: 'music-video' | 'something-else' | 'no-thanks') => {
+    console.log('[GambitChoice] User made choice:', choice);
     setUserChoice(choice);
     
     // Check if user has already seen the loading/confetti animation this session
     const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
+    console.log('[GambitChoice] hasSeenAnimation:', hasSeenAnimation);
     
     if (!hasSeenAnimation) {
+      console.log('[GambitChoice] First time this session - showing loading and will show confetti');
       // First time this session - show loading, grant credits, and show confetti
       setIsProcessingCredits(true);
       
@@ -698,12 +705,14 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       
       // Show loading for 1.5 seconds before showing credits result
       setTimeout(() => {
+        console.log('[GambitChoice] Timeout completed - transitioning to credits result');
         setIsProcessingCredits(false);
         setCurrentStep(6); // Go to credits result step
-        // Mark that user has seen the animation
-        sessionStorage.setItem('reigh_welcome_animation_seen', 'true');
+        // DON'T mark as seen yet - let the confetti component handle that
+        console.log('[GambitChoice] Moving to step 6, confetti should trigger');
       }, 1500);
     } else {
+      console.log('[GambitChoice] Already seen this session - skipping to result');
       // Already seen this session - skip directly to result (credits already granted)
       setCurrentStep(6);
     }
