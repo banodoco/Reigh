@@ -10,10 +10,15 @@ export class SimpleRealtimeManager {
   private maxReconnectAttempts = 3;
   private reconnectTimeout: NodeJS.Timeout | null = null;
 
+  private boundAuthHealHandler: (event: CustomEvent) => void;
+
   constructor() {
+    // Store bound handler for proper cleanup
+    this.boundAuthHealHandler = this.handleAuthHeal.bind(this);
+    
     // Listen for auth heal events from ReconnectScheduler
     if (typeof window !== 'undefined') {
-      window.addEventListener('realtime:auth-heal', this.handleAuthHeal.bind(this));
+      window.addEventListener('realtime:auth-heal', this.boundAuthHealHandler);
     }
   }
 
@@ -69,19 +74,27 @@ export class SimpleRealtimeManager {
   async joinProject(projectId: string): Promise<boolean> {
     console.log('[SimpleRealtime] 🚀 Joining project:', projectId);
     
-    // Check authentication first
+    // Check authentication first (use getSession for local/cached check)
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error('[SimpleRealtime] ❌ Not authenticated, cannot join project:', {
-          authError: authError?.message,
-          hasUser: !!user,
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        console.error('[SimpleRealtime] ❌ No valid session, cannot join project:', {
+          sessionError: sessionError?.message,
+          hasSession: !!session,
+          hasUser: !!session?.user,
           projectId
         });
-        dataFreshnessManager.onRealtimeStatusChange('error', 'Not authenticated');
+        dataFreshnessManager.onRealtimeStatusChange('error', 'No valid session');
         return false;
       }
-      console.log('[SimpleRealtime] ✅ Authentication verified for user:', user.id);
+      
+      // Explicitly set auth token for realtime before subscribing
+      if (session.access_token) {
+        console.log('[SimpleRealtime] 🔑 Setting realtime auth token');
+        supabase.realtime.setAuth(session.access_token);
+      }
+      
+      console.log('[SimpleRealtime] ✅ Authentication verified for user:', session.user.id);
     } catch (error) {
       console.error('[SimpleRealtime] ❌ Auth check failed:', error);
       dataFreshnessManager.onRealtimeStatusChange('error', 'Auth check failed');
@@ -191,25 +204,27 @@ export class SimpleRealtimeManager {
   }
 
   async leave(): Promise<void> {
+    console.log('[SimpleRealtime] 👋 Leaving channel');
+    
+    // Clear any pending reconnect timeout (unconditionally)
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    
     if (this.channel) {
-      console.log('[SimpleRealtime] 👋 Leaving channel');
       await this.channel.unsubscribe();
       this.channel = null;
-      this.isSubscribed = false;
-      this.projectId = null;
-      this.reconnectAttempts = 0;
-      
-      // Clear any pending reconnect timeout
-      if (this.reconnectTimeout) {
-        clearTimeout(this.reconnectTimeout);
-        this.reconnectTimeout = null;
-      }
-      
       this.updateGlobalSnapshot('closed');
       
       // Report disconnection to freshness manager
       dataFreshnessManager.onRealtimeStatusChange('disconnected', 'Channel unsubscribed');
     }
+    
+    // Reset state regardless of channel existence
+    this.isSubscribed = false;
+    this.projectId = null;
+    this.reconnectAttempts = 0;
   }
 
   private handleTaskUpdate(payload: any) {
@@ -277,7 +292,7 @@ export class SimpleRealtimeManager {
     console.log('[SimpleRealtime] 🔄 Resetting connection state');
     this.reconnectAttempts = 0;
     
-    // Clear any pending reconnect timeout
+    // Clear any pending reconnect timeout (unconditionally)
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -285,12 +300,12 @@ export class SimpleRealtimeManager {
   }
 
   destroy() {
-    // Clean up event listener
+    // Clean up event listener with proper bound handler
     if (typeof window !== 'undefined') {
-      window.removeEventListener('realtime:auth-heal', this.handleAuthHeal);
+      window.removeEventListener('realtime:auth-heal', this.boundAuthHealHandler);
     }
     
-    // Clean up any pending reconnect
+    // Clear any pending reconnect timeout (unconditionally)
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;

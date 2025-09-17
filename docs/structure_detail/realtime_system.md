@@ -39,11 +39,12 @@ UI Components ◀──────── React Query cache (data)
     - Emits DOM events for React consumption: `realtime:task-update`, `realtime:task-new`
     - Reports events and connection status to `DataFreshnessManager`
     - **Enhanced Features:**
-      - Authentication validation before channel creation
-      - Listens for `realtime:auth-heal` events from ReconnectScheduler
+      - Authentication validation using `getSession()` (local/cached) before channel creation
+      - Explicit `realtime.setAuth()` call with session token before subscribing
+      - Listens for `realtime:auth-heal` events from ReconnectScheduler with proper cleanup
       - Exponential backoff reconnection with attempt limits (max 3 attempts)
       - Comprehensive error handling and debugging
-      - Connection state management and cleanup methods
+      - Robust connection state management with unconditional timeout clearing
 
 - SimpleRealtimeProvider
   - Path: `src/shared/providers/SimpleRealtimeProvider.tsx`
@@ -180,10 +181,13 @@ useEffect(() => {
 
 ### Enhanced Error Handling
 The system now provides detailed debugging information for connection failures:
-- Authentication state verification before channel creation
+- Authentication state verification using local session cache (`getSession()`) to avoid network-dependent auth checks
+- Explicit `realtime.setAuth()` calls to ensure proper token synchronization before channel subscription
 - Post-failure auth checks to identify authentication vs. network issues
 - WebSocket readiness state logging
 - Reconnection attempt tracking with exponential backoff timing
+- Proper event listener cleanup to prevent memory leaks
+- Unconditional timeout clearing to prevent zombie retry attempts
 
 ### Common Checks
 1. **CHANNEL_ERROR issues**: Check authentication state in logs - user must be signed in
