@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal } from 'lucide-react';
+import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -11,10 +11,32 @@ import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 
+// Extend window interface for confetti flag
+declare global {
+  interface Window {
+    confettiAlreadyTriggered?: boolean;
+  }
+}
+
 interface WelcomeBonusModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// Color sequence for step icons
+const getStepColors = (stepIndex: number) => {
+  const colors = [
+    { bg: 'bg-purple-100 dark:bg-purple-900/20', icon: 'text-purple-600 dark:text-purple-400' }, // Step 1
+    { bg: 'bg-blue-100 dark:bg-blue-900/20', icon: 'text-blue-600 dark:text-blue-400' },       // Step 2
+    { bg: 'bg-green-100 dark:bg-green-900/20', icon: 'text-green-600 dark:text-green-400' },   // Step 3
+    { bg: 'bg-orange-100 dark:bg-orange-900/20', icon: 'text-orange-600 dark:text-orange-400' }, // Step 4
+    { bg: 'bg-yellow-100 dark:bg-yellow-900/20', icon: 'text-yellow-600 dark:text-yellow-400' }, // Step 5
+    { bg: 'bg-pink-100 dark:bg-pink-900/20', icon: 'text-pink-600 dark:text-pink-400' },       // Step 6
+    { bg: 'bg-indigo-100 dark:bg-indigo-900/20', icon: 'text-indigo-600 dark:text-indigo-400' } // Step 7
+  ];
+  
+  return colors[(stepIndex - 1) % colors.length];
+};
 
 // PWA Installation Hook
 const usePWAInstall = () => {
@@ -60,11 +82,13 @@ const usePWAInstall = () => {
 };
 
 // Step 1: Introduction to Reigh
-const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
+const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const colors = getStepColors(1);
+  return (
   <>
     <DialogHeader className="text-center space-y-4 mb-6">
-      <div className="mx-auto w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full flex items-center justify-center">
-        <Palette className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+      <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+        <Palette className={`w-8 h-8 ${colors.icon}`} />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
         Welcome to Reigh!
@@ -93,13 +117,16 @@ const IntroductionStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </div>
   </>
 );
+};
 
 // Step 2: Community
-const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
+const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const colors = getStepColors(2);
+  return (
   <>
     <DialogHeader className="text-center space-y-4 mb-6">
-      <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-        <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+      <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+        <Users className={`w-8 h-8 ${colors.icon}`} />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
         Join Our Community
@@ -133,10 +160,12 @@ const CommunityStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
     </div>
   </>
 );
+};
 
 // Step 3: PWA Installation (existing logic)
 const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   const { canInstall, installPWA } = usePWAInstall();
+  const colors = getStepColors(3);
 
   const handleInstall = async () => {
     const installed = await installPWA();
@@ -153,8 +182,8 @@ const PWAInstallStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   return (
     <>
       <DialogHeader className="text-center space-y-4 mb-6">
-        <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-          <Smartphone className="w-8 h-8 text-green-600 dark:text-green-400" />
+        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+          <Smartphone className={`w-8 h-8 ${colors.icon}`} />
         </div>
         <DialogTitle className="text-2xl font-bold text-center">
           Install Reigh App
@@ -243,6 +272,8 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     isLoading: isLoadingGenerationMethods
   } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   
+  const colors = getStepColors(4);
+  
   const onComputerChecked = generationMethods.onComputer;
   const inCloudChecked = generationMethods.inCloud;
 
@@ -251,8 +282,8 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
     return (
       <>
         <DialogHeader className="text-center space-y-4 mb-6">
-          <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
-            <Monitor className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+          <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+            <Monitor className={`w-8 h-8 ${colors.icon}`} />
           </div>
           <DialogTitle className="text-2xl font-bold text-center">
             How would you like to generate?
@@ -301,8 +332,8 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   return (
     <>
       <DialogHeader className="text-center space-y-4 mb-6">
-        <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
-          <Monitor className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+          <Monitor className={`w-8 h-8 ${colors.icon}`} />
         </div>
         <DialogTitle className="text-2xl font-bold text-center">
           How would you like to generate?
@@ -422,11 +453,13 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
 };
 
 // Step 5: Welcome Gambit (Promise Step)
-const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-else' | 'no-thanks') => void }> = ({ onNext }) => (
+const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-else' | 'no-thanks') => void }> = ({ onNext }) => {
+  const colors = getStepColors(5);
+  return (
   <>
     <DialogHeader className="text-center space-y-4 mb-6">
-      <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/20 rounded-full flex items-center justify-center">
-        <Coins className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+      <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+        <Coins className={`w-8 h-8 ${colors.icon}`} />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
         We'll give you $5 credit if you promise to make something with Reigh
@@ -459,7 +492,8 @@ const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-
       This will send a message in our #WelcomeGambit channel to act as mild social pressure but we'll never check if you actually made it.
     </div>
   </>
-);
+  );
+};
 
 // Loading Step: Processing Credits
 const ProcessingCreditsStep: React.FC = () => (
@@ -469,47 +503,86 @@ const ProcessingCreditsStep: React.FC = () => (
 );
 
 // Step 6: Credits Result
-const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | 'no-thanks', onNext: () => void }> = ({ choice, onNext }) => {
+const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | 'no-thanks', onNext: () => void, shouldShowConfetti?: boolean, onConfettiConsumed?: () => void }> = ({ choice, onNext, shouldShowConfetti = false, onConfettiConsumed }) => {
+  const colors = getStepColors(6);
   // Trigger confetti when component mounts (only if first time this session)
   useEffect(() => {
-    // Only show confetti if user hasn't seen it this session
-    const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
-    console.log('[Confetti] hasSeenAnimation:', hasSeenAnimation);
-    if (hasSeenAnimation) {
-      console.log('[Confetti] Skipping confetti - already seen this session');
-      return; // Skip confetti if already seen
+    // Only run confetti if parent indicates it should run
+    if (!shouldShowConfetti) {
+      return;
     }
-    
-    console.log('[Confetti] Creating confetti animation');
+    // Prevent multiple confetti explosions
+    if (window.confettiAlreadyTriggered) {
+      console.log('[Confetti] Already triggered, skipping');
+      return;
+    }
+    window.confettiAlreadyTriggered = true;
 
     // Create confetti elements
     const createConfetti = () => {
+      // Clean up any existing confetti first
+      const existingConfetti = document.querySelectorAll('[data-confetti]');
+      existingConfetti.forEach(el => el.remove());
+      
       const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
       const confettiCount = 50;
       
+      // Use a fixed overlay inside the modal for confetti containment
+      const container = document.getElementById('confetti-container');
+      const modal = document.querySelector('[data-radix-dialog-content]') as HTMLElement;
+      const modalRect = modal?.getBoundingClientRect();
+      if (!container || !modalRect) {
+        console.log('[Confetti] No modal/container found; skipping confetti');
+        return;
+      }
+      
       for (let i = 0; i < confettiCount; i++) {
         const confetti = document.createElement('div');
+        const leftPosition = Math.random() * 100; // Percentage within container
+        const fallDistance = 400; // Fixed fall distance within container
+        const animationDuration = 2 + Math.random() * 3;
+        
+        // Create individual keyframe for this confetti piece BEFORE applying animation
+        const individualStyle = document.createElement('style');
+        individualStyle.textContent = `
+          @keyframes confetti-fall-modal-${i} {
+            0% {
+              transform: translateY(0px) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(${fallDistance}px) rotate(720deg);
+              opacity: 0;
+            }
+          }
+        `;
+        document.head.appendChild(individualStyle);
+        
+        confetti.setAttribute('data-confetti', 'true');
         confetti.style.cssText = `
-          position: fixed;
+          position: absolute;
           width: 10px;
           height: 10px;
           background: ${colors[Math.floor(Math.random() * colors.length)]};
-          left: ${Math.random() * 100}vw;
+          left: ${leftPosition}%;
           top: -10px;
           z-index: 99999;
           pointer-events: none;
           border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
-          animation: confetti-fall ${2 + Math.random() * 3}s linear forwards;
+          animation: confetti-fall-modal-${i} ${animationDuration}s linear forwards;
         `;
         
-        document.body.appendChild(confetti);
+        container.appendChild(confetti);
         
-        // Remove confetti after animation
+        // Remove confetti after its animation completes (+buffer)
         setTimeout(() => {
           if (confetti.parentNode) {
             confetti.parentNode.removeChild(confetti);
           }
-        }, 5000);
+          if (individualStyle.parentNode) {
+            individualStyle.parentNode.removeChild(individualStyle);
+          }
+        }, (animationDuration * 1000) + 300);
       }
     };
 
@@ -528,25 +601,31 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
             opacity: 0;
           }
         }
+        
       `;
       document.head.appendChild(style);
     }
 
     createConfetti();
-    
-    // Mark that user has seen the animation AFTER creating confetti
-    sessionStorage.setItem('reigh_welcome_animation_seen', 'true');
-    console.log('[Confetti] Animation created and session flag set');
-  }, []);
+    // Notify parent that confetti has been consumed so it won't rerun on re-render
+    onConfettiConsumed?.();
+  }, [shouldShowConfetti]);
 
   return (
-    <>
+    <div className="relative">
+      {/* Confetti container overlay covering entire modal content */}
+      <div id="confetti-container" className="pointer-events-none absolute inset-0 overflow-hidden" style={{ zIndex: 50 }} />
+      
       <DialogHeader className="text-center space-y-4 mb-6">
-        <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-          <Sparkles className="w-8 h-8 text-green-600 dark:text-green-400" />
+        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+          {choice === 'music-video' ? (
+            <PartyPopper className={`w-8 h-8 ${colors.icon}`} />
+          ) : (
+            <Heart className={`w-8 h-8 ${colors.icon}`} />
+          )}
       </div>
         <DialogTitle className="text-2xl font-bold text-center">
-          {choice === 'music-video' ? "Great, here's $5! 🎉" : "No problem! Here's $5 anyway. 💝"}
+          {choice === 'music-video' ? "Great, here's $5!" : "No problem! Here's $5 anyway."}
         </DialogTitle>
       </DialogHeader>
     
@@ -578,12 +657,14 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
         Continue Setup
       </Button>
     </div>
-  </>
+    </div>
 );
 };
 
 // Step 7: Setup Complete
 const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const colors = getStepColors(7);
+  
   const handleOpenSettings = () => {
     onClose();
     // Trigger settings modal to open - we'll need to communicate this back to the parent
@@ -596,8 +677,8 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <>
       <DialogHeader className="text-center space-y-4 mb-6">
-        <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
-        <MoreHorizontal className="w-8 h-8 text-green-600 dark:text-green-400" />
+        <div className={`mx-auto w-16 h-16 ${colors.bg} rounded-full flex items-center justify-center`}>
+        <MoreHorizontal className={`w-8 h-8 ${colors.icon}`} />
         </div>
         <DialogTitle className="text-2xl font-bold text-center">
           One more thing
@@ -637,6 +718,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [userChoice, setUserChoice] = useState<'music-video' | 'something-else' | 'no-thanks' | null>(null);
   const [isProcessingCredits, setIsProcessingCredits] = useState(false);
+  const [shouldShowConfetti, setShouldShowConfetti] = useState(false);
   const queryClient = useQueryClient();
   const modal = useMediumModal();
   const { showFade, scrollRef } = useScrollFade({ 
@@ -665,21 +747,42 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
     console.log('[GambitChoice] User made choice:', choice);
     setUserChoice(choice);
     
-    // Check if user has already seen the loading/confetti animation this session
-    const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
-    console.log('[GambitChoice] hasSeenAnimation:', hasSeenAnimation);
-    
-    if (!hasSeenAnimation) {
-      console.log('[GambitChoice] First time this session - showing loading and will show confetti');
-      // First time this session - show loading, grant credits, and show confetti
-      setIsProcessingCredits(true);
+    try {
+      // Check if user has already been given credits
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[GambitChoice] Checking user credits status...');
       
-      try {
-        // Grant the welcome credits
-        const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('[GambitChoice] No user found');
+        setCurrentStep(6);
+        return;
+      }
+
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      console.log('[GambitChoice] User data:', { userData, error });
+      
+      if (error || !userData) {
+        console.log('[GambitChoice] Error fetching user data, skipping to result');
+        setCurrentStep(6);
+        return;
+      }
+
+      const givenCredits = (userData as any).given_credits;
+      console.log('[GambitChoice] given_credits status:', givenCredits);
+      
+      if (!givenCredits) {
+        console.log('[GambitChoice] First time user - showing loading and will grant credits with confetti');
+        // First time user - show loading, grant credits, and show confetti
+        setIsProcessingCredits(true);
+        
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (user && session) {
+        if (session) {
           const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-credits`, {
             method: 'POST',
             headers: {
@@ -694,33 +797,38 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
           });
           
           if (response.ok) {
-            // Invalidate credits queries to refresh UI
+            console.log('[GambitChoice] Credits granted successfully');
             queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
             queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
+            // Mark that we should show confetti exactly once after granting credits
+            setShouldShowConfetti(true);
+          } else {
+            console.error('[GambitChoice] Failed to grant credits');
           }
         }
-      } catch (error) {
-        console.error('Error granting welcome credits:', error);
+        
+        // Show loading for 1.5 seconds before showing credits result with confetti
+        setTimeout(() => {
+          console.log('[GambitChoice] Timeout completed - transitioning to credits result with confetti');
+          setIsProcessingCredits(false);
+          setCurrentStep(6); // Go to credits result step - confetti will show if shouldShowConfetti
+        }, 1500);
+      } else {
+        console.log('[GambitChoice] User already has credits - skipping directly to result without confetti');
+        // User already has credits - skip directly to result (no loading, no confetti)
+        setCurrentStep(6);
       }
-      
-      // Show loading for 1.5 seconds before showing credits result
-      setTimeout(() => {
-        console.log('[GambitChoice] Timeout completed - transitioning to credits result');
-        setIsProcessingCredits(false);
-        setCurrentStep(6); // Go to credits result step
-        // DON'T mark as seen yet - let the confetti component handle that
-        console.log('[GambitChoice] Moving to step 6, confetti should trigger');
-      }, 1500);
-    } else {
-      console.log('[GambitChoice] Already seen this session - skipping to result');
-      // Already seen this session - skip directly to result (credits already granted)
+    } catch (error) {
+      console.error('[GambitChoice] Error in handleGambitChoice:', error);
       setCurrentStep(6);
     }
   };
 
   const handleClose = () => {
-    setCurrentStep(1);
-    setUserChoice(null);
+    // Do not reset steps here to avoid flashing step 1 during close animation
+    setShouldShowConfetti(false);
+    // Reset confetti guard for future sessions
+    window.confettiAlreadyTriggered = false;
     onClose();
   };
 
@@ -743,7 +851,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       case 5:
         return <WelcomeGambitStep onNext={handleGambitChoice} />;
       case 6:
-        return <CreditsResultStep choice={userChoice!} onNext={handleNext} />;
+        return <CreditsResultStep choice={userChoice!} onNext={handleNext} shouldShowConfetti={shouldShowConfetti} onConfettiConsumed={() => setShouldShowConfetti(false)} />;
       case 7:
         return <SetupCompleteStep onClose={handleClose} />;
       default:
