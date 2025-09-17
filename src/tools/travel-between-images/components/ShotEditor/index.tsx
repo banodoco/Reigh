@@ -374,11 +374,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const rect = containerEl.getBoundingClientRect();
       const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
       const containerDocTop = rect.top + docTop;
-      const headerHeight = isMobile ? 150 : 96; // match ImageGenerationToolPage
-      const extra = isMobile ? 0 : -40;
-      // Make sticky trigger a bit earlier than before
-      const stickyAdvance = isMobile ? 12 : 20; // earlier by ~12px on mobile, 20px on desktop
-      stickyThresholdY.current = containerDocTop + headerHeight + extra - stickyAdvance;
+      
+      // More aggressive threshold - trigger as soon as the shot name starts to go out of view
+      // Use the actual header height from the global header plus minimal buffer
+      const globalHeaderHeight = isMobile ? 60 : 96; // Actual global header heights
+      const buffer = isMobile ? 5 : 10; // Small buffer to ensure smooth transition
+      
+      // Trigger when the shot name would be at the global header position
+      stickyThresholdY.current = containerDocTop - globalHeaderHeight - buffer;
     };
 
     const checkSticky = () => {
@@ -456,7 +459,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     try {
       const rect = containerEl.getBoundingClientRect();
-      const headerHeight = isMobile ? 80 : 96;
+      const headerHeight = isMobile ? 60 : 96; // Match the global header heights
       const bufferSpace = 30;
       const targetScrollTop = (window.scrollY || window.pageYOffset || 0) + rect.top - headerHeight - bufferSpace;
       window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
@@ -1678,9 +1681,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       {/* Sticky shot header - appears when original header is out of view */}
       {(!state.isEditingName) && isSticky && (() => {
-        // Use exact positioning from ImageGenerationToolPage but adjust for desktop header
-        const headerHeight = isMobile ? 20 : 96; // Mobile header VERY close to top, desktop is 96px (h-24)
-        const topPosition = isMobile ? headerHeight + 4 : 96 + 8; // Add more space for desktop header
+        // Position right below the global header with minimal gap
+        const globalHeaderHeight = isMobile ? 60 : 96; // Match actual global header heights
+        const gap = isMobile ? -15 : 8; // Much higher on mobile, small gap on desktop
+        const topPosition = globalHeaderHeight + gap;
         
         // Calculate horizontal constraints based on locked panes
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
