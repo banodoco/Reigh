@@ -5,6 +5,7 @@ import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/
 import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -403,6 +404,60 @@ const VideoTravelToolPage: React.FC = () => {
   // Add state for toggling between shots and videos view
   const [showVideosView, setShowVideosView] = useState<boolean>(false);
   
+  // Search functionality for shots
+  const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
+  
+  // Filter shots based on search query
+  const filteredShots = useMemo(() => {
+    if (!shots || !shotSearchQuery.trim()) {
+      return shots;
+    }
+    
+    const query = shotSearchQuery.toLowerCase().trim();
+    
+    // First, try to match shot names
+    const nameMatches = shots.filter(shot => 
+      shot.name.toLowerCase().includes(query)
+    );
+    
+    // If no shot name matches, search through generation parameters
+    if (nameMatches.length === 0) {
+      return shots.filter(shot => {
+        return shot.images?.some(image => {
+          // Search in metadata
+          if (image.metadata) {
+            const metadataStr = JSON.stringify(image.metadata).toLowerCase();
+            if (metadataStr.includes(query)) return true;
+          }
+          
+          // Search in params (if available via metadata or other fields)
+          if ((image as any).params) {
+            const paramsStr = JSON.stringify((image as any).params).toLowerCase();
+            if (paramsStr.includes(query)) return true;
+          }
+          
+          // Search in type field
+          if (image.type && image.type.toLowerCase().includes(query)) {
+            return true;
+          }
+          
+          // Search in location field
+          if (image.location && image.location.toLowerCase().includes(query)) {
+            return true;
+          }
+          
+          return false;
+        });
+      });
+    } else {
+      return nameMatches;
+    }
+  }, [shots, shotSearchQuery]);
+  
+  // Search state helpers
+  const isSearchActive = useMemo(() => shotSearchQuery.trim().length > 0, [shotSearchQuery]);
+  const hasNoSearchResults = isSearchActive && ((filteredShots?.length || 0) === 0);
+  
   // Fetch all videos generated with travel-between-images tool type
   const { 
     data: videosData, 
@@ -570,31 +625,47 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list or videos view
       const headerContent = (
-        <div className="flex items-center justify-between mb-2 sm:mb-4 mt-4 sm:mt-6 px-3 sm:px-4">
-          <div className="flex items-end gap-4">
-            <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
-              {showVideosView ? 'Videos' : 'Shots'}
-            </h1>
-            <button
-              onClick={(e) => {
-                setShowVideosView(!showVideosView);
-                e.currentTarget.blur(); // Remove focus immediately after click
-              }}
-              className="text-sm text-muted-foreground hover:text-foreground focus:text-foreground transition-colors underline mb-1.5 focus:outline-none"
-            >
-              {showVideosView ? 'See all shots' : 'See all videos'}
-            </button>
+        <div className="mb-2 sm:mb-4 mt-4 sm:mt-6 px-3 sm:px-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-end gap-4">
+              <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
+                {showVideosView ? 'Videos' : 'Shots'}
+              </h1>
+              <button
+                onClick={(e) => {
+                  setShowVideosView(!showVideosView);
+                  // Clear search when switching views
+                  if (!showVideosView) setShotSearchQuery('');
+                  e.currentTarget.blur(); // Remove focus immediately after click
+                }}
+                className="text-sm text-muted-foreground hover:text-foreground focus:text-foreground transition-colors underline mb-1.5 focus:outline-none"
+              >
+                {showVideosView ? 'See all shots' : 'See all videos'}
+              </button>
+            </div>
+            {/* Only show New Shot button when in shots view and there are shots */}
+            {(!showVideosView && !isLoading && shots && shots.length > 0) && (
+              <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
+            )}
           </div>
-          {/* Only show New Shot button when in shots view and there are shots */}
-          {(!showVideosView && !isLoading && shots && shots.length > 0) && (
-            <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
+          {/* Search box - only show when in shots view */}
+          {!showVideosView && (
+            <div className="w-full max-w-md">
+              <Input
+                type="text"
+                placeholder="Search shots..."
+                value={shotSearchQuery}
+                onChange={(e) => setShotSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
           )}
         </div>
       );
       setHeader(headerContent);
     }
     // Only clear header on component unmount, not on every effect re-run
-  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView]);
+  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView, shotSearchQuery, setShotSearchQuery]);
 
   // Clean up header on component unmount
   useLayoutEffect(() => {
@@ -1124,7 +1195,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // Otherwise show the main grid skeleton while the project hydrates
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 py-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
         {Array.from({ length: 6 }).map((_, idx) => (
           <Skeleton key={idx} className="h-40 rounded-lg" />
         ))}
@@ -1170,7 +1241,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // Otherwise show main list skeleton
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 py-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
         {Array.from({ length: 6 }).map((_, idx) => (
           <Skeleton key={idx} className="h-40 rounded-lg" />
         ))}
@@ -1216,11 +1287,18 @@ const VideoTravelToolPage: React.FC = () => {
               />
             )
           ) : (
-            <ShotListDisplay
-              onSelectShot={handleShotSelect}
-              onCreateNewShot={() => setIsCreateShotModalOpen(true)}
-              shots={shots}
-            />
+            hasNoSearchResults ? (
+              <div className="px-4 py-10 text-center text-muted-foreground">
+                <p className="mb-4">No shots or parameters match your search.</p>
+                <Button variant="outline" size="sm" onClick={() => setShotSearchQuery('')}>Clear search</Button>
+              </div>
+            ) : (
+              <ShotListDisplay
+                onSelectShot={handleShotSelect}
+                onCreateNewShot={() => setIsCreateShotModalOpen(true)}
+                shots={filteredShots}
+              />
+            )
           )}
         </>
       ) : (

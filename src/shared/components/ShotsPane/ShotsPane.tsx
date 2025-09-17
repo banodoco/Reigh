@@ -9,7 +9,8 @@ import { cn } from '@/shared/lib/utils';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowDown } from 'lucide-react';
+import { Input } from '@/shared/components/ui/input';
+import { ArrowDown, Search, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import CreateShotModal from '@/shared/components/CreateShotModal';
@@ -29,6 +30,10 @@ const ShotsPaneComponent: React.FC = () => {
   // Pagination state
   const pageSize = 5;
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch project-level settings for defaults when creating new shots
   const { settings: projectSettings } = useToolSettings<VideoTravelSettings>(
@@ -63,6 +68,20 @@ const ShotsPaneComponent: React.FC = () => {
     setCurrentPage(1);
   };
 
+  // Search handlers
+  const handleSearchToggle = () => {
+    setIsSearchOpen(!isSearchOpen);
+    if (isSearchOpen) {
+      // Clear search when closing
+      setSearchQuery('');
+    }
+  };
+
+  const handleSearchClear = () => {
+    setSearchQuery('');
+    setIsSearchOpen(false);
+  };
+
   useRenderLogger('ShotsPane', { shotsCount: shots?.length, currentPage });
   
   // Filter and sort shots
@@ -82,10 +101,10 @@ const ShotsPaneComponent: React.FC = () => {
       return [];
     }
     
-            const filtered = shots.map(shot => {
-          // Note: shot.images now contains all images from ShotsContext (unlimited)
-          // Filter to show only positioned images in the intended sequence
-          const filteredImages = (shot.images || [])
+    const filtered = shots.map(shot => {
+      // Note: shot.images now contains all images from ShotsContext (unlimited)
+      // Filter to show only positioned images in the intended sequence
+      const filteredImages = (shot.images || [])
         // Keep only images that have a valid position value
         .filter(img => {
           const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
@@ -104,8 +123,52 @@ const ShotsPaneComponent: React.FC = () => {
       };
     });
     
+    // Apply search filter if search is active
+    let searchFiltered = filtered;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      
+      // First, try to match shot names
+      const nameMatches = filtered.filter(shot => 
+        shot.name.toLowerCase().includes(query)
+      );
+      
+      // If no shot name matches, search through generation parameters
+      if (nameMatches.length === 0) {
+        searchFiltered = filtered.filter(shot => {
+          return shot.images?.some(image => {
+            // Search in metadata
+            if (image.metadata) {
+              const metadataStr = JSON.stringify(image.metadata).toLowerCase();
+              if (metadataStr.includes(query)) return true;
+            }
+            
+            // Search in params (if available via metadata or other fields)
+            if ((image as any).params) {
+              const paramsStr = JSON.stringify((image as any).params).toLowerCase();
+              if (paramsStr.includes(query)) return true;
+            }
+            
+            // Search in type field
+            if (image.type && image.type.toLowerCase().includes(query)) {
+              return true;
+            }
+            
+            // Search in location field
+            if (image.location && image.location.toLowerCase().includes(query)) {
+              return true;
+            }
+            
+            return false;
+          });
+        });
+      } else {
+        searchFiltered = nameMatches;
+      }
+    }
+    
     // Sort shots by creation date
-    return filtered.sort((a, b) => {
+    return searchFiltered.sort((a, b) => {
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       
@@ -115,7 +178,7 @@ const ShotsPaneComponent: React.FC = () => {
         return dateB - dateA; // Newest first
       }
     });
-  }, [shots, sortOrder]);
+  }, [shots, sortOrder, searchQuery]);
   
   // Adjust currentPage if shots length changes (e.g., after create/delete)
   useEffect(() => {
@@ -124,6 +187,11 @@ const ShotsPaneComponent: React.FC = () => {
       setCurrentPage(totalPages);
     }
   }, [filteredShots?.length]);
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
   
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
@@ -240,7 +308,18 @@ const ShotsPaneComponent: React.FC = () => {
           )}
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
-            <h2 className="text-xl font-light text-zinc-200 ml-2">Shots</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-light text-zinc-200 ml-2">Shots</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 active:bg-zinc-600/60 p-1"
+                onClick={handleSearchToggle}
+                title={isSearchOpen ? "Close search" : "Search shots"}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -253,13 +332,44 @@ const ShotsPaneComponent: React.FC = () => {
             </Button>
           </div>
           <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide">
-            <NewGroupDropZone onZoneClick={() => setIsCreateModalOpen(true)} />
+            {isSearchOpen ? (
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search shot..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-zinc-800 border-zinc-600 text-zinc-200 placeholder-zinc-400 pr-8 !text-zinc-200 !placeholder-zinc-400"
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-zinc-400 hover:text-zinc-100"
+                  onClick={handleSearchClear}
+                  title="Clear search"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <NewGroupDropZone onZoneClick={() => setIsCreateModalOpen(true)} />
+            )}
             {isLoading && (
               Array.from({ length: pageSize }).map((_, idx) => (
                 <Skeleton key={idx} className="h-24 rounded-lg bg-zinc-700/60" />
               ))
             )}
             {error && <p className="text-red-500">Error loading shots: {error.message}</p>}
+            {/* Show no results message when searching but no matches found */}
+            {searchQuery.trim() && filteredShots && filteredShots.length === 0 && !isLoading && (
+              <div className="text-center py-12 text-zinc-400">
+                <p className="mb-2">No shots or parameters match your search.</p>
+                <Button variant="ghost" size="sm" onClick={handleSearchClear} className="text-zinc-300 hover:text-zinc-100">
+                  Clear search
+                </Button>
+              </div>
+            )}
             {filteredShots && filteredShots
               .slice((currentPage - 1) * pageSize, currentPage * pageSize)
               .map(shot => <ShotGroup key={shot.id} shot={shot} />)}
