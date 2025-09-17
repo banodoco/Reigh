@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
-import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check } from 'lucide-react';
+import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2 } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -394,43 +394,156 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
   );
 };
 
-// Step 5: Credits Welcome (moved from step 1)
-const CreditsStep: React.FC<{ onNext: () => void }> = ({ onNext }) => (
+// Step 5: Welcome Gambit (Promise Step)
+const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-else' | 'no-thanks') => void }> = ({ onNext }) => (
   <>
     <DialogHeader className="text-center space-y-4 mb-6">
       <div className="mx-auto w-16 h-16 bg-yellow-100 dark:bg-yellow-900/20 rounded-full flex items-center justify-center">
         <Coins className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
       </div>
       <DialogTitle className="text-2xl font-bold text-center">
-        You've got credits! 💰
+        We'll give you $5 if you promise to make something with Reigh
       </DialogTitle>
     </DialogHeader>
     
     <div className="text-center space-y-4">
-      <div className="flex items-center justify-center space-x-2 text-lg">
-        <Sparkles className="w-5 h-5 text-yellow-500" />
-        <span className="font-light">We've added $5 to your account to help test our cloud service!</span>
-        <Sparkles className="w-5 h-5 text-yellow-500" />
-      </div>
+      <p className="text-muted-foreground">
+        To understand an art tool, you must try to make art with it.
+      </p>
       
       <p className="text-muted-foreground">
-      Credits are used for AI generation tasks in the cloud. 
-      You can check your balance anytime in Settings.
+        So let's make a deal: if you promise to make <strong>a tiny music video</strong> with Reigh and share it in our Discord, we'll give you $5 free credit.
       </p>
-
-
     </div>
     
-    <div className="flex justify-center pt-5 pb-2">
-      <Button onClick={onNext} className="w-full sm:w-auto">
-        Awesome!
-        <ChevronRight className="w-4 h-4 ml-2" />
+    <div className="flex flex-col space-y-2 pt-5 pb-2">
+      <Button onClick={() => onNext('music-video')} className="w-full">
+        I'll do it! 🎵
       </Button>
+      <Button variant="outline" onClick={() => onNext('something-else')} className="w-full">
+        Okay...but I'll make something else...
+      </Button>
+      <Button variant="ghost" onClick={() => onNext('no-thanks')} className="w-full text-muted-foreground bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700">
+        No thanks...
+      </Button>
+    </div>
+
+    <div className="text-xs text-muted-foreground text-center px-4">
+      This will send a message in our #WelcomeGambit channel to act as mild social pressure but we'll never check if you actually made it.
     </div>
   </>
 );
 
-// Step 6: Setup Complete
+// Loading Step: Processing Credits
+const ProcessingCreditsStep: React.FC = () => (
+  <div className="flex justify-center items-center py-20 opacity-50">
+    <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+  </div>
+);
+
+// Step 6: Credits Result
+const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | 'no-thanks', onNext: () => void }> = ({ choice, onNext }) => {
+  // Trigger confetti when component mounts (only if first time this session)
+  useEffect(() => {
+    // Only show confetti if user hasn't seen it this session
+    const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
+    if (hasSeenAnimation) {
+      return; // Skip confetti if already seen
+    }
+
+    // Create confetti elements
+    const createConfetti = () => {
+      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
+      const confettiCount = 50;
+      
+      for (let i = 0; i < confettiCount; i++) {
+        const confetti = document.createElement('div');
+        confetti.style.cssText = `
+          position: fixed;
+          width: 10px;
+          height: 10px;
+          background: ${colors[Math.floor(Math.random() * colors.length)]};
+          left: ${Math.random() * 100}vw;
+          top: -10px;
+          z-index: 99999;
+          pointer-events: none;
+          border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+          animation: confetti-fall ${2 + Math.random() * 3}s linear forwards;
+        `;
+        
+        document.body.appendChild(confetti);
+        
+        // Remove confetti after animation
+        setTimeout(() => {
+          if (confetti.parentNode) {
+            confetti.parentNode.removeChild(confetti);
+          }
+        }, 5000);
+      }
+    };
+
+    // Add CSS animation if it doesn't exist
+    if (!document.querySelector('#confetti-styles')) {
+      const style = document.createElement('style');
+      style.id = 'confetti-styles';
+      style.textContent = `
+        @keyframes confetti-fall {
+          0% {
+            transform: translateY(-10px) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100vh) rotate(720deg);
+            opacity: 0;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    createConfetti();
+  }, []);
+
+  return (
+    <>
+      <DialogHeader className="text-center space-y-4 mb-6">
+        <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+          <Sparkles className="w-8 h-8 text-green-600 dark:text-green-400" />
+        </div>
+        <DialogTitle className="text-2xl font-bold text-center">
+          {choice === 'music-video' ? "Great, here's $5! 🎉" : "No problem! Here's $5 anyway. 💝"}
+        </DialogTitle>
+      </DialogHeader>
+    
+    <div className="text-center space-y-4">
+      {choice === 'music-video' && (
+        <p className="text-muted-foreground">
+          You can join our Discord below to share your creation when you're ready!
+        </p>
+      )}
+      
+      <p className="text-muted-foreground">
+        We'll never check if you actually made something. We trust you &lt;3
+      </p>
+    </div>
+    
+    <div className="flex flex-col space-y-2 pt-5 pb-2">
+      <Button 
+        onClick={() => window.open('https://discord.gg/D5K2c6kfhy', '_blank')}
+        className="w-full"
+      >
+        <Users className="w-4 h-4 mr-2" />
+        Join Discord
+      </Button>
+      <Button variant="outline" onClick={onNext} className="w-full">
+        Continue Setup
+      </Button>
+    </div>
+  </>
+  );
+};
+
+// Step 7: Setup Complete
 const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const handleOpenSettings = () => {
     onClose();
@@ -483,6 +596,8 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   onClose,
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [userChoice, setUserChoice] = useState<'music-video' | 'something-else' | 'no-thanks' | null>(null);
+  const [isProcessingCredits, setIsProcessingCredits] = useState(false);
   const modal = useMediumModal();
   const { showFade, scrollRef } = useScrollFade({ 
     isOpen,
@@ -493,24 +608,55 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(1);
+      setUserChoice(null);
+      setIsProcessingCredits(false);
     }
   }, [isOpen]);
 
   const handleNext = () => {
-    setCurrentStep(prev => Math.min(prev + 1, 6));
+    setCurrentStep(prev => Math.min(prev + 1, 7));
   };
 
   const handleBack = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
+  const handleGambitChoice = (choice: 'music-video' | 'something-else' | 'no-thanks') => {
+    setUserChoice(choice);
+    
+    // Check if user has already seen the loading/confetti animation this session
+    const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
+    
+    if (!hasSeenAnimation) {
+      // First time this session - show loading and confetti
+      setIsProcessingCredits(true);
+      
+      // Show loading for 1.5 seconds before showing credits result
+      setTimeout(() => {
+        setIsProcessingCredits(false);
+        setCurrentStep(6); // Go to credits result step
+        // Mark that user has seen the animation
+        sessionStorage.setItem('reigh_welcome_animation_seen', 'true');
+      }, 1500);
+    } else {
+      // Already seen this session - skip directly to result
+      setCurrentStep(6);
+    }
+  };
+
   const handleClose = () => {
     setCurrentStep(1);
+    setUserChoice(null);
     onClose();
   };
 
   // Render current step component conditionally to avoid calling hooks for unused steps
   const renderCurrentStep = () => {
+    // Show loading step if processing credits
+    if (isProcessingCredits) {
+      return <ProcessingCreditsStep />;
+    }
+
     switch (currentStep) {
       case 1:
         return <IntroductionStep onNext={handleNext} />;
@@ -521,15 +667,17 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
       case 4:
         return <GenerationMethodStep onNext={handleNext} />;
       case 5:
-        return <CreditsStep onNext={handleNext} />;
+        return <WelcomeGambitStep onNext={handleGambitChoice} />;
       case 6:
+        return <CreditsResultStep choice={userChoice!} onNext={handleNext} />;
+      case 7:
         return <SetupCompleteStep onClose={handleClose} />;
       default:
         return <IntroductionStep onNext={handleNext} />;
     }
   };
 
-  const stepTitles = ["Welcome", "Community", "Install App", "Generation", "Credits", "Complete"];
+  const stepTitles = ["Welcome", "Community", "Install App", "Generation", "Promise", "Credits", "Complete"];
   
   return (
     <Dialog open={isOpen} onOpenChange={() => {

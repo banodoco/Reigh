@@ -6,6 +6,7 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
+import { Search, X } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -406,6 +407,12 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Search functionality for shots
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Search helper functions
+  const clearSearch = useCallback(() => {
+    setShotSearchQuery('');
+  }, []);
   
   // Filter shots based on search query
   const filteredShots = useMemo(() => {
@@ -625,7 +632,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       // Show header when in shot list or videos view
       const headerContent = (
-        <div className="mb-2 sm:mb-4 mt-4 sm:mt-6 px-3 sm:px-4">
+        <div className="mb-2 sm:mb-4 mt-4 sm:mt-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-end gap-4">
               <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
@@ -635,7 +642,9 @@ const VideoTravelToolPage: React.FC = () => {
                 onClick={(e) => {
                   setShowVideosView(!showVideosView);
                   // Clear search when switching views
-                  if (!showVideosView) setShotSearchQuery('');
+                  if (!showVideosView) {
+                    setShotSearchQuery('');
+                  }
                   e.currentTarget.blur(); // Remove focus immediately after click
                 }}
                 className="text-sm text-muted-foreground hover:text-foreground focus:text-foreground transition-colors underline mb-1.5 focus:outline-none"
@@ -643,21 +652,37 @@ const VideoTravelToolPage: React.FC = () => {
                 {showVideosView ? 'See all shots' : 'See all videos'}
               </button>
             </div>
-            {/* Only show New Shot button when in shots view and there are shots */}
-            {(!showVideosView && !isLoading && shots && shots.length > 0) && (
-              <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
-            )}
+            {/* Always reserve space for the button to maintain consistent layout */}
+            <div className="flex items-center">
+              {(!showVideosView && !isLoading && shots && shots.length > 0) && (
+                <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
+              )}
+            </div>
           </div>
           {/* Search box - only show when in shots view */}
           {!showVideosView && (
-            <div className="w-full max-w-md">
-              <Input
-                type="text"
-                placeholder="Search shots..."
-                value={shotSearchQuery}
-                onChange={(e) => setShotSearchQuery(e.target.value)}
-                className="w-full"
-              />
+            <div className="px-4">
+              <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background w-full max-w-xs">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search shots..."
+                  value={shotSearchQuery}
+                  onChange={(e) => setShotSearchQuery(e.target.value)}
+                  className="bg-transparent border-none outline-none text-base flex-1"
+                />
+                {shotSearchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSearch}
+                    className="h-auto p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -665,7 +690,7 @@ const VideoTravelToolPage: React.FC = () => {
       setHeader(headerContent);
     }
     // Only clear header on component unmount, not on every effect re-run
-  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView, shotSearchQuery, setShotSearchQuery]);
+  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView, shotSearchQuery, clearSearch]);
 
   // Clean up header on component unmount
   useLayoutEffect(() => {
@@ -1264,33 +1289,37 @@ const VideoTravelToolPage: React.FC = () => {
           {showVideosView ? (
             // Show SkeletonGallery when loading videos or when no data yet
             (!selectedProjectId || (videosLoading && (!videosData?.items || videosData.items.length === 0))) ? (
-              <SkeletonGallery
-                count={20}
-                columns={{ base: 2, sm: 3, md: 4, lg: 4, xl: 4, '2xl': 4 }}
-                showControls={true}
-                projectAspectRatio={projectAspectRatio}
-              />
+              <div className="px-4 pb-2">
+                <SkeletonGallery
+                  count={12}
+                  columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
+                  showControls={true}
+                  projectAspectRatio={projectAspectRatio}
+                />
+              </div>
             ) : (
-              <ImageGallery
-                images={videosData?.items || []}
-                allShots={shots || []}
-                onAddToLastShot={async () => false} // No-op for video gallery
-                onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
-                currentToolType="travel-between-images"
-                initialMediaTypeFilter="video"
-                initialToolTypeFilter={true}
-                currentToolTypeName="Travel Between Images"
-                showShotFilter={true}
-                initialShotFilter="all"
-                columnsPerRow={4}
-                itemsPerPage={20}
-              />
+              <div className="px-4 pb-2">
+                <ImageGallery
+                  images={videosData?.items || []}
+                  allShots={shots || []}
+                  onAddToLastShot={async () => false} // No-op for video gallery
+                  onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                  currentToolType="travel-between-images"
+                  initialMediaTypeFilter="video"
+                  initialToolTypeFilter={true}
+                  currentToolTypeName="Travel Between Images"
+                  showShotFilter={true}
+                  initialShotFilter="all"
+                  columnsPerRow={3}
+                  itemsPerPage={12}
+                />
+              </div>
             )
           ) : (
             hasNoSearchResults ? (
               <div className="px-4 py-10 text-center text-muted-foreground">
                 <p className="mb-4">No shots or parameters match your search.</p>
-                <Button variant="outline" size="sm" onClick={() => setShotSearchQuery('')}>Clear search</Button>
+                <Button variant="outline" size="sm" onClick={clearSearch}>Clear search</Button>
               </div>
             ) : (
               <ShotListDisplay
