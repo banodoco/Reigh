@@ -1139,7 +1139,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       {/* Render only if API key is valid and state is loaded */}
       {hasValidFalApiKey && isFormExpanded !== undefined && (
         <>
-          <div ref={collapsibleContainerRef}>
+          <div ref={collapsibleContainerRef} className="mb-6">
             <Collapsible 
               open={isFormExpanded} 
               onOpenChange={handleCollapsibleOpenChange}

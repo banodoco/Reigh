@@ -214,6 +214,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     numberToGenerate: 24, includeExistingContext: true, addSummary: true,
     replaceCurrentPrompts: false,
     temperature: 0.8,
+    showAdvanced: false,
   });
   const [bulkEditControlValues, setBulkEditControlValues] = useState<BulkEditControlValues>({
     editInstructions: '', modelType: 'smart' as AIModelType,
@@ -835,7 +836,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                       onFocus={() => console.log(`[EDIT_DEBUG:FOCUS] Input focused, value: "${editInstructionsRef.current?.value}"`)}
                       onBlur={() => console.log(`[EDIT_DEBUG:BLUR] Input blurred, value: "${editInstructionsRef.current?.value}"`)}
                       placeholder={promptToEdit.originalText.trim() === '' ? 'Describe what you want' : 'Edit instructions'}
-                      className={`h-7 ${isMobile ? 'w-48' : 'w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
+                      className={`h-7 ${isMobile ? 'w-36' : 'w-72'} ${isMobile && isAIEditing ? 'opacity-80' : ''}`}
                       disabled={isAIEditing}
                       clearable
                       onClear={() => setEditInstructionsValue('', 'clear-button')}
