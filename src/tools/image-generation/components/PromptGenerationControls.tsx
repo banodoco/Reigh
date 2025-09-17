@@ -152,8 +152,8 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         </div>
 
           {/* Number to Generate - desktop has toggle on same row, mobile separate */}
-          <div className="flex items-start gap-6">
-            <div className="w-full sm:w-1/3">
+          <div className={`flex items-start gap-6 ${showAdvanced ? 'w-full sm:w-[92.5%]' : 'w-full sm:w-1/2'}`}>
+            <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="gen_numberToGenerate" className="text-sm font-medium">
                   Number to Generate

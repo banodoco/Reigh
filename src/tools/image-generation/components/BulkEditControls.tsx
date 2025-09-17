@@ -97,9 +97,9 @@ export const BulkEditControls: React.FC<BulkEditControlsProps> = ({
             emitChange({ editInstructions: next });
           }}
           placeholder="e.g., Make all prompts more concise and add a call to action..."
-          rows={3}
+          rows={2}
           disabled={!hasApiKey || isEditing || numberOfPromptsToEdit === 0}
-          className="mt-1 mb-4"
+          className="mt-1 mb-4 min-h-[60px] max-h-[60px]"
         />
       </div>
       
