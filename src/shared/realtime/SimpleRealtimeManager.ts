@@ -6,9 +6,87 @@ export class SimpleRealtimeManager {
   private channel: any = null;
   private projectId: string | null = null;
   private isSubscribed = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 3;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+
+  constructor() {
+    // Listen for auth heal events from ReconnectScheduler
+    if (typeof window !== 'undefined') {
+      window.addEventListener('realtime:auth-heal', this.handleAuthHeal.bind(this));
+    }
+  }
+
+  private handleAuthHeal = (event: CustomEvent) => {
+    console.log('[SimpleRealtime] 🔄 Auth heal event received:', event.detail);
+    
+    // If we have a project and are not currently connected, attempt to reconnect
+    if (this.projectId && !this.isSubscribed && this.reconnectAttempts < this.maxReconnectAttempts) {
+      console.log('[SimpleRealtime] 🔄 Attempting reconnect due to auth heal');
+      this.attemptReconnect();
+    } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('[SimpleRealtime] ⏸️ Skipping auth heal reconnect - max attempts reached');
+    }
+  };
+
+  private async attemptReconnect() {
+    if (!this.projectId) return;
+
+    // Clear any existing reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    // Don't exceed max attempts
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('[SimpleRealtime] ❌ Max reconnect attempts reached');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
+    
+    console.log('[SimpleRealtime] ⏳ Reconnecting in', delay, 'ms (attempt', this.reconnectAttempts, '/', this.maxReconnectAttempts, ')');
+    
+    this.reconnectTimeout = setTimeout(async () => {
+      try {
+        const success = await this.joinProject(this.projectId!);
+        if (success) {
+          console.log('[SimpleRealtime] ✅ Reconnect successful');
+          this.reconnectAttempts = 0; // Reset on success
+        } else {
+          console.log('[SimpleRealtime] ❌ Reconnect failed, will retry');
+          this.attemptReconnect();
+        }
+      } catch (error) {
+        console.error('[SimpleRealtime] ❌ Reconnect error:', error);
+        this.attemptReconnect();
+      }
+    }, delay);
+  }
 
   async joinProject(projectId: string): Promise<boolean> {
     console.log('[SimpleRealtime] 🚀 Joining project:', projectId);
+    
+    // Check authentication first
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('[SimpleRealtime] ❌ Not authenticated, cannot join project:', {
+          authError: authError?.message,
+          hasUser: !!user,
+          projectId
+        });
+        dataFreshnessManager.onRealtimeStatusChange('error', 'Not authenticated');
+        return false;
+      }
+      console.log('[SimpleRealtime] ✅ Authentication verified for user:', user.id);
+    } catch (error) {
+      console.error('[SimpleRealtime] ❌ Auth check failed:', error);
+      dataFreshnessManager.onRealtimeStatusChange('error', 'Auth check failed');
+      return false;
+    }
     
     // Clean up existing subscription
     if (this.channel) {
@@ -16,11 +94,20 @@ export class SimpleRealtimeManager {
     }
 
     this.projectId = projectId;
+    this.reconnectAttempts = 0; // Reset reconnect attempts for new project
     const topic = `task-updates:${projectId}`;
 
     try {
       // Create channel following Supabase documentation pattern
       this.channel = supabase.channel(topic);
+      
+      console.log('[SimpleRealtime] 📡 Channel created:', {
+        topic,
+        channelExists: !!this.channel,
+        realtimeExists: !!(supabase as any)?.realtime,
+        socketExists: !!(supabase as any)?.realtime?.socket,
+        socketReadyState: (supabase as any)?.realtime?.socket?.readyState
+      });
 
       // Add event handlers BEFORE subscribing
       this.channel
@@ -58,6 +145,7 @@ export class SimpleRealtimeManager {
           if (status === 'SUBSCRIBED') {
             console.log('[SimpleRealtime] ✅ Successfully subscribed');
             this.isSubscribed = true;
+            this.reconnectAttempts = 0; // Reset reconnect attempts on success
             this.updateGlobalSnapshot('joined');
             
             // Report successful connection to freshness manager
@@ -68,6 +156,19 @@ export class SimpleRealtimeManager {
             console.error('[SimpleRealtime] ❌ Subscription failed:', status);
             this.isSubscribed = false;
             this.updateGlobalSnapshot('error');
+            
+            // Check authentication state for debugging
+            supabase.auth.getUser().then(({ data: { user }, error }) => {
+              console.error('[SimpleRealtime] 🔍 Auth check after channel error:', {
+                hasUser: !!user,
+                userId: user?.id,
+                authError: error?.message,
+                status,
+                timestamp: Date.now()
+              });
+            }).catch(authErr => {
+              console.error('[SimpleRealtime] ❌ Failed to check auth:', authErr);
+            });
             
             // Report failure to freshness manager
             dataFreshnessManager.onRealtimeStatusChange('error', `Subscription failed: ${status}`);
@@ -96,6 +197,14 @@ export class SimpleRealtimeManager {
       this.channel = null;
       this.isSubscribed = false;
       this.projectId = null;
+      this.reconnectAttempts = 0;
+      
+      // Clear any pending reconnect timeout
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+      
       this.updateGlobalSnapshot('closed');
       
       // Report disconnection to freshness manager
@@ -159,8 +268,36 @@ export class SimpleRealtimeManager {
     return {
       isSubscribed: this.isSubscribed,
       projectId: this.projectId,
-      channelState: this.channel?.state || 'closed'
+      channelState: this.channel?.state || 'closed',
+      reconnectAttempts: this.reconnectAttempts
     };
+  }
+
+  reset() {
+    console.log('[SimpleRealtime] 🔄 Resetting connection state');
+    this.reconnectAttempts = 0;
+    
+    // Clear any pending reconnect timeout
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+  }
+
+  destroy() {
+    // Clean up event listener
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('realtime:auth-heal', this.handleAuthHeal);
+    }
+    
+    // Clean up any pending reconnect
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    
+    // Leave any active channel
+    this.leave();
   }
 }
 

@@ -38,6 +38,12 @@ UI Components ◀──────── React Query cache (data)
       - Postgres changes: `tasks` table (INSERT/UPDATE) filtered by `project_id`
     - Emits DOM events for React consumption: `realtime:task-update`, `realtime:task-new`
     - Reports events and connection status to `DataFreshnessManager`
+    - **Enhanced Features:**
+      - Authentication validation before channel creation
+      - Listens for `realtime:auth-heal` events from ReconnectScheduler
+      - Exponential backoff reconnection with attempt limits (max 3 attempts)
+      - Comprehensive error handling and debugging
+      - Connection state management and cleanup methods
 
 - SimpleRealtimeProvider
   - Path: `src/shared/providers/SimpleRealtimeProvider.tsx`
@@ -160,20 +166,31 @@ useEffect(() => {
 ## Observability & Debugging
 
 ### Console Logs (key prefixes)
-- `[SimpleRealtime]` — channel join/leave, event delivery, status
+- `[SimpleRealtime]` — channel join/leave, event delivery, status, auth checks, reconnection attempts
 - `[SimpleRealtimeProvider]` — provider lifecycle
 - `[TasksPaneRealtimeDebug]` — end-to-end invalidation + query freshness
 - `[DataFreshness]` — freshness state, intervals, subscribers
 - `[SmartPolling]` — polling updates per query key
+- `[ReconnectScheduler]` — reconnection intent management and debouncing
 
 ### Runtime Diagnostics
 - `window.__REALTIME_SNAPSHOT__` — last channel state and event time
 - `window.__DATA_FRESHNESS_MANAGER__` — freshness manager instance (diagnostics available)
+- `window.__RECONNECT_SCHEDULER__` — reconnection scheduler state and pending intents
+
+### Enhanced Error Handling
+The system now provides detailed debugging information for connection failures:
+- Authentication state verification before channel creation
+- Post-failure auth checks to identify authentication vs. network issues
+- WebSocket readiness state logging
+- Reconnection attempt tracking with exponential backoff timing
 
 ### Common Checks
-1. Not receiving updates: verify channel status logs and project id
-2. UI not updating: ensure invalidated query key families match active queries
-3. Excess polling: check DataFreshness diagnostics and realtime connection state
+1. **CHANNEL_ERROR issues**: Check authentication state in logs - user must be signed in
+2. **Rapid reconnection loops**: Look for reconnection attempt limits being reached (max 3 attempts)
+3. **Not receiving updates**: verify channel status logs, project id, and authentication
+4. **UI not updating**: ensure invalidated query key families match active queries
+5. **Excess polling**: check DataFreshness diagnostics and realtime connection state
 
 ## Notes & Limitations
 - The system currently subscribes to `tasks` changes only. Generation-related UI updates are primarily driven by task events and by explicit mutation invalidations. Pure generation-only backend changes that are not accompanied by a task event (e.g., background thumbnail writes) are picked up by the smart polling fallback.
