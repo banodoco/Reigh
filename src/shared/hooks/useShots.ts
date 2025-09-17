@@ -682,14 +682,11 @@ export const useAddImageToShot = () => {
       const { project_id, shot_id } = variables;
       
       if (project_id) {
-        // Shot generation change events are now handled by DataFreshnessManager via realtime events
-        // Also directly invalidate unpositioned-count for immediate UI update
-        try {
-          const qc = (window as any).__REACT_QUERY_CLIENT__;
-          if (qc) {
-            qc.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
-          }
-        } catch {}
+        // CRITICAL: Invalidate shot generations query so ShotImagesEditor updates immediately
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
       }
     },
     onError: (error: Error) => {
@@ -764,16 +761,12 @@ export const useAddImageToShotWithoutPosition = () => {
       // Batch invalidate queries for better performance
       const { project_id, shot_id } = variables;
       
-      // Emit domain event for shot-generation change
       if (project_id) {
-        // Shot generation change events are now handled by DataFreshnessManager via realtime events
-        // Also directly invalidate unpositioned-count for immediate UI update
-        try {
-          const qc = (window as any).__REACT_QUERY_CLIENT__;
-          if (qc) {
-            qc.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
-          }
-        } catch {}
+        // CRITICAL: Invalidate shot generations query so ShotImagesEditor updates immediately
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
       }
     },
     onError: (error: Error) => {

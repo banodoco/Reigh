@@ -96,7 +96,7 @@ export function SkeletonGallery({
   return (
     <div className={cn('space-y-6 pb-8', className)}>
       {showControls && (
-        <div className="mt-7 space-y-3">
+        <div className="mt-0 space-y-3">
           {/* Pagination row - matches ImageGallery pagination section */}
           <div className="flex justify-between items-center">
             {/* Left side - Pagination controls skeleton */}

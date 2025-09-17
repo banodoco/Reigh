@@ -108,7 +108,7 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
   isMobile = false,
 }) => {
   return (
-    <div className={`${reducedSpacing ? 'mt-0' : 'mt-7'} space-y-3`}>
+    <div className="mt-0 space-y-3">
       {/* Top Pagination */}
       <div data-pagination-top>
         <ImageGalleryPagination
