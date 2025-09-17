@@ -24,52 +24,49 @@ export function useWelcomeBonus() {
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        console.log('[WelcomeBonus] User check:', user?.id);
 
         if (!user) {
+          console.log('[WelcomeBonus] No user found');
           return;
         }
 
-        // Check if user is eligible for welcome bonus
-        const { data, error } = await supabase.rpc('check_welcome_bonus_eligibility');
+        // Check if user is eligible for welcome bonus by querying users table directly
+        // First let's see what columns are available
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
         
-        if (error || !data || !Array.isArray(data) || data.length === 0) {
+        console.log('[WelcomeBonus] Query result:', { userData, error });
+        
+        if (error) {
+          console.log('[WelcomeBonus] Query error:', error);
+          return;
+        }
+        
+        if (!userData) {
+          console.log('[WelcomeBonus] No user data found');
           return;
         }
 
-        const result = data[0];
-        const { eligible } = result;
+        const givenCredits = (userData as any).given_credits;
+        console.log('[WelcomeBonus] given_credits value:', givenCredits);
 
-        if (eligible) {
-          // Call the grant-credits edge function
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-credits`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: user.id,
-              amount: 5,
-              isWelcomeBonus: true,
-            }),
-          });
-          
-          if (response.ok) {
-            // Invalidate credits queries to refresh UI
-            queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
-            queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
-            
-            // Show the modal after a brief delay
-            timeoutId = setTimeout(() => {
-              setShowModal(true);
-            }, 500);
-          }
+        // If user hasn't received welcome credits yet, show the modal
+        // Type assertion needed because given_credits isn't in generated types yet
+        if (!givenCredits) {
+          console.log('[WelcomeBonus] Showing modal - user eligible');
+          timeoutId = setTimeout(() => {
+            setShowModal(true);
+          }, 500);
+        } else {
+          console.log('[WelcomeBonus] User already has credits, not showing modal');
         }
 
       } catch (error) {
-        // Silent error handling - errors are handled server-side
+        console.error('[WelcomeBonus] Unexpected error:', error);
       } finally {
         setIsChecking(false);
       }

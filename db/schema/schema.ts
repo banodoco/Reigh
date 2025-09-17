@@ -20,6 +20,7 @@ export const users = pgTable('users', {
   settings: jsonb('settings'), // Store tool settings as JSONB
   onboarding: jsonb('onboarding').default('{}').notNull(), // Store onboarding progress as JSONB
   credits: numeric('credits', { precision: 10, scale: 3 }).default('0').notNull(), // Cached credit balance - supports fractional values
+  givenCredits: boolean('given_credits').default(false).notNull(), // Track if user has received welcome bonus
 });
 
 export const projects = pgTable('projects', {

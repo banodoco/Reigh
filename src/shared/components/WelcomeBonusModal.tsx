@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2 } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { useScrollFade } from '@/shared/hooks/useScrollFade';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface WelcomeBonusModalProps {
   isOpen: boolean;
@@ -308,7 +311,35 @@ const GenerationMethodStep: React.FC<{ onNext: () => void }> = ({ onNext }) => {
       
       <div className="space-y-6">
         <p className="text-center text-muted-foreground">
-          Choose where you'd like to run AI generation. You can change this later in settings.
+          If you have{' '}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="sparkle-underline cursor-pointer transition-colors duration-200">
+                  a sufficiently powerful computer
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                align="center"
+                className="flex items-center gap-2 text-left p-3 max-w-xs border-2 border-transparent bg-wes-cream/95 rounded-lg shadow-md transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1 z-[11100]"
+                style={{ zIndex: 11100 }}
+              >
+                <p className="text-xs sm:text-sm leading-relaxed text-primary">
+                  Things are optimized to run on a NVIDIA 4090 - 24GB VRAM GPU - but some models can work on computers with as little as 6GB of VRAM.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          , you can run Reigh <strong>for free</strong> - thanks to the work of{' '}
+          <a 
+            href="https://github.com/deepbeepmeep/Wan2GP" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="underline hover:no-underline text-primary"
+          >
+            deepbeepmeep
+          </a>. You can change this later in settings.
         </p>
 
         <div className="flex justify-center px-4">
@@ -412,7 +443,7 @@ const WelcomeGambitStep: React.FC<{ onNext: (choice: 'music-video' | 'something-
       </p>
       
       <p className="text-muted-foreground">
-        So let's make a deal: if you promise to make <strong>a tiny music video</strong> with Reigh and share it in our Discord, we'll give you $5 free credit.
+        So let's make a deal: if you promise to use Reigh to make <strong>a tiny music video (&lt;30 sec)</strong> and share it in our Discord, we'll give you $5 free credit.
       </p>
     </div>
     
@@ -523,7 +554,7 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
       )}
       
       <p className="text-muted-foreground">
-        Remember: what you create doesn't need to be exceptional. You're learning how to use a tool. Use this as an opportunity to have fun learning, start creating, and get over your fear of sharing!
+        Remember: what you create doesn't need to be exceptional. You're learning how to use a tool. Take this as an opportunity to have fun learning, start creating, and get over your fear of sharing!
       </p>
       
       <p className="text-muted-foreground">
@@ -602,6 +633,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [userChoice, setUserChoice] = useState<'music-video' | 'something-else' | 'no-thanks' | null>(null);
   const [isProcessingCredits, setIsProcessingCredits] = useState(false);
+  const queryClient = useQueryClient();
   const modal = useMediumModal();
   const { showFade, scrollRef } = useScrollFade({ 
     isOpen,
@@ -625,15 +657,44 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const handleGambitChoice = (choice: 'music-video' | 'something-else' | 'no-thanks') => {
+  const handleGambitChoice = async (choice: 'music-video' | 'something-else' | 'no-thanks') => {
     setUserChoice(choice);
     
     // Check if user has already seen the loading/confetti animation this session
     const hasSeenAnimation = sessionStorage.getItem('reigh_welcome_animation_seen');
     
     if (!hasSeenAnimation) {
-      // First time this session - show loading and confetti
+      // First time this session - show loading, grant credits, and show confetti
       setIsProcessingCredits(true);
+      
+      try {
+        // Grant the welcome credits
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (user && session) {
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/grant-credits`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              amount: 5,
+              isWelcomeBonus: true,
+            }),
+          });
+          
+          if (response.ok) {
+            // Invalidate credits queries to refresh UI
+            queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
+            queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
+          }
+        }
+      } catch (error) {
+        console.error('Error granting welcome credits:', error);
+      }
       
       // Show loading for 1.5 seconds before showing credits result
       setTimeout(() => {
@@ -643,7 +704,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
         sessionStorage.setItem('reigh_welcome_animation_seen', 'true');
       }, 1500);
     } else {
-      // Already seen this session - skip directly to result
+      // Already seen this session - skip directly to result (credits already granted)
       setCurrentStep(6);
     }
   };
