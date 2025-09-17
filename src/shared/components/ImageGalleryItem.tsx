@@ -116,6 +116,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   currentViewingShotId,
   projectAspectRatio,
 }) => {
+  // Local pending state to scope star button disabled to this item only
+  const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
   // [VideoThumbnailRender] Debug if this component is rendering for videos
   React.useEffect(() => {
     if (image.isVideo && index < 3) {
@@ -806,7 +808,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
                         isHovering && videoReady ? 'opacity-100 z-10' : 'opacity-0 z-0'
                       }`}
-                      style={{ backgroundColor: 'transparent' }}
+                      style={{ backgroundColor: 'transparent', cursor: 'pointer' }}
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
                       console.log('[MobileDebug] Video onTouchEnd fired', {
@@ -820,7 +822,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     onMouseEnter={() => setIsHovering(true)}
                     onMouseLeave={() => setIsHovering(false)}
                     draggable={false}
-                    style={{ cursor: 'pointer' }}
                     onError={handleImageError}
                     onLoadStart={() => setImageLoading(true)}
                     onLoadedData={handleImageLoad}
@@ -1531,16 +1532,29 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   size="icon"
                   className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                   onClick={() => {
-                      if (onToggleStar) {
-                          onToggleStar(image.id!, !image.starred);
-                      } else {
-                          toggleStarMutation.mutate({ 
-                              id: image.id!, 
-                              starred: !image.starred 
-                          });
+                      if (isTogglingStar) return;
+                      setIsTogglingStar(true);
+                      const nextStarred = !image.starred;
+                      try {
+                        if (onToggleStar) {
+                          onToggleStar(image.id!, nextStarred);
+                          // Assume parent handles async; release immediately to avoid global dulling
+                          setIsTogglingStar(false);
+                        } else {
+                          toggleStarMutation.mutate(
+                            { id: image.id!, starred: nextStarred },
+                            {
+                              onSettled: () => {
+                                setIsTogglingStar(false);
+                              },
+                            }
+                          );
+                        }
+                      } catch (_) {
+                        setIsTogglingStar(false);
                       }
                   }}
-                  disabled={toggleStarMutation.isPending}
+                  disabled={isTogglingStar}
               >
                   <Star 
                       className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 

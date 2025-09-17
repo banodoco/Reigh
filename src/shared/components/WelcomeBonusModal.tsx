@@ -523,6 +523,10 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
       )}
       
       <p className="text-muted-foreground">
+        Remember: what you create doesn't need to be exceptional. You're learning how to use a tool. Use this as an opportunity to have fun learning, start creating, and get over your fear of sharing!
+      </p>
+      
+      <p className="text-muted-foreground">
         We'll never check if you actually made something. We trust you &lt;3
       </p>
     </div>
