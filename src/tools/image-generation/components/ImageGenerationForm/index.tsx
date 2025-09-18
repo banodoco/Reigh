@@ -804,6 +804,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       loras: lorasForApi,
       shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
       model_name: selectedModel === 'wan-local' ? 'wan-2.2' : 'qwen-image',
+      // Set steps to 16 for Qwen models, use default for others
+      steps: selectedModel === 'qwen-image' ? 16 : undefined,
       // Add style reference for Qwen.Image
       ...(selectedModel === 'qwen-image' && styleReferenceImageGeneration && {
         style_reference_image: styleReferenceImageGeneration,

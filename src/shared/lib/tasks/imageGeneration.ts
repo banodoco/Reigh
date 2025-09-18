@@ -22,6 +22,7 @@ export interface ImageGenerationTaskParams {
   shot_id?: string; // Optional: associate generated image with a shot
   style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
   style_reference_strength?: number; // Strength for style reference (0.1-2.0)
+  steps?: number; // Number of inference steps
 }
 
 /**
@@ -41,6 +42,7 @@ export interface BatchImageGenerationTaskParams {
   model_name?: string;
   style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
   style_reference_strength?: number; // Strength for style reference (0.1-2.0)
+  steps?: number; // Number of inference steps
 }
 
 /**
@@ -184,6 +186,8 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       resolution: finalResolution,
       seed: params.seed ?? 11111,
       negative_prompt: params.negative_prompt,
+      // Set steps to 16 for Qwen models, use provided value or default for others
+      steps: isQwenModel ? 16 : (params.steps ?? 28),
       // Include LoRAs if present
       ...(params.loras?.length && {
         additional_loras: params.loras.reduce<Record<string, number>>((acc, lora) => {
@@ -257,6 +261,7 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
           loras: params.loras,
           shot_id: params.shot_id,
           model_name: params.model_name,
+          steps: params.steps, // Pass through the steps parameter
           // Include style reference for Qwen.Image model
           ...(params.style_reference_image && {
             style_reference_image: params.style_reference_image,
