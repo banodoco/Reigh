@@ -814,12 +814,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       loras: lorasForApi,
       shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
       model_name: selectedModel === 'wan-local' ? 'wan-2.2' : 'qwen-image',
-      // Set steps: 16 for Qwen models, user-selected value for local generation, or default for others
-      steps: selectedModel === 'qwen-image' 
-        ? 16 
-        : isLocalGenerationEnabled 
-          ? steps 
-          : undefined,
+      // Set steps: user-selected value for local generation (including Qwen), or undefined for cloud defaults
+      steps: isLocalGenerationEnabled ? steps : undefined,
       // Add style reference for Qwen.Image
       ...(selectedModel === 'qwen-image' && styleReferenceImageGeneration && {
         style_reference_image: styleReferenceImageGeneration,
@@ -834,6 +830,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       isLocalGenerationEnabled,
       userSelectedSteps: steps,
       finalStepsInBatchParams: batchTaskParams.steps,
+      logic: isLocalGenerationEnabled ? 'Using user-selected steps for local generation' : 'Using backend defaults for cloud generation',
       timestamp: Date.now()
     });
 
