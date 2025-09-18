@@ -828,6 +828,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // resolution will be resolved by the helper
     };
 
+    // Debug logging to verify steps parameter flow
+    console.log('[StepsDebug] Form submission debug:', {
+      selectedModel,
+      isLocalGenerationEnabled,
+      userSelectedSteps: steps,
+      finalStepsInBatchParams: batchTaskParams.steps,
+      timestamp: Date.now()
+    });
+
     // Legacy data structure for backward compatibility with existing onGenerate handler
     const legacyGenerationData = {
       prompts: batchTaskParams.prompts,
