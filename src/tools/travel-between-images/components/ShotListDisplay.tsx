@@ -134,6 +134,37 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
   }, [reorderShotsMutation.isPending, reorderShotsMutation.isError, reorderShotsMutation.error]);
 
+  // Check if focus is on an input element to conditionally disable KeyboardSensor
+  const [isInputFocused, setIsInputFocused] = React.useState(false);
+  
+  React.useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      const isFormElement = target.tagName === 'INPUT' || 
+                           target.tagName === 'TEXTAREA' || 
+                           target.contentEditable === 'true';
+      setIsInputFocused(isFormElement);
+    };
+    
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      const isFormElement = target.tagName === 'INPUT' || 
+                           target.tagName === 'TEXTAREA' || 
+                           target.contentEditable === 'true';
+      if (isFormElement) {
+        setIsInputFocused(false);
+      }
+    };
+    
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   // Set up sensors for drag and drop
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -147,9 +178,13 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         tolerance: 5,
       },
     }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    // Only enable KeyboardSensor when not focused on input elements
+    // This prevents keyboard conflicts with the search input
+    ...(isInputFocused ? [] : [
+      useSensor(KeyboardSensor, {
+        coordinateGetter: sortableKeyboardCoordinates,
+      })
+    ])
   );
 
   const handleDragEnd = (event: DragEndEvent) => {

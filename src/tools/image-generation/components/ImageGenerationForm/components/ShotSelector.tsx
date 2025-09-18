@@ -9,6 +9,7 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
+import { SectionHeader } from "./SectionHeader";
 
 interface Shot {
   id: string;
@@ -39,10 +40,7 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   return (
     <div className="space-y-2 mt-6">
       <div className="flex items-center gap-2">
-        <Label htmlFor="associatedShot" className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-green-200/60 pl-3 py-1 relative">
-          Shot
-          <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-green-200/60 rounded-full"></span>
-        </Label>
+        <SectionHeader title="Shot" theme="green" htmlFor="associatedShot" />
       </div>
       {/* Select dropdown and create button with aligned jump link */}
       <div className="flex items-center gap-2">

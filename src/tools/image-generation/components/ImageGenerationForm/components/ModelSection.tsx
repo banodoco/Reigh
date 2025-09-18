@@ -8,6 +8,7 @@ import { ActiveLoRAsDisplay, ActiveLora } from "@/shared/components/ActiveLoRAsD
 import { LoraModel } from "@/shared/components/LoraSelectorModal";
 import FileInput from "@/shared/components/FileInput";
 import { GenerationMode } from "../types";
+import { SectionHeader } from "./SectionHeader";
 
 interface ModelSectionProps {
   selectedModel: GenerationMode;
@@ -51,10 +52,7 @@ const LoraSection: React.FC<{
 }) => (
   <div className="space-y-2">
     <div className="space-y-1">
-      <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
-        LoRAs
-        <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
-      </Label>
+      <SectionHeader title="LoRAs" theme="purple" />
     </div>
 
     {/* Active LoRAs Display */}
@@ -121,10 +119,7 @@ const StyleReferenceSection: React.FC<{
   return (
   <div className="space-y-2">
     <div className="space-y-1">
-      <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-purple-200/60 pl-3 py-1 relative">
-        References
-        <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-purple-200/60 rounded-full"></span>
-      </Label>
+      <SectionHeader title="References" theme="purple" />
     </div>
 
     {/* Style Reference Upload */}
@@ -243,10 +238,7 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
       {/* Model Section */}
       <div className="space-y-4 mb-6">
         <div className="space-y-2">
-          <Label htmlFor="model" className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-blue-200/60 pl-3 py-1 relative">
-            Model
-            <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-blue-200/60 rounded-full"></span>
-          </Label>
+          <SectionHeader title="Model" theme="blue" htmlFor="model" />
           <div className="w-1/2">
             <Select
               value={selectedModel}

@@ -340,7 +340,7 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
             shotIdString = extractedShotId;
           } else if (typeof extractedShotId === 'object' && extractedShotId !== null) {
             // If it's wrapped in an object, try to extract the actual UUID
-            shotIdString = String(extractedShotId.id || extractedShotId.uuid || extractedShotId);
+            shotIdString = String((extractedShotId as any).id || (extractedShotId as any).uuid || extractedShotId);
           } else {
             shotIdString = String(extractedShotId);
           }
@@ -503,7 +503,64 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
       // Continue anyway - don't fail task completion
       }
     }
-    // 9) Update the database with the public URL
+    // 9) Create generation FIRST (so realtime fires when generation is ready)
+    const CREATE_GENERATION_IN_EDGE = Deno.env.get("CREATE_GENERATION_IN_EDGE") !== "false"; // Default ON
+    if (CREATE_GENERATION_IN_EDGE) {
+      console.log(`[GenMigration] Checking if task ${taskIdString} should create generation before completion...`);
+      // Fetch task metadata first, then lookup task_types separately (no FK relationship exists)
+      const { data: taskData, error: taskError } = await supabaseAdmin
+        .from("tasks")
+        .select("id, task_type, project_id, params")
+        .eq("id", taskIdString)
+        .single();
+      
+      if (taskError || !taskData) {
+        console.error(`[GenMigration] Failed to fetch task:`, taskError);
+        return;
+      }
+      
+      // Lookup task_types separately
+      const { data: taskTypeData, error: taskTypeError } = await supabaseAdmin
+        .from("task_types")
+        .select("category, tool_type")
+        .eq("name", taskData.task_type)
+        .single();
+
+      if (taskTypeError || !taskTypeData) {
+        console.error(`[GenMigration] Failed to fetch task_types metadata:`, taskTypeError);
+      } else {
+        const taskCategory = taskTypeData.category;
+        const toolType = taskTypeData.tool_type;
+        console.log(`[GenMigration] Task ${taskIdString} has category: ${taskCategory}, tool_type: ${toolType}`);
+
+        if (taskCategory === 'generation') {
+          console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
+          const combinedTaskData = {
+            ...taskData,
+            tool_type: toolType
+          };
+          try {
+            await createGenerationFromTask(
+              supabaseAdmin,
+              taskIdString,
+              combinedTaskData,
+              publicUrl,
+              thumbnailUrl || undefined
+            );
+          } catch (genError) {
+            console.error(`[GenMigration] Error creating generation for task ${taskIdString}:`, genError);
+            // Fail the request to keep atomic semantics
+            return new Response(`Generation creation failed: ${genError.message}`, { status: 500 });
+          }
+        } else {
+          console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
+        }
+      }
+    } else {
+      console.log(`[GenMigration] Generation creation disabled via CREATE_GENERATION_IN_EDGE=false`);
+    }
+
+    // 10) Update the database with the public URL and mark Complete
     console.log(`[COMPLETE-TASK-DEBUG] Updating task ${taskIdString} to Complete status`);
     const { error: dbError } = await supabaseAdmin.from("tasks").update({
       status: "Complete",
@@ -521,7 +578,8 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
       });
     }
     console.log(`[COMPLETE-TASK-DEBUG] Database update successful for task ${taskIdString}`);
-    // 10) Calculate and record task cost (only for service role)
+
+    // 11) Calculate and record task cost (only for service role)
     if (isServiceRole) {
       try {
         console.log(`[COMPLETE-TASK-DEBUG] Triggering cost calculation for task ${taskIdString}...`);
@@ -619,6 +677,272 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
     });
   }
 });
+// ===== GENERATION HELPER FUNCTIONS =====
+
+/**
+ * Extract shot_id and add_in_position from task params
+ * Supports multiple param shapes as per current DB trigger logic
+ */
+function extractShotAndPosition(params: any): { shotId?: string, addInPosition: boolean } {
+  let shotId: string | undefined;
+  let addInPosition = false; // Default: unpositioned
+
+  try {
+    // PRIORITY 1: Check originalParams.orchestrator_details.shot_id (MOST COMMON for wan_2_2_i2v)
+    if (params?.originalParams?.orchestrator_details?.shot_id) {
+      shotId = String(params.originalParams.orchestrator_details.shot_id);
+      console.log(`[GenMigration] Found shot_id in originalParams.orchestrator_details: ${shotId}`);
+    }
+    // PRIORITY 2: Check direct orchestrator_details.shot_id
+    else if (params?.orchestrator_details?.shot_id) {
+      shotId = String(params.orchestrator_details.shot_id);
+      console.log(`[GenMigration] Found shot_id in orchestrator_details: ${shotId}`);
+    }
+    // PRIORITY 3: Check direct shot_id field
+    else if (params?.shot_id) {
+      shotId = String(params.shot_id);
+      console.log(`[GenMigration] Found shot_id in params: ${shotId}`);
+    }
+    // PRIORITY 4: Check full_orchestrator_payload.shot_id (for travel_stitch)
+    else if (params?.full_orchestrator_payload?.shot_id) {
+      shotId = String(params.full_orchestrator_payload.shot_id);
+      console.log(`[GenMigration] Found shot_id in full_orchestrator_payload: ${shotId}`);
+    }
+    // PRIORITY 5: Check shotId field (camelCase variant)
+    else if (params?.shotId) {
+      shotId = String(params.shotId);
+      console.log(`[GenMigration] Found shotId in params: ${shotId}`);
+    }
+    else {
+      console.log(`[GenMigration] No shot_id found in task params - generation will not be linked to shot`);
+    }
+
+    // Extract add_in_position flag from multiple locations
+    if (params?.add_in_position !== undefined) {
+      addInPosition = Boolean(params.add_in_position);
+    } else if (params?.originalParams?.add_in_position !== undefined) {
+      addInPosition = Boolean(params.originalParams.add_in_position);
+    } else if (params?.orchestrator_details?.add_in_position !== undefined) {
+      addInPosition = Boolean(params.orchestrator_details.add_in_position);
+    } else if (params?.originalParams?.orchestrator_details?.add_in_position !== undefined) {
+      addInPosition = Boolean(params.originalParams.orchestrator_details.add_in_position);
+    }
+
+    console.log(`[GenMigration] Extracted add_in_position: ${addInPosition}`);
+  } catch (error) {
+    console.error(`[GenMigration] Error extracting shot/position:`, error);
+  }
+
+  return { shotId, addInPosition };
+}
+
+/**
+ * Determine generation type from tool_type
+ */
+function determineGenerationType(toolType: string): 'image' | 'video' {
+  if (toolType === 'image-generation' || toolType === 'magic-edit') {
+    return 'image';
+  } else if (toolType === 'travel-between-images' || toolType === 'edit-travel') {
+    return 'video';
+  } else {
+    return 'image'; // Default to image for unknown tool types
+  }
+}
+
+/**
+ * Build generation params starting from normalized task params
+ */
+function buildGenerationParams(baseParams: any, toolType: string, shotId?: string, thumbnailUrl?: string): any {
+  let generationParams = { ...baseParams };
+  
+  // Add tool_type to the params JSONB
+  generationParams.tool_type = toolType;
+  
+  // Add shot_id if present and valid
+  if (shotId) {
+    generationParams.shotId = shotId;
+  }
+  
+  // Add thumbnail_url to params if available
+  if (thumbnailUrl) {
+    generationParams.thumbnailUrl = thumbnailUrl;
+  }
+  
+  return generationParams;
+}
+
+/**
+ * Check for existing generation referencing this task_id
+ */
+async function findExistingGeneration(supabase: any, taskId: string): Promise<any | null> {
+  try {
+    // Use JSONB contains operator with proper JSON array syntax
+    const { data, error } = await supabase
+      .from('generations')
+      .select('*')
+      .contains('tasks', JSON.stringify([taskId]))
+      .single();
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error(`[GenMigration] Error finding existing generation:`, error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`[GenMigration] Exception finding existing generation:`, error);
+    return null;
+  }
+}
+
+/**
+ * Insert generation record
+ */
+async function insertGeneration(supabase: any, record: any): Promise<any> {
+  const { data, error } = await supabase
+    .from('generations')
+    .insert(record)
+    .select()
+    .single();
+  
+  if (error) {
+    throw new Error(`Failed to insert generation: ${error.message}`);
+  }
+  
+  return data;
+}
+
+/**
+ * Link generation to shot using the existing RPC
+ */
+async function linkGenerationToShot(supabase: any, shotId: string, generationId: string, addInPosition: boolean): Promise<void> {
+  try {
+    const { error } = await supabase.rpc('add_generation_to_shot', {
+      p_shot_id: shotId,
+      p_generation_id: generationId,
+      p_with_position: addInPosition
+    });
+    
+    if (error) {
+      console.error(`[ShotLink] Failed to link generation ${generationId} to shot ${shotId}:`, error);
+      // Don't throw - match current DB behavior (log and continue)
+    } else {
+      console.log(`[ShotLink] Successfully linked generation ${generationId} to shot ${shotId} with add_in_position=${addInPosition}`);
+    }
+  } catch (error) {
+    console.error(`[ShotLink] Exception linking generation to shot:`, error);
+    // Don't throw - match current DB behavior
+  }
+}
+
+/**
+ * Main function to create generation from completed task
+ * This replicates the logic from create_generation_on_task_complete() trigger
+ */
+async function createGenerationFromTask(
+  supabase: any, 
+  taskId: string, 
+  taskData: any, 
+  publicUrl: string, 
+  thumbnailUrl: string | null | undefined
+): Promise<any> {
+  console.log(`[GenMigration] Starting generation creation for task ${taskId}`);
+  
+  try {
+    // Check if generation already exists (idempotency)
+    const existingGeneration = await findExistingGeneration(supabase, taskId);
+    if (existingGeneration) {
+      console.log(`[GenMigration] Generation already exists for task ${taskId}: ${existingGeneration.id}`);
+      
+      // Ensure shot link if needed
+      const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
+      if (shotId) {
+        await linkGenerationToShot(supabase, shotId, existingGeneration.id, addInPosition);
+      }
+      
+      // Ensure generation_created flag is set
+      await supabase
+        .from('tasks')
+        .update({ generation_created: true })
+        .eq('id', taskId);
+      
+      return existingGeneration;
+    }
+    
+    // Extract shot information
+    const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
+    
+    // Validate shot exists if shotId is provided
+    if (shotId) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(shotId)) {
+        console.log(`[GenMigration] Invalid UUID format for shot: ${shotId}, proceeding without shot link`);
+        // Continue without shot linking
+      } else {
+        const { data: shotData, error: shotError } = await supabase
+          .from('shots')
+          .select('id')
+          .eq('id', shotId)
+          .single();
+        
+        if (shotError || !shotData) {
+          console.log(`[GenMigration] Shot ${shotId} does not exist, proceeding without shot link`);
+          // Continue without shot linking - don't fail the generation
+        }
+      }
+    }
+    
+    // Determine generation type
+    const generationType = determineGenerationType(taskData.tool_type);
+    
+    // Build generation params
+    const generationParams = buildGenerationParams(
+      taskData.params, 
+      taskData.tool_type, 
+      shotId, 
+      thumbnailUrl
+    );
+    
+    // Generate new UUID for generation
+    const newGenerationId = crypto.randomUUID();
+    
+    // Insert generation record
+    const generationRecord = {
+      id: newGenerationId,
+      tasks: [taskId], // Store as array
+      params: generationParams,
+      location: publicUrl,
+      type: generationType,
+      project_id: taskData.project_id,
+      thumbnail_url: thumbnailUrl,
+      created_at: new Date().toISOString()
+    };
+    
+    const newGeneration = await insertGeneration(supabase, generationRecord);
+    console.log(`[GenMigration] Created generation ${newGeneration.id} for task ${taskId}`);
+    
+    // Link to shot if applicable
+    if (shotId) {
+      await linkGenerationToShot(supabase, shotId, newGeneration.id, addInPosition);
+    }
+    
+    // Mark task as having created a generation
+    await supabase
+      .from('tasks')
+      .update({ generation_created: true })
+      .eq('id', taskId);
+    
+    console.log(`[GenMigration] Successfully completed generation creation for task ${taskId}`);
+    return newGeneration;
+    
+  } catch (error) {
+    console.error(`[GenMigration] Error creating generation for task ${taskId}:`, error);
+    throw error;
+  }
+}
+
+// ===== UTILITY FUNCTIONS =====
+
 function getContentType(filename) {
   const ext = filename.toLowerCase().split('.').pop();
   switch(ext){

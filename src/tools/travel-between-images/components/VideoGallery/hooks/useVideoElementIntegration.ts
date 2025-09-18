@@ -11,7 +11,8 @@ export const useVideoElementIntegration = (
   index: number,
   shouldLoad: boolean,
   shouldPreload: string,
-  videoLoader: ReturnType<typeof useVideoLoader>
+  videoLoader: ReturnType<typeof useVideoLoader>,
+  isMobile: boolean
 ) => {
   const { 
     setVideoMetadataLoaded, 
@@ -26,8 +27,7 @@ export const useVideoElementIntegration = (
   useEffect(() => {
     if (!shouldLoad) return;
     
-    // Skip hover video integration on mobile devices
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    // Skip hover video integration on mobile devices (use consistent detection)
     if (isMobile) {
       console.log(`🎬 [VideoLifecycle] Video ${index + 1} - MOBILE_SKIP: Hover integration disabled on mobile`);
       return;
@@ -224,11 +224,125 @@ export const useVideoElementIntegration = (
           phase: 'VIDEO_ELEMENT_NOT_FOUND',
           issue: 'HoverScrubVideo did not create video element',
           containerFound: !!container,
-          retryIn: 'Will retry in next render cycle',
+          retryIn: 'Will retry with longer timeout',
           timestamp: Date.now()
         });
+        
+        // Retry with a longer timeout in case the video element is created later
+        const retryTimeoutId = setTimeout(() => {
+          const retryContainer = document.querySelector(`[data-video-id="${video.id}"]`);
+          const retryVideoElement = retryContainer?.querySelector('video') as HTMLVideoElement | null;
+          
+          if (retryVideoElement) {
+            console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_FOUND_ON_RETRY:`, {
+              videoId: video.id,
+              phase: 'VIDEO_ELEMENT_FOUND_ON_RETRY',
+              retrySuccessful: true,
+              timestamp: Date.now()
+            });
+            
+            videoRef.current = retryVideoElement;
+            
+            // Apply the same event listeners as in the main path
+            const handleLoadStart = () => {
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOAD_STARTED (retry):`, {
+                  videoId: video.id,
+                  phase: 'VIDEO_LOAD_STARTED',
+                  src: retryVideoElement.src,
+                  preload: shouldPreload,
+                  timestamp: Date.now()
+                });
+              }
+            };
+
+            const handleLoadedMetadata = () => {
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_METADATA_LOADED (retry):`, {
+                  videoId: video.id,
+                  phase: 'VIDEO_METADATA_LOADED',
+                  duration: retryVideoElement?.duration,
+                  dimensions: `${retryVideoElement?.videoWidth}x${retryVideoElement?.videoHeight}`,
+                  timestamp: Date.now()
+                });
+              }
+              setVideoMetadataLoaded(true);
+              
+              // Fallback: If onLoadedData doesn't fire within 2 seconds, consider poster ready
+              if (posterFallbackTimeoutRef.current) {
+                clearTimeout(posterFallbackTimeoutRef.current);
+              }
+              posterFallbackTimeoutRef.current = setTimeout(() => {
+                if (!videoPosterLoaded) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_FALLBACK (retry):`, {
+                      videoId: video.id,
+                      phase: 'VIDEO_POSTER_FALLBACK',
+                      reason: 'onLoadedData did not fire within 2 seconds',
+                      readyState: retryVideoElement?.readyState,
+                      networkState: retryVideoElement?.networkState,
+                      timestamp: Date.now()
+                    });
+                  }
+                  setVideoPosterLoaded(true);
+                }
+              }, 2000);
+            };
+
+            const handleLoadedData = () => {
+              console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_LOADED (retry):`, {
+                videoId: video.id,
+                phase: 'VIDEO_POSTER_LOADED',
+                currentTime: retryVideoElement?.currentTime,
+                readyState: retryVideoElement?.readyState,
+                nextPhase: 'Will transition to VIDEO_READY',
+                timestamp: Date.now()
+              });
+              setVideoPosterLoaded(true);
+              
+              if (posterFallbackTimeoutRef.current) {
+                clearTimeout(posterFallbackTimeoutRef.current);
+                posterFallbackTimeoutRef.current = null;
+              }
+            };
+
+            retryVideoElement.addEventListener('loadstart', handleLoadStart);
+            retryVideoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+            retryVideoElement.addEventListener('loadeddata', handleLoadedData);
+            
+            // Check if video is already loaded
+            if (retryVideoElement.readyState >= 2) {
+              console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ALREADY_LOADED (retry):`, {
+                videoId: video.id,
+                phase: 'VIDEO_ALREADY_LOADED',
+                readyState: retryVideoElement.readyState,
+                timestamp: Date.now()
+              });
+              
+              setVideoMetadataLoaded(true);
+              if (retryVideoElement.readyState >= 3) {
+                setVideoPosterLoaded(true);
+              }
+            }
+            
+            if (shouldPreload === 'none') {
+              setTimeout(() => {
+                triggerLoadOnce('(retry integration)');
+              }, 50);
+            }
+          } else {
+            console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_STILL_NOT_FOUND:`, {
+              videoId: video.id,
+              phase: 'VIDEO_ELEMENT_STILL_NOT_FOUND',
+              issue: 'Video element not found even after retry',
+              timestamp: Date.now()
+            });
+          }
+        }, 500); // Retry after 500ms
+        
+        return () => clearTimeout(retryTimeoutId);
       }
-    }, 100);
+    }, 200); // Increased timeout for more reliable video element detection
     
     return () => clearTimeout(timeoutId);
   }, [shouldLoad, video.id, index, shouldPreload, triggerLoadOnce, setVideoMetadataLoaded, setVideoPosterLoaded, videoPosterLoaded, posterFallbackTimeoutRef, logVideoEvent, videoRef]);

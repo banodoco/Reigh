@@ -11,6 +11,7 @@ import {
 } from "@/shared/components/ui/tooltip";
 import { PromptEntry } from "../types";
 import { PromptInputRow } from "./PromptInputRow";
+import { SectionHeader } from "./SectionHeader";
 
 interface PromptsSectionProps {
   prompts: PromptEntry[];
@@ -58,10 +59,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-2">
-        <Label className="text-lg font-medium text-slate-700 dark:text-slate-200 border-l-8 border-orange-200/60 pl-3 py-1 relative">
-          Prompts
-          <span className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2.5 w-12 h-2 bg-orange-200/60 rounded-full"></span>
-        </Label>
+        <SectionHeader title="Prompts" theme="orange" />
         <div className="flex items-center space-x-2">
           {/* Magic Prompt button - always visible */}
           <TooltipProvider delayDuration={300}>

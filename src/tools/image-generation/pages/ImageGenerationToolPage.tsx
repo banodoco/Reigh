@@ -128,12 +128,26 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   console.log(`${DEBUG_TAG} Render #${renderCount.current} - useListPublicResources states:`, {
     isLoading: publicLorasResult.isLoading,
     hasData: !!publicLorasResult.data,
-    dataLength: publicLorasResult.data?.length,
+    dataLength: Array.isArray(publicLorasResult.data) ? publicLorasResult.data.length : undefined,
     error: !!publicLorasResult.error
   });
   
   // Use the new task queue notifier hook
   const { selectedProjectId, projects } = useProject();
+  
+  // Use a resilient project ID that can fall back to a global value set by ProjectContext
+  const effectiveProjectId = React.useMemo(() => {
+    if (selectedProjectId) return selectedProjectId;
+    if (typeof window !== 'undefined') {
+      const fromGlobal = (window as any).__PROJECT_CONTEXT__?.selectedProjectId;
+      if (fromGlobal) return fromGlobal;
+      try {
+        const fromStorage = window.localStorage.getItem('lastSelectedProjectId');
+        if (fromStorage) return fromStorage;
+      } catch {}
+    }
+    return null;
+  }, [selectedProjectId]);
   
   // Get current project's aspect ratio
   const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -266,12 +280,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   
   // Debug logging removed for performance
   
-  // Only fetch generations when project is ready to prevent unnecessary queries
+  // Fetch generations using a resilient project ID; enable when effectiveProjectId is available
   const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
-    selectedProjectId, 
+    effectiveProjectId, 
     currentPage, 
     itemsPerPage, 
-    !!selectedProjectId, // Only enable when project is selected
+    !!effectiveProjectId, 
     generationsFilters
   );
 
@@ -309,7 +323,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const queryClient = useQueryClient();
   
   // [Strategic Debug] Check React Query cache state for this exact query
-  const generationsQueryKey = ['unified-generations', 'project', selectedProjectId, currentPage, itemsPerPage, generationsFilters];
+  const generationsQueryKey = ['unified-generations', 'project', effectiveProjectId, currentPage, itemsPerPage, generationsFilters];
   const cachedGenerationsData = queryClient.getQueryData(generationsQueryKey);
   const generationsQueryState = queryClient.getQueryState(generationsQueryKey);
   
@@ -516,7 +530,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       }
 
       // Invalidate generations to ensure they refresh when tasks complete
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       
       console.log('[ImageGeneration] Image generation tasks created successfully');
       setLocalJustQueued(true);
@@ -615,8 +629,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       }
 
       // Aggressively invalidate and refetch the generations query to ensure fresh data
-      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
-      await queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
+      await queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       
     } catch (error) {
       console.error("[ImageGeneration-HandleImageSaved] Error:", error);
@@ -685,7 +699,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       
       // Force refresh of generations data to show updated positioning
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       
       return true;
     } catch (error) {
@@ -722,7 +736,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       setLastAffectedShotId(targetShotInfo.targetShotIdForButton);
       
       // Force refresh of generations data to show updated association
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       
       return true;
     } catch (error) {
@@ -786,12 +800,12 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       // Instead of fetching new data, we'll trigger a refresh of the current page
       // The server will naturally return items from the next page to fill gaps
       await queryClient.invalidateQueries({ 
-        queryKey: ['unified-generations', 'project', selectedProjectId] 
+        queryKey: ['unified-generations', 'project', effectiveProjectId] 
       });
       
       // Refetch the current page - this will get updated data with items moved up from next page
       await queryClient.refetchQueries({ 
-        queryKey: ['unified-generations', 'project', selectedProjectId, currentPage, itemsPerPage, generationsFilters] 
+        queryKey: ['unified-generations', 'project', effectiveProjectId, currentPage, itemsPerPage, generationsFilters] 
       });
 
       console.log('[BackfillDebug] Data refresh completed for backfill');
@@ -993,7 +1007,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Prefetch adjacent pages callback for ImageGallery with cancellation
   const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
-    if (!selectedProjectId) return;
+    if (!effectiveProjectId) return;
 
     // Cancel previous image preloads immediately
     const prevOps = prefetchOperationsRef.current;
@@ -1008,7 +1022,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     initializePrefetchOperations(prefetchOperationsRef, prefetchId);
 
     // Clean up old pagination cache to prevent memory leaks
-    smartCleanupOldPages(queryClient, currentPage, selectedProjectId, 'generations');
+    smartCleanupOldPages(queryClient, currentPage, effectiveProjectId, 'generations');
     
     // Trigger image garbage collection every 10 pages to free browser memory
     if (currentPage % 10 === 0) {
@@ -1023,11 +1037,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Prefetch next page first (higher priority)
     if (nextPage) {
       queryClient.prefetchQuery({
-        queryKey: ['unified-generations', 'project', selectedProjectId, nextPage, itemsPerPage, filters],
-        queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (nextPage - 1) * itemsPerPage, filters),
+        queryKey: ['unified-generations', 'project', effectiveProjectId, nextPage, itemsPerPage, filters],
+        queryFn: () => fetchGenerations(effectiveProjectId, itemsPerPage, (nextPage - 1) * itemsPerPage, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        const cached = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+        const cached = queryClient.getQueryData(['unified-generations', 'project', effectiveProjectId, nextPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
         smartPreloadImages(cached, 'next', prefetchId, prefetchOperationsRef);
       });
     }
@@ -1035,11 +1049,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // Prefetch previous page second (lower priority)
     if (prevPage) {
       queryClient.prefetchQuery({
-        queryKey: ['unified-generations', 'project', selectedProjectId, prevPage, itemsPerPage, filters],
-        queryFn: () => fetchGenerations(selectedProjectId, itemsPerPage, (prevPage - 1) * itemsPerPage, filters),
+        queryKey: ['unified-generations', 'project', effectiveProjectId, prevPage, itemsPerPage, filters],
+        queryFn: () => fetchGenerations(effectiveProjectId, itemsPerPage, (prevPage - 1) * itemsPerPage, filters),
         staleTime: 30 * 1000,
       }).then(() => {
-        const cachedPrev = queryClient.getQueryData(['unified-generations', 'project', selectedProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
+        const cachedPrev = queryClient.getQueryData(['unified-generations', 'project', effectiveProjectId, prevPage, itemsPerPage, filters]) as GenerationsPaginatedResponse | undefined;
         smartPreloadImages(cachedPrev, 'prev', prefetchId, prefetchOperationsRef);
       });
     }
@@ -1235,7 +1249,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           <div ref={galleryRef} className="pt-0 pb-5">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {(() => {
-              const showSkeleton = !selectedProjectId || (isLoadingGenerations && imagesToShow.length === 0);
+              const showSkeleton = !effectiveProjectId || (isLoadingGenerations && imagesToShow.length === 0);
               console.log(`${DEBUG_TAG} Render #${renderCount.current} - Skeleton decision:`, {
                 showSkeleton,
                 selectedProjectId,

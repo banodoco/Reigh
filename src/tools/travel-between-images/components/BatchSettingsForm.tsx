@@ -15,6 +15,7 @@ import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 
 interface BatchSettingsFormProps {
   batchVideoPrompt: string;
@@ -51,8 +52,8 @@ interface BatchSettingsFormProps {
   
   // Image count for conditional UI
   imageCount?: number;
-  // Selected model for conditional UI
-  selectedModel?: 'wan-2.1' | 'wan-2.2';
+  // Selected mode for conditional UI
+  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -83,13 +84,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   randomSeed,
   onRandomSeedChange,
   imageCount = 0,
-  selectedModel,
+  selectedMode,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
     return (
         <div className="space-y-4">
-          <div className="p-4 border rounded-lg bg-card shadow-md space-y-4 mb-4">
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,11 +143,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             
 
             
-            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 && selectedModel !== 'wan-2.2' ? 'md:grid-cols-2' : ''}`}>
+            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
                 {!isTimelineMode && (
                   <div className="relative">
                     <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
-                      {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {selectedModel === 'wan-2.2' ? '81 (Fixed for Wan 2.2)' : batchVideoFrames}
+                      {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
                     </Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -156,11 +156,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {selectedModel === 'wan-2.2' ? (
-                          <p>Wan 2.2 generates exactly 81 frames for optimal quality and motion.</p>
-                        ) : (
                           <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
-                        )}
                       </TooltipContent>
                     </Tooltip>
                     <Slider
@@ -168,14 +164,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       min={10}
                       max={81} 
                       step={1}
-                      value={[selectedModel === 'wan-2.2' ? 81 : batchVideoFrames]}
+                      value={[batchVideoFrames]}
                       onValueChange={(value) => onBatchVideoFramesChange(value[0])}
-                      disabled={selectedModel === 'wan-2.2'}
-                      className={selectedModel === 'wan-2.2' ? 'opacity-50' : ''}
                     />
                   </div>
                 )}
-                {!isTimelineMode && imageCount > 2 && selectedModel !== 'wan-2.2' && (
+                {!isTimelineMode && imageCount > 2 && (
                   <div className="relative">
                     <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Number of Context Frames: {batchVideoContext}</Label>
                     <Tooltip>
@@ -200,51 +194,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
             </div>
 
-            {selectedModel !== 'wan-2.2' && (<>
-            {/* Toggles row */}
-            <div className="flex flex-wrap gap-4 items-center">
-              {/* Only show Accelerated Mode toggle if not using Wan 2.2 */}
-              {steerableMotionSettings.model_name !== 'vace_14B_fake_cocktail_2_2' && (
-                <div className="relative">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="accelerated"
-                          checked={accelerated}
-                          onCheckedChange={onAcceleratedChange}
-                        />
-                        <Label htmlFor="accelerated" className="text-sm cursor-help">Enable Accelerated Mode</Label>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Accelerated mode enables the lighti2x LoRA for faster generation but may affect motion quality.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              )}
-              
-              {/* Style Boost LoRAs toggle */}
-              <div className="relative">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="styleboost"
-                        checked={steerableMotionSettings.use_styleboost_loras}
-                        onCheckedChange={(value) => onSteerableMotionSettingsChange({ use_styleboost_loras: value })}
-                      />
-                      <Label htmlFor="styleboost" className="text-sm cursor-help">Apply Style Boost LoRAs</Label>
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Applies curated style enhancement LoRAs to improve visual quality and aesthetic appeal.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
 
             {/* Steps slider in its own row */}
             <div className="grid grid-cols-1 gap-4 items-end">
@@ -270,85 +219,93 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 />
                 {showStepsNotification && (
                   <p className="text-sm text-yellow-600 mt-1">
-                    {steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2'
-                      ? 'Note: We recommend 10 steps for Wan 2.2'
-                      : `Note: We recommend ${accelerated ? '8' : '20'} steps for ${accelerated ? 'Accelerated' : 'Normal'} mode`
-                    }
+                    {(() => {
+                      switch (steerableMotionSettings.model_name) {
+                        case 'vace_fun_14B_cocktail_lightning':
+                          return 'Note: We recommend 6 steps for Zippy Supreme mode';
+                        case 'vace_fun_14B_cocktail_2_2':
+                          return `Note: We recommend ${accelerated ? '8' : '15'} steps for Steady Sprint mode`;
+                        case 'vace_fun_14B_2_2':
+                        default:
+                          return `Note: We recommend ${accelerated ? '8' : '20'} steps for Full Throttle mode`;
+                      }
+                    })()}
                   </p>
                 )}
               </div>
             </div>
-            <div>
-              <Label className="text-sm font-light block mb-2">Dimension Source</Label>
-              <RadioGroup
-                value={dimensionSource || 'project'}
-                onValueChange={(value) => {
-                  const newSource = value as 'project' | 'firstImage' | 'custom';
-                  onDimensionSourceChange(newSource);
-                  if (newSource === 'custom' && (!customWidth || !customHeight)) {
-                    const project = projects.find(p => p.id === selectedProjectId);
-                    if (project && project.aspectRatio) {
-                      const res = ASPECT_RATIO_TO_RESOLUTION[project.aspectRatio];
-                      if (res) {
-                        const [width, height] = res.split('x').map(Number);
-                        onCustomWidthChange(width);
-                        onCustomHeightChange(height);
-                      }
-                    }
-                  }
-                }}
-                className="flex flex-wrap gap-x-4 gap-y-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="project" id="r_project" />
-                  <Label htmlFor="r_project">Use Project Dimensions</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="firstImage" id="r_firstImage" />
-                  <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="custom" id="r_custom" />
-                  <Label htmlFor="r_custom">Custom</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            {dimensionSource === 'custom' && (
-              <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
-                <div>
-                  <Label htmlFor="customWidth">Width</Label>
-                  <Input
-                    id="customWidth"
-                    type="number"
-                    value={customWidth || ''}
-                    onChange={(e) => onCustomWidthChange(parseInt(e.target.value, 10) || undefined)}
-                    placeholder="e.g., 1024"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="customHeight">Height</Label>
-                  <Input
-                    id="customHeight"
-                    type="number"
-                    value={customHeight || ''}
-                    onChange={(e) => onCustomHeightChange(parseInt(e.target.value, 10) || undefined)}
-                    placeholder="e.g., 576"
-                  />
-                </div>
-                {(customWidth || 0) > 2048 || (customHeight || 0) > 2048 ? (
-                  <p className="col-span-2 text-sm text-destructive">Warning: Very large dimensions may lead to slow generation or failures.</p>
-                ) : null}
-              </div>
-            )}
             
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-center text-sm">
+                <Button variant="ghost" className="w-full justify-center text-sm bg-muted hover:bg-muted/80">
                   <ChevronsUpDown className="h-4 w-4 mr-2" />
                   {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 pt-4">
+                <div>
+                  <Label className="text-sm font-light block mb-2">Dimension Source</Label>
+                  <RadioGroup
+                    value={dimensionSource || 'project'}
+                    onValueChange={(value) => {
+                      const newSource = value as 'project' | 'firstImage' | 'custom';
+                      onDimensionSourceChange(newSource);
+                      if (newSource === 'custom' && (!customWidth || !customHeight)) {
+                        const project = projects.find(p => p.id === selectedProjectId);
+                        if (project && project.aspectRatio) {
+                          const res = ASPECT_RATIO_TO_RESOLUTION[project.aspectRatio];
+                          if (res) {
+                            const [width, height] = res.split('x').map(Number);
+                            onCustomWidthChange(width);
+                            onCustomHeightChange(height);
+                          }
+                        }
+                      }
+                    }}
+                    className="flex flex-wrap gap-x-4 gap-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="project" id="r_project" />
+                      <Label htmlFor="r_project">Use Project Dimensions</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="firstImage" id="r_firstImage" />
+                      <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="custom" id="r_custom" />
+                      <Label htmlFor="r_custom">Custom</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                {dimensionSource === 'custom' && (
+                  <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
+                    <div>
+                      <Label htmlFor="customWidth">Width</Label>
+                      <Input
+                        id="customWidth"
+                        type="number"
+                        value={customWidth || ''}
+                        onChange={(e) => onCustomWidthChange(parseInt(e.target.value, 10) || undefined)}
+                        placeholder="e.g., 1024"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customHeight">Height</Label>
+                      <Input
+                        id="customHeight"
+                        type="number"
+                        value={customHeight || ''}
+                        onChange={(e) => onCustomHeightChange(parseInt(e.target.value, 10) || undefined)}
+                        placeholder="e.g., 576"
+                      />
+                    </div>
+                    {(customWidth || 0) > 2048 || (customHeight || 0) > 2048 ? (
+                      <p className="col-span-2 text-sm text-destructive">Warning: Very large dimensions may lead to slow generation or failures.</p>
+                    ) : null}
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch
@@ -375,8 +332,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
               </CollapsibleContent>
             </Collapsible>
-            </>)}
-          </div>
         </div>
     );
 };

@@ -7,10 +7,17 @@ const getModelDisplayName = (modelName: string | undefined): string => {
   if (!modelName) return 'Unknown';
   
   switch (modelName) {
+    case 'vace_fun_14B_2_2':
+      return 'Full Throttle';
+    case 'vace_fun_14B_cocktail_2_2':
+      return 'Steady Sprint';
+    case 'vace_fun_14B_cocktail_lightning':
+      return 'Zippy Supreme';
+    // Legacy model names for backward compatibility
     case 'vace_14B':
-      return 'Wan 2.1';
+      return 'Legacy Model';
     case 'vace_14B_fake_cocktail_2_2':
-      return 'Wan 2.2';
+      return 'Legacy Model';
     default:
       return modelName;
   }

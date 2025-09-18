@@ -49,7 +49,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
           <p className="text-sm text-muted-foreground">None selected</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
           {selectedLoras.map((lora) => {
           // Check if preview is a video based on file extension or type
           const isVideo = lora.previewImageUrl && (

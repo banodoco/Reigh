@@ -121,12 +121,15 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       console.log('[TasksPaneRealtimeDebug] 🔄 Invalidating React Query caches for task update', {
         context: 'realtime-invalidation-task-update',
         eventDetail: event.detail,
-        queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations', 'shots', 'unpositioned-count', 'project-video-counts'],
+        queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations (all variants)', 'shots', 'unpositioned-count', 'project-video-counts'],
         timestamp: Date.now()
       });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      // Use predicate to invalidate all unified-generations queries (including shot-specific ones)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === 'unified-generations'
+      });
       queryClient.invalidateQueries({ queryKey: ['shots'] });
       queryClient.invalidateQueries({ queryKey: ['unpositioned-count'] });
       queryClient.invalidateQueries({ queryKey: ['project-video-counts'] });
@@ -144,12 +147,15 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       console.log('[TasksPaneRealtimeDebug] 🔄 Invalidating React Query caches for new task', {
         context: 'realtime-invalidation-new-task',
         eventDetail: event.detail,
-        queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations', 'shots', 'unpositioned-count', 'project-video-counts'],
+        queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations (all variants)', 'shots', 'unpositioned-count', 'project-video-counts'],
         timestamp: Date.now()
       });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      // Use predicate to invalidate all unified-generations queries (including shot-specific ones)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === 'unified-generations'
+      });
       queryClient.invalidateQueries({ queryKey: ['shots'] });
       queryClient.invalidateQueries({ queryKey: ['unpositioned-count'] });
       queryClient.invalidateQueries({ queryKey: ['project-video-counts'] });

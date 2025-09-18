@@ -47,8 +47,8 @@ interface ShotImagesEditorProps {
   onImageDuplicate: (shotImageEntryId: string, position: number) => void;
   /** Number of columns for ShotImageManager grid */
   columns: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-  /** Selected model for conditional UI */
-  selectedModel?: 'wan-2.1' | 'wan-2.2';
+  /** Selected mode for conditional UI */
+  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
   /** Skeleton shown while data is loading */
   skeleton?: React.ReactNode;
   /** Count of generations without position – if >0 we’ll show the helper message */
@@ -89,7 +89,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onImageDelete,
   onImageDuplicate,
   columns,
-  selectedModel,
+  selectedMode,
   skeleton,
   unpositionedGenerationsCount = 0,
   onOpenUnpositionedPane,
@@ -130,7 +130,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </div>
         )}
         <div className="flex items-center justify-between">
-          <CardTitle>Manage Shot Images</CardTitle>
+          <CardTitle>Manage Shot</CardTitle>
           {!isMobile && (
             <div className="flex flex-col items-end space-y-1">
               <ToggleGroup
@@ -143,38 +143,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 <ToggleGroupItem value="batch" aria-label="Toggle batch">
                   Batch
                 </ToggleGroupItem>
-                {selectedModel === 'wan-2.2' ? (
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-block">
-                          <ToggleGroupItem value="timeline" aria-label="Toggle timeline" disabled>
-                            Timeline
-                          </ToggleGroupItem>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Timeline mode only available with Wan 2.1
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ) : (
-                  <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
-                    Timeline
-                  </ToggleGroupItem>
-                )}
+                <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
+                  Timeline
+                </ToggleGroupItem>
               </ToggleGroup>
             </div>
-          )}
-        </div>
-        {/* Reserve space for instruction line to prevent header area height jitter */}
-        <div className="min-h-5">
-          {(isMobile || generationMode === "timeline") && (
-            <p className="text-sm text-muted-foreground pt-1">
-              {isMobile
-                ? "Tap to select and move multiple images."
-                : "Drag images to precise frame positions. Drop on other images to reorder."}
-            </p>
           )}
         </div>
       </CardHeader>

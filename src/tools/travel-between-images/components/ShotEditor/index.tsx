@@ -35,6 +35,7 @@ import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib
 import { supabase } from '@/integrations/supabase/client';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
+import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -67,8 +68,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onEnhancePromptChange,
   generationMode,
   onGenerationModeChange,
-  selectedModel,
-  onModelChange,
+  selectedMode,
+  onModeChange,
   onPreviousShot,
   onNextShot,
   onPreviousShotNoScroll,
@@ -636,16 +637,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [readinessState, onGenerationModeChange, actions, selectedShot?.id, contextImages.length, isShotUISettingsLoading, isShotLoraSettingsLoading]);
 
   // Accelerated mode and random seed from database settings
-  // Default accelerated mode to true when it has never been explicitly set for this shot
-  const accelerated = shotUISettings?.acceleratedMode ?? true;
+  // Default accelerated mode to false when it has never been explicitly set for this shot
+  const accelerated = shotUISettings?.acceleratedMode ?? false;
   const randomSeed = shotUISettings?.randomSeed ?? false;
   
   // Unified step management system
   const getRecommendedSteps = useCallback((modelName: string, isAccelerated: boolean) => {
-    if (modelName === 'vace_14B_fake_cocktail_2_2') {
-      return 10; // Wan 2.2 always uses 10 steps
+    // Mode-specific step recommendations
+    switch (modelName) {
+      case 'vace_fun_14B_cocktail_lightning': // Zippy Supreme
+        return 6; // Fastest mode uses fewer steps
+      case 'vace_fun_14B_cocktail_2_2': // Steady Sprint
+        return isAccelerated ? 8 : 15; // Balanced mode
+      case 'vace_fun_14B_2_2': // Full Throttle
+      default:
+        return isAccelerated ? 8 : 20; // Default/quality mode
     }
-    return isAccelerated ? 8 : 20; // Wan 2.1 uses 8 for accelerated, 20 for normal
   }, []);
 
   const updateStepsForCurrentSettings = useCallback(() => {
@@ -713,9 +720,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Show notification if manually changing steps away from recommended value
     const recommendedSteps = getRecommendedSteps(steerableMotionSettings.model_name, accelerated);
-    const isWan21 = steerableMotionSettings.model_name === 'vace_14B';
-    
-    if (isWan21 && accelerated && steps !== recommendedSteps) {
+    // Show notification if manually changing steps away from recommended value for any mode
+    if (steps !== recommendedSteps) {
       actions.setShowStepsNotification(true);
       // Hide notification after 5 seconds
       setTimeout(() => actions.setShowStepsNotification(false), 5000);
@@ -724,32 +730,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [accelerated, steerableMotionSettings.model_name, getRecommendedSteps, onBatchVideoStepsChange, actions]);
 
-  // Handle model changes - temporarily restricted to Wan 2.1 only
-  const handleModelChange = useCallback((newModelName: string) => {
-    // Accept either internal model_name or UI model ids
-    const resolvedModelName =
-      newModelName === 'wan-2.2' || newModelName === 'vace_14B_fake_cocktail_2_2'
-        ? 'vace_14B_fake_cocktail_2_2'
-        : 'vace_14B';
-
-    onSteerableMotionSettingsChange({ 
-      model_name: resolvedModelName,
-      apply_causvid: false
-    });
-
-    // Keep accelerated enabled for Wan 2.1; disable for Wan 2.2
-    setAccelerated(resolvedModelName !== 'vace_14B_fake_cocktail_2_2');
-    // Steps are auto-handled elsewhere
-  }, [onSteerableMotionSettingsChange, setAccelerated]);
-
-  // Ensure a valid model is always selected - allow both Wan 2.1 and 2.2
+  // Model validation for the new mode system
   useEffect(() => {
-    const validModels = ['vace_14B', 'vace_14B_fake_cocktail_2_2'];
+    const validModels = ['vace_fun_14B_2_2', 'vace_fun_14B_cocktail_2_2', 'vace_fun_14B_cocktail_lightning'];
     if (!validModels.includes(steerableMotionSettings.model_name)) {
-      console.log(`[ShotEditor] Invalid model name "${steerableMotionSettings.model_name}", defaulting to Wan 2.1`);
-      handleModelChange('vace_14B');
+      console.log(`[ShotEditor] Invalid model name "${steerableMotionSettings.model_name}", defaulting to Full Throttle`);
+      onSteerableMotionSettingsChange({ 
+        model_name: 'vace_fun_14B_2_2',
+        apply_causvid: false
+      });
     }
-  }, [steerableMotionSettings.model_name, handleModelChange]);
+  }, [steerableMotionSettings.model_name, onSteerableMotionSettingsChange]);
 
   // Update editing name when selected shot changes
   useEffect(() => {
@@ -892,117 +883,100 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [simpleFilteredImages.length, batchVideoContext, onBatchVideoContextChange]);
 
-  // Model availability based on image count
-  const modelOptions = useMemo(() => {
-    const imageCount = simpleFilteredImages.length;
-    const canUseWan22 = imageCount <= 2;
-    if (canUseWan22) {
-      return {
-        availableModels: ['wan-2.1', 'wan-2.2'] as const,
-        defaultModel: 'wan-2.2' as const,
-        note: null
-      };
-    }
-    return {
-      availableModels: ['wan-2.1'] as const,
-      defaultModel: 'wan-2.1' as const,
-      note: 'Wan 2.2 is only available for shots with 2 or fewer images'
-    };
-  }, [simpleFilteredImages.length]);
+  // All modes are always available - no restrictions based on image count
 
-  // Auto-correct model when image count changes (debounced to avoid flicker)
-  const correctModelTimeoutRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!onModelChange) return;
-    if (correctModelTimeoutRef.current) {
-      window.clearTimeout(correctModelTimeoutRef.current);
-      correctModelTimeoutRef.current = null;
+  // Helper function to map mode to model_name
+  const getModeModelName = (mode: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme') => {
+    switch (mode) {
+      case 'Full Throttle':
+        return 'vace_fun_14B_2_2';
+      case 'Steady Sprint':
+        return 'vace_fun_14B_cocktail_2_2';
+      case 'Zippy Supreme':
+        return 'vace_fun_14B_cocktail_lightning';
+      default:
+        return 'vace_fun_14B_2_2';
     }
-    correctModelTimeoutRef.current = window.setTimeout(() => {
-      if (selectedModel === 'wan-2.2' && simpleFilteredImages.length > 2) {
-        onModelChange('wan-2.1');
-      }
+  };
+
+  // Auto-correct mode when image count changes (debounced to avoid flicker)
+  const correctModeTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!onModeChange) return;
+    if (correctModeTimeoutRef.current) {
+      window.clearTimeout(correctModeTimeoutRef.current);
+      correctModeTimeoutRef.current = null;
+    }
+    correctModeTimeoutRef.current = window.setTimeout(() => {
+      // For now, no specific restrictions based on image count for modes
+      // This can be customized later if needed
     }, 150);
     return () => {
-      if (correctModelTimeoutRef.current) {
-        window.clearTimeout(correctModelTimeoutRef.current);
-        correctModelTimeoutRef.current = null;
+      if (correctModeTimeoutRef.current) {
+        window.clearTimeout(correctModeTimeoutRef.current);
+        correctModeTimeoutRef.current = null;
       }
     };
-  }, [selectedModel, simpleFilteredImages.length, onModelChange]);
+  }, [selectedMode, simpleFilteredImages.length, onModeChange]);
 
-  // Auto-set frames to 81 for Wan 2.2
-  useEffect(() => {
-    if (selectedModel === 'wan-2.2' && batchVideoFrames !== 81) {
-      onBatchVideoFramesChange(81);
-    }
-  }, [selectedModel, batchVideoFrames, onBatchVideoFramesChange]);
+  // Mode-specific frame adjustments can be added here if needed
+  // For now, no specific frame requirements for different modes
 
-  // Auto-switch timeline to batch for Wan 2.2
+  // Consolidated mode sync to prevent circular updates causing flicker
+  const modeSyncRef = useRef<{ lastSelectedMode?: string; lastModelName?: string }>({});
   useEffect(() => {
-    if (selectedModel === 'wan-2.2' && generationMode === 'timeline') {
-      onGenerationModeChange('batch');
-    }
-  }, [selectedModel, generationMode, onGenerationModeChange]);
-
-  // Consolidated model sync to prevent circular updates causing flicker
-  const modelSyncRef = useRef<{ lastSelectedModel?: string; lastModelName?: string }>({});
-  useEffect(() => {
-    if (!onModelChange) return;
+    if (!onModeChange) return;
     
-    const currentSelectedModel = selectedModel;
+    const currentSelectedMode = selectedMode;
     const currentModelName = steerableMotionSettings.model_name;
     
     // Skip if no actual change
-    if (modelSyncRef.current.lastSelectedModel === currentSelectedModel && 
-        modelSyncRef.current.lastModelName === currentModelName) {
+    if (modeSyncRef.current.lastSelectedMode === currentSelectedMode && 
+        modeSyncRef.current.lastModelName === currentModelName) {
       return;
     }
     
-    console.log(`[ModelFlickerDebug] Model sync check: selectedModel(${currentSelectedModel}) vs model_name(${currentModelName})`);
+    console.log(`[ModeDebug] Mode sync check: selectedMode(${currentSelectedMode}) vs model_name(${currentModelName})`);
     
-    const expectedUIModel = currentModelName === 'vace_14B_fake_cocktail_2_2' ? 'wan-2.2' : 'wan-2.1';
-    const expectedModelName = currentSelectedModel === 'wan-2.2' ? 'vace_14B_fake_cocktail_2_2' : 'vace_14B';
+    const expectedModelName = currentSelectedMode ? getModeModelName(currentSelectedMode) : 'vace_fun_14B_2_2';
     
     // Determine which value changed by comparing to last known state
-    const selectedModelChanged = modelSyncRef.current.lastSelectedModel !== currentSelectedModel;
-    const modelNameChanged = modelSyncRef.current.lastModelName !== currentModelName;
+    const selectedModeChanged = modeSyncRef.current.lastSelectedMode !== currentSelectedMode;
+    const modelNameChanged = modeSyncRef.current.lastModelName !== currentModelName;
     
-    console.log(`[ModelFlickerDebug] Change detection: selectedModel changed(${selectedModelChanged}), model_name changed(${modelNameChanged})`);
+    console.log(`[ModeDebug] Change detection: selectedMode changed(${selectedModeChanged}), model_name changed(${modelNameChanged})`);
     
-    // Priority 1: If selectedModel changed (user interaction), update model_name to match
-    if (selectedModelChanged && currentModelName !== expectedModelName) {
-      console.log(`[ModelFlickerDebug] User changed selectedModel, updating model_name: ${currentModelName} -> ${expectedModelName}`);
-      modelSyncRef.current = { lastSelectedModel: currentSelectedModel, lastModelName: expectedModelName };
+    // Priority 1: If selectedMode changed (user interaction), update model_name to match
+    if (selectedModeChanged && currentModelName !== expectedModelName) {
+      console.log(`[ModeDebug] User changed selectedMode, updating model_name: ${currentModelName} -> ${expectedModelName}`);
+      modeSyncRef.current = { lastSelectedMode: currentSelectedMode, lastModelName: expectedModelName };
       onSteerableMotionSettingsChange({ 
         model_name: expectedModelName,
+        // Force apply_causvid to false when changing modes
         apply_causvid: false
       });
       return;
     }
     
-    // Priority 2: If model_name changed (loading from settings), update selectedModel to match
-    if (modelNameChanged && currentSelectedModel !== expectedUIModel) {
-      console.log(`[ModelFlickerDebug] Settings loaded, updating selectedModel: ${currentSelectedModel} -> ${expectedUIModel}`);
-      modelSyncRef.current = { lastSelectedModel: expectedUIModel, lastModelName: currentModelName };
-      onModelChange(expectedUIModel);
-      return;
-    }
-    
-    // Fallback: If they're just out of sync and we can't determine priority, prefer selectedModel (user intent)
-    if (currentSelectedModel !== expectedUIModel && currentModelName !== expectedModelName) {
-      console.log(`[ModelFlickerDebug] Fallback sync - prioritizing selectedModel, updating model_name: ${currentModelName} -> ${expectedModelName}`);
-      modelSyncRef.current = { lastSelectedModel: currentSelectedModel, lastModelName: expectedModelName };
-      onSteerableMotionSettingsChange({ 
-        model_name: expectedModelName,
-        apply_causvid: false
-      });
-      return;
+    // Priority 2: If model_name changed (loading from settings), update selectedMode to match
+    if (modelNameChanged && currentSelectedMode) {
+      const expectedUIMode = Object.entries({
+        'Full Throttle': 'vace_fun_14B_2_2',
+        'Steady Sprint': 'vace_fun_14B_cocktail_2_2',
+        'Zippy Supreme': 'vace_fun_14B_cocktail_lightning'
+      }).find(([_, modelName]) => modelName === currentModelName)?.[0] as 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
+      
+      if (expectedUIMode && currentSelectedMode !== expectedUIMode) {
+        console.log(`[ModeDebug] Settings loaded, updating selectedMode: ${currentSelectedMode} -> ${expectedUIMode}`);
+        modeSyncRef.current = { lastSelectedMode: expectedUIMode, lastModelName: currentModelName };
+        onModeChange(expectedUIMode);
+        return;
+      }
     }
     
     // Update ref for next comparison
-    modelSyncRef.current = { lastSelectedModel: currentSelectedModel, lastModelName: currentModelName };
-  }, [selectedModel, steerableMotionSettings.model_name, onSteerableMotionSettingsChange, onModelChange]);
+    modeSyncRef.current = { lastSelectedMode: currentSelectedMode, lastModelName: currentModelName };
+  }, [selectedMode, steerableMotionSettings.model_name, onSteerableMotionSettingsChange, onModeChange, getModeModelName]);
   
   const videoOutputs = useMemo(() => {
     return getVideoOutputs(orderedShotImages);
@@ -1037,8 +1011,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const parsedResolution: string | undefined = params.parsed_resolution_wh;
 
       if (newModel && newModel !== steerableMotionSettings.model_name) {
-        // Apply model first so we can override steps after
-        handleModelChange(newModel);
+        // Apply model directly to settings
+        onSteerableMotionSettingsChange({ 
+          model_name: newModel,
+          apply_causvid: false
+        });
       }
 
       if (typeof newPrompt === 'string') {
@@ -1105,7 +1082,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     projectId,
     selectedShot?.id,
     simpleFilteredImages,
-    handleModelChange,
     onBatchVideoPromptChange,
     onSteerableMotionSettingsChange,
     onBatchVideoFramesChange,
@@ -1130,7 +1106,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const parsedResolution: string | undefined = settings?.parsed_resolution_wh;
 
       if (newModel && newModel !== steerableMotionSettings.model_name) {
-        handleModelChange(newModel);
+        onSteerableMotionSettingsChange({ 
+          model_name: newModel,
+          apply_causvid: false
+        });
       }
       if (typeof newPrompt === 'string') {
         onBatchVideoPromptChange(newPrompt);
@@ -1161,7 +1140,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.error('Failed to apply settings:', e);
     }
   }, [
-    handleModelChange,
     onBatchVideoPromptChange,
     onSteerableMotionSettingsChange,
     onBatchVideoFramesChange,
@@ -1299,8 +1277,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       negativePrompts = [steerableMotionSettings.negative_prompt];
     }
 
-    // Map selectedModel to actual model_name for task creation
-    const actualModelName = selectedModel === 'wan-2.2' ? 'vace_14B_fake_cocktail_2_2' : 'vace_14B';
+    // Map selectedMode to actual model_name for task creation
+    const actualModelName = selectedMode ? getModeModelName(selectedMode) : 'vace_fun_14B_2_2';
     
     const requestBody: any = {
       project_id: projectId,
@@ -1317,7 +1295,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Force these settings to consistent defaults, except use_lighti2x_lora which follows accelerated mode (unless Wan 2.2)
       apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
       apply_causvid: steerableMotionSettings.apply_causvid,
-      use_lighti2x_lora: steerableMotionSettings.model_name === 'vace_14B_fake_cocktail_2_2' ? false : accelerated,
+      use_lighti2x_lora: accelerated,
       use_styleboost_loras: steerableMotionSettings.use_styleboost_loras ?? DEFAULT_STEERABLE_MOTION_SETTINGS.use_styleboost_loras,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
       colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
@@ -1332,7 +1310,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       generation_mode: generationMode,
       accelerated_mode: accelerated,
       random_seed: randomSeed,
-      selected_model: selectedModel,
+      selected_mode: selectedMode,
     };
 
     if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
@@ -1383,7 +1361,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enhancePrompt,
     openaiApiKey,
     randomSeed,
-    selectedModel,
+    selectedMode,
     loraManager.selectedLoras
   ]);
 
@@ -1493,7 +1471,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
-            selectedModel={selectedModel}
+            selectedMode={selectedMode}
           />
         </div>
 
@@ -1501,13 +1479,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         <div className="w-full">
           <Card>
             <CardHeader>
-                <CardTitle>Travel Between Images</CardTitle>
-                <p className="text-sm text-muted-foreground pt-1">Configure and generate video segments between the images in this shot.</p>
+                <CardTitle>Generate Videos</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Left Column: Main Settings */}
                     <div className="lg:w-1/2 order-2 lg:order-1">
+                        <div className="mb-4">
+                            <SectionHeader title="Settings" theme="orange" />
+                        </div>
                         <BatchSettingsForm
                             batchVideoPrompt={batchVideoPrompt}
                             onBatchVideoPromptChange={onBatchVideoPromptChange}
@@ -1536,46 +1516,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
                             imageCount={simpleFilteredImages.length}
-                            selectedModel={selectedModel}
+                            selectedMode={selectedMode}
                         />
                         
-                        {/* Model Selection (Mobile) */}
-                        <div className="block lg:hidden mt-4">
-                            <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
-                                <h3 className="font-light text-sm">Which model would you like to use:</h3>
-                                <div className="w-1/2">
-                                    <Select
-                                        value={selectedModel || 'wan-2.1'}
-                                        onValueChange={(value) => {
-                                          console.log(`[ModelFlickerDebug] USER MOBILE SELECTION: ${value}`);
-                                          onModelChange?.(value as 'wan-2.1' | 'wan-2.2');
-                                        }}
-                                        disabled={modelOptions.availableModels.length === 1}
-                                    >
-                                        <SelectTrigger id="model-mobile" className={modelOptions.availableModels.length === 1 ? "opacity-75" : ""}>
-                                            <SelectValue placeholder="Select model..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {modelOptions.availableModels.map(model => (
-                                                <SelectItem key={model} value={model}>
-                                                    {model === 'wan-2.1' ? 'Wan 2.1' : 'Wan 2.2'}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {modelOptions.note && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {modelOptions.note}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
                         
                         {/* LoRA Settings (Mobile) */}
                         <div className="block lg:hidden">
-                            <div className="space-y-4 p-4 border rounded-lg bg-card">
-                                <h3 className="font-light text-sm">LoRA Models</h3>
+                            <div className="mb-4">
+                                <SectionHeader title="LoRAs" theme="purple" />
+                            </div>
+                            <div className="space-y-4">
                                 
                                 <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
                                     Add or Manage LoRAs
@@ -1593,70 +1543,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             </div>
                         </div>
                         
-                        <div className="mt-4 pt-6 border-t">
-                            <Button 
-                                size="lg" 
-                                className="w-full" 
-                                variant={steerableMotionJustQueued ? "success" : "default"}
-                                onClick={handleGenerateBatch}
-                                disabled={isGenerationDisabled}
-                            >
-                                {steerableMotionJustQueued
-                                  ? "Added to queue!"
-                                  : isSteerableMotionEnqueuing 
-                                    ? 'Creating Tasks...' 
-                                    : 'Generate Video'}
-                            </Button>
-                            {isGenerationDisabledDueToApiKey && (
-                              <p className="text-xs text-center text-muted-foreground mt-2">
-                                If Enhance Prompt is enabled, you must add an{' '}
-                                <button 
-                                  onClick={() => actions.setSettingsModalOpen(true)}
-                                  className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
-                                >
-                                  OpenAI API key
-                                </button>
-                              </p>
-                            )}
-                        </div>
+                        
                     </div>
 
                     {/* Right Column: Model & LoRA Settings (Desktop) */}
                     <div className="hidden lg:block lg:w-1/2 order-1 lg:order-2">
-                        {/* Model Selection */}
-                        <div className="space-y-4 p-4 border rounded-lg bg-card mb-4">
-                            <h3 className="font-light text-sm">Which model would you like to use:</h3>
-                            <div className="w-1/2">
-                                <Select
-                                    value={selectedModel || 'wan-2.1'}
-                                    onValueChange={(value) => {
-                                      console.log(`[ModelFlickerDebug] USER DESKTOP SELECTION: ${value}`);
-                                      onModelChange?.(value as 'wan-2.1' | 'wan-2.2');
-                                    }}
-                                    disabled={modelOptions.availableModels.length === 1}
-                                >
-                                    <SelectTrigger id="model" className={modelOptions.availableModels.length === 1 ? "opacity-75" : ""}>
-                                        <SelectValue placeholder="Select model..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {modelOptions.availableModels.map(model => (
-                                            <SelectItem key={model} value={model}>
-                                                {model === 'wan-2.1' ? 'Wan 2.1' : 'Wan 2.2'}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {modelOptions.note && (
-                                <p className="text-xs text-muted-foreground">
-                                    {modelOptions.note}
-                                </p>
-                            )}
-                        </div>
                         
                         {/* LoRA Settings */}
-                        <div className="space-y-4 p-4 border rounded-lg bg-card">
-                            <h3 className="font-light text-sm">LoRA Models</h3>
+                        <div className="mb-4">
+                            <SectionHeader title="LoRAs" theme="purple" />
+                        </div>
+                        <div className="space-y-4">
                             
                             <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
                                 Add or Manage LoRAs
@@ -1673,6 +1570,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* Full-width divider and generate button */}
+                <div className="mt-6 pt-6 border-t">
+                  <div className="flex flex-col items-center">
+                    <Button 
+                      size="lg" 
+                      className="w-full max-w-md" 
+                      variant={steerableMotionJustQueued ? "success" : "default"}
+                      onClick={handleGenerateBatch}
+                      disabled={isGenerationDisabled}
+                    >
+                      {steerableMotionJustQueued
+                        ? "Added to queue!"
+                        : isSteerableMotionEnqueuing 
+                          ? 'Creating Tasks...' 
+                          : 'Generate Video'}
+                    </Button>
+                    {isGenerationDisabledDueToApiKey && (
+                      <p className="text-xs text-center text-muted-foreground mt-2">
+                        If Enhance Prompt is enabled, you must add an{' '}
+                        <button 
+                          onClick={() => actions.setSettingsModalOpen(true)}
+                          className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
+                        >
+                          OpenAI API key
+                        </button>
+                      </p>
+                    )}
+                  </div>
                 </div>
             </CardContent>
           </Card>

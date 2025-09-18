@@ -89,7 +89,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }, [video.id, thumbnailLoaded, thumbnailError, hasThumbnail, isInitiallyCached, inPreloaderCache, inBrowserCache]);
   
   // Hook for video element integration
-  useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader);
+  useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader, isMobile);
   
   // ===============================================================================
   // VIDEO TRANSITION STATE - Smooth transition from thumbnail to video
@@ -430,7 +430,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 alt="Video thumbnail"
                 loading="eager"
                 decoding="sync"
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
                   videoFullyVisible ? 'opacity-0' : 'opacity-100'
                 }`}
             onLoad={() => {
@@ -480,7 +480,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 timestamp: Date.now()
               });
               return (
-                <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
+                <div className={`absolute inset-0 bg-gray-200 flex items-center justify-center z-10 transition-opacity duration-300 pointer-events-none ${videoFullyVisible ? 'opacity-0' : 'opacity-100'}`}>
                   <div className="w-6 h-6 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
                 </div>
               );
@@ -494,7 +494,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   src={video.location || video.imageUrl}
                   preload={shouldPreload as 'auto' | 'metadata' | 'none'}
                   className={`w-full h-full transition-opacity duration-500 ${
-                    videoPosterLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                    videoPosterLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   videoClassName="object-cover cursor-pointer"
                   poster={video.thumbUrl}

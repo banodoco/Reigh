@@ -58,14 +58,14 @@ export interface SteerableMotionSettings {
 // Default values for steerable motion settings - single source of truth
 export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   negative_prompt: '',
-  model_name: 'vace_14B',
+  model_name: 'vace_fun_14B_2_2',
   seed: 789,
   debug: true,
   apply_reward_lora: false,
   colour_match_videos: false,
   apply_causvid: false,
   use_lighti2x_lora: false,
-  use_styleboost_loras: true,
+  use_styleboost_loras: false,
   fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
   fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
   after_first_post_generation_saturation: 1,
@@ -121,9 +121,9 @@ export interface ShotEditorProps {
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
-  // Model selection
-  selectedModel?: 'wan-2.1' | 'wan-2.2';
-  onModelChange?: (model: 'wan-2.1' | 'wan-2.2') => void;
+  // Mode selection
+  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
+  onModeChange?: (mode: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme') => void;
   // Navigation props
   onPreviousShot?: () => void;
   onNextShot?: () => void;
