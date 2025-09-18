@@ -186,8 +186,8 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       resolution: finalResolution,
       seed: params.seed ?? 11111,
       negative_prompt: params.negative_prompt,
-      // Use provided steps value if available, otherwise use defaults (28 for non-Qwen, 16 for Qwen)
-      steps: params.steps ?? (isQwenModel ? 16 : 28),
+      // Use provided steps value if available, otherwise use default of 12
+      steps: params.steps ?? 12,
       // Include LoRAs if present
       ...(params.loras?.length && {
         additional_loras: params.loras.reduce<Record<string, number>>((acc, lora) => {
