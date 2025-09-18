@@ -11,6 +11,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { useToolSettings } from "@/shared/hooks/useToolSettings";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
@@ -129,6 +130,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [openPromptModalWithAIExpanded, setOpenPromptModalWithAIExpanded] = useState(false);
   const [imagesPerPrompt, setImagesPerPrompt] = useState(1);
+  const [steps, setSteps] = useState(12); // Default to 12 steps for local generation
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
@@ -139,6 +141,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [styleReferenceOverride, setStyleReferenceOverride] = useState<string | null | undefined>(undefined);
   
   const { selectedProjectId } = useProject();
+  
+  // Access user's generation settings to detect local generation
+  const {
+    value: generationMethods,
+    isLoading: isLoadingGenerationMethods
+  } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+  
+  const isLocalGenerationEnabled = generationMethods.onComputer && !generationMethods.inCloud;
   
   // Project-level settings for model and style reference (shared across tools)
   const {
@@ -804,8 +814,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       loras: lorasForApi,
       shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
       model_name: selectedModel === 'wan-local' ? 'wan-2.2' : 'qwen-image',
-      // Set steps to 16 for Qwen models, use default for others
-      steps: selectedModel === 'qwen-image' ? 16 : undefined,
+      // Set steps: 16 for Qwen models, user-selected value for local generation, or default for others
+      steps: selectedModel === 'qwen-image' 
+        ? 16 
+        : isLocalGenerationEnabled 
+          ? steps 
+          : undefined,
       // Add style reference for Qwen.Image
       ...(selectedModel === 'qwen-image' && styleReferenceImageGeneration && {
         style_reference_image: styleReferenceImageGeneration,
@@ -1027,6 +1041,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           isGenerating={isGenerating}
           hasApiKey={hasApiKey}
           justQueued={justQueued}
+          steps={steps}
+          onChangeSteps={setSteps}
+          showStepsDropdown={isLocalGenerationEnabled}
         />
       </form>
 
