@@ -143,7 +143,27 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       return;
     }
 
-    if (!videoRef.current || !containerRef.current || duration === 0) return;
+    if (!videoRef.current || !containerRef.current) return;
+
+    // Additional fallback: Prime video loading on mouse move if it still hasn't loaded
+    if (preloadProp === 'none' && videoRef.current.readyState < 2) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[VideoStallFix] Fallback priming video load on mouse move', {
+          src: src.substring(src.lastIndexOf('/') + 1) || 'no-src',
+          readyState: videoRef.current.readyState,
+          timestamp: Date.now()
+        });
+      }
+      try {
+        videoRef.current.load();
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[VideoStallFix] Failed to prime video load on mouse move', e);
+        }
+      }
+    }
+
+    if (duration === 0) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -174,7 +194,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
     }, 150); // Start playing 150ms after mouse stops moving
-  }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover]);
+  }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, preloadProp, src]);
 
   const handleMouseEnter = useCallback(() => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled
@@ -197,10 +217,29 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     
     isHoveringRef.current = true;
     if (videoRef.current) {
+      // Fix for video stalling: Prime video loading on first hover for preload="none"
+      // This ensures the video starts loading from a user interaction
+      if (preloadProp === 'none' && videoRef.current.readyState === 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[VideoStallFix] Priming video load on hover for preload="none"', {
+            src: src.substring(src.lastIndexOf('/') + 1) || 'no-src',
+            readyState: videoRef.current.readyState,
+            timestamp: Date.now()
+          });
+        }
+        try {
+          videoRef.current.load();
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[VideoStallFix] Failed to prime video load on hover', e);
+          }
+        }
+      }
+      
       // Don't start playing immediately, wait for mouse movement or timeout
       videoRef.current.pause();
     }
-  }, [isMobile, disableScrubbing, autoplayOnHover]);
+  }, [isMobile, disableScrubbing, autoplayOnHover, preloadProp, src]);
 
   const handleMouseLeave = useCallback(() => {
     // Skip hover interactions on mobile devices or when scrubbing is disabled

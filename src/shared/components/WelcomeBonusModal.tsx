@@ -686,7 +686,9 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </DialogHeader>
       
       <div className="text-center space-y-4">
-  
+        <p className="text-muted-foreground">
+          Reigh is an early-stage tool.
+        </p>
         
         <p className="text-muted-foreground">
           If there's anything that isn't working for you or could be better, please drop into our Discord and leave a message in our #support channel or DM POM.
@@ -694,8 +696,6 @@ const SetupCompleteStep: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <p className="text-muted-foreground">
           There's no feedback too big or too small - so please share!
         </p>
-
-
       </div>
       
       <div className="flex flex-col space-y-2 pt-5 pb-2">

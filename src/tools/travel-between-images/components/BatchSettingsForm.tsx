@@ -309,11 +309,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch
-                      id="debug"
-                      checked={steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug}
-                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
+                      id="accelerated"
+                      checked={accelerated}
+                      onCheckedChange={onAcceleratedChange}
                     />
-                    <Label htmlFor="debug">Debug Mode</Label>
+                    <Label htmlFor="accelerated">Accelerated Mode</Label>
                   </div>
                   
                   <div className="flex items-center space-x-2">
@@ -328,6 +328,17 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         (Using seed: {steerableMotionSettings.seed})
                       </span>
                     )}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="debug"
+                      checked={steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug}
+                      onCheckedChange={(v) => onSteerableMotionSettingsChange({ debug: v })}
+                    />
+                    <Label htmlFor="debug">Debug Mode</Label>
                   </div>
                 </div>
               </CollapsibleContent>

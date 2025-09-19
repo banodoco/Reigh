@@ -5,10 +5,11 @@ import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 // Import hooks
-import { useFramePositions } from "./Timeline/hooks/useFramePositions";
 import { useZoom } from "./Timeline/hooks/useZoom";
 import { useFileDrop } from "./Timeline/hooks/useFileDrop";
 import { useTimelineDrag } from "./Timeline/hooks/useTimelineDrag";
+// Import our database-backed position management
+import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 
 // Import components
 import TimelineControls from "./Timeline/TimelineControls";
@@ -26,48 +27,80 @@ import {
 
 // Main Timeline component props
 export interface TimelineProps {
-  images: GenerationRow[];
+  shotId: string;
   frameSpacing: number;
   contextFrames: number;
   onImageReorder: (orderedIds: string[]) => void;
   onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
-  shotId: string;
   onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   pendingPositions?: Map<string, number>;
   onPendingPositionApplied?: (generationId: string) => void;
+  // Shared data props to prevent hook re-instantiation
+  shotGenerations?: import("@/shared/hooks/useEnhancedShotPositions").ShotGeneration[];
+  updateTimelineFrame?: (generationId: string, frame: number) => Promise<void>;
+  images?: GenerationRow[];
+  // Callback to reload parent data after timeline changes
+  onTimelineChange?: () => Promise<void>;
 }
 
 /**
  * Refactored Timeline component with hooks and smaller components
  */
 const Timeline: React.FC<TimelineProps> = ({
-  images,
+  shotId,
   frameSpacing,
   contextFrames,
   onImageReorder,
   onImageSaved,
-  shotId,
   onContextFramesChange,
   onFramePositionsChange,
   onImageDrop,
   pendingPositions,
-  onPendingPositionApplied
+  onPendingPositionApplied,
+  // Shared data props
+  shotGenerations: propShotGenerations,
+  updateTimelineFrame: propUpdateTimelineFrame,
+  images: propImages,
+  onTimelineChange
 }) => {
-  // Light Timeline performance tracking
+  // Enhanced Timeline performance tracking with prop change detection
   const renderCountRef = React.useRef(0);
+  const prevPropsRef = React.useRef<any>();
 
   React.useEffect(() => {
     renderCountRef.current++;
-    // Only log significant render counts
-    if (renderCountRef.current === 1 || renderCountRef.current % 10 === 0) {
-      console.log('[PERF] Timeline renders:', {
-        renderCount: renderCountRef.current,
-        shotId,
-        imagesCount: images.length
+    const currentProps = {
+      shotId,
+      frameSpacing,
+      contextFrames,
+      propShotGenerations: propShotGenerations ? propShotGenerations.length : null,
+      propUpdateTimelineFrame: !!propUpdateTimelineFrame,
+      propImages: propImages ? propImages.length : null
+    };
+    
+    const prevProps = prevPropsRef.current;
+    // Only log the first few renders to debug mount issues
+    if (renderCountRef.current <= 5) {
+      console.log('[PositionSystemDebug] 🔄 TIMELINE RENDER #' + renderCountRef.current, {
+        ...currentProps,
+        // Prop change analysis (only show if previous props exist)
+        ...(prevProps ? {
+          shotIdChanged: shotId !== prevProps.shotId,
+          frameSpacingChanged: frameSpacing !== prevProps.frameSpacing,
+          contextFramesChanged: contextFrames !== prevProps.contextFrames,
+          propShotGenerationsChanged: propShotGenerations !== prevProps.propShotGenerations,
+          propUpdateTimelineFrameChanged: propUpdateTimelineFrame !== prevProps.propUpdateTimelineFrame,
+          propImagesChanged: propImages !== prevProps.propImages,
+          // Reference equality checks
+          propShotGenerationsRef: propShotGenerations === prevProps.propShotGenerations ? 'SAME' : 'DIFFERENT',
+          propImagesRef: propImages === prevProps.propImages ? 'SAME' : 'DIFFERENT'
+        } : { firstRender: true })
       });
     }
+    
+    prevPropsRef.current = currentProps;
   });
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -77,18 +110,204 @@ const Timeline: React.FC<TimelineProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const initialContextFrames = useRef(contextFrames);
 
-  // Frame positions hook
-  const { framePositions, setFramePositions } = useFramePositions({
-    images,
-    frameSpacing,
-    shotId,
-    pendingPositions,
-    onPendingPositionApplied,
-    onFramePositionsChange,
-  });
+  // Use shared data if provided, otherwise fallback to hook (for backward compatibility)
+  const hookData = useEnhancedShotPositions(propShotGenerations ? null : shotId);
+  const shotGenerations = propShotGenerations || hookData.shotGenerations;
+  const updateTimelineFrame = propUpdateTimelineFrame || hookData.updateTimelineFrame;
+  const initializeTimelineFrames = hookData.initializeTimelineFrames;
+  const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, not loading
+  
+  // Important: If using shared data, we need to ensure parent reloads when we make changes
+  const parentLoadPositions = propShotGenerations ? hookData.loadPositions : null;
+  
+  // Use provided images or generate from shotGenerations
+  const images = propImages || React.useMemo(() => {
+    const timelineImages = shotGenerations
+      .filter(sg => sg.generation)
+      .map(sg => ({
+        id: sg.generation_id,
+        shotImageEntryId: sg.id,
+        imageUrl: sg.generation?.location,
+        thumbUrl: sg.generation?.location,
+        location: sg.generation?.location,
+        type: sg.generation?.type,
+        createdAt: sg.generation?.created_at,
+        position: sg.position,
+        timeline_frame: sg.timeline_frame,
+        metadata: sg.metadata
+      } as GenerationRow & { position: number; timeline_frame?: number }));
+
+    // Sort by timeline_frame, fallback to calculated frame
+    return timelineImages.sort((a, b) => {
+      const frameA = a.timeline_frame ?? (a.position * frameSpacing);
+      const frameB = b.timeline_frame ?? (b.position * frameSpacing);
+      return frameA - frameB;
+    });
+  }, [shotGenerations, frameSpacing]);
+  
+  // Convert database timeline_frame values to Timeline-compatible Map
+  // Keep previous positions during loading to prevent flicker
+  const [stablePositions, setStablePositions] = React.useState<Map<string, number>>(new Map());
+  
+  // Track dependency changes with refs
+  const prevDepsRef = React.useRef<{
+    shotGenerations: any;
+    images: any;
+    frameSpacing: number;
+    shotId: string;
+  }>();
+
+  const framePositions = React.useMemo(() => {
+    const currentDeps = { shotGenerations, images, frameSpacing, shotId };
+    const prevDeps = prevDepsRef.current;
+    
+    console.log('[PositionSystemDebug] 🔄 RECALCULATING framePositions useMemo:', {
+      shotId: shotId.substring(0, 8),
+      shotGenerationsLength: shotGenerations.length,
+      imagesLength: images.length,
+      frameSpacing,
+      isLoading,
+      // Dependency change analysis
+      shotGenerationsChanged: prevDeps ? shotGenerations !== prevDeps.shotGenerations : true,
+      imagesChanged: prevDeps ? images !== prevDeps.images : true,
+      frameSpacingChanged: prevDeps ? frameSpacing !== prevDeps.frameSpacing : true,
+      shotIdChanged: prevDeps ? shotId !== prevDeps.shotId : true,
+      // Reference checks
+      shotGenerationsRef: shotGenerations === prevDeps?.shotGenerations ? 'SAME_REF' : 'DIFF_REF',
+      imagesRef: images === prevDeps?.images ? 'SAME_REF' : 'DIFF_REF'
+    });
+    
+    prevDepsRef.current = currentDeps;
+    
+    const positions = new Map<string, number>();
+    
+    shotGenerations.forEach(sg => {
+      const matchingImage = images.find(img => img.id === sg.generation_id);
+      if (matchingImage) {
+        if (sg.timeline_frame !== null && sg.timeline_frame !== undefined) {
+          positions.set(matchingImage.shotImageEntryId, sg.timeline_frame);
+        } else {
+          // Initialize with position * frameSpacing if no timeline_frame
+          positions.set(matchingImage.shotImageEntryId, sg.position * frameSpacing);
+        }
+      }
+    });
+
+    console.log('[PositionSystemDebug] 📊 TIMELINE frame positions from database:', {
+      shotId: shotId.substring(0, 8),
+      positionsCount: positions.size,
+      positions: Array.from(positions.entries()).map(([id, frame]) => ({
+        id: id.substring(0, 8),
+        frame
+      })),
+      isLoading
+    });
+    
+    return positions;
+  }, [shotGenerations, images, frameSpacing, shotId]);
+
+  // Update stable positions when not loading, separate from useMemo
+  React.useEffect(() => {
+    if (!isLoading && framePositions.size > 0) {
+      setStablePositions(framePositions);
+    }
+  }, [framePositions, isLoading]);
+
+  // Auto-initialize timeline frames for existing shots that don't have them
+  React.useEffect(() => {
+    if (isLoading || !shotGenerations || shotGenerations.length === 0) return;
+
+    // Check if any items are missing timeline_frame values
+    const itemsWithoutFrames = shotGenerations.filter(sg => 
+      sg.timeline_frame === null || sg.timeline_frame === undefined
+    );
+
+    if (itemsWithoutFrames.length > 0) {
+      console.log('[PositionSystemDebug] 🚀 Auto-initializing timeline frames for existing shot:', {
+        shotId: shotId.substring(0, 8),
+        totalItems: shotGenerations.length,
+        itemsNeedingInitialization: itemsWithoutFrames.length,
+        defaultFrameSpacing: 60
+      });
+
+      // Use the proper default frame spacing (60) instead of current UI frameSpacing
+      initializeTimelineFrames(60).catch(error => {
+        console.error('[PositionSystemDebug] ❌ Failed to auto-initialize timeline frames:', error);
+      });
+    }
+  }, [isLoading, shotGenerations, shotId, initializeTimelineFrames]);
+
+  // Use stable positions during loading to prevent flicker
+  const displayPositions = React.useMemo(() => {
+    // Use stable positions if we have them and we're loading, OR if the fresh positions are empty/different
+    const useStable = (isLoading && stablePositions.size > 0) || 
+                     (stablePositions.size > 0 && framePositions.size === 0);
+    
+    if (useStable) {
+      console.log('[PositionSystemDebug] ⏳ TIMELINE keeping stable positions:', {
+        shotId: shotId.substring(0, 8),
+        stableCount: stablePositions.size,
+        freshCount: framePositions.size,
+        isLoading,
+        reason: isLoading ? 'loading' : 'fresh_positions_empty'
+      });
+      return stablePositions;
+    }
+    
+    // If fresh positions are available and different from stable, use fresh
+    if (framePositions.size > 0) {
+      console.log('[PositionSystemDebug] 🔄 TIMELINE using fresh positions:', {
+        shotId: shotId.substring(0, 8),
+        freshCount: framePositions.size,
+        isLoading
+      });
+    }
+    
+    return framePositions;
+  }, [isLoading, stablePositions, framePositions, shotId]);
+
+  // Database-backed setFramePositions function
+  const setFramePositions = React.useCallback(async (newPositions: Map<string, number>) => {
+    console.log('[PositionSystemDebug] 🎯 TIMELINE updating positions to database:', {
+      shotId: shotId.substring(0, 8),
+      positionsCount: newPositions.size,
+    });
+
+    // IMMEDIATELY update stable positions to prevent visual glitches during database update
+    setStablePositions(new Map(newPositions));
+    console.log('[PositionSystemDebug] 🎭 TIMELINE immediately updated stable positions for smooth transition');
+
+    // Update database for each changed position
+    const updatePromises: Promise<void>[] = [];
+    newPositions.forEach((newFrame, shotImageEntryId) => {
+      const currentFrame = displayPositions.get(shotImageEntryId);
+      if (currentFrame !== newFrame) {
+        // Find the generation ID from shotImageEntryId
+        const matchingImage = images.find(img => img.shotImageEntryId === shotImageEntryId);
+        if (matchingImage) {
+          updatePromises.push(updateTimelineFrame(matchingImage.id, newFrame));
+        }
+      }
+    });
+
+    // Wait for all updates to complete
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+      
+      // If using shared data, trigger parent reload
+      if (propShotGenerations && onTimelineChange) {
+        await onTimelineChange();
+      }
+    }
+
+    // Also call the original callback if provided
+    if (onFramePositionsChange) {
+      onFramePositionsChange(newPositions);
+    }
+  }, [displayPositions, images, updateTimelineFrame, onFramePositionsChange, shotId, propShotGenerations, onTimelineChange]);
 
   // Calculate dimensions
-  const { fullMin, fullMax, fullRange } = getTimelineDimensions(framePositions);
+  const { fullMin, fullMax, fullRange } = getTimelineDimensions(displayPositions);
 
   // Zoom hook
   const {
@@ -123,7 +342,7 @@ const Timeline: React.FC<TimelineProps> = ({
     handleMouseMove,
     handleMouseUp,
   } = useTimelineDrag({
-    framePositions,
+    framePositions: displayPositions,
     setFramePositions,
     images,
     onImageReorder,
@@ -374,7 +593,7 @@ const Timeline: React.FC<TimelineProps> = ({
                 currentDragFrame={isDragging ? currentDragFrame : null}
                 dragDistances={isDragging ? dragDistances : null}
                 maxAllowedGap={maxAllowedGap}
-                originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
+                originalFramePos={displayPositions.get(image.shotImageEntryId) ?? 0}
               />
             );
           })}

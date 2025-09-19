@@ -166,6 +166,11 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   }, []);
 
   // Set up sensors for drag and drop
+  // Always create the keyboard sensor but conditionally disable it
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  });
+  
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -178,14 +183,22 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
         tolerance: 5,
       },
     }),
-    // Only enable KeyboardSensor when not focused on input elements
-    // This prevents keyboard conflicts with the search input
-    ...(isInputFocused ? [] : [
-      useSensor(KeyboardSensor, {
-        coordinateGetter: sortableKeyboardCoordinates,
-      })
-    ])
+    keyboardSensor
   );
+
+  const handleDragStart = (event: any) => {
+    // Prevent drag if an input is focused
+    if (isInputFocused) {
+      console.log(`${REORDER_DEBUG_TAG} Preventing drag start - input is focused`);
+      return false;
+    }
+    
+    console.log(`${REORDER_DEBUG_TAG} === DRAG START ===`, {
+      activeId: event.active.id,
+      activeData: event.active.data,
+      timestamp: Date.now()
+    });
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     console.log(`${REORDER_DEBUG_TAG} === DRAG END EVENT ===`);
@@ -308,6 +321,33 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     }
   };
 
+  // [ShotReorderDebug] Additional drag event handlers for debugging
+
+  const handleDragMove = (event: any) => {
+    // Only log when over a different item to reduce noise
+    if (event.over && event.active.id !== event.over.id) {
+      console.log(`${REORDER_DEBUG_TAG} Drag move over different item:`, {
+        activeId: event.active.id,
+        overId: event.over.id,
+        delta: event.delta,
+        timestamp: Date.now()
+      });
+    }
+  };
+
+  const handleDragCancel = () => {
+    console.log(`${REORDER_DEBUG_TAG} === DRAG CANCELLED ===`, {
+      timestamp: Date.now()
+    });
+  };
+
+  // [ShotReorderDebug] Memoize sortable items
+  const sortableItems = React.useMemo(() => {
+    if (!shots) return [];
+    const items = shots.map((shot) => shot.id);
+    return items;
+  }, [shots]);
+
   // Show loading skeleton while data is being fetched
   if (shotsLoading || shots === undefined) {
     return (
@@ -342,39 +382,6 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
       </div>
     );
   }
-
-  // [ShotReorderDebug] Additional drag event handlers for debugging
-  const handleDragStart = (event: any) => {
-    console.log(`${REORDER_DEBUG_TAG} === DRAG START ===`, {
-      activeId: event.active.id,
-      activeData: event.active.data,
-      timestamp: Date.now()
-    });
-  };
-
-  const handleDragMove = (event: any) => {
-    // Only log when over a different item to reduce noise
-    if (event.over && event.active.id !== event.over.id) {
-      console.log(`${REORDER_DEBUG_TAG} Drag move over different item:`, {
-        activeId: event.active.id,
-        overId: event.over.id,
-        delta: event.delta,
-        timestamp: Date.now()
-      });
-    }
-  };
-
-  const handleDragCancel = () => {
-    console.log(`${REORDER_DEBUG_TAG} === DRAG CANCELLED ===`, {
-      timestamp: Date.now()
-    });
-  };
-
-  // [ShotReorderDebug] Memoize sortable items
-  const sortableItems = React.useMemo(() => {
-    const items = shots.map((shot) => shot.id);
-    return items;
-  }, [shots]);
 
   return (
     <DndContext

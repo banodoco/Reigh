@@ -1441,7 +1441,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             isMobile={isMobile}
             generationMode={generationMode}
             onGenerationModeChange={onGenerationModeChange}
-            images={simpleFilteredImages}
             selectedShotId={selectedShot.id}
             batchVideoFrames={batchVideoFrames}
             batchVideoContext={batchVideoContext}
@@ -1471,7 +1470,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
-            selectedMode={selectedMode}
           />
         </div>
 

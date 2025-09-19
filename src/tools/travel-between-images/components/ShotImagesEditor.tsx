@@ -3,10 +3,12 @@ import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import ShotImageManager from "@/shared/components/ShotImageManager";
-import Timeline from "@/tools/travel-between-images/components/Timeline";
+import Timeline from "./Timeline";
 import { Button } from "@/shared/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import FileInput from "@/shared/components/FileInput";
+import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
+import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -19,9 +21,7 @@ interface ShotImagesEditorProps {
   generationMode: "batch" | "timeline";
   /** Callback to switch modes */
   onGenerationModeChange: (mode: "batch" | "timeline") => void;
-  /** Non-video images belonging to the shot */
-  images: GenerationRow[];
-  /** Selected shot id (needed by Timeline) */
+  /** Selected shot id */
   selectedShotId: string;
   /** Frame spacing (frames between key-frames) */
   batchVideoFrames: number;
@@ -39,33 +39,31 @@ interface ShotImagesEditorProps {
   onImageDrop: (files: File[], targetFrame?: number) => Promise<void>;
   /** Map of pending frame positions coming from server */
   pendingPositions: Map<string, number>;
-  /** Notify parent when pending position has been applied */
+  /** Callback when pending position is applied */
   onPendingPositionApplied: (generationId: string) => void;
-  /** Delete callback for ShotImageManager */
+  /** Image deletion callback */
   onImageDelete: (shotImageEntryId: string) => void;
-  /** Duplicate callback for ShotImageManager */
-  onImageDuplicate: (shotImageEntryId: string, position: number) => void;
-  /** Number of columns for ShotImageManager grid */
-  columns: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
-  /** Selected mode for conditional UI */
-  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
-  /** Skeleton shown while data is loading */
-  skeleton?: React.ReactNode;
-  /** Count of generations without position – if >0 we’ll show the helper message */
-  unpositionedGenerationsCount?: number;
-  /** Handler to open the Generations pane when user clicks helper */
-  onOpenUnpositionedPane?: () => void;
-  /** File input key so the element can be reset */
+  /** Image duplication callback */
+  onImageDuplicate?: (shotImageEntryId: string, position: number) => void;
+  /** Number of columns for batch mode grid */
+  columns: 2 | 3 | 4 | 6;
+  /** Skeleton component to show while loading */
+  skeleton: React.ReactNode;
+  /** Count of unpositioned generations */
+  unpositionedGenerationsCount: number;
+  /** Callback to open unpositioned pane */
+  onOpenUnpositionedPane: () => void;
+  /** File input key for resetting */
   fileInputKey: number;
-  /** Upload handler for adding new images */
-  onImageUpload: (files: File[]) => void;
-  /** Whether an upload is currently in progress */
+  /** Image upload callback */
+  onImageUpload: (files: File[]) => Promise<void>;
+  /** Whether currently uploading image */
   isUploadingImage: boolean;
-  /** ID of image currently being duplicated (for loading state) */
+  /** ID of image currently being duplicated */
   duplicatingImageId?: string | null;
-  /** ID of image that was successfully duplicated (for success state) */
+  /** ID of image that was just duplicated (for success indication) */
   duplicateSuccessImageId?: string | null;
-  /** Project aspect ratio for proper placeholder dimensions */
+  /** Project aspect ratio for display */
   projectAspectRatio?: string;
 }
 
@@ -75,7 +73,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   isMobile,
   generationMode,
   onGenerationModeChange,
-  images,
   selectedShotId,
   batchVideoFrames,
   batchVideoContext,
@@ -89,9 +86,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onImageDelete,
   onImageDuplicate,
   columns,
-  selectedMode,
   skeleton,
-  unpositionedGenerationsCount = 0,
+  unpositionedGenerationsCount,
   onOpenUnpositionedPane,
   fileInputKey,
   onImageUpload,
@@ -100,61 +96,86 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
 }) => {
-  // Light performance tracking - only log significant events
-  const renderCountRef = React.useRef(0);
-  const mountTimeRef = React.useRef(Date.now());
-
-  React.useEffect(() => {
-    renderCountRef.current++;
-    // Only log every 10th render or when switching shots
-    if (renderCountRef.current % 10 === 0 || renderCountRef.current === 1) {
-      console.log('[PERF] ShotImagesEditor:', {
-        renderCount: renderCountRef.current,
-        selectedShotId,
-        imagesCount: images.length,
-        isModeReady,
-        totalTime: Date.now() - mountTimeRef.current
-      });
-    }
+  // Enhanced position management
+  // Centralized position management - shared between Timeline and ShotImageManager
+  const { 
+    getImagesForMode, 
+    isLoading: positionsLoading,
+    shotGenerations,
+    updateTimelineFrame,
+    exchangePositions,
+    deleteItem,
+    loadPositions
+  } = useEnhancedShotPositions(selectedShotId);
+  
+  // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
+  const { handleReorder, handleDelete } = useEnhancedShotImageReorder(selectedShotId, {
+    shotGenerations,
+    getImagesForMode,
+    exchangePositions,
+    deleteItem,
+    loadPositions,
+    isLoading: positionsLoading
   });
-  /* ------------------------------------------------------------------ */
-  /* Main card with immediate header rendering                          */
-  /* ------------------------------------------------------------------ */
+
+  // Memoize images and shotGenerations to prevent infinite re-renders in Timeline
+  const images = React.useMemo(() => {
+    return getImagesForMode(generationMode);
+  }, [getImagesForMode, generationMode]);
+
+  // Memoize shotGenerations to prevent reference changes
+  const memoizedShotGenerations = React.useMemo(() => {
+    return shotGenerations;
+  }, [shotGenerations]);
+
+  console.log('[ShotImagesEditor] Render:', {
+    selectedShotId,
+    generationMode,
+    imagesCount: images.length,
+    positionsLoading,
+    isModeReady
+  });
+
   return (
-    <Card className="flex flex-col">
-      {/* Header - Always render immediately (static content) */}
-      <CardHeader>
-        {settingsError && (
-          <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 text-sm">
-            {settingsError}
-          </div>
-        )}
+    <Card className="w-full">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle>Manage Shot</CardTitle>
-          {!isMobile && (
-            <div className="flex flex-col items-end space-y-1">
-              <ToggleGroup
-                type="single"
-                value={generationMode}
-                onValueChange={(value: "batch" | "timeline") => value && onGenerationModeChange(value)}
-                size="sm"
-                disabled={!isModeReady}
-              >
-                <ToggleGroupItem value="batch" aria-label="Toggle batch">
-                  Batch
-                </ToggleGroupItem>
-                <ToggleGroupItem value="timeline" aria-label="Toggle timeline">
-                  Timeline
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          )}
+          <CardTitle className="text-lg font-medium">
+            Images
+            {settingsError && (
+              <div className="text-sm text-destructive mt-1">
+                {settingsError}
+              </div>
+            )}
+          </CardTitle>
+          
+          <div className="flex items-center gap-2">
+            {/* Generation Mode Toggle */}
+            <ToggleGroup
+              type="single"
+              value={generationMode}
+              onValueChange={(value) => {
+                if (value && (value === "batch" || value === "timeline")) {
+                  onGenerationModeChange(value);
+                }
+              }}
+              className="h-8"
+            >
+              <ToggleGroupItem value="batch" className="text-xs px-2 h-8">
+                Batch
+              </ToggleGroupItem>
+              <ToggleGroupItem value="timeline" className="text-xs px-2 h-8">
+                Timeline
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+          </div>
         </div>
       </CardHeader>
 
       {/* Content - Show skeleton if not ready, otherwise show actual content */}
       <CardContent>
-        {!isModeReady ? (
+        {!isModeReady || positionsLoading ? (
           <div className="p-1">
             {skeleton}
           </div>
@@ -163,7 +184,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             {generationMode === "timeline" ? (
               <Timeline
                 shotId={selectedShotId}
-                images={images}
                 frameSpacing={batchVideoFrames}
                 contextFrames={batchVideoContext}
                 onImageReorder={onImageReorder}
@@ -173,13 +193,18 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onImageDrop={onImageDrop}
                 pendingPositions={pendingPositions}
                 onPendingPositionApplied={onPendingPositionApplied}
+                // Pass shared data to prevent reloading
+                shotGenerations={memoizedShotGenerations}
+                updateTimelineFrame={updateTimelineFrame}
+                images={images}
+                onTimelineChange={loadPositions}
               />
             ) : (
               <ShotImageManager
                 images={images}
-                onImageDelete={onImageDelete}
+                onImageDelete={handleDelete}
                 onImageDuplicate={onImageDuplicate}
-                onImageReorder={onImageReorder}
+                onImageReorder={handleReorder}
                 columns={columns}
                 generationMode={isMobile ? "batch" : generationMode}
                 onImageSaved={onImageSaved}
@@ -195,35 +220,58 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </div>
         )}
 
+        {/* Upload Button - Moved below images */}
+        <div className="mt-4">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-full">
+                  <FileInput
+                    key={fileInputKey}
+                    onFilesSelected={onImageUpload}
+                    accept="image/*"
+                    multiple
+                    disabled={isUploadingImage}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploadingImage}
+                      className="w-full h-10 text-sm"
+                    >
+                      {isUploadingImage ? "Uploading..." : "Add Images"}
+                    </Button>
+                  </FileInput>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Upload new images to this shot</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
         {/* Helper for un-positioned generations - Reserve space during loading to prevent layout shift */}
-        <div className="mx-1 mt-4" style={{ minHeight: isModeReady && unpositionedGenerationsCount > 0 ? 'auto' : '0px' }}>
-          {isModeReady && unpositionedGenerationsCount > 0 && (
-            <div className="p-3 bg-muted/50 rounded-lg flex items-center justify-between animate-in fade-in duration-300">
-              <span className="text-sm text-muted-foreground">
-                There {unpositionedGenerationsCount === 1 ? "is" : "are"} {unpositionedGenerationsCount} generation
-                {unpositionedGenerationsCount === 1 ? "" : "s"} associated with this shot that {unpositionedGenerationsCount === 1 ? "doesn't" : "don't"} have a position
-              </span>
-              <Button variant="outline" size="sm" onClick={onOpenUnpositionedPane}>
-                Open Pane
+        <div className="mx-1 mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>
+          {unpositionedGenerationsCount > 0 && (
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed">
+              <div className="text-sm text-muted-foreground">
+                {unpositionedGenerationsCount} unpositioned generation{unpositionedGenerationsCount !== 1 ? 's' : ''}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onOpenUnpositionedPane}
+                className="text-xs"
+              >
+                View & Position
               </Button>
             </div>
           )}
         </div>
       </CardContent>
-
-      {/* File input - Always visible, only disabled during uploads */}
-      <div className="p-4 border-t space-y-3">
-        <FileInput
-          key={fileInputKey}
-          onFileChange={onImageUpload}
-          acceptTypes={["image"]}
-          label="Add more images"
-          disabled={isUploadingImage}
-          multiple
-        />
-      </div>
     </Card>
   );
 };
 
-export default ShotImagesEditor; 
+export default ShotImagesEditor;

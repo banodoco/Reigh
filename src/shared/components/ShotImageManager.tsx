@@ -864,10 +864,77 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     12: 'grid-cols-12',
   }[columns] || 'grid-cols-4';
 
+  // Mobile reordering function - integrates with unified position system
+  const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
+    if (mobileSelectedIds.length === 0) {
+      console.log('[MobileReorder] No items selected for reordering');
+      return;
+    }
+
+    console.log('[MobileReorder] 🔄 STARTING mobile reorder:', {
+      selectedCount: mobileSelectedIds.length,
+      selectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
+      targetIndex,
+      currentImagesLength: currentImages.length
+    });
+
+    try {
+      // Get the selected images and their current indices
+      const selectedItems = mobileSelectedIds.map(id => {
+        const image = currentImages.find(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
+        const index = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
+        return { id, image, currentIndex: index };
+      }).filter(item => item.image && item.currentIndex !== -1);
+
+      if (selectedItems.length === 0) {
+        console.log('[MobileReorder] No valid selected items found');
+        return;
+      }
+
+      // Sort by current index to maintain relative order
+      selectedItems.sort((a, b) => a.currentIndex - b.currentIndex);
+
+      // Create new order by moving selected items to target position
+      const newOrder = [...currentImages];
+      
+      // Remove selected items from their current positions (in reverse order to maintain indices)
+      selectedItems.reverse().forEach(item => {
+        newOrder.splice(item.currentIndex, 1);
+      });
+      
+      // Insert selected items at target position (maintaining their relative order)
+      selectedItems.reverse().forEach((item, i) => {
+        newOrder.splice(targetIndex + i, 0, item.image!);
+      });
+
+      // Create ordered IDs array for the unified system
+      const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
+
+      console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
+        originalOrder: currentImages.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
+        newOrder: orderedIds.map(id => id.substring(0, 8)),
+        movedItems: selectedItems.map(item => item.id.substring(0, 8)),
+        targetIndex
+      });
+
+      // Use the unified position system
+      await onImageReorder(orderedIds);
+
+      // Clear selection after successful reorder
+      setMobileSelectedIds([]);
+      
+      console.log('[MobileReorder] ✅ Mobile reorder completed successfully');
+
+    } catch (error) {
+      console.error('[MobileReorder] ❌ Mobile reorder failed:', error);
+      // Don't clear selection on error so user can retry
+    }
+  }, [mobileSelectedIds, currentImages, onImageReorder]);
+
   console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
   // Mobile batch mode with selection
   if (isMobile && generationMode === 'batch') {
-    console.log(`[DEBUG] EARLY RETURN - Mobile batch mode`);
+    console.log(`[DEBUG] EARLY RETURN - Mobile batch mode with unified position system integration`);
     const mobileColumns = columns; // Use the columns prop for mobile
     const itemsPerRow = mobileColumns;
     
@@ -972,7 +1039,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                             size="icon"
                             variant="secondary"
                             className="h-12 w-6 rounded-full p-0"
-                            onClick={() => handleMoveHere(index)}
+                            onClick={() => {
+                              console.log('[MobileReorder] 📱 Arrow button clicked:', { targetIndex: index, selectedCount: mobileSelectedIds.length });
+                              handleMobileMoveHere(index);
+                            }}
                             onPointerDown={e=>e.stopPropagation()}
                             title={index === 0 ? "Move to beginning" : "Move here"}
                           >
@@ -988,7 +1058,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                             size="icon"
                             variant="secondary"
                             className="h-12 w-6 rounded-full p-0"
-                            onClick={() => handleMoveHere(index + 1)}
+                            onClick={() => {
+                              console.log('[MobileReorder] 📱 Arrow button clicked (end):', { targetIndex: index + 1, selectedCount: mobileSelectedIds.length });
+                              handleMobileMoveHere(index + 1);
+                            }}
                             onPointerDown={e=>e.stopPropagation()}
                             title="Move to end"
                           >

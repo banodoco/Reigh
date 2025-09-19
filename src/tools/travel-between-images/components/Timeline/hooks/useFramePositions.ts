@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { GenerationRow } from "@/types/shots";
 
 interface UseFramePositionsProps {
@@ -76,30 +76,14 @@ export const useFramePositions = ({
     });
   }, [images, frameSpacing, pendingPositions, onPendingPositionApplied]);
 
-  // Save positions to localStorage with optimized debounce and change detection
-  const previousFramePositionsRef = useRef<string>('');
+  // Save positions to localStorage with increased debounce to reduce cascading updates
   useEffect(() => {
-    const currentPositionsStr = JSON.stringify(Array.from(framePositions.entries()));
-    
-    // Skip if positions haven't actually changed
-    if (currentPositionsStr === previousFramePositionsRef.current) {
-      return;
-    }
-    
     const timer = setTimeout(() => {
-      // Double-check positions haven't changed during timeout
-      const latestPositionsStr = JSON.stringify(Array.from(framePositions.entries()));
-      if (latestPositionsStr === previousFramePositionsRef.current) {
-        return; // Skip save if no change
-      }
-      
-      previousFramePositionsRef.current = latestPositionsStr;
-      localStorage.setItem(`timelineFramePositions_${shotId}`, latestPositionsStr);
+      localStorage.setItem(`timelineFramePositions_${shotId}`, JSON.stringify(Array.from(framePositions.entries())));
       if (onFramePositionsChange) {
         onFramePositionsChange(framePositions);
       }
-    }, 500);
-    
+    }, 500); // Increased from 100ms to 500ms to reduce rapid updates during task cancellation
     return () => clearTimeout(timer);
   }, [framePositions, shotId, onFramePositionsChange]);
 
@@ -107,4 +91,4 @@ export const useFramePositions = ({
     framePositions,
     setFramePositions,
   };
-}; 
+};

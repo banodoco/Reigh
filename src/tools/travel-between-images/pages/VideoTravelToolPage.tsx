@@ -659,8 +659,8 @@ const VideoTravelToolPage: React.FC = () => {
               )}
             </div>
           </div>
-          {/* Search box - only show when in shots view */}
-          {!showVideosView && (
+          {/* Search box - only show when in shots view and there are shots */}
+          {!showVideosView && shots && shots.length > 0 && (
             <div className="px-4">
               <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background w-full max-w-xs">
                 <Search className="h-4 w-4 text-muted-foreground" />
