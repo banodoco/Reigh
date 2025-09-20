@@ -399,7 +399,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
-  const [selectedMode, setSelectedMode] = useState<'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme'>('Zippy Supreme');
+  // Mode selection removed - now hardcoded to use specific model
   // const [afterEachPromptText, setAfterEachPromptText] = useState<string>(''); // Removed - not used in ShotEditor
   
   // Add state for toggling between shots and videos view
@@ -743,7 +743,7 @@ const VideoTravelToolPage: React.FC = () => {
       setVideoPairConfigs(settingsToApply.pairConfigs || []);
       setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
       setPairConfigs(settingsToApply.pairConfigs || []);
-      setSelectedMode(settingsToApply.selectedMode || 'Zippy Supreme');
+      // selectedMode removed - now hardcoded to use specific model
       setSteerableMotionSettings({
         ...(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS),
         apply_causvid: false // Force apply_causvid to false regardless of saved settings
@@ -1068,15 +1068,7 @@ const VideoTravelToolPage: React.FC = () => {
     }));
   }, []);
 
-  const handleModeChange = useCallback((mode: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme') => {
-    if (isLoadingSettingsRef.current) {
-      console.log(`[ModeDebug] BLOCKED handleModeChange during loading: ${mode}`);
-      return;
-    }
-    console.log(`[ModeDebug] VideoTravelToolPage.handleModeChange: ${selectedMode} -> ${mode}`);
-    userHasInteracted.current = true;
-    setSelectedMode(mode);
-  }, [selectedMode]);
+  // Mode change handler removed - now hardcoded to use specific model
 
   // Memoize current settings to reduce effect runs
   const currentSettings = useMemo<VideoTravelSettings>(() => ({
@@ -1092,7 +1084,7 @@ const VideoTravelToolPage: React.FC = () => {
     enhancePrompt,
     generationMode,
     pairConfigs,
-    selectedMode,
+    // selectedMode removed - now hardcoded to use specific model
     // selectedLoras removed - now managed directly in ShotEditor
   }), [
           videoControlMode,
@@ -1107,7 +1099,7 @@ const VideoTravelToolPage: React.FC = () => {
           enhancePrompt,
           generationMode,
           pairConfigs,
-          selectedMode,
+          // selectedMode removed - now hardcoded to use specific model
           // selectedLoras removed - now managed directly in ShotEditor
   ]);
 
@@ -1394,8 +1386,6 @@ const VideoTravelToolPage: React.FC = () => {
               onEnhancePromptChange={handleEnhancePromptChange}
               generationMode={generationMode}
               onGenerationModeChange={handleGenerationModeChange}
-              selectedMode={selectedMode}
-              onModeChange={handleModeChange}
 
               onPreviousShot={handlePreviousShot}
               onNextShot={handleNextShot}

@@ -679,7 +679,7 @@ export default function HomePage() {
                     <img 
                       src={currentExample.image1} 
                       alt="Input image 1"
-                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded ml-2"
                     />
                     <span className="text-lg sm:text-xl font-light px-3">+</span>
                     <img 
@@ -689,7 +689,7 @@ export default function HomePage() {
                     />
                     <span className="text-lg sm:text-xl font-light pl-4">=</span>
                   </div>
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 flex items-center">
                     <ChevronRight className="hover-arrow w-6 h-6 text-primary transition-transform transition-colors duration-700 ease-in-out group-hover:text-primary group-hover:animate-sway-x" strokeWidth={1.5} />
                   </div>
                 </TooltipContent>

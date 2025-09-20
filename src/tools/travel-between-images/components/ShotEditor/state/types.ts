@@ -121,9 +121,7 @@ export interface ShotEditorProps {
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
-  // Mode selection
-  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
-  onModeChange?: (mode: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme') => void;
+  // Mode selection removed - now hardcoded to use specific model
   // Navigation props
   onPreviousShot?: () => void;
   onNextShot?: () => void;

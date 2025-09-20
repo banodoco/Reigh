@@ -220,7 +220,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </div>
         )}
 
-        {/* Upload Button - Moved below images */}
+        {/* Upload Input - Moved below images */}
         <div className="mt-4">
           <TooltipProvider>
             <Tooltip>
@@ -228,20 +228,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 <div className="w-full">
                   <FileInput
                     key={fileInputKey}
-                    onFilesSelected={onImageUpload}
-                    accept="image/*"
+                    onFileChange={(files) => { onImageUpload(files); }}
+                    acceptTypes={["image"]}
                     multiple
                     disabled={isUploadingImage}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isUploadingImage}
-                      className="w-full h-10 text-sm"
-                    >
-                      {isUploadingImage ? "Uploading..." : "Add Images"}
-                    </Button>
-                  </FileInput>
+                    label={isUploadingImage ? "Uploading..." : "Add Images"}
+                    className="w-full"
+                    suppressAcceptedTypes
+                  />
                 </div>
               </TooltipTrigger>
               <TooltipContent>

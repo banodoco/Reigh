@@ -52,8 +52,7 @@ interface BatchSettingsFormProps {
   
   // Image count for conditional UI
   imageCount?: number;
-  // Selected mode for conditional UI
-  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
+  // selectedMode removed - now hardcoded to use specific model
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -219,17 +218,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 />
                 {showStepsNotification && (
                   <p className="text-sm text-yellow-600 mt-1">
-                    {(() => {
-                      switch (steerableMotionSettings.model_name) {
-                        case 'vace_fun_14B_cocktail_lightning':
-                          return 'Note: We recommend 6 steps for Zippy Supreme mode';
-                        case 'vace_fun_14B_cocktail_2_2':
-                          return `Note: We recommend ${accelerated ? '8' : '15'} steps for Steady Sprint mode`;
-                        case 'vace_fun_14B_2_2':
-                        default:
-                          return `Note: We recommend ${accelerated ? '8' : '20'} steps for Full Throttle mode`;
-                      }
-                    })()}
+                    Note: We recommend 6 steps for optimal performance
                   </p>
                 )}
               </div>

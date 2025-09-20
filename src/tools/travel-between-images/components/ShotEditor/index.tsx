@@ -68,8 +68,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onEnhancePromptChange,
   generationMode,
   onGenerationModeChange,
-  selectedMode,
-  onModeChange,
+  // selectedMode and onModeChange removed - now hardcoded to use specific model
   onPreviousShot,
   onNextShot,
   onPreviousShotNoScroll,
@@ -641,18 +640,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const accelerated = shotUISettings?.acceleratedMode ?? false;
   const randomSeed = shotUISettings?.randomSeed ?? false;
   
-  // Unified step management system
+  // Always use 6 steps for the hardcoded model
   const getRecommendedSteps = useCallback((modelName: string, isAccelerated: boolean) => {
-    // Mode-specific step recommendations
-    switch (modelName) {
-      case 'vace_fun_14B_cocktail_lightning': // Zippy Supreme
-        return 6; // Fastest mode uses fewer steps
-      case 'vace_fun_14B_cocktail_2_2': // Steady Sprint
-        return isAccelerated ? 8 : 15; // Balanced mode
-      case 'vace_fun_14B_2_2': // Full Throttle
-      default:
-        return isAccelerated ? 8 : 20; // Default/quality mode
-    }
+    return 6; // Always use 6 steps for the hardcoded model
   }, []);
 
   const updateStepsForCurrentSettings = useCallback(() => {
@@ -730,13 +720,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [accelerated, steerableMotionSettings.model_name, getRecommendedSteps, onBatchVideoStepsChange, actions]);
 
-  // Model validation for the new mode system
+  // Always ensure we use the hardcoded model
   useEffect(() => {
-    const validModels = ['vace_fun_14B_2_2', 'vace_fun_14B_cocktail_2_2', 'vace_fun_14B_cocktail_lightning'];
-    if (!validModels.includes(steerableMotionSettings.model_name)) {
-      console.log(`[ShotEditor] Invalid model name "${steerableMotionSettings.model_name}", defaulting to Full Throttle`);
+    const hardcodedModel = 'vace_fun_14B_cocktail_lightning';
+    if (steerableMotionSettings.model_name !== hardcodedModel) {
+      console.log(`[ShotEditor] Setting model to hardcoded: ${hardcodedModel}`);
       onSteerableMotionSettingsChange({ 
-        model_name: 'vace_fun_14B_2_2',
+        model_name: hardcodedModel,
         apply_causvid: false
       });
     }
@@ -885,98 +875,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // All modes are always available - no restrictions based on image count
 
-  // Helper function to map mode to model_name
-  const getModeModelName = (mode: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme') => {
-    switch (mode) {
-      case 'Full Throttle':
-        return 'vace_fun_14B_2_2';
-      case 'Steady Sprint':
-        return 'vace_fun_14B_cocktail_2_2';
-      case 'Zippy Supreme':
-        return 'vace_fun_14B_cocktail_lightning';
-      default:
-        return 'vace_fun_14B_2_2';
-    }
+  // Always use the hardcoded model
+  const getHardcodedModelName = () => {
+    return 'vace_fun_14B_cocktail_lightning';
   };
 
-  // Auto-correct mode when image count changes (debounced to avoid flicker)
-  const correctModeTimeoutRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!onModeChange) return;
-    if (correctModeTimeoutRef.current) {
-      window.clearTimeout(correctModeTimeoutRef.current);
-      correctModeTimeoutRef.current = null;
-    }
-    correctModeTimeoutRef.current = window.setTimeout(() => {
-      // For now, no specific restrictions based on image count for modes
-      // This can be customized later if needed
-    }, 150);
-    return () => {
-      if (correctModeTimeoutRef.current) {
-        window.clearTimeout(correctModeTimeoutRef.current);
-        correctModeTimeoutRef.current = null;
-      }
-    };
-  }, [selectedMode, simpleFilteredImages.length, onModeChange]);
-
-  // Mode-specific frame adjustments can be added here if needed
-  // For now, no specific frame requirements for different modes
-
-  // Consolidated mode sync to prevent circular updates causing flicker
-  const modeSyncRef = useRef<{ lastSelectedMode?: string; lastModelName?: string }>({});
-  useEffect(() => {
-    if (!onModeChange) return;
-    
-    const currentSelectedMode = selectedMode;
-    const currentModelName = steerableMotionSettings.model_name;
-    
-    // Skip if no actual change
-    if (modeSyncRef.current.lastSelectedMode === currentSelectedMode && 
-        modeSyncRef.current.lastModelName === currentModelName) {
-      return;
-    }
-    
-    console.log(`[ModeDebug] Mode sync check: selectedMode(${currentSelectedMode}) vs model_name(${currentModelName})`);
-    
-    const expectedModelName = currentSelectedMode ? getModeModelName(currentSelectedMode) : 'vace_fun_14B_2_2';
-    
-    // Determine which value changed by comparing to last known state
-    const selectedModeChanged = modeSyncRef.current.lastSelectedMode !== currentSelectedMode;
-    const modelNameChanged = modeSyncRef.current.lastModelName !== currentModelName;
-    
-    console.log(`[ModeDebug] Change detection: selectedMode changed(${selectedModeChanged}), model_name changed(${modelNameChanged})`);
-    
-    // Priority 1: If selectedMode changed (user interaction), update model_name to match
-    if (selectedModeChanged && currentModelName !== expectedModelName) {
-      console.log(`[ModeDebug] User changed selectedMode, updating model_name: ${currentModelName} -> ${expectedModelName}`);
-      modeSyncRef.current = { lastSelectedMode: currentSelectedMode, lastModelName: expectedModelName };
-      onSteerableMotionSettingsChange({ 
-        model_name: expectedModelName,
-        // Force apply_causvid to false when changing modes
-        apply_causvid: false
-      });
-      return;
-    }
-    
-    // Priority 2: If model_name changed (loading from settings), update selectedMode to match
-    if (modelNameChanged && currentSelectedMode) {
-      const expectedUIMode = Object.entries({
-        'Full Throttle': 'vace_fun_14B_2_2',
-        'Steady Sprint': 'vace_fun_14B_cocktail_2_2',
-        'Zippy Supreme': 'vace_fun_14B_cocktail_lightning'
-      }).find(([_, modelName]) => modelName === currentModelName)?.[0] as 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
-      
-      if (expectedUIMode && currentSelectedMode !== expectedUIMode) {
-        console.log(`[ModeDebug] Settings loaded, updating selectedMode: ${currentSelectedMode} -> ${expectedUIMode}`);
-        modeSyncRef.current = { lastSelectedMode: expectedUIMode, lastModelName: currentModelName };
-        onModeChange(expectedUIMode);
-        return;
-      }
-    }
-    
-    // Update ref for next comparison
-    modeSyncRef.current = { lastSelectedMode: currentSelectedMode, lastModelName: currentModelName };
-  }, [selectedMode, steerableMotionSettings.model_name, onSteerableMotionSettingsChange, onModeChange, getModeModelName]);
+  // Mode synchronization removed - now hardcoded to use specific model
   
   const videoOutputs = useMemo(() => {
     return getVideoOutputs(orderedShotImages);
@@ -1277,8 +1181,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       negativePrompts = [steerableMotionSettings.negative_prompt];
     }
 
-    // Map selectedMode to actual model_name for task creation
-    const actualModelName = selectedMode ? getModeModelName(selectedMode) : 'vace_fun_14B_2_2';
+    // Always use the hardcoded model for task creation
+    const actualModelName = getHardcodedModelName();
     
     const requestBody: any = {
       project_id: projectId,
@@ -1310,7 +1214,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       generation_mode: generationMode,
       accelerated_mode: accelerated,
       random_seed: randomSeed,
-      selected_mode: selectedMode,
+      // selected_mode removed - now hardcoded to use specific model
     };
 
     if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
@@ -1361,7 +1265,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enhancePrompt,
     openaiApiKey,
     randomSeed,
-    selectedMode,
+    // selectedMode removed - now hardcoded to use specific model
     loraManager.selectedLoras
   ]);
 
@@ -1514,7 +1418,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
                             imageCount={simpleFilteredImages.length}
-                            selectedMode={selectedMode}
                         />
                         
                         
@@ -1595,6 +1498,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         >
                           OpenAI API key
                         </button>
+                      </p>
+                    )}
+                    {!batchVideoPrompt.trim() && (
+                      <p className="text-xs text-center text-red-600 mt-2">
+                        Having a prompt is very important for directing the video
                       </p>
                     )}
                   </div>

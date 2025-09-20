@@ -14,7 +14,7 @@ export interface VideoTravelSettings {
   enhancePrompt: boolean;
   generationMode: 'batch' | 'by-pair' | 'timeline';
   selectedModel?: 'wan-2.1' | 'wan-2.2';
-  selectedMode?: 'Full Throttle' | 'Steady Sprint' | 'Zippy Supreme';
+  // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;
     prompt: string;

@@ -6,14 +6,17 @@ import { Button } from '@/shared/components/ui/button';
 const getModelDisplayName = (modelName: string | undefined): string => {
   if (!modelName) return 'Unknown';
   
+  // Now all tasks use the same hardcoded model
+  if (modelName === 'vace_fun_14B_cocktail_lightning') {
+    return 'Optimized Model';
+  }
+  
+  // Legacy model names for backward compatibility
   switch (modelName) {
     case 'vace_fun_14B_2_2':
-      return 'Full Throttle';
+      return 'Full Throttle (Legacy)';
     case 'vace_fun_14B_cocktail_2_2':
-      return 'Steady Sprint';
-    case 'vace_fun_14B_cocktail_lightning':
-      return 'Zippy Supreme';
-    // Legacy model names for backward compatibility
+      return 'Steady Sprint (Legacy)';
     case 'vace_14B':
       return 'Legacy Model';
     case 'vace_14B_fake_cocktail_2_2':
