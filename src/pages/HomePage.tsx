@@ -643,7 +643,7 @@ export default function HomePage() {
                     <span className="text-lg sm:text-xl font-light pl-4">=</span>
                   </div>
                   <div className="flex-shrink-0">
-                    <ChevronRight className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-x" />
+                    <ChevronRight className="hover-arrow w-6 h-6 text-primary transition-transform transition-colors duration-700 ease-in-out group-hover:text-primary group-hover:animate-sway-x" strokeWidth={1.5} />
                   </div>
                 </TooltipContent>
               </Tooltip>
