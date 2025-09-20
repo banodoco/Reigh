@@ -97,6 +97,53 @@ export default function HomePage() {
 
   const currentExample = exampleStyles[selectedExampleStyle];
 
+  // Video ref for philosophy pane preview
+  const philosophyVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Proactively preload the example video when the Philosophy pane opens
+  useEffect(() => {
+    if (!showPhilosophy || !currentExample?.video) return;
+    try {
+      const id = 'preload-video-home';
+      let link = document.getElementById(id) as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.id = id;
+        link.rel = 'preload';
+        link.as = 'video';
+        link.href = currentExample.video;
+        // Ensure cross-origin preloading works for public Supabase storage
+        (link as any).crossOrigin = 'anonymous';
+        document.head.appendChild(link);
+        console.log('[VideoLoadSpeedIssue] Added <link rel="preload" as="video">', link.href);
+      } else if (link.href !== currentExample.video) {
+        link.href = currentExample.video;
+        console.log('[VideoLoadSpeedIssue] Updated preload link to', link.href);
+      }
+    } catch (e) {
+      console.log('[VideoLoadSpeedIssue] Failed to add preload link', e);
+    }
+  }, [showPhilosophy, currentExample.video]);
+
+  // Start playback only after pane's open animation completes to avoid jank
+  useEffect(() => {
+    if (!showPhilosophy || isPhilosophyPaneOpening) return;
+    const video = philosophyVideoRef.current;
+    if (!video) return;
+    try {
+      console.log('[VideoLoadSpeedIssue] Initiating playback after pane animation');
+      video.currentTime = 0;
+      // Reload to ensure buffering starts for the current source
+      video.load();
+      const p = video.play();
+      if (p && typeof (p as any).catch === 'function') {
+        (p as Promise<void>).catch((err) => console.log('[VideoLoadSpeedIssue] play() blocked', err));
+      }
+    } catch (e) {
+      console.log('[VideoLoadSpeedIssue] Failed to start playback', e);
+    }
+  }, [showPhilosophy, isPhilosophyPaneOpening, currentExample.video]);
+
   // Debug ecosystem tooltip state
   useEffect(() => {
     console.log('[EcosystemTooltip] State change - open:', ecosystemTipOpen, 'disabled:', ecosystemTipDisabled);
@@ -1105,32 +1152,68 @@ export default function HomePage() {
                     </div>
                   </div>
                   {/* Right side: Output video - square matching combined height */}
-                  <div className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative">
+                  <div className="w-[168px] h-[168px] sm:w-[264px] sm:h-[264px] flex-shrink-0 relative" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
                     <video 
                       key={selectedExampleStyle}
                       ref={(video) => {
+                        philosophyVideoRef.current = video;
                         if (video && showPhilosophy) {
-                          const playButton = video.nextElementSibling;
+                          const playButton = video.nextElementSibling as HTMLElement | null;
                           if (playButton) {
                             playButton.style.display = 'none';
                             playButton.style.opacity = '0';
                           }
-                          video.currentTime = 0;
-                          video.play();
                         }
                       }}
                       src={currentExample.video}
+                      poster={currentExample.image1}
                       muted
                       playsInline
+                      preload="auto"
+                      crossOrigin="anonymous"
+                      disableRemotePlayback
+                      onLoadedMetadata={(e) => {
+                        const v = e.currentTarget as HTMLVideoElement;
+                        console.log('[VideoLoadSpeedIssue] loadedmetadata', { duration: v.duration, readyState: v.readyState });
+                      }}
+                      onCanPlay={(e) => {
+                        const v = e.currentTarget as HTMLVideoElement;
+                        console.log('[VideoLoadSpeedIssue] canplay', { readyState: v.readyState });
+                        if (v.paused && showPhilosophy && !isPhilosophyPaneOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplay', err));
+                      }}
+                      onCanPlayThrough={(e) => {
+                        const v = e.currentTarget as HTMLVideoElement;
+                        console.log('[VideoLoadSpeedIssue] canplaythrough', { readyState: v.readyState });
+                        if (v.paused && showPhilosophy && !isPhilosophyPaneOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplaythrough', err));
+                      }}
+                      onWaiting={() => {
+                        console.log('[VideoLoadSpeedIssue] waiting (buffering)');
+                      }}
+                      onStalled={() => {
+                        console.log('[VideoLoadSpeedIssue] stalled (network)');
+                      }}
+                      onPlaying={(e) => {
+                        const v = e.currentTarget as HTMLVideoElement;
+                        const quality = (v as any).getVideoPlaybackQuality ? (v as any).getVideoPlaybackQuality() : null;
+                        const webkitDropped = (v as any).webkitDroppedFrameCount;
+                        console.log('[VideoLoadSpeedIssue] playing', {
+                          readyState: v.readyState,
+                          droppedFrames: quality?.droppedVideoFrames ?? webkitDropped,
+                          totalFrames: quality?.totalVideoFrames,
+                        });
+                      }}
+                      onError={(e) => {
+                        console.log('[VideoLoadSpeedIssue] error', (e as any)?.message);
+                      }}
                       onPlay={(e) => {
-                        const playButton = e.target.nextElementSibling;
+                        const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
                         if (playButton) {
                           playButton.style.display = 'none';
                           playButton.style.opacity = '0';
                         }
                       }}
                       onEnded={(e) => {
-                        const playButton = e.target.nextElementSibling;
+                        const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
                         if (playButton) {
                           // Start with no blur and gradually increase
                           playButton.style.display = 'flex';
@@ -1154,7 +1237,7 @@ export default function HomePage() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const video = e.currentTarget.previousElementSibling;
+                        const video = e.currentTarget.previousElementSibling as HTMLVideoElement | null;
                         if (video) {
                           video.currentTime = 0;
                           video.play();
