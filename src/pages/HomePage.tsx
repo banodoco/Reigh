@@ -65,33 +65,33 @@ export default function HomePage() {
   const exampleStyles = {
     'Dramatic': {
       prompt: 'He runs up to the camera rapidly',
-      image1: '/files/main_example_input_1.png',
-      image2: '/files/main_example_input_2.png',
-      video: '/files/main_example_output.mp4'
+      image1: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/b0adac1b-eef7-42ea-bc6b-0dd0b7ac29f7-u2_ba329b5a-20e3-43c4-8077-08500fc26fb2.jpeg',
+      image2: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/7e3a6775-aba4-45ca-85f7-ffafaf711511-u2_970c5947-1edf-475c-9395-1e25274c096f.jpeg',
+      video: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/61baab8d-3fd7-445a-a0ba-c481000d37ad-u2_f1734e58-a433-47e0-b901-9f5d252bf285.mp4'
     },
     'Whimsical': {
       prompt: 'She dances with butterflies',
-      image1: '/files/main_example_input_1.png',
-      image2: '/files/main_example_input_2.png',
-      video: '/files/main_example_output.mp4'
+      image1: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/b0adac1b-eef7-42ea-bc6b-0dd0b7ac29f7-u2_ba329b5a-20e3-43c4-8077-08500fc26fb2.jpeg',
+      image2: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/7e3a6775-aba4-45ca-85f7-ffafaf711511-u2_970c5947-1edf-475c-9395-1e25274c096f.jpeg',
+      video: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/61baab8d-3fd7-445a-a0ba-c481000d37ad-u2_f1734e58-a433-47e0-b901-9f5d252bf285.mp4'
     },
     'Action-Packed': {
       prompt: 'Explosion in the background',
-      image1: '/files/main_example_input_1.png',
-      image2: '/files/main_example_input_2.png',
-      video: '/files/main_example_output.mp4'
+      image1: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/b0adac1b-eef7-42ea-bc6b-0dd0b7ac29f7-u2_ba329b5a-20e3-43c4-8077-08500fc26fb2.jpeg',
+      image2: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/7e3a6775-aba4-45ca-85f7-ffafaf711511-u2_970c5947-1edf-475c-9395-1e25274c096f.jpeg',
+      video: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/61baab8d-3fd7-445a-a0ba-c481000d37ad-u2_f1734e58-a433-47e0-b901-9f5d252bf285.mp4'
     },
     'Eerie': {
       prompt: 'Shadows creep closer slowly',
-      image1: '/files/main_example_input_1.png',
-      image2: '/files/main_example_input_2.png',
-      video: '/files/main_example_output.mp4'
+      image1: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/b0adac1b-eef7-42ea-bc6b-0dd0b7ac29f7-u2_ba329b5a-20e3-43c4-8077-08500fc26fb2.jpeg',
+      image2: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/7e3a6775-aba4-45ca-85f7-ffafaf711511-u2_970c5947-1edf-475c-9395-1e25274c096f.jpeg',
+      video: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/61baab8d-3fd7-445a-a0ba-c481000d37ad-u2_f1734e58-a433-47e0-b901-9f5d252bf285.mp4'
     },
     'Questionable': {
       prompt: 'Something feels very wrong',
-      image1: '/files/main_example_input_1.png',
-      image2: '/files/main_example_input_2.png',
-      video: '/files/main_example_output.mp4'
+      image1: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/b0adac1b-eef7-42ea-bc6b-0dd0b7ac29f7-u2_ba329b5a-20e3-43c4-8077-08500fc26fb2.jpeg',
+      image2: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/7e3a6775-aba4-45ca-85f7-ffafaf711511-u2_970c5947-1edf-475c-9395-1e25274c096f.jpeg',
+      video: 'https://wczysqzxlwdndgxitrvc.supabase.co/storage/v1/object/public/image_uploads/8a9fdac5-ed89-482c-aeca-c3dd7922d53c/61baab8d-3fd7-445a-a0ba-c481000d37ad-u2_f1734e58-a433-47e0-b901-9f5d252bf285.mp4'
     }
   };
 
@@ -630,23 +630,17 @@ export default function HomePage() {
                 >
                   <div className="flex items-center gap-1 text-primary">
                     <img 
-                      src="/files/main_example_input_1.png" 
+                      src={currentExample.image1} 
                       alt="Input image 1"
                       className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded"
                     />
-                    <span className="text-sm sm:text-base font-light">+</span>
-                    <div className="flex items-center">
-                        <div className="text-xs font-medium text-center px-2 py-1.5 bg-gradient-to-r from-wes-cream/90 to-wes-vintage-gold/20 border border-wes-vintage-gold/30 rounded-md shadow-sm max-w-[80px] text-primary">
-                          "{currentExample.prompt}"
-                        </div>
-                    </div>
-                    <span className="text-sm sm:text-base font-light">+</span>
+                    <span className="text-lg sm:text-xl font-light px-3">+</span>
                     <img 
-                      src="/files/main_example_input_2.png" 
+                      src={currentExample.image2} 
                       alt="Input image 2"
                       className="w-16 h-16 sm:w-20 sm:h-20 object-cover border rounded"
                     />
-                    <span className="text-sm sm:text-base font-light">=</span>
+                    <span className="text-lg sm:text-xl font-light pl-4">=</span>
                   </div>
                   <div className="flex-shrink-0">
                     <ChevronRight className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-x" />
