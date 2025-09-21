@@ -301,6 +301,68 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     }
   }, [shotId, shotGenerations, loadPositions]);
 
+  // Exchange positions without reloading (for batch operations)
+  const exchangePositionsNoReload = useCallback(async (generationIdA: string, generationIdB: string) => {
+    if (!shotId) {
+      throw new Error('No shot ID provided for position exchange');
+    }
+
+    try {
+      const { error } = await supabase.rpc('exchange_shot_positions', {
+        p_shot_id: shotId,
+        p_generation_id_a: generationIdA,
+        p_generation_id_b: generationIdB
+      });
+
+      if (error) throw error;
+
+      // No position reload - caller will handle this
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to exchange positions';
+      console.error('[useEnhancedShotPositions] ❌ Exchange error (no reload):', err);
+      throw err;
+    }
+  }, [shotId]);
+
+  // Batch exchange positions - performs multiple exchanges then reloads once
+  const batchExchangePositions = useCallback(async (exchanges: Array<{ generationIdA: string; generationIdB: string }>) => {
+    if (!shotId) {
+      throw new Error('No shot ID provided for batch position exchange');
+    }
+
+    if (exchanges.length === 0) {
+      return;
+    }
+
+    console.log('[useEnhancedShotPositions] Batch exchange starting:', {
+      shotId: shotId.substring(0, 8),
+      exchangeCount: exchanges.length,
+      exchanges: exchanges.map(ex => ({
+        idA: ex.generationIdA.substring(0, 8),
+        idB: ex.generationIdB.substring(0, 8)
+      }))
+    });
+
+    try {
+      // Perform all exchanges without reloading positions each time
+      for (const exchange of exchanges) {
+        await exchangePositionsNoReload(exchange.generationIdA, exchange.generationIdB);
+      }
+
+      console.log('[useEnhancedShotPositions] ✅ All exchanges completed, reloading positions once');
+
+      // Single reload after all exchanges are done
+      await loadPositions();
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to batch exchange positions';
+      console.error('[useEnhancedShotPositions] ❌ Batch exchange error:', err);
+      toast.error(`Failed to reorder items: ${errorMessage}`);
+      throw err;
+    }
+  }, [shotId, loadPositions, exchangePositionsNoReload]);
+
   // Delete item and its positions by shot_generations.id (not generation_id to avoid deleting duplicates)
   const deleteItem = useCallback(async (shotGenerationId: string) => {
     if (!shotId) {
@@ -531,6 +593,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     getPositionsForMode,
     getImagesForMode,
     exchangePositions,
+    batchExchangePositions,
     deleteItem,
     addItem,
     updateTimelineFrame,

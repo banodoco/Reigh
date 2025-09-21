@@ -1,12 +1,13 @@
 import React from 'react';
 import { Button } from "@/shared/components/ui/button";
+import { Card, CardContent } from "@/shared/components/ui/card";
 import { Slider } from "@/shared/components/ui/slider";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/components/ui/collapsible";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { ChevronsUpDown, Info } from 'lucide-react';
+import { ChevronRight, ChevronDown, Info } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Checkbox } from "@/shared/components/ui/checkbox";
@@ -116,7 +117,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   />
                 </div>
                 <div className="relative">
-                  <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">Negative Prompt:</Label>
+                  <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">Negative prompt:</Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -170,7 +171,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 )}
                 {!isTimelineMode && imageCount > 2 && (
                   <div className="relative">
-                    <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Number of Context Frames: {batchVideoContext}</Label>
+                    <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Context frames: {batchVideoContext}</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -197,7 +198,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             {/* Steps slider in its own row */}
             <div className="grid grid-cols-1 gap-4 items-end">
               <div className="relative">
-                <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation Steps: {batchVideoSteps}</Label>
+                <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation steps: {batchVideoSteps}</Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -224,16 +225,23 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             </div>
             
-            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <div className="pt-6 pb-8 sm:pt-4 sm:pb-0">
+              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-center text-sm bg-muted hover:bg-muted/80">
-                  <ChevronsUpDown className="h-4 w-4 mr-2" />
-                  {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
-                </Button>
+                  <Button variant="ghost" className="w-full justify-center text-sm border border-input hover:bg-muted/80">
+                   {showAdvanced ? (
+                     <ChevronDown className="h-4 w-4 mr-2" />
+                   ) : (
+                     <ChevronRight className="h-4 w-4 mr-2" />
+                   )}
+                    {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+                  </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-4">
-                <div>
-                  <Label className="text-sm font-light block mb-2">Dimension Source</Label>
+              <CollapsibleContent className="pt-0">
+                <Card>
+                  <CardContent className="space-y-4 pt-6">
+                    <div>
+                      <Label className="text-sm font-light block mb-2">Dimension source:</Label>
                   <RadioGroup
                     value={dimensionSource || 'project'}
                     onValueChange={(value) => {
@@ -298,15 +306,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch
-                      id="accelerated"
-                      checked={accelerated}
-                      onCheckedChange={onAcceleratedChange}
-                    />
-                    <Label htmlFor="accelerated">Accelerated Mode</Label>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Switch
                       id="random-seed"
                       checked={randomSeed}
                       onCheckedChange={onRandomSeedChange}
@@ -318,9 +317,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       </span>
                     )}
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4">
+                  
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="debug"
@@ -330,8 +327,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     <Label htmlFor="debug">Debug Mode</Label>
                   </div>
                 </div>
+                  </CardContent>
+                </Card>
               </CollapsibleContent>
             </Collapsible>
+            </div>
         </div>
     );
 };

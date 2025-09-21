@@ -413,6 +413,8 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
               updatedParams.full_orchestrator_payload = {};
             }
             updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
+            // Hardcode accelerated to false for all travel_stitch tasks
+            updatedParams.full_orchestrator_payload.accelerated = false;
           } else if (currentTask.task_type === 'wan_2_2_i2v') {
             // For wan_2_2_i2v tasks, add to orchestrator_details.thumbnail_url
             if (!updatedParams.orchestrator_details) {
@@ -464,6 +466,11 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
             }
             if (!updatedParams.full_orchestrator_payload.thumbnail_url) {
               updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
+              shouldUpdate = true;
+            }
+            // Always hardcode accelerated to false for travel_stitch tasks
+            if (updatedParams.full_orchestrator_payload.accelerated !== false) {
+              updatedParams.full_orchestrator_payload.accelerated = false;
               shouldUpdate = true;
             }
           } else if (currentTask.task_type === 'wan_2_2_i2v') {

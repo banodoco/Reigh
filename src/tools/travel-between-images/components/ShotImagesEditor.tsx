@@ -104,6 +104,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     shotGenerations,
     updateTimelineFrame,
     exchangePositions,
+    batchExchangePositions,
     deleteItem,
     loadPositions
   } = useEnhancedShotPositions(selectedShotId);
@@ -113,6 +114,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     shotGenerations,
     getImagesForMode,
     exchangePositions,
+    batchExchangePositions,
     deleteItem,
     loadPositions,
     isLoading: positionsLoading

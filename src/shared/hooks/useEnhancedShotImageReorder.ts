@@ -12,6 +12,7 @@ export const useEnhancedShotImageReorder = (
     shotGenerations: any[];
     getImagesForMode: (mode: 'batch' | 'timeline') => any[];
     exchangePositions: (genIdA: string, genIdB: string) => Promise<void>;
+    batchExchangePositions: (exchanges: Array<{ generationIdA: string; generationIdB: string }>) => Promise<void>;
     deleteItem: (genId: string) => Promise<void>;
     loadPositions: () => Promise<void>;
     isLoading: boolean;
@@ -24,6 +25,7 @@ export const useEnhancedShotImageReorder = (
     shotGenerations,
     getImagesForMode,
     exchangePositions,
+    batchExchangePositions,
     deleteItem,
     loadPositions,
     isLoading
@@ -51,53 +53,99 @@ export const useEnhancedShotImageReorder = (
         currentPositionMap.set(img.shotImageEntryId || img.id, index);
       });
 
-      // Find what changed by comparing arrays
+      // Enhanced exchange detection: Convert any reordering into a series of adjacent exchanges
+      // This handles both simple swaps and complex multi-step moves
       const exchanges: Array<{ fromId: string; toId: string; fromGenId: string; toGenId: string }> = [];
       
-      for (let newIndex = 0; newIndex < orderedShotImageEntryIds.length; newIndex++) {
-        const newId = orderedShotImageEntryIds[newIndex];
-        const currentIndex = currentOrder.indexOf(newId);
+      // Create a working copy of the current order to simulate the exchanges
+      const workingOrder = [...currentOrder];
+      
+      // For each position in the desired order, move the correct item there via adjacent swaps
+      for (let targetPos = 0; targetPos < orderedShotImageEntryIds.length; targetPos++) {
+        const desiredId = orderedShotImageEntryIds[targetPos];
+        const currentPos = workingOrder.indexOf(desiredId);
         
-        if (currentIndex !== newIndex && currentIndex !== -1) {
-          // This item moved - find what it swapped with
-          const displacedId = currentOrder[newIndex];
-          const displacedNewIndex = orderedShotImageEntryIds.indexOf(displacedId);
-          
-          if (displacedNewIndex === currentIndex) {
-            // This is a clean swap between two items
-            const fromImg = currentImages.find(img => (img.shotImageEntryId || img.id) === newId);
-            const toImg = currentImages.find(img => (img.shotImageEntryId || img.id) === displacedId);
+        if (currentPos === -1) {
+          console.warn(`[useEnhancedShotImageReorder] Item ${desiredId} not found in current order`);
+          continue;
+        }
+        
+        // If item is already in the right position, skip
+        if (currentPos === targetPos) {
+          continue;
+        }
+        
+        // Move the item to target position via adjacent swaps
+        if (currentPos < targetPos) {
+          // Item needs to move right - swap with each item to the right
+          for (let i = currentPos; i < targetPos; i++) {
+            const itemA = workingOrder[i];
+            const itemB = workingOrder[i + 1];
             
-            if (fromImg && toImg) {
+            // Find the generation objects for these items
+            const imgA = currentImages.find(img => (img.shotImageEntryId || img.id) === itemA);
+            const imgB = currentImages.find(img => (img.shotImageEntryId || img.id) === itemB);
+            
+            if (imgA && imgB) {
               exchanges.push({
-                fromId: newId,
-                toId: displacedId,
-                fromGenId: fromImg.id,
-                toGenId: toImg.id
+                fromId: itemA,
+                toId: itemB,
+                fromGenId: imgA.id,
+                toGenId: imgB.id
               });
+              
+              // Update working order to reflect this swap
+              [workingOrder[i], workingOrder[i + 1]] = [workingOrder[i + 1], workingOrder[i]];
+            }
+          }
+        } else {
+          // Item needs to move left - swap with each item to the left
+          for (let i = currentPos; i > targetPos; i--) {
+            const itemA = workingOrder[i];
+            const itemB = workingOrder[i - 1];
+            
+            // Find the generation objects for these items
+            const imgA = currentImages.find(img => (img.shotImageEntryId || img.id) === itemA);
+            const imgB = currentImages.find(img => (img.shotImageEntryId || img.id) === itemB);
+            
+            if (imgA && imgB) {
+              exchanges.push({
+                fromId: itemA,
+                toId: itemB,
+                fromGenId: imgA.id,
+                toGenId: imgB.id
+              });
+              
+              // Update working order to reflect this swap
+              [workingOrder[i], workingOrder[i - 1]] = [workingOrder[i - 1], workingOrder[i]];
             }
           }
         }
       }
+      
+      // No need to remove duplicates since we're generating a specific sequence
+      const uniqueExchanges = exchanges;
 
-      // Remove duplicates (each swap is detected twice)
-      const uniqueExchanges = exchanges.filter((exchange, index) => 
-        !exchanges.slice(0, index).some(prev => 
-          (prev.fromGenId === exchange.toGenId && prev.toGenId === exchange.fromGenId)
-        )
-      );
-
-      console.log('[useEnhancedShotImageReorder] Detected exchanges:', {
+      console.log('[useEnhancedShotImageReorder] Enhanced exchange detection results:', {
+        originalOrder: currentOrder.map(id => id.substring(0, 8)),
+        desiredOrder: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
+        finalWorkingOrder: workingOrder.map(id => id.substring(0, 8)),
         exchangeCount: uniqueExchanges.length,
         exchanges: uniqueExchanges.map(ex => ({
           from: ex.fromGenId.substring(0, 8),
           to: ex.toGenId.substring(0, 8)
-        }))
+        })),
+        orderMatches: JSON.stringify(workingOrder) === JSON.stringify(orderedShotImageEntryIds)
       });
 
-      // Perform all exchanges
-      for (const exchange of uniqueExchanges) {
-        await exchangePositions(exchange.fromGenId, exchange.toGenId);
+      // Perform all exchanges in a batch to prevent UI flickering
+      if (uniqueExchanges.length > 0) {
+        await batchExchangePositions(
+          uniqueExchanges.map(ex => ({
+            generationIdA: ex.fromGenId,
+            generationIdB: ex.toGenId
+          }))
+        );
       }
 
       if (uniqueExchanges.length > 0) {
