@@ -104,6 +104,7 @@ const Timeline: React.FC<TimelineProps> = ({
   });
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isPersistingPositions, setIsPersistingPositions] = useState<boolean>(false);
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -241,7 +242,8 @@ const Timeline: React.FC<TimelineProps> = ({
   const displayPositions = React.useMemo(() => {
     // Use stable positions if we have them and we're loading, OR if the fresh positions are empty/different
     const useStable = (isLoading && stablePositions.size > 0) || 
-                     (stablePositions.size > 0 && framePositions.size === 0);
+                     (stablePositions.size > 0 && framePositions.size === 0) ||
+                     (isPersistingPositions && stablePositions.size > 0);
     
     if (useStable) {
       console.log('[PositionSystemDebug] ⏳ TIMELINE keeping stable positions:', {
@@ -264,7 +266,7 @@ const Timeline: React.FC<TimelineProps> = ({
     }
     
     return framePositions;
-  }, [isLoading, stablePositions, framePositions, shotId]);
+  }, [isLoading, isPersistingPositions, stablePositions, framePositions, shotId]);
 
   // Database-backed setFramePositions function
   const setFramePositions = React.useCallback(async (newPositions: Map<string, number>) => {
@@ -275,6 +277,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
     // IMMEDIATELY update stable positions to prevent visual glitches during database update
     setStablePositions(new Map(newPositions));
+    setIsPersistingPositions(true);
     console.log('[PositionSystemDebug] 🎭 TIMELINE immediately updated stable positions for smooth transition');
 
     // Update database for each changed position
@@ -299,6 +302,7 @@ const Timeline: React.FC<TimelineProps> = ({
         await onTimelineChange();
       }
     }
+    setIsPersistingPositions(false);
 
     // Also call the original callback if provided
     if (onFramePositionsChange) {

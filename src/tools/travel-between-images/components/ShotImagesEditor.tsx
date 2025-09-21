@@ -199,7 +199,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 shotGenerations={memoizedShotGenerations}
                 updateTimelineFrame={updateTimelineFrame}
                 images={images}
-                onTimelineChange={loadPositions}
+                onTimelineChange={() => loadPositions({ silent: true })}
               />
             ) : (
               <ShotImageManager

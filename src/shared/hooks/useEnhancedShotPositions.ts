@@ -41,13 +41,15 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
   const [error, setError] = useState<string | null>(null);
 
   // Load all shot_generations data for the shot
-  const loadPositions = useCallback(async () => {
+  const loadPositions = useCallback(async (opts?: { silent?: boolean }) => {
     if (!shotId) {
       setShotGenerations([]);
       return;
     }
 
-    setIsLoading(true);
+    if (!opts?.silent) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -89,7 +91,9 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       setError(errorMessage);
       console.error('[useEnhancedShotPositions] Load error:', err);
     } finally {
-      setIsLoading(false);
+      if (!opts?.silent) {
+        setIsLoading(false);
+      }
     }
   }, [shotId]);
 
@@ -122,7 +126,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
             invalidatedQueryKey: queryKey,
             timestamp: new Date().toISOString()
           });
-          loadPositions();
+          loadPositions({ silent: true });
         }
       }
     });
@@ -248,7 +252,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       if (error) throw error;
 
       // Reload positions to reflect changes
-      await loadPositions();
+      await loadPositions({ silent: true });
 
       // Get positions after exchange for verification logging
       const updatedGenerations = await supabase
@@ -353,7 +357,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       console.log('[useEnhancedShotPositions] ✅ All exchanges completed, reloading positions once');
 
       // Single reload after all exchanges are done
-      await loadPositions();
+      await loadPositions({ silent: true });
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to batch exchange positions';
@@ -384,7 +388,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       if (error) throw error;
 
       // Reload positions to reflect changes
-      await loadPositions();
+      await loadPositions({ silent: true });
       
       // Item deletion completed successfully - no toast needed for smooth UX
       
@@ -557,7 +561,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       const recordCount = data as number;
       
       if (recordCount > 0) {
-        await loadPositions();
+        await loadPositions({ silent: true });
         
         console.log('[PositionSystemDebug] ✅ COMPLETED timeline initialization:', {
           shotId: shotId.substring(0, 8),
