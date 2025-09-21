@@ -140,8 +140,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     <Card className="w-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-medium">
-            Images
+          <CardTitle className="text-base sm:text-lg font-light">
+            Input Images
             {settingsError && (
               <div className="text-sm text-destructive mt-1">
                 {settingsError}

@@ -697,15 +697,17 @@ const VideoTravelToolPage: React.FC = () => {
     return () => clearHeader();
   }, []);
 
-  // Update state when settings are loaded from database
+  // Update state when settings are loaded from database (or confirmed absent)
   useEffect(() => {
-    if (settings && !isLoadingSettings && !hasLoadedInitialSettings.current) {
+    if (!isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
       // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
-      
+
+      // Start from existing settings if present, otherwise empty defaults
+      let settingsToApply: VideoTravelSettings = (settings as VideoTravelSettings) || ({} as VideoTravelSettings);
+
       // Check if this shot needs project defaults applied
-      let settingsToApply = settings;
       if (selectedShot?.id) {
         const projectDefaultsKey = `apply-project-defaults-${selectedShot.id}`;
         const storedProjectDefaults = sessionStorage.getItem(projectDefaultsKey);
@@ -714,7 +716,7 @@ const VideoTravelToolPage: React.FC = () => {
           try {
             const projectDefaults = JSON.parse(storedProjectDefaults);
             // Merge project defaults with any existing shot settings, with shot settings taking precedence
-            settingsToApply = { ...projectDefaults, ...settings };
+            settingsToApply = { ...(projectDefaults || {}), ...(settings || {}) } as VideoTravelSettings;
             
             // Apply the merged settings to the database
             setTimeout(() => {
@@ -726,7 +728,7 @@ const VideoTravelToolPage: React.FC = () => {
             sessionStorage.removeItem(projectDefaultsKey);
           } catch (error) {
             console.warn('[VideoTravelToolPage] Failed to parse stored project defaults:', error);
-            settingsToApply = settings;
+            settingsToApply = (settings as VideoTravelSettings) || ({} as VideoTravelSettings);
           }
         }
       }
@@ -1105,7 +1107,7 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Save settings to database whenever they change (optimized)
   useEffect(() => {
-    if (selectedShot?.id && settings && hasLoadedInitialSettings.current && userHasInteracted.current) {
+    if (selectedShot?.id && hasLoadedInitialSettings.current && userHasInteracted.current) {
       // Clear any pending save
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);

@@ -1381,7 +1381,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         <div className="w-full">
           <Card>
             <CardHeader>
-                <CardTitle>Generate Videos</CardTitle>
+                <CardTitle className="text-base sm:text-lg font-light">Generate Videos</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col lg:flex-row gap-6">
