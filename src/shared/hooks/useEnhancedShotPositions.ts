@@ -285,7 +285,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         timestamp: new Date().toISOString()
       });
       
-      toast.success('Positions exchanged successfully');
+      // Position exchange completed successfully - no toast needed for smooth UX
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to exchange positions';
@@ -386,7 +386,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       // Reload positions to reflect changes
       await loadPositions();
       
-      toast.success('Item deleted successfully');
+      // Item deletion completed successfully - no toast needed for smooth UX
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete item';
@@ -442,7 +442,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       // Reload positions to reflect changes
       await loadPositions();
       
-      toast.success('Item added successfully');
+      // Item addition completed successfully - no toast needed for smooth UX
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add item';
@@ -566,7 +566,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
           timestamp: new Date().toISOString()
         });
         
-        toast.success(`Initialized timeline frames for ${recordCount} items`);
+        // Timeline frames initialized successfully - no toast needed for smooth UX
       } else {
         console.log('[PositionSystemDebug] ⚠️ No records were initialized (possibly already initialized)');
       }

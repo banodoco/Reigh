@@ -148,9 +148,7 @@ export const useEnhancedShotImageReorder = (
         );
       }
 
-      if (uniqueExchanges.length > 0) {
-        toast.success(`Exchanged positions for ${uniqueExchanges.length} item pairs`);
-      }
+      // Reordering completed successfully - no toast needed for smooth UX
 
     } catch (error) {
       console.error('[useEnhancedShotImageReorder] Reorder error:', error);
