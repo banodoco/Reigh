@@ -32,8 +32,8 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
       if (isVideo) {
         videosFiltered++;
       } else {
-        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
-        if (hasPosition) {
+        const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+        if (hasTimelineFrame) {
           positionedNonVideoCount++;
         } else {
           unpositionedFiltered++;

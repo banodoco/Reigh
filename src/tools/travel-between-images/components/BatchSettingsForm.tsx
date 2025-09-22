@@ -94,7 +94,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative">
-                  <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">Prompt:</Label>
+                  <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">
+                    {isTimelineMode ? 'Default Prompt:' : 'Prompt:'}
+                  </Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
@@ -117,7 +119,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   />
                 </div>
                 <div className="relative">
-                  <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">Negative prompt:</Label>
+                  <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">
+                    {isTimelineMode ? 'Default Negative Prompt:' : 'Negative prompt:'}
+                  </Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">

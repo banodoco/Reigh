@@ -32,7 +32,7 @@ export const useShotGenerations = (
           generation:generations(*)
         `)
         .eq('shot_id', shotId!)
-        .order('position', { ascending: true })
+        .order('timeline_frame', { ascending: true })
         .range(pageParam, pageParam + PAGE_SIZE - 1)
         .abortSignal(signal);
 
@@ -52,7 +52,7 @@ export const useShotGenerations = (
           ...sg.generation,
           shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
-          position: sg.position,
+          position: Math.floor((sg.timeline_frame ?? 0) / 50),
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
           thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
         }));
@@ -101,7 +101,7 @@ export const useUnpositionedGenerationsCount = (
         .from('shot_generations')
         .select('generation_id', { count: 'exact', head: true })
         .eq('shot_id', shotId!)
-        .is('position', null);
+        .is('timeline_frame', null);
 
       if (countError) throw countError;
 
@@ -110,7 +110,7 @@ export const useUnpositionedGenerationsCount = (
         .from('shot_generations')
         .select('generation:generations(type)')
         .eq('shot_id', shotId!)
-        .is('position', null);
+        .is('timeline_frame', null);
 
       const nonVideoCount = (unpositioned || []).filter(
         sg => !(sg.generation as any)?.type?.includes('video')
@@ -169,7 +169,7 @@ export const useAllShotGenerations = (
         .from('shot_generations')
         .select(`
           id,
-          position,
+          timeline_frame,
           generation:generations(
             id,
             location,
@@ -178,7 +178,7 @@ export const useAllShotGenerations = (
           )
         `)
         .eq('shot_id', shotId!)
-        .order('position', { ascending: true })
+        .order('timeline_frame', { ascending: true })
         .range(0, INITIAL_LOAD - 1)
         .abortSignal(signal);
 
@@ -217,7 +217,7 @@ export const useAllShotGenerations = (
           ...sg.generation,
           shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
-          position: sg.position,
+          position: Math.floor((sg.timeline_frame ?? 0) / 50),
           imageUrl: sg.generation?.location,
           thumbUrl: sg.generation?.location,
         }));

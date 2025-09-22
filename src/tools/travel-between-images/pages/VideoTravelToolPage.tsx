@@ -35,6 +35,7 @@ import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCounts
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -397,10 +398,12 @@ const VideoTravelToolPage: React.FC = () => {
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
-  const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>('batch');
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
   // Mode selection removed - now hardcoded to use specific model
   // const [afterEachPromptText, setAfterEachPromptText] = useState<string>(''); // Removed - not used in ShotEditor
+
+  const isMobile = useIsMobile();
+  const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>(isMobile ? 'batch' : 'timeline');
   
   // Add state for toggling between shots and videos view
   const [showVideosView, setShowVideosView] = useState<boolean>(false);

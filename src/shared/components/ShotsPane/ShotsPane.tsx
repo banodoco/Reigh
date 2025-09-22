@@ -105,16 +105,16 @@ const ShotsPaneComponent: React.FC = () => {
       // Note: shot.images now contains all images from ShotsContext (unlimited)
       // Filter to show only positioned images in the intended sequence
       const filteredImages = (shot.images || [])
-        // Keep only images that have a valid position value
+        // Keep only images that have a valid timeline_frame value (replaces position check)
         .filter(img => {
-          const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
-          return hasPosition;
+          const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+          return hasTimelineFrame;
         })
-        // Order the images by their position so they appear in the intended sequence
+        // Order the images by their timeline_frame so they appear in the intended sequence
         .sort((a, b) => {
-          const posA = (a as any).position as number;
-          const posB = (b as any).position as number;
-          return posA - posB;
+          const frameA = (a as any).timeline_frame as number;
+          const frameB = (b as any).timeline_frame as number;
+          return frameA - frameB;
         });
       
       return {

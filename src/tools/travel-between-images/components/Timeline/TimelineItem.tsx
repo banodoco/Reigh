@@ -1,6 +1,9 @@
 import React, { useRef, useState } from "react";
 import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl } from "@/shared/lib/utils";
+import { Button } from "@/shared/components/ui/button";
+import { Trash2, Copy, Sparkles, Check } from "lucide-react";
+import { MagicEditModal } from "@/shared/components/MagicEditModal";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -22,6 +25,13 @@ interface TimelineItemProps {
   originalFramePos: number;
   /** When provided, image src will only be set once this is true */
   shouldLoad?: boolean;
+  
+  // Action handlers
+  onDelete: (imageId: string) => void;
+  onDuplicate: (imageId: string, timeline_frame: number) => void;
+  duplicatingImageId?: string;
+  duplicateSuccessImageId?: string;
+  projectAspectRatio?: string;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -43,12 +53,59 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   maxAllowedGap,
   originalFramePos,
   shouldLoad = true,
+  onDelete,
+  onDuplicate,
+  duplicatingImageId,
+  duplicateSuccessImageId,
+  projectAspectRatio = undefined,
 }) => {
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Track hover state
   const [isHovered, setIsHovered] = useState(false);
+  
+  // Track magic edit modal state
+  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
+
+  // Calculate aspect ratio for consistent sizing
+  const getAspectRatioStyle = () => {
+    // Try to get dimensions from image metadata first
+    let width = (image as any).metadata?.width;
+    let height = (image as any).metadata?.height;
+
+    // If not found, try to extract from resolution string
+    if (!width || !height) {
+      const resolution = (image as any).metadata?.originalParams?.orchestrator_details?.resolution;
+      if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+        const [w, h] = resolution.split('x').map(Number);
+        if (!isNaN(w) && !isNaN(h)) {
+          width = w;
+          height = h;
+        }
+      }
+    }
+
+    // If we have image dimensions, use them
+    if (width && height) {
+      const aspectRatio = width / height;
+      return { aspectRatio: `${aspectRatio}` };
+    }
+
+    // Fall back to project aspect ratio if available
+    if (projectAspectRatio) {
+      const [w, h] = projectAspectRatio.split(':').map(Number);
+      if (!isNaN(w) && !isNaN(h)) {
+        const aspectRatio = w / h;
+        return { aspectRatio: `${aspectRatio}` };
+      }
+    }
+
+    // Default to square aspect ratio
+    return { aspectRatio: '1' };
+  };
+
+  const aspectRatioStyle = getAspectRatioStyle();
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -70,6 +127,32 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     }
     
     touchStartRef.current = null;
+  };
+  
+  // Action handlers
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    if (onDelete) {
+      onDelete(image.shotImageEntryId);
+    }
+  };
+
+  const handleDuplicateClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    if (onDuplicate) {
+      onDuplicate(image.shotImageEntryId, framePosition);
+    }
+  };
+  
+  const handleMagicEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    setIsMagicEditOpen(true);
   };
   // Calculate position as pixel offset instead of percentage
   const pixelPosition = ((framePosition - fullMinFrames) / fullRange) * timelineWidth;
@@ -114,7 +197,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       }}
       className={isSwapTarget ? "ring-4 ring-primary/60" : ""}
     >
-      <div className="flex flex-col items-center relative">
+      <div className="flex flex-col items-center relative group">
         {/* Distance indicators on left/right */}
         {isDragging && dragDistances && (
           <>
@@ -144,10 +227,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         )}
 
         <div
-          className={`relative w-24 h-24 border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden`}
+          className={`relative border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden group`}
           style={{
+            width: '96px', // Fixed width for consistent button positioning
+            height: '96px', // Fixed height for consistent button positioning
             transform: isHovered || isDragging ? 'scale(1.05)' : 'scale(1)',
             transition: isDragging ? 'none' : 'all 0.2s ease-out',
+            ...aspectRatioStyle, // Apply aspect ratio directly to container
           }}
         >
           <img
@@ -158,10 +244,93 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5">
+
+          {/* Hover action buttons */}
+          {!isDragging && (
+            <>
+              {/* Magic Edit Button */}
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute bottom-1 left-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                onClick={handleMagicEditClick}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                title="Magic Edit"
+              >
+                <Sparkles className="h-3 w-3" />
+              </Button>
+
+              {/* Duplicate Button */}
+              <Button
+                variant="secondary"
+                size="icon"
+                className="absolute top-1 right-7 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                onClick={handleDuplicateClick}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                disabled={duplicatingImageId === image.shotImageEntryId}
+                title="Duplicate image"
+              >
+                {duplicatingImageId === image.shotImageEntryId ? (
+                  <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                ) : duplicateSuccessImageId === image.shotImageEntryId ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </Button>
+
+              {/* Delete Button */}
+              <Button
+                variant="destructive"
+                size="icon"
+                className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                onClick={handleDeleteClick}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                title="Remove image from shot"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </>
+          )}
+
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none">
             {displayFrame}
           </div>
         </div>
+        
+        {/* Magic Edit Modal */}
+        <MagicEditModal
+          isOpen={isMagicEditOpen}
+          imageUrl={getDisplayUrl(image.imageUrl)}
+          onClose={() => setIsMagicEditOpen(false)}
+        />
       </div>
     </div>
   );

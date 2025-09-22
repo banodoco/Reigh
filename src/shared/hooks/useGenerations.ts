@@ -75,17 +75,17 @@ export async function fetchGenerations(
     // Get generation IDs associated with this shot
     const { data: shotGenerations, error: sgError } = await supabase
       .from('shot_generations')
-      .select('generation_id, position')
+      .select('generation_id, timeline_frame')
       .eq('shot_id', filters.shotId);
     
     if (sgError) throw sgError;
     
     let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
     
-    // Filter by position if excludePositioned is true
+    // Filter by timeline_frame if excludePositioned is true
     if (filters.excludePositioned) {
       const unpositionedIds = shotGenerations
-        ?.filter(sg => sg.position === null || sg.position === undefined)
+        ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
         .map(sg => sg.generation_id) || [];
       generationIds = unpositionedIds;
     }
@@ -123,7 +123,7 @@ export async function fetchGenerations(
       created_at,
       params,
       starred,
-      shot_generations(shot_id, position)
+      shot_generations(shot_id, timeline_frame)
     `)
     .eq('project_id', projectId);
 
@@ -162,17 +162,17 @@ export async function fetchGenerations(
     // Get shot associations for filtering
     const { data: shotGenerations, error: sgError } = await supabase
       .from('shot_generations')
-      .select('generation_id, position')
+      .select('generation_id, timeline_frame')
       .eq('shot_id', filters.shotId);
     
     if (sgError) throw sgError;
     
     let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
     
-    // Filter by position if excludePositioned is true
+    // Filter by timeline_frame if excludePositioned is true
     if (filters.excludePositioned) {
       const unpositionedIds = shotGenerations
-        ?.filter(sg => sg.position === null || sg.position === undefined)
+        ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
         .map(sg => sg.generation_id) || [];
       
       // Debug logging for excludePositioned filtering
@@ -180,10 +180,10 @@ export async function fetchGenerations(
         shotId: filters.shotId,
         excludePositioned: filters.excludePositioned,
         totalShotGenerations: shotGenerations?.length || 0,
-        positionedCount: shotGenerations?.filter(sg => sg.position !== null && sg.position !== undefined).length || 0,
+        positionedCount: shotGenerations?.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length || 0,
         unpositionedCount: unpositionedIds.length,
         unpositionedSample: unpositionedIds.slice(0, 3),
-        allPositions: shotGenerations?.map(sg => ({ id: sg.generation_id, position: sg.position })).slice(0, 5)
+        allTimelineFrames: shotGenerations?.map(sg => ({ id: sg.generation_id, timeline_frame: sg.timeline_frame })).slice(0, 5)
       });
       
       generationIds = unpositionedIds;
@@ -304,14 +304,14 @@ export async function fetchGenerations(
         return {
           ...baseItem,
           shot_id: singleShot.shot_id,
-          position: singleShot.position,
+          position: Math.floor((singleShot.timeline_frame ?? 0) / 50),
         };
       }
       
       // Multiple shots: include all associations for positioning checks
       const allAssociations = shotGenerations.map(sg => ({
         shot_id: sg.shot_id,
-        position: sg.position
+        timeline_frame: sg.timeline_frame
       }));
       
       // When filtering by specific shot, use that shot as primary
@@ -326,7 +326,7 @@ export async function fetchGenerations(
       return {
         ...baseItem,
         shot_id: primaryShot.shot_id,
-        position: primaryShot.position,
+        position: Math.floor((primaryShot.timeline_frame ?? 0) / 50),
         all_shot_associations: allAssociations,
       };
     }

@@ -173,7 +173,7 @@ export const useEnhancedShotImageReorder = (
       console.log('[PositionSystemDebug] 🗑️ Deleting individual duplicate item:', {
         shotImageEntryId: shotImageEntryId.substring(0, 8),
         generationId: targetItem.generation_id.substring(0, 8),
-        position: targetItem.position
+        timeline_frame: targetItem.timeline_frame
       });
 
       // Pass the shot_generations.id (shotImageEntryId) to delete only this specific record

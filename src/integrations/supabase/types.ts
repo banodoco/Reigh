@@ -407,7 +407,6 @@ export type Database = {
           generation_id: string
           id: string
           metadata: Json | null
-          position: number | null
           shot_id: string
           timeline_frame: number | null
           updated_at: string
@@ -417,7 +416,6 @@ export type Database = {
           generation_id: string
           id?: string
           metadata?: Json | null
-          position?: number | null
           shot_id: string
           timeline_frame?: number | null
           updated_at?: string
@@ -427,7 +425,6 @@ export type Database = {
           generation_id?: string
           id?: string
           metadata?: Json | null
-          position?: number | null
           shot_id?: string
           timeline_frame?: number | null
           updated_at?: string
@@ -461,7 +458,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
-          position: number
+          timeline_frame: number
           project_id: string
           settings: Json | null
           updated_at: string | null
@@ -470,7 +467,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
-          position?: number
+          timeline_frame?: number
           project_id: string
           settings?: Json | null
           updated_at?: string | null
@@ -479,7 +476,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
-          position?: number
+          timeline_frame?: number
           project_id?: string
           settings?: Json | null
           updated_at?: string | null
@@ -1083,7 +1080,7 @@ export type Database = {
         Returns: {
           generation_id: string
           id: string
-          position: number
+          timeline_frame: number
           shot_id: string
         }[]
       }
@@ -1126,7 +1123,7 @@ export type Database = {
         Returns: {
           generation_id: string
           id: string
-          position: number
+          timeline_frame: number
           timeline_frame: number
           updated_at: string
         }[]
@@ -1140,7 +1137,7 @@ export type Database = {
         Returns: {
           generation_id: string
           id: string
-          position: number
+          timeline_frame: number
           timeline_frame: number
           updated_at: string
         }[]
@@ -1444,7 +1441,7 @@ export type Database = {
         Returns: {
           generation_id: string
           id: string
-          position: number
+          timeline_frame: number
           shot_id: string
         }[]
       }

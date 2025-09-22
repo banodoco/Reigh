@@ -164,12 +164,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // [VideoLoadSpeedIssue] DEBUG: Check if context images are being filtered somewhere
       contextImagesSample: contextImages.slice(0, 3).map(img => ({
         id: img.id,
-        position: (img as any).position,
+        position: Math.floor(((img as any).timeline_frame ?? 0) / 50),
         imageUrl: !!img.imageUrl
       })),
       orderedImagesSample: orderedShotImages.slice(0, 3).map(img => ({
         id: img.id,
-        position: (img as any).position,
+        position: Math.floor(((img as any).timeline_frame ?? 0) / 50),
         imageUrl: !!img.imageUrl
       }))
     });
@@ -831,8 +831,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // 3. Sort by position
     const filtered = sourceImages
       .filter(img => {
-        const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
-        return hasPosition;
+        const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+        return hasTimelineFrame;
       })
       .filter(img => {
         // EXACT same video detection as ShotsPane's ShotGroup component
@@ -843,9 +843,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         return !isVideo; // Exclude videos, just like ShotsPane
       })
       .sort((a, b) => {
-        const posA = (a as any).position as number;
-        const posB = (b as any).position as number;
-        return posA - posB;
+        const frameA = (a as any).timeline_frame ?? 0;
+        const frameB = (b as any).timeline_frame ?? 0;
+        return frameA - frameB;
       });
     
     // OPTIMIZED: Only log filtering results when they change significantly
@@ -1105,6 +1105,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSteerableMotionEnqueuing, setIsSteerableMotionEnqueuing] = useState(false);
   const [steerableMotionJustQueued, setSteerableMotionJustQueued] = useState(false);
 
+  // Note: Pair prompts are now managed through the database via ShotImagesEditor
+  // The generation logic will need to be updated to fetch pair prompts from the database
+
   // Check if generation should be disabled due to missing OpenAI API key for enhance prompt
   const openaiApiKey = getApiKey('openai_api_key');
   const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
@@ -1169,10 +1172,53 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         frameGaps.push(gap);
       }
       
-      basePrompts = frameGaps.length > 0 ? frameGaps.map(() => batchVideoPrompt) : [batchVideoPrompt];
+      // Fetch pair prompts from database for timeline generation
+      let pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
+      
+      try {
+        const { data: shotGenerationsData, error } = await supabase
+          .from('shot_generations')
+          .select('id, generation_id, timeline_frame, metadata')
+          .eq('shot_id', selectedShotId)
+          .order('timeline_frame', { ascending: true });
+
+        if (error) {
+          console.error('[Generation] Error fetching pair prompts:', error);
+        } else if (shotGenerationsData) {
+          // Extract pair prompts from metadata
+          for (let i = 0; i < shotGenerationsData.length - 1; i++) {
+            const firstItem = shotGenerationsData[i];
+            const metadata = firstItem.metadata as any;
+            if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
+              pairPrompts[i] = {
+                prompt: metadata.pair_prompt || '',
+                negativePrompt: metadata.pair_negative_prompt || '',
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Generation] Error fetching pair prompts:', err);
+      }
+
+      basePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
+        // Use pair-specific prompt if available, otherwise fall back to default
+        const pairPrompt = pairPrompts[index]?.prompt;
+        const finalPrompt = (pairPrompt && pairPrompt.trim()) ? pairPrompt.trim() : batchVideoPrompt;
+        console.log(`[Generation] Pair ${index}: Using ${pairPrompt ? 'custom' : 'default'} prompt:`, finalPrompt);
+        return finalPrompt;
+      }) : [batchVideoPrompt];
       segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
       frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
-      negativePrompts = frameGaps.length > 0 ? frameGaps.map(() => steerableMotionSettings.negative_prompt) : [steerableMotionSettings.negative_prompt];
+      negativePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
+        // Use pair-specific negative prompt if available, otherwise fall back to default
+        const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
+        const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : steerableMotionSettings.negative_prompt;
+        console.log(`[Generation] Pair ${index}: Using ${pairNegativePrompt ? 'custom' : 'default'} negative prompt:`, finalNegativePrompt);
+        return finalNegativePrompt;
+      }) : [steerableMotionSettings.negative_prompt];
+
+      console.log(`[Generation] Timeline mode - Final prompts:`, { basePrompts, negativePrompts, pairPrompts });
     } else {
       // batch mode
       basePrompts = [batchVideoPrompt];
@@ -1374,6 +1420,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+            defaultPrompt={batchVideoPrompt}
+            onDefaultPromptChange={onBatchVideoPromptChange}
+            defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
+            onDefaultNegativePromptChange={(value) => onSteerableMotionSettingsChange({ negative_prompt: value })}
           />
         </div>
 

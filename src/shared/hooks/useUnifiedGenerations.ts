@@ -114,7 +114,7 @@ async function fetchShotSpecificGenerations({
     .from('shot_generations')
     .select(`
       id,
-      position,
+      timeline_frame,
       generation:generations(
         id,
         location,
@@ -136,12 +136,12 @@ async function fetchShotSpecificGenerations({
   
   // Apply other filters that work on shot_generations table
   if (filters?.excludePositioned) {
-    dataQuery = dataQuery.is('position', null);
+    dataQuery = dataQuery.is('timeline_frame', null);
   }
   
   // Apply ordering
   dataQuery = dataQuery
-    .order('position', { ascending: true })
+    .order('timeline_frame', { ascending: true })
     .order('created_at', { ascending: false });
   
   // Execute single query with limit+1 to detect hasMore
@@ -189,7 +189,7 @@ async function fetchShotSpecificGenerations({
         starred: gen.starred || false,
         metadata: gen.params || {},
         shotImageEntryId: sg.id,
-        position: sg.position,
+        position: Math.floor((sg.timeline_frame ?? 0) / 50),
         taskId: includeTaskData && gen.tasks ? (Array.isArray(gen.tasks) ? gen.tasks[0] : gen.tasks) : null,
       };
       

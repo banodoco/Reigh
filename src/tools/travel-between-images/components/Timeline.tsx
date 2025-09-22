@@ -43,6 +43,35 @@ export interface TimelineProps {
   images?: GenerationRow[];
   // Callback to reload parent data after timeline changes
   onTimelineChange?: () => Promise<void>;
+  // Pair-specific prompt editing
+  onPairClick?: (pairIndex: number, pairData: {
+    index: number;
+    frames: number;
+    startFrame: number;
+    endFrame: number;
+    startImage?: {
+      id: string;
+      url?: string;
+      thumbUrl?: string;
+      timeline_frame: number;
+    } | null;
+    endImage?: {
+      id: string;
+      url?: string;
+      thumbUrl?: string;
+      timeline_frame: number;
+    } | null;
+  }) => void;
+  // Pair prompt data for display (optional - will use database if not provided)
+  pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  defaultPrompt?: string;
+  defaultNegativePrompt?: string;
+  // Action handlers
+  onImageDelete: (imageId: string) => void;
+  onImageDuplicate: (imageId: string, timeline_frame: number) => void;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
+  projectAspectRatio?: string;
 }
 
 /**
@@ -63,7 +92,16 @@ const Timeline: React.FC<TimelineProps> = ({
   shotGenerations: propShotGenerations,
   updateTimelineFrame: propUpdateTimelineFrame,
   images: propImages,
-  onTimelineChange
+  onTimelineChange,
+  onPairClick,
+  pairPrompts,
+  defaultPrompt,
+  defaultNegativePrompt,
+  onImageDelete,
+  onImageDuplicate,
+  duplicatingImageId,
+  duplicateSuccessImageId,
+  projectAspectRatio
 }) => {
   // State to track context visibility with delay
   const [showContext, setShowContext] = useState(false);
@@ -124,7 +162,11 @@ const Timeline: React.FC<TimelineProps> = ({
   const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
   const applyTimelineFrames = hookData.applyTimelineFrames; // New atomic update method
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
-  const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, not loading
+  
+  // Get pair prompts from database instead of props
+  const databasePairPrompts = hookData.getPairPrompts();
+  const actualPairPrompts = pairPrompts || databasePairPrompts; // Fallback to props for backward compatibility
+  const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, never show loading (shared data)
   
   // Important: If using shared data, we need to ensure parent reloads when we make changes
   const parentLoadPositions = propShotGenerations ? hookData.loadPositions : null;
@@ -132,7 +174,8 @@ const Timeline: React.FC<TimelineProps> = ({
   // Use provided images or generate from shotGenerations
   const images = React.useMemo(() => {
     if (propImages) return propImages;
-    return shotGenerations
+    
+    const imagesWithPositions = shotGenerations
       .filter(sg => sg.generation)
       .map(sg => ({
         id: sg.generation_id,
@@ -142,15 +185,14 @@ const Timeline: React.FC<TimelineProps> = ({
         location: sg.generation?.location,
         type: sg.generation?.type,
         createdAt: sg.generation?.created_at,
-        position: sg.position,
         timeline_frame: sg.timeline_frame,
         metadata: sg.metadata
-      } as GenerationRow & { position: number; timeline_frame?: number }));
+      } as GenerationRow & { timeline_frame?: number }));
 
-    // Sort by timeline_frame, fallback to calculated frame
-    return timelineImages.sort((a, b) => {
-      const frameA = a.timeline_frame ?? (a.position * frameSpacing);
-      const frameB = b.timeline_frame ?? (b.position * frameSpacing);
+    // Sort by timeline_frame only (no position fallback needed)
+    return imagesWithPositions.sort((a, b) => {
+      const frameA = a.timeline_frame ?? 0;
+      const frameB = b.timeline_frame ?? 0;
       return frameA - frameB;
     });
   }, [shotGenerations, frameSpacing, propImages]);
@@ -197,8 +239,9 @@ const Timeline: React.FC<TimelineProps> = ({
         if (sg.timeline_frame !== null && sg.timeline_frame !== undefined) {
           positions.set(matchingImage.shotImageEntryId, sg.timeline_frame);
         } else {
-          // Initialize with position * frameSpacing if no timeline_frame
-          positions.set(matchingImage.shotImageEntryId, sg.position * frameSpacing);
+          // Initialize with max existing frame + 50 if no timeline_frame
+          const maxFrame = Math.max(0, ...Array.from(positions.values()));
+          positions.set(matchingImage.shotImageEntryId, maxFrame + 50);
         }
       }
     });
@@ -447,7 +490,7 @@ const Timeline: React.FC<TimelineProps> = ({
         throw new Error('Atomic timeline frame update function not available');
       }
       
-      // If using shared data, trigger parent reload
+      // If using shared data, trigger parent reload (but only if we need to refresh database state)
       if (propShotGenerations && onTimelineChange) {
         try {
           await onTimelineChange();
@@ -840,6 +883,38 @@ const Timeline: React.FC<TimelineProps> = ({
                 isDragging={dragState.isDragging}
                 contextFrames={contextFrames}
                 numPairs={numPairs}
+                startFrame={pair.startFrame}
+                endFrame={pair.endFrame}
+                onPairClick={onPairClick ? (pairIndex, pairData) => {
+                  // Get the images for this pair
+                  const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
+                  const endImage = images.find(img => img.shotImageEntryId === endEntry?.[0]);
+                  
+                  // Calculate actual position numbers (1-based)
+                  const startPosition = index + 1; // First image in pair
+                  const endPosition = index + 2;   // Second image in pair
+                  
+                  // Call the original onPairClick with enhanced data
+                  onPairClick(pairIndex, {
+                    ...pairData,
+                    startImage: startImage ? {
+                      id: startImage.shotImageEntryId,
+                      url: startImage.imageUrl || startImage.thumbUrl,
+                      thumbUrl: startImage.thumbUrl,
+                      position: startPosition
+                    } : null,
+                    endImage: endImage ? {
+                      id: endImage.shotImageEntryId,
+                      url: endImage.imageUrl || endImage.thumbUrl,
+                      thumbUrl: endImage.thumbUrl,
+                      position: endPosition
+                    } : null
+                  });
+                } : undefined}
+                pairPrompt={actualPairPrompts?.[index]?.prompt}
+                pairNegativePrompt={actualPairPrompts?.[index]?.negativePrompt}
+                defaultPrompt={defaultPrompt}
+                defaultNegativePrompt={defaultNegativePrompt}
               />
             );
           })}
@@ -868,6 +943,11 @@ const Timeline: React.FC<TimelineProps> = ({
                 dragDistances={isDragging ? dragDistances : null}
                 maxAllowedGap={maxAllowedGap}
                 originalFramePos={displayPositions.get(image.shotImageEntryId) ?? 0}
+                onDelete={onImageDelete}
+                onDuplicate={onImageDuplicate}
+                duplicatingImageId={duplicatingImageId}
+                duplicateSuccessImageId={duplicateSuccessImageId}
+                projectAspectRatio={projectAspectRatio}
               />
             );
           })}

@@ -25,5 +25,5 @@ export interface Shot {
 export interface ShotImage {
   shot_id: string;
   generation_id: string; // Assuming generation_id is a string. If it's BIGINT, this might be number.
-  position?: number;
+  timeline_frame?: number;
 } 

@@ -42,7 +42,7 @@ import MagicEditModal from '@/shared/components/MagicEditModal';
 export interface ShotImageManagerProps {
   images: GenerationRow[];
   onImageDelete: (shotImageEntryId: string) => void;
-  onImageDuplicate?: (shotImageEntryId: string, position: number) => void;
+  onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   generationMode: 'batch' | 'timeline';
@@ -1312,7 +1312,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                     }}
                     onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
                     onDuplicate={onImageDuplicate}
-                    position={(image as any).position ?? index}
+                    timeline_frame={(image as any).timeline_frame ?? (index * 50)}
                     onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
                     onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
                     skipConfirmation={imageDeletionSettings.skipConfirmation}
@@ -1441,7 +1441,7 @@ interface MobileImageItemProps {
   onDoubleClick?: () => void;
   onMobileTap?: () => void;
   onDelete: () => void; // Fixed: properly typed delete function
-  onDuplicate?: (shotImageEntryId: string, position: number) => void; // Add duplicate function
+  onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void; // Add duplicate function
   hideDeleteButton?: boolean;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
@@ -1701,7 +1701,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
             className="absolute top-2 left-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
             onClick={(e) => {
               e.stopPropagation();
-              onDuplicate?.(image.shotImageEntryId, (image as any).position ?? index);
+              onDuplicate?.(image.shotImageEntryId, (image as any).timeline_frame ?? (index * 50));
             }}
             disabled={duplicatingImageId === image.shotImageEntryId}
             title="Duplicate image"

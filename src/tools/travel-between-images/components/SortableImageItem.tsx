@@ -26,14 +26,14 @@ import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoadin
 interface SortableImageItemProps {
   image: GenerationRow;
   onDelete: (shotImageEntryId: string) => void;
-  onDuplicate?: (shotImageEntryId: string, position: number) => void;
+  onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   onDoubleClick: () => void;
   onMobileTap?: () => void;
   onClick: (event: React.MouseEvent) => void;
   onPointerDown?: (event: React.PointerEvent) => void;
   isSelected: boolean;
   isDragDisabled?: boolean;
-  position?: number;
+  timeline_frame?: number;
   skipConfirmation: boolean;
   onSkipConfirmationSave: () => void;
   duplicatingImageId?: string | null;
@@ -54,7 +54,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
   onPointerDown,
   isSelected,
   isDragDisabled = false,
-  position,
+  timeline_frame,
   skipConfirmation,
   onSkipConfirmationSave,
   duplicatingImageId,
@@ -186,8 +186,8 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    if (onDuplicate && position !== undefined) {
-      onDuplicate(image.shotImageEntryId, position);
+    if (onDuplicate && timeline_frame !== undefined) {
+      onDuplicate(image.shotImageEntryId, timeline_frame);
     }
   };
 
@@ -290,7 +290,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       <img
         ref={progressiveRef}
         src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
-        alt={`Generated image ${(position ?? 0) + 1}`}
+        alt={`Generated image ${Math.floor((timeline_frame ?? 0) / 50) + 1}`}
         className={cn(
           "w-full h-full object-cover transition-all duration-200",
           // Progressive loading visual states
@@ -337,7 +337,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
           >
             <Sparkles className="h-3.5 w-3.5" />
           </Button>
-          {onDuplicate && position !== undefined && (
+          {onDuplicate && timeline_frame !== undefined && (
             <Button
               variant="secondary"
               size="icon"

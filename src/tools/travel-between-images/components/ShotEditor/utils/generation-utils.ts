@@ -19,20 +19,20 @@ export const isGenerationVideo = (gen: GenerationRow): boolean => {
  */
 export const filterAndSortShotImages = (images: GenerationRow[]): GenerationRow[] => {
   const filtered = images.filter(img => {
-    const hasPosition = (img as any).position !== null && (img as any).position !== undefined;
+    const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
     const isVideo = isGenerationVideo(img);
     
-    // Include if it has a position OR if it's a video (videos can have null positions)
-    return hasPosition || isVideo;
+    // Include if it has a timeline_frame OR if it's a video (videos can have null timeline_frames)
+    return hasTimelineFrame || isVideo;
   });
   
   // Sort by position (ascending) to maintain user-intended order
   filtered.sort((a, b) => {
-    // Sort by position (ascending), then by created date for stable ordering
-    const posA = (a as any).position;
-    const posB = (b as any).position;
-    if (posA != null && posB != null) return posA - posB;   // ascending
-    if (posA != null) return -1;
+    // Sort by timeline_frame (ascending), then by created date for stable ordering
+    const frameA = (a as any).timeline_frame;
+    const frameB = (b as any).timeline_frame;
+    if (frameA != null && frameB != null) return frameA - frameB;   // ascending
+    if (frameA != null) return -1;
     if (posB != null) return 1;
     // fall back to createdAt (newest last so order is stable)
     const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;

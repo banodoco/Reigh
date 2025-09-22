@@ -8,7 +8,10 @@ export interface ShotGeneration {
   id: string;
   shot_id: string;
   generation_id: string;
-  timeline_frame: number;
+  position: number;
+  timeline_frame?: number;
+  pair_prompt?: string | null;
+  pair_negative_prompt?: string | null;
   metadata?: PositionMetadata;
   generation?: {
     id: string;
@@ -26,9 +29,6 @@ export interface PositionMetadata {
   user_positioned?: boolean;
   created_by_mode?: 'timeline' | 'batch';
   auto_initialized?: boolean;
-  // Pair prompts (stored on the first item of each pair)
-  pair_prompt?: string;
-  pair_negative_prompt?: string;
 }
 
 const DEFAULT_FRAME_SPACING = 60;
@@ -79,7 +79,10 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
           id,
           shot_id,
           generation_id,
+          position,
           timeline_frame,
+          pair_prompt,
+          pair_negative_prompt,
           metadata,
           generation:generations(
             id,
@@ -89,7 +92,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
           )
         `)
         .eq('shot_id', shotId)
-        .order('timeline_frame', { ascending: true });
+        .order('position', { ascending: true });
 
       if (fetchError) throw fetchError;
 
@@ -102,19 +105,13 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
           newCount: data?.length || 0,
           newData: (data || []).map(sg => ({
             id: sg.generation_id.substring(0, 8),
+            position: sg.position,
             timeline_frame: sg.timeline_frame
           })),
           timestamp: new Date().toISOString()
         });
         
-        return (data || []).map(sg => ({
-          id: sg.id,
-          shot_id: sg.shot_id,
-          generation_id: sg.generation_id,
-          timeline_frame: sg.timeline_frame,
-          metadata: sg.metadata as PositionMetadata,
-          generation: sg.generation
-        }));
+        return data || [];
       });
       
       console.log('[PositionResetDebug] ✅ Loaded positions:', {
@@ -122,6 +119,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         recordCount: data?.length || 0,
         records: data?.map(sg => ({
           generationId: sg.generation_id?.substring(0, 8),
+          position: sg.position,
           timelineFrame: sg.timeline_frame
         })),
         timestamp: new Date().toISOString()
@@ -192,16 +190,14 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     const positions = new Map<string, number>();
     
     shotGenerations.forEach(sg => {
-    if (mode === 'timeline') {
-      // Use timeline_frame (no position fallback needed after migration)
-      const frame = sg.timeline_frame ?? 0;
-      positions.set(sg.generation_id, frame);
-    } else {
-      // Batch mode now also uses timeline_frame for consistent ordering
-      // But we'll use the timeline_frame as the position value for batch display
-      const frame = sg.timeline_frame ?? 0;
-      positions.set(sg.generation_id, frame);
-    }
+      if (mode === 'timeline') {
+        // Use timeline_frame if available, fallback to calculated frame
+        const frame = sg.timeline_frame ?? (sg.position * DEFAULT_FRAME_SPACING);
+        positions.set(sg.generation_id, frame);
+      } else {
+        // Batch mode uses sequential position
+        positions.set(sg.generation_id, sg.position);
+      }
     });
     
     return positions;
@@ -219,7 +215,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         location: sg.generation?.location,
         type: sg.generation?.type,
         createdAt: sg.generation?.created_at,
-        position: Math.floor((sg.timeline_frame ?? 0) / 50), // Convert timeline_frame to position for display
+        position: sg.position,
         timeline_frame: sg.timeline_frame,
         metadata: sg.metadata
       } as GenerationRow & { position: number; timeline_frame?: number }))
@@ -258,17 +254,13 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     if (mode === 'timeline') {
       // Sort by timeline_frame, fallback to calculated frame
       return images.sort((a, b) => {
-        const frameA = a.timeline_frame ?? 0;
-        const frameB = b.timeline_frame ?? 0;
+        const frameA = a.timeline_frame ?? (a.position * DEFAULT_FRAME_SPACING);
+        const frameB = b.timeline_frame ?? (b.position * DEFAULT_FRAME_SPACING);
         return frameA - frameB;
       });
     } else {
-      // Batch mode now also sorts by timeline_frame for consistent ordering
-      return images.sort((a, b) => {
-        const frameA = a.timeline_frame ?? 0;
-        const frameB = b.timeline_frame ?? 0;
-        return frameA - frameB;
-      });
+      // Sort by sequential position
+      return images.sort((a, b) => a.position - b.position);
     }
   }, [shotGenerations]);
 
@@ -286,12 +278,12 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     const beforeState = {
       itemA: itemA ? {
         id: generationIdA.substring(0, 8),
-        timeline_frame: itemA.timeline_frame,
+        position: itemA.position,
         timelineFrame: itemA.timeline_frame
       } : null,
       itemB: itemB ? {
         id: generationIdB.substring(0, 8),
-        timeline_frame: itemB.timeline_frame,
+        position: itemB.position,
         timelineFrame: itemB.timeline_frame
       } : null
     };
@@ -303,16 +295,10 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     });
 
     try {
-      // Use timeline_sync_bulletproof to exchange timeline frames
-      const changes = [
-        { generation_id: generationIdA, timeline_frame: beforeState.find(s => s.id === generationIdB.substring(0, 8))?.frame || 0 },
-        { generation_id: generationIdB, timeline_frame: beforeState.find(s => s.id === generationIdA.substring(0, 8))?.frame || 0 }
-      ];
-      
-      const { error } = await supabase.rpc('timeline_sync_bulletproof', {
-        shot_uuid: shotId,
-        frame_changes: changes,
-        should_update_positions: false
+      const { error } = await supabase.rpc('exchange_shot_positions', {
+        p_shot_id: shotId,
+        p_generation_id_a: generationIdA,
+        p_generation_id_b: generationIdB
       });
 
       if (error) throw error;
@@ -323,7 +309,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       // Get positions after exchange for verification logging
       const updatedGenerations = await supabase
         .from('shot_generations')
-        .select('generation_id, timeline_frame')
+        .select('generation_id, position, timeline_frame')
         .eq('shot_id', shotId)
         .in('generation_id', [generationIdA, generationIdB]);
 
@@ -337,18 +323,18 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         after: {
           itemA: afterState.itemA ? {
             id: generationIdA.substring(0, 8),
-            timeline_frame: afterState.itemA.timeline_frame,
+            position: afterState.itemA.position,
             timelineFrame: afterState.itemA.timeline_frame
           } : null,
           itemB: afterState.itemB ? {
             id: generationIdB.substring(0, 8),
-            timeline_frame: afterState.itemB.timeline_frame,
+            position: afterState.itemB.position,
             timelineFrame: afterState.itemB.timeline_frame
           } : null
         },
         exchangeVerified: beforeState.itemA && afterState.itemA && beforeState.itemB && afterState.itemB
-          ? (beforeState.itemA.timeline_frame === afterState.itemB?.timeline_frame &&
-             beforeState.itemB.timeline_frame === afterState.itemA?.timeline_frame &&
+          ? (beforeState.itemA.position === afterState.itemB?.position && 
+             beforeState.itemB.position === afterState.itemA?.position &&
              beforeState.itemA.timelineFrame === afterState.itemB?.timeline_frame &&
              beforeState.itemB.timelineFrame === afterState.itemA?.timeline_frame)
           : false,
@@ -379,16 +365,10 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     }
 
     try {
-      // Use timeline_sync_bulletproof to exchange timeline frames
-      const changes = [
-        { generation_id: generationIdA, timeline_frame: beforeState.find(s => s.id === generationIdB.substring(0, 8))?.frame || 0 },
-        { generation_id: generationIdB, timeline_frame: beforeState.find(s => s.id === generationIdA.substring(0, 8))?.frame || 0 }
-      ];
-      
-      const { error } = await supabase.rpc('timeline_sync_bulletproof', {
-        shot_uuid: shotId,
-        frame_changes: changes,
-        should_update_positions: false
+      const { error } = await supabase.rpc('exchange_shot_positions', {
+        p_shot_id: shotId,
+        p_generation_id_a: generationIdA,
+        p_generation_id_b: generationIdB
       });
 
       if (error) throw error;
@@ -424,10 +404,11 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
     // [TimelineItemMoveSummary] - Log batch position exchanges
     const positionsBefore = shotGenerations
-      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
+      .sort((a, b) => a.position - b.position)
       .map((gen, index) => ({
         id: gen.generation_id.slice(-8),
         shotGenId: gen.id.slice(-8),
+        position: gen.position,
         timelineFrame: gen.timeline_frame
       }));
 
@@ -444,10 +425,11 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
       // Log the batch exchange summary after reload
       const positionsAfter = shotGenerations
-        .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
+        .sort((a, b) => a.position - b.position)
         .map((gen, index) => ({
           id: gen.generation_id.slice(-8),
           shotGenId: gen.id.slice(-8),
+          position: gen.position,
           timelineFrame: gen.timeline_frame
         }));
 
@@ -528,7 +510,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     const { position, timelineFrame, metadata } = options;
     
     // Calculate next available positions if not provided
-    const nextPosition = position ?? Math.floor(Math.max(...shotGenerations.map(sg => sg.timeline_frame ?? 0)) / 50) + 1;
+    const nextPosition = position ?? Math.max(...shotGenerations.map(sg => sg.position), -1) + 1;
     const nextFrame = timelineFrame ?? (nextPosition * DEFAULT_FRAME_SPACING);
 
     console.log('[useEnhancedShotPositions] Adding item:', {
@@ -544,7 +526,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         .insert({
           shot_id: shotId,
           generation_id: generationId,
-          // position removed - using timeline_frame only
+          position: nextPosition,
           timeline_frame: nextFrame,
           metadata: {
             created_by_mode: 'batch',
@@ -599,7 +581,8 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         .from('shot_generations')
         .update({ 
           timeline_frame: newTimelineFrame,
-          metadata: metadata ? { ...metadata } : undefined
+          metadata: metadata ? { ...metadata } : undefined,
+          updated_at: new Date().toISOString()
         })
         .eq('shot_id', shotId)
         .eq('generation_id', generationId);
@@ -608,16 +591,131 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
       // Optimistically update local state
       setShotGenerations(prev => {
-        const updated = prev.map(sg => 
-          sg.generation_id === generationId 
+        const updated = prev.map(sg =>
+          sg.generation_id === generationId
             ? { ...sg, timeline_frame: newTimelineFrame, metadata: { ...sg.metadata, ...metadata } }
             : sg
         );
-        
-        console.log('[PositionResetDebug] 🔄 OPTIMISTIC STATE UPDATE:', {
-          shotId: shotId.substring(0, 8),
+
+        console.log('[TimelineFrameUpdate] ✅ Optimistic update completed:', {
           itemId: generationId.substring(0, 8),
-          fromFrame: beforeFrame,
+          newFrame: newTimelineFrame,
+          totalItems: updated.length
+        });
+
+        return updated;
+      });
+    } catch (error) {
+      console.error('[TimelineFrameUpdate] ❌ Update failed:', error);
+      toast.error('Failed to update timeline position');
+      throw error;
+    }
+  }, [shotId, queryClient]);
+
+  // Update pair prompt for a generation
+  const updatePairPrompt = useCallback(async (
+    shotId: string,
+    generationId: string,
+    pairPrompt?: string | null,
+    pairNegativePrompt?: string | null
+  ) => {
+    try {
+      console.log('[PairPromptUpdate] 🔄 Updating pair prompt:', {
+        shotId: shotId.substring(0, 8),
+        generationId: generationId.substring(0, 8),
+        pairPrompt: pairPrompt ? '[SET]' : '[NULL]',
+        pairNegativePrompt: pairNegativePrompt ? '[SET]' : '[NULL]'
+      });
+
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({
+          pair_prompt: pairPrompt && pairPrompt.trim() ? pairPrompt.trim() : null,
+          pair_negative_prompt: pairNegativePrompt && pairNegativePrompt.trim() ? pairNegativePrompt.trim() : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('shot_id', shotId)
+        .eq('generation_id', generationId);
+
+      if (error) throw error;
+
+      // Optimistically update local state
+      setShotGenerations(prev => {
+        const updated = prev.map(sg =>
+          sg.generation_id === generationId
+            ? {
+                ...sg,
+                pair_prompt: pairPrompt && pairPrompt.trim() ? pairPrompt.trim() : null,
+                pair_negative_prompt: pairNegativePrompt && pairNegativePrompt.trim() ? pairNegativePrompt.trim() : null
+              }
+            : sg
+        );
+
+        console.log('[PairPromptUpdate] ✅ Optimistic update completed:', {
+          itemId: generationId.substring(0, 8),
+          pairPrompt: pairPrompt ? '[SET]' : '[NULL]',
+          pairNegativePrompt: pairNegativePrompt ? '[SET]' : '[NULL]'
+        });
+
+        return updated;
+      });
+    } catch (error) {
+      console.error('[PairPromptUpdate] ❌ Update failed:', error);
+      toast.error('Failed to update pair prompt');
+      throw error;
+    }
+  }, [shotId, queryClient]);
+
+  // Clear all pair prompts for a shot
+  const clearAllPairPrompts = useCallback(async (shotId: string) => {
+    try {
+      console.log('[PairPromptClear] 🔄 Clearing all pair prompts:', {
+        shotId: shotId.substring(0, 8)
+      });
+
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({
+          pair_prompt: null,
+          pair_negative_prompt: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('shot_id', shotId);
+
+      if (error) throw error;
+
+      // Optimistically update local state
+      setShotGenerations(prev => {
+        const updated = prev.map(sg => ({
+          ...sg,
+          pair_prompt: null,
+          pair_negative_prompt: null
+        }));
+
+        console.log('[PairPromptClear] ✅ All pair prompts cleared:', {
+          shotId: shotId.substring(0, 8),
+          totalItems: updated.length
+        });
+
+        return updated;
+      });
+    } catch (error) {
+      console.error('[PairPromptClear] ❌ Clear failed:', error);
+      toast.error('Failed to clear pair prompts');
+      throw error;
+    }
+  }, [shotId, queryClient]);
+
+  return {
+    shotGenerations,
+    isLoading,
+    error,
+    loadPositions,
+    updateTimelineFrame,
+    updatePairPrompt,
+    clearAllPairPrompts,
+    // ... other existing functions
+  };
           toFrame: newTimelineFrame,
           beforeCount: prev.length,
           afterCount: updated.length,
@@ -670,7 +768,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       frameSpacing,
       itemsToInitialize: itemsNeedingFrames.map(sg => ({
         id: sg.generation_id.substring(0, 8),
-        currentTimelineFrame: sg.timeline_frame,
+        currentPosition: sg.position,
         calculatedFrame: 'max_existing_frame + 50 (database function handles this)'
       })),
       timestamp: new Date().toISOString()
@@ -792,7 +890,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         should_update_positions: updatePositions
       });
       
-      const { data, error } = await (supabase as any).rpc('timeline_sync_bulletproof', {
+      const { data, error } = await supabase.rpc('timeline_sync_bulletproof', {
         shot_uuid: shotId,
         frame_changes: rpcChanges,
         should_update_positions: updatePositions
@@ -830,7 +928,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
           });
           const beforeState = prev.map(sg => ({ 
             id: sg.generation_id.substring(0, 8), 
-            pos: Math.floor((sg.timeline_frame ?? 0) / 50), 
+            pos: sg.position, 
             frame: sg.timeline_frame 
           }));
           console.log('[Position0JumpBug] 🔍 CURRENT STATE DETAILS:');
@@ -845,19 +943,22 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
             const existing = updatedMap.get(updatedRow.generation_id);
             if (existing) {
               // Log position changes, especially for position 0
-              if (existing.timeline_frame !== updatedRow.timeline_frame) {
-                console.log('[Position0JumpBug] 📊 TIMELINE_FRAME CHANGE:', {
+              if (existing.position !== updatedRow.position) {
+                console.log('[Position0JumpBug] 📊 POSITION CHANGE:', {
                   itemId: updatedRow.generation_id.substring(0, 8),
+                  oldPos: existing.position,
+                  newPos: updatedRow.position,
                   oldFrame: existing.timeline_frame,
                   newFrame: updatedRow.timeline_frame,
-                  isFrame0: existing.timeline_frame === 0 || updatedRow.timeline_frame === 0
+                  isPosition0: existing.position === 0 || updatedRow.position === 0
                 });
               }
 
               updatedMap.set(updatedRow.generation_id, {
                 ...existing,
-                position: Math.floor((updatedRow.timeline_frame ?? 0) / 50),
-                timeline_frame: updatedRow.timeline_frame
+                position: updatedRow.position,
+                timeline_frame: updatedRow.timeline_frame,
+                updated_at: updatedRow.updated_at
               });
             }
           });
@@ -870,7 +971,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
           });
           const afterState = updated.map(r => ({ 
             id: r.generation_id.substring(0, 8), 
-            pos: Math.floor((r.timeline_frame ?? 0) / 50), 
+            pos: r.position, 
             frame: r.timeline_frame 
           }));
           console.log('[Position0JumpBug] ✅ NEW STATE DETAILS:');
@@ -934,96 +1035,6 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     }
   }, [shotId]);
 
-  // Update pair prompts for a specific generation (first item in pair)
-  const updatePairPrompts = useCallback(async (generationId: string, pairPrompt?: string, pairNegativePrompt?: string) => {
-    if (!shotId) return;
-
-    try {
-      console.log(`[PairPrompts] Updating pair prompts for generation ${generationId}:`, { pairPrompt, pairNegativePrompt });
-
-      // Find the current generation
-      const generation = shotGenerations.find(sg => sg.id === generationId);
-      if (!generation) {
-        throw new Error(`Generation ${generationId} not found`);
-      }
-
-      // Update metadata with pair prompts
-      const updatedMetadata: PositionMetadata = {
-        ...generation.metadata,
-        pair_prompt: pairPrompt?.trim() || undefined,
-        pair_negative_prompt: pairNegativePrompt?.trim() || undefined,
-      };
-
-      // Update in database
-      const { data, error } = await supabase
-        .from('shot_generations')
-        .update({ 
-          metadata: updatedMetadata as any, // Cast to any for JSON compatibility
-        })
-        .eq('id', generationId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('[PairPrompts] Error updating pair prompts:', error);
-        toast.error('Failed to update pair prompts');
-        throw error;
-      }
-
-      console.log('[PairPrompts] Successfully updated pair prompts:', data);
-
-      // Update local state
-      setShotGenerations(prev => prev.map(sg => 
-        sg.id === generationId 
-          ? { ...sg, metadata: updatedMetadata }
-          : sg
-      ));
-
-      toast.success('Pair prompts updated');
-    } catch (err) {
-      console.error('[PairPrompts] Error updating pair prompts:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to update pair prompts: ${errorMessage}`);
-      throw err;
-    }
-  }, [shotId, shotGenerations]);
-
-  // Get pair prompts in Timeline component format
-  const getPairPrompts = useCallback((): Record<number, { prompt: string; negativePrompt: string }> => {
-    const sortedGenerations = [...shotGenerations]
-      .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
-
-    const pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
-
-    // Each pair is represented by its first item (index in the sorted array)
-    for (let i = 0; i < sortedGenerations.length - 1; i++) {
-      const firstItem = sortedGenerations[i];
-      if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
-        pairPrompts[i] = {
-          prompt: firstItem.metadata.pair_prompt || '',
-          negativePrompt: firstItem.metadata.pair_negative_prompt || '',
-        };
-      }
-    }
-
-    return pairPrompts;
-  }, [shotGenerations]);
-
-  // Update pair prompts for a specific pair index
-  const updatePairPromptsByIndex = useCallback(async (pairIndex: number, prompt: string, negativePrompt: string) => {
-    const sortedGenerations = [...shotGenerations]
-      .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
-
-    if (pairIndex >= sortedGenerations.length - 1) {
-      console.error('[PairPrompts] Invalid pair index:', pairIndex);
-      return;
-    }
-
-    // Get the first item in the pair (the one that stores the prompts)
-    const firstItem = sortedGenerations[pairIndex];
-    await updatePairPrompts(firstItem.id, prompt, negativePrompt);
-  }, [shotGenerations, updatePairPrompts]);
-
   return { 
     shotGenerations,
     isLoading,
@@ -1037,11 +1048,10 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     deleteItem,
     addItem,
     updateTimelineFrame,
+    updatePairPrompt,
+    clearAllPairPrompts,
     initializeTimelineFrames,
     applyTimelineFrames,
-    loadPositions,
-    updatePairPrompts,
-    getPairPrompts,
-    updatePairPromptsByIndex
+    loadPositions
   };
 };

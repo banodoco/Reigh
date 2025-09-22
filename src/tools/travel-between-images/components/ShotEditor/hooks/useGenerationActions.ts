@@ -325,10 +325,10 @@ export const useGenerationActions = ({
     });
   }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages]);
 
-  const handleDuplicateImage = useCallback(async (shotImageEntryId: string, position: number) => {
+  const handleDuplicateImage = useCallback(async (shotImageEntryId: string, timeline_frame: number) => {
     console.log('[DUPLICATE] handleDuplicateImage called', {
       shotImageEntryId,
-      position,
+      timeline_frame,
       timestamp: Date.now()
     });
 
@@ -347,18 +347,17 @@ export const useGenerationActions = ({
     // Start loading state targeting the specific shotImageEntryId
     actions.setDuplicatingImageId(shotImageEntryId);
 
-    // Place the duplicate one position after the original (position + 1)
-    const duplicatePosition = position + 1;
-
-    console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
-      duplicatePosition,
-      originalPosition: position
+    // Position is now computed from timeline_frame, so we don't need to calculate it
+    // The useDuplicateImageInShot hook will calculate the timeline_frame midpoint
+    
+      console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
+        originalTimelineFrame: (originalImage as any).timeline_frame
     });
 
     duplicateImageInShotMutation.mutate({
       shot_id: selectedShot.id,
       generation_id: generationId,
-      position: duplicatePosition,
+      // Position will be computed from timeline_frame - no parameter needed
       project_id: projectId,
     }, {
       onSuccess: () => {

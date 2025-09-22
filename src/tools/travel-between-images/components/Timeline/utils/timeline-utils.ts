@@ -374,9 +374,11 @@ export const applyFluidTimeline = (
       });
 
       // Apply gap constraint between dragged item and new adjacent item
+      // For rightward drags, allow the dragged item to move past the next item
+      // For leftward drags, allow the dragged item to move past the previous item
       const constraint = limitedMovementAmount > 0
-        ? nextItemAfterShift.pos - maxGap
-        : nextItemAfterShift.pos + maxGap;
+        ? nextItemAfterShift.pos + maxGap  // Allow dragging past the next item
+        : nextItemAfterShift.pos - maxGap; // Allow dragging past the previous item
 
       const constrainedPos = limitedMovementAmount > 0
         ? Math.min(limitedTargetFrame, constraint)

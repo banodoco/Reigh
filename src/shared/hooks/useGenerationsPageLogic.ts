@@ -63,8 +63,8 @@ export function useGenerationsPageLogic({
     const shot = shotsData.find(s => s.id === shotId);
     if (!shot?.images) return false;
     
-    // Check if any images have position === null/undefined (i.e., unpositioned)
-    const unpositionedImages = shot.images.filter(img => img.position === null || img.position === undefined);
+    // Check if any images have timeline_frame === null/undefined (i.e., unpositioned)
+    const unpositionedImages = shot.images.filter(img => (img as any).timeline_frame === null || (img as any).timeline_frame === undefined);
     console.log('[ShotFilterLogic] Shot unpositioned images check:', {
       shotId,
       totalImages: shot.images.length,

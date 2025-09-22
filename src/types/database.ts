@@ -67,7 +67,7 @@ export interface ShotGeneration {
   id: string;
   shot_id: string;
   generation_id: string;
-  position?: number; // Now nullable for unpositioned associations
+  timeline_frame?: number; // Now nullable for unpositioned associations
 }
 
 export interface Task {

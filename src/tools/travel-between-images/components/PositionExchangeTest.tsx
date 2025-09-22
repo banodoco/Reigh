@@ -101,7 +101,7 @@ const PositionExchangeTest: React.FC<PositionExchangeTestProps> = ({ shotId }) =
           <div className="space-y-1 text-sm font-mono bg-muted p-2 rounded max-h-40 overflow-y-auto">
             {shotGenerations.map(sg => (
               <div key={sg.id}>
-                {sg.generation_id.substring(0, 8)}: pos={sg.position}, frame={sg.timeline_frame || 'null'}
+                {sg.generation_id.substring(0, 8)}: pos={Math.floor((sg.timeline_frame ?? 0) / 50)}, frame={sg.timeline_frame || 'null'}
               </div>
             ))}
           </div>

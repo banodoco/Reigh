@@ -18,7 +18,7 @@ export interface ShotGenerationRow {
   id: string;
   shotId: string;
   generationId: string;
-  position?: number;
+  timeline_frame?: number;
 }
 
 // CRUD functions will go here 
@@ -185,7 +185,6 @@ export const useDuplicateShot = () => {
           ...sg.generation,
           shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
-          position: sg.position,
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
           thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
         })) || []
@@ -307,10 +306,10 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       const shotPromises = shots.map(async (shot) => {
         let query = supabase
           .from('shot_generations')
-          .select(`
-            id,
-            position,
-            generation:generations(
+        .select(`
+          id,
+          timeline_frame,
+          generation:generations(
               id,
               location,
               type,
@@ -318,7 +317,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             )
           `)
           .eq('shot_id', shot.id)
-          .order('position', { ascending: true })
+          .order('timeline_frame', { ascending: true })
           .order('created_at', { ascending: false });
         
         // Only apply limit if specified (allows unlimited when needed)
@@ -337,7 +336,6 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
           .map(sg => ({
             ...sg.generation,
             shotImageEntryId: sg.id,
-            position: sg.position,
             imageUrl: (sg.generation as any).location,
             thumbUrl: (sg.generation as any).location,
           }));
@@ -483,7 +481,7 @@ interface AddImageToShotArgs {
   shot_id: string;
   generation_id: string; 
   project_id: string | null; // For invalidating correct query
-  position?: number | null; // Allow null for unpositioned associations
+  timeline_frame?: number | null; // Allow null for unpositioned associations
   imageUrl?: string; // For optimistic update
   thumbUrl?: string; // For optimistic update
 }
@@ -568,7 +566,7 @@ export const useAddImageToShot = () => {
       // Check what currently exists for this shot-generation combo
       const { data: allExistingRecords, error: checkError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position, created_at')
+        .select('id, shot_id, generation_id, timeline_frame, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
         .order('created_at', { ascending: true });
@@ -582,9 +580,9 @@ export const useAddImageToShot = () => {
           recordCount: allExistingRecords?.length || 0,
           allRecords: allExistingRecords?.map(record => ({
             id: record.id,
-            position: record.position,
+            timeline_frame: record.timeline_frame,
             created_at: record.created_at,
-            isPositionNull: record.position === null || record.position === undefined
+            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
           })) || []
         });
       }
@@ -636,14 +634,14 @@ export const useAddImageToShot = () => {
       
       console.log('[PositionFix] RPC success (regular path), returned data:', {
         shotGeneration,
-        newPosition: (shotGeneration as any)?.position,
+        newTimelineFrame: (shotGeneration as any)?.timeline_frame,
         timestamp: Date.now()
       });
 
       // Verify the final state
       const { data: finalRecords, error: verifyError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position, created_at')
+        .select('id, shot_id, generation_id, timeline_frame, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
         .order('created_at', { ascending: true });
@@ -665,11 +663,11 @@ export const useAddImageToShot = () => {
           recordsAdded: (finalRecords?.length || 0) - (allExistingRecords?.length || 0),
           finalRecords: finalRecords?.map(record => ({
             id: record.id,
-            position: record.position,
+            timeline_frame: record.timeline_frame,
             created_at: record.created_at,
-            isPositionNull: record.position === null || record.position === undefined
+            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
           })) || [],
-          rpcReturnedPosition: (shotGeneration as any)?.position,
+          rpcReturnedTimelineFrame: (shotGeneration as any)?.timeline_frame,
           rpcReturnedId: (shotGeneration as any)?.id
         });
       }
@@ -797,7 +795,7 @@ export const usePositionExistingGenerationInShot = () => {
       // Use .select() instead of .maybeSingle() to see ALL records
       const { data: allExistingRecords, error: checkError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position, created_at')
+        .select('id, shot_id, generation_id, timeline_frame, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
         .order('created_at', { ascending: true });
@@ -811,12 +809,12 @@ export const usePositionExistingGenerationInShot = () => {
           recordCount: allExistingRecords?.length || 0,
           allRecords: allExistingRecords?.map(record => ({
             id: record.id,
-            position: record.position,
+            timeline_frame: record.timeline_frame,
             created_at: record.created_at,
-            isPositionNull: record.position === null || record.position === undefined
+            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
           })) || [],
-          hasNullPositionRecord: allExistingRecords?.some(r => r.position === null || r.position === undefined) || false,
-          hasPositionedRecord: allExistingRecords?.some(r => r.position !== null && r.position !== undefined) || false
+          hasNullTimelineFrameRecord: allExistingRecords?.some(r => r.timeline_frame === null || r.timeline_frame === undefined) || false,
+          hasTimelineFrameRecord: allExistingRecords?.some(r => r.timeline_frame !== null && r.timeline_frame !== undefined) || false
         });
       }
       
@@ -849,7 +847,7 @@ export const usePositionExistingGenerationInShot = () => {
       
       console.log('[PositionFix] RPC success, returned data:', {
         shotGeneration,
-        newPosition: (shotGeneration as any)?.position,
+        newTimelineFrame: (shotGeneration as any)?.timeline_frame,
         recordId: (shotGeneration as any)?.id,
         shotId: (shotGeneration as any)?.shot_id,
         generationId: (shotGeneration as any)?.generation_id,
@@ -859,7 +857,7 @@ export const usePositionExistingGenerationInShot = () => {
       // Let's verify the final state - get ALL records again to see what happened
       const { data: finalRecords, error: verifyError } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, position, created_at')
+        .select('id, shot_id, generation_id, timeline_frame, created_at')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
         .order('created_at', { ascending: true });
@@ -881,11 +879,11 @@ export const usePositionExistingGenerationInShot = () => {
           recordsAdded: (finalRecords?.length || 0) - (allExistingRecords?.length || 0),
           finalRecords: finalRecords?.map(record => ({
             id: record.id,
-            position: record.position,
+            timeline_frame: record.timeline_frame,
             created_at: record.created_at,
-            isPositionNull: record.position === null || record.position === undefined
+            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
           })) || [],
-          rpcReturnedPosition: (shotGeneration as any)?.position,
+          rpcReturnedTimelineFrame: (shotGeneration as any)?.timeline_frame,
           rpcReturnedId: (shotGeneration as any)?.id
         });
       }
@@ -913,46 +911,79 @@ export const useDuplicateImageInShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ 
-      shot_id, 
-      generation_id, 
-      position,
+    mutationFn: async ({
+      shot_id,
+      generation_id,
       project_id,
-      silent 
-    }: { 
-      shot_id: string; 
+      silent
+    }: {
+      shot_id: string;
       generation_id: string;
-      position: number;
       project_id: string;
       silent?: boolean;
     }) => {
-      // First, shift all images at or after the target position up by 1
-      const { data: existingImages, error: fetchError } = await supabase
+      // Get all existing images to calculate timeline frame midpoint
+      const { data: allImages, error: fetchAllError } = await supabase
         .from('shot_generations')
-        .select('id, position')
+        .select('id, timeline_frame, generation_id')
         .eq('shot_id', shot_id)
-        .gte('position', position)
-        .order('position', { ascending: false });
+        .order('timeline_frame', { ascending: true });
       
-      if (fetchError) throw fetchError;
+      if (fetchAllError) throw fetchAllError;
       
-      // Update positions in reverse order to avoid conflicts
-      for (const img of existingImages || []) {
-        const { error: updateError } = await supabase
-          .from('shot_generations')
-          .update({ position: (img.position || 0) + 1 })
-          .eq('id', img.id);
+      // Find the original image and the next image to calculate midpoint
+      const originalImage = allImages?.find(img => img.generation_id === generation_id);
+      if (!originalImage) throw new Error('Original image not found');
+      
+      // Find the next image by timeline_frame order (not position order)
+      const originalFrame = originalImage.timeline_frame || 0;
+      
+      // Sort all images by timeline_frame to find the actual next image in timeline order
+      const sortedByTimelineFrame = allImages
+        ?.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined)
+        .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0)) || [];
+      
+      // Find the next image after the original in timeline order
+      const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === originalImage.id);
+      const nextImageInTimeline = originalIndex >= 0 && originalIndex < sortedByTimelineFrame.length - 1 
+        ? sortedByTimelineFrame[originalIndex + 1] 
+        : null;
         
-        if (updateError) throw updateError;
-      }
+      // If we're at the end of the timeline, there's no next image
+      // The duplicate should go after the original with default spacing
       
-      // Insert the duplicate at the target position
+      // Calculate timeline frame as midpoint
+      const nextFrame = nextImageInTimeline 
+        ? (nextImageInTimeline.timeline_frame || (originalFrame + 60))
+        : (originalFrame + 60); // Default spacing if no next image
+      const duplicateTimelineFrame = Math.floor((originalFrame + nextFrame) / 2);
+      
+      console.log('[DUPLICATE] Timeline frame calculation:', {
+        originalFrame,
+        nextFrame,
+        duplicateTimelineFrame,
+        nextImageInTimeline: nextImageInTimeline ? {
+          id: nextImageInTimeline.id.substring(0, 8),
+          timeline_frame: nextImageInTimeline.timeline_frame
+        } : 'none',
+        totalImagesInTimeline: sortedByTimelineFrame.length,
+        originalIndexInTimeline: originalIndex
+      });
+      
+      // No need to shift positions manually - they're now computed from timeline_frame!
+      // Just insert the duplicate with the calculated timeline frame
       const { data: newShotGeneration, error: insertError } = await supabase
         .from('shot_generations')
         .insert({
           shot_id,
           generation_id,
-          position
+          // Remove position - it will be computed from timeline_frame
+          timeline_frame: duplicateTimelineFrame,
+          metadata: {
+            duplicated_from: originalImage.id,
+            original_timeline_frame: originalFrame,
+            calculated_midpoint: duplicateTimelineFrame
+          }
         })
         .select()
         .single();
@@ -961,11 +992,10 @@ export const useDuplicateImageInShot = () => {
       
       return newShotGeneration;
     },
-    onMutate: async ({ shot_id, generation_id, position, project_id, silent }) => {
+    onMutate: async ({ shot_id, generation_id, project_id, silent }) => {
       console.log('[DUPLICATE] onMutate optimistic update', {
         shot_id,
         generation_id,
-        position,
         timestamp: Date.now()
       });
 
@@ -1205,11 +1235,11 @@ export const useUpdateShotImageOrder = () => {
   
   return useMutation({
     mutationFn: async ({ shotId, orderedShotGenerationIds, projectId }: { shotId: string; orderedShotGenerationIds: string[]; projectId: string }) => {
-      // Update positions for all shot_generations in a transaction-like manner
+      // Update timeline_frames for all shot_generations in a transaction-like manner
       const updates = orderedShotGenerationIds.map((id, index) => 
         supabase
           .from('shot_generations')
-          .update({ position: index })
+          .update({ timeline_frame: index * 50 })
           .eq('id', id)
           .eq('shot_id', shotId)
       );

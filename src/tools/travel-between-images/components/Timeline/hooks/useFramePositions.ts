@@ -57,10 +57,11 @@ export const useFramePositions = ({
           }
           positionsApplied = true;
         } else if (!map.has(img.shotImageEntryId)) {
-          // No pending position, assign a default
-          const defaultPos = (images.length - 1) * frameSpacing + frameSpacing;
+          // No pending position, assign a default at final frame + 50
+          const maxFrame = Math.max(0, ...Array.from(map.values()));
+          const defaultPos = maxFrame + 50;
           map.set(img.shotImageEntryId, defaultPos);
-          console.log(`[Timeline] Applied default position for new image ${img.shotImageEntryId} to frame ${defaultPos}`);
+          console.log(`[Timeline] Applied default position for new image ${img.shotImageEntryId} to frame ${defaultPos} (maxFrame: ${maxFrame})`);
           positionsApplied = true;
         }
       });

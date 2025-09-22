@@ -1,14 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
 import ShotImageManager from "@/shared/components/ShotImageManager";
-import Timeline from "./Timeline";
+import Timeline from "./Timeline"; // Main timeline component with drag/drop and image actions
 import { Button } from "@/shared/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import FileInput from "@/shared/components/FileInput";
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
+import PairPromptModal from "./Timeline/PairPromptModal";
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -44,7 +45,7 @@ interface ShotImagesEditorProps {
   /** Image deletion callback */
   onImageDelete: (shotImageEntryId: string) => void;
   /** Image duplication callback */
-  onImageDuplicate?: (shotImageEntryId: string, position: number) => void;
+  onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   /** Number of columns for batch mode grid */
   columns: 2 | 3 | 4 | 6;
   /** Skeleton component to show while loading */
@@ -65,7 +66,15 @@ interface ShotImagesEditorProps {
   duplicateSuccessImageId?: string | null;
   /** Project aspect ratio for display */
   projectAspectRatio?: string;
+  /** Default prompt for timeline pairs (from existing generation settings) */
+  defaultPrompt?: string;
+  onDefaultPromptChange?: (prompt: string) => void;
+  /** Default negative prompt for timeline pairs (from existing generation settings) */
+  defaultNegativePrompt?: string;
+  onDefaultNegativePromptChange?: (prompt: string) => void;
 }
+
+// Force TypeScript to re-evaluate this interface
 
 const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   isModeReady,
@@ -95,7 +104,39 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
+  defaultPrompt = "",
+  onDefaultPromptChange,
+  defaultNegativePrompt = "",
+  onDefaultNegativePromptChange,
 }) => {
+  // Note: Pair prompts are retrieved from the enhanced shot positions hook below
+  
+  const [pairPromptModalData, setPairPromptModalData] = useState<{
+    isOpen: boolean;
+    pairData: { 
+      index: number; 
+      frames: number; 
+      startFrame: number; 
+      endFrame: number;
+      startImage?: {
+        id: string;
+        url?: string;
+        thumbUrl?: string;
+        timeline_frame: number;
+      } | null;
+      endImage?: {
+        id: string;
+        url?: string;
+        thumbUrl?: string;
+        timeline_frame: number;
+      } | null;
+    } | null;
+  }>({
+    isOpen: false,
+    pairData: null,
+  });
+
+
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
   const { 
@@ -106,8 +147,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     exchangePositions,
     batchExchangePositions,
     deleteItem,
-    loadPositions
+    loadPositions,
+    getPairPrompts,
+    updatePairPromptsByIndex
   } = useEnhancedShotPositions(selectedShotId);
+  
+  // Get pair prompts from the enhanced shot positions hook
+  const pairPrompts = getPairPrompts();
   
   // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
   const { handleReorder, handleDelete } = useEnhancedShotImageReorder(selectedShotId, {
@@ -130,7 +176,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     return shotGenerations;
   }, [shotGenerations]);
 
-  console.log('[ShotImagesEditor] Render:', {
+  // Note: Pair prompts cleanup is handled automatically by the database
+  // when shot_generations are deleted, since prompts are stored in their metadata
+
+    console.log('[ShotImagesEditor] Render:', {
     selectedShotId,
     generationMode,
     imagesCount: images.length,
@@ -163,11 +212,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               }}
               className="h-8"
             >
-              <ToggleGroupItem value="batch" className="text-xs px-2 h-8">
-                Batch
-              </ToggleGroupItem>
               <ToggleGroupItem value="timeline" className="text-xs px-2 h-8">
                 Timeline
+              </ToggleGroupItem>
+              <ToggleGroupItem value="batch" className="text-xs px-2 h-8">
+                Batch
               </ToggleGroupItem>
             </ToggleGroup>
 
@@ -177,14 +226,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
       {/* Content - Show skeleton if not ready, otherwise show actual content */}
       <CardContent>
-        {!isModeReady || positionsLoading ? (
+        {!isModeReady || (positionsLoading && !memoizedShotGenerations.length) ? (
           <div className="p-1">
             {skeleton}
           </div>
         ) : (
           <div className="p-1">
             {generationMode === "timeline" ? (
-              <Timeline
+              <>
+                <Timeline
                 shotId={selectedShotId}
                 frameSpacing={batchVideoFrames}
                 contextFrames={batchVideoContext}
@@ -195,12 +245,26 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onImageDrop={onImageDrop}
                 pendingPositions={pendingPositions}
                 onPendingPositionApplied={onPendingPositionApplied}
+                onImageDelete={onImageDelete}
+                onImageDuplicate={onImageDuplicate}
+                duplicatingImageId={duplicatingImageId}
+                duplicateSuccessImageId={duplicateSuccessImageId}
+                projectAspectRatio={projectAspectRatio}
                 // Pass shared data to prevent reloading
                 shotGenerations={memoizedShotGenerations}
                 updateTimelineFrame={updateTimelineFrame}
                 images={images}
                 onTimelineChange={() => loadPositions({ silent: true })}
+                onPairClick={(pairIndex, pairData) => {
+                  setPairPromptModalData({
+                    isOpen: true,
+                    pairData,
+                  });
+                }}
+                defaultPrompt={defaultPrompt}
+                defaultNegativePrompt={defaultNegativePrompt}
               />
+              </>
             ) : (
               <ShotImageManager
                 images={images}
@@ -266,6 +330,25 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           )}
         </div>
       </CardContent>
+
+      {/* Pair Prompt Modal */}
+      <PairPromptModal
+        isOpen={pairPromptModalData.isOpen}
+        onClose={() => setPairPromptModalData({ isOpen: false, pairData: null })}
+        pairData={pairPromptModalData.pairData}
+        pairPrompt={pairPromptModalData.pairData ? (pairPrompts[pairPromptModalData.pairData.index]?.prompt || "") : ""}
+        pairNegativePrompt={pairPromptModalData.pairData ? (pairPrompts[pairPromptModalData.pairData.index]?.negativePrompt || "") : ""}
+        defaultPrompt={defaultPrompt}
+        defaultNegativePrompt={defaultNegativePrompt}
+          onSave={async (pairIndex, prompt, negativePrompt) => {
+            try {
+              await updatePairPromptsByIndex(pairIndex, prompt, negativePrompt);
+              console.log(`[PairPrompts] Saved prompts for Pair ${pairIndex + 1}:`, { prompt, negativePrompt });
+            } catch (error) {
+              console.error(`[PairPrompts] Failed to save prompts for Pair ${pairIndex + 1}:`, error);
+            }
+                }}
+              />
     </Card>
   );
 };
