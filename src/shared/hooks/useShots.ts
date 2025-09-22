@@ -307,10 +307,10 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       const shotPromises = shots.map(async (shot) => {
         let query = supabase
           .from('shot_generations')
-        .select(`
-          id,
-          timeline_frame,
-          generation:generations(
+          .select(`
+            id,
+            timeline_frame,
+            generation:generations!inner(
               id,
               location,
               type,
@@ -318,7 +318,8 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             )
           `)
           .eq('shot_id', shot.id)
-          .order('timeline_frame', { ascending: true })
+          .or('generation.type.eq.image,generation.type.is.null') // Only include image generations or null type
+          .order('timeline_frame', { ascending: true, nullsLast: true })
           .order('created_at', { ascending: false });
         
         // Only apply limit if specified (allows unlimited when needed)
@@ -329,8 +330,21 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         const { data: shotGenerations, error: sgError } = await query;
         
         if (sgError) {
+          console.error('[useListShots] Error loading shot generations:', sgError, { shotId: shot.id });
           throw sgError;
         }
+        
+        console.log('[useListShots] Loaded shot generations:', {
+          shotId: shot.id.substring(0, 8),
+          shotName: shot.name,
+          generationsCount: shotGenerations?.length || 0,
+          sampleGenerations: shotGenerations?.slice(0, 3).map(sg => ({
+            id: sg.generation?.id?.substring(0, 8),
+            type: sg.generation?.type,
+            timeline_frame: sg.timeline_frame,
+            hasLocation: !!sg.generation?.location
+          }))
+        });
         
         const transformedImages = (shotGenerations || [])
           .filter(sg => sg.generation) // Filter out any null generations
