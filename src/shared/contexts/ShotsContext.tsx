@@ -40,9 +40,9 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
       timestamp: Date.now()
     });
     
-    // [ImageDebug] Log detailed image data for first few shots
+    // [ShotImageDebug] Log detailed image data for first few shots
     if (shots && shots.length > 0) {
-      console.log('[ImageDebug] First 3 shots with image details:', 
+      console.log('[ShotImageDebug] First 3 shots with image details:', 
         shots.slice(0, 3).map(shot => ({
           shotId: shot.id.substring(0, 8),
           shotName: shot.name,

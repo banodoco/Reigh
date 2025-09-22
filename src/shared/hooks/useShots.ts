@@ -330,11 +330,11 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         const { data: shotGenerations, error: sgError } = await query;
         
         if (sgError) {
-          console.error('[useListShots] Error loading shot generations:', sgError, { shotId: shot.id });
+          console.error('[ShotImageDebug] Error loading shot generations:', sgError, { shotId: shot.id });
           throw sgError;
         }
         
-        console.log('[useListShots] Loaded shot generations:', {
+        console.log('[ShotImageDebug] Loaded shot generations:', {
           shotId: shot.id.substring(0, 8),
           shotName: shot.name,
           generationsCount: shotGenerations?.length || 0,
@@ -357,7 +357,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
           }));
         
-        console.log('[useListShots] Transformed images for shot:', {
+        console.log('[ShotImageDebug] Transformed images for shot:', {
           shotId: shot.id.substring(0, 8),
           shotName: shot.name,
           transformedImagesCount: transformedImages.length,

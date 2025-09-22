@@ -81,13 +81,13 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   };
 
   const handleImageError = () => {
-    console.error(`[ShotImage-${index}] Image failed to load:`, { displayUrl });
+    console.error(`[ShotImageDebug] Image failed to load:`, { displayUrl, index, shotImageEntryId: image.shotImageEntryId });
     setImageLoadError(true);
   };
 
   // Don't render anything if we don't have a valid URL
   if (!displayUrl) {
-    console.warn(`[ShotImage-${index}] No valid URL found for image:`, { 
+    console.warn(`[ShotImageDebug] No valid URL found for image:`, { 
       image: {
         shotImageEntryId: image.shotImageEntryId,
         imageUrl: image.imageUrl,
@@ -361,9 +361,33 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  // Match ShotEditor/ShotsPane: show only positioned, non-video images sorted by position
+  // Log the raw shot images data to understand what we're getting
+  console.log('[ShotImageDebug] Processing shot images:', {
+    shotId: shot.id.substring(0, 8),
+    shotName: shot.name,
+    totalImages: shot.images?.length || 0,
+    sampleImages: shot.images?.slice(0, 3).map(img => ({
+      shotImageEntryId: img.shotImageEntryId,
+      type: img.type,
+      hasImageUrl: !!img.imageUrl,
+      hasLocation: !!img.location,
+      timeline_frame: (img as any).timeline_frame,
+      position: (img as any).position
+    })) || []
+  });
+
+  // Match ShotEditor/ShotsPane: show only positioned, non-video images sorted by timeline_frame
   const positionedImages = (shot.images || [])
-    .filter(img => (img as any).position !== null && (img as any).position !== undefined)
+    .filter(img => {
+      const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+      console.log('[ShotImageDebug] Filtering image:', {
+        shotImageEntryId: img.shotImageEntryId,
+        timeline_frame: (img as any).timeline_frame,
+        hasTimelineFrame,
+        type: img.type
+      });
+      return hasTimelineFrame;
+    })
     .filter(img => {
       const isVideo = img.type === 'video' || img.type === 'video_travel_output' ||
         ((img as any).location && (img as any).location.endsWith('.mp4')) ||
@@ -371,12 +395,24 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
       return !isVideo;
     })
     .sort((a, b) => {
-      const posA = (a as any).position as number;
-      const posB = (b as any).position as number;
-      return posA - posB;
+      const frameA = (a as any).timeline_frame || 0;
+      const frameB = (b as any).timeline_frame || 0;
+      return frameA - frameB;
     });
 
   const imagesToShow: GenerationRow[] = positionedImages.slice(0, 5);
+  
+  console.log('[ShotImageDebug] Final images to show:', {
+    shotId: shot.id.substring(0, 8),
+    shotName: shot.name,
+    positionedImagesCount: positionedImages.length,
+    imagesToShowCount: imagesToShow.length,
+    finalImages: imagesToShow.map(img => ({
+      shotImageEntryId: img.shotImageEntryId,
+      hasImageUrl: !!img.imageUrl,
+      timeline_frame: (img as any).timeline_frame
+    }))
+  });
   
   // Calculate how many placeholder blocks we need to fill to 5 total slots
   const maxSlots = 5;
