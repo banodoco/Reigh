@@ -318,7 +318,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             )
           `)
           .eq('shot_id', shot.id)
-          .or('generation.type.eq.image,generation.type.is.null') // Only include image generations or null type
+          .not('generation.type', 'eq', 'video')
           .order('timeline_frame', { ascending: true, nullsLast: true })
           .order('created_at', { ascending: false });
         
