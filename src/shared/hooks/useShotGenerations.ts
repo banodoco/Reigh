@@ -53,6 +53,7 @@ export const useShotGenerations = (
           shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
           position: Math.floor((sg.timeline_frame ?? 0) / 50),
+          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
           thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
         }));
@@ -218,6 +219,7 @@ export const useAllShotGenerations = (
           shotImageEntryId: sg.id,
           shot_generation_id: sg.id,
           position: Math.floor((sg.timeline_frame ?? 0) / 50),
+          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
           imageUrl: sg.generation?.location,
           thumbUrl: sg.generation?.location,
         }));

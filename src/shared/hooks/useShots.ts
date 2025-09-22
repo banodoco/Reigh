@@ -187,6 +187,7 @@ export const useDuplicateShot = () => {
           shot_generation_id: sg.id,
           imageUrl: sg.generation?.location || sg.generation?.imageUrl,
           thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
+          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
         })) || []
       };
     },
@@ -338,6 +339,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             shotImageEntryId: sg.id,
             imageUrl: (sg.generation as any).location,
             thumbUrl: (sg.generation as any).location,
+            timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
           }));
         
         return {
