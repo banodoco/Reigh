@@ -65,6 +65,11 @@ const Timeline: React.FC<TimelineProps> = ({
   images: propImages,
   onTimelineChange
 }) => {
+  // State to track context visibility with delay
+  const [showContext, setShowContext] = useState(false);
+  const contextTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+
   // Enhanced Timeline performance tracking with prop change detection
   const renderCountRef = React.useRef(0);
   const prevPropsRef = React.useRef<any>();
@@ -112,9 +117,12 @@ const Timeline: React.FC<TimelineProps> = ({
   const initialContextFrames = useRef(contextFrames);
 
   // Use shared data if provided, otherwise fallback to hook (for backward compatibility)
-  const hookData = useEnhancedShotPositions(propShotGenerations ? null : shotId);
+  // IMPORTANT: Always pass shotId to hook so applyTimelineFrames works correctly
+  const hookData = useEnhancedShotPositions(shotId); // Always pass shotId for atomic operations
   const shotGenerations = propShotGenerations || hookData.shotGenerations;
   const updateTimelineFrame = propUpdateTimelineFrame || hookData.updateTimelineFrame;
+  const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
+  const applyTimelineFrames = hookData.applyTimelineFrames; // New atomic update method
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
   const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, not loading
   
@@ -122,8 +130,9 @@ const Timeline: React.FC<TimelineProps> = ({
   const parentLoadPositions = propShotGenerations ? hookData.loadPositions : null;
   
   // Use provided images or generate from shotGenerations
-  const images = propImages || React.useMemo(() => {
-    const timelineImages = shotGenerations
+  const images = React.useMemo(() => {
+    if (propImages) return propImages;
+    return shotGenerations
       .filter(sg => sg.generation)
       .map(sg => ({
         id: sg.generation_id,
@@ -144,7 +153,7 @@ const Timeline: React.FC<TimelineProps> = ({
       const frameB = b.timeline_frame ?? (b.position * frameSpacing);
       return frameA - frameB;
     });
-  }, [shotGenerations, frameSpacing]);
+  }, [shotGenerations, frameSpacing, propImages]);
   
   // Convert database timeline_frame values to Timeline-compatible Map
   // Keep previous positions during loading to prevent flicker
@@ -216,7 +225,10 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Auto-initialize timeline frames for existing shots that don't have them
   React.useEffect(() => {
-    if (isLoading || !shotGenerations || shotGenerations.length === 0) return;
+    // Early return if we don't have the required data
+    if (isLoading || !shotId || !shotGenerations || shotGenerations.length === 0 || !initializeTimelineFrames) {
+      return;
+    }
 
     // Check if any items are missing timeline_frame values
     const itemsWithoutFrames = shotGenerations.filter(sg => 
@@ -268,50 +280,287 @@ const Timeline: React.FC<TimelineProps> = ({
     return framePositions;
   }, [isLoading, isPersistingPositions, stablePositions, framePositions, shotId]);
 
-  // Database-backed setFramePositions function
+  // Atomic database-backed setFramePositions function using new RPC
   const setFramePositions = React.useCallback(async (newPositions: Map<string, number>) => {
-    console.log('[PositionSystemDebug] 🎯 TIMELINE updating positions to database:', {
+    console.log('[TimelineMoveFlow] 🎯 TIMELINE setFramePositions CALLED - Processing position update:', {
       shotId: shotId.substring(0, 8),
       positionsCount: newPositions.size,
+      positions: Array.from(newPositions.entries()).map(([id, frame]) => ({
+        id: id.substring(0, 8),
+        frame
+      })),
+      stackTrace: new Error().stack?.split('\n').slice(1, 5),
+      timestamp: new Date().toISOString()
     });
+    
+    console.log('[PositionResetDebug] 🎯 TIMELINE setFramePositions CALLED (ATOMIC):', {
+      shotId: shotId.substring(0, 8),
+      positionsCount: newPositions.size,
+      positions: Array.from(newPositions.entries()).map(([id, frame]) => ({
+        id: id.substring(0, 8),
+        frame
+      })),
+      stackTrace: new Error().stack?.split('\n').slice(1, 5),
+      timestamp: new Date().toISOString()
+    });
+
+    // [TimelineItemMoveSummary] Check if this update might be causing cascading issues
+    const updateSource = new Error().stack?.includes('useTimelineDrag') ? 'drag' : 'programmatic';
+    console.log('[TimelineItemMoveSummary] Position update source:', {
+      source: updateSource,
+      shotId: shotId.substring(0, 8),
+      timestamp: new Date().toISOString()
+    });
+
+    // Calculate what actually changed
+    const positionChanges = [...newPositions.entries()]
+      .filter(([id, newPos]) => {
+        const currentPos = displayPositions.get(id);
+        return currentPos !== newPos;
+      })
+      .map(([id, newPos]) => {
+        const currentPos = displayPositions.get(id) ?? 0;
+        const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+        return {
+          id: id.slice(-8),
+          imageIdx: imageIndex,
+          oldPos: currentPos,
+          newPos,
+          delta: newPos - currentPos
+        };
+      });
+
+    // Log the move summary for debugging
+    if (positionChanges.length > 0) {
+      const positionsBefore = [...displayPositions.entries()]
+        .sort(([, a], [, b]) => a - b)
+        .map(([id, pos]) => {
+          const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+          return {
+            id: id.slice(-8),
+            imageIdx: imageIndex,
+            frame: pos
+          };
+        });
+
+      const positionsAfter = [...newPositions.entries()]
+        .sort(([, a], [, b]) => a - b)
+        .map(([id, pos]) => {
+          const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+          return {
+            id: id.slice(-8),
+            imageIdx: imageIndex,
+            frame: pos
+          };
+        });
+
+      console.log('[TimelineItemMoveSummary] Timeline atomic move initiated', {
+        moveType: 'atomic_rpc',
+        positionsBefore,
+        positionsAfter,
+        changes: {
+          totalChanges: positionChanges.length,
+          positionChanges
+        },
+        metadata: {
+          shotId: shotId.substring(0, 8),
+          totalImages: images.length,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
 
     // IMMEDIATELY update stable positions to prevent visual glitches during database update
     setStablePositions(new Map(newPositions));
     setIsPersistingPositions(true);
     console.log('[PositionSystemDebug] 🎭 TIMELINE immediately updated stable positions for smooth transition');
 
-    // Update database for each changed position
-    const updatePromises: Promise<void>[] = [];
-    newPositions.forEach((newFrame, shotImageEntryId) => {
-      const currentFrame = displayPositions.get(shotImageEntryId);
-      if (currentFrame !== newFrame) {
-        // Find the generation ID from shotImageEntryId
-        const matchingImage = images.find(img => img.shotImageEntryId === shotImageEntryId);
-        if (matchingImage) {
-          updatePromises.push(updateTimelineFrame(matchingImage.id, newFrame));
-        }
-      }
-    });
+    // Only proceed if there are actual changes
+    if (positionChanges.length === 0) {
+      setIsPersistingPositions(false);
+      console.log('[PositionSystemDebug] ✅ No changes needed - positions already match');
+      return;
+    }
 
-    // Wait for all updates to complete
-    if (updatePromises.length > 0) {
-      await Promise.all(updatePromises);
+    try {
+      // Use the new atomic RPC function if available
+      if (applyTimelineFrames) {
+        console.log('[TimelineMoveFlow] 🚀 CALLING ATOMIC RPC - applyTimelineFrames:', {
+          shotId: shotId.substring(0, 8),
+          changesCount: positionChanges.length,
+          changes: positionChanges.map(c => ({
+            id: c.id,
+            from: c.oldPos,
+            to: c.newPos
+          }))
+        });
+        
+        console.log('[PositionSystemDebug] 🚀 Using ATOMIC timeline frame updates:', {
+          shotId: shotId.substring(0, 8),
+          changesCount: positionChanges.length,
+          changes: positionChanges.map(c => ({
+            id: c.id,
+            from: c.oldPos,
+            to: c.newPos
+          }))
+        });
+
+        // Convert to the format expected by applyTimelineFrames
+        const atomicChanges = positionChanges.map(change => {
+          const shotImageEntryId = [...newPositions.entries()].find(([, pos]) => pos === change.newPos)?.[0];
+          const matchingImage = images.find(img => img.shotImageEntryId === shotImageEntryId);
+          return {
+            generationId: matchingImage!.id, // We know it exists from positionChanges
+            timelineFrame: change.newPos
+          };
+        });
+
+        console.log('[TimelineMoveFlow] 📡 RPC PAYLOAD PREPARED:', {
+          shotId: shotId.substring(0, 8),
+          atomicChanges: atomicChanges.map(c => ({
+            generationId: c.generationId.substring(0, 8),
+            timelineFrame: c.timelineFrame
+          })),
+          updatePositions: true
+        });
+
+        await applyTimelineFrames(atomicChanges, true); // Update positions too for batch view consistency
+        
+        console.log('[TimelineMoveFlow] ✅ ATOMIC RPC COMPLETED - applyTimelineFrames succeeded:', {
+          shotId: shotId.substring(0, 8),
+          changesApplied: atomicChanges.length
+        });
+
+        console.log('[TimelineItemMoveSummary] Timeline atomic move completed successfully', {
+          moveType: 'atomic_rpc',
+          changesApplied: atomicChanges.length,
+          metadata: {
+            shotId: shotId.substring(0, 8),
+            totalImages: images.length,
+            timestamp: new Date().toISOString()
+          }
+        });
+
+      } else {
+        // Fallback for when atomic function is not available (shouldn't happen in normal flow)
+        console.warn('[PositionSystemDebug] ⚠️ Atomic function not available, this should not happen');
+        throw new Error('Atomic timeline frame update function not available');
+      }
       
       // If using shared data, trigger parent reload
       if (propShotGenerations && onTimelineChange) {
-        await onTimelineChange();
+        try {
+          await onTimelineChange();
+        } catch (error) {
+          console.error('[PositionSystemDebug] ❌ Failed to reload parent data:', error);
+        }
       }
+
+    } catch (error) {
+      console.error('[TimelineMoveFlow] ❌ ATOMIC RPC FAILED - applyTimelineFrames error:', {
+        shotId: shotId.substring(0, 8),
+        error: error instanceof Error ? error.message : error,
+        stackTrace: error instanceof Error ? error.stack : undefined
+      });
+      
+      console.error('[PositionSystemDebug] ❌ Atomic position update failed:', error);
+      // Reset stable positions on error
+      setStablePositions(displayPositions);
+      throw error; // Re-throw to let caller handle
+    } finally {
+      setIsPersistingPositions(false);
     }
-    setIsPersistingPositions(false);
+    
+    console.log('[PositionResetDebug] ✅ TIMELINE setFramePositions COMPLETED (ATOMIC):', {
+      shotId: shotId.substring(0, 8),
+      success: true,
+      timestamp: new Date().toISOString()
+    });
 
     // Also call the original callback if provided
     if (onFramePositionsChange) {
       onFramePositionsChange(newPositions);
     }
-  }, [displayPositions, images, updateTimelineFrame, onFramePositionsChange, shotId, propShotGenerations, onTimelineChange]);
+  }, [displayPositions, images, applyTimelineFrames, onFramePositionsChange, shotId, propShotGenerations, onTimelineChange]);
 
-  // Calculate dimensions
+  // Calculate dimensions - use stable coordinate system during dragging
+  // Use original positions for coordinate system to prevent feedback loop during drag
+  // Note: This is defined after dragState is available
+
+  // Zoom and File Drop hooks - defined after coordinate system is available
+
+  // Drag hook - defined after coordinate system is available
+
+  // Global event listeners will be set up after drag hook is defined
+
+  // Calculate dimensions - use display positions initially, will be updated after drag hook
   const { fullMin, fullMax, fullRange } = getTimelineDimensions(displayPositions);
+
+  // Get actual container dimensions for ground truth calculations
+  const containerRect = containerRef.current?.getBoundingClientRect() || null;
+
+  // Drag hook
+  const {
+    dragState,
+    dragOffset,
+    currentDragFrame,
+    swapTargetId,
+    dragDistances,
+    dynamicPositions,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+  } = useTimelineDrag({
+    framePositions: displayPositions,
+    setFramePositions,
+    images,
+    onImageReorder,
+    contextFrames,
+    fullMin,
+    fullRange,
+    containerRect,
+  });
+
+  // Effect to handle context visibility delay when not dragging
+  useEffect(() => {
+    if (!dragState.isDragging) {
+      // Clear any existing timer
+      if (contextTimerRef.current) {
+        clearTimeout(contextTimerRef.current);
+      }
+      
+      // Set a 100ms delay before showing context
+      contextTimerRef.current = setTimeout(() => {
+        setShowContext(true);
+      }, 100);
+    } else {
+      // Hide context immediately when dragging starts
+      setShowContext(false);
+      if (contextTimerRef.current) {
+        clearTimeout(contextTimerRef.current);
+      }
+    }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (contextTimerRef.current) {
+        clearTimeout(contextTimerRef.current);
+      }
+    };
+  }, [dragState.isDragging]);
+
+  // Log coordinate system changes for debugging
+  React.useEffect(() => {
+    if (dragState.isDragging) {
+      console.log('[CoordinateSystemDebug] 🎯 COORDINATE SYSTEM STABILITY:', {
+        isDragging: dragState.isDragging,
+        fullMin,
+        fullMax,
+        fullRange,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [dragState.isDragging, fullMin, fullMax, fullRange]);
 
   // Zoom hook
   const {
@@ -334,42 +583,44 @@ const Timeline: React.FC<TimelineProps> = ({
     handleDrop,
   } = useFileDrop({ onImageDrop, fullMin, fullRange });
 
-  // Drag hook
-  const {
-    dragState,
-    dragOffset,
-    currentDragFrame,
-    swapTargetId,
-    dragDistances,
-    dynamicPositions,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-  } = useTimelineDrag({
-    framePositions: displayPositions,
-    setFramePositions,
-    images,
-    onImageReorder,
-    contextFrames,
-    fullMin,
-    fullRange,
-  });
-
   // Set up global mouse event listeners for drag
   useEffect(() => {
     if (dragState.isDragging) {
-      const moveHandler = (e: MouseEvent) => handleMouseMove(e);
-      const upHandler = (e: MouseEvent) => handleMouseUp(e, containerRef);
-      
+      console.log('[TimelineGlobalEvents] 🎧 SETTING UP GLOBAL EVENT LISTENERS:', {
+        isDragging: dragState.isDragging,
+        activeId: dragState.activeId?.substring(0, 8),
+        timestamp: new Date().toISOString()
+      });
+
+      const moveHandler = (e: MouseEvent) => {
+        console.log('[TimelineGlobalEvents] 🖱️ GLOBAL MOUSE MOVE:', {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          timestamp: e.timeStamp
+        });
+        handleMouseMove(e);
+      };
+
+      const upHandler = (e: MouseEvent) => {
+        console.log('[TimelineGlobalEvents] 🖱️ GLOBAL MOUSE UP:', {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          timestamp: e.timeStamp,
+          willCallHandleMouseUp: true
+        });
+        handleMouseUp(e, containerRef);
+      };
+
       document.addEventListener('mousemove', moveHandler);
       document.addEventListener('mouseup', upHandler);
-      
+
       return () => {
+        console.log('[TimelineGlobalEvents] 🧹 CLEANING UP GLOBAL EVENT LISTENERS');
         document.removeEventListener('mousemove', moveHandler);
         document.removeEventListener('mouseup', upHandler);
       };
     }
-  }, [dragState.isDragging, handleMouseMove, handleMouseUp]);
+  }, [dragState.isDragging, dragState.activeId, handleMouseMove, handleMouseUp]);
 
   // Auto-adjust positions when context frames change
   useEffect(() => {
@@ -519,20 +770,39 @@ const Timeline: React.FC<TimelineProps> = ({
           {pairInfo.map((pair, index) => {
             // Build sorted positions array with id for pixel calculations
             const sortedDynamicPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
-
             const [startEntry, endEntry] = [sortedDynamicPositions[index], sortedDynamicPositions[index + 1]];
 
+            // Hide context for pairs involving the dragged item
+            if (dragState.isDragging && dragState.activeId) {
+              const isDraggedItemInPair = startEntry?.[0] === dragState.activeId || endEntry?.[0] === dragState.activeId;
+              if (isDraggedItemInPair) {
+                return null; // Skip rendering context for dragged item
+              }
+            }
+
+            // Hide context with delay for non-dragged pairs when not dragging
+            if (!dragState.isDragging && !showContext) {
+              return null; // Skip rendering until delay period is over
+            }
+
+            // Only calculate pixels for non-dragged items
             const getPixel = (entry: [string, number] | undefined): number => {
               if (!entry) return 0;
               const [id, framePos] = entry;
-              // Base pixel from current framePos (may already be quantized)
-              const basePixel = ((framePos - fullMin) / fullRange) * containerWidth;
 
-              // When actively dragging this item, align to cursor using its ORIGINAL start pixel plus dragOffset
-              if (dragState.isDragging && id === dragState.activeId && dragOffset) {
-                const originalPixel = ((dragState.originalFramePos - fullMin) / fullRange) * containerWidth;
-                return originalPixel + dragOffset.x;
+              // Skip DOM-based positioning for dragged items since we're not rendering their context
+              if (dragState.isDragging && id === dragState.activeId) {
+                console.log('[ContextSkip] 🎯 SKIPPING CONTEXT CALCULATION FOR DRAGGED ITEM:', {
+                  itemId: id.substring(0, 8),
+                  framePos,
+                  reason: 'context_hidden_for_dragged_item',
+                  timestamp: new Date().toISOString()
+                });
+                return 0; // Return 0 since this won't be used anyway
               }
+
+              // GROUND TRUTH: Use actual container dimensions
+              const basePixel = ((framePos - fullMin) / fullRange) * containerWidth;
 
               return basePixel;
             };

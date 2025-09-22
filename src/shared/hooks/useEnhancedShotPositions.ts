@@ -37,17 +37,35 @@ const DEFAULT_FRAME_SPACING = 60;
 export const useEnhancedShotPositions = (shotId: string | null) => {
   const [shotGenerations, setShotGenerations] = useState<ShotGeneration[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isPersistingPositions, setIsPersistingPositions] = useState(false);
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
   // Load all shot_generations data for the shot
-  const loadPositions = useCallback(async (opts?: { silent?: boolean }) => {
+  const loadPositions = useCallback(async (opts?: { silent?: boolean; reason?: 'shot_change' | 'invalidation' | 'reorder' }) => {
+    console.log('[PositionResetDebug] 📥 LOAD POSITIONS CALLED:', {
+      shotId: shotId?.substring(0, 8) || 'null',
+      reason: opts?.reason || 'unknown',
+      silent: opts?.silent || false,
+      stackTrace: new Error().stack?.split('\n').slice(1, 5),
+      timestamp: new Date().toISOString()
+    });
+    
     if (!shotId) {
       setShotGenerations([]);
+      setIsInitialLoad(false);
       return;
     }
 
-    if (!opts?.silent) {
+    // Determine if we should show loading based on context
+    const shouldShowLoading = !opts?.silent && (
+      isInitialLoad ||  // Always show loading for initial load
+      opts?.reason === 'shot_change' ||  // Show loading when switching shots
+      shotGenerations.length === 0  // Show loading if no data exists
+    );
+
+    if (shouldShowLoading) {
       setIsLoading(true);
     }
     setError(null);
@@ -74,16 +92,33 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
       if (fetchError) throw fetchError;
 
-      setShotGenerations(data || []);
+      setShotGenerations(prev => {
+        console.log('[PositionResetDebug] 📊 SETTING SHOT GENERATIONS:', {
+          shotId: shotId.substring(0, 8),
+          reason: opts?.reason || 'unknown',
+          silent: opts?.silent || false,
+          prevCount: prev.length,
+          newCount: data?.length || 0,
+          newData: (data || []).map(sg => ({
+            id: sg.generation_id.substring(0, 8),
+            position: sg.position,
+            timeline_frame: sg.timeline_frame
+          })),
+          timestamp: new Date().toISOString()
+        });
+        
+        return data || [];
+      });
       
-      console.log('[useEnhancedShotPositions] Loaded positions:', {
-        shotId,
+      console.log('[PositionResetDebug] ✅ Loaded positions:', {
+        shotId: shotId.substring(0, 8),
         recordCount: data?.length || 0,
         records: data?.map(sg => ({
           generationId: sg.generation_id?.substring(0, 8),
           position: sg.position,
           timelineFrame: sg.timeline_frame
-        }))
+        })),
+        timestamp: new Date().toISOString()
       });
 
     } catch (err) {
@@ -91,15 +126,16 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       setError(errorMessage);
       console.error('[useEnhancedShotPositions] Load error:', err);
     } finally {
-      if (!opts?.silent) {
+      if (shouldShowLoading) {
         setIsLoading(false);
       }
+      setIsInitialLoad(false);
     }
-  }, [shotId]);
+  }, [shotId, isInitialLoad, shotGenerations.length]);
 
   // Auto-load on shotId change
   useEffect(() => {
-    loadPositions();
+    loadPositions({ reason: 'shot_change' });
   }, [loadPositions]);
 
   // Listen for query invalidations that should trigger a reload
@@ -121,18 +157,29 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         );
 
         if (shouldReload) {
-          console.log('[PositionSystemDebug] 🔄 Query invalidation detected, reloading positions:', {
+          // Skip reload if we're currently persisting positions to avoid conflicts
+          if (isPersistingPositions) {
+            console.log('[PositionResetDebug] ⏸️ Skipping query invalidation reload - positions being persisted:', {
+              shotId: shotId.substring(0, 8),
+              invalidatedQueryKey: queryKey,
+              timestamp: new Date().toISOString()
+            });
+            return;
+          }
+          
+          console.log('[PositionResetDebug] 🔄 Query invalidation detected, reloading positions:', {
             shotId: shotId.substring(0, 8),
             invalidatedQueryKey: queryKey,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            stackTrace: new Error().stack?.split('\n').slice(1, 4)
           });
-          loadPositions({ silent: true });
+          loadPositions({ reason: 'invalidation' });
         }
       }
     });
 
     return unsubscribe;
-  }, [shotId, queryClient, loadPositions]);
+  }, [shotId, queryClient, loadPositions, isPersistingPositions]);
 
   // Get positions formatted for specific mode
   const getPositionsForMode = useCallback((mode: 'batch' | 'timeline'): Map<string, number> => {
@@ -216,7 +263,8 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
   // Exchange positions between two items
   const exchangePositions = useCallback(async (generationIdA: string, generationIdB: string) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for position exchange');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping position exchange - no shot ID provided');
+      return;
     }
 
     // Get current positions before exchange for logging
@@ -252,7 +300,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       if (error) throw error;
 
       // Reload positions to reflect changes
-      await loadPositions({ silent: true });
+      await loadPositions({ reason: 'reorder' });
 
       // Get positions after exchange for verification logging
       const updatedGenerations = await supabase
@@ -308,7 +356,8 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
   // Exchange positions without reloading (for batch operations)
   const exchangePositionsNoReload = useCallback(async (generationIdA: string, generationIdB: string) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for position exchange');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping position exchange (no reload) - no shot ID provided');
+      return;
     }
 
     try {
@@ -332,7 +381,8 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
   // Batch exchange positions - performs multiple exchanges then reloads once
   const batchExchangePositions = useCallback(async (exchanges: Array<{ generationIdA: string; generationIdB: string }>) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for batch position exchange');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping batch position exchange - no shot ID provided');
+      return;
     }
 
     if (exchanges.length === 0) {
@@ -348,6 +398,16 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       }))
     });
 
+    // [TimelineItemMoveSummary] - Log batch position exchanges
+    const positionsBefore = shotGenerations
+      .sort((a, b) => a.position - b.position)
+      .map((gen, index) => ({
+        id: gen.generation_id.slice(-8),
+        shotGenId: gen.id.slice(-8),
+        position: gen.position,
+        timelineFrame: gen.timeline_frame
+      }));
+
     try {
       // Perform all exchanges without reloading positions each time
       for (const exchange of exchanges) {
@@ -357,7 +417,35 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       console.log('[useEnhancedShotPositions] ✅ All exchanges completed, reloading positions once');
 
       // Single reload after all exchanges are done
-      await loadPositions({ silent: true });
+      await loadPositions({ reason: 'reorder' });
+
+      // Log the batch exchange summary after reload
+      const positionsAfter = shotGenerations
+        .sort((a, b) => a.position - b.position)
+        .map((gen, index) => ({
+          id: gen.generation_id.slice(-8),
+          shotGenId: gen.id.slice(-8),
+          position: gen.position,
+          timelineFrame: gen.timeline_frame
+        }));
+
+      console.log('[TimelineItemMoveSummary] Timeline batch exchange completed', {
+        moveType: 'batch_exchange',
+        positionsBefore,
+        positionsAfter,
+        attemptedMove: {
+          exchangeCount: exchanges.length,
+          exchanges: exchanges.map(ex => ({
+            idA: ex.generationIdA.slice(-8),
+            idB: ex.generationIdB.slice(-8)
+          }))
+        },
+        metadata: {
+          shotId: shotId.substring(0, 8),
+          totalItems: shotGenerations.length,
+          timestamp: new Date().toISOString()
+        }
+      });
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to batch exchange positions';
@@ -365,12 +453,13 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       toast.error(`Failed to reorder items: ${errorMessage}`);
       throw err;
     }
-  }, [shotId, loadPositions, exchangePositionsNoReload]);
+  }, [shotId, loadPositions, exchangePositionsNoReload, shotGenerations]);
 
   // Delete item and its positions by shot_generations.id (not generation_id to avoid deleting duplicates)
   const deleteItem = useCallback(async (shotGenerationId: string) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for item deletion');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping item deletion - no shot ID provided');
+      return;
     }
 
     console.log('[PositionSystemDebug] 🗑️ Deleting specific shot generation record:', {
@@ -388,7 +477,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       if (error) throw error;
 
       // Reload positions to reflect changes
-      await loadPositions({ silent: true });
+      await loadPositions({ reason: 'reorder' });
       
       // Item deletion completed successfully - no toast needed for smooth UX
       
@@ -410,7 +499,8 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     } = {}
   ) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for adding item');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping add item - no shot ID provided');
+      return;
     }
 
     const { position, timelineFrame, metadata } = options;
@@ -463,22 +553,25 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     metadata?: Partial<PositionMetadata>
   ) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for timeline frame update');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping timeline frame update - no shot ID provided');
+      return;
     }
 
     // Get current state for logging
     const currentItem = shotGenerations.find(sg => sg.generation_id === generationId);
     const beforeFrame = currentItem?.timeline_frame;
 
-    console.log('[PositionSystemDebug] 🎯 STARTING frame update:', {
+    console.log('[PositionResetDebug] 🎯 STARTING frame update:', {
       shotId: shotId.substring(0, 8),
       itemId: generationId.substring(0, 8),
       fromFrame: beforeFrame,
       toFrame: newTimelineFrame,
       metadata,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      stackTrace: new Error().stack?.split('\n').slice(1, 4)
     });
 
+    setIsPersistingPositions(true);
     try {
       const { error } = await supabase
         .from('shot_generations')
@@ -493,13 +586,27 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       if (error) throw error;
 
       // Optimistically update local state
-      setShotGenerations(prev => prev.map(sg => 
-        sg.generation_id === generationId 
-          ? { ...sg, timeline_frame: newTimelineFrame, metadata: { ...sg.metadata, ...metadata } }
-          : sg
-      ));
+      setShotGenerations(prev => {
+        const updated = prev.map(sg => 
+          sg.generation_id === generationId 
+            ? { ...sg, timeline_frame: newTimelineFrame, metadata: { ...sg.metadata, ...metadata } }
+            : sg
+        );
+        
+        console.log('[PositionResetDebug] 🔄 OPTIMISTIC STATE UPDATE:', {
+          shotId: shotId.substring(0, 8),
+          itemId: generationId.substring(0, 8),
+          fromFrame: beforeFrame,
+          toFrame: newTimelineFrame,
+          beforeCount: prev.length,
+          afterCount: updated.length,
+          timestamp: new Date().toISOString()
+        });
+        
+        return updated;
+      });
 
-      console.log('[PositionSystemDebug] ✅ COMPLETED frame update:', {
+      console.log('[PositionResetDebug] ✅ COMPLETED frame update:', {
         shotId: shotId.substring(0, 8),
         itemId: generationId.substring(0, 8),
         fromFrame: beforeFrame,
@@ -520,13 +627,16 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       });
       toast.error(`Failed to update timeline position: ${errorMessage}`);
       throw err;
+    } finally {
+      setIsPersistingPositions(false);
     }
   }, [shotId, shotGenerations]);
 
   // Initialize timeline frames for existing records without them
   const initializeTimelineFrames = useCallback(async (frameSpacing: number = DEFAULT_FRAME_SPACING) => {
     if (!shotId) {
-      throw new Error('No shot ID provided for timeline initialization');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping timeline initialization - no shot ID provided');
+      return;
     }
 
     // Count items that need initialization
@@ -561,7 +671,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       const recordCount = data as number;
       
       if (recordCount > 0) {
-        await loadPositions({ silent: true });
+        await loadPositions({ reason: 'reorder' });
         
         console.log('[PositionSystemDebug] ✅ COMPLETED timeline initialization:', {
           shotId: shotId.substring(0, 8),
@@ -590,10 +700,228 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     }
   }, [shotId, shotGenerations, loadPositions]);
 
+  // Apply timeline frame changes atomically - replaces complex client-side exchange logic
+  const applyTimelineFrames = useCallback(async (
+    changes: Array<{ generationId: string; timelineFrame: number }>,
+    updatePositions: boolean = true
+  ) => {
+    console.log('[TimelineMoveFlow] 📥 HOOK CALLED - applyTimelineFrames received:', {
+      shotId: shotId?.substring(0, 8) || 'none',
+      changesCount: changes.length,
+      changes: changes.map(c => ({
+        generationId: c.generationId.substring(0, 8),
+        timelineFrame: c.timelineFrame
+      })),
+      updatePositions
+    });
+    
+    if (!shotId) {
+      console.warn('[TimelineMoveFlow] ❌ NO SHOT ID - Skipping timeline frame application');
+      console.warn('[PositionSystemDebug] ⚠️ Skipping timeline frame application - no shot ID provided');
+      return;
+    }
+
+    if (changes.length === 0) {
+      console.log('[TimelineMoveFlow] ✅ NO CHANGES - Empty changes array');
+      console.log('[PositionSystemDebug] ⚠️ No changes to apply');
+      return;
+    }
+
+    // Log the operation for debugging
+    console.log('[PositionSystemDebug] 🎯 STARTING atomic timeline frame application:', {
+      shotId: shotId.substring(0, 8),
+      changesCount: changes.length,
+      updatePositions,
+      changes: changes.map(c => ({
+        id: c.generationId.substring(0, 8),
+        frame: c.timelineFrame
+      })),
+      timestamp: new Date().toISOString(),
+      stackTrace: new Error().stack?.split('\n').slice(1, 4)
+    });
+
+    setIsPersistingPositions(true);
+    
+    try {
+      // Convert to the format expected by the RPC function
+      const rpcChanges = changes.map(c => ({
+        generation_id: c.generationId,
+        timeline_frame: c.timelineFrame
+      }));
+
+        console.log('[TimelineMoveFlow] 📡 CALLING SUPABASE RPC - timeline_sync_bulletproof:', {
+        shotId: shotId.substring(0, 8),
+        rpcChanges: rpcChanges.map(c => ({
+          generation_id: c.generation_id.substring(0, 8),
+          timeline_frame: c.timeline_frame
+        })),
+        updatePositions
+      });
+      
+      console.log('[TimelineMoveFlow] 📡 FULL RPC PAYLOAD:');
+      console.log('p_shot_id:', shotId);
+      console.log('p_changes:', rpcChanges);
+      console.log('p_update_positions:', updatePositions);
+
+      // Call the BULLETPROOF function (NO ambiguous columns AT ALL)
+      console.log('[TimelineMoveFlow] 🚨 ABOUT TO CALL FUNCTION:', 'timeline_sync_bulletproof');
+      console.log('[TimelineMoveFlow] 🚨 FUNCTION PARAMETERS:', {
+        shot_uuid: shotId,
+        frame_changes: rpcChanges,
+        should_update_positions: updatePositions
+      });
+      
+      const { data, error } = await supabase.rpc('timeline_sync_bulletproof', {
+        shot_uuid: shotId,
+        frame_changes: rpcChanges,
+        should_update_positions: updatePositions
+      });
+
+      console.log('[TimelineMoveFlow] 📡 SUPABASE RPC RESPONSE:', {
+        shotId: shotId.substring(0, 8),
+        hasError: !!error,
+        error: error?.message || null,
+        errorCode: error?.code || null,
+        dataLength: data ? (Array.isArray(data) ? data.length : 'not-array') : 'no-data'
+      });
+
+      if (error) {
+        console.error('❌ SUPABASE RPC ERROR - timeline_sync_bulletproof FAILED');
+        console.error('[TimelineMoveFlow] 🚨 ERROR MESSAGE:', error.message);
+        console.error('[TimelineMoveFlow] 🚨 ERROR CODE:', error.code);  
+        console.error('[TimelineMoveFlow] 🚨 ERROR DETAILS:', error.details);
+        console.error('[TimelineMoveFlow] 🚨 ERROR HINT:', error.hint);
+        console.error('[TimelineMoveFlow] 🚨 FULL ERROR JSON:', JSON.stringify(error, null, 2));
+        
+        // Add timestamp to identify which version of the function is running
+        console.error('[TimelineMoveFlow] 🕐 ERROR TIMESTAMP:', new Date().toISOString());
+        console.error('[TimelineMoveFlow] 🔍 FUNCTION VERSION CHECK - If you see "ambiguous column" error, the old function is still cached');
+        
+        throw error;
+      }
+
+      // Optimistically update local state with the returned data
+      if (data && Array.isArray(data)) {
+        setShotGenerations(prev => {
+          console.log('[Position0JumpBug] 🔍 BEFORE SERVER UPDATE:', {
+            shotId: shotId.substring(0, 8),
+            totalItems: prev.length
+          });
+          const beforeState = prev.map(sg => ({ 
+            id: sg.generation_id.substring(0, 8), 
+            pos: sg.position, 
+            frame: sg.timeline_frame 
+          }));
+          console.log('[Position0JumpBug] 🔍 CURRENT STATE DETAILS:');
+          beforeState.forEach((item, idx) => {
+            console.log(`  ${idx}: id=${item.id}, pos=${item.pos}, frame=${item.frame}`);
+          });
+
+          const updatedMap = new Map(prev.map(sg => [sg.generation_id, sg]));
+          
+          // Update with returned data
+          data.forEach((updatedRow: any) => {
+            const existing = updatedMap.get(updatedRow.generation_id);
+            if (existing) {
+              // Log position changes, especially for position 0
+              if (existing.position !== updatedRow.position) {
+                console.log('[Position0JumpBug] 📊 POSITION CHANGE:', {
+                  itemId: updatedRow.generation_id.substring(0, 8),
+                  oldPos: existing.position,
+                  newPos: updatedRow.position,
+                  oldFrame: existing.timeline_frame,
+                  newFrame: updatedRow.timeline_frame,
+                  isPosition0: existing.position === 0 || updatedRow.position === 0
+                });
+              }
+
+              updatedMap.set(updatedRow.generation_id, {
+                ...existing,
+                position: updatedRow.position,
+                timeline_frame: updatedRow.timeline_frame,
+                updated_at: updatedRow.updated_at
+              });
+            }
+          });
+          
+          const updated = Array.from(updatedMap.values());
+          
+          console.log('[Position0JumpBug] ✅ AFTER SERVER UPDATE:', {
+            shotId: shotId.substring(0, 8),
+            totalItems: updated.length
+          });
+          const afterState = updated.map(r => ({ 
+            id: r.generation_id.substring(0, 8), 
+            pos: r.position, 
+            frame: r.timeline_frame 
+          }));
+          console.log('[Position0JumpBug] ✅ NEW STATE DETAILS:');
+          afterState.forEach((item, idx) => {
+            console.log(`  ${idx}: id=${item.id}, pos=${item.pos}, frame=${item.frame}`);
+          });
+
+          console.log('[TimelineMoveFlow] ✅ LOCAL STATE UPDATED - Optimistic update from RPC response:', {
+            shotId: shotId.substring(0, 8),
+            updatedCount: data.length,
+            beforeCount: prev.length,
+            afterCount: updated.length
+          });
+          
+          console.log('[PositionSystemDebug] 🔄 OPTIMISTIC STATE UPDATE from RPC:', {
+            shotId: shotId.substring(0, 8),
+            updatedCount: data.length,
+            beforeCount: prev.length,
+            afterCount: updated.length,
+            timestamp: new Date().toISOString()
+          });
+          
+          return updated;
+        });
+      }
+
+      console.log('[TimelineMoveFlow] 🎉 HOOK COMPLETED - applyTimelineFrames finished successfully:', {
+        shotId: shotId.substring(0, 8),
+        changesApplied: changes.length,
+        updatePositions
+      });
+
+      console.log('[PositionSystemDebug] ✅ COMPLETED atomic timeline frame application:', {
+        shotId: shotId.substring(0, 8),
+        changesApplied: changes.length,
+        updatePositions,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to apply timeline frames';
+      
+      console.error('[TimelineMoveFlow] ❌ HOOK FAILED - applyTimelineFrames error:', {
+        shotId: shotId.substring(0, 8),
+        changesCount: changes.length,
+        error: errorMessage,
+        stackTrace: err instanceof Error ? err.stack : undefined
+      });
+      
+      console.error('[PositionSystemDebug] ❌ FAILED atomic timeline frame application:', {
+        shotId: shotId.substring(0, 8),
+        changesCount: changes.length,
+        error: errorMessage,
+        fullError: err,
+        timestamp: new Date().toISOString()
+      });
+      toast.error(`Failed to update timeline positions: ${errorMessage}`);
+      throw err;
+    } finally {
+      setIsPersistingPositions(false);
+    }
+  }, [shotId]);
+
   return { 
     shotGenerations,
     isLoading,
     error,
+    isPersistingPositions,
+    setIsPersistingPositions,
     getPositionsForMode,
     getImagesForMode,
     exchangePositions,
@@ -602,6 +930,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     addItem,
     updateTimelineFrame,
     initializeTimelineFrames,
+    applyTimelineFrames,
     loadPositions
   };
 };

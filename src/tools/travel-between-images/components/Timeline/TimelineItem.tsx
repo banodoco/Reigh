@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl } from "@/shared/lib/utils";
 
@@ -47,6 +47,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Track hover state
+  const [isHovered, setIsHovered] = useState(false);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
@@ -90,17 +93,21 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
   return (
     <div
+      data-item-id={image.shotImageEntryId}
       style={{
         position: 'absolute',
         left: `${leftPercent}%`,
         top: '50%',
-        transform: 'translate(-50%, -50%)',
+        transform: `translate(-50%, -50%) ${isHovered || isDragging ? 'scale(1.15)' : 'scale(1)'}`,
         transition: isDragging ? 'none' : 'all 0.2s ease-out',
         opacity: isDragging ? 0.8 : 1,
-        zIndex: isDragging ? 10 : 1,
+        zIndex: isHovered || isDragging ? 20 : 1,
         cursor: 'move',
+        boxShadow: isHovered || isDragging ? '0 8px 25px rgba(0, 0, 0, 0.15)' : 'none',
       }}
       onMouseDown={(e) => onMouseDown(e, image.shotImageEntryId)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onDoubleClick?.();
@@ -136,7 +143,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           </>
         )}
 
-        <div className={`relative w-24 h-24 border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden`}>
+        <div
+          className={`relative w-24 h-24 border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden`}
+          style={{
+            transform: isHovered || isDragging ? 'scale(1.05)' : 'scale(1)',
+            transition: isDragging ? 'none' : 'all 0.2s ease-out',
+          }}
+        >
           <img
             src={shouldLoad ? getDisplayUrl(image.imageUrl) : '/placeholder.svg'}
             alt={`Frame ${displayFrame}`}

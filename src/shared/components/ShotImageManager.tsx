@@ -878,6 +878,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       currentImagesLength: currentImages.length
     });
 
+    // [TimelineItemMoveSummary] - Log mobile reorder positions before
+    const positionsBefore = currentImages.map((img, index) => ({
+      id: ((img as any).shotImageEntryId ?? (img as any).id).slice(-8),
+      imageIdx: index,
+      frame: (img as any).timeline_frame || index
+    }));
+
     try {
       // Get the selected images and their current indices
       const selectedItems = mobileSelectedIds.map(id => {
@@ -919,6 +926,32 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
       // Use the unified position system
       await onImageReorder(orderedIds);
+
+      // [TimelineItemMoveSummary] - Log mobile reorder completion
+      const positionsAfter = newOrder.map((img, index) => ({
+        id: ((img as any).shotImageEntryId ?? (img as any).id).slice(-8),
+        imageIdx: index,
+        frame: (img as any).timeline_frame || index
+      }));
+
+      console.log('[TimelineItemMoveSummary] Timeline mobile reorder completed', {
+        moveType: 'mobile_reorder',
+        positionsBefore,
+        positionsAfter,
+        attemptedMove: {
+          selectedCount: mobileSelectedIds.length,
+          selectedItems: selectedItems.map(item => ({
+            id: item.id.slice(-8),
+            fromIndex: item.currentIndex,
+            toIndex: targetIndex
+          })),
+          targetIndex
+        },
+        metadata: {
+          totalImages: currentImages.length,
+          timestamp: new Date().toISOString()
+        }
+      });
 
       // Clear selection after successful reorder
       setMobileSelectedIds([]);
