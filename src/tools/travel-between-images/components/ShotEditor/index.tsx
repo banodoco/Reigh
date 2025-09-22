@@ -185,7 +185,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     update: updateShotUISettings,
     isLoading: isShotUISettingsLoading 
   } = useToolSettings<{
-    timelineFramePositions?: Array<[string, number]>;
     acceleratedMode?: boolean;
     randomSeed?: boolean;
   }>('travel-ui-state', { 
@@ -206,47 +205,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enabled: !!selectedProjectId 
   });
   
-  // Convert timeline positions to Map for component usage
-  const timelineFramePositions = useMemo(() => {
-    try {
-      const positions = shotUISettings?.timelineFramePositions;
-      if (Array.isArray(positions)) {
-        return new Map(positions);
-      }
-      return new Map<string, number>();
-    } catch (error) {
-      console.warn('[ShotEditor] Failed to create Map from timeline positions:', error);
-      return new Map<string, number>();
-    }
-  }, [shotUISettings?.timelineFramePositions]);
+  // Timeline positions now come directly from database via useEnhancedShotPositions
+  // No local caching needed
   
-  // Debounced ref for timeline position updates to prevent cascading
-  const timelineUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  const setTimelineFramePositions = useCallback((newMap: Map<string, number>) => {
-    try {
-      // Clear any existing debounce timer
-      if (timelineUpdateTimeoutRef.current) {
-        clearTimeout(timelineUpdateTimeoutRef.current);
-      }
-      
-      // Debounce timeline position updates to prevent cascading during task cancellation
-      timelineUpdateTimeoutRef.current = setTimeout(() => {
-        updateShotUISettings('shot', { timelineFramePositions: [...newMap.entries()] });
-      }, 1000); // 1 second debounce to reduce noise during rapid changes
-    } catch (error) {
-      console.warn('[ShotEditor] Failed to save timeline positions:', error);
-    }
-  }, [updateShotUISettings]);
-  
-  // Cleanup timeline update timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timelineUpdateTimeoutRef.current) {
-        clearTimeout(timelineUpdateTimeoutRef.current);
-      }
-    };
-  }, []);
+  // Timeline positions are now managed directly by the database via useEnhancedShotPositions
+  // No local caching or debouncing needed
   
   const isMobile = useIsMobile();
   
@@ -1161,10 +1124,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     let negativePrompts: string[];
 
     if (generationMode === 'timeline') {
-      // Extract frame gaps from timeline positions
-      const sortedPositions = [...timelineFramePositions.entries()]
-        .map(([id, pos]) => ({ id, pos }))
-        .sort((a, b) => a.pos - b.pos);
+      // Timeline positions are now managed by useEnhancedShotPositions
+      // Frame gaps will be extracted from the database-driven positions
+      const sortedPositions: Array<{id: string, pos: number}> = [];
       
       const frameGaps = [];
       for (let i = 0; i < sortedPositions.length - 1; i++) {
@@ -1300,7 +1262,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     customWidth,
     customHeight,
     generationMode,
-    timelineFramePositions,
     batchVideoPrompt,
     batchVideoFrames,
     batchVideoContext,
@@ -1397,7 +1358,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onImageReorder={handleReorderImagesInShot}
             onImageSaved={async () => {}} // TODO: implement
             onContextFramesChange={onBatchVideoContextChange}
-            onFramePositionsChange={setTimelineFramePositions}
+            onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}
             pendingPositions={state.pendingFramePositions}
             onPendingPositionApplied={handlePendingPositionApplied}

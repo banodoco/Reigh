@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 
+// Clear legacy timeline cache on import
+import "@/utils/clearTimelineCache";
+
 // Import hooks
 import { useZoom } from "./Timeline/hooks/useZoom";
 import { useFileDrop } from "./Timeline/hooks/useFileDrop";
@@ -162,6 +165,17 @@ const Timeline: React.FC<TimelineProps> = ({
   const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
   const applyTimelineFrames = hookData.applyTimelineFrames; // New atomic update method
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
+
+  // Listen for cache clear events and force reload
+  useEffect(() => {
+    const handleCacheCleared = () => {
+      console.log('[Timeline] Cache cleared event received - forcing data reload');
+      hookData.loadPositions({ reason: 'invalidation' });
+    };
+
+    window.addEventListener('timeline-cache-cleared', handleCacheCleared);
+    return () => window.removeEventListener('timeline-cache-cleared', handleCacheCleared);
+  }, [hookData.loadPositions]);
   
   // Get pair prompts from database instead of props
   const databasePairPrompts = hookData.getPairPrompts();
