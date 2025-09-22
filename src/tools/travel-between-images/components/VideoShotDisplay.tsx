@@ -87,7 +87,20 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
 
   // Don't render anything if we don't have a valid URL
   if (!displayUrl) {
-    console.warn(`[ShotImage-${index}] No valid URL found for image:`, image);
+    console.warn(`[ShotImage-${index}] No valid URL found for image:`, { 
+      image: {
+        shotImageEntryId: image.shotImageEntryId,
+        imageUrl: image.imageUrl,
+        thumbUrl: image.thumbUrl, 
+        location: image.location,
+        type: image.type,
+        timeline_frame: (image as any).timeline_frame
+      },
+      shotName,
+      displayUrl,
+      imageUrl,
+      thumbUrl
+    });
     return null;
   }
 

@@ -342,7 +342,8 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             id: sg.generation?.id?.substring(0, 8),
             type: sg.generation?.type,
             timeline_frame: sg.timeline_frame,
-            hasLocation: !!sg.generation?.location
+            hasLocation: !!sg.generation?.location,
+            location: sg.generation?.location?.substring(0, 60) + '...'
           }))
         });
         
@@ -355,6 +356,19 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
             thumbUrl: (sg.generation as any).location,
             timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
           }));
+        
+        console.log('[useListShots] Transformed images for shot:', {
+          shotId: shot.id.substring(0, 8),
+          shotName: shot.name,
+          transformedImagesCount: transformedImages.length,
+          sampleTransformed: transformedImages.slice(0, 2).map(img => ({
+            shotImageEntryId: img.shotImageEntryId,
+            hasImageUrl: !!img.imageUrl,
+            hasThumbUrl: !!img.thumbUrl,
+            timeline_frame: img.timeline_frame,
+            type: img.type
+          }))
+        });
         
         return {
           ...shot,

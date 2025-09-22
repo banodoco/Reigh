@@ -30,9 +30,34 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
       shotsCount: shots?.length || 0,
       isLoading,
       error: error?.message,
-      shotsData: shots?.map(s => ({ id: s.id, position: s.position, name: s.name })) || [],
+      shotsData: shots?.map(s => ({ 
+        id: s.id.substring(0, 8), 
+        position: s.position, 
+        name: s.name,
+        imagesCount: s.images?.length || 0,
+        hasImages: !!s.images && s.images.length > 0
+      })) || [],
       timestamp: Date.now()
     });
+    
+    // [ImageDebug] Log detailed image data for first few shots
+    if (shots && shots.length > 0) {
+      console.log('[ImageDebug] First 3 shots with image details:', 
+        shots.slice(0, 3).map(shot => ({
+          shotId: shot.id.substring(0, 8),
+          shotName: shot.name,
+          imagesCount: shot.images?.length || 0,
+          sampleImages: shot.images?.slice(0, 2).map(img => ({
+            shotImageEntryId: img.shotImageEntryId,
+            hasImageUrl: !!img.imageUrl,
+            hasThumbUrl: !!img.thumbUrl,
+            hasLocation: !!img.location,
+            type: img.type,
+            timeline_frame: (img as any).timeline_frame
+          })) || []
+        }))
+      );
+    }
   }, [shots, selectedProjectId, isLoading, error]);
 
   // [ShotReorderDebug] Log refetch calls
