@@ -305,8 +305,8 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     try {
       // Use timeline_sync_bulletproof to exchange timeline frames
       const changes = [
-        { generation_id: generationIdA, timeline_frame: beforeState.find(s => s.id === generationIdB.substring(0, 8))?.frame || 0 },
-        { generation_id: generationIdB, timeline_frame: beforeState.find(s => s.id === generationIdA.substring(0, 8))?.frame || 0 }
+        { generation_id: generationIdA, timeline_frame: beforeState.itemB?.timeline_frame || 0 },
+        { generation_id: generationIdB, timeline_frame: beforeState.itemA?.timeline_frame || 0 }
       ];
       
       const { error } = await supabase.rpc('timeline_sync_bulletproof', {
@@ -378,11 +378,15 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       return;
     }
 
+    // Get current positions before exchange
+    const itemA = shotGenerations.find(sg => sg.generation_id === generationIdA);
+    const itemB = shotGenerations.find(sg => sg.generation_id === generationIdB);
+
     try {
       // Use timeline_sync_bulletproof to exchange timeline frames
       const changes = [
-        { generation_id: generationIdA, timeline_frame: beforeState.find(s => s.id === generationIdB.substring(0, 8))?.frame || 0 },
-        { generation_id: generationIdB, timeline_frame: beforeState.find(s => s.id === generationIdA.substring(0, 8))?.frame || 0 }
+        { generation_id: generationIdA, timeline_frame: itemB?.timeline_frame || 0 },
+        { generation_id: generationIdB, timeline_frame: itemA?.timeline_frame || 0 }
       ];
       
       const { error } = await supabase.rpc('timeline_sync_bulletproof', {

@@ -117,7 +117,7 @@ export const useVideoGalleryPreloader = (options?: {
         .eq('shot_id', shotId)
         // IMPORTANT: Match gallery sort (newest first)
         .order('created_at', { ascending: false })
-        .order('position', { ascending: true })
+        .order('timeline_frame', { ascending: true })
         .range(startIndex, endIndex);
 
       if (error) {

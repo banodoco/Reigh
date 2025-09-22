@@ -293,7 +293,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         .from('shots')
         .select('*')
         .eq('project_id', projectId)
-        .order('position', { ascending: true, nullsFirst: false });
+        .order('position', { ascending: true, nullsFirst: false }); // This is shots.position, not shot_generations.position
       
       if (shotsError) {
         throw shotsError;
