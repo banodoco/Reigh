@@ -564,7 +564,7 @@ const Timeline: React.FC<TimelineProps> = ({
         };
       });
 
-    // [TimelineJumpDebug] Log the filtering results  
+    // [TimelineJumpDebug] Log the filtering results
     console.log('[TimelineJumpDebug] 📊 POSITION CHANGE FILTERING RESULTS:', {
       shotId: shotId.substring(0, 8),
       totalIncoming: newPositions.size,
@@ -572,6 +572,63 @@ const Timeline: React.FC<TimelineProps> = ({
       filteredOut: newPositions.size - positionChanges.length,
       timestamp: new Date().toISOString()
     });
+
+    // [DragBoundaryDebug] Analyze drag direction and boundary conditions
+    if (positionChanges.length > 0) {
+      const dragDirections = positionChanges.map(change => ({
+        id: change.id,
+        direction: change.delta > 0 ? 'RIGHT' : change.delta < 0 ? 'LEFT' : 'NO_MOVE',
+        magnitude: Math.abs(change.delta),
+        atBoundary: change.newPos <= fullMin || change.newPos >= fullMax
+      }));
+
+      const hasLeftMovement = dragDirections.some(d => d.direction === 'LEFT');
+      const hasRightMovement = dragDirections.some(d => d.direction === 'RIGHT');
+      const hasBoundaryHits = dragDirections.some(d => d.atBoundary);
+
+      console.log('[DragBoundaryDebug] 🎯 DRAG DIRECTION ANALYSIS:', {
+        shotId: shotId.substring(0, 8),
+        totalChanges: positionChanges.length,
+        directions: dragDirections,
+        summary: {
+          hasLeftMovement,
+          hasRightMovement,
+          hasBoundaryHits,
+          primaryDirection: hasLeftMovement && !hasRightMovement ? 'LEFT_DOMINANT' :
+                           hasRightMovement && !hasLeftMovement ? 'RIGHT_DOMINANT' :
+                           'MIXED_DIRECTION'
+        },
+        boundaryContext: {
+          fullMin,
+          fullMax,
+          fullRange,
+          maxAllowedGap
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      // [DragBoundaryDebug] Track asymmetric behavior patterns
+      const leftBoundaryHits = dragDirections.filter(d => d.direction === 'LEFT' && d.atBoundary);
+      const rightBoundaryHits = dragDirections.filter(d => d.direction === 'RIGHT' && d.atBoundary);
+
+      if (hasBoundaryHits) {
+        console.log('[DragBoundaryDebug] 🚨 BOUNDARY HIT DETECTED:', {
+          shotId: shotId.substring(0, 8),
+          leftBoundaryHits: leftBoundaryHits.map(h => ({
+            id: h.id,
+            magnitude: h.magnitude,
+            position: positionChanges.find(c => c.id === h.id)?.newPos
+          })),
+          rightBoundaryHits: rightBoundaryHits.map(h => ({
+            id: h.id,
+            magnitude: h.magnitude,
+            position: positionChanges.find(c => c.id === h.id)?.newPos
+          })),
+          asymmetricPattern: leftBoundaryHits.length !== rightBoundaryHits.length ? 'ASYMMETRIC' : 'SYMMETRIC',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
 
     // Log the move summary for debugging
     if (positionChanges.length > 0) {
@@ -670,6 +727,38 @@ const Timeline: React.FC<TimelineProps> = ({
         return;
       }
 
+      // [DragBoundaryDebug] Pre-database update boundary analysis
+      console.log('[DragBoundaryDebug] 🎯 PRE-UPDATE BOUNDARY ANALYSIS:', {
+        shotId: shotId.substring(0, 8),
+        positionChanges: positionChanges.map(c => ({
+          id: c.id,
+          oldPos: c.oldPos,
+          newPos: c.newPos,
+          delta: c.delta,
+          direction: c.delta > 0 ? 'RIGHT' : c.delta < 0 ? 'LEFT' : 'STATIONARY',
+          boundaryHit: c.newPos <= fullMin || c.newPos >= fullMax,
+          boundaryType: c.newPos <= fullMin ? 'LEFT_EDGE' : c.newPos >= fullMax ? 'RIGHT_EDGE' : 'MIDDLE'
+        })),
+        boundaryContext: {
+          fullMin,
+          fullMax,
+          fullRange,
+          totalImages: images.length,
+          maxAllowedGap
+        },
+        analysis: {
+          leftEdgeHits: positionChanges.filter(c => c.newPos <= fullMin).length,
+          rightEdgeHits: positionChanges.filter(c => c.newPos >= fullMax).length,
+          middleChanges: positionChanges.filter(c => c.newPos > fullMin && c.newPos < fullMax).length,
+          dominantDirection: positionChanges.every(c => c.delta > 0) ? 'ALL_RIGHT' :
+                           positionChanges.every(c => c.delta < 0) ? 'ALL_LEFT' :
+                           'MIXED',
+          asymmetricPattern: positionChanges.filter(c => c.newPos <= fullMin).length !==
+                           positionChanges.filter(c => c.newPos >= fullMax).length ? 'ASYMMETRIC' : 'SYMMETRIC'
+        },
+        timestamp: new Date().toISOString()
+      });
+
     // DEBUG: Log the state before database update
     console.log('[TimelineDragFix] 🔍 PRE-UPDATE STATE CHECK:', {
       positionChangesCount: positionChanges.length,
@@ -694,6 +783,30 @@ const Timeline: React.FC<TimelineProps> = ({
 
       // Process each position change individually using updateTimelineFrame
       for (const change of positionChanges) {
+        // [DragBoundaryDebug] Individual change boundary analysis
+        console.log('[DragBoundaryDebug] 🔄 PROCESSING INDIVIDUAL CHANGE:', {
+          shotId: shotId.substring(0, 8),
+          changeId: change.id,
+          changeDetails: {
+            oldPos: change.oldPos,
+            newPos: change.newPos,
+            delta: change.delta,
+            direction: change.delta > 0 ? 'RIGHT' : change.delta < 0 ? 'LEFT' : 'STATIONARY',
+            boundaryHit: change.newPos <= fullMin || change.newPos >= fullMax,
+            boundaryType: change.newPos <= fullMin ? 'LEFT_EDGE' : change.newPos >= fullMax ? 'RIGHT_EDGE' : 'MIDDLE',
+            magnitude: Math.abs(change.delta)
+          },
+          boundaryContext: {
+            fullMin,
+            fullMax,
+            isAtLeftEdge: change.newPos <= fullMin,
+            isAtRightEdge: change.newPos >= fullMax,
+            distanceFromLeftEdge: change.newPos - fullMin,
+            distanceFromRightEdge: fullMax - change.newPos
+          },
+          timestamp: new Date().toISOString()
+        });
+
         // Find the correct image by matching the shotImageEntryId directly
         // change.id is the last 8 chars of shotImageEntryId, so we need to find the full ID
         const matchingImage = images.find(img =>
@@ -755,6 +868,48 @@ const Timeline: React.FC<TimelineProps> = ({
         }
       }
 
+      // [DragBoundaryDebug] Post-update boundary success analysis
+      console.log('[DragBoundaryDebug] ✅ POST-UPDATE BOUNDARY ANALYSIS:', {
+        shotId: shotId.substring(0, 8),
+        updateResults: {
+          successfulUpdates: positionChanges.filter(c => {
+            const matchingImage = images.find(img =>
+              img.shotImageEntryId.endsWith(c.id) || img.shotImageEntryId.substring(0, 8) === c.id
+            );
+            return !!matchingImage;
+          }).length,
+          failedUpdates: positionChanges.filter(c => {
+            const matchingImage = images.find(img =>
+              img.shotImageEntryId.endsWith(c.id) || img.shotImageEntryId.substring(0, 8) === c.id
+            );
+            return !matchingImage;
+          }).length,
+          leftBoundarySuccesses: positionChanges.filter(c =>
+            c.newPos <= fullMin &&
+            images.find(img => img.shotImageEntryId.endsWith(c.id) || img.shotImageEntryId.substring(0, 8) === c.id)
+          ).length,
+          rightBoundarySuccesses: positionChanges.filter(c =>
+            c.newPos >= fullMax &&
+            images.find(img => img.shotImageEntryId.endsWith(c.id) || img.shotImageEntryId.substring(0, 8) === c.id)
+          ).length
+        },
+        boundaryPattern: {
+          leftBoundaryItems: positionChanges.filter(c => c.newPos <= fullMin).map(c => ({
+            id: c.id,
+            finalPosition: c.newPos,
+            wasAtBoundary: c.newPos <= fullMin
+          })),
+          rightBoundaryItems: positionChanges.filter(c => c.newPos >= fullMax).map(c => ({
+            id: c.id,
+            finalPosition: c.newPos,
+            wasAtBoundary: c.newPos >= fullMax
+          })),
+          asymmetricBoundaryBehavior: positionChanges.filter(c => c.newPos <= fullMin).length !==
+                                     positionChanges.filter(c => c.newPos >= fullMax).length ? 'ASYMMETRIC' : 'SYMMETRIC'
+        },
+        timestamp: new Date().toISOString()
+      });
+
       console.log('[TimelineItemMoveSummary] Timeline individual updates completed successfully', {
         moveType: 'updateTimelineFrame',
         changesApplied: positionChanges.length,
@@ -801,6 +956,40 @@ const Timeline: React.FC<TimelineProps> = ({
         shotId: shotId ? shotId.substring(0, 8) : 'undefined',
         positionChanges: positionChanges.map(c => `${c.id.substring(0, 8)}: ${c.oldPos}→${c.newPos}`),
         stablePositionsBefore: Array.from(stablePositions.entries()).map(([id, pos]) => `${id.substring(0, 8)}:${pos}`).join(', '),
+        timestamp: new Date().toISOString()
+      });
+
+      // [DragBoundaryDebug] Final boundary behavior summary
+      console.log('[DragBoundaryDebug] 🎯 FINAL DRAG BOUNDARY SUMMARY:', {
+        shotId: shotId.substring(0, 8),
+        operationSummary: {
+          totalChanges: positionChanges.length,
+          leftMovements: positionChanges.filter(c => c.delta < 0).length,
+          rightMovements: positionChanges.filter(c => c.delta > 0).length,
+          leftBoundaryHits: positionChanges.filter(c => c.newPos <= fullMin).length,
+          rightBoundaryHits: positionChanges.filter(c => c.newPos >= fullMax).length,
+          successfulUpdates: positionChanges.filter(c => {
+            const matchingImage = images.find(img =>
+              img.shotImageEntryId.endsWith(c.id) || img.shotImageEntryId.substring(0, 8) === c.id
+            );
+            return !!matchingImage;
+          }).length
+        },
+        boundaryAsymmetry: {
+          leftBoundaryBehavior: positionChanges.filter(c => c.newPos <= fullMin).length > 0 ? 'ACTIVE' : 'INACTIVE',
+          rightBoundaryBehavior: positionChanges.filter(c => c.newPos >= fullMax).length > 0 ? 'ACTIVE' : 'INACTIVE',
+          asymmetryDetected: positionChanges.filter(c => c.newPos <= fullMin).length !==
+                           positionChanges.filter(c => c.newPos >= fullMax).length,
+          asymmetryDirection: positionChanges.filter(c => c.newPos <= fullMin).length >
+                           positionChanges.filter(c => c.newPos >= fullMax).length ? 'LEFT_DOMINANT' : 'RIGHT_DOMINANT'
+        },
+        patternAnalysis: {
+          expectedBehavior: 'When dragging LEFT and hitting boundary, RIGHT items should move LEFT with dragged item',
+          actualLeftBehavior: 'UNKNOWN - Check if right items moved when left boundary hit',
+          expectedRightBehavior: 'When dragging RIGHT and hitting boundary, LEFT items should move RIGHT with dragged item',
+          actualRightBehavior: 'UNKNOWN - Check if left items moved when right boundary hit',
+          asymmetryEvidence: 'Compare left vs right boundary hit counts and success rates'
+        },
         timestamp: new Date().toISOString()
       });
 
@@ -857,12 +1046,13 @@ const Timeline: React.FC<TimelineProps> = ({
   // Calculate dimensions - use display positions initially, will be updated after drag hook
   const { fullMin, fullMax, fullRange } = getTimelineDimensions(displayPositions);
 
-  // [TimelineJumpDebug] Track coordinate system changes
+  // [DragBoundaryDebug] Track coordinate system changes and drag boundaries
   const prevCoordinatesRef = React.useRef({ fullMin, fullMax, fullRange });
+  const prevDragBoundaryRef = React.useRef({ fullMin, fullMax, fullRange });
   React.useEffect(() => {
     const prev = prevCoordinatesRef.current;
     const current = { fullMin, fullMax, fullRange };
-    
+
     if (prev.fullMin !== current.fullMin || prev.fullMax !== current.fullMax || prev.fullRange !== current.fullRange) {
       console.log('[TimelineJumpDebug] 📐 COORDINATE SYSTEM CHANGED:', {
         shotId: shotId ? shotId.substring(0, 8) : 'undefined',
@@ -875,9 +1065,32 @@ const Timeline: React.FC<TimelineProps> = ({
         },
         timestamp: new Date().toISOString()
       });
+
+      // [DragBoundaryDebug] Track boundary changes for drag behavior analysis
+      const prevBoundary = prevDragBoundaryRef.current;
+      console.log('[DragBoundaryDebug] 📐 BOUNDARY SYSTEM CHANGED:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        boundaryChanged: {
+          minChanged: current.fullMin !== prevBoundary.fullMin,
+          maxChanged: current.fullMax !== prevBoundary.fullMax,
+          rangeChanged: current.fullRange !== prevBoundary.fullRange
+        },
+        previousBoundary: prevBoundary,
+        currentBoundary: current,
+        deltas: {
+          minDelta: current.fullMin - prevBoundary.fullMin,
+          maxDelta: current.fullMax - prevBoundary.fullMax,
+          rangeDelta: current.fullRange - prevBoundary.fullRange
+        },
+        direction: current.fullMin < prevBoundary.fullMin ? 'LEFT_EXPANSION' :
+                  current.fullMax > prevBoundary.fullMax ? 'RIGHT_EXPANSION' :
+                  current.fullRange > prevBoundary.fullRange ? 'RANGE_EXPANSION' : 'CONTRACTION',
+        timestamp: new Date().toISOString()
+      });
     }
-    
+
     prevCoordinatesRef.current = current;
+    prevDragBoundaryRef.current = current;
   }, [fullMin, fullMax, fullRange, shotId]);
 
   // Get actual container dimensions for ground truth calculations
@@ -901,6 +1114,7 @@ const Timeline: React.FC<TimelineProps> = ({
     onImageReorder,
     contextFrames,
     fullMin,
+    fullMax,
     fullRange,
     containerRect,
   });
@@ -1146,6 +1360,38 @@ const Timeline: React.FC<TimelineProps> = ({
     lastTouchTimeRef.current = currentTime;
   };
 
+  // Handle resetting frames to evenly spaced intervals
+  const handleResetFrames = useCallback(async (gap: number) => {
+    console.log('[FrameReset] 🔄 RESETTING FRAMES:', {
+      shotId: shotId.substring(0, 8),
+      gap,
+      imagesCount: images.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Create new positions: 0, gap, gap*2, gap*3, etc.
+    const newPositions = new Map<string, number>();
+    images.forEach((image, index) => {
+      newPositions.set(image.shotImageEntryId, index * gap);
+    });
+
+    console.log('[FrameReset] 📊 NEW POSITIONS:', {
+      shotId: shotId.substring(0, 8),
+      positions: Array.from(newPositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        position: pos
+      })),
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      await setFramePositions(newPositions);
+      console.log('[FrameReset] ✅ FRAME RESET COMPLETED');
+    } catch (error) {
+      console.error('[FrameReset] ❌ FRAME RESET FAILED:', error);
+    }
+  }, [images, setFramePositions, shotId]);
+
   return (
     <div className="w-full overflow-x-hidden">
       {/* Controls */}
@@ -1157,6 +1403,7 @@ const Timeline: React.FC<TimelineProps> = ({
         onZoomOut={handleZoomOut}
         onZoomReset={handleZoomReset}
         onZoomToStart={handleZoomToStart}
+        onResetFrames={handleResetFrames}
       />
 
       {/* Timeline */}

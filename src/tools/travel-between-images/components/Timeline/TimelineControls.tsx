@@ -13,6 +13,7 @@ interface TimelineControlsProps {
   onZoomOut: () => void;
   onZoomReset: () => void;
   onZoomToStart: () => void;
+  onResetFrames?: (gap: number) => void;
 }
 
 const TimelineControls: React.FC<TimelineControlsProps> = ({
@@ -23,7 +24,17 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
   onZoomOut,
   onZoomReset,
   onZoomToStart,
+  onResetFrames,
 }) => {
+  const [resetGap, setResetGap] = React.useState<number>(10);
+  
+  // Ensure resetGap doesn't exceed the max allowed value when contextFrames changes
+  const maxGap = 81 - contextFrames;
+  React.useEffect(() => {
+    if (resetGap > maxGap) {
+      setResetGap(maxGap);
+    }
+  }, [contextFrames, maxGap, resetGap]);
   return (
     <div className="flex items-center justify-between mb-3 gap-6">
         <div className="flex items-center gap-4 flex-1">
@@ -43,20 +54,34 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
               className="w-full"
             />
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="h-5 w-5 text-muted-foreground cursor-help hover:text-foreground transition-colors" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="mb-1 font-light">Timeline Drag Shortcuts</p>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li><kbd className="font-mono">⌘</kbd> – <span className="font-light">push/pull frames to the right</span></li>
-                <li><kbd className="font-mono">⌥</kbd> – <span className="font-light">push/pull frames to the left</span></li>
-                <li><kbd className="font-mono">⌘ + ⌥</kbd> – shift the <span className="font-light">entire timeline</span></li>
-              </ul>
-              <p className="text-xs text-muted-foreground mt-2">Push when dragging away, pull when dragging towards</p>
-            </TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-2">
+            <div className="w-32">
+              <Label htmlFor="resetGap" className="text-sm font-light">
+                Gap to reset to:
+              </Label>
+              <Slider
+                id="resetGap"
+                min={1}
+                max={maxGap}
+                step={1}
+                value={[resetGap]}
+                onValueChange={(value) => setResetGap(value[0])}
+                className="w-full mt-1"
+              />
+              <div className="text-xs text-muted-foreground mt-1 text-center">
+                {resetGap} frames
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onResetFrames?.(resetGap)}
+              disabled={!onResetFrames}
+              className="mt-4"
+            >
+              Reset Frames
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

@@ -30,6 +30,7 @@ interface UseTimelineDragProps {
   onImageReorder: (orderedIds: string[]) => void;
   contextFrames: number;
   fullMin: number;
+  fullMax: number;
   fullRange: number;
   containerRect: DOMRect | null;
 }
@@ -41,6 +42,7 @@ export const useTimelineDrag = ({
   onImageReorder,
   contextFrames,
   fullMin,
+  fullMax,
   fullRange,
   containerRect,
 }: UseTimelineDragProps) => {
@@ -171,7 +173,7 @@ export const useTimelineDrag = ({
       }))
     });
 
-    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames);
+    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames, undefined, fullMin, fullMax);
 
     console.log('[FluidTimelineDebug] ✅ FLUID TIMELINE RESULT - After fluid timeline:', {
       itemId: dragState.activeId.substring(0, 8),
@@ -275,7 +277,7 @@ export const useTimelineDrag = ({
       }))
     });
 
-    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames);
+    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames, undefined, fullMin, fullMax);
 
     console.log('[FinalDropDebug] ✅ FINAL DROP RESULT - After fluid timeline:', {
       itemId: dragState.activeId.substring(0, 8),

@@ -137,7 +137,9 @@ export const applyFluidTimeline = (
   draggedId: string,
   targetFrame: number,
   contextFrames: number,
-  excludeId?: string
+  excludeId?: string,
+  fullMin: number = 0,
+  fullMax: number = Number.MAX_SAFE_INTEGER
 ): Map<string, number> => {
   const maxGap = calculateMaxGap(contextFrames);
   const originalPos = positions.get(draggedId) ?? 0;
@@ -241,6 +243,57 @@ export const applyFluidTimeline = (
     });
   }
 
+  // [BoundaryCollisionDebug] Check for boundary collisions
+  const hitsLeftBoundary = targetFrame <= fullMin;
+  const hitsRightBoundary = targetFrame >= fullMax;
+
+  if (hitsLeftBoundary || hitsRightBoundary) {
+    console.log('[BoundaryCollisionDebug] 🚨 BOUNDARY COLLISION DETECTED:', {
+      draggedId: draggedId.substring(0, 8),
+      targetFrame,
+      fullMin,
+      fullMax,
+      hitsLeftBoundary,
+      hitsRightBoundary,
+      boundaryType: hitsLeftBoundary ? 'LEFT_EDGE' : 'RIGHT_EDGE',
+      boundaryContext: {
+        distanceFromLeftBoundary: targetFrame - fullMin,
+        distanceFromRightBoundary: fullMax - targetFrame,
+        movementDirection: movementAmount > 0 ? 'RIGHT' : 'LEFT'
+      },
+      timestamp: new Date().toISOString()
+    });
+
+    // When hitting a boundary, we need to shift adjacent items to make room
+    if (hitsLeftBoundary) {
+      // When hitting left boundary while moving left, shift items to the RIGHT
+      const itemsToShiftRight = sorted.slice(draggedIndex + 1); // Items after dragged item
+      if (itemsToShiftRight.length > 0) {
+        violations.push({
+          type: 'BOUNDARY_COLLISION',
+          withItem: 'LEFT_EDGE',
+          gap: Math.abs(targetFrame - fullMin),
+          maxAllowed: 0, // At boundary, no gap allowed
+          requiredShift: Math.abs(targetFrame - fullMin),
+          direction: 'SHIFT_RIGHT'
+        });
+      }
+    } else if (hitsRightBoundary) {
+      // When hitting right boundary while moving right, shift items to the LEFT
+      const itemsToShiftLeft = sorted.slice(0, draggedIndex).reverse(); // Items before dragged item
+      if (itemsToShiftLeft.length > 0) {
+        violations.push({
+          type: 'BOUNDARY_COLLISION',
+          withItem: 'RIGHT_EDGE',
+          gap: Math.abs(targetFrame - fullMax),
+          maxAllowed: 0, // At boundary, no gap allowed
+          requiredShift: Math.abs(targetFrame - fullMax),
+          direction: 'SHIFT_LEFT'
+        });
+      }
+    }
+  }
+
   // COMPREHENSIVE FLUID TIMELINE ANALYSIS - All decision factors in one place
   console.log('[FLUID_TIMELINE_ANALYSIS] 🌊 FLUID TIMELINE DECISION MATRIX:', {
     // Input Parameters
@@ -280,7 +333,8 @@ export const applyFluidTimeline = (
       gap: v.gap,
       maxAllowed: v.maxAllowed,
       requiredShift: v.requiredShift,
-      severity: v.gap > v.maxAllowed ? 'CRITICAL' : 'MINOR'
+      severity: v.gap > v.maxAllowed ? 'CRITICAL' : 'MINOR',
+      direction: v.direction || 'UNKNOWN'
     })),
 
     // Decision Logic
@@ -329,19 +383,70 @@ export const applyFluidTimeline = (
     return shrinkOversizedGaps(result, contextFrames, excludeId);
   }
 
-  // Apply shifting to all subsequent items
+  // Apply shifting to handle violations (both gap violations and boundary collisions)
   const shiftDirection = movementAmount > 0 ? 1 : -1;
-  const itemsToShift = sorted.slice(draggedIndex + 1);
+
+  // Determine which items to shift based on violation types
+  let itemsToShift: [string, number][] = [];
+
+  // Handle different violation types
+  for (const violation of violations) {
+    if (violation.type === 'BOUNDARY_COLLISION') {
+      if (violation.direction === 'SHIFT_RIGHT') {
+        // Shift items to the right of dragged item
+        itemsToShift = sorted.slice(draggedIndex + 1);
+        break;
+      } else if (violation.direction === 'SHIFT_LEFT') {
+        // Shift items to the left of dragged item (in reverse order for consistent shifting)
+        itemsToShift = sorted.slice(0, draggedIndex);
+        break;
+      }
+    }
+  }
+
+  // If no boundary violations, use traditional logic for gap violations
+  if (itemsToShift.length === 0) {
+    // Symmetric handling:
+    // - Dragging RIGHT (limitedMovementAmount > 0): if prev-gap violated, shift LEFT items
+    // - Dragging LEFT (limitedMovementAmount < 0): if next-gap violated, shift RIGHT items
+    const prevGapViolation = prevItem ? (targetFrame - prevItem[1] > maxGap) : false;
+    const nextGapViolation = nextItem ? (nextItem[1] - targetFrame > maxGap) : false;
+
+    if (limitedMovementAmount > 0 && prevGapViolation) {
+      // Right drag stretching gap to the left → pull left items rightwards
+      itemsToShift = sorted.slice(0, draggedIndex);
+      console.log('[BoundaryCollisionDebug] 🔁 SYMMETRIC SHIFT (RIGHT DRAG, PREV GAP): shifting LEFT items', {
+        draggedId: draggedId.substring(0, 8),
+        prevItem: prevItem ? { id: prevItem[0].substring(0,8), pos: prevItem[1] } : null,
+        draggedIndex,
+        itemsToShift: itemsToShift.map(([id, pos]) => ({ id: id.substring(0,8), pos }))
+      });
+    } else if (limitedMovementAmount < 0 && nextGapViolation) {
+      // Left drag stretching gap to the right → push right items leftwards
+      itemsToShift = sorted.slice(draggedIndex + 1);
+      console.log('[BoundaryCollisionDebug] 🔁 SYMMETRIC SHIFT (LEFT DRAG, NEXT GAP): shifting RIGHT items', {
+        draggedId: draggedId.substring(0, 8),
+        nextItem: nextItem ? { id: nextItem[0].substring(0,8), pos: nextItem[1] } : null,
+        draggedIndex,
+        itemsToShift: itemsToShift.map(([id, pos]) => ({ id: id.substring(0,8), pos }))
+      });
+    } else {
+      // Default: shift subsequent items (previous behavior)
+      itemsToShift = sorted.slice(draggedIndex + 1);
+    }
+  }
 
   console.log('[FluidTimelineCore] 🌊 APPLYING TIMELINE SHIFT:', {
     draggedId: draggedId.substring(0, 8),
     shiftDirection: shiftDirection > 0 ? 'RIGHT' : 'LEFT',
     shiftAmount,
+    violationTypes: violations.map(v => v.type),
     itemsToShift: itemsToShift.map(([id, pos]) => ({
       id: id.substring(0, 8),
       oldPos: pos,
       newPos: pos + (shiftAmount * shiftDirection)
-    }))
+    })),
+    boundaryCollisionDetected: violations.some(v => v.type === 'BOUNDARY_COLLISION')
   });
 
   // Shift items by the required amount
