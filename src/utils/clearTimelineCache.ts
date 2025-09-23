@@ -36,7 +36,10 @@ export const clearTimelineCache = () => {
   }
 };
 
-// Auto-run on import to clean up legacy cache
-if (typeof window !== 'undefined') {
-  clearTimelineCache();
-}
+// DISABLED: Auto-cleanup was causing timeline position resets
+// The cache cleanup was triggering data reloads that override user drag positions
+//
+// // Auto-run on import to clean up legacy cache
+// if (typeof window !== 'undefined') {
+//   clearTimelineCache();
+// }

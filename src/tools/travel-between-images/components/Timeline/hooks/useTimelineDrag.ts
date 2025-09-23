@@ -318,7 +318,7 @@ export const useTimelineDrag = ({
     const now = Date.now();
     const timeSinceLastUp = now - dragRefsRef.current.lastMouseUpTime;
 
-    console.log('[DragLifecycle] 🎯 DRAG START - Initializing drag operation:', {
+    console.log('[TimelineDragFix] 🎯 DRAG START DETECTED:', {
       itemId: imageId.substring(0, 8),
       buttons: e.buttons,
       isDragging: dragState.isDragging,
@@ -329,7 +329,13 @@ export const useTimelineDrag = ({
       clientY: e.clientY,
       framePosition: framePositions.get(imageId) ?? 0,
       contextFrames,
-      maxGap: calculateMaxGap(contextFrames)
+      maxGap: calculateMaxGap(contextFrames),
+      framePositionsCount: framePositions.size,
+      framePositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        pos
+      })),
+      willStartDrag: e.buttons === 1 && !dragState.isDragging && !dragRefsRef.current.isBlocked && timeSinceLastUp >= 50
     });
 
     log('TimelineDragDebug', 'mousedown', {
@@ -454,6 +460,17 @@ export const useTimelineDrag = ({
       currentY: e.clientY,
     }));
 
+    console.log('[TimelineDragFix] 🖱️ MOUSE MOVE DURING DRAG:', {
+      itemId: dragState.activeId?.substring(0, 8),
+      clientX: e.clientX,
+      clientY: e.clientY,
+      currentX: e.clientX,
+      startX: dragState.startX,
+      deltaX: e.clientX - dragState.startX,
+      targetFrame: calculateTargetFrame(e.clientX, containerRect),
+      timestamp: e.timeStamp
+    });
+
     // DOM-based debugging for mouse movement
     if (containerRect) {
       console.log('[GroundTruthMouseMove] 🖱️ DOM-BASED MOUSE TRACKING:', {
@@ -530,17 +547,18 @@ export const useTimelineDrag = ({
   }, [dragState.isDragging, dragState.activeId, dragState.originalFramePos, dragState.startX, dragState.currentX, calculateTargetFrame, calculateFinalPosition, contextFrames, fullMin, fullRange]);
 
   const handleMouseUp = useCallback((e: MouseEvent, containerRef: React.RefObject<HTMLDivElement>) => {
-    console.log('[MouseUpDebug] 🎯 MOUSE UP CALLED:', {
+    console.log('[TimelineDragFix] 🎯 MOUSE UP CALLED:', {
       isDragging: dragState.isDragging,
       activeId: dragState.activeId,
       timestamp: e.timeStamp,
       clientX: e.clientX,
       clientY: e.clientY,
-      containerRef_exists: !!containerRef.current
+      containerRef_exists: !!containerRef.current,
+      setFramePositionsAvailable: typeof setFramePositions === 'function'
     });
 
     if (!dragState.isDragging || !dragState.activeId) {
-      console.log('[MouseUpDebug] ❌ MOUSE UP - No active drag or no active ID:', {
+      console.log('[TimelineDragFix] ❌ MOUSE UP - No active drag or no active ID:', {
         isDragging: dragState.isDragging,
         activeId: dragState.activeId,
         timestamp: e.timeStamp
@@ -705,18 +723,37 @@ export const useTimelineDrag = ({
 
     // Apply final positions with a small delay to prevent cascading updates
     setTimeout(async () => {
-      console.log('[MouseUpDebug] 🚀 APPLYING POSITIONS - About to call setFramePositions:', {
+      console.log('[TimelineDragFix] 🚀 SETFRAMEPOSITIONS CALL IMMINENT - About to call setFramePositions:', {
         itemId: dragState.activeId.substring(0, 8),
         positionsCount: finalPositions.size,
         positionsToApply: Array.from(finalPositions.entries()).map(([id, pos]) => ({
           id: id.substring(0, 8),
           pos
         })),
-        timestamp: new Date().toISOString()
+        originalPositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          pos
+        })),
+        positionChanges: Array.from(finalPositions.entries())
+          .filter(([id, newPos]) => (framePositions.get(id) ?? 0) !== newPos)
+          .map(([id, newPos]) => ({
+            id: id.substring(0, 8),
+            oldPos: framePositions.get(id) ?? 0,
+            newPos,
+            delta: newPos - (framePositions.get(id) ?? 0)
+          })),
+        timestamp: new Date().toISOString(),
+        setFramePositionsFunction: typeof setFramePositions
       });
 
       try {
         await setFramePositions(finalPositions);
+
+        console.log('[TimelineDragFix] ✅ SETFRAMEPOSITIONS CALL COMPLETED SUCCESSFULLY:', {
+          itemId: dragState.activeId.substring(0, 8),
+          finalPositionsCount: finalPositions.size,
+          timestamp: new Date().toISOString()
+        });
 
         console.log('[DragLifecycle] ✅ POSITIONS APPLIED - Now updating image order:', {
           itemId: dragState.activeId.substring(0, 8),
@@ -886,7 +923,17 @@ export const useTimelineDrag = ({
       currentY: 0,
       originalFramePos: 0,
     });
-  }, [dragState, images, onImageReorder, calculateDragPreview, fullMin, fullRange]);
+  }, [
+    dragState, 
+    images, 
+    onImageReorder, 
+    calculateDragPreviewWithPosition, 
+    setFramePositions,
+    framePositions,
+    containerRect,
+    calculateTargetFrame,
+    contextFrames
+  ]);
 
   // Calculate current values for rendering
   const dragOffset = dragState.isDragging

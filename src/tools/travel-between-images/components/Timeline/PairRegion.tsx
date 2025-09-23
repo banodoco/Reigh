@@ -87,11 +87,34 @@ const PairRegion: React.FC<PairRegionProps> = ({
         </div>
       )}
 
+      {/* Connecting lines from pill to timeline items */}
+      {/* Left connecting line - from left timeline item to pill */}
+      <div
+        className={`absolute top-1/2 h-[2px] ${colorScheme.line} pointer-events-none z-5`}
+        style={{
+          left: `${startPercent}%`,
+          width: `${((startPercent + endPercent) / 2) - startPercent}%`,
+          transform: 'translateY(-50%)',
+          transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
+        }}
+      />
+
+      {/* Right connecting line - from pill to right timeline item */}
+      <div
+        className={`absolute top-1/2 h-[2px] ${colorScheme.line} pointer-events-none z-5`}
+        style={{
+          left: `${(startPercent + endPercent) / 2}%`,
+          width: `${endPercent - ((startPercent + endPercent) / 2)}%`,
+          transform: 'translateY(-50%)',
+          transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
+        }}
+      />
+
       {/* Pair label */}
       <Tooltip>
         <TooltipTrigger asChild>
           <div
-            className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} z-10 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200`}
+            className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200`}
             style={{
               left: `${(startPercent + endPercent) / 2}%`,
               transform: 'translate(-50%, -50%)',

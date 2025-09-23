@@ -149,20 +149,21 @@ BEGIN
     -- Link to shot if shot_id exists
     IF shot_id IS NOT NULL THEN
         IF add_in_position THEN
-            -- Calculate next timeline_frame
+            -- Calculate next timeline_frame, but only consider items that haven't been manually positioned
             SELECT COALESCE(MAX(timeline_frame), -50) + 50
             INTO next_timeline_frame
             FROM shot_generations
-            WHERE shot_id = shot_id;
+            WHERE shot_id = shot_id
+              AND (metadata->>'user_positioned' IS NULL AND metadata->>'drag_source' IS NULL);
 
-            INSERT INTO shot_generations (shot_id, generation_id, timeline_frame)
-            VALUES (shot_id, new_generation_id, next_timeline_frame);
+            INSERT INTO shot_generations (shot_id, generation_id, timeline_frame, metadata)
+            VALUES (shot_id, new_generation_id, next_timeline_frame, jsonb_build_object('auto_positioned', true));
 
             RAISE LOG '[ProcessTask] Linked generation % to shot % at timeline_frame %', new_generation_id, shot_id, next_timeline_frame;
         ELSE
             -- Create shot_generations link without timeline_frame (unpositioned)
-            INSERT INTO shot_generations (shot_id, generation_id, timeline_frame)
-            VALUES (shot_id, new_generation_id, NULL);
+            INSERT INTO shot_generations (shot_id, generation_id, timeline_frame, metadata)
+            VALUES (shot_id, new_generation_id, NULL, '{}'::jsonb);
 
             RAISE LOG '[ProcessTask] Linked generation % to shot % without timeline_frame', new_generation_id, shot_id;
         END IF;

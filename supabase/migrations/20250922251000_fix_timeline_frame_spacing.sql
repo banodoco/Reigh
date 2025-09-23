@@ -38,24 +38,36 @@ BEGIN
         
         -- Get all shot_generations for this shot, ordered by current timeline_frame
         FOR generation_record IN
-            SELECT id, generation_id, timeline_frame
+            SELECT id, generation_id, timeline_frame, metadata
             FROM shot_generations
-            WHERE shot_id = shot_record.shot_id 
+            WHERE shot_id = shot_record.shot_id
               AND timeline_frame IS NOT NULL
             ORDER BY timeline_frame ASC, created_at ASC
         LOOP
-            -- Only update if the current timeline_frame doesn't match expected value
-            IF generation_record.timeline_frame != frame_counter THEN
-                UPDATE shot_generations
-                SET timeline_frame = frame_counter
-                WHERE id = generation_record.id;
-                
-                total_updates := total_updates + 1;
-                
-                RAISE NOTICE '  Updated generation % from timeline_frame % to %', 
-                    generation_record.generation_id, 
-                    generation_record.timeline_frame, 
-                    frame_counter;
+            -- Skip items that have been manually positioned by users (drag operations)
+            -- Check metadata for user_positioned flag or drag_source flag
+            IF NOT EXISTS (
+                SELECT 1 FROM shot_generations
+                WHERE id = generation_record.id
+                AND (metadata->>'user_positioned' = 'true' OR metadata->>'drag_source' IS NOT NULL)
+            ) THEN
+                -- Only update auto-positioned items that don't match expected spacing
+                IF generation_record.timeline_frame != frame_counter THEN
+                    UPDATE shot_generations
+                    SET timeline_frame = frame_counter
+                    WHERE id = generation_record.id;
+
+                    total_updates := total_updates + 1;
+
+                    RAISE NOTICE '  Updated generation % from timeline_frame % to %',
+                        generation_record.generation_id,
+                        generation_record.timeline_frame,
+                        frame_counter;
+                END IF;
+            ELSE
+                RAISE NOTICE '  Skipping user-positioned generation % at timeline_frame %',
+                    generation_record.generation_id,
+                    generation_record.timeline_frame;
             END IF;
             
             -- Increment counter by 50 for next generation
@@ -68,5 +80,5 @@ BEGIN
     END LOOP;
     
     RAISE NOTICE 'Timeline frame spacing correction completed!';
-    RAISE NOTICE 'Affected shots: %, Total updates: %', affected_shots, total_updates;
+    RAISE NOTICE 'Affected shots: %, Total updates: % (user-positioned items preserved)', affected_shots, total_updates;
 END $$;

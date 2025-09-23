@@ -1527,7 +1527,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {(!state.isEditingName) && isSticky && (() => {
         // Position right below the global header with minimal gap
         const globalHeaderHeight = isMobile ? 60 : 96; // Match actual global header heights
-        const gap = isMobile ? -15 : 8; // Much higher on mobile, small gap on desktop
+        const gap = isMobile ? 4 : 8; // Small positive gap on both mobile and desktop
         const topPosition = globalHeaderHeight + gap;
         
         // Calculate horizontal constraints based on locked panes
@@ -1535,8 +1535,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         
         return (
-          <div 
-            className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2`}
+          <div
+            className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
               left: `${leftOffset}px`,
@@ -1551,39 +1551,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-3' : 'p-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
               {/* Subtle grain overlay to match GlobalHeader vibe */}
               <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (onPreviousShotNoScroll) onPreviousShotNoScroll();
                 }}
                 disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                className="flex-shrink-0"
+                className="flex-shrink-0 pointer-events-auto"
                 title="Previous shot"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <span 
-                className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-primary truncate px-2 ${isMobile ? 'w-[135px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''}`}
+              <span
+                className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-primary truncate px-2 ${isMobile ? 'w-[135px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''} pointer-events-auto`}
                 onClick={handleStickyNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
                 {selectedShot?.name || 'Untitled Shot'}
               </span>
               
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   if (onNextShotNoScroll) onNextShotNoScroll();
                 }}
                 disabled={!hasNext || state.isTransitioningFromNameEdit}
-                className="flex-shrink-0"
+                className="flex-shrink-0 pointer-events-auto"
                 title="Next shot"
               >
                 <ChevronRight className="h-4 w-4" />

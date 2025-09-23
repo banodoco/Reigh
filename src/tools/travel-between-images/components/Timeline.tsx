@@ -46,6 +46,8 @@ export interface TimelineProps {
   images?: GenerationRow[];
   // Callback to reload parent data after timeline changes
   onTimelineChange?: () => Promise<void>;
+  // Shared hook data to prevent creating duplicate hook instances
+  hookData?: import("@/shared/hooks/useEnhancedShotPositions").UseEnhancedShotPositionsReturn;
   // Pair-specific prompt editing
   onPairClick?: (pairIndex: number, pairData: {
     index: number;
@@ -57,12 +59,14 @@ export interface TimelineProps {
       url?: string;
       thumbUrl?: string;
       timeline_frame: number;
+      position: number;
     } | null;
     endImage?: {
       id: string;
       url?: string;
       thumbUrl?: string;
       timeline_frame: number;
+      position: number;
     } | null;
   }) => void;
   // Pair prompt data for display (optional - will use database if not provided)
@@ -96,6 +100,7 @@ const Timeline: React.FC<TimelineProps> = ({
   updateTimelineFrame: propUpdateTimelineFrame,
   images: propImages,
   onTimelineChange,
+  hookData: propHookData,
   onPairClick,
   pairPrompts,
   defaultPrompt,
@@ -151,34 +156,40 @@ const Timeline: React.FC<TimelineProps> = ({
   // Core state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isPersistingPositions, setIsPersistingPositions] = useState<boolean>(false);
+  const [isDragInProgress, setIsDragInProgress] = useState<boolean>(false);
 
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialContextFrames = useRef(contextFrames);
 
-  // Use shared data if provided, otherwise fallback to hook (for backward compatibility)
-  // IMPORTANT: Always pass shotId to hook so applyTimelineFrames works correctly
-  const hookData = useEnhancedShotPositions(shotId); // Always pass shotId for atomic operations
+  // Use shared hook data if provided, otherwise create new instance (for backward compatibility)
+  const hookData = propHookData || useEnhancedShotPositions(shotId, isDragInProgress);
   const shotGenerations = propShotGenerations || hookData.shotGenerations;
   const updateTimelineFrame = propUpdateTimelineFrame || hookData.updateTimelineFrame;
   const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
-  const applyTimelineFrames = hookData.applyTimelineFrames; // New atomic update method
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
 
-  // Listen for cache clear events and force reload
-  useEffect(() => {
-    const handleCacheCleared = () => {
-      console.log('[Timeline] Cache cleared event received - forcing data reload');
-      hookData.loadPositions({ reason: 'invalidation' });
-    };
+  // Track previous positions to detect unexpected changes
+  const prevStablePositionsRef = useRef<Map<string, number>>(new Map());
 
-    window.addEventListener('timeline-cache-cleared', handleCacheCleared);
-    return () => window.removeEventListener('timeline-cache-cleared', handleCacheCleared);
-  }, [hookData.loadPositions]);
+
+  // DISABLED: Cache clear events were causing timeline position resets
+  // The cache cleanup was triggering data reloads that override user drag positions
+  //
+  // // Listen for cache clear events and force reload
+  // useEffect(() => {
+  //   const handleCacheCleared = () => {
+  //     console.log('[Timeline] Cache cleared event received - forcing data reload');
+  //     hookData.loadPositions({ reason: 'invalidation' });
+  //   };
+  //
+  //   window.addEventListener('timeline-cache-cleared', handleCacheCleared);
+  //   return () => window.removeEventListener('timeline-cache-cleared', handleCacheCleared);
+  // }, [hookData.loadPositions]);
   
-  // Get pair prompts from database instead of props
-  const databasePairPrompts = hookData.getPairPrompts();
+  // Get pair prompts from database instead of props (now reactive)
+  const databasePairPrompts = hookData.pairPrompts;
   const actualPairPrompts = pairPrompts || databasePairPrompts; // Fallback to props for backward compatibility
   const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, never show loading (shared data)
   
@@ -213,8 +224,72 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Convert database timeline_frame values to Timeline-compatible Map
   // Keep previous positions during loading to prevent flicker
-  const [stablePositions, setStablePositions] = React.useState<Map<string, number>>(new Map());
+  const [stablePositions, _setStablePositions] = React.useState<Map<string, number>>(new Map());
   
+  // Controlled setStablePositions wrapper to prevent unwanted resets
+  const setStablePositions = React.useCallback((newPositions: Map<string, number>, reason?: string) => {
+    const stack = new Error().stack;
+    const isFromDragOperation = stack?.includes('setFramePositions') || stack?.includes('handleMouseUp') || reason;
+    
+    console.log('[TimelineDragFix] 🎯 setStablePositions WRAPPER CALLED:', {
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      reason: reason || 'unknown',
+      isFromDragOperation,
+      positionsCount: newPositions.size,
+      positions: Array.from(newPositions.entries()).map(([id, pos]) => `${id.substring(0, 8)}:${pos}`).join(', '),
+      stackSnippet: stack?.split('\n').slice(1, 4).join(' → ')
+    });
+    
+    if (isFromDragOperation || reason) {
+      console.log('[TimelineDragFix] ✅ ALLOWING setStablePositions:', reason || 'drag operation');
+      _setStablePositions(newPositions);
+    } else {
+      console.log('[TimelineDragFix] 🚫 BLOCKING unwanted setStablePositions call');
+    }
+  }, [shotId]);
+
+
+  // Detect unexpected position changes
+  useEffect(() => {
+    const prevPositions = prevStablePositionsRef.current;
+    const currentPositions = Array.from(stablePositions.entries());
+
+    // Only check if we have previous data
+    if (prevPositions.size > 0 && currentPositions.length > 0) {
+      let positionChanged = false;
+      const changes = [];
+
+      // Check for changed positions
+      for (const [id, pos] of currentPositions) {
+        const prevPos = prevPositions.get(id);
+        if (prevPos !== pos) {
+          changes.push(`${id.substring(0, 8)}: ${prevPos}→${pos}`);
+          positionChanged = true;
+        }
+      }
+
+      // Check for removed positions
+      for (const [id, pos] of prevPositions) {
+        if (!stablePositions.has(id)) {
+          changes.push(`${id.substring(0, 8)}: ${pos}→REMOVED`);
+          positionChanged = true;
+        }
+      }
+
+      if (positionChanged) {
+        console.log('[TimelineResetDebug] 🚨 UNEXPECTED POSITION CHANGE DETECTED:', {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          changes: changes.join(', '),
+          timestamp: new Date().toISOString(),
+          warning: 'This indicates positions are being reset by something other than drag operations'
+        });
+      }
+    }
+
+    // Update previous positions
+    prevStablePositionsRef.current = new Map(stablePositions);
+  }, [stablePositions, shotId]);
+
   // Track dependency changes with refs
   const prevDepsRef = React.useRef<{
     shotGenerations: any;
@@ -223,12 +298,16 @@ const Timeline: React.FC<TimelineProps> = ({
     shotId: string;
   }>();
 
+  // [TimelineJumpDebug] Track what's causing repeated framePositions recalculations
+  const framePositionsRenderCount = React.useRef(0);
+
   const framePositions = React.useMemo(() => {
+    framePositionsRenderCount.current++;
     const currentDeps = { shotGenerations, images, frameSpacing, shotId };
     const prevDeps = prevDepsRef.current;
     
     console.log('[PositionSystemDebug] 🔄 RECALCULATING framePositions useMemo:', {
-      shotId: shotId.substring(0, 8),
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
       shotGenerationsLength: shotGenerations.length,
       imagesLength: images.length,
       frameSpacing,
@@ -241,6 +320,19 @@ const Timeline: React.FC<TimelineProps> = ({
       // Reference checks
       shotGenerationsRef: shotGenerations === prevDeps?.shotGenerations ? 'SAME_REF' : 'DIFF_REF',
       imagesRef: images === prevDeps?.images ? 'SAME_REF' : 'DIFF_REF'
+    });
+
+    // [TimelineJumpDebug] Track repeated recalculations
+    console.log('[TimelineJumpDebug] 🔢 FRAMEPOSITIONS RECALC COUNT:', {
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      recalcCount: framePositionsRenderCount.current,
+      trigger: prevDeps ? {
+        shotGenerationsChanged: shotGenerations !== prevDeps.shotGenerations,
+        imagesChanged: images !== prevDeps.images,
+        frameSpacingChanged: frameSpacing !== prevDeps.frameSpacing,
+        shotIdChanged: shotId !== prevDeps.shotId
+      } : { firstRender: true },
+      timestamp: new Date().toISOString()
     });
     
     prevDepsRef.current = currentDeps;
@@ -273,72 +365,126 @@ const Timeline: React.FC<TimelineProps> = ({
     return positions;
   }, [shotGenerations, images, frameSpacing, shotId]);
 
-  // Update stable positions when not loading, separate from useMemo
-  React.useEffect(() => {
-    if (!isLoading && framePositions.size > 0) {
-      setStablePositions(framePositions);
-    }
-  }, [framePositions, isLoading]);
 
-  // Auto-initialize timeline frames for existing shots that don't have them
-  React.useEffect(() => {
-    // Early return if we don't have the required data
-    if (isLoading || !shotId || !shotGenerations || shotGenerations.length === 0 || !initializeTimelineFrames) {
-      return;
-    }
 
-    // Check if any items are missing timeline_frame values
-    const itemsWithoutFrames = shotGenerations.filter(sg => 
-      sg.timeline_frame === null || sg.timeline_frame === undefined
-    );
-
-    if (itemsWithoutFrames.length > 0) {
-      console.log('[PositionSystemDebug] 🚀 Auto-initializing timeline frames for existing shot:', {
-        shotId: shotId.substring(0, 8),
-        totalItems: shotGenerations.length,
-        itemsNeedingInitialization: itemsWithoutFrames.length,
-        defaultFrameSpacing: 60
-      });
-
-      // Use the proper default frame spacing (60) instead of current UI frameSpacing
-      initializeTimelineFrames(60).catch(error => {
-        console.error('[PositionSystemDebug] ❌ Failed to auto-initialize timeline frames:', error);
-      });
-    }
-  }, [isLoading, shotGenerations, shotId, initializeTimelineFrames]);
-
-  // Use stable positions during loading to prevent flicker
+  // Use stable positions during loading or drag operations to prevent flicker
   const displayPositions = React.useMemo(() => {
-    // Use stable positions if we have them and we're loading, OR if the fresh positions are empty/different
-    const useStable = (isLoading && stablePositions.size > 0) || 
+    // [TimelineResetDebug] CRITICAL: Track when displayPositions changes after drag
+    const callStack = new Error().stack;
+    const isAfterDrag = callStack?.includes('handleMouseUp') || callStack?.includes('dragState');
+    const stackLines = callStack?.split('\n').slice(0, 10).join('\n') || 'No stack';
+
+    // Only log if this is happening frequently or after drag
+    const shouldLog = isAfterDrag || stablePositions.size > 0;
+
+    if (shouldLog) {
+      console.log('[TimelineResetDebug] 🔄 DISPLAY POSITIONS RECALCULATING:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        isAfterDrag,
+        isLoading,
+        isDragInProgress,
+        stackTrace: stackLines,
+        timestamp: new Date().toISOString(),
+        stablePositionsSize: stablePositions.size,
+        framePositionsSize: framePositions.size,
+        isPersistingPositions,
+        willUseStable: (isLoading && stablePositions.size > 0) ||
+                       (stablePositions.size > 0 && framePositions.size === 0) ||
+                       (isPersistingPositions && stablePositions.size > 0) ||
+                       (isDragInProgress && stablePositions.size > 0),
+        stablePositionsData: Array.from(stablePositions.entries()).map(([id, pos]) =>
+          `${id.substring(0, 8)}:${pos}`).join(', '),
+        framePositionsData: Array.from(framePositions.entries()).map(([id, pos]) =>
+          `${id.substring(0, 8)}:${pos}`).join(', ')
+      });
+    }
+
+    // [TimelineJumpDebug] Log every displayPositions recalculation with triggers
+    const triggers = {
+      isLoadingChanged: 'unknown', // We'd need prev state to compare
+      stablePositionsChanged: 'unknown', // We'd need prev state to compare
+      framePositionsChanged: 'unknown', // We'd need prev state to compare
+      isPersistingPositionsChanged: 'unknown', // We'd need prev state to compare
+      isDragInProgressChanged: 'unknown' // We'd need prev state to compare
+    };
+
+    console.log('[TimelineJumpDebug] 🎯 DISPLAY POSITIONS RECALC TRIGGER:', {
+      shotId: shotId.substring(0, 8),
+      isLoading,
+      isDragInProgress,
+      stablePositionsSize: stablePositions.size,
+      framePositionsSize: framePositions.size,
+      isPersistingPositions,
+      triggers,
+      timestamp: new Date().toISOString()
+    });
+
+    // Use stable positions if we have them and we're loading, persisting, or during drag
+    const useStable = (isLoading && stablePositions.size > 0) ||
                      (stablePositions.size > 0 && framePositions.size === 0) ||
-                     (isPersistingPositions && stablePositions.size > 0);
-    
+                     (isPersistingPositions && stablePositions.size > 0) ||
+                     (isDragInProgress && stablePositions.size > 0);
+
     if (useStable) {
       console.log('[PositionSystemDebug] ⏳ TIMELINE keeping stable positions:', {
-        shotId: shotId.substring(0, 8),
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
         stableCount: stablePositions.size,
         freshCount: framePositions.size,
         isLoading,
-        reason: isLoading ? 'loading' : 'fresh_positions_empty'
+        isDragInProgress,
+        reason: isLoading ? 'loading' : isDragInProgress ? 'drag_in_progress' : 'fresh_positions_empty'
+      });
+      console.log('[TimelineJumpDebug] 📍 DISPLAY POSITIONS - Using Stable:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        positions: Array.from(stablePositions.entries()).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          position: pos
+        })),
+        reason: useStable ? 'stable_fallback' : 'fresh_available',
+        timestamp: new Date().toISOString()
       });
       return stablePositions;
     }
-    
+
     // If fresh positions are available and different from stable, use fresh
     if (framePositions.size > 0) {
       console.log('[PositionSystemDebug] 🔄 TIMELINE using fresh positions:', {
-        shotId: shotId.substring(0, 8),
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
         freshCount: framePositions.size,
         isLoading
       });
+      console.log('[TimelineJumpDebug] 📍 DISPLAY POSITIONS - Using Fresh:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        positions: Array.from(framePositions.entries()).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          position: pos
+        })),
+        reason: 'fresh_available',
+        timestamp: new Date().toISOString()
+      });
     }
-    
+
     return framePositions;
-  }, [isLoading, isPersistingPositions, stablePositions, framePositions, shotId]);
+  }, [isLoading, isPersistingPositions, isDragInProgress, stablePositions, framePositions, shotId]);
 
   // Atomic database-backed setFramePositions function using new RPC
   const setFramePositions = React.useCallback(async (newPositions: Map<string, number>) => {
+    // [DragPositionReset] Track which system is calling setFramePositions
+    const callStack = new Error().stack;
+    const isDragCall = callStack?.includes('useTimelineDrag');
+    const isBatchCall = callStack?.includes('batchExchange') || callStack?.includes('handleReorder');
+
+    const callSource = isDragCall ? 'TIMELINE_DRAG' : isBatchCall ? 'BATCH_REORDER' : 'UNKNOWN';
+    console.log(`[TimelineDragFix] 🎯 setFramePositions CALLED FROM: ${callSource} (${newPositions.size} positions) - ${shotId.substring(0, 8)}`);
+
+    // Set drag in progress flag to prevent query invalidation reloads
+    if (isDragCall) {
+      console.log('[TimelineDragFix] 🎯 Setting isDragInProgress = true to prevent position resets');
+      setIsDragInProgress(true);
+    }
+
+    let dragCallForFinally = isDragCall;
+
     console.log('[TimelineMoveFlow] 🎯 TIMELINE setFramePositions CALLED - Processing position update:', {
       shotId: shotId.substring(0, 8),
       positionsCount: newPositions.size,
@@ -361,6 +507,23 @@ const Timeline: React.FC<TimelineProps> = ({
       timestamp: new Date().toISOString()
     });
 
+    // [TimelineJumpDebug] Check for duplicate frames in the incoming positions
+    const incomingFrames = Array.from(newPositions.values());
+    const uniqueIncomingFrames = new Set(incomingFrames);
+    if (incomingFrames.length !== uniqueIncomingFrames.size) {
+      console.error('[TimelineJumpDebug] ❌ DUPLICATE FRAMES IN INCOMING POSITIONS:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        allFrames: incomingFrames,
+        uniqueFrames: [...uniqueIncomingFrames],
+        duplicates: incomingFrames.filter((frame, index) => incomingFrames.indexOf(frame) !== index),
+        positionsDetail: Array.from(newPositions.entries()).map(([id, frame]) => ({
+          id: id.substring(0, 8),
+          frame
+        })),
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // [TimelineItemMoveSummary] Check if this update might be causing cascading issues
     const updateSource = new Error().stack?.includes('useTimelineDrag') ? 'drag' : 'programmatic';
     console.log('[TimelineItemMoveSummary] Position update source:', {
@@ -373,7 +536,21 @@ const Timeline: React.FC<TimelineProps> = ({
     const positionChanges = [...newPositions.entries()]
       .filter(([id, newPos]) => {
         const currentPos = displayPositions.get(id);
-        return currentPos !== newPos;
+        const isActualChange = currentPos !== newPos;
+        
+        // [TimelineJumpDebug] Log items that are being filtered out as no-change
+        if (!isActualChange) {
+          console.log('[TimelineJumpDebug] 🚫 FILTERING OUT NO-CHANGE ITEM:', {
+            shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+            itemId: id.substring(0, 8),
+            currentPos,
+            requestedPos: newPos,
+            reason: 'already_at_target_position',
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        return isActualChange;
       })
       .map(([id, newPos]) => {
         const currentPos = displayPositions.get(id) ?? 0;
@@ -386,6 +563,15 @@ const Timeline: React.FC<TimelineProps> = ({
           delta: newPos - currentPos
         };
       });
+
+    // [TimelineJumpDebug] Log the filtering results  
+    console.log('[TimelineJumpDebug] 📊 POSITION CHANGE FILTERING RESULTS:', {
+      shotId: shotId.substring(0, 8),
+      totalIncoming: newPositions.size,
+      actualChanges: positionChanges.length,
+      filteredOut: newPositions.size - positionChanges.length,
+      timestamp: new Date().toISOString()
+    });
 
     // Log the move summary for debugging
     if (positionChanges.length > 0) {
@@ -420,114 +606,232 @@ const Timeline: React.FC<TimelineProps> = ({
           positionChanges
         },
         metadata: {
-          shotId: shotId.substring(0, 8),
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
           totalImages: images.length,
           timestamp: new Date().toISOString()
         }
       });
     }
 
-    // IMMEDIATELY update stable positions to prevent visual glitches during database update
-    setStablePositions(new Map(newPositions));
-    setIsPersistingPositions(true);
-    console.log('[PositionSystemDebug] 🎭 TIMELINE immediately updated stable positions for smooth transition');
+      // 🚨 IMMEDIATE DEBUG: Check if drag operation is working at all
+      console.log('[TimelineDragFix] 🎯 DRAG OPERATION STARTED - position changes detected:', {
+        positionChangesCount: positionChanges.length,
+        positionChanges: positionChanges.map(c => `${c.id}:${c.oldPos}→${c.newPos}`),
+        timestamp: new Date().toISOString()
+      });
 
-    // Only proceed if there are actual changes
-    if (positionChanges.length === 0) {
-      setIsPersistingPositions(false);
-      console.log('[PositionSystemDebug] ✅ No changes needed - positions already match');
-      return;
-    }
+      // IMMEDIATELY update stable positions to prevent visual glitches during database update
+      console.log('[TimelineDragFix] 🎯 setStablePositions CALL #1 - setFramePositions optimistic update');
+      setStablePositions(new Map(newPositions), 'drag-optimistic-update');
+      setIsPersistingPositions(true);
+      console.log('[PositionSystemDebug] 🎭 TIMELINE immediately updated stable positions for smooth transition');
+
+    // 🚨 CRITICAL: Check if drag operation is reaching this point at all
+    console.log('[TimelineDragFix] ⚠️ DRAG OPERATION TRIGGERED - checking if database update will be attempted:', {
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      positionChangesCount: positionChanges.length,
+      updateTimelineFrameAvailable: !!updateTimelineFrame,
+      timestamp: new Date().toISOString()
+    });
+    console.log('[TimelineJumpDebug] 🎭 STABLE POSITIONS UPDATED (pre-database):', {
+      shotId: shotId.substring(0, 8),
+      newStablePositions: Array.from(newPositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        position: pos
+      })),
+      timestamp: new Date().toISOString()
+    });
+
+      // DEBUG: Check if we're reaching the database update code
+      console.log('[TimelineDragFix] 🔍 DRAG OPERATION REACHED DATABASE UPDATE ATTEMPT:', {
+        positionChangesCount: positionChanges.length,
+        positionChanges: positionChanges.map(c => `${c.id}:${c.oldPos}→${c.newPos}`),
+        isPersistingPositions,
+        updateTimelineFrame: !!updateTimelineFrame,
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        images: images.map(img => img.shotImageEntryId.substring(0, 8)),
+        timestamp: new Date().toISOString()
+      });
+
+      // IMMEDIATE DEBUG: Check if the issue is the positionChanges.length === 0 check
+      if (positionChanges.length === 0) {
+        console.log('[TimelineDragFix] 🚨 POSITION CHANGES IS EMPTY - THIS IS THE ISSUE:', {
+          positionChanges,
+          stablePositionsSize: stablePositions.size,
+          framePositionsSize: framePositions.size,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Only proceed if there are actual changes
+      if (positionChanges.length === 0) {
+        setIsPersistingPositions(false);
+        console.log('[PositionSystemDebug] ✅ No changes needed - positions already match');
+        return;
+      }
+
+    // DEBUG: Log the state before database update
+    console.log('[TimelineDragFix] 🔍 PRE-UPDATE STATE CHECK:', {
+      positionChangesCount: positionChanges.length,
+      positionChanges: positionChanges.map(c => `${c.id}:${c.oldPos}→${c.newPos}`),
+      imagesCount: images.length,
+      updateTimelineFrameAvailable: !!updateTimelineFrame,
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      timestamp: new Date().toISOString()
+    });
 
     try {
-      // Use the new atomic RPC function if available
-      if (applyTimelineFrames) {
-        console.log('[TimelineMoveFlow] 🚀 CALLING ATOMIC RPC - applyTimelineFrames:', {
-          shotId: shotId.substring(0, 8),
-          changesCount: positionChanges.length,
-          changes: positionChanges.map(c => ({
-            id: c.id,
-            from: c.oldPos,
-            to: c.newPos
-          }))
-        });
-        
-        console.log('[PositionSystemDebug] 🚀 Using ATOMIC timeline frame updates:', {
-          shotId: shotId.substring(0, 8),
-          changesCount: positionChanges.length,
-          changes: positionChanges.map(c => ({
-            id: c.id,
-            from: c.oldPos,
-            to: c.newPos
-          }))
-        });
+      // Use updateTimelineFrame for arbitrary positioning (not exchange/batch operations)
+      console.log(`[TimelineDragFix] 🚀 USING updateTimelineFrame for arbitrary positioning - ${shotId ? shotId.substring(0, 8) : 'undefined'} - ${positionChanges.length} changes`);
+      console.log(`[TimelineDragFix] 📋 CHANGES: ${positionChanges.map(c => `${c.id}:${c.oldPos}→${c.newPos}`).join(', ')}`);
+      console.log(`[TimelineDragFix] 📊 DRAG STATE:`, {
+        positionChanges,
+        imagesCount: images.length,
+        updateTimelineFrame: !!updateTimelineFrame,
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        timestamp: new Date().toISOString()
+      });
 
-        // Convert to the format expected by applyTimelineFrames
-        const atomicChanges = positionChanges.map(change => {
-          const shotImageEntryId = [...newPositions.entries()].find(([, pos]) => pos === change.newPos)?.[0];
-          const matchingImage = images.find(img => img.shotImageEntryId === shotImageEntryId);
-          return {
-            generationId: matchingImage!.id, // We know it exists from positionChanges
-            timelineFrame: change.newPos
-          };
-        });
+      // Process each position change individually using updateTimelineFrame
+      for (const change of positionChanges) {
+        // Find the correct image by matching the shotImageEntryId directly
+        // change.id is the last 8 chars of shotImageEntryId, so we need to find the full ID
+        const matchingImage = images.find(img =>
+          img.shotImageEntryId.endsWith(change.id) || img.shotImageEntryId.substring(0, 8) === change.id
+        );
 
-        console.log('[TimelineMoveFlow] 📡 RPC PAYLOAD PREPARED:', {
-          shotId: shotId.substring(0, 8),
-          atomicChanges: atomicChanges.map(c => ({
-            generationId: c.generationId.substring(0, 8),
-            timelineFrame: c.timelineFrame
+        console.log(`[TimelineDragFix] 🔍 IMAGE MATCHING DEBUG:`, {
+          changeId: change.id,
+          changeOldPos: change.oldPos,
+          changeNewPos: change.newPos,
+          availableImages: images.map(img => ({
+            shotEntry: img.shotImageEntryId.substring(0, 8),
+            genId: img.id.substring(0, 8),
+            currentFrame: (img as GenerationRow & { timeline_frame?: number }).timeline_frame,
+            endsWith: img.shotImageEntryId.endsWith(change.id),
+            startsWith: img.shotImageEntryId.substring(0, 8) === change.id
           })),
-          updatePositions: true
+          matchedImage: matchingImage ? {
+            shotEntry: matchingImage.shotImageEntryId.substring(0, 8),
+            genId: matchingImage.id.substring(0, 8),
+            currentFrame: (matchingImage as GenerationRow & { timeline_frame?: number }).timeline_frame
+          } : null,
+          updateTimelineFrame: !!updateTimelineFrame
         });
 
-        await applyTimelineFrames(atomicChanges, true); // Update positions too for batch view consistency
-        
-        console.log('[TimelineMoveFlow] ✅ ATOMIC RPC COMPLETED - applyTimelineFrames succeeded:', {
-          shotId: shotId.substring(0, 8),
-          changesApplied: atomicChanges.length
-        });
+        if (matchingImage && updateTimelineFrame) {
+          console.log(`[TimelineDragFix] 📡 UPDATING ITEM: shotEntry=${matchingImage.shotImageEntryId.substring(0, 8)} genId=${matchingImage.id.substring(0, 8)} from ${change.oldPos} to ${change.newPos}`);
 
-        console.log('[TimelineItemMoveSummary] Timeline atomic move completed successfully', {
-          moveType: 'atomic_rpc',
-          changesApplied: atomicChanges.length,
-          metadata: {
-            shotId: shotId.substring(0, 8),
-            totalImages: images.length,
-            timestamp: new Date().toISOString()
+          try {
+            await updateTimelineFrame(matchingImage.id, change.newPos, {
+              user_positioned: true,
+              drag_source: 'timeline_drag'
+            });
+
+            console.log(`[TimelineDragFix] ✅ ITEM UPDATE COMPLETED: ${(matchingImage as GenerationRow & { timeline_frame?: number }).id.substring(0, 8)} now at ${change.newPos}`);
+          } catch (error) {
+            console.error(`[TimelineDragFix] ❌ UPDATE FAILED: ${error instanceof Error ? error.message : error}`);
+            console.error(`[TimelineDragFix] 📋 FAILED UPDATE DETAILS:`, {
+              generationId: matchingImage.id.substring(0, 8),
+              fromFrame: change.oldPos,
+              toFrame: change.newPos,
+              error: error instanceof Error ? error.message : error
+            });
           }
-        });
-
-      } else {
-        // Fallback for when atomic function is not available (shouldn't happen in normal flow)
-        console.warn('[PositionSystemDebug] ⚠️ Atomic function not available, this should not happen');
-        throw new Error('Atomic timeline frame update function not available');
-      }
-      
-      // If using shared data, trigger parent reload (but only if we need to refresh database state)
-      if (propShotGenerations && onTimelineChange) {
-        try {
-          await onTimelineChange();
-        } catch (error) {
-          console.error('[PositionSystemDebug] ❌ Failed to reload parent data:', error);
+        } else {
+          console.error(`[TimelineDragFix] ❌ NO MATCHING IMAGE FOUND for change.id: ${change.id}`);
+          console.error(`[TimelineDragFix] 📋 Available images:`, images.map(img => ({
+            shotEntry: img.shotImageEntryId.substring(0, 8),
+            genId: img.id.substring(0, 8),
+            currentFrame: (img as GenerationRow & { timeline_frame?: number }).timeline_frame
+          })));
+          console.error(`[TimelineDragFix] 🔍 MATCHING DEBUG:`, {
+            changeId: change.id,
+            changeOldPos: change.oldPos,
+            changeNewPos: change.newPos,
+            matchingImageFound: !!matchingImage,
+            updateTimelineFrameAvailable: !!updateTimelineFrame
+          });
         }
       }
 
-    } catch (error) {
-      console.error('[TimelineMoveFlow] ❌ ATOMIC RPC FAILED - applyTimelineFrames error:', {
-        shotId: shotId.substring(0, 8),
-        error: error instanceof Error ? error.message : error,
-        stackTrace: error instanceof Error ? error.stack : undefined
+      console.log('[TimelineItemMoveSummary] Timeline individual updates completed successfully', {
+        moveType: 'updateTimelineFrame',
+        changesApplied: positionChanges.length,
+        metadata: {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          totalImages: images.length,
+          timestamp: new Date().toISOString()
+        }
       });
-      
-      console.error('[PositionSystemDebug] ❌ Atomic position update failed:', error);
+
+      console.log('[TimelineJumpDebug] ✅ DATABASE UPDATE COMPLETED:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        changesApplied: positionChanges.length,
+        willReloadParent: !!(propShotGenerations && onTimelineChange),
+        timestamp: new Date().toISOString()
+      });
+
+      // 🚨 CRITICAL FIX: Don't trigger parent reload for simple drag operations
+      // The parent reload is fetching stale data and overriding our successful update
+      // Let the Timeline handle its own state updates
+      if (propShotGenerations && onTimelineChange) {
+        console.log('[TimelineDragFix] ⚠️ SKIPPING PARENT RELOAD - Timeline will handle position updates');
+        console.log('[TimelineDragFix] 💡 This prevents stale data from overriding fresh drag positions');
+
+        // Instead of parent reload, update our own stable positions
+        // This keeps the UI consistent without fetching potentially stale data
+        const updatedPositions = new Map(stablePositions);
+        positionChanges.forEach(change => {
+          const matchingImage = images.find(img => img.shotImageEntryId.endsWith(change.id) || img.shotImageEntryId.substring(0, 8) === change.id);
+          if (matchingImage) {
+            updatedPositions.set(matchingImage.shotImageEntryId, change.newPos);
+          }
+        });
+
+        console.log('[TimelineDragFix] 🎯 setStablePositions CALL #2 - optimistic parent update');
+        setStablePositions(updatedPositions, 'drag-parent-update');
+        console.log('[TimelineDragFix] ✅ UPDATED STABLE POSITIONS OPTIMISTICALLY');
+
+      } else {
+        console.log('[TimelineDragFix] 📝 No parent reload needed - using prop data or callback not provided');
+      }
+
+      console.log('[TimelineResetDebug] 🎯 DRAG OPERATION COMPLETED - checking position integrity:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        positionChanges: positionChanges.map(c => `${c.id.substring(0, 8)}: ${c.oldPos}→${c.newPos}`),
+        stablePositionsBefore: Array.from(stablePositions.entries()).map(([id, pos]) => `${id.substring(0, 8)}:${pos}`).join(', '),
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error(`[TimelineDragFix] ❌ TIMELINE UPDATE FAILED: ${error instanceof Error ? error.message : error} - ${shotId ? shotId.substring(0, 8) : 'undefined'}`);
+
+      console.error('[PositionSystemDebug] ❌ Timeline position update failed:', error);
+      console.error('[TimelineDragFix] 📋 FAILURE DETAILS:', {
+        positionChanges,
+        imagesCount: images.length,
+        updateTimelineFrame: !!updateTimelineFrame,
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        error: error instanceof Error ? error.message : error,
+        timestamp: new Date().toISOString()
+      });
       // Reset stable positions on error
-      setStablePositions(displayPositions);
+      console.log('[TimelineDragFix] 🎯 setStablePositions CALL #3 - error handler reset');
+      setStablePositions(displayPositions, 'error-reset');
+      // Show user-friendly error message
+      toast.error(`Failed to update timeline positions: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error; // Re-throw to let caller handle
     } finally {
       setIsPersistingPositions(false);
+
+      // Reset drag in progress flag after database operations complete
+      if (dragCallForFinally) {
+        console.log('[TimelineDragFix] 🎯 Resetting isDragInProgress = false after database operations');
+        setIsDragInProgress(false);
+      }
     }
-    
+
     console.log('[PositionResetDebug] ✅ TIMELINE setFramePositions COMPLETED (ATOMIC):', {
       shotId: shotId.substring(0, 8),
       success: true,
@@ -538,7 +842,7 @@ const Timeline: React.FC<TimelineProps> = ({
     if (onFramePositionsChange) {
       onFramePositionsChange(newPositions);
     }
-  }, [displayPositions, images, applyTimelineFrames, onFramePositionsChange, shotId, propShotGenerations, onTimelineChange]);
+  }, [displayPositions, images, updateTimelineFrame, onFramePositionsChange, shotId, propShotGenerations, onTimelineChange]);
 
   // Calculate dimensions - use stable coordinate system during dragging
   // Use original positions for coordinate system to prevent feedback loop during drag
@@ -552,6 +856,29 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Calculate dimensions - use display positions initially, will be updated after drag hook
   const { fullMin, fullMax, fullRange } = getTimelineDimensions(displayPositions);
+
+  // [TimelineJumpDebug] Track coordinate system changes
+  const prevCoordinatesRef = React.useRef({ fullMin, fullMax, fullRange });
+  React.useEffect(() => {
+    const prev = prevCoordinatesRef.current;
+    const current = { fullMin, fullMax, fullRange };
+    
+    if (prev.fullMin !== current.fullMin || prev.fullMax !== current.fullMax || prev.fullRange !== current.fullRange) {
+      console.log('[TimelineJumpDebug] 📐 COORDINATE SYSTEM CHANGED:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        previous: prev,
+        current: current,
+        delta: {
+          minShift: current.fullMin - prev.fullMin,
+          maxShift: current.fullMax - prev.fullMax,
+          rangeShift: current.fullRange - prev.fullRange
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    prevCoordinatesRef.current = current;
+  }, [fullMin, fullMax, fullRange, shotId]);
 
   // Get actual container dimensions for ground truth calculations
   const containerRect = containerRef.current?.getBoundingClientRect() || null;
@@ -577,6 +904,56 @@ const Timeline: React.FC<TimelineProps> = ({
     fullRange,
     containerRect,
   });
+
+  // [TimelineJumpDebug] Track drag state changes
+  const prevDragStateRef = React.useRef(dragState);
+  React.useEffect(() => {
+    const prev = prevDragStateRef.current;
+    const current = dragState;
+    
+    if (prev.isDragging !== current.isDragging || prev.activeId !== current.activeId) {
+      console.log('[TimelineJumpDebug] 🎭 DRAG STATE CHANGE:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        transition: `${prev.isDragging ? 'DRAGGING' : 'IDLE'} → ${current.isDragging ? 'DRAGGING' : 'IDLE'}`,
+        activeId: current.activeId?.substring(0, 8) || 'none',
+        prevActiveId: prev.activeId?.substring(0, 8) || 'none',
+        timestamp: new Date().toISOString()
+      });
+      
+      // Log positions when drag starts/ends
+      if (!prev.isDragging && current.isDragging) {
+        console.log('[TimelineJumpDebug] 🚀 DRAG STARTED - Current Positions:', {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          displayPositions: Array.from(displayPositions.entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          dynamicPositions: Array.from(dynamicPositions().entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          coordinateSystem: { fullMin, fullMax, fullRange },
+          timestamp: new Date().toISOString()
+        });
+      } else if (prev.isDragging && !current.isDragging) {
+        console.log('[TimelineJumpDebug] 🛑 DRAG ENDED - Final Positions:', {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          displayPositions: Array.from(displayPositions.entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          dynamicPositions: Array.from(dynamicPositions().entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          coordinateSystem: { fullMin, fullMax, fullRange },
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    
+    prevDragStateRef.current = current;
+  }, [dragState, displayPositions, dynamicPositions, fullMin, fullMax, fullRange, shotId]);
 
   // Effect to handle context visibility delay when not dragging
   useEffect(() => {
@@ -915,12 +1292,14 @@ const Timeline: React.FC<TimelineProps> = ({
                       id: startImage.shotImageEntryId,
                       url: startImage.imageUrl || startImage.thumbUrl,
                       thumbUrl: startImage.thumbUrl,
+                      timeline_frame: (startImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
                       position: startPosition
                     } : null,
                     endImage: endImage ? {
                       id: endImage.shotImageEntryId,
                       url: endImage.imageUrl || endImage.thumbUrl,
                       thumbUrl: endImage.thumbUrl,
+                      timeline_frame: (endImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
                       position: endPosition
                     } : null
                   });

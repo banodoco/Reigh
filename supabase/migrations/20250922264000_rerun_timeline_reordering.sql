@@ -38,23 +38,31 @@ BEGIN
     RAISE NOTICE 'Renumbering image generations for shot: % (shot % of affected shots)', r_shot.shot_id, affected_shots_count;
 
     FOR r_gen IN
-      SELECT sg.id, sg.generation_id, sg.timeline_frame, g.type
+      SELECT sg.id, sg.generation_id, sg.timeline_frame, g.type, sg.metadata
       FROM public.shot_generations sg
       JOIN public.generations g ON sg.generation_id = g.id
       WHERE sg.shot_id = r_shot.shot_id
         AND (g.type = 'image' OR g.type IS NULL) -- Only process image/NULL generations
       ORDER BY sg.timeline_frame ASC NULLS LAST, sg.created_at ASC -- Ensure stable order
     LOOP
-      IF r_gen.timeline_frame IS DISTINCT FROM current_frame_value THEN
-        UPDATE public.shot_generations
-        SET timeline_frame = current_frame_value, updated_at = NOW()
-        WHERE id = r_gen.id;
-        image_updates := image_updates + 1;
-        RAISE NOTICE '  Updated generation % (type: %) from timeline_frame % to %', 
-          r_gen.generation_id, 
-          COALESCE(r_gen.type, 'NULL'), 
-          r_gen.timeline_frame, 
-          current_frame_value;
+      -- Skip user-positioned items (drag operations)
+      IF NOT (r_gen.metadata->>'user_positioned' = 'true' OR r_gen.metadata->>'drag_source' IS NOT NULL) THEN
+        IF r_gen.timeline_frame IS DISTINCT FROM current_frame_value THEN
+          UPDATE public.shot_generations
+          SET timeline_frame = current_frame_value, updated_at = NOW()
+          WHERE id = r_gen.id;
+          image_updates := image_updates + 1;
+          RAISE NOTICE '  Updated generation % (type: %) from timeline_frame % to %',
+            r_gen.generation_id,
+            COALESCE(r_gen.type, 'NULL'),
+            r_gen.timeline_frame,
+            current_frame_value;
+        END IF;
+      ELSE
+        RAISE NOTICE '  Skipping user-positioned generation % (type: %) at timeline_frame %',
+          r_gen.generation_id,
+          COALESCE(r_gen.type, 'NULL'),
+          r_gen.timeline_frame;
       END IF;
       current_frame_value := current_frame_value + frame_spacing;
     END LOOP;

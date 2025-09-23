@@ -123,12 +123,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         url?: string;
         thumbUrl?: string;
         timeline_frame: number;
+        position: number;
       } | null;
       endImage?: {
         id: string;
         url?: string;
         thumbUrl?: string;
         timeline_frame: number;
+        position: number;
       } | null;
     } | null;
   }>({
@@ -139,8 +141,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
-  const { 
-    getImagesForMode, 
+  const hookData = useEnhancedShotPositions(selectedShotId);
+  const {
+    getImagesForMode,
     isLoading: positionsLoading,
     shotGenerations,
     updateTimelineFrame,
@@ -148,12 +151,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     batchExchangePositions,
     deleteItem,
     loadPositions,
-    getPairPrompts,
+    pairPrompts, // Use reactive pairPrompts value directly
     updatePairPromptsByIndex
-  } = useEnhancedShotPositions(selectedShotId);
-  
-  // Get pair prompts from the enhanced shot positions hook
-  const pairPrompts = getPairPrompts();
+  } = hookData;
   
   // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
   const { handleReorder, handleDelete } = useEnhancedShotImageReorder(selectedShotId, {
@@ -254,7 +254,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 shotGenerations={memoizedShotGenerations}
                 updateTimelineFrame={updateTimelineFrame}
                 images={images}
-                onTimelineChange={() => loadPositions({ silent: true })}
+                onTimelineChange={async () => {
+                  console.log('[ShotImagesEditor] 🔄 TIMELINE CHANGE - Reloading parent data');
+                  await loadPositions({ silent: true });
+                }}
+                // Pass shared hook data to prevent creating duplicate instances
+                hookData={hookData}
                 onPairClick={(pairIndex, pairData) => {
                   setPairPromptModalData({
                     isOpen: true,
@@ -344,6 +349,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             try {
               await updatePairPromptsByIndex(pairIndex, prompt, negativePrompt);
               console.log(`[PairPrompts] Saved prompts for Pair ${pairIndex + 1}:`, { prompt, negativePrompt });
+              // Timeline now uses shared hook data, so changes are reactive
             } catch (error) {
               console.error(`[PairPrompts] Failed to save prompts for Pair ${pairIndex + 1}:`, error);
             }

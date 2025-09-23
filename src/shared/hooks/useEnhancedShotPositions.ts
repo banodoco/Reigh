@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ export interface PositionMetadata {
   user_positioned?: boolean;
   created_by_mode?: 'timeline' | 'batch';
   auto_initialized?: boolean;
+  drag_source?: string;
   // Pair prompts (stored on the first item of each pair)
   pair_prompt?: string;
   pair_negative_prompt?: string;
@@ -36,7 +37,7 @@ const DEFAULT_FRAME_SPACING = 60;
 /**
  * Enhanced hook for managing shot positions with unified timeline and batch support
  */
-export const useEnhancedShotPositions = (shotId: string | null) => {
+export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress?: boolean) => {
   const [shotGenerations, setShotGenerations] = useState<ShotGeneration[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -151,7 +152,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type === 'updated' && event.query.state.isInvalidated) {
         const queryKey = event.query.queryKey;
-        
+
         // Check if this invalidation affects our shot data
         const shouldReload = (
           // Direct shot-specific invalidation (used by duplicate mutation)
@@ -163,29 +164,42 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         );
 
         if (shouldReload) {
-          // Skip reload if we're currently persisting positions to avoid conflicts
-          if (isPersistingPositions) {
-            console.log('[PositionResetDebug] ⏸️ Skipping query invalidation reload - positions being persisted:', {
+          // Skip reload if we're currently persisting positions or during drag to avoid conflicts
+          // Also skip if this is from a drag operation (indicated by timeline_sync_bulletproof or updateTimelineFrame calls)
+          if (isPersistingPositions || isDragInProgress) {
+            console.log('[TimelineDragFix] ⏸️ Skipping query invalidation reload - positions being persisted or drag in progress:', {
               shotId: shotId.substring(0, 8),
               invalidatedQueryKey: queryKey,
-              timestamp: new Date().toISOString()
+              isPersistingPositions,
+              isDragInProgress,
+              timestamp: new Date().toISOString(),
+              stackTrace: new Error().stack?.split('\n').slice(1, 4)
             });
             return;
           }
-          
-          console.log('[PositionResetDebug] 🔄 Query invalidation detected, reloading positions:', {
+
+          console.log('[TimelineDragFix] 🔄 Query invalidation detected, reloading positions:', {
             shotId: shotId.substring(0, 8),
             invalidatedQueryKey: queryKey,
+            isPersistingPositions,
             timestamp: new Date().toISOString(),
             stackTrace: new Error().stack?.split('\n').slice(1, 4)
           });
+
+          // 🚨 CRITICAL: Don't reload positions during drag operations
+          // This prevents the database reload from overriding user drag positions
+          if (isPersistingPositions) {
+            console.log('[TimelineDragFix] ⏸️ SKIPPING POSITION RELOAD DURING DRAG OPERATION - positions will be preserved');
+            return;
+          }
+
           loadPositions({ reason: 'invalidation' });
         }
       }
     });
 
     return unsubscribe;
-  }, [shotId, queryClient, loadPositions, isPersistingPositions]);
+  }, [shotId, queryClient, loadPositions, isPersistingPositions, isDragInProgress]);
 
   // Get positions formatted for specific mode
   const getPositionsForMode = useCallback((mode: 'batch' | 'timeline'): Map<string, number> => {
@@ -219,10 +233,9 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
         location: sg.generation?.location,
         type: sg.generation?.type,
         createdAt: sg.generation?.created_at,
-        position: Math.floor((sg.timeline_frame ?? 0) / 50), // Convert timeline_frame to position for display
         timeline_frame: sg.timeline_frame,
         metadata: sg.metadata
-      } as GenerationRow & { position: number; timeline_frame?: number }))
+      } as GenerationRow & { timeline_frame?: number }))
       .filter(img => {
         // EXACT same video detection as original ShotEditor/ShotsPane logic
         const isVideo = img.type === 'video' ||
@@ -303,16 +316,11 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     });
 
     try {
-      // Use timeline_sync_bulletproof to exchange timeline frames
-      const changes = [
-        { generation_id: generationIdA, timeline_frame: beforeState.itemB?.timeline_frame || 0 },
-        { generation_id: generationIdB, timeline_frame: beforeState.itemA?.timeline_frame || 0 }
-      ];
-      
-      const { error } = await supabase.rpc('timeline_sync_bulletproof', {
-        shot_uuid: shotId,
-        frame_changes: changes,
-        should_update_positions: false
+      // Use exchange_timeline_frames which is designed specifically for swapping two items
+      const { error } = await (supabase as any).rpc('exchange_timeline_frames', {
+        p_shot_id: shotId,
+        p_generation_id_a: generationIdA,
+        p_generation_id_b: generationIdB
       });
 
       if (error) throw error;
@@ -382,29 +390,80 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     const itemA = shotGenerations.find(sg => sg.generation_id === generationIdA);
     const itemB = shotGenerations.find(sg => sg.generation_id === generationIdB);
 
+    const frameA = itemA?.timeline_frame || 0;
+    const frameB = itemB?.timeline_frame || 0;
+
+    // [TimelineJumpDebug] Check for no-op exchange (items already have same timeline_frame)
+    if (frameA === frameB) {
+      console.warn('[TimelineJumpDebug] 🚫 SKIPPING NO-OP EXCHANGE - Items already have same timeline_frame:', {
+        shotId: shotId.substring(0, 8),
+        itemA: generationIdA.substring(0, 8),
+        itemB: generationIdB.substring(0, 8),
+        sharedFrame: frameA,
+        reason: 'identical_timeline_frames_would_create_duplicate_payload',
+        timestamp: new Date().toISOString()
+      });
+      return; // Skip this exchange as it would create duplicate timeline_frame values in payload
+    }
+
+    console.log('[TimelineJumpDebug] 🔄 PERFORMING EXCHANGE:', {
+      shotId: shotId.substring(0, 8),
+      itemA: generationIdA.substring(0, 8),
+      itemB: generationIdB.substring(0, 8),
+      frameA,
+      frameB,
+      willSwapTo: { itemA: frameB, itemB: frameA },
+      timestamp: new Date().toISOString()
+    });
+
     try {
-      // Use timeline_sync_bulletproof to exchange timeline frames
-      const changes = [
-        { generation_id: generationIdA, timeline_frame: itemB?.timeline_frame || 0 },
-        { generation_id: generationIdB, timeline_frame: itemA?.timeline_frame || 0 }
-      ];
-      
-      const { error } = await supabase.rpc('timeline_sync_bulletproof', {
-        shot_uuid: shotId,
-        frame_changes: changes,
-        should_update_positions: false
+      // Use exchange_timeline_frames which is designed specifically for swapping two items
+      const { error } = await (supabase as any).rpc('exchange_timeline_frames', {
+        p_shot_id: shotId,
+        p_generation_id_a: generationIdA,
+        p_generation_id_b: generationIdB
       });
 
       if (error) throw error;
+
+      console.log('[TimelineJumpDebug] ✅ EXCHANGE COMPLETED:', {
+        shotId: shotId.substring(0, 8),
+        itemA: generationIdA.substring(0, 8),
+        itemB: generationIdB.substring(0, 8),
+        swapped: { itemA: `${frameA}→${frameB}`, itemB: `${frameB}→${frameA}` },
+        timestamp: new Date().toISOString()
+      });
 
       // No position reload - caller will handle this
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to exchange positions';
       console.error('[useEnhancedShotPositions] ❌ Exchange error (no reload):', err);
+      console.error('[TimelineJumpDebug] ❌ EXCHANGE FAILED - DETAILED:', {
+        shotId: shotId.substring(0, 8),
+        itemA: generationIdA.substring(0, 8),
+        itemB: generationIdB.substring(0, 8),
+        attemptedSwap: { itemA: `${frameA}→${frameB}`, itemB: `${frameB}→${frameA}` },
+        error: errorMessage,
+        // Capture full error details for database debugging
+        fullError: err,
+        errorCode: (err as any)?.code || 'unknown',
+        errorDetails: (err as any)?.details || 'none',
+        errorHint: (err as any)?.hint || 'none',
+        // Log the exact RPC call that failed
+        rpcCallDetails: {
+          function: 'exchange_timeline_frames',
+          parameters: {
+            p_shot_id: shotId,
+            p_generation_id_a: generationIdA,
+            p_generation_id_b: generationIdB
+          }
+        },
+        timestamp: new Date().toISOString()
+      });
       throw err;
     }
-  }, [shotId]);
+  }, [shotId, shotGenerations]);
 
   // Batch exchange positions - performs multiple exchanges then reloads once
   const batchExchangePositions = useCallback(async (exchanges: Array<{ generationIdA: string; generationIdB: string }>) => {
@@ -599,22 +658,92 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
     setIsPersistingPositions(true);
     try {
-      const { error } = await supabase
+      console.log('[TimelineDragFix] 🚀 ATTEMPTING DATABASE UPDATE:', {
+        shotId: shotId.substring(0, 8),
+        generationId: generationId.substring(0, 8),
+        newTimelineFrame,
+        metadata
+      });
+
+      // Use direct update - the RPC function will handle metadata properly
+      const { data, error } = await supabase
         .from('shot_generations')
-        .update({ 
+        .update({
           timeline_frame: newTimelineFrame,
-          metadata: metadata ? { ...metadata } : undefined
+          metadata: metadata ? { user_positioned: true, drag_source: 'timeline_drag', ...metadata } : { user_positioned: true, drag_source: 'timeline_drag' }
         })
         .eq('shot_id', shotId)
-        .eq('generation_id', generationId);
+        .eq('generation_id', generationId)
+        .select();
 
-      if (error) throw error;
+    console.log('[TimelineDragFix] 📊 DATABASE UPDATE RESULT:', {
+      shotId: shotId.substring(0, 8),
+      generationId: generationId.substring(0, 8),
+      success: !error,
+      error: error ? {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      } : null,
+      rowsAffected: data ? data.length : 0,
+      actualTimelineFrame: data?.[0]?.timeline_frame
+    });
+
+    // CRITICAL: Check if database value actually persisted after a delay
+    setTimeout(async () => {
+      try {
+        const { data: checkData, error: checkError } = await supabase
+          .from('shot_generations')
+          .select('timeline_frame, metadata')
+          .eq('shot_id', shotId)
+          .eq('generation_id', generationId)
+          .single();
+
+        console.log('[TimelineDragFix] 🔍 DATABASE VALUE CHECK (after 500ms):', {
+          shotId: shotId.substring(0, 8),
+          generationId: generationId.substring(0, 8),
+          expectedFrame: newTimelineFrame,
+          actualFrame: checkData?.timeline_frame,
+          wasReverted: checkData?.timeline_frame !== newTimelineFrame,
+          metadata: checkData?.metadata,
+          checkError: checkError?.message
+        });
+
+        if (checkData?.timeline_frame !== newTimelineFrame) {
+          console.error('[TimelineDragFix] 🚨 DATABASE TRIGGER REVERTED OUR UPDATE!', {
+            expected: newTimelineFrame,
+            actual: checkData?.timeline_frame,
+            revertedBy: 'Likely a database trigger or function'
+          });
+        }
+      } catch (err) {
+        console.error('[TimelineDragFix] ❌ Failed to check database value:', err);
+      }
+    }, 500);
+
+      if (error) {
+        console.error('[TimelineDragFix] ❌ DATABASE ERROR DETAILS:', {
+          errorMessage: error.message,
+          errorCode: error.code,
+          errorDetails: error.details,
+          errorHint: error.hint,
+          isUniqueViolation: error.code === '23505',
+          isConstraintViolation: error.code?.startsWith('23')
+        });
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        console.error('[TimelineDragFix] ❌ NO ROWS UPDATED - WHERE clause matched nothing');
+        throw new Error('No rows updated - record not found');
+      }
 
       // Optimistically update local state
       setShotGenerations(prev => {
-        const updated = prev.map(sg => 
-          sg.generation_id === generationId 
-            ? { ...sg, timeline_frame: newTimelineFrame, metadata: { ...sg.metadata, ...metadata } }
+        const updated = prev.map(sg =>
+          sg.generation_id === generationId
+            ? { ...sg, timeline_frame: newTimelineFrame, metadata: { user_positioned: true, drag_source: 'timeline_drag', ...sg.metadata, ...metadata } }
             : sg
         );
         
@@ -784,11 +913,11 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
       });
       
       console.log('[TimelineMoveFlow] 📡 FULL RPC PAYLOAD:');
-      console.log('p_shot_id:', shotId);
-      console.log('p_changes:', rpcChanges);
-      console.log('p_update_positions:', updatePositions);
+      console.log('shot_uuid:', shotId);
+      console.log('frame_changes:', rpcChanges);
+      console.log('should_update_positions:', updatePositions);
 
-      // Call the BULLETPROOF function (NO ambiguous columns AT ALL)
+      // Call the timeline_sync_bulletproof function  
       console.log('[TimelineMoveFlow] 🚨 ABOUT TO CALL FUNCTION:', 'timeline_sync_bulletproof');
       console.log('[TimelineMoveFlow] 🚨 FUNCTION PARAMETERS:', {
         shot_uuid: shotId,
@@ -860,7 +989,6 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
               updatedMap.set(updatedRow.generation_id, {
                 ...existing,
-                position: Math.floor((updatedRow.timeline_frame ?? 0) / 50),
                 timeline_frame: updatedRow.timeline_frame
               });
             }
@@ -970,48 +1098,48 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
 
       if (error) {
         console.error('[PairPrompts] Error updating pair prompts:', error);
-        toast.error('Failed to update pair prompts');
         throw error;
       }
 
       console.log('[PairPrompts] Successfully updated pair prompts:', data);
 
       // Update local state
-      setShotGenerations(prev => prev.map(sg => 
-        sg.id === generationId 
+      setShotGenerations(prev => prev.map(sg =>
+        sg.id === generationId
           ? { ...sg, metadata: updatedMetadata }
           : sg
       ));
-
-      toast.success('Pair prompts updated');
     } catch (err) {
       console.error('[PairPrompts] Error updating pair prompts:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to update pair prompts: ${errorMessage}`);
       throw err;
     }
   }, [shotId, shotGenerations]);
 
-  // Get pair prompts in Timeline component format
-  const getPairPrompts = useCallback((): Record<number, { prompt: string; negativePrompt: string }> => {
+  // Get pair prompts in Timeline component format as a reactive value
+  const pairPrompts = useMemo((): Record<number, { prompt: string; negativePrompt: string }> => {
     const sortedGenerations = [...shotGenerations]
       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
 
-    const pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
+    const pairPromptsData: Record<number, { prompt: string; negativePrompt: string }> = {};
 
     // Each pair is represented by its first item (index in the sorted array)
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
       if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
-        pairPrompts[i] = {
+        pairPromptsData[i] = {
           prompt: firstItem.metadata.pair_prompt || '',
           negativePrompt: firstItem.metadata.pair_negative_prompt || '',
         };
       }
     }
 
-    return pairPrompts;
+    return pairPromptsData;
   }, [shotGenerations]);
+
+  // Legacy function for backward compatibility
+  const getPairPrompts = useCallback((): Record<number, { prompt: string; negativePrompt: string }> => {
+    return pairPrompts;
+  }, [pairPrompts]);
 
   // Update pair prompts for a specific pair index
   const updatePairPromptsByIndex = useCallback(async (pairIndex: number, prompt: string, negativePrompt: string) => {
@@ -1028,7 +1156,7 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     await updatePairPrompts(firstItem.id, prompt, negativePrompt);
   }, [shotGenerations, updatePairPrompts]);
 
-  return { 
+  return {
     shotGenerations,
     isLoading,
     error,
@@ -1046,6 +1174,10 @@ export const useEnhancedShotPositions = (shotId: string | null) => {
     loadPositions,
     updatePairPrompts,
     getPairPrompts,
+    pairPrompts, // Export reactive pairPrompts value
     updatePairPromptsByIndex
   };
 };
+
+// Export the return type for use in other components
+export type UseEnhancedShotPositionsReturn = ReturnType<typeof useEnhancedShotPositions>;
