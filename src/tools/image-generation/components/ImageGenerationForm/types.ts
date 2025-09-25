@@ -51,7 +51,10 @@ export interface ProjectImageSettings {
   selectedModel?: GenerationMode;
   styleReferenceImage?: string | null; // URL of processed style reference image (used for generation)
   styleReferenceImageOriginal?: string | null; // URL of original uploaded image (used for display)
-  styleReferenceStrength?: number; // Strength slider value
+  styleReferenceStrength?: number; // Style strength slider value
+  subjectStrength?: number; // Subject strength slider value
+  subjectDescription?: string; // Subject description text input
+  inThisScene?: boolean; // Whether subject is "in this scene" checkbox
 }
 
 export interface PromptInputRowProps {

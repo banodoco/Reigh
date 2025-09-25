@@ -51,7 +51,9 @@ serve(async (req) => {
 
 IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, colors, and atmosphere.
 
-STYLE GUIDANCE: Do not mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) in the prompts unless the user specifically asks for a particular style. Focus on describing the subject, scene, composition, lighting, and visual details instead.
+STYLE GUIDANCE: Do not mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) in the prompts unless the user specifically asks for it. Focus on describing the scene, composition, lighting, and visual details instead.
+
+CHARACTER GUIDANCE: Do NOT mention anything about the character unless specifically requested - all prompts should assume that an image reference is provided - referring to them simply as 'she', 'he', 'it', 'the dog', etc.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output EXACTLY ${numberToGenerate} prompts

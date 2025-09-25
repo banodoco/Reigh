@@ -22,6 +22,10 @@ export interface ImageGenerationTaskParams {
   shot_id?: string; // Optional: associate generated image with a shot
   style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
   style_reference_strength?: number; // Strength for style reference (0.1-2.0)
+  subject_reference_image?: string; // URL of uploaded subject reference image for Qwen.Image model
+  subject_strength?: number; // Strength for subject reference (0.0-2.0)
+  subject_description?: string; // Text description of the subject for Qwen.Image model
+  in_this_scene?: boolean; // Whether the subject is "in this scene"
   steps?: number; // Number of inference steps
 }
 
@@ -42,6 +46,10 @@ export interface BatchImageGenerationTaskParams {
   model_name?: string;
   style_reference_image?: string; // URL of uploaded style reference image for Qwen.Image model
   style_reference_strength?: number; // Strength for style reference (0.1-2.0)
+  subject_reference_image?: string; // URL of uploaded subject reference image for Qwen.Image model
+  subject_strength?: number; // Strength for subject reference (0.0-2.0)
+  subject_description?: string; // Text description of the subject for Qwen.Image model
+  in_this_scene?: boolean; // Whether the subject is "in this scene"
   steps?: number; // Number of inference steps
 }
 
@@ -198,7 +206,11 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       // Include style reference for Qwen.Image
       ...(isQwenModel && params.style_reference_image && {
         style_reference_image: params.style_reference_image,
-        style_reference_strength: params.style_reference_strength ?? 1.0
+        style_reference_strength: params.style_reference_strength ?? 1.0,
+        subject_reference_image: params.subject_reference_image || params.style_reference_image, // Fallback to style image
+        subject_strength: params.subject_strength ?? 0.0,
+        subject_description: params.subject_description,
+        in_this_scene: params.in_this_scene
       }),
       // Include shot association
       ...(params.shot_id ? { shot_id: params.shot_id } : {}),
@@ -265,7 +277,11 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
           // Include style reference for Qwen.Image model
           ...(params.style_reference_image && {
             style_reference_image: params.style_reference_image,
-            style_reference_strength: params.style_reference_strength
+            style_reference_strength: params.style_reference_strength,
+            subject_reference_image: params.subject_reference_image || params.style_reference_image, // Fallback to style image
+            subject_strength: params.subject_strength,
+            subject_description: params.subject_description,
+            in_this_scene: params.in_this_scene
           })
         } as ImageGenerationTaskParams;
       });

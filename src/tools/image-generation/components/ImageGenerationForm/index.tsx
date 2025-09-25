@@ -134,7 +134,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [directFormActivePromptId, setDirectFormActivePromptId] = useState<string | null>(null);
-  const [styleReferenceStrength, setStyleReferenceStrength] = useState<number>(1);
+  const [styleReferenceStrength, setStyleReferenceStrength] = useState<number>(1.0);
+  const [subjectStrength, setSubjectStrength] = useState<number>(0.0);
+  const [subjectDescription, setSubjectDescription] = useState<string>('');
+  const [inThisScene, setInThisScene] = useState<boolean>(false);
   const [isUploadingStyleReference, setIsUploadingStyleReference] = useState<boolean>(false);
   // Optimistic local override for style reference image so UI updates immediately
   // undefined => no override, use settings; string|null => explicit override
@@ -163,11 +166,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Local optimistic override for model to avoid UI stutter while saving
   const [modelOverride, setModelOverride] = useState<GenerationMode | undefined>(undefined);
 
-  // Extract current values with defaults (apply optimistic override first)
-  const selectedModel = (modelOverride ?? projectImageSettings?.selectedModel) || 'qwen-image';
+  // Always use qwen-image model (model selector removed)
+  const selectedModel = 'qwen-image';
   const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null; // For generation
   const rawStyleReferenceImageOriginal = projectImageSettings?.styleReferenceImageOriginal || null; // For display
-  const currentStyleStrength = projectImageSettings?.styleReferenceStrength || 1;
+  const currentStyleStrength = projectImageSettings?.styleReferenceStrength ?? 1.0;
+  const currentSubjectStrength = projectImageSettings?.subjectStrength ?? 0.0;
+  const currentSubjectDescription = projectImageSettings?.subjectDescription || '';
+  const currentInThisScene = projectImageSettings?.inThisScene ?? false;
   
   // Display image (use original if available, fallback to processed)
   const styleReferenceImageDisplay = useMemo(() => {
@@ -365,8 +371,35 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   useEffect(() => {
     if (projectImageSettings?.styleReferenceStrength !== undefined) {
       setStyleReferenceStrength(projectImageSettings.styleReferenceStrength);
+    } else {
+      setStyleReferenceStrength(1.0); // Default value
     }
   }, [projectImageSettings?.styleReferenceStrength]);
+
+  // Sync local subject strength with project settings
+  useEffect(() => {
+    if (projectImageSettings?.subjectStrength !== undefined) {
+      setSubjectStrength(projectImageSettings.subjectStrength);
+    } else {
+      setSubjectStrength(0.0); // Default value
+    }
+  }, [projectImageSettings?.subjectStrength]);
+
+  // Sync local subject description with project settings
+  useEffect(() => {
+    if (projectImageSettings?.subjectDescription !== undefined) {
+      setSubjectDescription(projectImageSettings.subjectDescription);
+    }
+  }, [projectImageSettings?.subjectDescription]);
+
+  // Sync local inThisScene with project settings
+  useEffect(() => {
+    if (projectImageSettings?.inThisScene !== undefined) {
+      setInThisScene(projectImageSettings.inThisScene);
+    } else {
+      setInThisScene(false); // Default value
+    }
+  }, [projectImageSettings?.inThisScene]);
 
   // Load shot-specific prompt count when shot changes
   React.useEffect(() => {
@@ -709,6 +742,32 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     markAsInteracted();
   }, [updateProjectImageSettings, markAsInteracted]);
 
+  // Handle subject strength change
+  const handleSubjectStrengthChange = useCallback(async (value: number) => {
+    setSubjectStrength(value);
+    await updateProjectImageSettings('project', {
+      subjectStrength: value
+    });
+    markAsInteracted();
+  }, [updateProjectImageSettings, markAsInteracted]);
+
+  // Handle subject description change
+  const handleSubjectDescriptionChange = useCallback(async (value: string) => {
+    setSubjectDescription(value);
+    await updateProjectImageSettings('project', {
+      subjectDescription: value
+    });
+    markAsInteracted();
+  }, [updateProjectImageSettings, markAsInteracted]);
+
+  const handleInThisSceneChange = useCallback(async (value: boolean) => {
+    setInThisScene(value);
+    await updateProjectImageSettings('project', {
+      inThisScene: value
+    });
+    markAsInteracted();
+  }, [updateProjectImageSettings, markAsInteracted]);
+
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
     markAsInteracted();
     const newId = generatePromptId();
@@ -819,7 +878,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Add style reference for Qwen.Image
       ...(selectedModel === 'qwen-image' && styleReferenceImageGeneration && {
         style_reference_image: styleReferenceImageGeneration,
-        style_reference_strength: currentStyleStrength
+        style_reference_strength: currentStyleStrength,
+        subject_reference_image: styleReferenceImageGeneration, // Same image for now
+        subject_strength: currentSubjectStrength,
+        subject_description: currentSubjectDescription,
+        in_this_scene: currentInThisScene
       }),
       // resolution will be resolved by the helper
     };
@@ -844,6 +907,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       associatedShotId,
       styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImageGeneration : null,
       styleReferenceStrength: selectedModel === 'qwen-image' ? currentStyleStrength : undefined,
+      subjectStrength: selectedModel === 'qwen-image' ? currentSubjectStrength : undefined,
+      subjectDescription: selectedModel === 'qwen-image' ? currentSubjectDescription : undefined,
       selectedModel,
       // Add the new unified params for the updated handler
       batchTaskParams
@@ -1020,23 +1085,19 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           
           {/* Right Column */}
           <ModelSection
-            selectedModel={selectedModel}
             isGenerating={isGenerating}
-            availableLoras={availableLoras}
-            selectedLoras={loraManager.selectedLoras}
             styleReferenceImage={styleReferenceImageDisplay}
             styleReferenceStrength={styleReferenceStrength}
+            subjectStrength={subjectStrength}
+            subjectDescription={subjectDescription}
+            inThisScene={inThisScene}
             isUploadingStyleReference={isUploadingStyleReference}
-            onModelChange={handleModelChange}
-            onAddLora={handleAddLora}
-            onRemoveLora={handleRemoveLora}
-            onLoraStrengthChange={handleLoraStrengthChange}
-            onOpenLoraModal={() => loraManager.setIsLoraModalOpen(true)}
             onStyleUpload={handleStyleReferenceUpload}
             onStyleRemove={handleRemoveStyleReference}
             onStyleStrengthChange={handleStyleStrengthChange}
-            renderLoraHeaderActions={loraManager.renderHeaderActions}
-            onAddTriggerWord={loraManager.handleAddTriggerWord}
+            onSubjectStrengthChange={handleSubjectStrengthChange}
+            onSubjectDescriptionChange={handleSubjectDescriptionChange}
+            onInThisSceneChange={handleInThisSceneChange}
           />
         </div>
 
