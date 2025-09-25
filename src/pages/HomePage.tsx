@@ -125,28 +125,24 @@ export default function HomePage() {
     }
   }, [showPhilosophy, currentExample.video]);
 
-  // Start playback immediately when pane opens to avoid delay/blink
+  // Start playback only after pane's open animation completes to avoid jank
   useEffect(() => {
-    if (!showPhilosophy) return;
+    if (!showPhilosophy || isPhilosophyPaneOpening) return;
     const video = philosophyVideoRef.current;
     if (!video) return;
-    
-    // Small delay to ensure video element is rendered, but start during animation
-    const playTimeout = setTimeout(() => {
-      try {
-        console.log('[VideoLoadSpeedIssue] Initiating playback immediately on pane open');
-        video.currentTime = 0;
-        const p = video.play();
-        if (p && typeof (p as any).catch === 'function') {
-          (p as Promise<void>).catch((err) => console.log('[VideoLoadSpeedIssue] play() blocked', err));
-        }
-      } catch (e) {
-        console.log('[VideoLoadSpeedIssue] Failed to start playback', e);
+    try {
+      console.log('[VideoLoadSpeedIssue] Initiating playback after pane animation');
+      video.currentTime = 0;
+      // Reload to ensure buffering starts for the current source
+      video.load();
+      const p = video.play();
+      if (p && typeof (p as any).catch === 'function') {
+        (p as Promise<void>).catch((err) => console.log('[VideoLoadSpeedIssue] play() blocked', err));
       }
-    }, 50); // Very small delay just to ensure DOM is ready
-
-    return () => clearTimeout(playTimeout);
-  }, [showPhilosophy, currentExample.video]);
+    } catch (e) {
+      console.log('[VideoLoadSpeedIssue] Failed to start playback', e);
+    }
+  }, [showPhilosophy, isPhilosophyPaneOpening, currentExample.video]);
 
   // Debug ecosystem tooltip state
   useEffect(() => {
@@ -619,7 +615,7 @@ export default function HomePage() {
                     onMouseLeave={() => {
                       if (emergingTipDisabled) setEmergingTipDisabled(false);
                     }}
-                    className={`sparkle-underline cursor-pointer transition-colors duration-200 whitespace-nowrap ${emergingTipOpen ? 'tooltip-open' : ''} ${emergingTipDisabled ? 'pointer-events-none' : ''} ${
+                    className={`sparkle-underline cursor-pointer transition-colors duration-200 ${emergingTipOpen ? 'tooltip-open' : ''} ${emergingTipDisabled ? 'pointer-events-none' : ''} ${
                       showExamples
                         ? 'pointer-events-none opacity-60'
                         : showCreativePartner || showPhilosophy
@@ -1167,19 +1163,11 @@ export default function HomePage() {
                         console.log('[VideoLoadSpeedIssue] error', (e as any)?.message);
                       }}
                       onPlay={(e) => {
-                        const video = e.target as HTMLVideoElement;
-                        const playButton = video.nextElementSibling as HTMLElement | null;
+                        const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
                         if (playButton) {
                           playButton.style.display = 'none';
                           playButton.style.opacity = '0';
                         }
-                        // Ensure smooth transition from poster to video
-                        video.style.opacity = '1';
-                      }}
-                      onLoadStart={(e) => {
-                        // Keep poster visible during initial loading
-                        const video = e.target as HTMLVideoElement;
-                        video.style.opacity = '1';
                       }}
                       onEnded={(e) => {
                         const playButton = (e.target as HTMLElement).nextElementSibling as HTMLElement | null;
@@ -1200,7 +1188,7 @@ export default function HomePage() {
                           }, 50);
                         }
                       }}
-                      className="w-full h-full object-cover border rounded-lg transition-opacity duration-75"
+                      className="w-full h-full object-cover border rounded-lg"
                     />
                     <button
                       onClick={(e) => {

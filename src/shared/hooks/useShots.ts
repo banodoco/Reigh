@@ -710,10 +710,10 @@ export const useAddImageToShot = () => {
       const { project_id, shot_id } = variables;
 
       if (project_id) {
-        // RACE CONDITION FIX: Use mobile-optimized batched invalidations
-        const { invalidateProjectQueriesMobile } = require('@/shared/lib/mobileInvalidationFix');
-        
-        invalidateProjectQueriesMobile(queryClient, project_id, shot_id);
+        // CRITICAL: Invalidate shot generations query so ShotImagesEditor updates immediately
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
         // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during drag operations
         // This causes the useEnhancedShotPositions hook to reload positions and override user drag
@@ -794,16 +794,10 @@ export const useAddImageToShotWithoutPosition = () => {
       const { project_id, shot_id } = variables;
       
       if (project_id) {
-        // RACE CONDITION FIX: Use batched invalidations to prevent multiple simultaneous queries
-        const { getInvalidationHelper } = require('@/shared/lib/queryInvalidationHelper');
-        const helper = getInvalidationHelper(queryClient);
-        
-        helper.invalidateProjectQueries(
-          project_id, 
-          ['shots', 'generations', 'unpositioned-count'], 
-          shot_id,
-          false // Use debouncing for better mobile performance
-        );
+        // CRITICAL: Invalidate shot generations query so ShotImagesEditor updates immediately
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
         // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during operations
         // This causes the useEnhancedShotPositions hook to reload positions and override user drag
@@ -1322,16 +1316,10 @@ export const useDuplicateImageInShot = () => {
       }
     },
     onSuccess: (_, { project_id, shot_id }) => {
-      // RACE CONDITION FIX: Use batched invalidations to prevent multiple simultaneous queries
-      const { getInvalidationHelper } = require('@/shared/lib/queryInvalidationHelper');
-      const helper = getInvalidationHelper(queryClient);
-      
-      helper.invalidateProjectQueries(
-        project_id, 
-        ['shots', 'unpositioned-count'], 
-        shot_id,
-        false // Use debouncing for better mobile performance
-      );
+      // Invalidate to get fresh data
+      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+      // Also invalidate unpositioned-count in case duplication affects positions
+      queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
       // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during operations
       // This causes the useEnhancedShotPositions hook to reload positions and override user drag
@@ -1397,16 +1385,11 @@ export const useRemoveImageFromShot = () => {
       const project_id = variables.project_id;
       
       if (project_id) {
-        // RACE CONDITION FIX: Use batched invalidations to prevent multiple simultaneous queries
-        const { getInvalidationHelper } = require('@/shared/lib/queryInvalidationHelper');
-        const helper = getInvalidationHelper(queryClient);
-        
-        helper.invalidateProjectQueries(
-          project_id, 
-          ['shots', 'generations', 'unpositioned-count'], 
-          variables.shot_id,
-          false // Use debouncing for better mobile performance
-        );
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        // Also invalidate unified generations cache so GenerationsPane updates immediately
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        // Ensure unpositioned-count updates after deletion
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
 
         // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during operations
         // This causes the useEnhancedShotPositions hook to reload positions and override user drag
