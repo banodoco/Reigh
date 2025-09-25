@@ -379,10 +379,14 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     }));
     console.log(`[PromptEditorModal] AI Generation: Parsed ${newEntries.length} new PromptEntry items:`, JSON.stringify(newEntries.map(p => ({id: p.id, text: p.fullPrompt.substring(0,30)+'...'}))));
     
-    // Add or replace prompts based on user preference
+    // Check if all existing prompts are empty
+    const allExistingPromptsAreEmpty = internalPrompts.every(p => !p.fullPrompt.trim() && !p.shortPrompt.trim());
+    
+    // Auto-replace if user explicitly chose replace, OR if all existing prompts are empty
+    const shouldReplace = params.replaceCurrentPrompts || allExistingPromptsAreEmpty;
+    
     let newlyAddedPromptIds: string[] = [];
-    const shouldReplace = params.replaceCurrentPrompts;
-    console.log(`[PromptEditorModal:AI_GENERATION] About to ${shouldReplace ? 'replace' : 'add'} ${newEntries.length} AI-generated prompts`);
+    console.log(`[PromptEditorModal:AI_GENERATION] About to ${shouldReplace ? 'replace' : 'add'} ${newEntries.length} AI-generated prompts${allExistingPromptsAreEmpty && !params.replaceCurrentPrompts ? ' (auto-replacing empty prompts)' : ''}`);
     setInternalPrompts(currentPrompts => {
       const updatedPrompts = shouldReplace ? newEntries : [...currentPrompts, ...newEntries];
       newlyAddedPromptIds = newEntries.map(e => e.id); // Capture IDs of newly added prompts
