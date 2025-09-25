@@ -151,9 +151,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           />
         </div>
 
-          {/* Number to Generate - desktop has toggle on same row, mobile separate */}
-          <div className={`flex items-start gap-6 ${showAdvanced ? 'w-full sm:w-[92.5%]' : 'w-full sm:w-1/2'}`}>
-            <div className="flex-1">
+          {/* Number to Generate - allow wrapping with Advanced toggle */}
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
+            <div className={`${showAdvanced ? 'w-full sm:min-w-[300px] sm:flex-1' : 'w-full sm:w-1/2 sm:min-w-[280px]'}`}>
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="gen_numberToGenerate" className="text-sm font-medium">
                   Number to Generate
@@ -162,28 +162,30 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   {numberToGenerate}
                 </span>
               </div>
-              <Slider
-                id="gen_numberToGenerate"
-                value={[numberToGenerate]}
-                onValueChange={(values) => {
-                  const next = values[0];
-                  setNumberToGenerate(next);
-                  emitChange({ numberToGenerate: next });
-                }}
-                min={1}
-                max={32}
-                step={1}
-                disabled={!hasApiKey || isGenerating}
-                className="w-[130%]"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1 w-[130%]">
-                <span>1</span>
-                <span>32</span>
+              <div className="overflow-visible">
+                <Slider
+                  id="gen_numberToGenerate"
+                  value={[numberToGenerate]}
+                  onValueChange={(values) => {
+                    const next = values[0];
+                    setNumberToGenerate(next);
+                    emitChange({ numberToGenerate: next });
+                  }}
+                  min={1}
+                  max={32}
+                  step={1}
+                  disabled={!hasApiKey || isGenerating}
+                  className="w-[130%]"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1 w-[130%]">
+                  <span>1</span>
+                  <span>32</span>
+                </div>
               </div>
             </div>
 
-            {/* Advanced toggle button - desktop only */}
-            <div className="hidden sm:flex flex-shrink-0 pt-2">
+            {/* Advanced toggle button - desktop only, can wrap to next line if needed */}
+            <div className="hidden sm:flex flex-shrink-0 pt-2 ml-auto">
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                 <CollapsibleTrigger asChild>
                   <Button 
