@@ -47,60 +47,51 @@ serve(async (req) => {
           temperature = 0.8,
         } = body;
 
-        let systemMsg = `You are a helpful assistant that generates image prompts based on user input.
+        const systemMsg = `You are a helpful assistant that generates detailed image prompts optimized for AI image generation. Focus on visual elements like composition, lighting, colors, and atmosphere while following the user's specific instructions and formatting requirements.`;
+        
+        let detailedInstructions = `Generate exactly ${numberToGenerate} distinct image generation prompts based on the following:
 
-IMPORTANT: Each prompt you generate should be specifically designed for AI image generation. The prompts should follow the user's instruction. Unless the user requests otherwise, the prompts should be detailed, descriptive, and focus on visual elements like composition, lighting, colors, and atmosphere.
+USER REQUEST: ${overallPromptText || "Please generate general image prompts based on the overall goal and rules."}
 
-STYLE GUIDANCE: Do not mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) in the prompts unless the user specifically asks for it. Focus on describing the scene, composition, lighting, and visual details instead.
+ADDITIONAL RULES TO REMEMBER: ${rulesToRememberText}
 
-CHARACTER GUIDANCE: Do NOT mention anything about the character unless specifically requested - all prompts should assume that an image reference is provided - referring to them simply as 'she', 'he', 'it', 'the dog', etc.
+IMPORTANT GUIDELINES:
+- Each prompt should be specifically designed for AI image generation
+- Add detail that expands or adds to the user's instruction (unless they request otherwise)
+- Focus on visual elements like composition, lighting, colors, and atmosphere
+- CHARACTER GUIDANCE: If there's a character or specific subject, doo NOT mention anything specific about it unless specifically requested - assume an image reference is provided and refer to them simply as 'she', 'he', 'it', 'the dog', etc. without detail
+- STYLE GUIDANCE: Do NOT mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) unless the user specifically asks for it
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output EXACTLY ${numberToGenerate} prompts
 - Each prompt must be on its own line
-- NO numbering, bullet points, quotation marks, empty lines, formatting, markdown or special characters
-- Make sure to follow the user's request and the rules to remember
+- NO numbering, bullet points, quotation marks, empty lines, formatting, markdown or special characters`;
 
-Remember: The user's request is as follows: ${overallPromptText}
-
-And rules to remember are: ${rulesToRememberText}`;
-        
         if (existingPrompts.length) {
           const ctx = existingPrompts.map((p: any) => `- ${typeof p === "string" ? p : p.text ?? ""}`).join("\n");
-          systemMsg += `\n\nExisting Prompts for Context (do NOT repeat or return these, but use them as inspiration for new, distinct image generation ideas):\n${ctx}`;
-        }
-        
-        const userMsg = overallPromptText || "Please generate general image prompts based on the overall goal and rules.";
-        
-        // Generate dynamic examples based on the requested number
-        const generateExamplePrompts = (count: number): string[] => {
-          const examplePool = [
-            "A majestic dragon soaring through storm clouds with lightning illuminating its scales, dramatic chiaroscuro lighting, fantasy art style",
-            "A serene Japanese garden at dawn with cherry blossoms falling, soft golden hour lighting, peaceful atmosphere, traditional composition", 
-            "A futuristic cyberpunk cityscape at night with neon reflections on wet streets, high contrast lighting, noir aesthetic",
-            "An ancient library with floating books and magical glowing orbs, warm amber lighting, mystical atmosphere, detailed architecture",
-            "A vast desert landscape with towering sand dunes under a starry night sky, moonlight casting long shadows, epic scale composition"
-          ];
-          return examplePool.slice(0, Math.min(count, examplePool.length));
-        };
-
-        const examplePrompts = generateExamplePrompts(numberToGenerate);
-        const formatExample = examplePrompts.join("\n");
-        
-        const instruction = `Generate exactly ${numberToGenerate} distinct image generation prompts. Each prompt should be detailed and optimized for AI image generation, focusing on visual descriptions, style, composition, lighting, and atmosphere.
+          detailedInstructions += `\n\nExisting Prompts for Context (do NOT repeat or return these, but use them as inspiration for new, distinct image generation ideas):\n${ctx}`;
+        } else {
+          detailedInstructions += `
 
 FORMAT EXAMPLE (${numberToGenerate} prompts):
-${formatExample}
+The dragon is soaring through storm clouds with lightning illuminating its scales
+The monster is standing together on sand dunes under a starry night sky
+A futuristic cyberpunk cityscape at night with neon reflections on wet streets`;
+        }
+
+        detailedInstructions += `
 
 YOUR OUTPUT (${numberToGenerate} prompts):
 
 IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do not include any commentary, explanations, or additional text.`;
 
+        const userMsg = detailedInstructions;
+
         const resp = await groq.chat.completions.create({
           model: "moonshotai/kimi-k2-instruct",
           messages: [
             { role: "system", content: systemMsg },
-            { role: "user", content: `${userMsg}\n\n${instruction}` },
+            { role: "user", content: userMsg },
           ],
           temperature: temperature,
           max_tokens: 4096,
@@ -124,22 +115,22 @@ IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do n
       case "edit_prompt": {
         const { originalPromptText = "", editInstructions = "", modelType = "fast" } = body;
         if (!originalPromptText || !editInstructions) return jsonResponse({ error: "originalPromptText and editInstructions required" }, 400);
-        const systemMsg = `You are an AI assistant that helps refine user prompts for image generation.
+        const systemMsg = `You are an AI assistant that helps refine user prompts for image generation. Edit the provided prompt based on the user's instructions while maintaining optimization for AI image generation.`;
+        
+        const userMsg = `Original Image Prompt: ${originalPromptText}
 
-Your task is to edit the provided image prompt based on the user's instructions.
+Edit Instructions: ${editInstructions}
 
-STYLE GUIDANCE: Do not add specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) to the prompts unless the user specifically requests a particular style in their edit instructions. Focus on describing the subject, scene, composition, lighting, and visual details instead.
+GUIDELINES:
+- Only change what is specifically requested in the edit instructions
+- Do not add specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) unless specifically requested
+- Focus on describing the subject, scene, composition, lighting, and visual details
+- Keep it optimized for AI image generation with detailed visual descriptions
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output ONLY the revised prompt text
 - NO additional commentary, explanations, or formatting
 - NO quotation marks around the output
-- Keep it optimized for AI image generation with detailed visual descriptions
-
-IMPORTANT: Only change what is specifically requested in the edit instructions.`;
-        const userMsg = `Original Image Prompt: ${originalPromptText}
-
-Edit Instructions: ${editInstructions}
 
 Revised Prompt:`;
         const resp = await groq.chat.completions.create({
@@ -148,7 +139,7 @@ Revised Prompt:`;
             { role: "system", content: systemMsg },
             { role: "user", content: userMsg },
           ],
-          temperature: 1.0,
+          temperature: 0.7,
           max_tokens: 2048,
           top_p: 1,
         });
