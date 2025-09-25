@@ -4,6 +4,7 @@ import { getDisplayUrl } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { Trash2, Copy, Sparkles, Check } from "lucide-react";
 import { MagicEditModal } from "@/shared/components/MagicEditModal";
+import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -144,6 +145,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
     if (onDuplicate) {
+      console.log('[DUPLICATE_DEBUG] 🖱️ TIMELINE ITEM - DUPLICATE CLICK:', {
+        shotImageEntryId: image.shotImageEntryId.substring(0, 8),
+        framePosition_from_timeline: framePosition,
+        timeline_frame_from_image: (image as any).timeline_frame,
+        image_id: image.id.substring(0, 8),
+        mismatch: framePosition !== (image as any).timeline_frame ? 'POSITION_MISMATCH!' : 'positions_match'
+      });
       onDuplicate(image.shotImageEntryId, framePosition);
     }
   };
@@ -154,15 +162,29 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.nativeEvent.stopImmediatePropagation();
     setIsMagicEditOpen(true);
   };
-  // Calculate position as pixel offset instead of percentage
-  const pixelPosition = ((framePosition - fullMinFrames) / fullRange) * timelineWidth;
+  // Calculate position as pixel offset with padding adjustment
+  const paddingOffset = TIMELINE_HORIZONTAL_PADDING; // Left padding from container
+  const effectiveWidth = timelineWidth - (paddingOffset * 2); // Subtract both left and right padding
+  const pixelPosition = paddingOffset + ((framePosition - fullMinFrames) / fullRange) * effectiveWidth;
+
+  // [Position0Debug] Only log position 0 items to reduce noise
+  if (framePosition === 0) {
+    console.log(`[Position0Debug] 📍 POSITION 0 Item ${image.shotImageEntryId.substring(0, 8)} position calculation:`, {
+      framePosition,
+      fullMinFrames,
+      fullRange,
+      finalPixelPosition: pixelPosition,
+      leftPercent: (pixelPosition / timelineWidth) * 100,
+      shouldBeAtStart: framePosition === 0 && fullMinFrames === 0
+    });
+  }
 
   // Apply drag offset if dragging
   // To avoid double-counting we translate by the difference between the desired cursor offset
   // and the shift already implied by the updated framePosition.
   let finalX = pixelPosition;
   if (isDragging && dragOffset) {
-    const originalPixel = ((originalFramePos - fullMinFrames) / fullRange) * timelineWidth;
+    const originalPixel = paddingOffset + ((originalFramePos - fullMinFrames) / fullRange) * effectiveWidth;
     const desiredPixel = originalPixel + dragOffset.x;
     finalX = desiredPixel; // cursor-aligned
   }
@@ -320,8 +342,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             </>
           )}
 
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none">
-            {displayFrame}
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
+            <span className="inline-block">{displayFrame}</span>
           </div>
         </div>
         

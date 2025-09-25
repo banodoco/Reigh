@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from "react";
 import { Button } from "@/shared/components/ui/button";
-import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata } from "@/shared/components/ImageGallery";
+import { ImageGalleryOptimized as ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata } from "@/shared/components/ImageGallery";
 import SettingsModal from "@/shared/components/SettingsModal";
 import { PromptEntry } from "@/tools/image-generation/components/ImageGenerationForm";
 import PromptEditorModal from "@/shared/components/PromptEditorModal";

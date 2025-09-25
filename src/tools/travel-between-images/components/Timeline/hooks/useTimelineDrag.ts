@@ -33,6 +33,7 @@ interface UseTimelineDragProps {
   fullMax: number;
   fullRange: number;
   containerRect: DOMRect | null;
+  setIsDragInProgress?: (isDragging: boolean) => void;
 }
 
 export const useTimelineDrag = ({
@@ -45,7 +46,11 @@ export const useTimelineDrag = ({
   fullMax,
   fullRange,
   containerRect,
+  setIsDragInProgress,
 }: UseTimelineDragProps) => {
+  
+  // Debug: Log if setIsDragInProgress is available
+  console.log('[TimelineMovementDebug] 🔧 useTimelineDrag initialized with setIsDragInProgress:', !!setIsDragInProgress);
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     activeId: null,
@@ -71,18 +76,27 @@ export const useTimelineDrag = ({
     // GROUND TRUTH: Use actual container dimensions
     const containerWidth = containerRect.width;
     const containerLeft = containerRect.left;
+    const paddingOffset = 60; // Account for container padding
+    const effectiveWidth = containerWidth - (paddingOffset * 2);
 
-    // Calculate where mouse is relative to container
-    const relativeMouseX = clientX - containerLeft;
+    // Calculate where mouse is relative to container (accounting for padding)
+    const relativeMouseX = clientX - containerLeft - paddingOffset; // Subtract left padding
     const dragOffsetX = clientX - dragState.startX;
 
     // Find the actual position of the dragged item in the container
-    const originalRelativePos = ((dragState.originalFramePos - fullMin) / fullRange) * containerWidth;
+    const originalRelativePos = ((dragState.originalFramePos - fullMin) / fullRange) * effectiveWidth;
 
-    // The target position is where the mouse is now
-    const targetRelativePos = relativeMouseX;
+    // Allow dragging beyond right boundary to expand timeline, but clamp left boundary
+    const targetRelativePos = Math.max(0, relativeMouseX);
 
-    console.log('[GroundTruthDebug] 🎯 DOM-BASED TARGET CALCULATION:', {
+    const baseCalculatedFrame = Math.max(0, pixelToFrame(targetRelativePos, effectiveWidth, fullMin, fullRange));
+    const isExpanding = targetRelativePos > effectiveWidth;
+    
+    const finalFrame = isExpanding ? 
+      Math.round(baseCalculatedFrame + ((targetRelativePos - effectiveWidth) / effectiveWidth) * fullRange) :
+      baseCalculatedFrame;
+      
+    console.log('[TimelineExpansion] 🎯 DOM-BASED TARGET CALCULATION:', {
       clientX,
       containerLeft,
       relativeMouseX,
@@ -91,13 +105,30 @@ export const useTimelineDrag = ({
       fullMin,
       fullRange,
       containerWidth,
+      effectiveWidth,
+      paddingOffset,
       originalRelativePos,
       targetRelativePos,
-      calculatedFrame: Math.max(0, pixelToFrame(targetRelativePos, containerWidth, fullMin, fullRange)),
+      baseCalculatedFrame,
+      isExpanding,
+      overshoot: isExpanding ? targetRelativePos - effectiveWidth : 0,
+      finalFrame,
       timestamp: new Date().toISOString()
     });
 
-    return Math.max(0, pixelToFrame(targetRelativePos, containerWidth, fullMin, fullRange));
+    // Calculate frame position, allowing expansion beyond current timeline bounds
+    const calculatedFrame = Math.max(0, pixelToFrame(targetRelativePos, effectiveWidth, fullMin, fullRange));
+    
+    // If dragging beyond right edge, extend the timeline
+    if (targetRelativePos > effectiveWidth) {
+      // Calculate how far beyond the right edge we are
+      const overshoot = targetRelativePos - effectiveWidth;
+      const overshootFrames = (overshoot / effectiveWidth) * fullRange;
+      // Round to whole frame numbers to avoid decimal distance displays
+      return Math.round(calculatedFrame + overshootFrames);
+    }
+    
+    return calculatedFrame;
   }, [dragState.startX, dragState.originalFramePos, fullMin, fullRange]);
 
   // Apply normal drag behavior - for now, allow free positioning to enable fluid timeline
@@ -316,10 +347,23 @@ export const useTimelineDrag = ({
     const container = containerRef.current;
     if (!container) return;
 
+    // Ensure we start with a fresh, accurate mouse position for this drag
+    // This prevents reusing a stale value from a previous drag session
+    currentMousePosRef.current = { x: e.clientX, y: e.clientY };
+
+    // CRITICAL: Set drag in progress flag IMMEDIATELY to prevent query invalidation reloads
+    if (setIsDragInProgress) {
+      console.log('[TimelineMovementDebug] 🚀 DRAG STARTED - Setting isDragInProgress = true to prevent query reloads');
+      setIsDragInProgress(true);
+    }
+
     // Prevent phantom drags
     const now = Date.now();
     const timeSinceLastUp = now - dragRefsRef.current.lastMouseUpTime;
 
+    // 🎯 DRAG TRACKING: Log every drag start
+    console.log(`[TIMELINE_TRACK] [DRAG_START] 🖱️ Item ${imageId.substring(0, 8)} drag initiated at frame ${framePositions.get(imageId) ?? 0}`);
+    
     console.log('[TimelineDragFix] 🎯 DRAG START DETECTED:', {
       itemId: imageId.substring(0, 8),
       buttons: e.buttons,
@@ -723,8 +767,8 @@ export const useTimelineDrag = ({
       finalPos,
     });
 
-    // Apply final positions with a small delay to prevent cascading updates
-    setTimeout(async () => {
+    // Apply final positions immediately to avoid any momentary fallback to database positions
+    (async () => {
       console.log('[TimelineDragFix] 🚀 SETFRAMEPOSITIONS CALL IMMINENT - About to call setFramePositions:', {
         itemId: dragState.activeId.substring(0, 8),
         positionsCount: finalPositions.size,
@@ -757,27 +801,34 @@ export const useTimelineDrag = ({
           timestamp: new Date().toISOString()
         });
 
-        console.log('[DragLifecycle] ✅ POSITIONS APPLIED - Now updating image order:', {
+        console.log('[TimelineDragFix] ✅ POSITIONS APPLIED - SKIPPING image order update during drag:', {
           itemId: dragState.activeId.substring(0, 8),
           finalPos,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          reason: 'Timeline drag already set timeline_frame values - order update would overwrite them'
         });
 
-        // Update image order
-        const newOrder = [...images]
-          .sort((a, b) => {
-            const fa = finalPositions.get(a.shotImageEntryId) ?? 0;
-            const fb = finalPositions.get(b.shotImageEntryId) ?? 0;
-            return fa - fb;
-          })
-          .map(img => img.shotImageEntryId);
-
-        onImageReorder(newOrder);
-
+        // 🎯 DRAG TRACKING: Log every drag completion
+        console.log(`[TIMELINE_TRACK] [DRAG_COMPLETE] ✅ Item ${dragState.activeId.substring(0, 8)} drag completed: ${dragState.originalFramePos} → ${finalPos}`);
+        
+        // 🎯 DEBUG: Log all position changes to identify wrong item movements
+        const allChanges = Array.from(finalPositions.entries())
+          .filter(([id, newPos]) => (framePositions.get(id) ?? 0) !== newPos)
+          .map(([id, newPos]) => ({
+            id: id.substring(0, 8),
+            oldPos: framePositions.get(id) ?? 0,
+            newPos,
+            isDraggedItem: id === dragState.activeId
+          }));
+        
+        if (allChanges.length > 1) {
+          console.log(`[TIMELINE_TRACK] [MULTI_ITEM_MOVE] ⚠️ Multiple items moving in single drag:`, allChanges);
+        }
+        
         console.log('[DragLifecycle] 🎉 DRAG COMPLETE - All updates finished:', {
           itemId: dragState.activeId.substring(0, 8),
           finalPos,
-          newOrder: newOrder.map(id => id.substring(0, 8)),
+          positionsUpdated: finalPositions.size,
           timestamp: new Date().toISOString()
         });
         
@@ -795,7 +846,7 @@ export const useTimelineDrag = ({
         });
         console.error('[TimelineDragDebug] Error applying drag results:', error);
       }
-    }, 50); // Small delay to prevent race conditions
+    })();
 
     // Generate comprehensive drag summary with unique tag [TimelineItemMoveSummary]
     const mode = 'normal';
@@ -915,6 +966,12 @@ export const useTimelineDrag = ({
       finalPos,
     });
 
+    // CRITICAL: Reset drag in progress flag after applying positions to prevent flicker
+    if (setIsDragInProgress) {
+      console.log('[TimelineMovementDebug] 🏁 DRAG ENDED - Setting isDragInProgress = false');
+      setIsDragInProgress(false);
+    }
+
     // Reset drag state
     setDragState({
       isDragging: false,
@@ -925,6 +982,9 @@ export const useTimelineDrag = ({
       currentY: 0,
       originalFramePos: 0,
     });
+
+    // Clear the mouse position ref at the end of a drag to avoid stale values on next drag
+    currentMousePosRef.current = null;
   }, [
     dragState, 
     images, 
@@ -1005,8 +1065,8 @@ export const useTimelineDrag = ({
         });
 
         return {
-          distanceToPrev: prev !== undefined ? currentDragFrame - prev : undefined,
-          distanceToNext: next !== undefined ? next - currentDragFrame : undefined,
+          distanceToPrev: prev !== undefined ? Math.round(currentDragFrame - prev) : undefined,
+          distanceToNext: next !== undefined ? Math.round(next - currentDragFrame) : undefined,
         };
       })()
     : null;

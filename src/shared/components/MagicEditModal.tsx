@@ -5,7 +5,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { SliderWithValue } from '@/shared/components/ui/slider-with-value';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, X } from 'lucide-react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useListShots, useCreateShot } from '@/shared/hooks/useShots';
@@ -21,7 +21,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogPortal,
+  DialogOverlay,
 } from '@/shared/components/ui/dialog';
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from "@/shared/lib/utils";
 
 interface MagicEditModalProps {
   isOpen: boolean;
@@ -162,11 +166,71 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent
-          className={modal.className}
-          style={modal.style}
-          {...{...modal.props}}
-        >
+        <DialogPortal>
+          <DialogOverlay 
+            onPointerDown={(e) => {
+              // Block all pointer events from reaching underlying elements
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent?.stopImmediatePropagation) {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onPointerUp={(e) => {
+              // Block pointer up events too
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent?.stopImmediatePropagation) {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onMouseDown={(e) => {
+              // Block mouse down events
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent?.stopImmediatePropagation) {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onMouseUp={(e) => {
+              // Block mouse up events
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent?.stopImmediatePropagation) {
+                e.nativeEvent.stopImmediatePropagation();
+              }
+            }}
+            onClick={(e) => {
+              // Only close if clicking directly on the overlay (background)
+              if (e.target === e.currentTarget) {
+                onClose();
+              }
+            }}
+          />
+          {/* Use DialogPrimitive.Content directly to avoid double overlay */}
+          <DialogPrimitive.Content
+            data-pane-control
+            data-radix-dialog-content
+            className={cn(
+              "fixed left-[50%] top-[50%] z-[11000] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+              modal.className
+            )}
+            style={modal.style}
+            {...{...modal.props}}
+            onPointerDown={(e) => {
+              // Block propagation from modal content to underlying elements
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              // Block propagation from modal content to underlying elements
+              e.stopPropagation();
+            }}
+          >
+            {/* Close button */}
+            <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
           <div className={modal.headerClass}>
             <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-1' : 'px-6 pt-2 pb-1'} flex-shrink-0`}>
               <DialogTitle>Magic Edit</DialogTitle>
@@ -275,7 +339,8 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
               </Button>
             </DialogFooter>
           </div>
-        </DialogContent>
+          </DialogPrimitive.Content>
+        </DialogPortal>
       </Dialog>
 
       {/* Create Shot Modal for Magic Edit */}

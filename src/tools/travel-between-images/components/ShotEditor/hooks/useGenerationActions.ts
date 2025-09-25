@@ -326,10 +326,11 @@ export const useGenerationActions = ({
   }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages]);
 
   const handleDuplicateImage = useCallback(async (shotImageEntryId: string, timeline_frame: number) => {
-    console.log('[DUPLICATE] handleDuplicateImage called', {
-      shotImageEntryId,
+    console.log('[DUPLICATE_DEBUG] 🚀 DUPLICATE BUTTON CLICKED:', {
+      shotImageEntryId: shotImageEntryId.substring(0, 8),
       timeline_frame,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      source: 'timeline_duplicate_button'
     });
 
     if (!selectedShot || !projectId) {
@@ -343,6 +344,15 @@ export const useGenerationActions = ({
       return;
     }
     const generationId = originalImage.id;
+    
+    console.log('[DUPLICATE_DEBUG] 📍 FOUND ORIGINAL IMAGE IN LOCAL STATE:', {
+      shotImageEntryId: shotImageEntryId.substring(0, 8),
+      generationId: generationId.substring(0, 8),
+      timeline_frame_from_button: timeline_frame,
+      timeline_frame_from_image: (originalImage as any).timeline_frame,
+      imageUrl: originalImage.imageUrl?.substring(0, 50) + '...',
+      totalImagesInShot: state.localOrderedShotImages.length
+    });
 
     // Start loading state targeting the specific shotImageEntryId
     actions.setDuplicatingImageId(shotImageEntryId);

@@ -1,45 +1,3 @@
-/**
- * Timeline Component - Refactored Modular Architecture
- * 
- * This is the main Timeline component that orchestrates all timeline functionality
- * using a modular architecture. The complex logic has been extracted into focused
- * modules for better maintainability and testability.
- * 
- * 📁 MODULAR STRUCTURE:
- * 
- * 🎯 /hooks/ - Custom hooks for specific functionality:
- *   • usePositionManagement.ts - Manages all position state and database updates
- *   • useCoordinateSystem.ts - Handles timeline dimensions and coordinate calculations  
- *   • useLightbox.ts - Manages lightbox state and navigation (mobile + desktop)
- *   • useGlobalEvents.ts - Handles global mouse events during drag operations
- *   • useZoom.ts - Zoom controls and viewport management
- *   • useFileDrop.ts - File drag-and-drop functionality
- *   • useTimelineDrag.ts - Complex drag-and-drop timeline operations
- * 
- * 🔧 /utils/ - Utility functions and helpers:
- *   • timeline-debug.ts - Centralized logging system with categories and structured output
- *   • timeline-utils.ts - Core calculation functions (dimensions, gaps, pair info)
- * 
- * 🎨 /components/ - UI components:
- *   • TimelineContainer.tsx - Main timeline rendering logic and controls
- *   • TimelineControls.tsx - Zoom and context frame controls
- *   • TimelineRuler.tsx - Frame number ruler display
- *   • TimelineItem.tsx - Individual draggable timeline items
- *   • PairRegion.tsx - Pair visualization and context display
- *   • DropIndicator.tsx - Visual feedback for file drops
- *   • PairPromptModal.tsx - Modal for editing pair prompts
- * 
- * 🏗️ ARCHITECTURE BENEFITS:
- *   • Single Responsibility - Each module has one clear purpose
- *   • Testability - Hooks can be unit tested in isolation
- *   • Maintainability - Changes are localized to specific modules
- *   • Reusability - Hooks can be used in other components
- *   • Performance - Optimized re-render patterns and dependency management
- *   • Debugging - Structured logging with categorized output
- * 
- * 📊 SIZE REDUCTION: 1,287 lines → 347 lines (73% reduction)
- */
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
@@ -148,18 +106,53 @@ const Timeline: React.FC<TimelineProps> = ({
   // Core state
   const [isPersistingPositions, setIsPersistingPositions] = useState<boolean>(false);
   const [isDragInProgress, setIsDragInProgress] = useState<boolean>(false);
-
-  // Refs (removed initialContextFrames - no longer needed for auto-adjustment)
-
-  // Remove excessive render tracking - not needed in production
   
+  // Refs
+  // Refs (removed initialContextFrames - no longer needed for auto-adjustment)
+  
+  // Enhanced Timeline performance tracking
+  const renderCountRef = useRef(0);
+  const prevPropsRef = useRef<any>();
+
+  useEffect(() => {
+    renderCountRef.current++;
+    const currentProps = {
+      shotId,
+      frameSpacing,
+      contextFrames,
+      propShotGenerations: propShotGenerations ? propShotGenerations.length : null,
+      propUpdateTimelineFrame: !!propUpdateTimelineFrame,
+      propImages: propImages ? propImages.length : null
+    };
+    
+    const prevProps = prevPropsRef.current;
+    // Only log the first few renders to debug mount issues
+    if (renderCountRef.current <= 3) {
+      timelineDebugger.logRender(`Timeline render #${renderCountRef.current}`, {
+        shotId,
+        ...currentProps,
+        // Prop change analysis (only show if previous props exist)
+        ...(prevProps ? {
+          shotIdChanged: shotId !== prevProps.shotId,
+          frameSpacingChanged: frameSpacing !== prevProps.frameSpacing,
+          contextFramesChanged: contextFrames !== prevProps.contextFrames,
+          propShotGenerationsChanged: propShotGenerations !== prevProps.propShotGenerations,
+          propUpdateTimelineFrameChanged: propUpdateTimelineFrame !== prevProps.propUpdateTimelineFrame,
+          propImagesChanged: propImages !== prevProps.propImages
+        } : { firstRender: true })
+      });
+    }
+    
+    prevPropsRef.current = currentProps;
+  });
+
   // Use shared hook data if provided, otherwise create new instance (for backward compatibility)
   const hookData = propHookData || useEnhancedShotPositions(shotId, isDragInProgress);
   const shotGenerations = propShotGenerations || hookData.shotGenerations;
   const updateTimelineFrame = propUpdateTimelineFrame || hookData.updateTimelineFrame;
   const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
-  
+
   // Get pair prompts from database instead of props (now reactive)
   const databasePairPrompts = hookData.pairPrompts;
   const actualPairPrompts = pairPrompts || databasePairPrompts; // Fallback to props for backward compatibility
@@ -167,53 +160,29 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Use provided images or generate from shotGenerations
   const images = React.useMemo(() => {
-    let result: (GenerationRow & { timeline_frame?: number })[];
+    if (propImages) return propImages;
     
-    if (propImages) {
-      result = propImages;
-    } else {
-      result = shotGenerations
-        .filter(sg => sg.generation)
-        .map(sg => ({
-          id: sg.generation_id,
-          shotImageEntryId: sg.id,
-          imageUrl: sg.generation?.location,
-          thumbUrl: sg.generation?.location,
-          location: sg.generation?.location,
-          type: sg.generation?.type,
-          createdAt: sg.generation?.created_at,
-          timeline_frame: sg.timeline_frame,
-          metadata: sg.metadata
-        } as GenerationRow & { timeline_frame?: number }))
-        .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
-    }
-
-    // [Position0Debug] Log timeline data transformation for debugging
-    const position0Images = result.filter(img => img.timeline_frame === 0);
-    console.log(`[Position0Debug] 🎭 Timeline images data transformation:`, {
-      shotId,
-      totalImages: result.length,
-      dataSource: propImages ? 'propImages' : 'shotGenerations',
-      position0Images: position0Images.map(img => ({
-        id: img.shotImageEntryId?.substring(0, 8) || img.id?.substring(0, 8),
-        timeline_frame: img.timeline_frame,
-        hasImageUrl: !!img.imageUrl
-      })),
-      allImages: result.map(img => ({
-        id: img.shotImageEntryId?.substring(0, 8) || img.id?.substring(0, 8),
-        timeline_frame: img.timeline_frame,
-        hasImageUrl: !!img.imageUrl
-      })).sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0)),
-      shotGenerationsData: !propImages ? shotGenerations.map(sg => ({
-        id: sg.id.substring(0, 8),
-        generation_id: sg.generation_id?.substring(0, 8),
+    const imagesWithPositions = shotGenerations
+      .filter(sg => sg.generation)
+      .map(sg => ({
+        id: sg.generation_id,
+        shotImageEntryId: sg.id,
+        imageUrl: sg.generation?.location,
+        thumbUrl: sg.generation?.location,
+        location: sg.generation?.location,
+        type: sg.generation?.type,
+        createdAt: sg.generation?.created_at,
         timeline_frame: sg.timeline_frame,
-        hasGeneration: !!sg.generation
-      })) : 'using propImages'
-    });
+        metadata: sg.metadata
+      } as GenerationRow & { timeline_frame?: number }));
 
-    return result;
-  }, [shotGenerations, propImages, shotId]);
+    // Sort by timeline_frame only (no position fallback needed)
+    return imagesWithPositions.sort((a, b) => {
+      const frameA = a.timeline_frame ?? 0;
+      const frameB = b.timeline_frame ?? 0;
+      return frameA - frameB;
+    });
+  }, [shotGenerations, frameSpacing, propImages]);
 
   // Position management hook
   const {
@@ -227,10 +196,10 @@ const Timeline: React.FC<TimelineProps> = ({
     shotId,
     shotGenerations,
     images,
-      frameSpacing,
-      isLoading,
-        isPersistingPositions,
-      isDragInProgress,
+    frameSpacing,
+    isLoading,
+    isPersistingPositions,
+    isDragInProgress,
     updateTimelineFrame,
     onFramePositionsChange,
     setIsPersistingPositions
@@ -260,28 +229,58 @@ const Timeline: React.FC<TimelineProps> = ({
 
   // Handle resetting frames to evenly spaced intervals and setting context frames
   const handleResetFrames = useCallback(async (gap: number, newContextFrames: number) => {
+    timelineDebugger.logPositionUpdate('Resetting frames', {
+      shotId,
+      gap,
+      newContextFrames,
+      imagesCount: images.length
+    });
+
     // First set the context frames (this will trigger all constraint recalculations)
     onContextFramesChange(newContextFrames);
-    
-    // Then set the positions with the specified gap
+
+    // Create new positions: 0, gap, gap*2, gap*3, etc.
     const newPositions = new Map<string, number>();
     images.forEach((image, index) => {
       newPositions.set(image.shotImageEntryId, index * gap);
     });
 
-    await setFramePositions(newPositions);
-  }, [images, setFramePositions, onContextFramesChange]);
+    timelineDebugger.logPositionUpdate('New positions calculated', {
+      shotId,
+      positions: Array.from(newPositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        position: pos
+      }))
+    });
+
+    try {
+      await setFramePositions(newPositions);
+      timelineDebugger.logPositionUpdate('Frame reset completed', { shotId });
+    } catch (error) {
+      timelineDebugger.logPositionError('Frame reset failed', { shotId, error });
+    }
+  }, [images, setFramePositions, shotId, onContextFramesChange]);
 
   return (
     <div className="w-full overflow-x-hidden">
-      {/* Timeline Container - includes both controls and timeline */}
+      {/* Controls */}
+      <TimelineControls
+        contextFrames={contextFrames}
+        onContextFramesChange={onContextFramesChange}
+        zoomLevel={1} // Will be provided by TimelineContainer
+        onZoomIn={() => {}} // Will be provided by TimelineContainer
+        onZoomOut={() => {}} // Will be provided by TimelineContainer
+        onZoomReset={() => {}} // Will be provided by TimelineContainer
+        onZoomToStart={() => {}} // Will be provided by TimelineContainer
+        onResetFrames={handleResetFrames}
+      />
+
+      {/* Timeline Container */}
       <TimelineContainer
         shotId={shotId}
         images={images}
         contextFrames={contextFrames}
         framePositions={displayPositions}
-        onContextFramesChange={onContextFramesChange}
-        onResetFrames={handleResetFrames}
         setFramePositions={setFramePositions}
         onImageReorder={onImageReorder}
         onImageSaved={onImageSaved}
@@ -289,14 +288,14 @@ const Timeline: React.FC<TimelineProps> = ({
         setIsDragInProgress={setIsDragInProgress}
         onPairClick={onPairClick}
         pairPrompts={actualPairPrompts}
-                defaultPrompt={defaultPrompt}
-                defaultNegativePrompt={defaultNegativePrompt}
+        defaultPrompt={defaultPrompt}
+        defaultNegativePrompt={defaultNegativePrompt}
         onImageDelete={onImageDelete}
         onImageDuplicate={onImageDuplicate}
-                duplicatingImageId={duplicatingImageId}
-                duplicateSuccessImageId={duplicateSuccessImageId}
-                projectAspectRatio={projectAspectRatio}
-              />
+        duplicatingImageId={duplicatingImageId}
+        duplicateSuccessImageId={duplicateSuccessImageId}
+        projectAspectRatio={projectAspectRatio}
+      />
 
       {/* Lightbox */}
       {lightboxIndex !== null && currentLightboxImage && (
@@ -322,4 +321,4 @@ const Timeline: React.FC<TimelineProps> = ({
   );
 };
 
-export default Timeline; 
+export default Timeline;

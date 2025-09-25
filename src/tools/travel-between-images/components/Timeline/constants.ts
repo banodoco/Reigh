@@ -1,0 +1,2 @@
+export const TIMELINE_HORIZONTAL_PADDING = 60;
+

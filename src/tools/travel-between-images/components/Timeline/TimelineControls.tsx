@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Slider } from "@/shared/components/ui/slider";
 import { Label } from "@/shared/components/ui/label";
-import { Info } from 'lucide-react';
+import { Info, ZoomOut, ZoomIn, RotateCcw, MoveLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 
 interface TimelineControlsProps {
@@ -13,7 +13,7 @@ interface TimelineControlsProps {
   onZoomOut: () => void;
   onZoomReset: () => void;
   onZoomToStart: () => void;
-  onResetFrames?: (gap: number) => void;
+  onResetFrames?: (gap: number, contextFrames: number) => void;
 }
 
 const TimelineControls: React.FC<TimelineControlsProps> = ({
@@ -27,21 +27,42 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
   onResetFrames,
 }) => {
   const [resetGap, setResetGap] = React.useState<number>(10);
+  // Separate pending context frames from active context frames
+  const [pendingContextFrames, setPendingContextFrames] = React.useState<number>(contextFrames);
   
-  // Ensure resetGap doesn't exceed the max allowed value when contextFrames changes
-  const maxGap = 81 - contextFrames;
+  // Sync pending context frames when active context frames change (from external sources)
+  React.useEffect(() => {
+    setPendingContextFrames(contextFrames);
+  }, [contextFrames]);
+  
+  // Keep resetGap limited by pending contextFrames for live adjustment
+  const maxGap = 81 - pendingContextFrames;
   React.useEffect(() => {
     if (resetGap > maxGap) {
       setResetGap(maxGap);
     }
-  }, [contextFrames, maxGap, resetGap]);
+  }, [pendingContextFrames, maxGap, resetGap]);
   return (
     <div className="flex items-center justify-between mb-3 gap-6">
         <div className="flex items-center gap-4 flex-1">
-          <div className="w-1/2">
+          <div className="w-64">
+            <Label htmlFor="resetGap" className="text-sm font-light">
+              Gap to reset to: {resetGap}
+            </Label>
+            <Slider
+              id="resetGap"
+              min={1}
+              max={maxGap}
+              step={1}
+              value={[resetGap]}
+              onValueChange={(value) => setResetGap(value[0])}
+              className="w-full mt-1"
+            />
+          </div>
+          <div className="w-40">
             <div className="flex items-center gap-2 mb-1">
               <Label htmlFor="contextFrames" className="text-sm font-light">
-                Context Frames: {contextFrames}
+                Context frames: {pendingContextFrames}
               </Label>
             </div>
             <Slider
@@ -49,55 +70,108 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
               min={1}
               max={24}
               step={1}
-              value={[contextFrames]}
-              onValueChange={(value) => onContextFramesChange(value[0])}
+              value={[pendingContextFrames]}
+              onValueChange={(value) => setPendingContextFrames(value[0])}
               className="w-full"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-32">
-              <Label htmlFor="resetGap" className="text-sm font-light">
-                Gap to reset to:
-              </Label>
-              <Slider
-                id="resetGap"
-                min={1}
-                max={maxGap}
-                step={1}
-                value={[resetGap]}
-                onValueChange={(value) => setResetGap(value[0])}
-                className="w-full mt-1"
-              />
-              <div className="text-xs text-muted-foreground mt-1 text-center">
-                {resetGap} frames
-              </div>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => onResetFrames?.(resetGap)}
-              disabled={!onResetFrames}
-              className="mt-4"
-            >
-              Reset Frames
-            </Button>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => onResetFrames?.(resetGap, pendingContextFrames)}
+                  disabled={!onResetFrames}
+                  className="mt-4"
+                >
+                  Reset
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>This will reset to a {resetGap} frames gap with {pendingContextFrames} context frames</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onZoomReset} disabled={zoomLevel <= 1}>
-            <span className="text-xs">⤺</span> Zoom Out Fully
-          </Button>
-          <Button variant="outline" size="sm" onClick={onZoomOut} disabled={zoomLevel <= 1}>
-            <span className="text-xs">−</span> Zoom Out
-          </Button>
-          <Button variant="outline" size="sm" onClick={onZoomIn} disabled={zoomLevel >= 10}>
-            <span className="text-xs">+</span> Zoom In
-          </Button>
-          <Button variant="outline" size="sm" onClick={onZoomToStart}>
-            <span className="text-xs">⟵</span> Zoom to Start
-          </Button>
-          <span className="text-sm text-muted-foreground ml-2">{zoomLevel.toFixed(1)}x zoom</span>
+          <span className="text-sm text-muted-foreground mr-2">{zoomLevel.toFixed(1)}x zoom</span>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onZoomReset} 
+                  disabled={zoomLevel <= 1}
+                  className="hover:bg-muted/50 transition-colors"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Zoom Out Fully</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onZoomOut} 
+                  disabled={zoomLevel <= 1}
+                  className="hover:bg-muted/50 transition-colors"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Zoom Out</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onZoomIn} 
+                  disabled={zoomLevel >= 10}
+                  className="hover:bg-muted/50 transition-colors"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Zoom In</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onZoomToStart}
+                  className="hover:bg-muted/50 transition-colors"
+                >
+                  <MoveLeft className="h-4 w-4" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Zoom to Start</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
     </div>
   );

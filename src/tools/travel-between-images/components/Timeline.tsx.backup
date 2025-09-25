@@ -1,0 +1,1287 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { GenerationRow } from "@/types/shots";
+import { toast } from "sonner";
+import MediaLightbox from "@/shared/components/MediaLightbox";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
+
+// Clear legacy timeline cache on import
+import "@/utils/clearTimelineCache";
+
+// Import hooks
+import { useZoom } from "./Timeline/hooks/useZoom";
+import { useFileDrop } from "./Timeline/hooks/useFileDrop";
+import { useTimelineDrag } from "./Timeline/hooks/useTimelineDrag";
+// Import our database-backed position management
+import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
+
+// Import components
+import TimelineControls from "./Timeline/TimelineControls";
+import TimelineRuler from "./Timeline/TimelineRuler";
+import DropIndicator from "./Timeline/DropIndicator";
+import PairRegion from "./Timeline/PairRegion";
+import TimelineItem from "./Timeline/TimelineItem";
+
+// Import utils
+import { 
+  getTimelineDimensions, 
+  calculateMaxGap, 
+  getPairInfo 
+} from "./Timeline/utils/timeline-utils";
+
+// Main Timeline component props
+export interface TimelineProps {
+  shotId: string;
+  frameSpacing: number;
+  contextFrames: number;
+  onImageReorder: (orderedIds: string[]) => void;
+  onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
+  onContextFramesChange: (context: number) => void;
+  onFramePositionsChange?: (framePositions: Map<string, number>) => void;
+  onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
+  pendingPositions?: Map<string, number>;
+  onPendingPositionApplied?: (generationId: string) => void;
+  // Shared data props to prevent hook re-instantiation
+  shotGenerations?: import("@/shared/hooks/useEnhancedShotPositions").ShotGeneration[];
+  updateTimelineFrame?: (generationId: string, frame: number) => Promise<void>;
+  images?: GenerationRow[];
+  // Callback to reload parent data after timeline changes
+  onTimelineChange?: () => Promise<void>;
+  // Shared hook data to prevent creating duplicate hook instances
+  hookData?: import("@/shared/hooks/useEnhancedShotPositions").UseEnhancedShotPositionsReturn;
+  // Pair-specific prompt editing
+  onPairClick?: (pairIndex: number, pairData: {
+    index: number;
+    frames: number;
+    startFrame: number;
+    endFrame: number;
+    startImage?: {
+      id: string;
+      url?: string;
+      thumbUrl?: string;
+      timeline_frame: number;
+      position: number;
+    } | null;
+    endImage?: {
+      id: string;
+      url?: string;
+      thumbUrl?: string;
+      timeline_frame: number;
+      position: number;
+    } | null;
+  }) => void;
+  // Pair prompt data for display (optional - will use database if not provided)
+  pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  defaultPrompt?: string;
+  defaultNegativePrompt?: string;
+  // Action handlers
+  onImageDelete: (imageId: string) => void;
+  onImageDuplicate: (imageId: string, timeline_frame: number) => void;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
+  projectAspectRatio?: string;
+}
+
+/**
+ * Refactored Timeline component with hooks and smaller components
+ */
+const Timeline: React.FC<TimelineProps> = ({
+  shotId,
+  frameSpacing,
+  contextFrames,
+  onImageReorder,
+  onImageSaved,
+  onContextFramesChange,
+  onFramePositionsChange,
+  onImageDrop,
+  pendingPositions,
+  onPendingPositionApplied,
+  // Shared data props
+  shotGenerations: propShotGenerations,
+  updateTimelineFrame: propUpdateTimelineFrame,
+  images: propImages,
+  onTimelineChange,
+  hookData: propHookData,
+  onPairClick,
+  pairPrompts,
+  defaultPrompt,
+  defaultNegativePrompt,
+  onImageDelete,
+  onImageDuplicate,
+  duplicatingImageId,
+  duplicateSuccessImageId,
+  projectAspectRatio
+}) => {
+  // State to track context visibility with delay
+  const [showContext, setShowContext] = useState(false);
+  const contextTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+
+  // Enhanced Timeline performance tracking with prop change detection
+  const renderCountRef = React.useRef(0);
+  const prevPropsRef = React.useRef<any>();
+
+  React.useEffect(() => {
+    renderCountRef.current++;
+    const currentProps = {
+      shotId,
+      frameSpacing,
+      contextFrames,
+      propShotGenerations: propShotGenerations ? propShotGenerations.length : null,
+      propUpdateTimelineFrame: !!propUpdateTimelineFrame,
+      propImages: propImages ? propImages.length : null
+    };
+    
+    const prevProps = prevPropsRef.current;
+    // Only log the first few renders to debug mount issues
+    if (renderCountRef.current <= 5) {
+      console.log('[TimelineMovementDebug] 🔄 TIMELINE RENDER #' + renderCountRef.current, {
+        ...currentProps,
+        // Prop change analysis (only show if previous props exist)
+        ...(prevProps ? {
+          shotIdChanged: shotId !== prevProps.shotId,
+          frameSpacingChanged: frameSpacing !== prevProps.frameSpacing,
+          contextFramesChanged: contextFrames !== prevProps.contextFrames,
+          propShotGenerationsChanged: propShotGenerations !== prevProps.propShotGenerations,
+          propUpdateTimelineFrameChanged: propUpdateTimelineFrame !== prevProps.propUpdateTimelineFrame,
+          propImagesChanged: propImages !== prevProps.propImages,
+          // Reference equality checks
+          propShotGenerationsRef: propShotGenerations === prevProps.propShotGenerations ? 'SAME' : 'DIFFERENT',
+          propImagesRef: propImages === prevProps.propImages ? 'SAME' : 'DIFFERENT'
+        } : { firstRender: true })
+      });
+    }
+    
+    prevPropsRef.current = currentProps;
+  });
+  // Core state
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isPersistingPositions, setIsPersistingPositions] = useState<boolean>(false);
+  const [isDragInProgress, setIsDragInProgress] = useState<boolean>(false);
+
+  // Refs
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const initialContextFrames = useRef(contextFrames);
+
+  // Debug: Log isDragInProgress state
+  console.log('[TimelineMovementDebug] 🔧 Timeline isDragInProgress state:', isDragInProgress);
+  
+  // Use shared hook data if provided, otherwise create new instance (for backward compatibility)
+  const hookData = propHookData || useEnhancedShotPositions(shotId, isDragInProgress);
+  const shotGenerations = propShotGenerations || hookData.shotGenerations;
+  const updateTimelineFrame = propUpdateTimelineFrame || hookData.updateTimelineFrame;
+  const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
+  const initializeTimelineFrames = hookData.initializeTimelineFrames;
+
+  // Track previous positions to detect unexpected changes
+  const prevStablePositionsRef = useRef<Map<string, number>>(new Map());
+
+
+  // DISABLED: Cache clear events were causing timeline position resets
+  // The cache cleanup was triggering data reloads that override user drag positions
+  //
+  // // Listen for cache clear events and force reload
+  // useEffect(() => {
+  //   const handleCacheCleared = () => {
+  //     console.log('[Timeline] Cache cleared event received - forcing data reload');
+  //     hookData.loadPositions({ reason: 'invalidation' });
+  //   };
+  //
+  //   window.addEventListener('timeline-cache-cleared', handleCacheCleared);
+  //   return () => window.removeEventListener('timeline-cache-cleared', handleCacheCleared);
+  // }, [hookData.loadPositions]);
+  
+  // Get pair prompts from database instead of props (now reactive)
+  const databasePairPrompts = hookData.pairPrompts;
+  const actualPairPrompts = pairPrompts || databasePairPrompts; // Fallback to props for backward compatibility
+  const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, never show loading (shared data)
+  
+  // Important: If using shared data, we need to ensure parent reloads when we make changes
+  const parentLoadPositions = propShotGenerations ? hookData.loadPositions : null;
+  
+  // Use provided images or generate from shotGenerations
+  const images = React.useMemo(() => {
+    if (propImages) return propImages;
+    
+    const imagesWithPositions = shotGenerations
+      .filter(sg => sg.generation)
+      .map(sg => ({
+        id: sg.generation_id,
+        shotImageEntryId: sg.id,
+        imageUrl: sg.generation?.location,
+        thumbUrl: sg.generation?.location,
+        location: sg.generation?.location,
+        type: sg.generation?.type,
+        createdAt: sg.generation?.created_at,
+        timeline_frame: sg.timeline_frame,
+        metadata: sg.metadata
+      } as GenerationRow & { timeline_frame?: number }));
+
+    // Sort by timeline_frame only (no position fallback needed)
+    return imagesWithPositions.sort((a, b) => {
+      const frameA = a.timeline_frame ?? 0;
+      const frameB = b.timeline_frame ?? 0;
+      return frameA - frameB;
+    });
+  }, [shotGenerations, frameSpacing, propImages]);
+  
+  // Convert database timeline_frame values to Timeline-compatible Map
+  // Keep previous positions during loading to prevent flicker
+  const [stablePositions, _setStablePositions] = React.useState<Map<string, number>>(new Map());
+  
+  // Controlled setStablePositions wrapper to prevent unwanted resets
+  const setStablePositions = React.useCallback((newPositions: Map<string, number>, reason?: string) => {
+    const stack = new Error().stack;
+    const isFromDragOperation = stack?.includes('setFramePositions') || stack?.includes('handleMouseUp') || reason;
+    
+    console.log('[TimelineMovementDebug] 🎯 setStablePositions WRAPPER CALLED:', {
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      reason: reason || 'unknown',
+      isFromDragOperation,
+      positionsCount: newPositions.size,
+      positions: Array.from(newPositions.entries()).map(([id, pos]) => `${id.substring(0, 8)}:${pos}`).join(', '),
+      stackSnippet: stack?.split('\n').slice(1, 4).join(' → ')
+    });
+    
+    if (isFromDragOperation || reason) {
+      console.log('[TimelineMovementDebug] ✅ ALLOWING setStablePositions:', reason || 'drag operation');
+      _setStablePositions(newPositions);
+    } else {
+      console.log('[TimelineMovementDebug] 🚫 BLOCKING unwanted setStablePositions call');
+    }
+  }, [shotId]);
+
+
+
+  // Detect unexpected position changes (original logic)
+  useEffect(() => {
+    const prevPositions = prevStablePositionsRef.current;
+    const currentPositions = Array.from(stablePositions.entries());
+
+    // Only check if we have previous data
+    if (prevPositions.size > 0 && currentPositions.length > 0) {
+      let positionChanged = false;
+      const changes = [];
+
+      // Check for changed positions
+      for (const [id, pos] of currentPositions) {
+        const prevPos = prevPositions.get(id);
+        if (prevPos !== pos) {
+          changes.push(`${id.substring(0, 8)}: ${prevPos}→${pos}`);
+          positionChanged = true;
+        }
+      }
+
+      // Check for removed positions
+      for (const [id, pos] of prevPositions) {
+        if (!stablePositions.has(id)) {
+          changes.push(`${id.substring(0, 8)}: ${pos}→REMOVED`);
+          positionChanged = true;
+        }
+      }
+
+      if (positionChanged) {
+        console.log('[TimelineMovementDebug] 🚨 UNEXPECTED POSITION CHANGE DETECTED:', {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          changes: changes.join(', '),
+          timestamp: new Date().toISOString(),
+          warning: 'This indicates positions are being reset by something other than drag operations'
+        });
+      }
+    }
+
+    // Update previous positions
+    prevStablePositionsRef.current = new Map(stablePositions);
+  }, [stablePositions, shotId]);
+
+  // Track dependency changes with refs
+  const prevDepsRef = React.useRef<{
+    shotGenerations: any;
+    images: any;
+    frameSpacing: number;
+    shotId: string;
+  }>();
+
+  // [TimelineJumpDebug] Track what's causing repeated framePositions recalculations
+  const framePositionsRenderCount = React.useRef(0);
+
+  const framePositions = React.useMemo(() => {
+    framePositionsRenderCount.current++;
+    const currentDeps = { shotGenerations, images, frameSpacing, shotId };
+    const prevDeps = prevDepsRef.current;
+    
+    console.log('[TimelineMovementDebug] 🔄 RECALCULATING framePositions useMemo:', {
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      shotGenerationsLength: shotGenerations.length,
+      imagesLength: images.length,
+      frameSpacing,
+      isLoading,
+      // Dependency change analysis
+      shotGenerationsChanged: prevDeps ? shotGenerations !== prevDeps.shotGenerations : true,
+      imagesChanged: prevDeps ? images !== prevDeps.images : true,
+      frameSpacingChanged: prevDeps ? frameSpacing !== prevDeps.frameSpacing : true,
+      shotIdChanged: prevDeps ? shotId !== prevDeps.shotId : true,
+      // Reference checks
+      shotGenerationsRef: shotGenerations === prevDeps?.shotGenerations ? 'SAME_REF' : 'DIFF_REF',
+      imagesRef: images === prevDeps?.images ? 'SAME_REF' : 'DIFF_REF'
+    });
+
+    // [TimelineJumpDebug] Track repeated recalculations
+    console.log('[TimelineMovementDebug] 🔢 FRAMEPOSITIONS RECALC COUNT:', {
+      shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+      recalcCount: framePositionsRenderCount.current,
+      trigger: prevDeps ? {
+        shotGenerationsChanged: shotGenerations !== prevDeps.shotGenerations,
+        imagesChanged: images !== prevDeps.images,
+        frameSpacingChanged: frameSpacing !== prevDeps.frameSpacing,
+        shotIdChanged: shotId !== prevDeps.shotId
+      } : { firstRender: true },
+      timestamp: new Date().toISOString()
+    });
+    
+    prevDepsRef.current = currentDeps;
+    
+    const positions = new Map<string, number>();
+    
+    shotGenerations.forEach(sg => {
+      const matchingImage = images.find(img => img.id === sg.generation_id);
+      if (matchingImage) {
+        if (sg.timeline_frame !== null && sg.timeline_frame !== undefined) {
+          positions.set(matchingImage.shotImageEntryId, sg.timeline_frame);
+        } else {
+          // Initialize with max existing frame + 50 if no timeline_frame
+          const maxFrame = Math.max(0, ...Array.from(positions.values()));
+          positions.set(matchingImage.shotImageEntryId, maxFrame + 50);
+        }
+      }
+    });
+
+    console.log('[TimelineMovementDebug] 📊 TIMELINE frame positions from database:', {
+      shotId: shotId.substring(0, 8),
+      positionsCount: positions.size,
+      positions: Array.from(positions.entries()).map(([id, frame]) => ({
+        id: id.substring(0, 8),
+        frame
+      })),
+      isLoading
+    });
+    
+    return positions;
+  }, [shotGenerations, images, frameSpacing, shotId]);
+
+
+
+  // Use stable positions during loading or drag operations to prevent flicker
+  const displayPositions = React.useMemo(() => {
+    // [TimelineResetDebug] CRITICAL: Track when displayPositions changes after drag
+    const callStack = new Error().stack;
+    const isAfterDrag = callStack?.includes('handleMouseUp') || callStack?.includes('dragState');
+    const stackLines = callStack?.split('\n').slice(0, 10).join('\n') || 'No stack';
+
+    // Only log if this is happening frequently or after drag
+    const shouldLog = isAfterDrag || stablePositions.size > 0;
+
+    if (shouldLog) {
+      console.log('[TimelineMovementDebug] 🔄 DISPLAY POSITIONS RECALCULATING:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        isAfterDrag,
+        isLoading,
+        isDragInProgress,
+        stackTrace: stackLines,
+        timestamp: new Date().toISOString(),
+        stablePositionsSize: stablePositions.size,
+        framePositionsSize: framePositions.size,
+        isPersistingPositions,
+        willUseStable: (isLoading && stablePositions.size > 0) ||
+                       (stablePositions.size > 0 && framePositions.size === 0) ||
+                       (isPersistingPositions && stablePositions.size > 0) ||
+                       (isDragInProgress && stablePositions.size > 0),
+        stablePositionsData: Array.from(stablePositions.entries()).map(([id, pos]) =>
+          `${id.substring(0, 8)}:${pos}`).join(', '),
+        framePositionsData: Array.from(framePositions.entries()).map(([id, pos]) =>
+          `${id.substring(0, 8)}:${pos}`).join(', ')
+      });
+    }
+
+    // [TimelineJumpDebug] Log every displayPositions recalculation with triggers
+    const triggers = {
+      isLoadingChanged: 'unknown', // We'd need prev state to compare
+      stablePositionsChanged: 'unknown', // We'd need prev state to compare
+      framePositionsChanged: 'unknown', // We'd need prev state to compare
+      isPersistingPositionsChanged: 'unknown', // We'd need prev state to compare
+      isDragInProgressChanged: 'unknown' // We'd need prev state to compare
+    };
+
+    console.log('[TimelineMovementDebug] 🎯 DISPLAY POSITIONS RECALC TRIGGER:', {
+      shotId: shotId.substring(0, 8),
+      isLoading,
+      isDragInProgress,
+      stablePositionsSize: stablePositions.size,
+      framePositionsSize: framePositions.size,
+      isPersistingPositions,
+      triggers,
+      timestamp: new Date().toISOString()
+    });
+
+    // Use stable positions if we have them and we're loading, persisting, or during drag
+    const useStable = (isLoading && stablePositions.size > 0) ||
+                     (stablePositions.size > 0 && framePositions.size === 0) ||
+                     (isPersistingPositions && stablePositions.size > 0) ||
+                     (isDragInProgress && stablePositions.size > 0);
+
+    if (useStable) {
+      console.log('[TimelineMovementDebug] ⏳ TIMELINE keeping stable positions:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        stableCount: stablePositions.size,
+        freshCount: framePositions.size,
+        isLoading,
+        isDragInProgress,
+        reason: isLoading ? 'loading' : isDragInProgress ? 'drag_in_progress' : 'fresh_positions_empty'
+      });
+      console.log('[TimelineMovementDebug] 📍 DISPLAY POSITIONS - Using Stable:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        positions: Array.from(stablePositions.entries()).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          position: pos
+        })),
+        reason: useStable ? 'stable_fallback' : 'fresh_available',
+        timestamp: new Date().toISOString()
+      });
+      return stablePositions;
+    }
+
+    // If fresh positions are available and different from stable, use fresh
+    if (framePositions.size > 0) {
+      console.log('[TimelineMovementDebug] 🔄 TIMELINE using fresh positions:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        freshCount: framePositions.size,
+        isLoading
+      });
+      console.log('[TimelineMovementDebug] 📍 DISPLAY POSITIONS - Using Fresh:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        positions: Array.from(framePositions.entries()).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          position: pos
+        })),
+        reason: 'fresh_available',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return framePositions;
+  }, [isLoading, isPersistingPositions, isDragInProgress, stablePositions, framePositions, shotId]);
+
+  // [EnhancedPositionTracking] Comprehensive position state monitoring
+  useEffect(() => {
+    // Only run this effect when we have meaningful data to analyze
+    if (shotGenerations.length === 0 || images.length === 0) return;
+
+    console.log('[TimelineMovementDebug] 📊 POSITION STATE MONITORING:', {
+      shotId: shotId?.substring(0, 8),
+      trigger: 'stablePositions_change',
+      positionCounts: {
+        shotGenerations: shotGenerations.length,
+        images: images.length,
+        framePositions: framePositions.size,
+        displayPositions: displayPositions.size,
+        stablePositions: stablePositions.size
+      },
+      databaseFrames: shotGenerations.map(sg => ({
+        id: sg.generation_id.substring(0, 8),
+        timeline_frame: sg.timeline_frame
+      })),
+      framePositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        frame: pos
+      })),
+      displayPositions: Array.from(displayPositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        display: pos
+      })),
+      stablePositions: Array.from(stablePositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        stable: pos
+      })),
+      syncAnalysis: {
+        db_vs_frame_synced: shotGenerations.every(sg =>
+          framePositions.get(sg.generation_id) === sg.timeline_frame
+        ),
+        frame_vs_display_synced: Array.from(framePositions.entries()).every(([id, pos]) =>
+          displayPositions.get(id) === pos
+        ),
+        frame_vs_stable_synced: Array.from(framePositions.entries()).every(([id, pos]) =>
+          stablePositions.get(id) === pos
+        ),
+        display_vs_stable_synced: Array.from(displayPositions.entries()).every(([id, pos]) =>
+          stablePositions.get(id) === pos
+        )
+      },
+      driftAnalysis: {
+        db_vs_frame_drift: shotGenerations.filter(sg =>
+          framePositions.get(sg.generation_id) !== sg.timeline_frame
+        ).map(sg => ({
+          id: sg.generation_id.substring(0, 8),
+          db: sg.timeline_frame,
+          frame: framePositions.get(sg.generation_id)
+        })),
+        frame_vs_display_drift: Array.from(framePositions.entries()).filter(([id, pos]) =>
+          displayPositions.get(id) !== pos
+        ).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          frame: pos,
+          display: displayPositions.get(id)
+        })),
+        frame_vs_stable_drift: Array.from(framePositions.entries()).filter(([id, pos]) =>
+          stablePositions.get(id) !== pos
+        ).map(([id, pos]) => ({
+          id: id.substring(0, 8),
+          frame: pos,
+          stable: stablePositions.get(id)
+        }))
+      },
+      timestamp: new Date().toISOString()
+    });
+  }, [shotGenerations, images, framePositions, stablePositions, shotId]);
+
+  // Enhanced position change analysis function
+  const analyzePositionChanges = React.useCallback((
+    newPositions: Map<string, number>,
+    framePositions: Map<string, number>,
+    displayPositions: Map<string, number>,
+    stablePositions: Map<string, number>,
+    shotId: string
+  ) => {
+    const allChanges: Array<[string, any]> = [];
+    const significantChanges: Array<[string, any]> = [];
+    const filteredOut: Array<[string, any]> = [];
+
+    for (const [id, newPos] of newPositions) {
+      const dbPos = framePositions.get(id);
+      const displayPos = displayPositions.get(id);
+      const stablePos = stablePositions.get(id);
+
+      const analysis = {
+        id: id.substring(0, 8),
+        newPos,
+        dbPos,
+        displayPos,
+        stablePos,
+        vsDatabase: newPos - (dbPos ?? 0),
+        vsDisplay: newPos - (displayPos ?? 0),
+        vsStable: newPos - (stablePos ?? 0),
+        isSignificant: Math.abs(newPos - (dbPos ?? 0)) > 0.1, // Allow small floating point differences
+        positionSources: {
+          database: dbPos !== undefined ? 'PRESENT' : 'MISSING',
+          display: displayPos !== undefined ? 'PRESENT' : 'MISSING',
+          stable: stablePos !== undefined ? 'PRESENT' : 'MISSING'
+        },
+        syncStatus: {
+          db_vs_display: dbPos === displayPos ? 'SYNCED' : 'OUT_OF_SYNC',
+          db_vs_stable: dbPos === stablePos ? 'SYNCED' : 'OUT_OF_SYNC',
+          display_vs_stable: displayPos === stablePos ? 'SYNCED' : 'OUT_OF_SYNC'
+        }
+      };
+
+      allChanges.push([id, analysis]);
+
+      if (analysis.isSignificant) {
+        significantChanges.push([id, analysis]);
+
+        console.log('[TimelineMovementDebug] ✅ SIGNIFICANT CHANGE DETECTED:', {
+          shotId: shotId?.substring(0, 8),
+          itemId: id.substring(0, 8),
+          change: `${dbPos ?? 'null'} → ${newPos} (Δ${analysis.vsDatabase})`,
+          vsDisplay: `${displayPos ?? 'null'} → ${newPos} (Δ${analysis.vsDisplay})`,
+          vsStable: `${stablePos ?? 'null'} → ${newPos} (Δ${analysis.vsStable})`,
+          syncStatus: analysis.syncStatus,
+          reason: 'significant_change_vs_database',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        filteredOut.push([id, analysis]);
+
+        console.log('[TimelineMovementDebug] 🚫 FILTERED OUT (insignificant change):', {
+          shotId: shotId?.substring(0, 8),
+          itemId: id.substring(0, 8),
+          change: `${dbPos ?? 'null'} → ${newPos} (Δ${analysis.vsDatabase})`,
+          reason: 'change_too_small_or_already_at_database_position',
+          threshold: 0.1,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    return {
+      totalAnalyzed: newPositions.size,
+      significantChanges,
+      filteredOut,
+      allChanges,
+      syncSummary: {
+        db_vs_display_synced: allChanges.filter(([, a]) => a.syncStatus.db_vs_display === 'SYNCED').length,
+        db_vs_display_out_of_sync: allChanges.filter(([, a]) => a.syncStatus.db_vs_display === 'OUT_OF_SYNC').length,
+        total_out_of_sync: allChanges.filter(([, a]) =>
+          a.syncStatus.db_vs_display === 'OUT_OF_SYNC' ||
+          a.syncStatus.db_vs_stable === 'OUT_OF_SYNC' ||
+          a.syncStatus.display_vs_stable === 'OUT_OF_SYNC'
+        ).length
+      }
+    };
+  }, []);
+
+  // Simple position update function
+  const setFramePositions = React.useCallback(async (newPositions: Map<string, number>) => {
+    console.log('[Timeline] 🎯 Setting positions:', {
+      shotId: shotId.substring(0, 8),
+      count: newPositions.size,
+      timestamp: new Date().toISOString()
+    });
+
+    // Find what actually changed
+    const positionChanges: Array<{id: string, oldPos: number, newPos: number}> = [];
+    
+    for (const [id, newPos] of newPositions) {
+      const currentPos = framePositions.get(id);
+      if (currentPos !== newPos) {
+        positionChanges.push({
+          id: id.slice(-8),
+          oldPos: currentPos ?? 0,
+          newPos
+        });
+      }
+    }
+
+    if (positionChanges.length === 0) {
+      console.log('[Timeline] ✅ No changes needed');
+      return;
+    }
+
+    console.log('[Timeline] 📝 Changes:', positionChanges.map(c => `${c.id}:${c.oldPos}→${c.newPos}`));
+
+    // Update UI immediately for smooth experience
+    setStablePositions(new Map(newPositions));
+    setIsPersistingPositions(true);
+
+    try {
+      // Update each changed position
+      for (const change of positionChanges) {
+        const matchingImage = images.find(img =>
+          img.shotImageEntryId.endsWith(change.id) || img.shotImageEntryId.substring(0, 8) === change.id
+        );
+
+        if (matchingImage && updateTimelineFrame) {
+          console.log(`[Timeline] 📡 Updating ${change.id}: ${change.oldPos} → ${change.newPos}`);
+          await updateTimelineFrame(matchingImage.id, change.newPos, {
+            user_positioned: true,
+            drag_source: 'timeline_drag'
+          });
+        }
+      }
+
+      console.log('[Timeline] ✅ Updates completed');
+
+      // Skip parent reload to prevent stale data conflicts
+
+      // All done
+
+    } catch (error) {
+      console.error('[Timeline] ❌ Update failed:', error);
+      setStablePositions(displayPositions); // Reset on error
+      toast.error('Failed to update timeline positions');
+      throw error;
+    } finally {
+      setIsPersistingPositions(false);
+    }
+
+    console.log('[Timeline] ✅ Operation completed');
+
+    // Also call the original callback if provided
+    if (onFramePositionsChange) {
+      onFramePositionsChange(newPositions);
+    }
+  }, [displayPositions, images, updateTimelineFrame, onFramePositionsChange, shotId, propShotGenerations, onTimelineChange]);
+
+  // Calculate dimensions - use stable coordinate system during dragging
+  // Use original positions for coordinate system to prevent feedback loop during drag
+  // Note: This is defined after dragState is available
+
+  // Zoom and File Drop hooks - defined after coordinate system is available
+
+  // Drag hook - defined after coordinate system is available
+
+  // Global event listeners will be set up after drag hook is defined
+
+  // Calculate dimensions - use display positions initially, will be updated after drag hook
+  const { fullMin, fullMax, fullRange } = getTimelineDimensions(displayPositions);
+
+  // [DragBoundaryDebug] Track coordinate system changes and drag boundaries
+  const prevCoordinatesRef = React.useRef({ fullMin, fullMax, fullRange });
+  const prevDragBoundaryRef = React.useRef({ fullMin, fullMax, fullRange });
+  React.useEffect(() => {
+    const prev = prevCoordinatesRef.current;
+    const current = { fullMin, fullMax, fullRange };
+
+    if (prev.fullMin !== current.fullMin || prev.fullMax !== current.fullMax || prev.fullRange !== current.fullRange) {
+      console.log('[TimelineJumpDebug] 📐 COORDINATE SYSTEM CHANGED:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        previous: prev,
+        current: current,
+        delta: {
+          minShift: current.fullMin - prev.fullMin,
+          maxShift: current.fullMax - prev.fullMax,
+          rangeShift: current.fullRange - prev.fullRange
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      // [DragBoundaryDebug] Track boundary changes for drag behavior analysis
+      const prevBoundary = prevDragBoundaryRef.current;
+      console.log('[DragBoundaryDebug] 📐 BOUNDARY SYSTEM CHANGED:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        boundaryChanged: {
+          minChanged: current.fullMin !== prevBoundary.fullMin,
+          maxChanged: current.fullMax !== prevBoundary.fullMax,
+          rangeChanged: current.fullRange !== prevBoundary.fullRange
+        },
+        previousBoundary: prevBoundary,
+        currentBoundary: current,
+        deltas: {
+          minDelta: current.fullMin - prevBoundary.fullMin,
+          maxDelta: current.fullMax - prevBoundary.fullMax,
+          rangeDelta: current.fullRange - prevBoundary.fullRange
+        },
+        direction: current.fullMin < prevBoundary.fullMin ? 'LEFT_EXPANSION' :
+                  current.fullMax > prevBoundary.fullMax ? 'RIGHT_EXPANSION' :
+                  current.fullRange > prevBoundary.fullRange ? 'RANGE_EXPANSION' : 'CONTRACTION',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    prevCoordinatesRef.current = current;
+    prevDragBoundaryRef.current = current;
+  }, [fullMin, fullMax, fullRange, shotId]);
+
+  // Get actual container dimensions for ground truth calculations
+  const containerRect = containerRef.current?.getBoundingClientRect() || null;
+
+  // Drag hook
+  const {
+    dragState,
+    dragOffset,
+    currentDragFrame,
+    swapTargetId,
+    dragDistances,
+    dynamicPositions,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+  } = useTimelineDrag({
+    framePositions: displayPositions,
+    setFramePositions,
+    images,
+    onImageReorder,
+    contextFrames,
+    fullMin,
+    fullMax,
+    fullRange,
+    containerRect,
+    setIsDragInProgress,  // Pass the setter to set flag at drag start
+  });
+
+  // [TimelineJumpDebug] Track drag state changes
+  const prevDragStateRef = React.useRef(dragState);
+  React.useEffect(() => {
+    const prev = prevDragStateRef.current;
+    const current = dragState;
+    
+    if (prev.isDragging !== current.isDragging || prev.activeId !== current.activeId) {
+      console.log('[TimelineJumpDebug] 🎭 DRAG STATE CHANGE:', {
+        shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+        transition: `${prev.isDragging ? 'DRAGGING' : 'IDLE'} → ${current.isDragging ? 'DRAGGING' : 'IDLE'}`,
+        activeId: current.activeId?.substring(0, 8) || 'none',
+        prevActiveId: prev.activeId?.substring(0, 8) || 'none',
+        timestamp: new Date().toISOString()
+      });
+      
+      // Log positions when drag starts/ends
+      if (!prev.isDragging && current.isDragging) {
+        console.log('[TimelineJumpDebug] 🚀 DRAG STARTED - Current Positions:', {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          displayPositions: Array.from(displayPositions.entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          dynamicPositions: Array.from(dynamicPositions().entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          coordinateSystem: { fullMin, fullMax, fullRange },
+          timestamp: new Date().toISOString()
+        });
+      } else if (prev.isDragging && !current.isDragging) {
+        console.log('[TimelineJumpDebug] 🛑 DRAG ENDED - Final Positions:', {
+          shotId: shotId ? shotId.substring(0, 8) : 'undefined',
+          displayPositions: Array.from(displayPositions.entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          dynamicPositions: Array.from(dynamicPositions().entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          coordinateSystem: { fullMin, fullMax, fullRange },
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    
+    prevDragStateRef.current = current;
+  }, [dragState, displayPositions, dynamicPositions, fullMin, fullMax, fullRange, shotId]);
+
+  // Effect to handle context visibility delay when not dragging
+  useEffect(() => {
+    if (!dragState.isDragging) {
+      // Clear any existing timer
+      if (contextTimerRef.current) {
+        clearTimeout(contextTimerRef.current);
+      }
+      
+      // Set a 100ms delay before showing context
+      contextTimerRef.current = setTimeout(() => {
+        setShowContext(true);
+      }, 100);
+    } else {
+      // Hide context immediately when dragging starts
+      setShowContext(false);
+      if (contextTimerRef.current) {
+        clearTimeout(contextTimerRef.current);
+      }
+    }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (contextTimerRef.current) {
+        clearTimeout(contextTimerRef.current);
+      }
+    };
+  }, [dragState.isDragging]);
+
+  // Log coordinate system changes for debugging
+  React.useEffect(() => {
+    if (dragState.isDragging) {
+      console.log('[CoordinateSystemDebug] 🎯 COORDINATE SYSTEM STABILITY:', {
+        isDragging: dragState.isDragging,
+        fullMin,
+        fullMax,
+        fullRange,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [dragState.isDragging, fullMin, fullMax, fullRange]);
+
+  // Zoom hook
+  const {
+    zoomLevel,
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomReset,
+    handleZoomToStart,
+    handleTimelineDoubleClick,
+    handleWheel,
+  } = useZoom({ fullMin, fullMax, fullRange });
+
+  // File drop hook
+  const {
+    isFileOver,
+    dropTargetFrame,
+    handleDragEnter,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useFileDrop({ onImageDrop, fullMin, fullRange });
+
+  // Set up global mouse event listeners for drag
+  useEffect(() => {
+    if (dragState.isDragging) {
+      console.log('[TimelineGlobalEvents] 🎧 SETTING UP GLOBAL EVENT LISTENERS:', {
+        isDragging: dragState.isDragging,
+        activeId: dragState.activeId?.substring(0, 8),
+        timestamp: new Date().toISOString()
+      });
+
+      const moveHandler = (e: MouseEvent) => {
+        console.log('[TimelineGlobalEvents] 🖱️ GLOBAL MOUSE MOVE:', {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          timestamp: e.timeStamp
+        });
+        handleMouseMove(e);
+      };
+
+      const upHandler = (e: MouseEvent) => {
+        console.log('[TimelineGlobalEvents] 🖱️ GLOBAL MOUSE UP:', {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          timestamp: e.timeStamp,
+          willCallHandleMouseUp: true
+        });
+        handleMouseUp(e, containerRef);
+      };
+
+      document.addEventListener('mousemove', moveHandler);
+      document.addEventListener('mouseup', upHandler);
+
+      return () => {
+        console.log('[TimelineGlobalEvents] 🧹 CLEANING UP GLOBAL EVENT LISTENERS');
+        document.removeEventListener('mousemove', moveHandler);
+        document.removeEventListener('mouseup', upHandler);
+      };
+    }
+  }, [dragState.isDragging, dragState.activeId, handleMouseMove, handleMouseUp]);
+
+  // Auto-adjust positions when context frames change
+  useEffect(() => {
+    if (initialContextFrames.current === contextFrames) {
+      initialContextFrames.current = contextFrames;
+      return;
+    }
+
+    const maxGap = calculateMaxGap(contextFrames);
+    const sortedPositions = [...framePositions.entries()]
+      .map(([id, pos]) => ({ id, pos }))
+      .sort((a, b) => a.pos - b.pos);
+
+    let needsAdjustment = false;
+    for (let i = 0; i < sortedPositions.length - 1; i++) {
+      const currentGap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
+      if (currentGap > maxGap) {
+        needsAdjustment = true;
+        break;
+      }
+    }
+
+    if (needsAdjustment) {
+      const adjustedPositions = new Map(framePositions);
+      let currentPos = 0;
+      for (let i = 0; i < sortedPositions.length; i++) {
+        adjustedPositions.set(sortedPositions[i].id, currentPos);
+        if (i < sortedPositions.length - 1) {
+          currentPos += Math.min(maxGap, frameSpacing);
+        }
+      }
+
+      setFramePositions(adjustedPositions);
+      toast.info(`Timeline positions auto-adjusted due to context frame changes (max gap: ${maxGap} frames)`);
+    }
+
+    initialContextFrames.current = contextFrames;
+  }, [contextFrames, framePositions, frameSpacing, setFramePositions]);
+
+  // Lightbox navigation
+  const goNext = () => setLightboxIndex(i => (i === null ? null : (i + 1) % images.length));
+  const goPrev = () => setLightboxIndex(i => (i === null ? null : (i - 1 + images.length) % images.length));
+
+  // Prepare data
+  const currentPositions = dynamicPositions();
+  const pairInfo = getPairInfo(currentPositions, contextFrames);
+  const numPairs = Math.max(0, images.length - 1);
+  const maxAllowedGap = calculateMaxGap(contextFrames);
+  const containerWidth = containerRef.current?.clientWidth || 1000;
+
+  const isMobile = useIsMobile();
+
+  // Mobile double-tap detection refs
+  const lastTouchTimeRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle mobile double-tap detection for image lightbox
+  const handleMobileTap = (idx: number) => {
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // This is a double-tap, clear any pending timeout and open lightbox
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+        doubleTapTimeoutRef.current = null;
+      }
+      setLightboxIndex(idx);
+    } else {
+      // This is a single tap, set a timeout to handle it if no second tap comes
+      if (doubleTapTimeoutRef.current) {
+        clearTimeout(doubleTapTimeoutRef.current);
+      }
+      doubleTapTimeoutRef.current = setTimeout(() => {
+        // Single tap on mobile - you could add single tap behavior here if needed
+        doubleTapTimeoutRef.current = null;
+      }, 300);
+    }
+    
+    lastTouchTimeRef.current = currentTime;
+  };
+
+  // Handle resetting frames to evenly spaced intervals
+  const handleResetFrames = useCallback(async (gap: number) => {
+    console.log('[FrameReset] 🔄 RESETTING FRAMES:', {
+      shotId: shotId.substring(0, 8),
+      gap,
+      imagesCount: images.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Create new positions: 0, gap, gap*2, gap*3, etc.
+    const newPositions = new Map<string, number>();
+    images.forEach((image, index) => {
+      newPositions.set(image.shotImageEntryId, index * gap);
+    });
+
+    console.log('[FrameReset] 📊 NEW POSITIONS:', {
+      shotId: shotId.substring(0, 8),
+      positions: Array.from(newPositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        position: pos
+      })),
+      timestamp: new Date().toISOString()
+    });
+
+    try {
+      await setFramePositions(newPositions);
+      console.log('[FrameReset] ✅ FRAME RESET COMPLETED');
+    } catch (error) {
+      console.error('[FrameReset] ❌ FRAME RESET FAILED:', error);
+    }
+  }, [images, setFramePositions, shotId]);
+
+  return (
+    <div className="w-full overflow-x-hidden">
+      {/* Controls */}
+      <TimelineControls
+        contextFrames={contextFrames}
+        onContextFramesChange={onContextFramesChange}
+        zoomLevel={zoomLevel}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onZoomReset={handleZoomReset}
+        onZoomToStart={handleZoomToStart}
+        onResetFrames={handleResetFrames}
+      />
+
+      {/* Timeline */}
+      <div
+        ref={timelineRef}
+        className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
+        }`}
+        style={{ minHeight: "200px", paddingBottom: "3rem" }}
+        onWheel={handleWheel}
+        onDragEnter={handleDragEnter}
+        onDragOver={(e) => handleDragOver(e, containerRef)}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drop position indicator */}
+        <DropIndicator
+          isVisible={isFileOver}
+          dropTargetFrame={dropTargetFrame}
+          fullMin={fullMin}
+          fullRange={fullRange}
+        />
+
+        {/* Ruler */}
+        <TimelineRuler
+          fullMin={fullMin}
+          fullMax={fullMax}
+          fullRange={fullRange}
+          zoomLevel={zoomLevel}
+        />
+
+        {/* Timeline container */}
+        <div
+          ref={containerRef}
+          id="timeline-container"
+          className="relative h-32 mb-8"
+          onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
+          style={{
+            width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
+            minWidth: "100%",
+            userSelect: 'none',
+          }}
+        >
+          {/* Pair visualizations */}
+          {pairInfo.map((pair, index) => {
+            // Build sorted positions array with id for pixel calculations
+            const sortedDynamicPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
+            const [startEntry, endEntry] = [sortedDynamicPositions[index], sortedDynamicPositions[index + 1]];
+
+            // Hide context for pairs involving the dragged item
+            if (dragState.isDragging && dragState.activeId) {
+              const isDraggedItemInPair = startEntry?.[0] === dragState.activeId || endEntry?.[0] === dragState.activeId;
+              if (isDraggedItemInPair) {
+                return null; // Skip rendering context for dragged item
+              }
+            }
+
+            // Hide context with delay for non-dragged pairs when not dragging
+            if (!dragState.isDragging && !showContext) {
+              return null; // Skip rendering until delay period is over
+            }
+
+            // Only calculate pixels for non-dragged items
+            const getPixel = (entry: [string, number] | undefined): number => {
+              if (!entry) return 0;
+              const [id, framePos] = entry;
+
+              // Skip DOM-based positioning for dragged items since we're not rendering their context
+              if (dragState.isDragging && id === dragState.activeId) {
+                console.log('[ContextSkip] 🎯 SKIPPING CONTEXT CALCULATION FOR DRAGGED ITEM:', {
+                  itemId: id.substring(0, 8),
+                  framePos,
+                  reason: 'context_hidden_for_dragged_item',
+                  timestamp: new Date().toISOString()
+                });
+                return 0; // Return 0 since this won't be used anyway
+              }
+
+              // GROUND TRUTH: Use actual container dimensions
+              const basePixel = ((framePos - fullMin) / fullRange) * containerWidth;
+
+              return basePixel;
+            };
+
+            const startPixel = getPixel(startEntry);
+            const endPixel = getPixel(endEntry);
+
+            const actualStartFrame = startEntry?.[1] ?? pair.startFrame;
+            const actualEndFrame = endEntry?.[1] ?? pair.endFrame;
+            const actualFrames = actualEndFrame - actualStartFrame;
+
+            const startPercent = (startPixel / containerWidth) * 100;
+            const endPercent = (endPixel / containerWidth) * 100;
+
+            const contextStartFrameUnclipped = actualEndFrame - contextFrames;
+            const contextStartFrame = Math.max(0, contextStartFrameUnclipped);
+            const visibleContextFrames = Math.max(0, actualEndFrame - contextStartFrame);
+            
+            const contextStartPixel = ((contextStartFrame - fullMin) / fullRange) * containerWidth;
+            const contextStartPercent = (contextStartPixel / containerWidth) * 100;
+
+            const generationStartPixel = ((pair.generationStart - fullMin) / fullRange) * containerWidth;
+            const generationStartPercent = (generationStartPixel / containerWidth) * 100;
+
+            return (
+              <PairRegion
+                key={`pair-${index}`}
+                index={index}
+                startPercent={startPercent}
+                endPercent={endPercent}
+                contextStartPercent={contextStartPercent}
+                generationStartPercent={generationStartPercent}
+                actualFrames={actualFrames}
+                visibleContextFrames={visibleContextFrames}
+                isDragging={dragState.isDragging}
+                contextFrames={contextFrames}
+                numPairs={numPairs}
+                startFrame={pair.startFrame}
+                endFrame={pair.endFrame}
+                onPairClick={onPairClick ? (pairIndex, pairData) => {
+                  // Get the images for this pair
+                  const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
+                  const endImage = images.find(img => img.shotImageEntryId === endEntry?.[0]);
+                  
+                  // Calculate actual position numbers (1-based)
+                  const startPosition = index + 1; // First image in pair
+                  const endPosition = index + 2;   // Second image in pair
+                  
+                  // Call the original onPairClick with enhanced data
+                  onPairClick(pairIndex, {
+                    ...pairData,
+                    startImage: startImage ? {
+                      id: startImage.shotImageEntryId,
+                      url: startImage.imageUrl || startImage.thumbUrl,
+                      thumbUrl: startImage.thumbUrl,
+                      timeline_frame: (startImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
+                      position: startPosition
+                    } : null,
+                    endImage: endImage ? {
+                      id: endImage.shotImageEntryId,
+                      url: endImage.imageUrl || endImage.thumbUrl,
+                      thumbUrl: endImage.thumbUrl,
+                      timeline_frame: (endImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
+                      position: endPosition
+                    } : null
+                  });
+                } : undefined}
+                pairPrompt={actualPairPrompts?.[index]?.prompt}
+                pairNegativePrompt={actualPairPrompts?.[index]?.negativePrompt}
+                defaultPrompt={defaultPrompt}
+                defaultNegativePrompt={defaultNegativePrompt}
+              />
+            );
+          })}
+
+          {/* Timeline items */}
+          {images.map((image, idx) => {
+            const framePosition = currentPositions.get(image.shotImageEntryId) ?? idx * frameSpacing;
+            const isDragging = dragState.isDragging && dragState.activeId === image.shotImageEntryId;
+
+            return (
+              <TimelineItem
+                key={image.shotImageEntryId}
+                image={image}
+                framePosition={framePosition}
+                isDragging={isDragging}
+                isSwapTarget={swapTargetId === image.shotImageEntryId}
+                dragOffset={isDragging ? dragOffset : null}
+                onMouseDown={(e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
+                onDoubleClick={isMobile ? undefined : () => setLightboxIndex(idx)}
+                onMobileTap={isMobile ? () => handleMobileTap(idx) : undefined}
+                zoomLevel={zoomLevel}
+                timelineWidth={containerWidth}
+                fullMinFrames={fullMin}
+                fullRange={fullRange}
+                currentDragFrame={isDragging ? currentDragFrame : null}
+                dragDistances={isDragging ? dragDistances : null}
+                maxAllowedGap={maxAllowedGap}
+                originalFramePos={displayPositions.get(image.shotImageEntryId) ?? 0}
+                onDelete={onImageDelete}
+                onDuplicate={onImageDuplicate}
+                duplicatingImageId={duplicatingImageId}
+                duplicateSuccessImageId={duplicateSuccessImageId}
+                projectAspectRatio={projectAspectRatio}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && images[lightboxIndex] && (
+        <MediaLightbox
+          media={images[lightboxIndex]}
+          onClose={() => setLightboxIndex(null)}
+          onNext={images.length > 1 ? goNext : undefined}
+          onPrevious={images.length > 1 ? goPrev : undefined}
+          onImageSaved={async (newUrl: string, createNew?: boolean) => await onImageSaved(images[lightboxIndex].id, newUrl, createNew)}
+          showNavigation={true}
+          showMagicEdit={true}
+          hasNext={lightboxIndex < images.length - 1}
+          hasPrevious={lightboxIndex > 0}
+          onMagicEdit={(imageUrl, prompt, numImages) => {
+            // TODO: Implement magic edit generation
+            console.log('Magic Edit from Timeline:', { imageUrl, prompt, numImages });
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default Timeline; 

@@ -8,7 +8,7 @@ import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
 import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ImageGallery } from '@/shared/components/ImageGallery';
+import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
 import { Skeleton } from '@/shared/components/ui/skeleton';

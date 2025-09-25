@@ -1,10 +1,12 @@
 import React from "react";
+import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
 
 interface DropIndicatorProps {
   isVisible: boolean;
   dropTargetFrame: number | null;
   fullMin: number;
   fullRange: number;
+  containerWidth: number;
 }
 
 const DropIndicator: React.FC<DropIndicatorProps> = ({
@@ -12,16 +14,22 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
   dropTargetFrame,
   fullMin,
   fullRange,
+  containerWidth,
 }) => {
   if (!isVisible || dropTargetFrame === null) {
     return null;
   }
 
+  // Use same positioning calculation as TimelineItem
+  const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+  const pixelPosition = TIMELINE_HORIZONTAL_PADDING + ((dropTargetFrame - fullMin) / fullRange) * effectiveWidth;
+  const leftPercent = (pixelPosition / containerWidth) * 100;
+
   return (
     <div
       className="absolute top-0 bottom-0 w-1 bg-primary z-40 pointer-events-none"
       style={{
-        left: `${((dropTargetFrame - fullMin) / fullRange) * 100}%`,
+        left: `${leftPercent}%`,
         transform: 'translateX(-50%)',
       }}
     >

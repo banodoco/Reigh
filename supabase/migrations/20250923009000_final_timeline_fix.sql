@@ -10,9 +10,10 @@ BEGIN
        (OLD.metadata->>'user_positioned' = 'true' OR OLD.metadata->>'drag_source' IS NOT NULL) AND
        NEW.timeline_frame IS DISTINCT FROM OLD.timeline_frame THEN
 
-        -- Log the attempt for debugging
-        RAISE LOG 'BLOCKED: Attempt to modify user-positioned timeline frame % from % to %',
-            OLD.generation_id, OLD.timeline_frame, NEW.timeline_frame;
+        -- Log the attempt for debugging with timestamp
+        RAISE LOG '[TimelineTriggerDebug] BLOCKED: Attempt to modify user-positioned timeline frame % from % to % (drag_source: %, user_positioned: %)',
+            OLD.generation_id, OLD.timeline_frame, NEW.timeline_frame,
+            OLD.metadata->>'drag_source', OLD.metadata->>'user_positioned';
 
         -- Restore the original timeline_frame
         NEW.timeline_frame := OLD.timeline_frame;

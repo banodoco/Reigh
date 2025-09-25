@@ -20,6 +20,9 @@ BEGIN
     IF TG_OP = 'UPDATE' AND
        (OLD.metadata->>'user_positioned' = 'true' OR OLD.metadata->>'drag_source' IS NOT NULL) AND
        NEW.timeline_frame IS DISTINCT FROM OLD.timeline_frame THEN
+        RAISE LOG '[TimelineTriggerDebug] EXCEPTION: Attempt to modify user-positioned timeline frame % from % to % (drag_source: %, user_positioned: %)',
+            OLD.generation_id, OLD.timeline_frame, NEW.timeline_frame,
+            OLD.metadata->>'drag_source', OLD.metadata->>'user_positioned';
         RAISE EXCEPTION 'Cannot modify timeline_frame of user-positioned item: %', OLD.generation_id;
     END IF;
 

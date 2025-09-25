@@ -137,7 +137,7 @@ export const useDuplicateShot = () => {
         name: newName || originalShot.name + ' Copy',
         projectId: projectId,
         shouldSelectAfterCreation: false,
-        position: (originalShot.position || 0) + 1
+        position: ((originalShot as any).position || 0) + 1
       }) as { shot: Shot };
       
       // Copy only non-video images to the new shot
@@ -180,7 +180,7 @@ export const useDuplicateShot = () => {
         created_at: completeShot.created_at,
         updated_at: completeShot.updated_at,
         project_id: completeShot.project_id,
-        position: completeShot.position || 1, // Include position field
+        position: (completeShot as any).position || 1, // Include position field
         images: completeShot.shot_generations?.map((sg: any) => ({
           ...sg.generation,
           shotImageEntryId: sg.id,
@@ -212,14 +212,14 @@ export const useDuplicateShot = () => {
           created_at: new Date().toISOString(),
           images: nonVideoImages, // Only copy non-video images for optimistic update
           project_id: projectId,
-          position: (originalShot.position || 0) + 1, // Position after the original shot
+          position: ((originalShot as any).position || 0) + 1, // Position after the original shot
         };
 
         queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
           // Insert the duplicate at the correct position in the ordered list
           // Since shots are ordered by position (ascending), find the insertion point
           const insertionIndex = oldShots.findIndex(shot => 
-            shot.position > (originalShot.position || 0)
+            shot.position > ((originalShot as any).position || 0)
           );
           
           if (insertionIndex === -1) {
@@ -293,7 +293,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         .from('shots')
         .select('*')
         .eq('project_id', projectId)
-        .order('position', { ascending: true, nullsFirst: false }); // This is shots.position, not shot_generations.position
+        .order('position', { ascending: true }); // This is shots.position, not shot_generations.position
       
       if (shotsError) {
         throw shotsError;
@@ -319,7 +319,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
           `)
           .eq('shot_id', shot.id)
           .not('generation.type', 'eq', 'video')
-          .order('timeline_frame', { ascending: true, nullsLast: true })
+          .order('timeline_frame', { ascending: true })
           .order('created_at', { ascending: false });
         
         // Only apply limit if specified (allows unlimited when needed)
@@ -387,7 +387,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       
       // [ShotReorderDebug] Log each position individually to avoid array collapse
       result.slice(0, 10).forEach((shot, index) => {
-        console.log(`[ShotReorderDebug] Shot ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${shot.position}`);
+        console.log(`[ShotReorderDebug] Shot ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${(shot as any).position}`);
       });
       
       return result;
@@ -430,7 +430,7 @@ export const useReorderShots = () => {
         
         return supabase
           .from('shots')
-          .update({ position })
+          .update({ position } as any)
           .eq('id', shotId)
           .eq('project_id', projectId);
       });
@@ -517,7 +517,7 @@ interface AddImageToShotArgs {
 }
 
 // Type for the response from adding an image to a shot
-type ShotImageResponse = Database['public']['Tables']['shot_images']['Row'];
+type ShotImageResponse = Database['public']['Tables']['shot_generations']['Row'];
 
 // Helper function to create a generation record for an externally uploaded image
 const createGenerationForUploadedImage = async (
@@ -969,37 +969,116 @@ export const useDuplicateImageInShot = () => {
       
       if (fetchAllError) throw fetchAllError;
       
+      console.log('[DUPLICATE_DEBUG] 📊 ALL IMAGES FROM DATABASE:', {
+        shot_id: shot_id.substring(0, 8),
+        generation_id: generation_id.substring(0, 8),
+        totalImages: allImages?.length || 0,
+        allImages: allImages?.map(img => ({
+          id: img.id.substring(0, 8),
+          generation_id: img.generation_id.substring(0, 8),
+          timeline_frame: img.timeline_frame
+        })) || []
+      });
+      
       // Find the original image and the next image to calculate midpoint
       const originalImage = allImages?.find(img => img.generation_id === generation_id);
       if (!originalImage) throw new Error('Original image not found');
       
+      console.log('[DUPLICATE_DEBUG] 🚨 UI vs DATABASE COMPARISON:', {
+        generation_id: generation_id.substring(0, 8),
+        database_timeline_frame: originalImage.timeline_frame,
+        note: 'This should match the timeline_frame_from_button in previous logs',
+        warning: 'If these don\'t match, there\'s a UI sync issue'
+      });
+      
+      console.log('[DUPLICATE_DEBUG] 🎯 FOUND ORIGINAL IMAGE:', {
+        originalImage: {
+          id: originalImage.id.substring(0, 8),
+          generation_id: originalImage.generation_id.substring(0, 8),
+          timeline_frame: originalImage.timeline_frame
+        }
+      });
+      
       // Find the next image by timeline_frame order (not position order)
-      const originalFrame = originalImage.timeline_frame || 0;
+      const originalFrameValue = originalImage.timeline_frame || 0;
       
       // Sort all images by timeline_frame to find the actual next image in timeline order
       const sortedByTimelineFrame = allImages
         ?.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined)
         .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0)) || [];
       
-      // Find the next image after the original in timeline order
+      // Check for duplicate timeline_frame values (this indicates previous duplication bugs)
+      const timelineFrameCounts = {};
+      sortedByTimelineFrame.forEach(img => {
+        const frame = img.timeline_frame;
+        timelineFrameCounts[frame] = (timelineFrameCounts[frame] || 0) + 1;
+      });
+      
+      const duplicateFrames = Object.entries(timelineFrameCounts)
+        .filter(([frame, count]) => (count as number) > 1)
+        .map(([frame, count]) => ({ frame: parseInt(frame), count: count as number }));
+
+      console.log('[DUPLICATE_DEBUG] 📋 SORTED BY TIMELINE_FRAME:', {
+        sortedImages: sortedByTimelineFrame.map((img, index) => ({
+          index,
+          id: img.id.substring(0, 8),
+          generation_id: img.generation_id.substring(0, 8),
+          timeline_frame: img.timeline_frame,
+          isOriginal: img.id === originalImage.id
+        })),
+        duplicateFrames: duplicateFrames.length > 0 ? duplicateFrames : 'none',
+        warning: duplicateFrames.length > 0 ? 'DUPLICATE_TIMELINE_FRAMES_DETECTED!' : 'all_frames_unique'
+      });
+      
+      // Find the next image after the original in timeline order with a DIFFERENT timeline_frame
       const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === originalImage.id);
-      const nextImageInTimeline = originalIndex >= 0 && originalIndex < sortedByTimelineFrame.length - 1 
-        ? sortedByTimelineFrame[originalIndex + 1] 
-        : null;
+      
+      // Look for the next image with a different timeline_frame value
+      let nextImageInTimeline = null;
+      for (let i = originalIndex + 1; i < sortedByTimelineFrame.length; i++) {
+        const candidate = sortedByTimelineFrame[i];
+        if (candidate.timeline_frame !== originalFrameValue) {
+          nextImageInTimeline = candidate;
+          break;
+        }
+      }
+      
+      console.log('[DUPLICATE_DEBUG] 🔍 NEXT IMAGE SEARCH:', {
+        originalIndex,
+        totalSortedImages: sortedByTimelineFrame.length,
+        hasNextImage: !!nextImageInTimeline,
+        nextImageInTimeline: nextImageInTimeline ? {
+          id: nextImageInTimeline.id.substring(0, 8),
+          generation_id: nextImageInTimeline.generation_id.substring(0, 8),
+          timeline_frame: nextImageInTimeline.timeline_frame
+        } : null,
+        isLastImage: originalIndex === sortedByTimelineFrame.length - 1
+      });
         
       // If we're at the end of the timeline, there's no next image
       // The duplicate should go after the original with default spacing
       
       // Calculate timeline frame as midpoint
       const nextFrame = nextImageInTimeline 
-        ? (nextImageInTimeline.timeline_frame || (originalFrame + 60))
-        : (originalFrame + 60); // Default spacing if no next image
-      const duplicateTimelineFrame = Math.floor((originalFrame + nextFrame) / 2);
+        ? nextImageInTimeline.timeline_frame  // Use the actual timeline_frame value
+        : (originalFrameValue + 60); // Default spacing if no next image
+      const duplicateTimelineFrame = Math.floor((originalFrameValue + nextFrame) / 2);
       
-      console.log('[DUPLICATE] Timeline frame calculation:', {
-        originalFrame,
+      console.log('[DUPLICATE_DEBUG] 🔧 FRAME CALCULATION DEBUG:', {
+        hasNextImage: !!nextImageInTimeline,
+        nextImageTimelineFrame: nextImageInTimeline?.timeline_frame,
+        nextFrameUsed: nextFrame,
+        originalFrame: originalFrameValue,
+        calculatedMidpoint: duplicateTimelineFrame,
+        issue: nextFrame === originalFrameValue ? 'NEXT_FRAME_EQUALS_ORIGINAL!' : 'OK'
+      });
+      
+      console.log('[DUPLICATE_DEBUG] 🧮 TIMELINE FRAME CALCULATION:', {
+        originalFrame: originalFrameValue,
         nextFrame,
         duplicateTimelineFrame,
+        calculationMethod: nextImageInTimeline ? 'midpoint_between_images' : 'default_spacing_after_last',
+        midpointFormula: `Math.floor((${originalFrameValue} + ${nextFrame}) / 2) = ${duplicateTimelineFrame}`,
         nextImageInTimeline: nextImageInTimeline ? {
           id: nextImageInTimeline.id.substring(0, 8),
           timeline_frame: nextImageInTimeline.timeline_frame
@@ -1008,19 +1087,80 @@ export const useDuplicateImageInShot = () => {
         originalIndexInTimeline: originalIndex
       });
       
-      // No need to shift positions manually - they're now computed from timeline_frame!
-      // Just insert the duplicate with the calculated timeline frame
+      // Step 1: Get the original generation data to duplicate
+      console.log('[DUPLICATE_DEBUG] 🔍 FETCHING ORIGINAL GENERATION DATA:', {
+        generation_id: generation_id.substring(0, 8)
+      });
+      
+      const { data: originalGeneration, error: fetchGenError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', generation_id)
+        .single();
+      
+      if (fetchGenError || !originalGeneration) {
+        throw new Error('Failed to fetch original generation for duplication');
+      }
+      
+      console.log('[DUPLICATE_DEBUG] 📄 ORIGINAL GENERATION DATA:', {
+        id: originalGeneration.id.substring(0, 8),
+        location: originalGeneration.location?.substring(0, 50) + '...',
+        type: originalGeneration.type,
+        project_id: originalGeneration.project_id?.substring(0, 8)
+      });
+      
+      // Step 2: Create a new generation record (duplicate the image)
+      console.log('[DUPLICATE_DEBUG] 🆕 CREATING NEW GENERATION RECORD:', {
+        duplicating_from: originalGeneration.id.substring(0, 8),
+        timeline_frame: duplicateTimelineFrame
+      });
+      
+      const { data: newGeneration, error: createGenError } = await supabase
+        .from('generations')
+        .insert({
+          location: originalGeneration.location,
+          thumbnail_url: originalGeneration.thumbnail_url,
+          type: originalGeneration.type,
+          project_id: originalGeneration.project_id,
+          params: {
+            ...(originalGeneration.params as Record<string, any> || {}),
+            duplicated_from: originalGeneration.id,
+            duplicate_source: 'timeline_duplicate_button',
+            original_timeline_frame: originalFrameValue
+          } as any
+        })
+        .select()
+        .single();
+      
+      if (createGenError || !newGeneration) {
+        throw new Error('Failed to create new generation for duplicate');
+      }
+      
+      console.log('[DUPLICATE_DEBUG] ✅ NEW GENERATION CREATED:', {
+        new_generation_id: newGeneration.id.substring(0, 8),
+        original_generation_id: generation_id.substring(0, 8)
+      });
+      
+      // Step 3: Create shot_generations entry pointing to the NEW generation
+      console.log('[DUPLICATE_DEBUG] 💾 INSERTING INTO DATABASE:', {
+        shot_id: shot_id.substring(0, 8),
+        new_generation_id: newGeneration.id.substring(0, 8),
+        timeline_frame: duplicateTimelineFrame,
+        originalImageShouldRemainAt: originalFrameValue,
+        warning: 'ORIGINAL_IMAGE_SHOULD_NOT_MOVE'
+      });
+      
       const { data: newShotGeneration, error: insertError } = await supabase
         .from('shot_generations')
         .insert({
           shot_id,
-          generation_id,
-          // Remove position - it will be computed from timeline_frame
+          generation_id: newGeneration.id, // ✅ NOW USING THE NEW GENERATION ID!
           timeline_frame: duplicateTimelineFrame,
           metadata: {
             duplicated_from: originalImage.id,
-            original_timeline_frame: originalFrame,
-            calculated_midpoint: duplicateTimelineFrame
+            original_timeline_frame: originalFrameValue,
+            calculated_midpoint: duplicateTimelineFrame,
+            original_generation_id: generation_id
           }
         })
         .select()
@@ -1051,49 +1191,108 @@ export const useDuplicateImageInShot = () => {
             const genToDuplicate = shot.images.find(img => img.id === generation_id);
             if (!genToDuplicate) return shot;
             
+            // Get timeline_frame from the original image
+            const originalTimelineFrame = (genToDuplicate as any).timeline_frame || 0;
+            
             console.log('[DUPLICATE] Found generation to duplicate', {
               genToDuplicate: genToDuplicate.shotImageEntryId,
-              originalPosition: (genToDuplicate as any).position
+              originalTimelineFrame
             });
 
-            // Create a new shot generation entry
+            console.log('[DUPLICATE_DEBUG] 🎯 OPTIMISTIC UPDATE - Starting calculation:', {
+              shot_id: shot_id.substring(0, 8),
+              generation_id: generation_id.substring(0, 8),
+              originalTimelineFrame,
+              totalImagesInShot: shot.images.length
+            });
+
+            // Calculate the duplicate's timeline_frame (same logic as in mutationFn)
+            // Find all images sorted by timeline_frame
+            const sortedByTimelineFrame = shot.images
+              .filter(img => (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined)
+              .sort((a, b) => ((a as any).timeline_frame || 0) - ((b as any).timeline_frame || 0));
+            
+            console.log('[DUPLICATE_DEBUG] 📋 OPTIMISTIC - SORTED BY TIMELINE_FRAME:', {
+              sortedImages: sortedByTimelineFrame.map((img, index) => ({
+                index,
+                shotImageEntryId: img.shotImageEntryId.substring(0, 8),
+                id: img.id.substring(0, 8),
+                timeline_frame: (img as any).timeline_frame,
+                isOriginal: img.id === generation_id
+              }))
+            });
+            
+            // Find the next image after the original in timeline order with a DIFFERENT timeline_frame
+            const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === generation_id);
+            
+            // Look for the next image with a different timeline_frame value
+            let nextImageInTimeline = null;
+            for (let i = originalIndex + 1; i < sortedByTimelineFrame.length; i++) {
+              const candidate = sortedByTimelineFrame[i];
+              if ((candidate as any).timeline_frame !== originalTimelineFrame) {
+                nextImageInTimeline = candidate;
+                break;
+              }
+            }
+            
+            console.log('[DUPLICATE_DEBUG] 🔍 OPTIMISTIC - NEXT IMAGE SEARCH:', {
+              originalIndex,
+              totalSortedImages: sortedByTimelineFrame.length,
+              hasNextImage: !!nextImageInTimeline,
+              nextImageInTimeline: nextImageInTimeline ? {
+                shotImageEntryId: nextImageInTimeline.shotImageEntryId.substring(0, 8),
+                id: nextImageInTimeline.id.substring(0, 8),
+                timeline_frame: (nextImageInTimeline as any).timeline_frame
+              } : null,
+              isLastImage: originalIndex === sortedByTimelineFrame.length - 1
+            });
+            
+            // Calculate timeline frame as midpoint
+            const nextFrame = nextImageInTimeline 
+              ? (nextImageInTimeline as any).timeline_frame  // Use the actual timeline_frame value
+              : (originalTimelineFrame + 60); // Default spacing if no next image
+            const duplicateTimelineFrame = Math.floor((originalTimelineFrame + nextFrame) / 2);
+            
+            console.log('[DUPLICATE_DEBUG] 🔧 OPTIMISTIC - FRAME CALCULATION DEBUG:', {
+              hasNextImage: !!nextImageInTimeline,
+              nextImageTimelineFrame: nextImageInTimeline ? (nextImageInTimeline as any).timeline_frame : null,
+              nextFrameUsed: nextFrame,
+              originalTimelineFrame,
+              calculatedMidpoint: duplicateTimelineFrame,
+              issue: nextFrame === originalTimelineFrame ? 'NEXT_FRAME_EQUALS_ORIGINAL!' : 'OK'
+            });
+
+            console.log('[DUPLICATE_DEBUG] 🧮 OPTIMISTIC - TIMELINE FRAME CALCULATION:', {
+              originalTimelineFrame,
+              nextFrame,
+              duplicateTimelineFrame,
+              calculationMethod: nextImageInTimeline ? 'midpoint_between_images' : 'default_spacing_after_last',
+              midpointFormula: `Math.floor((${originalTimelineFrame} + ${nextFrame}) / 2) = ${duplicateTimelineFrame}`
+            });
+
+            // Create a new shot generation entry with timeline_frame
             const duplicatedImage = {
               ...genToDuplicate,
               shotImageEntryId: `temp-${Date.now()}`, // Temporary ID for optimistic update
               shot_generation_id: `temp-${Date.now()}`,
-              position: position
+              timeline_frame: duplicateTimelineFrame
             };
             
-            console.log('[DUPLICATE] Images before position adjustment', {
-              imageCount: shot.images.length,
-              positions: shot.images.map(img => (img as any).position)
+            console.log('[DUPLICATE_DEBUG] ✅ OPTIMISTIC - Created duplicate image:', {
+              originalTimelineFrame,
+              nextFrame,
+              duplicateTimelineFrame,
+              duplicatedImageId: duplicatedImage.shotImageEntryId,
+              nextImageInTimeline: nextImageInTimeline ? (nextImageInTimeline as any).timeline_frame : 'none'
             });
 
-            // Update positions and insert duplicate
-            const updatedImages = shot.images.map(img => {
-              const imgPosition = (img as any).position;
-              if (imgPosition !== null && imgPosition !== undefined && imgPosition >= position) {
-                console.log('[DUPLICATE] Shifting image position', {
-                  imageId: img.shotImageEntryId,
-                  oldPosition: imgPosition,
-                  newPosition: imgPosition + 1
-                });
-                return { ...img, position: imgPosition + 1 } as any;
-              }
-              return img;
-            });
+            // Simply add the duplicate to the images array - no position shifting needed
+            // The timeline will sort by timeline_frame automatically
+            const updatedImages = [...shot.images, duplicatedImage];
             
-            console.log('[DUPLICATE] About to splice at position', {
-              splicePosition: position,
-              arrayLength: updatedImages.length
-            });
-
-            // Insert the duplicate at the correct position
-            updatedImages.splice(position, 0, duplicatedImage);
-            
-            console.log('[DUPLICATE] Final images after splice', {
+            console.log('[DUPLICATE] Added duplicate image', {
               imageCount: updatedImages.length,
-              positions: updatedImages.map(img => (img as any).position)
+              duplicateTimelineFrame
             });
 
             return { ...shot, images: updatedImages };
@@ -1274,28 +1473,28 @@ interface UpdateShotImageOrderArgs {
 }
 
 // Update the order of images in a shot VIA API
+// 🚨 DISABLED: This function was overwriting user drag positions with index-based spacing
+// Only use for non-drag operations like bulk reorder from ShotsPane
 export const useUpdateShotImageOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async ({ shotId, orderedShotGenerationIds, projectId }: { shotId: string; orderedShotGenerationIds: string[]; projectId: string }) => {
-      // Update timeline_frames for all shot_generations in a transaction-like manner
-      const updates = orderedShotGenerationIds.map((id, index) => 
-        supabase
-          .from('shot_generations')
-          .update({ timeline_frame: index * 50 })
-          .eq('id', id)
-          .eq('shot_id', shotId)
-      );
-      
-      // Execute all updates
-      const results = await Promise.all(updates);
-      
-      // Check for errors
-      const error = results.find(r => r.error)?.error;
-      if (error) throw error;
-      
-      return { message: 'Image order updated successfully' };
+      console.log('[TimelineDragFix] 🚨 BLOCKED: useUpdateShotImageOrder called - this would overwrite drag positions');
+      throw new Error('useUpdateShotImageOrder is disabled to prevent overwriting drag positions. Use timeline drag instead.');
+
+      // OLD CODE - DISABLED TO PREVENT DRAG POSITION OVERWRITES:
+      // const updates = orderedShotGenerationIds.map((id, index) =>
+      //   supabase
+      //     .from('shot_generations')
+      //     .update({ timeline_frame: index * 50 })
+      //     .eq('id', id)
+      //     .eq('shot_id', shotId)
+      // );
+      // const results = await Promise.all(updates);
+      // const error = results.find(r => r.error)?.error;
+      // if (error) throw error;
+      // return { message: 'Image order updated successfully' };
     },
     onMutate: async ({ shotId, orderedShotGenerationIds, projectId }) => {
       if (!projectId) return { previousShots: [], projectId: null };

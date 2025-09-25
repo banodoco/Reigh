@@ -81,6 +81,9 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
     }
   };
 
+  // Check if there are any custom prompts to reset
+  const hasCustomPrompts = (prompt.trim() !== '') || (negativePrompt.trim() !== '');
+
   if (!pairData) return null;
 
   return (
@@ -185,6 +188,7 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
               <Button
                 variant="outline"
                 onClick={handleReset}
+                disabled={!hasCustomPrompts}
                 className={`flex items-center gap-2 ${modal.isMobile ? 'order-3' : ''}`}
               >
                 Reset to Defaults

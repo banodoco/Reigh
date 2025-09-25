@@ -584,7 +584,7 @@ export default function HomePage() {
                     showCreativePartner ? 'pointer-events-none opacity-60' : showPhilosophy || showExamples ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100' : 'opacity-100 pointer-events-auto transition-all duration-300'
                   }`}
                 >
-                  open tool
+                  open source tool
                 </span>
               </TooltipTrigger>
               <TooltipContent
@@ -601,50 +601,7 @@ export default function HomePage() {
                 </p>
               </TooltipContent>
             </Tooltip>
-          </TooltipProvider>{' '}made{' '}
-          {/* Exploring tooltip temporarily disabled */}
-          {/*
-          <TooltipProvider>
-            <Tooltip
-              open={exploringTipOpen}
-              onOpenChange={(o) => {
-                if (!exploringTipDisabled) setExploringTipOpen(o);
-              }}
-            >
-              <TooltipTrigger asChild>
-                <span
-                  onClick={handleExploringActivate}
-                  onMouseLeave={() => {
-                    if (exploringTipDisabled) setExploringTipDisabled(false);
-                  }}
-                  className={`sparkle-underline cursor-pointer transition-colors duration-200 ${exploringTipDisabled ? 'pointer-events-none' : ''} ${
-                    showCreativePartner
-                      ? 'pointer-events-none opacity-60'
-                      : showPhilosophy || showExamples
-                      ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
-                      : 'opacity-100 pointer-events-auto transition-all duration-300'
-                  }`}
-                >
-                  for exploring
-                </span>
-              </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                align="center"
-                onClick={handleExploringActivate}
-                className="group flex flex-col items-center gap-2 text-center p-3 max-w-xs border-2 border-transparent bg-wes-cream/80 rounded-lg shadow-md cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-wes-pink/10 hover:via-wes-coral/10 hover:to-wes-vintage-gold/10 hover:border-transparent hover:bg-origin-border hover:shadow-2xl hover:-translate-y-1"
-              >
-                <p className="text-xs sm:text-sm leading-relaxed text-primary">
-                  Dummy text for exploring tooltip. This is some longer dummy text to demonstrate how the tooltip handles more content while maintaining its layout and style.
-                </p>
-                <div className="flex-shrink-0">
-                  <ChevronDown className="hover-arrow w-6 h-6 text-wes-vintage-gold transition-transform transition-colors duration-700 ease-in-out group-hover:text-wes-coral group-hover:animate-sway-y" />
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          */}
-          for exploring an{' '}
+          </TooltipProvider>{' '}for{' '}
             <TooltipProvider>
               <Tooltip
                 open={emergingTipOpen}
@@ -666,7 +623,7 @@ export default function HomePage() {
                         : 'opacity-100 pointer-events-auto transition-all duration-300'
                     }`}
                   >
-                    emerging artform
+                    travelling between images
                   </span>
                 </TooltipTrigger>
                 <TooltipContent
@@ -694,7 +651,7 @@ export default function HomePage() {
                   </div>
                 </TooltipContent>
               </Tooltip>
-            </TooltipProvider>.
+            </TooltipProvider>
               </p>
             </FadeInSection>
             

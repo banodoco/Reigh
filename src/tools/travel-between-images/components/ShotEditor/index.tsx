@@ -16,6 +16,7 @@ import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import ShotImagesEditor from '../ShotImagesEditor';
+import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { useAllShotGenerations, useUnpositionedGenerationsCount } from '@/shared/hooks/useShotGenerations';
 import usePersistentState from '@/shared/hooks/usePersistentState';
@@ -210,6 +211,30 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Timeline positions are now managed directly by the database via useEnhancedShotPositions
   // No local caching or debouncing needed
+  
+  // Get pair prompts data for checking if all pairs have prompts
+  const { pairPrompts, shotGenerations } = useEnhancedShotPositions(selectedShotId);
+  
+  // Check if all pairs (except the last one) have custom prompts
+  const allPairsHavePrompts = React.useMemo(() => {
+    if (generationMode !== 'timeline' || !shotGenerations?.length) {
+      return false;
+    }
+    
+    // Calculate number of pairs (frames - 1)
+    const numPairs = Math.max(0, shotGenerations.length - 1);
+    if (numPairs === 0) return false;
+    
+    // Check if all pairs have custom prompts
+    for (let i = 0; i < numPairs; i++) {
+      const pairPrompt = pairPrompts[i]?.prompt;
+      if (!pairPrompt || !pairPrompt.trim()) {
+        return false; // This pair doesn't have a custom prompt
+      }
+    }
+    
+    return true; // All pairs have custom prompts
+  }, [generationMode, shotGenerations, pairPrompts]);
   
   const isMobile = useIsMobile();
   
@@ -1511,7 +1536,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </button>
                       </p>
                     )}
-                    {!batchVideoPrompt.trim() && (
+                    {!batchVideoPrompt.trim() && !allPairsHavePrompts && (
                       <p className="text-xs text-center text-red-600 mt-2">
                         Having a prompt is very important for directing the video
                       </p>

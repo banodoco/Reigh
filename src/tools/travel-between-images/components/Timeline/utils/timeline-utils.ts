@@ -160,27 +160,43 @@ export const applyFluidTimeline = (
     timestamp: new Date().toISOString()
   });
 
+  // 🎯 DEBUG: Check for position conflicts (multiple items at same position)
+  const positionConflicts = new Map<number, string[]>();
+  for (const [id, pos] of positions) {
+    if (!positionConflicts.has(pos)) {
+      positionConflicts.set(pos, []);
+    }
+    positionConflicts.get(pos)!.push(id.substring(0, 8));
+  }
+  
+  const conflicts = Array.from(positionConflicts.entries())
+    .filter(([pos, ids]) => ids.length > 1);
+  
+  if (conflicts.length > 0) {
+    console.log(`[TIMELINE_TRACK] [POSITION_CONFLICTS] ⚠️ Multiple items at same positions:`, 
+      conflicts.map(([pos, ids]) => `${pos}: [${ids.join(', ')}]`).join(', '));
+  }
+
   // Start with the proposed position (but use limited movement)
   const result = new Map(positions);
   const limitedTargetFrame = originalPos + limitedMovementAmount;
   result.set(draggedId, limitedTargetFrame);
 
-  // Get all items sorted by position
-  const sorted = [...result.entries()]
+  // Get all items sorted by ORIGINAL positions (before any movement)
+  const originalSorted = [...positions.entries()]
     .filter(([id]) => id !== excludeId)
     .sort((a, b) => a[1] - b[1]);
 
-  // Find the dragged item's position in the sorted list
-  const draggedIndex = sorted.findIndex(([id, _]) => id === draggedId);
-  if (draggedIndex === -1) {
+  // Find the dragged item's position in the ORIGINAL sorted list
+  const originalDraggedIndex = originalSorted.findIndex(([id, _]) => id === draggedId);
+  if (originalDraggedIndex === -1) {
     console.log('[FluidTimelineCore] ⚠️ DRAGGED ITEM NOT FOUND - Falling back to shrinkOversizedGaps');
     return shrinkOversizedGaps(result, contextFrames, excludeId);
   }
 
-  // For fluid timeline behavior, we want to shift subsequent items when dragging
-  // Check the current gap situation
-  const prevItem = draggedIndex > 0 ? sorted[draggedIndex - 1] : null;
-  const nextItem = draggedIndex < sorted.length - 1 ? sorted[draggedIndex + 1] : null;
+  // Get adjacent items based on ORIGINAL positions, not the moved position
+  const prevItem = originalDraggedIndex > 0 ? originalSorted[originalDraggedIndex - 1] : null;
+  const nextItem = originalDraggedIndex < originalSorted.length - 1 ? originalSorted[originalDraggedIndex + 1] : null;
 
   let needsShift = false;
   let shiftAmount = 0;
@@ -195,14 +211,11 @@ export const applyFluidTimeline = (
   });
 
   if (limitedMovementAmount !== 0) {
-    // Check if the limited movement would create gap violations
     const limitedTargetFrame = originalPos + limitedMovementAmount;
-    const draggedIndex = sorted.findIndex(([id, _]) => id === draggedId);
-    const prevItem = draggedIndex > 0 ? sorted[draggedIndex - 1] : null;
-    const nextItem = draggedIndex < sorted.length - 1 ? sorted[draggedIndex + 1] : null;
 
     let wouldCreateViolation = false;
 
+    // Use the original adjacent items for gap calculations
     if (prevItem && limitedTargetFrame - prevItem[1] > maxGap) {
       wouldCreateViolation = true;
     }
@@ -214,11 +227,12 @@ export const applyFluidTimeline = (
     if (wouldCreateViolation) {
       needsShift = true;
       shiftAmount = Math.abs(limitedMovementAmount);
+      console.log(`[TIMELINE_TRACK] [GAP_VIOLATION] ⚠️ Gap violation detected - shifting required for item ${draggedId.substring(0, 8)}`);
     } else {
-      // Even if no violation, allow some fluid movement for better UX
-      // But only shift a fraction of the movement to make it feel more natural
-      needsShift = true;
-      shiftAmount = Math.max(1, Math.abs(limitedMovementAmount) * 0.3); // Only 30% of the movement
+      // NO SHIFT NEEDED: If no gap violation, don't shift adjacent items
+      needsShift = false;
+      shiftAmount = 0;
+      console.log(`[TIMELINE_TRACK] [NO_VIOLATION] ✅ No gap violation - no shifting needed for item ${draggedId.substring(0, 8)}`);
     }
   }
 
@@ -267,7 +281,7 @@ export const applyFluidTimeline = (
     // When hitting a boundary, we need to shift adjacent items to make room
     if (hitsLeftBoundary) {
       // When hitting left boundary while moving left, shift items to the RIGHT
-      const itemsToShiftRight = sorted.slice(draggedIndex + 1); // Items after dragged item
+      const itemsToShiftRight = originalSorted.slice(originalDraggedIndex + 1); // Items after dragged item
       if (itemsToShiftRight.length > 0) {
         violations.push({
           type: 'BOUNDARY_COLLISION',
@@ -280,7 +294,7 @@ export const applyFluidTimeline = (
       }
     } else if (hitsRightBoundary) {
       // When hitting right boundary while moving right, shift items to the LEFT
-      const itemsToShiftLeft = sorted.slice(0, draggedIndex).reverse(); // Items before dragged item
+      const itemsToShiftLeft = originalSorted.slice(0, originalDraggedIndex).reverse(); // Items before dragged item
       if (itemsToShiftLeft.length > 0) {
         violations.push({
           type: 'BOUNDARY_COLLISION',
@@ -357,9 +371,9 @@ export const applyFluidTimeline = (
 
     // Timeline Impact (preview based on current state)
     impact: {
-      itemsToShift: sorted.slice(draggedIndex + 1).length,
+      itemsToShift: originalSorted.slice(originalDraggedIndex + 1).length,
       shiftMagnitude: shiftAmount,
-      totalAffectedItems: 1 + sorted.slice(draggedIndex + 1).length, // dragged + subsequent
+      totalAffectedItems: 1 + originalSorted.slice(originalDraggedIndex + 1).length, // dragged + subsequent
       wouldCross: false, // Will be calculated after shifting
       constraintApplied: 'PENDING_CALCULATION'
     },
@@ -367,7 +381,7 @@ export const applyFluidTimeline = (
     // Final State Preview (preview based on current state)
     preview: {
       draggedFinalPos: limitedTargetFrame,
-      subsequentItemsShifted: sorted.slice(draggedIndex + 1).map(([id, pos]) => ({
+      subsequentItemsShifted: originalSorted.slice(originalDraggedIndex + 1).map(([id, pos]) => ({
         id: id.substring(0, 8),
         oldPos: pos,
         newPos: pos + (shiftAmount * (limitedMovementAmount > 0 ? 1 : -1))
@@ -389,16 +403,16 @@ export const applyFluidTimeline = (
   // Determine which items to shift based on violation types
   let itemsToShift: [string, number][] = [];
 
-  // Handle different violation types
+  // Handle different violation types - use original sorted positions
   for (const violation of violations) {
     if (violation.type === 'BOUNDARY_COLLISION') {
       if (violation.direction === 'SHIFT_RIGHT') {
         // Shift items to the right of dragged item
-        itemsToShift = sorted.slice(draggedIndex + 1);
+        itemsToShift = originalSorted.slice(originalDraggedIndex + 1);
         break;
       } else if (violation.direction === 'SHIFT_LEFT') {
         // Shift items to the left of dragged item (in reverse order for consistent shifting)
-        itemsToShift = sorted.slice(0, draggedIndex);
+        itemsToShift = originalSorted.slice(0, originalDraggedIndex);
         break;
       }
     }
@@ -406,33 +420,37 @@ export const applyFluidTimeline = (
 
   // If no boundary violations, use traditional logic for gap violations
   if (itemsToShift.length === 0) {
-    // Symmetric handling:
-    // - Dragging RIGHT (limitedMovementAmount > 0): if prev-gap violated, shift LEFT items
-    // - Dragging LEFT (limitedMovementAmount < 0): if next-gap violated, shift RIGHT items
+    // FIXED: Only shift immediately adjacent items, not all items on one side
     const prevGapViolation = prevItem ? (targetFrame - prevItem[1] > maxGap) : false;
     const nextGapViolation = nextItem ? (nextItem[1] - targetFrame > maxGap) : false;
 
-    if (limitedMovementAmount > 0 && prevGapViolation) {
-      // Right drag stretching gap to the left → pull left items rightwards
-      itemsToShift = sorted.slice(0, draggedIndex);
-      console.log('[BoundaryCollisionDebug] 🔁 SYMMETRIC SHIFT (RIGHT DRAG, PREV GAP): shifting LEFT items', {
+    if (limitedMovementAmount > 0 && prevGapViolation && prevItem) {
+      // Right drag stretching gap to the left → only shift the immediately previous item
+      itemsToShift = [prevItem];
+      console.log('[BoundaryCollisionDebug] 🔁 ADJACENT SHIFT (RIGHT DRAG, PREV GAP): shifting only adjacent previous item', {
         draggedId: draggedId.substring(0, 8),
-        prevItem: prevItem ? { id: prevItem[0].substring(0,8), pos: prevItem[1] } : null,
-        draggedIndex,
+        prevItem: { id: prevItem[0].substring(0,8), pos: prevItem[1] },
+        originalDraggedIndex,
         itemsToShift: itemsToShift.map(([id, pos]) => ({ id: id.substring(0,8), pos }))
       });
-    } else if (limitedMovementAmount < 0 && nextGapViolation) {
-      // Left drag stretching gap to the right → push right items leftwards
-      itemsToShift = sorted.slice(draggedIndex + 1);
-      console.log('[BoundaryCollisionDebug] 🔁 SYMMETRIC SHIFT (LEFT DRAG, NEXT GAP): shifting RIGHT items', {
+    } else if (limitedMovementAmount < 0 && nextGapViolation && nextItem) {
+      // Left drag stretching gap to the right → only shift the immediately next item
+      itemsToShift = [nextItem];
+      console.log('[BoundaryCollisionDebug] 🔁 ADJACENT SHIFT (LEFT DRAG, NEXT GAP): shifting only adjacent next item', {
         draggedId: draggedId.substring(0, 8),
-        nextItem: nextItem ? { id: nextItem[0].substring(0,8), pos: nextItem[1] } : null,
-        draggedIndex,
+        nextItem: { id: nextItem[0].substring(0,8), pos: nextItem[1] },
+        originalDraggedIndex,
         itemsToShift: itemsToShift.map(([id, pos]) => ({ id: id.substring(0,8), pos }))
       });
     } else {
-      // Default: shift subsequent items (previous behavior)
-      itemsToShift = sorted.slice(draggedIndex + 1);
+      // Default: no shifting for normal drag operations
+      itemsToShift = [];
+      console.log('[BoundaryCollisionDebug] ✅ NO SHIFT NEEDED: Normal drag operation within constraints', {
+        draggedId: draggedId.substring(0, 8),
+        limitedMovementAmount,
+        prevGapViolation,
+        nextGapViolation
+      });
     }
   }
 
@@ -453,10 +471,14 @@ export const applyFluidTimeline = (
   itemsToShift.forEach(([id, pos]) => {
     const newPos = pos + (shiftAmount * shiftDirection);
     result.set(id, newPos);
+    
+    // 🎯 MOVEMENT TRACKING: Log fluid timeline shifts
+    console.log(`[TIMELINE_TRACK] [FLUID_SHIFT] 🌊 Item ${id.substring(0, 8)} shifted by fluid timeline: ${pos} → ${newPos} (Δ${newPos - pos})`);
   });
 
   // Check if after shifting, the dragged item would cross another item
-  const wouldCrossAfterShift = wouldCrossItem(draggedId, limitedTargetFrame, result, limitedMovementAmount);
+  // Use ORIGINAL positions for collision detection, not the shifted positions
+  const wouldCrossAfterShift = wouldCrossItem(draggedId, limitedTargetFrame, positions, limitedMovementAmount);
 
   console.log('[FluidTimelineCore] 🚧 COLLISION DETECTION:', {
     draggedId: draggedId.substring(0, 8),
@@ -466,8 +488,8 @@ export const applyFluidTimeline = (
   });
 
   if (wouldCrossAfterShift) {
-    // Find the new adjacent item after shifting
-    const nextItemAfterShift = findNextItemInDirection(draggedId, limitedTargetFrame, result, limitedMovementAmount);
+    // Find the new adjacent item after shifting (use original positions for this check)
+    const nextItemAfterShift = findNextItemInDirection(draggedId, limitedTargetFrame, positions, limitedMovementAmount);
 
     if (nextItemAfterShift) {
       console.log('[FluidTimelineCore] ⚡ CONSTRAINT APPLICATION - Would cross item:', {
@@ -732,13 +754,41 @@ export const findClosestValidPosition = (
 // Calculate timeline dimensions
 export const getTimelineDimensions = (framePositions: Map<string, number>) => {
   const positions = Array.from(framePositions.values());
+  
+  // Handle empty positions case
+  if (positions.length === 0) {
+    return { fullMin: 0, fullMax: 0, fullRange: 1 }; // Minimal range for empty case
+  }
+  
   const staticMax = Math.max(...positions, 0);
   const staticMin = Math.min(...positions, 0);
-  const padding = 30;
 
-  const fullMax = Math.max(60, staticMax + padding);
-  const fullMin = Math.min(0, staticMin - padding);
-  const fullRange = fullMax - fullMin;
+  // NO RIGHT-SIDE PADDING - timeline ends exactly at the last image position
+  const fullMax = staticMax;
+  
+  // NO LEFT-SIDE PADDING - timeline starts exactly at the first image position (or 0)
+  const fullMin = Math.min(0, staticMin);
+  const fullRange = Math.max(fullMax - fullMin, 1); // Ensure minimum range of 1 to avoid division by zero
+
+  // DEBUG: Log coordinate system calculation for position 0 visibility debugging
+  if (positions.includes(0)) {
+    console.log('[NoPaddingFix] 🎯 Timeline dimensions calculated with NO PADDING:', {
+      positions: positions.sort((a, b) => a - b),
+      staticMin,
+      staticMax,
+      fullMin,
+      fullMax,
+      fullRange,
+      noPadding: 'Timeline ends exactly at last image position',
+      position0PixelCalculation: {
+        framePosition: 0,
+        fullMinFrames: fullMin,
+        formula: `60 + ((0 - ${fullMin}) / ${fullRange}) * effectiveWidth`,
+        normalizedPosition: (0 - fullMin) / fullRange,
+        shouldBeAtStart: fullMin === 0 && staticMin === 0
+      }
+    });
+  }
 
   return { fullMin, fullMax, fullRange };
 };

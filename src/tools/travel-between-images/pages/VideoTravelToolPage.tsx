@@ -34,7 +34,7 @@ import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCounts
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
-import { ImageGallery } from '@/shared/components/ImageGallery';
+import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 // Custom hook to parallelize data fetching for better performance
