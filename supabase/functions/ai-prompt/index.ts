@@ -99,16 +99,46 @@ IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do n
           top_p: 1,
         });
         const outputText = resp.choices[0]?.message?.content?.trim() || "";
-        const prompts = outputText.split("\n").map((s) => s.trim()).filter(Boolean);
+        let prompts = outputText.split("\n").map((s) => s.trim()).filter(Boolean);
         
-        // Validate we got the expected number of prompts
-        if (prompts.length !== numberToGenerate) {
-          console.warn(`[ai-prompt] Expected ${numberToGenerate} prompts but got ${prompts.length}. Adjusting...`);
-          // If we got too many, take the first N
-          if (prompts.length > numberToGenerate) {
-            prompts.splice(numberToGenerate);
+        // Filter out any empty or very short prompts (less than 10 characters)
+        const validPrompts = prompts.filter(prompt => prompt.length >= 10);
+        
+        // If we have fewer valid prompts than requested, try to generate more
+        if (validPrompts.length < numberToGenerate) {
+          console.warn(`[ai-prompt] Got ${validPrompts.length} valid prompts but needed ${numberToGenerate}. Attempting to generate ${numberToGenerate - validPrompts.length} more...`);
+          
+          try {
+            // Generate additional prompts to fill the gap
+            const additionalNeeded = numberToGenerate - validPrompts.length;
+            const followUpResp = await groq.chat.completions.create({
+              model: "moonshotai/kimi-k2-instruct",
+              messages: [
+                { role: "system", content: systemMsg },
+                { role: "user", content: `${userMsg}\n\nI need ${additionalNeeded} more detailed image generation prompts. Focus on visual elements, composition, lighting, and atmosphere.` },
+              ],
+              temperature: temperature,
+              max_tokens: 2048,
+              top_p: 1,
+            });
+            
+            const additionalText = followUpResp.choices[0]?.message?.content?.trim() || "";
+            const additionalPrompts = additionalText.split("\n").map((s) => s.trim()).filter(prompt => prompt.length >= 10);
+            
+            // Add the additional prompts to our valid ones
+            validPrompts.push(...additionalPrompts.slice(0, additionalNeeded));
+            console.log(`[ai-prompt] Generated ${additionalPrompts.length} additional prompts, now have ${validPrompts.length} total`);
+          } catch (error) {
+            console.error(`[ai-prompt] Failed to generate additional prompts:`, error);
           }
-          // If we got too few, we'll just return what we have rather than failing
+        }
+        
+        // Use the valid prompts, taking only what we need
+        prompts = validPrompts.slice(0, numberToGenerate);
+        
+        // Final validation
+        if (prompts.length !== numberToGenerate) {
+          console.warn(`[ai-prompt] Expected ${numberToGenerate} prompts but got ${prompts.length} valid ones.`);
         }
         
         return jsonResponse({ prompts, usage: resp.usage });
