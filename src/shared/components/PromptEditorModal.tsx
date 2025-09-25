@@ -211,7 +211,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
 
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
     overallPromptText: '', rulesToRememberText: '',
-    numberToGenerate: 24, includeExistingContext: true, addSummary: true,
+    numberToGenerate: 16, includeExistingContext: true, addSummary: true,
     replaceCurrentPrompts: false,
     temperature: 0.8,
     showAdvanced: false,

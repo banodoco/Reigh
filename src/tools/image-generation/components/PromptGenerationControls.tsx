@@ -47,7 +47,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
 }) => {
   const [overallPromptText, setOverallPromptText] = useState(initialValues?.overallPromptText || '');
   const [rulesToRememberText, setRulesToRememberText] = useState(initialValues?.rulesToRememberText || '');
-  const [numberToGenerate, setNumberToGenerate] = useState<number>(initialValues?.numberToGenerate || 3);
+  const [numberToGenerate, setNumberToGenerate] = useState<number>(initialValues?.numberToGenerate || 16);
   const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext ?? true);
   const [addSummary] = useState(true); // Always true, no longer user-configurable
   const [replaceCurrentPrompts, setReplaceCurrentPrompts] = useState(initialValues?.replaceCurrentPrompts || false);
@@ -171,13 +171,14 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   emitChange({ numberToGenerate: next });
                 }}
                 min={1}
-                max={50}
+                max={32}
                 step={1}
                 disabled={!hasApiKey || isGenerating}
+                className="w-[130%]"
               />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <div className="flex justify-between text-xs text-muted-foreground mt-1 w-[130%]">
                 <span>1</span>
-                <span>50</span>
+                <span>32</span>
               </div>
             </div>
 
