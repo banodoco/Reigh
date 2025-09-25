@@ -723,18 +723,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
-
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft' && onPrevious) {
-      onPrevious();
-    } else if (e.key === 'ArrowRight' && onNext) {
-      onNext();
-    } else if (e.key === 'Escape') {
-      onClose();
-    }
-  };
-
   return (
     <TooltipProvider delayDuration={500}>
       <DialogPrimitive.Root 
@@ -870,7 +858,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto" // Mobile: no animations
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
-            onKeyDown={handleKeyDown}
             onPointerDownOutside={(event) => {
               // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
               // Always stop propagation and default so the gesture does not reach elements behind

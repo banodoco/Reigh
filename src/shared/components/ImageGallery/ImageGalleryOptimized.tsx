@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useCallback } from "react";
+import React, { useMemo, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/shared/hooks/use-toast";
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
@@ -333,60 +333,82 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     }
   }, [filtersHook.filteredImages, stateHook.state.pendingLightboxTarget, actionsHook.handleOpenLightbox, stateHook.setPendingLightboxTarget]);
 
-  // Lightbox navigation handlers
+  // Create refs to store current values to avoid stale closures
+  const navigationDataRef = useRef({
+    activeLightboxMedia: stateHook.state.activeLightboxMedia,
+    filteredImages: filtersHook.filteredImages,
+    isServerPagination: paginationHook.isServerPagination,
+    serverPage: serverPage,
+    totalPages: paginationHook.totalPages,
+  });
+
+  // Update refs on each render
+  navigationDataRef.current = {
+    activeLightboxMedia: stateHook.state.activeLightboxMedia,
+    filteredImages: filtersHook.filteredImages,
+    isServerPagination: paginationHook.isServerPagination,
+    serverPage: serverPage,
+    totalPages: paginationHook.totalPages,
+  };
+
+  // Lightbox navigation handlers with stable dependencies
   const handleNextImage = useCallback(() => {
-    if (!stateHook.state.activeLightboxMedia) return;
-    const currentIndex = filtersHook.filteredImages.findIndex(img => img.id === stateHook.state.activeLightboxMedia!.id);
+    const { activeLightboxMedia, filteredImages, isServerPagination, serverPage: currentServerPage, totalPages } = navigationDataRef.current;
     
-    if (paginationHook.isServerPagination) {
+    if (!activeLightboxMedia) return;
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    
+    if (isServerPagination) {
       // For server pagination, handle page boundaries
-      if (currentIndex < filtersHook.filteredImages.length - 1) {
+      if (currentIndex < filteredImages.length - 1) {
         // Move to next item on current page
-        actionsHook.handleOpenLightbox(filtersHook.filteredImages[currentIndex + 1]);
+        actionsHook.handleOpenLightbox(filteredImages[currentIndex + 1]);
       } else {
         // At the end of current page, go to next page if available
-        const currentServerPage = serverPage || 1;
-        if (currentServerPage < paginationHook.totalPages && onServerPageChange) {
+        const page = currentServerPage || 1;
+        if (page < totalPages && onServerPageChange) {
           // Close lightbox and navigate to next page
           stateHook.setActiveLightboxMedia(null);
           stateHook.setPendingLightboxTarget('first'); // Open first item of next page
-          onServerPageChange(currentServerPage + 1);
+          onServerPageChange(page + 1);
         }
       }
     } else {
       // For client pagination, use existing logic
-      if (currentIndex < filtersHook.filteredImages.length - 1) {
-        actionsHook.handleOpenLightbox(filtersHook.filteredImages[currentIndex + 1]);
+      if (currentIndex < filteredImages.length - 1) {
+        actionsHook.handleOpenLightbox(filteredImages[currentIndex + 1]);
       }
     }
-  }, [stateHook.state.activeLightboxMedia, filtersHook.filteredImages, paginationHook.isServerPagination, serverPage, paginationHook.totalPages, onServerPageChange, actionsHook.handleOpenLightbox, stateHook.setActiveLightboxMedia, stateHook.setPendingLightboxTarget]);
+  }, [actionsHook.handleOpenLightbox, stateHook.setActiveLightboxMedia, stateHook.setPendingLightboxTarget, onServerPageChange]);
 
   const handlePreviousImage = useCallback(() => {
-    if (!stateHook.state.activeLightboxMedia) return;
-    const currentIndex = filtersHook.filteredImages.findIndex(img => img.id === stateHook.state.activeLightboxMedia!.id);
+    const { activeLightboxMedia, filteredImages, isServerPagination, serverPage: currentServerPage } = navigationDataRef.current;
     
-    if (paginationHook.isServerPagination) {
+    if (!activeLightboxMedia) return;
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    
+    if (isServerPagination) {
       // For server pagination, handle page boundaries
       if (currentIndex > 0) {
         // Move to previous item on current page
-        actionsHook.handleOpenLightbox(filtersHook.filteredImages[currentIndex - 1]);
+        actionsHook.handleOpenLightbox(filteredImages[currentIndex - 1]);
       } else {
         // At the beginning of current page, go to previous page if available
-        const currentServerPage = serverPage || 1;
-        if (currentServerPage > 1 && onServerPageChange) {
+        const page = currentServerPage || 1;
+        if (page > 1 && onServerPageChange) {
           // Close lightbox and navigate to previous page
           stateHook.setActiveLightboxMedia(null);
           stateHook.setPendingLightboxTarget('last'); // Open last item of previous page
-          onServerPageChange(currentServerPage - 1);
+          onServerPageChange(page - 1);
         }
       }
     } else {
       // For client pagination, use existing logic
       if (currentIndex > 0) {
-        actionsHook.handleOpenLightbox(filtersHook.filteredImages[currentIndex - 1]);
+        actionsHook.handleOpenLightbox(filteredImages[currentIndex - 1]);
       }
     }
-  }, [stateHook.state.activeLightboxMedia, filtersHook.filteredImages, paginationHook.isServerPagination, serverPage, onServerPageChange, actionsHook.handleOpenLightbox, stateHook.setActiveLightboxMedia, stateHook.setPendingLightboxTarget]);
+  }, [actionsHook.handleOpenLightbox, stateHook.setActiveLightboxMedia, stateHook.setPendingLightboxTarget, onServerPageChange]);
 
   // Additional action handlers
   const handleSwitchToAssociatedShot = useCallback(() => {

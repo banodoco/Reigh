@@ -59,8 +59,9 @@ IMPORTANT GUIDELINES:
 - Each prompt should be specifically designed for AI image generation
 - Add detail that expands or adds to the user's instruction (unless they request otherwise)
 - Focus on visual elements like composition, lighting, colors, and atmosphere
-- CHARACTER GUIDANCE: If there's a character or specific subject, doo NOT mention anything specific about it unless specifically requested - assume an image reference is provided and refer to them simply as 'she', 'he', 'it', 'the dog', etc. without detail
+- CHARACTER GUIDANCE: If there's a character or specific subject, doo NOT mention anything specific about it unless specifically requested - assume an image reference is provided and refer to them simply as 'she', 'he', 'it', 'the dog', etc. without detail. ALWAYS use a consistnt description of the character or subject across prompts.
 - STYLE GUIDANCE: Do NOT mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) unless the user specifically asks for it
+- SCENE GUIDANCE: ALWAYS specifically describe the scene and environment - if the user doesn't specify, you should always describe the scene and environment in detail.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output EXACTLY ${numberToGenerate} prompts
@@ -74,9 +75,9 @@ CRITICAL FORMATTING REQUIREMENTS:
           detailedInstructions += `
 
 FORMAT EXAMPLE (${numberToGenerate} prompts):
-The dragon is soaring through storm clouds with lightning illuminating its scales
-The monster is standing together on sand dunes under a starry night sky
-A futuristic cyberpunk cityscape at night with neon reflections on wet streets`;
+The dragon is soaring through storm clouds with lightning illuminating its scales, below massive skyscrapers are visible through the clouds
+The woman is standing on sand dunes under a starry night sky, the nights sky is clear and the moon is visible behind them.
+A futuristic cyberpunk cityscape at night with neon reflections on wet streets, the city is lit up by neon lights with a bridge visible in the background.`;
         }
 
         detailedInstructions += `
