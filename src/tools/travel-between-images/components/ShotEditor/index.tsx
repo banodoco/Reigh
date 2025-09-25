@@ -1388,6 +1388,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             pendingPositions={state.pendingFramePositions}
             onPendingPositionApplied={handlePendingPositionApplied}
             onImageDelete={generationActions.handleDeleteImageFromShot}
+            onBatchImageDelete={generationActions.handleBatchDeleteImages}
             onImageDuplicate={generationActions.handleDuplicateImage}
             columns={mobileColumns as 2 | 3 | 4 | 6}
             skeleton={

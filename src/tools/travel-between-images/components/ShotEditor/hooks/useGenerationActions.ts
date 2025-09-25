@@ -310,8 +310,15 @@ export const useGenerationActions = ({
       return;
     }
 
+    console.log('[OPTIMISTIC_DELETE] Parent handling optimistic delete', {
+      shotImageEntryId: shotImageEntryId.substring(0, 8),
+      currentCount: state.localOrderedShotImages.length
+    });
+
     // Optimistically remove the image from the local state
-    actions.setLocalOrderedShotImages(state.localOrderedShotImages.filter(img => img.shotImageEntryId !== shotImageEntryId));
+    const optimisticImages = state.localOrderedShotImages.filter(img => img.shotImageEntryId !== shotImageEntryId);
+    actions.setLocalOrderedShotImages(optimisticImages);
+    skipNextSyncRef.current = true; // Skip next prop sync to prevent flicker
     
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
@@ -320,10 +327,49 @@ export const useGenerationActions = ({
     }, {
       onError: () => {
         // Rollback on error
+        console.log('[OPTIMISTIC_DELETE] Rolling back optimistic delete');
         actions.setLocalOrderedShotImages(orderedShotImages);
+        skipNextSyncRef.current = false;
       }
     });
-  }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages]);
+  }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages, state.localOrderedShotImages, skipNextSyncRef]);
+
+  const handleBatchDeleteImages = useCallback(async (shotImageEntryIds: string[]) => {
+    if (!selectedShot || !projectId || shotImageEntryIds.length === 0) {
+      return;
+    }
+
+    console.log('[OPTIMISTIC_DELETE] Parent handling batch optimistic delete', {
+      idsToDelete: shotImageEntryIds.map(id => id.substring(0, 8)),
+      totalCount: shotImageEntryIds.length,
+      currentCount: state.localOrderedShotImages.length
+    });
+
+    // Optimistically remove all images from the local state
+    const optimisticImages = state.localOrderedShotImages.filter(img => !shotImageEntryIds.includes(img.shotImageEntryId));
+    actions.setLocalOrderedShotImages(optimisticImages);
+    skipNextSyncRef.current = true; // Skip next prop sync to prevent flicker
+    
+    // Execute all deletions
+    const deletePromises = shotImageEntryIds.map(id => 
+      removeImageFromShotMutation.mutateAsync({
+        shot_id: selectedShot.id,
+        shotImageEntryId: id,
+        project_id: projectId,
+      })
+    );
+
+    try {
+      await Promise.all(deletePromises);
+      console.log('[OPTIMISTIC_DELETE] Batch delete completed successfully');
+    } catch (error) {
+      // Rollback on error
+      console.log('[OPTIMISTIC_DELETE] Rolling back batch optimistic delete');
+      actions.setLocalOrderedShotImages(orderedShotImages);
+      skipNextSyncRef.current = false;
+      toast.error('Failed to delete some images');
+    }
+  }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages, state.localOrderedShotImages, skipNextSyncRef]);
 
   const handleDuplicateImage = useCallback(async (shotImageEntryId: string, timeline_frame: number) => {
     console.log('[DUPLICATE_DEBUG] 🚀 DUPLICATE BUTTON CLICKED:', {
@@ -357,11 +403,36 @@ export const useGenerationActions = ({
     // Start loading state targeting the specific shotImageEntryId
     actions.setDuplicatingImageId(shotImageEntryId);
 
+    // OPTIMISTIC UPDATE: Create a temporary duplicate for immediate feedback
+    const tempDuplicateId = nanoid();
+    const optimisticDuplicate: GenerationRow = {
+      ...originalImage,
+      shotImageEntryId: tempDuplicateId,
+      id: tempDuplicateId,
+      isOptimistic: true,
+      // Place duplicate right after the original for mobile batch view
+    };
+
+    console.log('[OPTIMISTIC_DUPLICATE] Adding optimistic duplicate for mobile', {
+      originalId: shotImageEntryId.substring(0, 8),
+      tempDuplicateId: tempDuplicateId.substring(0, 8),
+      currentImagesCount: state.localOrderedShotImages.length
+    });
+
+    // Find position of original image and insert duplicate after it
+    const originalIndex = state.localOrderedShotImages.findIndex(img => img.shotImageEntryId === shotImageEntryId);
+    const optimisticImages = [...state.localOrderedShotImages];
+    if (originalIndex !== -1) {
+      optimisticImages.splice(originalIndex + 1, 0, optimisticDuplicate);
+      actions.setLocalOrderedShotImages(optimisticImages);
+      skipNextSyncRef.current = true; // Skip the next prop sync to prevent flicker
+    }
+
     // Position is now computed from timeline_frame, so we don't need to calculate it
     // The useDuplicateImageInShot hook will calculate the timeline_frame midpoint
     
-      console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
-        originalTimelineFrame: (originalImage as any).timeline_frame
+    console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
+      originalTimelineFrame: (originalImage as any).timeline_frame
     });
 
     duplicateImageInShotMutation.mutate({
@@ -370,8 +441,20 @@ export const useGenerationActions = ({
       // Position will be computed from timeline_frame - no parameter needed
       project_id: projectId,
     }, {
-      onSuccess: () => {
-        console.log('[DUPLICATE] Duplicate mutation successful');
+      onSuccess: (result) => {
+        console.log('[DUPLICATE] Duplicate mutation successful', result);
+        
+        // Replace optimistic duplicate with real data
+        const updatedImages = state.localOrderedShotImages.map(img => 
+          img.shotImageEntryId === tempDuplicateId ? {
+            ...img,
+            shotImageEntryId: result.shotImageEntryId || result.id,
+            id: result.generationId || result.id,
+            isOptimistic: false
+          } : img
+        );
+        actions.setLocalOrderedShotImages(updatedImages);
+        
         // Show success state
         actions.setDuplicateSuccessImageId(shotImageEntryId);
         // Clear success state after 2 seconds
@@ -380,13 +463,17 @@ export const useGenerationActions = ({
       onError: (error) => {
         console.error('[DUPLICATE] Duplicate mutation failed:', error);
         toast.error(`Failed to duplicate image: ${error.message}`);
+        
+        // Remove optimistic duplicate on error
+        const revertedImages = state.localOrderedShotImages.filter(img => img.shotImageEntryId !== tempDuplicateId);
+        actions.setLocalOrderedShotImages(revertedImages);
       },
       onSettled: () => {
         // Clear loading state
         actions.setDuplicatingImageId(null);
       }
     });
-  }, [state.localOrderedShotImages, selectedShot?.id, projectId, actions, duplicateImageInShotMutation]);
+  }, [state.localOrderedShotImages, selectedShot?.id, projectId, actions, duplicateImageInShotMutation, skipNextSyncRef]);
 
   const handleTimelineImageDrop = useCallback(async (files: File[], targetFrame?: number) => {
     if (!selectedShot?.id || !projectId) {
@@ -427,6 +514,7 @@ export const useGenerationActions = ({
     handleImageUploadToShot,
     handleDeleteVideoOutput,
     handleDeleteImageFromShot,
+    handleBatchDeleteImages,
     handleDuplicateImage,
     handleTimelineImageDrop,
     isEnqueuing,

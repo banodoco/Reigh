@@ -44,6 +44,8 @@ interface ShotImagesEditorProps {
   onPendingPositionApplied: (generationId: string) => void;
   /** Image deletion callback */
   onImageDelete: (shotImageEntryId: string) => void;
+  /** Batch image deletion callback */
+  onBatchImageDelete?: (shotImageEntryIds: string[]) => void;
   /** Image duplication callback */
   onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   /** Number of columns for batch mode grid */
@@ -93,6 +95,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   pendingPositions,
   onPendingPositionApplied,
   onImageDelete,
+  onBatchImageDelete,
   onImageDuplicate,
   columns,
   skeleton,
@@ -109,6 +112,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   defaultNegativePrompt = "",
   onDefaultNegativePromptChange,
 }) => {
+  // Force mobile to use batch mode regardless of desktop setting
+  const effectiveGenerationMode = isMobile ? 'batch' : generationMode;
+  
   // Note: Pair prompts are retrieved from the enhanced shot positions hook below
   
   const [pairPromptModalData, setPairPromptModalData] = useState<{
@@ -201,24 +207,26 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </CardTitle>
           
           <div className="flex items-center gap-2">
-            {/* Generation Mode Toggle */}
-            <ToggleGroup
-              type="single"
-              value={generationMode}
-              onValueChange={(value) => {
-                if (value && (value === "batch" || value === "timeline")) {
-                  onGenerationModeChange(value);
-                }
-              }}
-              className="h-8"
-            >
-              <ToggleGroupItem value="timeline" className="text-xs px-2 h-8">
-                Timeline
-              </ToggleGroupItem>
-              <ToggleGroupItem value="batch" className="text-xs px-2 h-8">
-                Batch
-              </ToggleGroupItem>
-            </ToggleGroup>
+            {/* Generation Mode Toggle - Hidden on mobile */}
+            {!isMobile && (
+              <ToggleGroup
+                type="single"
+                value={generationMode}
+                onValueChange={(value) => {
+                  if (value && (value === "batch" || value === "timeline")) {
+                    onGenerationModeChange(value);
+                  }
+                }}
+                className="h-8"
+              >
+                <ToggleGroupItem value="timeline" className="text-xs px-2 h-8">
+                  Timeline
+                </ToggleGroupItem>
+                <ToggleGroupItem value="batch" className="text-xs px-2 h-8">
+                  Batch
+                </ToggleGroupItem>
+              </ToggleGroup>
+            )}
 
           </div>
         </div>
@@ -232,7 +240,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </div>
         ) : (
           <div className="p-1">
-            {generationMode === "timeline" ? (
+            {effectiveGenerationMode === "timeline" ? (
               <>
                 <Timeline
                 shotId={selectedShotId}
@@ -274,6 +282,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               <ShotImageManager
                 images={images}
                 onImageDelete={handleDelete}
+                onBatchImageDelete={onBatchImageDelete}
                 onImageDuplicate={onImageDuplicate}
                 onImageReorder={handleReorder}
                 columns={columns}

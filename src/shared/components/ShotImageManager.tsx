@@ -42,6 +42,7 @@ import MagicEditModal from '@/shared/components/MagicEditModal';
 export interface ShotImageManagerProps {
   images: GenerationRow[];
   onImageDelete: (shotImageEntryId: string) => void;
+  onBatchImageDelete?: (shotImageEntryIds: string[]) => void;
   onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -56,6 +57,7 @@ export interface ShotImageManagerProps {
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   images,
   onImageDelete,
+  onBatchImageDelete,
   onImageDuplicate,
   onImageReorder,
   columns = 4,
@@ -268,31 +270,53 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     (ids: string[]) => {
       if (ids.length === 0) return;
       
-      // Clear selection first for immediate UI feedback (both mobile and desktop)
+      console.log('[OPTIMISTIC_DELETE] Starting optimistic batch delete for mobile', {
+        idsToDelete: ids.map(id => id.substring(0, 8)),
+        totalCount: ids.length,
+        currentImagesCount: currentImages.length
+      });
+      
+      // Let parent handle optimistic updates to avoid dual state systems
+      console.log('[OPTIMISTIC_DELETE] Delegating optimistic update to parent ShotEditor');
+      
+      // Clear selection and UI state for immediate feedback
       console.log('[CLEAR_TRACE] Clearing selection in performBatchDelete');
       setMobileSelectedIds([]);
       setSelectedIds([]);
-    setLastSelectedIndex(null);
+      setLastSelectedIndex(null);
       setConfirmOpen(false);
       setPendingDeleteIds([]); // Clear pending delete IDs
       
-      // Execute deletions
-      ids.forEach(id => onImageDelete(id));
+      // Use batch delete handler if available, otherwise fall back to individual deletes
+      if (onBatchImageDelete) {
+        onBatchImageDelete(ids);
+      } else {
+        // Fallback to individual deletions
+        ids.forEach(id => onImageDelete(id));
+      }
     },
-    [onImageDelete]
+    [onImageDelete, onBatchImageDelete, currentImages]
   );
 
   // Individual delete function that clears selection if needed
   const handleIndividualDelete = React.useCallback(
     (id: string) => {
+      console.log('[OPTIMISTIC_DELETE] Starting optimistic individual delete for mobile', {
+        idToDelete: id.substring(0, 8),
+        currentImagesCount: currentImages.length
+      });
+      
+      // Let parent handle optimistic updates to avoid dual state systems
+      console.log('[OPTIMISTIC_DELETE] Delegating individual delete optimistic update to parent ShotEditor');
+      
       // Clear selection if the deleted item was selected
       setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
       setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
       
-      // Execute deletion
+      // Execute deletion asynchronously
       onImageDelete(id);
     },
-    [onImageDelete]
+    [onImageDelete, currentImages]
   );
 
   // Deselect when clicking outside the entire image manager area (mobile selection mode)
@@ -1465,8 +1489,11 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
   projectAspectRatio,
 }) => {
   const mobileClassName = cn(
-    'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center overflow-hidden shadow-sm cursor-pointer',
-    { 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected },
+    'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center overflow-hidden shadow-sm cursor-pointer transition-all duration-200',
+    { 
+      'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected,
+      'opacity-60 animate-pulse': image.isOptimistic, // Visual feedback for optimistic updates
+    },
   );
 
   console.log('[SelectionDebug:MobileImageItem] DEEP MOBILE RENDER TRACE', {
