@@ -313,12 +313,31 @@ export const smartCleanupOldPages = (
     
     while (queryIndex < allQueries.length && (performance.now() - startTime) < MAX_BATCH_TIME) {
       const query = allQueries[queryIndex];
-      const queryKey = query.queryKey;
-      if (queryKey?.[0] === baseQueryKey && 
-          queryKey?.[1] === projectId && 
-          typeof queryKey?.[2] === 'number') {
-        generationQueries.push(query);
+      const queryKey = query.queryKey as any[];
+
+      // Support multiple query key shapes:
+      // 1) ['generations', projectId, page]
+      // 2) ['unified-generations', 'project', projectId, page, limit, filters]
+      // Ignore shot-specific keys like ['unified-generations','shot',shotId,...]
+      if (Array.isArray(queryKey) && queryKey.length > 0) {
+        const isLegacy = queryKey[0] === 'generations' || baseQueryKey === 'generations';
+        const isUnified = queryKey[0] === 'unified-generations' || baseQueryKey === 'unified-generations';
+
+        if (isLegacy && queryKey[0] === 'generations') {
+          const qProjectId = queryKey[1];
+          const qPage = queryKey[2];
+          if (qProjectId === projectId && typeof qPage === 'number') {
+            generationQueries.push({ query, pageIndex: 2 });
+          }
+        } else if (isUnified && queryKey[0] === 'unified-generations' && queryKey[1] === 'project') {
+          const qProjectId = queryKey[2];
+          const qPage = queryKey[3];
+          if (qProjectId === projectId && typeof qPage === 'number') {
+            generationQueries.push({ query, pageIndex: 3 });
+          }
+        }
       }
+
       queryIndex++;
     }
     
@@ -336,10 +355,11 @@ export const smartCleanupOldPages = (
     if (generationQueries.length > 0) {
       // Find the query with the most recent dataUpdatedAt
       const mostRecentQuery = generationQueries.reduce((latest, current) => 
-        (current.state.dataUpdatedAt || 0) > (latest.state.dataUpdatedAt || 0) ? current : latest
+        (current.query.state.dataUpdatedAt || 0) > (latest.query.state.dataUpdatedAt || 0) ? current : latest
       );
       
-      const detectedPage = mostRecentQuery.queryKey[2];
+      const pageIdx = mostRecentQuery.pageIndex;
+      const detectedPage = mostRecentQuery.query.queryKey[pageIdx];
       
       // If the detected page is very different from the passed page, use the detected one
       if (Math.abs(detectedPage - currentPage) > 1) {
@@ -371,14 +391,14 @@ export const smartCleanupOldPages = (
     console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Found cached queries:`, {
       totalQueries: allQueries.length,
       generationQueries: generationQueries.length,
-      pages: generationQueries.map(q => q.queryKey[2]).sort((a, b) => a - b)
+      pages: generationQueries.map(entry => entry.query.queryKey[entry.pageIndex]).sort((a, b) => a - b)
     });
 
     // Sort by page distance from current page
-    const queriesWithDistance = generationQueries.map((query: any) => ({
-      query,
-      page: query.queryKey[2],
-      distance: Math.abs(query.queryKey[2] - actualCurrentPage)
+    const queriesWithDistance = generationQueries.map((entry: any) => ({
+      query: entry.query,
+      page: entry.query.queryKey[entry.pageIndex],
+      distance: Math.abs(entry.query.queryKey[entry.pageIndex] - actualCurrentPage)
     }));
 
     // Keep queries within range (current ± keepRange), remove distant ones

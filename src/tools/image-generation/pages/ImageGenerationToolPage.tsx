@@ -266,7 +266,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [lastAffectedShotId]);
   
   // Use consistent page sizes with ImageGallery defaults to prevent cache mismatches
-  const itemsPerPage = isMobile ? 20 : 20;
+  // Reduce items per page on mobile to speed up initial paint and network usage
+  const itemsPerPage = isMobile ? 12 : 20;
   
   // Use stable object for filters to prevent recreating on every render
   const generationsFilters = useStableObject(() => ({
@@ -1008,6 +1009,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Prefetch adjacent pages callback for ImageGallery with cancellation
   const handlePrefetchAdjacentPages = useCallback((prevPage: number | null, nextPage: number | null) => {
     if (!effectiveProjectId) return;
+    // Disable adjacent prefetch on mobile to avoid main thread/contention and slow paints
+    if (isMobile) return;
 
     // Cancel previous image preloads immediately
     const prevOps = prefetchOperationsRef.current;
@@ -1022,7 +1025,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     initializePrefetchOperations(prefetchOperationsRef, prefetchId);
 
     // Clean up old pagination cache to prevent memory leaks
-    smartCleanupOldPages(queryClient, currentPage, effectiveProjectId, 'generations');
+    // Use unified base key to match actual query keys in this page
+    smartCleanupOldPages(queryClient, currentPage, effectiveProjectId, 'unified-generations');
     
     // Trigger image garbage collection every 10 pages to free browser memory
     if (currentPage % 10 === 0) {
@@ -1304,6 +1308,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 formAssociatedShotId={formAssociatedShotId}
                 onSwitchToAssociatedShot={handleSwitchToAssociatedShot}
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
+                enableAdjacentPagePreloading={!isMobile}
                 onCreateShot={handleCreateShot}
                 onBackfillRequest={handleBackfillRequest}
               />

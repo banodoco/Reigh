@@ -102,7 +102,7 @@ const ShotsPaneComponent: React.FC = () => {
     }
     
     const filtered = shots.map(shot => {
-      // Note: shot.images now contains all images from ShotsContext (unlimited)
+      // Note: shot.images may be limited on mobile/heavy pages; we only show a preview anyway
       // Filter to show only positioned images in the intended sequence
       const filteredImages = (shot.images || [])
         // Keep only images that have a valid timeline_frame value (replaces position check)

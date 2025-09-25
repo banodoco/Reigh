@@ -2,6 +2,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { useListShots } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Shot } from '@/types/shots';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface ShotsContextType {
   shots: Shot[] | undefined;
@@ -21,7 +22,14 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
   
   const { selectedProjectId } = useProject();
-  const { data: shots, isLoading, error, refetch } = useListShots(selectedProjectId); // Default to unlimited images
+  const isMobile = useIsMobile();
+
+  // On mobile devices, drastically limit per-shot images fetched to reduce initial load and network pressure.
+  // We can't use useLocation here since ShotsProvider is outside Router context, but mobile optimization
+  // is the primary concern for performance.
+  const maxImagesPerShot = isMobile ? 2 : 0; // 0 = unlimited
+
+  const { data: shots, isLoading, error, refetch } = useListShots(selectedProjectId, { maxImagesPerShot });
 
   // [ShotReorderDebug] Log shots context data changes
   React.useEffect(() => {
