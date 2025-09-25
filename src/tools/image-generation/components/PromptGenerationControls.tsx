@@ -151,9 +151,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           />
         </div>
 
-          {/* Number to Generate - allow wrapping with Advanced toggle */}
-          <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
-            <div className={`${showAdvanced ? 'w-full sm:min-w-[300px] sm:flex-1' : 'w-full sm:w-1/2 sm:min-w-[280px]'}`}>
+          {/* Number to Generate - desktop has toggle on same row, mobile separate */}
+          <div className={`flex items-start gap-6 ${showAdvanced ? 'w-full sm:w-[92.5%]' : 'w-full sm:w-[65%]'}`}>
+            <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="gen_numberToGenerate" className="text-sm font-medium">
                   Number to Generate
@@ -162,44 +162,41 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   {numberToGenerate}
                 </span>
               </div>
-              <div className="overflow-visible">
-                <Slider
-                  id="gen_numberToGenerate"
-                  value={[numberToGenerate]}
-                  onValueChange={(values) => {
-                    const next = values[0];
-                    setNumberToGenerate(next);
-                    emitChange({ numberToGenerate: next });
-                  }}
-                  min={1}
-                  max={32}
-                  step={1}
-                  disabled={!hasApiKey || isGenerating}
-                  className="w-[130%]"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1 w-[130%]">
-                  <span>1</span>
-                  <span>32</span>
-                </div>
+              <Slider
+                id="gen_numberToGenerate"
+                value={[numberToGenerate]}
+                onValueChange={(values) => {
+                  const next = values[0];
+                  setNumberToGenerate(next);
+                  emitChange({ numberToGenerate: next });
+                }}
+                min={1}
+                max={32}
+                step={1}
+                disabled={!hasApiKey || isGenerating}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>1</span>
+                <span>32</span>
               </div>
             </div>
 
-            {/* Advanced toggle button - desktop only, can wrap to next line if needed */}
-            <div className="hidden sm:flex flex-shrink-0 pt-2 ml-auto">
+            {/* Advanced toggle button - desktop only, allow wrapping */}
+            <div className="hidden sm:flex flex-shrink-0 pt-2 min-w-0">
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                 <CollapsibleTrigger asChild>
                   <Button 
                     variant="ghost" 
-                    className="flex items-center gap-2 text-sm p-2 h-auto justify-start"
+                    className="flex items-center gap-2 text-sm p-2 h-auto justify-start flex-wrap"
                     onClick={() => {
                       const next = !showAdvanced;
                       setShowAdvanced(next);
                       emitChange({ showAdvanced: next });
                     }}
                   >
-                    <Settings className="h-4 w-4" />
-                    <span>Advanced Options</span>
-                    {showAdvanced ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    <Settings className="h-4 w-4 flex-shrink-0" />
+                    <span className="whitespace-normal text-left leading-tight">Advanced Options</span>
+                    {showAdvanced ? <ChevronRight className="h-4 w-4 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 flex-shrink-0" />}
                   </Button>
                 </CollapsibleTrigger>
               </Collapsible>
