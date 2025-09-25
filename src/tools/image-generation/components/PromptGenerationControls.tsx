@@ -409,12 +409,12 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           </Collapsible>
 
           {/* Generate button */}
-          <div>
+          <div className="w-full sm:w-[65%]">
             <Button 
               type="button"
               onClick={handleGenerateClick}
               disabled={!hasApiKey || isGenerating} 
-              className="w-full sm:w-auto"
+              className="w-full"
             >
               {isGenerating ? 'Generating...' : 'Generate Prompts'}
             </Button>
