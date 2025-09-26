@@ -31,121 +31,130 @@ export const useEnhancedShotImageReorder = (
     isLoading
   } = parentHook || ownHook;
 
-  // Handle drag and drop reordering in batch mode
+  // Handle drag and drop reordering in batch mode - Timeline-frame-based swapping
   const handleReorder = useCallback(async (orderedShotImageEntryIds: string[]) => {
     if (!shotId || orderedShotImageEntryIds.length === 0) {
       return;
     }
 
-    console.log('[useEnhancedShotImageReorder] Handling reorder:', {
+    console.log('[useEnhancedShotImageReorder] Handling timeline-frame-based reorder:', {
       shotId,
       orderedIds: orderedShotImageEntryIds.map(id => id.substring(0, 8))
     });
 
     try {
-      // Find the changes by comparing current order with new order
+      // Get current images and their timeline_frame values
       const currentImages = getImagesForMode('batch');
       const currentOrder = currentImages.map(img => img.shotImageEntryId || img.id);
       
-      // Build a map of current positions
-      const currentPositionMap = new Map<string, number>();
-      currentImages.forEach((img, index) => {
-        currentPositionMap.set(img.shotImageEntryId || img.id, index);
+      // Find what actually changed between current and desired order
+      const changes: Array<{
+        oldPos: number;
+        newPos: number;
+        shotImageEntryId: string;
+        generationId: string;
+        currentTimelineFrame: number;
+        targetTimelineFrame: number;
+      }> = [];
+
+      // For each item in the desired order, check if its position changed
+      for (let newPos = 0; newPos < orderedShotImageEntryIds.length; newPos++) {
+        const shotImageEntryId = orderedShotImageEntryIds[newPos];
+        const oldPos = currentOrder.indexOf(shotImageEntryId);
+        
+        if (oldPos !== -1 && oldPos !== newPos) {
+          // This item moved - find its current and target timeline_frame values
+          const currentImg = currentImages[oldPos];
+          const targetImg = currentImages[newPos];
+          
+          // Find the shot_generation data to get timeline_frame values
+          const currentShotGen = shotGenerations.find(sg => sg.generation_id === currentImg.id);
+          const targetShotGen = shotGenerations.find(sg => sg.generation_id === targetImg.id);
+          
+          if (currentShotGen && targetShotGen) {
+            changes.push({
+              oldPos,
+              newPos,
+              shotImageEntryId,
+              generationId: currentImg.id,
+              currentTimelineFrame: currentShotGen.timeline_frame || 0,
+              targetTimelineFrame: targetShotGen.timeline_frame || 0
+            });
+          }
+        }
+      }
+
+      console.log('[useEnhancedShotImageReorder] Timeline-frame-based changes detected:', {
+        changesCount: changes.length,
+        changes: changes.map(c => ({
+          id: c.generationId.substring(0, 8),
+          oldPos: c.oldPos,
+          newPos: c.newPos,
+          currentFrame: c.currentTimelineFrame,
+          targetFrame: c.targetTimelineFrame,
+          frameSwap: `${c.currentTimelineFrame} → ${c.targetTimelineFrame}`
+        }))
       });
 
-      // Enhanced exchange detection: Convert any reordering into a series of adjacent exchanges
-      // This handles both simple swaps and complex multi-step moves
-      const exchanges: Array<{ fromId: string; toId: string; fromGenId: string; toGenId: string }> = [];
-      
-      // Create a working copy of the current order to simulate the exchanges
-      const workingOrder = [...currentOrder];
-      
-      // For each position in the desired order, move the correct item there via adjacent swaps
-      for (let targetPos = 0; targetPos < orderedShotImageEntryIds.length; targetPos++) {
-        const desiredId = orderedShotImageEntryIds[targetPos];
-        const currentPos = workingOrder.indexOf(desiredId);
-        
-        if (currentPos === -1) {
-          console.warn(`[useEnhancedShotImageReorder] Item ${desiredId} not found in current order`);
-          continue;
-        }
-        
-        // If item is already in the right position, skip
-        if (currentPos === targetPos) {
-          continue;
-        }
-        
-        // Move the item to target position via adjacent swaps
-        if (currentPos < targetPos) {
-          // Item needs to move right - swap with each item to the right
-          for (let i = currentPos; i < targetPos; i++) {
-            const itemA = workingOrder[i];
-            const itemB = workingOrder[i + 1];
+      if (changes.length === 0) {
+        console.log('[useEnhancedShotImageReorder] No changes detected');
+        return;
+      }
+
+      // Convert changes into direct timeline_frame swaps
+      // For timeline-frame-based swapping, we need to identify pairs of items that should swap values
+      const exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }> = [];
+      const processedPairs = new Set<string>();
+
+      for (const change of changes) {
+        // Find if there's another item that should get this item's current timeline_frame
+        const reciprocalChange = changes.find(c => 
+          c.generationId !== change.generationId && 
+          c.targetTimelineFrame === change.currentTimelineFrame &&
+          c.currentTimelineFrame === change.targetTimelineFrame
+        );
+
+        if (reciprocalChange) {
+          // This is a direct swap - create exchange pair using shot_generation IDs
+          const pairKey = [change.generationId, reciprocalChange.generationId].sort().join('-');
+          
+          if (!processedPairs.has(pairKey)) {
+            // Find the shot_generation IDs for these generation IDs
+            const shotGenA = shotGenerations.find(sg => sg.generation_id === change.generationId);
+            const shotGenB = shotGenerations.find(sg => sg.generation_id === reciprocalChange.generationId);
             
-            // Find the generation objects for these items
-            const imgA = currentImages.find(img => (img.shotImageEntryId || img.id) === itemA);
-            const imgB = currentImages.find(img => (img.shotImageEntryId || img.id) === itemB);
-            
-            if (imgA && imgB) {
+            if (shotGenA && shotGenB) {
               exchanges.push({
-                fromId: itemA,
-                toId: itemB,
-                fromGenId: imgA.id,
-                toGenId: imgB.id
+                shotGenerationIdA: shotGenA.id,
+                shotGenerationIdB: shotGenB.id
               });
+              processedPairs.add(pairKey);
               
-              // Update working order to reflect this swap
-              [workingOrder[i], workingOrder[i + 1]] = [workingOrder[i + 1], workingOrder[i]];
-            }
-          }
-        } else {
-          // Item needs to move left - swap with each item to the left
-          for (let i = currentPos; i > targetPos; i--) {
-            const itemA = workingOrder[i];
-            const itemB = workingOrder[i - 1];
-            
-            // Find the generation objects for these items
-            const imgA = currentImages.find(img => (img.shotImageEntryId || img.id) === itemA);
-            const imgB = currentImages.find(img => (img.shotImageEntryId || img.id) === itemB);
-            
-            if (imgA && imgB) {
-              exchanges.push({
-                fromId: itemA,
-                toId: itemB,
-                fromGenId: imgA.id,
-                toGenId: imgB.id
+              console.log('[useEnhancedShotImageReorder] Direct timeline_frame swap:', {
+                itemA: change.generationId.substring(0, 8),
+                itemB: reciprocalChange.generationId.substring(0, 8),
+                shotGenA: shotGenA.id.substring(0, 8),
+                shotGenB: shotGenB.id.substring(0, 8),
+                swapFrames: `${change.currentTimelineFrame} ↔ ${change.targetTimelineFrame}`
               });
-              
-              // Update working order to reflect this swap
-              [workingOrder[i], workingOrder[i - 1]] = [workingOrder[i - 1], workingOrder[i]];
             }
           }
         }
       }
-      
-      // No need to remove duplicates since we're generating a specific sequence
-      const uniqueExchanges = exchanges;
 
-      console.log('[useEnhancedShotImageReorder] Enhanced exchange detection results:', {
-        originalOrder: currentOrder.map(id => id.substring(0, 8)),
-        desiredOrder: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
-        finalWorkingOrder: workingOrder.map(id => id.substring(0, 8)),
-        exchangeCount: uniqueExchanges.length,
-        exchanges: uniqueExchanges.map(ex => ({
-          from: ex.fromGenId.substring(0, 8),
-          to: ex.toGenId.substring(0, 8)
-        })),
-        orderMatches: JSON.stringify(workingOrder) === JSON.stringify(orderedShotImageEntryIds)
-      });
-
-      // Perform all exchanges in a batch to prevent UI flickering
-      if (uniqueExchanges.length > 0) {
-        await batchExchangePositions(
-          uniqueExchanges.map(ex => ({
-            generationIdA: ex.fromGenId,
-            generationIdB: ex.toGenId
+      // Perform all exchanges in a batch
+      if (exchanges.length > 0) {
+        console.log('[useEnhancedShotImageReorder] Executing timeline-frame swaps:', {
+          exchangeCount: exchanges.length,
+          exchanges: exchanges.map(ex => ({
+            shotGenA: ex.shotGenerationIdA.substring(0, 8),
+            shotGenB: ex.shotGenerationIdB.substring(0, 8)
           }))
-        );
+        });
+
+        await batchExchangePositions(exchanges);
+      } else {
+        console.warn('[useEnhancedShotImageReorder] No direct swaps detected - complex reordering not yet supported in timeline-frame mode');
       }
 
       // Reordering completed successfully - no toast needed for smooth UX

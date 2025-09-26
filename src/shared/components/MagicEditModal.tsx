@@ -71,7 +71,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
     isLoading: isLoadingMetadata
   } = useShotGenerationMetadata({
     shotId: currentShotId || '',
-    generationId: shotGenerationId || '',
+    shotGenerationId: shotGenerationId || '',
     enabled: !!shotGenerationId && !!currentShotId
   });
 

@@ -17,13 +17,13 @@ export interface ShotGenerationMetadata {
 
 interface UseShotGenerationMetadataOptions {
   shotId: string;
-  generationId: string;
+  shotGenerationId: string;
   enabled?: boolean;
 }
 
 export function useShotGenerationMetadata({
   shotId,
-  generationId,
+  shotGenerationId,
   enabled = true
 }: UseShotGenerationMetadataOptions) {
   const [metadata, setMetadata] = useState<ShotGenerationMetadata>({});
@@ -33,7 +33,7 @@ export function useShotGenerationMetadata({
 
   // Load metadata from database
   useEffect(() => {
-    if (!enabled || !shotId || !generationId) {
+    if (!enabled || !shotId || !shotGenerationId) {
       setIsLoading(false);
       return;
     }
@@ -45,8 +45,7 @@ export function useShotGenerationMetadata({
         const { data, error } = await supabase
           .from('shot_generations')
           .select('metadata')
-          .eq('shot_id', shotId)
-          .eq('generation_id', generationId)
+          .eq('id', shotGenerationId)
           .single();
 
         if (error) {
@@ -73,11 +72,11 @@ export function useShotGenerationMetadata({
 
     loadMetadata();
     return () => { cancelled = true; };
-  }, [shotId, generationId, enabled]);
+  }, [shotId, shotGenerationId, enabled]);
 
   // Update metadata in database
   const updateMetadata = useCallback(async (updates: Partial<ShotGenerationMetadata>) => {
-    if (!shotId || !generationId || isUpdating) {
+    if (!shotId || !shotGenerationId || isUpdating) {
       return;
     }
 
@@ -89,8 +88,7 @@ export function useShotGenerationMetadata({
       const { error } = await supabase
         .from('shot_generations')
         .update({ metadata: newMetadata })
-        .eq('shot_id', shotId)
-        .eq('generation_id', generationId);
+        .eq('id', shotGenerationId);
 
       if (error) {
         console.error('[useShotGenerationMetadata] Error updating metadata:', error);
@@ -106,7 +104,7 @@ export function useShotGenerationMetadata({
 
       console.log('[useShotGenerationMetadata] Successfully updated metadata for generation:', {
         shotId: shotId.substring(0, 8),
-        generationId: generationId.substring(0, 8),
+        shotGenerationId: shotGenerationId.substring(0, 8),
         updates
       });
 
@@ -116,7 +114,7 @@ export function useShotGenerationMetadata({
     } finally {
       setIsUpdating(false);
     }
-  }, [shotId, generationId, metadata, isUpdating, queryClient]);
+  }, [shotId, shotGenerationId, metadata, isUpdating, queryClient]);
 
   // Convenience method to add a magic edit prompt
   const addMagicEditPrompt = useCallback(async (prompt: string, numImages?: number) => {

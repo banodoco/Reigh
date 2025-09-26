@@ -286,14 +286,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   }, [shotId, shotGenerations, loadPositions]);
 
   // Exchange positions without reloading (for batch operations)
-  const exchangePositionsNoReload = useCallback(async (generationIdA: string, generationIdB: string) => {
+  const exchangePositionsNoReload = useCallback(async (shotGenerationIdA: string, shotGenerationIdB: string) => {
     if (!shotId) {
       return;
     }
 
-    // Get current positions before exchange
-    const itemA = shotGenerations.find(sg => sg.generation_id === generationIdA);
-    const itemB = shotGenerations.find(sg => sg.generation_id === generationIdB);
+    // Get current positions before exchange using shot_generation IDs
+    const itemA = shotGenerations.find(sg => sg.id === shotGenerationIdA);
+    const itemB = shotGenerations.find(sg => sg.id === shotGenerationIdB);
 
     const frameA = itemA?.timeline_frame || 0;
     const frameB = itemB?.timeline_frame || 0;
@@ -305,11 +305,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
 
     try {
-      // Use exchange_timeline_frames which is designed specifically for swapping two items
+      // Use exchange_timeline_frames with shot_generation IDs for precise targeting
       const { data, error } = await (supabase as any).rpc('exchange_timeline_frames', {
         p_shot_id: shotId,
-        p_generation_id_a: generationIdA,
-        p_generation_id_b: generationIdB
+        p_shot_generation_id_a: shotGenerationIdA,
+        p_shot_generation_id_b: shotGenerationIdB
       });
 
       if (error) throw error;
@@ -325,7 +325,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   }, [shotId, shotGenerations]);
 
   // Batch exchange positions - performs multiple exchanges then reloads once
-  const batchExchangePositions = useCallback(async (exchanges: Array<{ generationIdA: string; generationIdB: string }>) => {
+  const batchExchangePositions = useCallback(async (exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }>) => {
     if (!shotId) {
       return;
     }
@@ -347,7 +347,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     try {
       // Perform all exchanges without reloading positions each time
       for (const exchange of exchanges) {
-        await exchangePositionsNoReload(exchange.generationIdA, exchange.generationIdB);
+        await exchangePositionsNoReload(exchange.shotGenerationIdA, exchange.shotGenerationIdB);
       }
 
 

@@ -52,6 +52,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Update add_generation_to_shot function to log with drag session ID if available
+DROP FUNCTION IF EXISTS add_generation_to_shot(uuid, uuid, boolean);
 CREATE OR REPLACE FUNCTION add_generation_to_shot(
   p_shot_id UUID,
   p_generation_id UUID,
