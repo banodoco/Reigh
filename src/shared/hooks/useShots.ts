@@ -32,57 +32,55 @@ export const useCreateShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ name, projectId, shouldSelectAfterCreation = true, position }: { 
-      name: string; 
-      projectId: string; 
+    mutationFn: async ({ name, projectId, shouldSelectAfterCreation = true, position }: {
+      name: string;
+      projectId: string;
       shouldSelectAfterCreation?: boolean;
-      position?: number; 
+      position?: number;
     }) => {
-      let newShot;
-      
-      if (position !== undefined) {
-        // Use the new database function to insert at specific position
-        const { data, error } = await supabase
-          .rpc('insert_shot_at_position', {
-            p_project_id: projectId,
-            p_shot_name: name,
-            p_position: position
-          })
-          .single();
-        
-        if (error) throw error;
-        
-        const result = data as { shot_id: string; success: boolean } | null;
-        if (!result?.success) {
-          throw new Error('Failed to create shot at position');
+      let resolvedPosition = position;
+
+      if (resolvedPosition === undefined) {
+        const { data: lastShot, error: lastShotError } = await supabase
+          .from('shots')
+          .select('position')
+          .eq('project_id', projectId)
+          .order('position', { ascending: false })
+          .limit(1)
+          .maybeSingle<{ position: number | null }>();
+
+        if (lastShotError && lastShotError.code !== 'PGRST116') {
+          throw lastShotError;
         }
-        
-        // Fetch the created shot
-        const { data: shotData, error: fetchError } = await supabase
-          .from('shots')
-          .select()
-          .eq('id', result.shot_id)
-          .single();
-        
-        if (fetchError) throw fetchError;
-        newShot = shotData;
-      } else {
-        // Use regular insertion (triggers auto-position assignment)
-        const { data, error } = await supabase
-          .from('shots')
-          .insert({ 
-            name, 
-            project_id: projectId,
-            position: null  // Explicitly set to NULL to trigger the database function
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        newShot = data;
+
+        const lastPosition = lastShot?.position ?? 0;
+        resolvedPosition = lastPosition + 1;
       }
-      
-      return { shot: newShot, shouldSelectAfterCreation };
+
+      const { data, error } = await supabase
+        .rpc('insert_shot_at_position', {
+          p_project_id: projectId,
+          p_shot_name: name,
+          p_position: resolvedPosition,
+        })
+        .single();
+
+      if (error) throw error;
+
+      const result = data as { shot_id: string; success: boolean } | null;
+      if (!result?.success || !result.shot_id) {
+        throw new Error('Failed to create shot at position');
+      }
+
+      const { data: shotData, error: fetchError } = await supabase
+        .from('shots')
+        .select()
+        .eq('id', result.shot_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return { shot: shotData, shouldSelectAfterCreation };
     },
     onSuccess: (result) => {
       // Shot creation events are now handled by DataFreshnessManager via realtime events
