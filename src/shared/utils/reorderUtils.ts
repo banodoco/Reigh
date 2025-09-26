@@ -1,22 +1,7 @@
 /**
- * Pure utility functions for handling image reordering logic
- * Extracted from useEnhancedShotImageReorder for better testability and reuse
+ * Pure utility functions for handling complex reordering operations
+ * These functions contain no side effects and can be easily tested
  */
-
-export interface ReorderItem {
-  shotImageEntryId: string;
-  generationId: string;
-  timeline_frame?: number;
-}
-
-export interface ReorderChange {
-  oldPos: number;
-  newPos: number;
-  shotImageEntryId: string;
-  generationId: string;
-  currentTimelineFrame: number;
-  targetTimelineFrame: number;
-}
 
 export interface SwapStep {
   shotGenIdA: string;
@@ -25,85 +10,57 @@ export interface SwapStep {
 }
 
 export interface ReorderAnalysis {
-  changes: ReorderChange[];
   swapSequence: SwapStep[];
-  duplicateGenerationIds: Array<{ generationId: string; count: number }>;
   finalOrder: string[];
+  noChangesNeeded: boolean;
 }
 
 /**
- * Analyzes the difference between current and desired order
+ * Analyzes a reorder operation and generates the sequence of swaps needed
+ * to transform the current order into the desired order.
+ * 
+ * Uses a bubble-sort approach: for each target position, bubbles the correct 
+ * item there via sequential swaps. This handles any permutation including
+ * simple A↔B swaps, complex chain moves, and scenarios with duplicate generation_ids.
+ * 
+ * @param currentOrder Array of current shot_generation IDs in their current order
+ * @param desiredOrder Array of shot_generation IDs in the desired order
+ * @returns Analysis object with swap sequence and metadata
  */
-export function analyzeReorderChanges(
-  currentImages: ReorderItem[],
-  orderedShotImageEntryIds: string[],
-  shotGenerations: Array<{ id: string; generation_id: string; timeline_frame?: number }>
+export function analyzeReorderOperation(
+  currentOrder: string[],
+  desiredOrder: string[]
 ): ReorderAnalysis {
-  const currentOrder = currentImages.map(img => img.shotImageEntryId);
-  
-  // Check for duplicate generation_ids
-  const generationIdCounts = new Map<string, number>();
-  currentImages.forEach(img => {
-    const count = generationIdCounts.get(img.generationId) || 0;
-    generationIdCounts.set(img.generationId, count + 1);
-  });
-  
-  const duplicateGenerationIds = Array.from(generationIdCounts.entries())
-    .filter(([_, count]) => count > 1)
-    .map(([generationId, count]) => ({ generationId, count }));
-
-  // Find what actually changed between current and desired order
-  const changes: ReorderChange[] = [];
-
-  for (let newPos = 0; newPos < orderedShotImageEntryIds.length; newPos++) {
-    const shotImageEntryId = orderedShotImageEntryIds[newPos];
-    const oldPos = currentOrder.indexOf(shotImageEntryId);
-    
-    if (oldPos !== -1 && oldPos !== newPos) {
-      const currentImg = currentImages[oldPos];
-      const targetImg = currentImages[newPos];
-      
-      const currentShotGen = shotGenerations.find(sg => sg.generation_id === currentImg.generationId);
-      const targetShotGen = shotGenerations.find(sg => sg.generation_id === targetImg.generationId);
-      
-      if (currentShotGen && targetShotGen) {
-        changes.push({
-          oldPos,
-          newPos,
-          shotImageEntryId,
-          generationId: currentImg.generationId,
-          currentTimelineFrame: currentShotGen.timeline_frame || 0,
-          targetTimelineFrame: targetShotGen.timeline_frame || 0
-        });
-      }
-    }
+  // Validate inputs
+  if (currentOrder.length !== desiredOrder.length) {
+    throw new Error('Current and desired order arrays must have the same length');
   }
-
-  // Build sequential swaps using bubble-sort approach
-  const swapSequence = buildSwapSequence(currentOrder, orderedShotImageEntryIds);
-
-  return {
-    changes,
-    swapSequence,
-    duplicateGenerationIds,
-    finalOrder: [...orderedShotImageEntryIds]
-  };
-}
-
-/**
- * Builds a sequence of swaps to transform current order into desired order
- * Uses bubble-sort approach for reliability
- */
-export function buildSwapSequence(
-  currentOrderIds: string[],
-  desiredOrderIds: string[]
-): SwapStep[] {
+  
+  if (currentOrder.length === 0) {
+    return {
+      swapSequence: [],
+      finalOrder: [],
+      noChangesNeeded: true
+    };
+  }
+  
+  // Check if reordering is actually needed
+  const ordersMatch = currentOrder.every((id, index) => id === desiredOrder[index]);
+  if (ordersMatch) {
+    return {
+      swapSequence: [],
+      finalOrder: [...currentOrder],
+      noChangesNeeded: true
+    };
+  }
+  
+  // Create working copy for simulation
+  const workingOrder = [...currentOrder];
   const swapSequence: SwapStep[] = [];
-  const workingOrder = [...currentOrderIds];
   
   // For each position, ensure the correct item is there
-  for (let targetPos = 0; targetPos < desiredOrderIds.length; targetPos++) {
-    const desiredItemId = desiredOrderIds[targetPos];
+  for (let targetPos = 0; targetPos < desiredOrder.length; targetPos++) {
+    const desiredItemId = desiredOrder[targetPos];
     const currentItemId = workingOrder[targetPos];
     
     if (currentItemId !== desiredItemId) {
@@ -111,12 +68,7 @@ export function buildSwapSequence(
       const currentPos = workingOrder.findIndex(id => id === desiredItemId);
       
       if (currentPos === -1) {
-        console.warn('[ReorderUtils] Desired item not found in current order:', {
-          desiredItemId: desiredItemId.substring(0, 8),
-          targetPos,
-          workingOrder: workingOrder.map(id => id.substring(0, 8))
-        });
-        continue;
+        throw new Error(`Desired item ${desiredItemId} not found in current order`);
       }
       
       // Bubble the desired item toward its target position via sequential swaps
@@ -137,41 +89,37 @@ export function buildSwapSequence(
     }
   }
   
-  return swapSequence;
+  return {
+    swapSequence,
+    finalOrder: workingOrder,
+    noChangesNeeded: false
+  };
 }
 
 /**
- * Validates that a reorder operation is safe to perform
+ * Validates that a reorder analysis is consistent
+ * @param analysis The analysis to validate
+ * @param desiredOrder The expected final order
+ * @returns true if valid, throws error if invalid
  */
-export function validateReorderOperation(
-  currentImages: ReorderItem[],
-  orderedShotImageEntryIds: string[]
-): { isValid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  // Check lengths match
-  if (currentImages.length !== orderedShotImageEntryIds.length) {
-    errors.push(`Length mismatch: current=${currentImages.length}, desired=${orderedShotImageEntryIds.length}`);
+export function validateReorderAnalysis(
+  analysis: ReorderAnalysis,
+  desiredOrder: string[]
+): boolean {
+  if (analysis.noChangesNeeded) {
+    return true;
   }
   
-  // Check all IDs are present
-  const currentIds = new Set(currentImages.map(img => img.shotImageEntryId));
-  const desiredIds = new Set(orderedShotImageEntryIds);
+  // Check that final order matches desired order
+  if (analysis.finalOrder.length !== desiredOrder.length) {
+    throw new Error('Final order length does not match desired order length');
+  }
   
-  for (const id of desiredIds) {
-    if (!currentIds.has(id)) {
-      errors.push(`Missing ID in current order: ${id.substring(0, 8)}`);
+  for (let i = 0; i < desiredOrder.length; i++) {
+    if (analysis.finalOrder[i] !== desiredOrder[i]) {
+      throw new Error(`Final order mismatch at position ${i}: expected ${desiredOrder[i]}, got ${analysis.finalOrder[i]}`);
     }
   }
   
-  for (const id of currentIds) {
-    if (!desiredIds.has(id)) {
-      errors.push(`Extra ID in current order: ${id.substring(0, 8)}`);
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
+  return true;
 }
