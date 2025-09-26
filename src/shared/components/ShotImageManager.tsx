@@ -1214,4 +1214,4 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   );
 }
 
-export default ShotImageManager;
+export default ShotImageManagerComponent;
