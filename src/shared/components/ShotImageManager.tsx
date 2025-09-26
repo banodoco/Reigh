@@ -36,6 +36,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import MagicEditModal from '@/shared/components/MagicEditModal';
+import { ShotImageManagerMobile } from './ShotImageManager/ShotImageManagerMobile';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
 
@@ -1025,24 +1026,29 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   }, [mobileSelectedIds, currentImages, onImageReorder]);
 
   console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
-  // Mobile batch mode with selection
+  // Mobile batch mode with selection - delegate to specialized component
   if (isMobile && generationMode === 'batch') {
-    console.log(`[DEBUG] EARLY RETURN - Mobile batch mode with unified position system integration`);
-    const mobileColumns = columns; // Use the columns prop for mobile
-    const itemsPerRow = mobileColumns;
-    
-    const shouldSkipConfirmation = imageDeletionSettings.skipConfirmation;
-
-    const handleDeleteTrigger = () => {
-      if (mobileSelectedIds.length === 0) return;
-      if (shouldSkipConfirmation) {
-        performBatchDelete(mobileSelectedIds);
-      } else {
-        setSkipConfirmationNextTimeVisual(false);
-        currentDialogSkipChoiceRef.current = false;
-        setConfirmOpen(true);
-      }
-    };
+    console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
+    return (
+      <ShotImageManagerMobile
+        images={images}
+        onImageDelete={onImageDelete}
+        onBatchImageDelete={onBatchImageDelete}
+        onImageDuplicate={onImageDuplicate}
+        onImageReorder={onImageReorder}
+        columns={columns}
+        generationMode={generationMode}
+        onImageSaved={onImageSaved}
+        onMagicEdit={onMagicEdit}
+        duplicatingImageId={duplicatingImageId}
+        duplicateSuccessImageId={duplicateSuccessImageId}
+        projectAspectRatio={projectAspectRatio}
+      />
+    );
+  }
+  
+  // Desktop/non-mobile logic continues below
+  const shouldSkipConfirmation = imageDeletionSettings.skipConfirmation;
     
     return (
       <div ref={outerRef} className="relative"
