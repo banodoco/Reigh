@@ -242,7 +242,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           <div className="p-1">
             {effectiveGenerationMode === "timeline" ? (
               <>
-                <Timeline
+              <Timeline
+                key={`timeline-${selectedShotId}-${memoizedShotGenerations.length}-${images.length}`}
                 shotId={selectedShotId}
                 frameSpacing={batchVideoFrames}
                 contextFrames={batchVideoContext}

@@ -391,6 +391,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
         isOpen={isMagicEditOpen}
         onClose={() => setIsMagicEditOpen(false)}
         imageUrl={displayUrl}
+        shotGenerationId={image.shotImageEntryId}
       />
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogOverlay

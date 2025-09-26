@@ -12,7 +12,7 @@ interface PositionManagementProps {
   isLoading: boolean;
   isPersistingPositions: boolean;
   isDragInProgress: boolean;
-  updateTimelineFrame?: (generationId: string, frame: number, metadata?: any) => Promise<void>;
+  updateTimelineFrame?: (shotGenerationId: string, frame: number, metadata?: any) => Promise<void>;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   setIsPersistingPositions: (persisting: boolean) => void;
 }
@@ -114,6 +114,12 @@ export function usePositionManagement({
   }, [stablePositions, shotId]);
 
   // Calculate frame positions from database
+  const imagesByShotGenId = useMemo(() => {
+    return new Map(
+      images.map(img => [img.shotImageEntryId, img])
+    );
+  }, [images]);
+
   const framePositions = useMemo(() => {
     framePositionsRenderCount.current++;
     const currentDeps = { shotGenerations, images, frameSpacing, shotId };
@@ -154,7 +160,7 @@ export function usePositionManagement({
     const positions = new Map<string, number>();
     
     shotGenerations.forEach(sg => {
-      const matchingImage = images.find(img => img.id === sg.generation_id);
+      const matchingImage = imagesByShotGenId.get(sg.id);
       
       // [Position0Debug] Log the mapping process to find why position 0 items are lost
       if (sg.timeline_frame === 0) {
@@ -164,13 +170,11 @@ export function usePositionManagement({
           timeline_frame: sg.timeline_frame,
           matchingImage: matchingImage ? {
             id: matchingImage.id?.substring(0, 8),
-            shotImageEntryId: matchingImage.shotImageEntryId?.substring(0, 8),
-            timeline_frame: matchingImage.timeline_frame
+            shotImageEntryId: matchingImage.shotImageEntryId?.substring(0, 8)
           } : null,
           allImageIds: images.map(img => ({
             id: img.id?.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
-            timeline_frame: img.timeline_frame
+            shotImageEntryId: img.shotImageEntryId?.substring(0, 8)
           }))
         });
       }
@@ -418,7 +422,7 @@ export function usePositionManagement({
       .filter(([pos, ids]) => ids.length > 1);
     
     if (duplicates.length > 0) {
-      console.error(`[TIMELINE_TRACK] [DUPLICATE_PREVENTION] ❌ Attempted to set duplicate timeline_frame values:`, 
+      console.error(`[TimelineDragFlow] [DUPLICATE_PREVENTION] ❌ Session: ${(window as any).__CURRENT_DRAG_SESSION__ || 'no-session'} | Attempted to set duplicate timeline_frame values:`, 
         duplicates.map(([pos, ids]) => `${pos}: [${ids.join(', ')}]`).join(', '));
       
       // Auto-resolve duplicates before proceeding
@@ -431,12 +435,14 @@ export function usePositionManagement({
             while (Array.from(resolvedPositions.values()).includes(newPos)) {
               newPos++;
             }
-            console.log(`[TIMELINE_TRACK] [DUPLICATE_RESOLUTION] 📍 Auto-resolving: ${duplicateIds[i]} ${duplicatePos} → ${newPos}`);
+            console.log(`[TimelineDragFlow] [DUPLICATE_RESOLUTION] 📍 Session: ${(window as any).__CURRENT_DRAG_SESSION__ || 'no-session'} | Auto-resolving: ${duplicateIds[i]} ${duplicatePos} → ${newPos}`);
             resolvedPositions.set(fullId, newPos);
           }
         }
       }
       newPositions = resolvedPositions;
+      
+      console.log(`[TimelineDragFlow] [DUPLICATE_RESOLUTION_COMPLETE] ✅ Session: ${(window as any).__CURRENT_DRAG_SESSION__ || 'no-session'} | Resolved all duplicates, proceeding with ${newPositions.size} unique positions`);
     }
 
     // Find what actually changed
@@ -497,16 +503,30 @@ export function usePositionManagement({
         );
 
         if (matchingImage && updateTimelineFrame) {
-          timelineDebugger.logPositionUpdate(`Updating ${change.id}`, {
-            shotId,
-            from: change.oldPos,
-            to: change.newPos
-          });
+          // Find the shot_generation.id that corresponds to this change
+          const shotGeneration = shotGenerations.find(sg => 
+            sg.generation_id === matchingImage.id || 
+            matchingImage.shotImageEntryId === sg.id ||
+            matchingImage.shotImageEntryId?.endsWith(change.id) ||
+            sg.id.substring(0, 8) === change.id
+          );
           
-          await updateTimelineFrame(matchingImage.id, change.newPos, {
-            user_positioned: true,
-            drag_source: 'timeline_drag'
-          });
+          if (shotGeneration) {
+            timelineDebugger.logPositionUpdate(`Updating ${change.id}`, {
+              shotId,
+              shotGenerationId: shotGeneration.id.substring(0, 8),
+              from: change.oldPos,
+              to: change.newPos
+            });
+            
+            await updateTimelineFrame(shotGeneration.id, change.newPos, {
+              user_positioned: true,
+              drag_source: 'timeline_drag',
+              drag_session_id: (window as any).__CURRENT_DRAG_SESSION__ || 'unknown'
+            });
+          } else {
+            console.error(`[TimelineDragFlow] [MAPPING_ERROR] ❌ Could not find shot_generation for change.id: ${change.id}, matchingImage.id: ${matchingImage.id}`);
+          }
         }
       }
 

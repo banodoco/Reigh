@@ -148,6 +148,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     fullShotImages.length > 0 ? fullShotImages : contextImages,
     [fullShotImages, contextImages]
   );
+
   
   // [VideoLoadSpeedIssue] Track image data loading progress
   React.useEffect(() => {
@@ -344,6 +345,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
+
+  // Timeline warmup: Use optimistic local state for initial render to prevent order jumping
+  const timelineReadyImages = React.useMemo(() => {
+    if (state.localOrderedShotImages.length > 0) {
+      const optimizedImages = state.localOrderedShotImages
+        .filter(img => img.timeline_frame !== undefined && img.timeline_frame !== null);
+      if (optimizedImages.length === state.localOrderedShotImages.length) {
+        console.log('[TimelineWarmup] Using cached localOrderedShotImages for initial render', {
+          shotId: selectedShotId,
+          count: optimizedImages.length
+        });
+        return optimizedImages;
+      }
+      const fallback = orderedShotImages.map(serverImg => {
+        const localMatch = state.localOrderedShotImages.find(img => img.id === serverImg.id);
+        return localMatch ? { ...localMatch, timeline_frame: serverImg.timeline_frame } : serverImg;
+      });
+      console.log('[TimelineWarmup] Merging local and server images for initial render', {
+        shotId: selectedShotId,
+        count: fallback.length
+      });
+      return fallback;
+    }
+    return orderedShotImages;
+  }, [state.localOrderedShotImages, orderedShotImages, selectedShotId]);
 
   // Sticky header visibility similar to ImageGenerationToolPage
   const headerContainerRef = useRef<HTMLDivElement>(null);

@@ -16,6 +16,7 @@ interface DragState {
   currentX: number;
   currentY: number;
   originalFramePos: number;
+  dragSessionId?: string;
 }
 
 interface DragRefs {
@@ -361,8 +362,10 @@ export const useTimelineDrag = ({
     const now = Date.now();
     const timeSinceLastUp = now - dragRefsRef.current.lastMouseUpTime;
 
-    // 🎯 DRAG TRACKING: Log every drag start
-    console.log(`[TIMELINE_TRACK] [DRAG_START] 🖱️ Item ${imageId.substring(0, 8)} drag initiated at frame ${framePositions.get(imageId) ?? 0}`);
+    // 🎯 DRAG TRACKING: Log every drag start with common identifier
+    const dragSessionId = `drag_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    (window as any).__CURRENT_DRAG_SESSION__ = dragSessionId;
+    console.log(`[TimelineDragFlow] [DRAG_START] 🖱️ Session: ${dragSessionId} | Item ${imageId.substring(0, 8)} drag initiated at frame ${framePositions.get(imageId) ?? 0}`);
     
     console.log('[TimelineDragFix] 🎯 DRAG START DETECTED:', {
       itemId: imageId.substring(0, 8),
@@ -485,6 +488,7 @@ export const useTimelineDrag = ({
       currentX: e.clientX,
       currentY: e.clientY,
       originalFramePos: framePos,
+      dragSessionId: dragSessionId,
     });
 
     log('TimelineDragDebug', 'start', {
@@ -809,7 +813,8 @@ export const useTimelineDrag = ({
         });
 
         // 🎯 DRAG TRACKING: Log every drag completion
-        console.log(`[TIMELINE_TRACK] [DRAG_COMPLETE] ✅ Item ${dragState.activeId.substring(0, 8)} drag completed: ${dragState.originalFramePos} → ${finalPos}`);
+        console.log(`[TimelineDragFlow] [DRAG_COMPLETE] ✅ Session: ${dragState.dragSessionId || 'unknown'} | Item ${dragState.activeId.substring(0, 8)} drag completed: ${dragState.originalFramePos} → ${finalPos}`);
+        (window as any).__CURRENT_DRAG_SESSION__ = null;
         
         // 🎯 DEBUG: Log all position changes to identify wrong item movements
         const allChanges = Array.from(finalPositions.entries())
@@ -822,7 +827,24 @@ export const useTimelineDrag = ({
           }));
         
         if (allChanges.length > 1) {
-          console.log(`[TIMELINE_TRACK] [MULTI_ITEM_MOVE] ⚠️ Multiple items moving in single drag:`, allChanges);
+          console.log(`[TimelineDragFlow] [MULTI_ITEM_MOVE] ⚠️ Session: ${dragState.dragSessionId || 'unknown'} | Multiple items moving in single drag:`, allChanges);
+          
+          // 🚨 CONFLICT DETECTION: Check for duplicate final positions
+          const finalPositionCounts = new Map<number, string[]>();
+          for (const change of allChanges) {
+            if (!finalPositionCounts.has(change.newPos)) {
+              finalPositionCounts.set(change.newPos, []);
+            }
+            finalPositionCounts.get(change.newPos)!.push(change.id);
+          }
+          
+          const finalConflicts = Array.from(finalPositionCounts.entries())
+            .filter(([pos, ids]) => ids.length > 1);
+            
+          if (finalConflicts.length > 0) {
+            console.error(`[TimelineDragFlow] [FINAL_CONFLICTS] 💥 Multiple items ended up at same positions after drag:`, 
+              finalConflicts.map(([pos, ids]) => `Frame ${pos}: [${ids.join(', ')}]`));
+          }
         }
         
         console.log('[DragLifecycle] 🎉 DRAG COMPLETE - All updates finished:', {

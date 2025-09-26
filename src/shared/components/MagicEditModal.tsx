@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { createBatchMagicEditTasks, TaskValidationError } from '@/shared/lib/tasks/magicEdit';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal } from '@/shared/hooks/useModal';
+import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
 import {
   Dialog,
   DialogContent,
@@ -32,13 +33,16 @@ interface MagicEditModalProps {
   imageUrl: string;
   imageDimensions?: { width: number; height: number };
   onClose: () => void;
+  // Optional shot generation context for prompt persistence
+  shotGenerationId?: string;
 }
 
-export const MagicEditModal: React.FC<MagicEditModalProps> = ({
+const MagicEditModal: React.FC<MagicEditModalProps> = ({
   isOpen,
   imageUrl,
   imageDimensions,
   onClose,
+  shotGenerationId,
 }) => {
   const isMobile = useIsMobile();
   
@@ -46,7 +50,6 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const modal = useMediumModal();
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
   const [magicEditNumImages, setMagicEditNumImages] = useState(1);
-  const [magicEditInSceneBoost, setMagicEditInSceneBoost] = useState(false);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
 
@@ -60,6 +63,17 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
   // State for task creation
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [tasksCreated, setTasksCreated] = useState(false);
+
+  // Shot generation metadata for prompt persistence (only when shotGenerationId is provided)
+  const {
+    addMagicEditPrompt,
+    getLastMagicEditPrompt,
+    isLoading: isLoadingMetadata
+  } = useShotGenerationMetadata({
+    shotId: currentShotId || '',
+    generationId: shotGenerationId || '',
+    enabled: !!shotGenerationId && !!currentShotId
+  });
 
   const handleMagicEditGenerate = async () => {
     if (!selectedProjectId) {
@@ -88,7 +102,6 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
         negative_prompt: "", // Empty negative prompt as default
         resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
         seed: 11111, // Base seed, will be incremented for each image
-        in_scene: magicEditInSceneBoost,
         shot_id: shotId, // Associate with shot if available (currentShotId takes priority over magicEditShotId)
       };
       
@@ -98,6 +111,21 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
       
       console.log(`[MagicEditForm] Created ${results.length} magic edit tasks`);
       
+      // Save the prompt to shot generation metadata if we have the context
+      if (shotGenerationId && currentShotId) {
+        try {
+          await addMagicEditPrompt(magicEditPrompt.trim(), magicEditNumImages);
+          console.log('[MagicEditModal] Saved prompt to shot generation metadata:', {
+            shotGenerationId: shotGenerationId.substring(0, 8),
+            promptLength: magicEditPrompt.trim().length,
+            numImages: magicEditNumImages
+          });
+        } catch (error) {
+          console.warn('[MagicEditModal] Failed to save prompt to metadata:', error);
+          // Don't fail the entire operation if metadata save fails
+        }
+      }
+      
       setTasksCreated(true);
       
       // Don't close modal immediately - let success state show
@@ -106,7 +134,6 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
         onClose();
         setMagicEditPrompt('');
         setMagicEditNumImages(1);
-        setMagicEditInSceneBoost(false);
         setMagicEditShotId(null);
         setTasksCreated(false);
       }, 2000); // Wait 2 seconds to show success state
@@ -151,6 +178,20 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
       toast.error("Failed to create shot");
     }
   }, [selectedProjectId, createShotMutation, queryClient]);
+
+  // Load last saved prompt when modal opens (for shot generation context)
+  useEffect(() => {
+    if (isOpen && shotGenerationId && !isLoadingMetadata) {
+      const lastPrompt = getLastMagicEditPrompt();
+      if (lastPrompt && !magicEditPrompt) {
+        setMagicEditPrompt(lastPrompt);
+        console.log('[MagicEditModal] Loaded last saved prompt for shot generation:', {
+          shotGenerationId: shotGenerationId.substring(0, 8),
+          promptLength: lastPrompt.length
+        });
+      }
+    }
+  }, [isOpen, shotGenerationId, isLoadingMetadata, getLastMagicEditPrompt, magicEditPrompt]);
 
   // Reset magicEditShotId if the selected shot no longer exists (e.g., was deleted)
   useEffect(() => {
@@ -306,17 +347,6 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
           />
         </div>
 
-        {/* In-Scene Boost Checkbox */}
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="magic-edit-in-scene"
-            checked={magicEditInSceneBoost}
-            onCheckedChange={(checked) => setMagicEditInSceneBoost(checked === true)}
-          />
-          <Label htmlFor="magic-edit-in-scene" className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            In-Scene Boost
-          </Label>
-        </div>
 
             </div>
           </div>
@@ -354,4 +384,5 @@ export const MagicEditModal: React.FC<MagicEditModalProps> = ({
   );
 };
 
-export default MagicEditModal; 
+export default MagicEditModal;
+export { MagicEditModal }; 

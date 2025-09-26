@@ -152,8 +152,8 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         </div>
 
           {/* Number to Generate - desktop has toggle on same row, mobile separate */}
-          <div className={`flex items-start gap-6 ${showAdvanced ? 'w-full sm:w-[92.5%]' : 'w-full sm:w-[65%]'}`}>
-            <div className="flex-1">
+          <div className={`flex items-start gap-4 w-full sm:w-[400px]`}>
+            <div className="flex-1 sm:flex-none sm:w-[70%]">
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="gen_numberToGenerate" className="text-sm font-medium">
                   Number to Generate
@@ -182,21 +182,21 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             </div>
 
             {/* Advanced toggle button - desktop only, allow wrapping */}
-            <div className="hidden sm:flex flex-shrink-0 pt-2 min-w-0">
+            <div className="hidden sm:flex flex-shrink-0 pt-2 w-[30%]">
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
                 <CollapsibleTrigger asChild>
                   <Button 
                     variant="ghost" 
-                    className="flex items-center gap-2 text-sm p-2 h-auto justify-start flex-wrap"
+                    className="flex items-center gap-2 text-xs p-2 h-auto justify-center w-full"
                     onClick={() => {
                       const next = !showAdvanced;
                       setShowAdvanced(next);
                       emitChange({ showAdvanced: next });
                     }}
                   >
-                    <Settings className="h-4 w-4 flex-shrink-0" />
-                    <span className="whitespace-normal text-left leading-tight">Advanced Options</span>
-                    {showAdvanced ? <ChevronRight className="h-4 w-4 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 flex-shrink-0" />}
+                    <Settings className="h-3 w-3" />
+                    <span className="text-center leading-tight">Advanced<br />Options</span>
+                    {showAdvanced ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                   </Button>
                 </CollapsibleTrigger>
               </Collapsible>
@@ -409,7 +409,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           </Collapsible>
 
           {/* Generate button */}
-          <div className="w-full sm:w-[65%]">
+          <div className="w-full sm:w-[300px]">
             <Button 
               type="button"
               onClick={handleGenerateClick}

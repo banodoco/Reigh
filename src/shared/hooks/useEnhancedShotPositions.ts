@@ -29,6 +29,7 @@ export interface PositionMetadata {
   created_by_mode?: 'timeline' | 'batch';
   auto_initialized?: boolean;
   drag_source?: string;
+  drag_session_id?: string;
   // Pair prompts (stored on the first item of each pair)
   pair_prompt?: string;
   pair_negative_prompt?: string;
@@ -83,7 +84,19 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           )
         `)
         .eq('shot_id', shotId)
-        .order('timeline_frame', { ascending: true });
+        .order('timeline_frame', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      console.debug('[PositionLoadDebug] Loaded shot_generations from DB:', {
+        shotId,
+        count: data?.length || 0,
+        items: (data || []).map((sg: any) => ({
+          id: sg.id,
+          genId: sg.generation_id,
+          timeline_frame: sg.timeline_frame,
+          created_at: sg.created_at
+        }))
+      });
 
       if (fetchError) throw fetchError;
 
@@ -440,13 +453,16 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
   // Update timeline frame for specific item
   const updateTimelineFrame = useCallback(async (
-    generationId: string,
+    shotGenerationId: string,
     newTimelineFrame: number,
     metadata?: Partial<PositionMetadata>
   ) => {
     if (!shotId) {
       return;
     }
+
+    const dragSessionId = metadata?.drag_session_id || 'no-session';
+    console.log(`[TimelineDragFlow] [DB_UPDATE] 🎯 Session: ${dragSessionId} | Updating timeline frame for shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
 
     setIsPersistingPositions(true);
 
@@ -457,9 +473,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           timeline_frame: newTimelineFrame,
           metadata: metadata ? { user_positioned: true, drag_source: 'timeline_drag', ...metadata } : { user_positioned: true, drag_source: 'timeline_drag' }
         })
-        .eq('generation_id', generationId);
+        .eq('id', shotGenerationId);
 
-      if (error) throw error;
+      if (error) {
+        console.log(`[TimelineDragFlow] [DB_ERROR] ❌ Session: ${dragSessionId} | Database update failed for shot_generation ${shotGenerationId.substring(0, 8)}:`, error);
+        throw error;
+      }
+
+      console.log(`[TimelineDragFlow] [DB_SUCCESS] ✅ Session: ${dragSessionId} | Successfully updated shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update timeline frame';
@@ -471,42 +492,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     }
   }, [shotId]);
 
-  // Initialize timeline frames for existing records without them
+  // REMOVED: Automatic timeline frame initialization
+  // This was causing magic edit items (with add_in_position: false) to be automatically
+  // positioned on the timeline, undermining the intentional unpositioned behavior.
   const initializeTimelineFrames = useCallback(async (frameSpacing: number = DEFAULT_FRAME_SPACING) => {
-    if (!shotId) {
-      return;
-    }
-
-    // Count items that need initialization
-    const itemsNeedingFrames = shotGenerations.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined);
-    
-    if (itemsNeedingFrames.length === 0) {
-      return 0;
-    }
-
-    try {
-      const { data, error } = await supabase.rpc('initialize_timeline_frames_for_shot', {
-        p_shot_id: shotId,
-        p_frame_spacing: frameSpacing
-      });
-
-      if (error) throw error;
-
-      const recordCount = data as number;
-      
-      if (recordCount > 0) {
-        await loadPositions({ reason: 'reorder' });
-      }
-      
-      return recordCount;
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize timeline frames';
-      console.error('[initializeTimelineFrames] Error:', errorMessage);
-      toast.error(`Failed to initialize timeline frames: ${errorMessage}`);
-      throw err;
-    }
-  }, [shotId, shotGenerations, loadPositions]);
+    console.warn('[initializeTimelineFrames] This function has been disabled. Items with timeline_frame: NULL are intentionally unpositioned.');
+    return 0;
+  }, []);
 
   // Apply timeline frame changes atomically - replaces complex client-side exchange logic
   const applyTimelineFrames = useCallback(async (

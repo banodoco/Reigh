@@ -352,6 +352,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           isOpen={isMagicEditOpen}
           imageUrl={getDisplayUrl(image.imageUrl)}
           onClose={() => setIsMagicEditOpen(false)}
+          shotGenerationId={image.shotImageEntryId}
         />
       </div>
     </div>

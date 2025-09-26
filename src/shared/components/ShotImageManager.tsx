@@ -1749,6 +1749,7 @@ const MobileImageItem: React.FC<MobileImageItemProps> = ({
         isOpen={isMagicEditOpen}
         imageUrl={displayUrl!}
         onClose={() => setIsMagicEditOpen(false)}
+        shotGenerationId={image.shotImageEntryId}
       />
     </div>
   );
