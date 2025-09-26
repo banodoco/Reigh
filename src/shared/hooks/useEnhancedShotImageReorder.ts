@@ -145,126 +145,91 @@ export const useEnhancedShotImageReorder = (
         return;
       }
 
-      // Convert changes into direct timeline_frame swaps
-      // For timeline-frame-based swapping, we need to identify pairs of items that should swap values
-      const exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }> = [];
-      const processedPairs = new Set<string>();
-
-      for (const change of changes) {
-        // Find if there's another item that should get this item's current timeline_frame
-        const reciprocalChange = changes.find(c => 
-          c.generationId !== change.generationId && 
-          c.targetTimelineFrame === change.currentTimelineFrame &&
-          c.currentTimelineFrame === change.targetTimelineFrame
-        );
-
-        if (reciprocalChange) {
-          // This is a direct swap - create exchange pair using shot_generation IDs
-          const pairKey = [change.generationId, reciprocalChange.generationId].sort().join('-');
+      // Build sequential swaps to transform current order into desired order
+      // This handles any permutation (simple swaps, complex chains, duplicate generation_ids)
+      console.log('[BatchModeReorderFlow] [SEQUENTIAL_SWAPS] 🔄 Building sequential swap sequence...');
+      
+      // Create working arrays with shot_generation IDs (the unique identifiers we need for swaps)
+      const currentOrderIds = currentImages.map(img => img.shotImageEntryId);
+      const desiredOrderIds = [...orderedShotImageEntryIds]; // Copy to avoid mutation
+      
+      console.log('[BatchModeReorderFlow] [ORDER_COMPARISON] 📋 Comparing orders:', {
+        currentOrder: currentOrderIds.map(id => id.substring(0, 8)),
+        desiredOrder: desiredOrderIds.map(id => id.substring(0, 8)),
+        timestamp: Date.now()
+      });
+      
+      // Build sequence of swaps needed to transform current → desired
+      const swapSequence: Array<{ shotGenIdA: string; shotGenIdB: string; reason: string }> = [];
+      const workingOrder = [...currentOrderIds]; // Working copy we'll mutate
+      
+      // For each position, ensure the correct item is there
+      for (let targetPos = 0; targetPos < desiredOrderIds.length; targetPos++) {
+        const desiredItemId = desiredOrderIds[targetPos];
+        const currentItemId = workingOrder[targetPos];
+        
+        if (currentItemId !== desiredItemId) {
+          // Find where the desired item currently is
+          const currentPos = workingOrder.findIndex(id => id === desiredItemId);
           
-          if (!processedPairs.has(pairKey)) {
-            // Find the shot_generation IDs for these generation IDs
-            const shotGenA = shotGenerations.find(sg => sg.generation_id === change.generationId);
-            const shotGenB = shotGenerations.find(sg => sg.generation_id === reciprocalChange.generationId);
+          if (currentPos === -1) {
+            console.error('[BatchModeReorderFlow] [MISSING_ITEM] ❌ Desired item not found in current order:', {
+              desiredItemId: desiredItemId.substring(0, 8),
+              targetPos,
+              workingOrder: workingOrder.map(id => id.substring(0, 8))
+            });
+            continue;
+          }
+          
+          // Bubble the desired item toward its target position via sequential swaps
+          for (let swapPos = currentPos; swapPos > targetPos; swapPos--) {
+            const itemA = workingOrder[swapPos];
+            const itemB = workingOrder[swapPos - 1];
             
-            console.log('[BatchModeReorderFlow] [SWAP_DETECTION] 🔄 Attempting to find shot_generations for swap:', {
-              changeA: {
-                generationId: change.generationId.substring(0, 8),
-                shotImageEntryId: change.shotImageEntryId.substring(0, 8),
-                foundShotGen: shotGenA?.id?.substring(0, 8) || 'NOT_FOUND'
-              },
-              changeB: {
-                generationId: reciprocalChange.generationId.substring(0, 8),
-                shotImageEntryId: reciprocalChange.shotImageEntryId.substring(0, 8),
-                foundShotGen: shotGenB?.id?.substring(0, 8) || 'NOT_FOUND'
-              }
+            swapSequence.push({
+              shotGenIdA: itemA,
+              shotGenIdB: itemB,
+              reason: `Moving ${itemA.substring(0, 8)} from pos ${swapPos} to ${swapPos - 1} (target: ${targetPos})`
             });
             
-            if (shotGenA && shotGenB) {
-              exchanges.push({
-                shotGenerationIdA: shotGenA.id,
-                shotGenerationIdB: shotGenB.id
-              });
-              processedPairs.add(pairKey);
-              
-              console.log('[BatchModeReorderFlow] [DIRECT_SWAP] ✅ Direct timeline_frame swap detected:', {
-                itemA: change.generationId.substring(0, 8),
-                itemB: reciprocalChange.generationId.substring(0, 8),
-                shotGenA: shotGenA.id.substring(0, 8),
-                shotGenB: shotGenB.id.substring(0, 8),
-                swapFrames: `${change.currentTimelineFrame} ↔ ${change.targetTimelineFrame}`
-              });
-            } else {
-              console.warn('[BatchModeReorderFlow] [SWAP_FAILED] ❌ Could not find shot_generations for swap:', {
-                missingA: !shotGenA,
-                missingB: !shotGenB,
-                changeA: change.generationId.substring(0, 8),
-                changeB: reciprocalChange.generationId.substring(0, 8)
-              });
-            }
+            // Apply swap to working order
+            workingOrder[swapPos] = itemB;
+            workingOrder[swapPos - 1] = itemA;
           }
-        } else {
-          console.log('[BatchModeReorderFlow] [NO_RECIPROCAL] ℹ️ No reciprocal change found for:', {
-            generationId: change.generationId.substring(0, 8),
-            shotImageEntryId: change.shotImageEntryId.substring(0, 8),
-            oldPos: change.oldPos,
-            newPos: change.newPos,
-            currentFrame: change.currentTimelineFrame,
-            targetFrame: change.targetTimelineFrame
-          });
         }
       }
-
-      // Perform all exchanges in a batch
-      if (exchanges.length > 0) {
-        console.log('[BatchModeReorderFlow] [EXCHANGES_DETECTED] 🔄 Executing timeline-frame swaps:', {
-          exchangeCount: exchanges.length,
-          exchanges: exchanges.map(ex => ({
-            shotGenA: ex.shotGenerationIdA.substring(0, 8),
-            shotGenB: ex.shotGenerationIdB.substring(0, 8)
-          })),
-          timestamp: Date.now()
-        });
-
-        console.log('[BatchModeReorderFlow] [CALLING_DB] 📞 Calling batchExchangePositions...');
-        await batchExchangePositions(exchanges);
-        console.log('[BatchModeReorderFlow] [DB_COMPLETE] ✅ batchExchangePositions completed');
-      } else {
-        console.warn('[BatchModeReorderFlow] [COMPLEX_REORDER] ⚠️ No direct swaps detected - attempting sequential timeline frame updates...');
+      
+      console.log('[BatchModeReorderFlow] [SWAP_SEQUENCE] 📝 Generated swap sequence:', {
+        totalSwaps: swapSequence.length,
+        swaps: swapSequence.map((swap, i) => ({
+          step: i + 1,
+          itemA: swap.shotGenIdA.substring(0, 8),
+          itemB: swap.shotGenIdB.substring(0, 8),
+          reason: swap.reason
+        })),
+        finalOrder: workingOrder.map(id => id.substring(0, 8)),
+        timestamp: Date.now()
+      });
+      
+      // Execute the swap sequence
+      if (swapSequence.length > 0) {
+        console.log('[BatchModeReorderFlow] [EXECUTING_SWAPS] 🚀 Executing sequential swaps...');
         
-        // Handle complex reordering by updating timeline_frames sequentially
-        // This handles cases where items need to move in a chain (A→B→C→D) rather than direct swaps (A↔B)
-        if (changes.length > 0) {
-          console.log('[BatchModeReorderFlow] [SEQUENTIAL_UPDATE] 🔄 Performing sequential timeline frame updates:', {
-            changesCount: changes.length,
-            changes: changes.map(c => ({
-              shotImageEntryId: c.shotImageEntryId.substring(0, 8),
-              generationId: c.generationId.substring(0, 8),
-              frameChange: `${c.currentTimelineFrame} → ${c.targetTimelineFrame}`
-            }))
+        for (let i = 0; i < swapSequence.length; i++) {
+          const swap = swapSequence[i];
+          console.log('[BatchModeReorderFlow] [SWAP_STEP] 🔀 Step', i + 1, 'of', swapSequence.length, ':', {
+            itemA: swap.shotGenIdA.substring(0, 8),
+            itemB: swap.shotGenIdB.substring(0, 8),
+            reason: swap.reason
           });
           
-          // Use updateTimelineFrame for each change instead of exchanges
-          for (const change of changes) {
-            const shotGeneration = shotGenerations.find(sg => sg.generation_id === change.generationId);
-            if (shotGeneration) {
-              console.log('[BatchModeReorderFlow] [SEQUENTIAL_ITEM] 🎯 Updating timeline frame:', {
-                shotGenerationId: shotGeneration.id.substring(0, 8),
-                generationId: change.generationId.substring(0, 8),
-                frameChange: `${change.currentTimelineFrame} → ${change.targetTimelineFrame}`
-              });
-              
-              await updateTimelineFrame(shotGeneration.id, change.targetTimelineFrame, {
-                user_positioned: true,
-                drag_source: 'batch_reorder_sequential',
-                drag_session_id: 'batch_sequential_' + Date.now()
-              });
-            }
-          }
-          
-          console.log('[BatchModeReorderFlow] [SEQUENTIAL_COMPLETE] ✅ Sequential updates completed, reloading positions...');
-          await loadPositions({ reason: 'reorder' });
+          await exchangePositionsNoReload(swap.shotGenIdA, swap.shotGenIdB);
         }
+        
+        console.log('[BatchModeReorderFlow] [SWAPS_COMPLETE] ✅ All swaps completed, reloading positions...');
+        await loadPositions({ reason: 'reorder' });
+      } else {
+        console.log('[BatchModeReorderFlow] [NO_SWAPS_NEEDED] ℹ️ No swaps needed - order already correct');
       }
 
       // Reordering completed successfully - no toast needed for smooth UX
