@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useEnhancedShotPositions } from './useEnhancedShotPositions';
+import { useBatchReorder } from './useBatchReorder';
 import { toast } from 'sonner';
 import { analyzeReorderOperation, validateReorderAnalysis } from '@/shared/utils/reorderUtils';
 
@@ -22,17 +23,27 @@ export const useEnhancedShotImageReorder = (
 ) => {
   // Use parent hook functions if provided, otherwise create own instance
   const ownHook = useEnhancedShotPositions(parentHook ? null : shotId);
+  const ownBatchReorder = useBatchReorder({ 
+    shotId: parentHook ? null : shotId,
+    onReload: parentHook ? undefined : (reason) => ownHook.loadPositions({ reason: 'reorder' })
+  });
   
   const {
     shotGenerations,
     getImagesForMode,
     exchangePositions,
-    exchangePositionsNoReload,
-    batchExchangePositions,
     deleteItem,
     loadPositions,
     isLoading
   } = parentHook || ownHook;
+  
+  const {
+    batchExchangePositions,
+    exchangePositionsNoReload
+  } = parentHook ? {
+    batchExchangePositions: parentHook.batchExchangePositions,
+    exchangePositionsNoReload: parentHook.exchangePositionsNoReload
+  } : ownBatchReorder;
 
   // Handle drag and drop reordering in batch mode - Timeline-frame-based swapping
   const handleReorder = useCallback(async (orderedShotImageEntryIds: string[]) => {
