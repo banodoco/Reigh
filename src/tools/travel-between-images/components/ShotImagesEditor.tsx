@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/shared/components/ui/toggle-group";
@@ -10,6 +10,9 @@ import FileInput from "@/shared/components/FileInput";
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 import PairPromptModal from "./Timeline/PairPromptModal";
+import { Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -115,6 +118,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Force mobile to use batch mode regardless of desktop setting
   const effectiveGenerationMode = isMobile ? 'batch' : generationMode;
   
+  // State for download functionality
+  const [isDownloadingImages, setIsDownloadingImages] = useState(false);
+  
   // Note: Pair prompts are retrieved from the enhanced shot positions hook below
   
   const [pairPromptModalData, setPairPromptModalData] = useState<{
@@ -187,6 +193,109 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Note: Pair prompts cleanup is handled automatically by the database
   // when shot_generations are deleted, since prompts are stored in their metadata
 
+  // Download all shot images handler
+  const handleDownloadAllImages = useCallback(async () => {
+    if (!images || images.length === 0) {
+      toast.error("No images to download");
+      return;
+    }
+
+    setIsDownloadingImages(true);
+    
+    try {
+      // Dynamic import JSZip
+      const JSZipModule = await import('jszip');
+      const zip = new JSZipModule.default();
+      
+      // Sort images by position for consistent ordering
+      const sortedImages = [...images].sort((a, b) => {
+        const posA = (a as any).position || 0;
+        const posB = (b as any).position || 0;
+        return posA - posB;
+      });
+      
+      toast(`Processing ${sortedImages.length} images...`);
+
+      // Process images sequentially to avoid overwhelming the server
+      for (let i = 0; i < sortedImages.length; i++) {
+        const image = sortedImages[i];
+        const accessibleImageUrl = getDisplayUrl(image.imageUrl || image.location || '');
+        
+        try {
+          // Fetch the image blob
+          const response = await fetch(accessibleImageUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+          }
+          
+          const blob = await response.blob();
+          
+          // Determine file extension
+          let fileExtension = 'png'; // Default fallback
+          const contentType = blob.type || (image as any).metadata?.content_type;
+          
+          if (contentType && typeof contentType === 'string') {
+            if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+              fileExtension = 'jpg';
+            } else if (contentType.includes('png')) {
+              fileExtension = 'png';
+            } else if (contentType.includes('webp')) {
+              fileExtension = 'webp';
+            } else if (contentType.includes('gif')) {
+              fileExtension = 'gif';
+            }
+          }
+          
+          // Generate zero-padded filename
+          const paddedNumber = String(i + 1).padStart(3, '0');
+          const filename = `${paddedNumber}.${fileExtension}`;
+          
+          // Add to zip
+          zip.file(filename, blob);
+          
+          // Update progress every 5 images
+          if ((i + 1) % 5 === 0 || i === sortedImages.length - 1) {
+            toast(`Processed ${i + 1}/${sortedImages.length} images...`);
+          }
+        } catch (error) {
+          console.error(`Error processing image ${i + 1}:`, error);
+          // Continue with other images, don't fail the entire operation
+          toast.error(`Failed to process image ${i + 1}, continuing with others...`);
+        }
+      }
+      
+      // Generate zip file
+      toast("Creating zip file...");
+      
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      
+      // Create download
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      
+      // Generate filename with current date
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+      a.download = `shot-images-${dateStr}.zip`;
+      
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success(`Successfully downloaded ${sortedImages.length} images.`);
+      
+    } catch (error) {
+      console.error("Error downloading shot images:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Could not create zip file. ${errorMessage}`);
+    } finally {
+      setIsDownloadingImages(false);
+    }
+  }, [images]);
+
     console.log('[ShotImagesEditor] Render:', {
     selectedShotId,
     generationMode,
@@ -209,6 +318,31 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           </CardTitle>
           
           <div className="flex items-center gap-2">
+            {/* Download All Images Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDownloadAllImages}
+                    disabled={isDownloadingImages || !images || images.length === 0}
+                    className="text-xs h-8 px-2 text-muted-foreground hover:text-foreground"
+                  >
+                    {isDownloadingImages ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-3 w-3 mr-1" />
+                    )}
+                    <span className="hidden sm:inline">Download all</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Download all images in this shot as a zip file</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
             {/* Generation Mode Toggle - Hidden on mobile */}
             {!isMobile && (
               <ToggleGroup

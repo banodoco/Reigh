@@ -21,6 +21,11 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
  *   first_frame_filename?: "thumb.png"   // Optional thumbnail filename
  * }
  * 
+ * TOOL TYPE ASSIGNMENT:
+ * 1. Default: Uses tool_type from task_types table based on task_type
+ * 2. Override: If task.params.tool_type is set and matches a valid tool_type, uses that instead
+ * 3. Valid tool types: image-generation, travel-between-images, magic-edit, edit-travel, etc.
+ * 
  * Returns:
  * - 200 OK with success data
  * - 401 Unauthorized if no valid token
@@ -526,19 +531,14 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
         return;
       }
       
-      // Lookup task_types separately
-      const { data: taskTypeData, error: taskTypeError } = await supabaseAdmin
-        .from("task_types")
-        .select("category, tool_type")
-        .eq("name", taskData.task_type)
-        .single();
-
-      if (taskTypeError || !taskTypeData) {
-        console.error(`[GenMigration] Failed to fetch task_types metadata:`, taskTypeError);
+      // Resolve tool_type with potential override from params
+      const toolTypeInfo = await resolveToolType(supabaseAdmin, taskData.task_type, taskData.params);
+      
+      if (!toolTypeInfo) {
+        console.error(`[GenMigration] Failed to resolve tool_type for task ${taskIdString}`);
       } else {
-        const taskCategory = taskTypeData.category;
-        const toolType = taskTypeData.tool_type;
-        console.log(`[GenMigration] Task ${taskIdString} has category: ${taskCategory}, tool_type: ${toolType}`);
+        const { toolType, category: taskCategory } = toolTypeInfo;
+        console.log(`[GenMigration] Task ${taskIdString} resolved to category: ${taskCategory}, tool_type: ${toolType}`);
 
         if (taskCategory === 'generation') {
           console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
@@ -744,6 +744,61 @@ function extractShotAndPosition(params: any): { shotId?: string, addInPosition: 
 }
 
 /**
+ * Resolve the final tool_type for a task, considering both default mapping and potential overrides
+ * @param supabase - Supabase client
+ * @param taskType - The task type (e.g., 'single_image', 'wan_2_2_i2v')
+ * @param taskParams - Task parameters that might contain tool_type override
+ * @returns Object with resolved tool_type and category, or null if task type not found
+ */
+async function resolveToolType(supabase: any, taskType: string, taskParams: any): Promise<{
+  toolType: string;
+  category: string;
+} | null> {
+  // Get default tool_type from task_types table
+  const { data: taskTypeData, error: taskTypeError } = await supabase
+    .from("task_types")
+    .select("category, tool_type")
+    .eq("name", taskType)
+    .single();
+
+  if (taskTypeError || !taskTypeData) {
+    console.error(`[ToolTypeResolver] Failed to fetch task_types metadata for '${taskType}':`, taskTypeError);
+    return null;
+  }
+
+  let finalToolType = taskTypeData.tool_type;
+  const category = taskTypeData.category;
+
+  // Check for tool_type override in params
+  const paramsToolType = taskParams?.tool_type;
+  if (paramsToolType) {
+    console.log(`[ToolTypeResolver] Found tool_type override in params: ${paramsToolType}`);
+    
+    // Validate that the override tool_type is a known valid tool type
+    const { data: validToolTypes } = await supabase
+      .from("task_types")
+      .select("tool_type")
+      .not("tool_type", "is", null)
+      .eq("is_active", true);
+    
+    const validToolTypeSet = new Set(validToolTypes?.map(t => t.tool_type) || []);
+    
+    if (validToolTypeSet.has(paramsToolType)) {
+      console.log(`[ToolTypeResolver] Using tool_type override: ${paramsToolType} (was: ${finalToolType})`);
+      finalToolType = paramsToolType;
+    } else {
+      console.log(`[ToolTypeResolver] Invalid tool_type override '${paramsToolType}', using default: ${finalToolType}`);
+      console.log(`[ToolTypeResolver] Valid tool types: ${Array.from(validToolTypeSet).join(', ')}`);
+    }
+  }
+
+  return {
+    toolType: finalToolType,
+    category
+  };
+}
+
+/**
  * Determine generation type from tool_type
  */
 function determineGenerationType(toolType: string): 'image' | 'video' {
@@ -907,7 +962,7 @@ async function createGenerationFromTask(
       taskData.params, 
       taskData.tool_type, 
       shotId, 
-      thumbnailUrl
+      thumbnailUrl || undefined
     );
     
     // Generate new UUID for generation
