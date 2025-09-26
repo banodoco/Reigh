@@ -214,8 +214,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         return posA - posB;
       });
       
-      toast(`Processing ${sortedImages.length} images...`);
-
       // Process images sequentially to avoid overwhelming the server
       for (let i = 0; i < sortedImages.length; i++) {
         const image = sortedImages[i];
@@ -252,11 +250,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           
           // Add to zip
           zip.file(filename, blob);
-          
-          // Update progress every 5 images
-          if ((i + 1) % 5 === 0 || i === sortedImages.length - 1) {
-            toast(`Processed ${i + 1}/${sortedImages.length} images...`);
-          }
         } catch (error) {
           console.error(`Error processing image ${i + 1}:`, error);
           // Continue with other images, don't fail the entire operation
@@ -265,8 +258,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       }
       
       // Generate zip file
-      toast("Creating zip file...");
-      
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       
       // Create download
@@ -284,8 +275,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       a.click();
       URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      toast.success(`Successfully downloaded ${sortedImages.length} images.`);
       
     } catch (error) {
       console.error("Error downloading shot images:", error);
