@@ -383,6 +383,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     isServerPagination: paginationHook.isServerPagination,
     setIsBackfillLoading: stateHook.setIsBackfillLoading,
     setBackfillSkeletonCount: stateHook.setBackfillSkeletonCount,
+    filteredImages: filtersHook.filteredImages,
+    setIsDownloadingStarred: stateHook.setIsDownloadingStarred,
   });
 
   // Mobile interactions hook
@@ -609,6 +611,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
               // Propagate to parent to trigger server-side refetch
               onStarredFilterChange?.(next);
             }}
+            onDownloadStarred={actionsHook.handleDownloadStarred}
+            isDownloadingStarred={stateHook.isDownloadingStarred}
             
             // Shot filter props
             showShotFilter={showShotFilter}

@@ -46,6 +46,8 @@ export interface UseImageGalleryStateReturn {
   setAddingToShotWithoutPositionImageId: (id: string | null) => void;
   downloadingImageId: string | null;
   setDownloadingImageId: (id: string | null) => void;
+  isDownloadingStarred: boolean;
+  setIsDownloadingStarred: (downloading: boolean) => void;
   
   // Mobile state
   mobileActiveImageId: string | null;
@@ -134,6 +136,7 @@ export const useImageGalleryState = ({
   const [addingToShotImageId, setAddingToShotImageId] = useState<string | null>(null);
   const [addingToShotWithoutPositionImageId, setAddingToShotWithoutPositionImageId] = useState<string | null>(null);
   const [downloadingImageId, setDownloadingImageId] = useState<string | null>(null);
+  const [isDownloadingStarred, setIsDownloadingStarred] = useState<boolean>(false);
   
   // Optimistic state to bridge server refresh latency
   const [optimisticUnpositionedIds, setOptimisticUnpositionedIds] = useState<Set<string>>(new Set());
@@ -345,6 +348,8 @@ export const useImageGalleryState = ({
     setAddingToShotWithoutPositionImageId,
     downloadingImageId,
     setDownloadingImageId,
+    isDownloadingStarred,
+    setIsDownloadingStarred,
     
     // Mobile state
     mobileActiveImageId,

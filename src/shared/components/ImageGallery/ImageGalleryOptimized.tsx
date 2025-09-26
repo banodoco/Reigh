@@ -237,6 +237,8 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     isServerPagination: paginationHook.isServerPagination,
     setIsBackfillLoading: stateHook.setIsBackfillLoading,
     setBackfillSkeletonCount: stateHook.setBackfillSkeletonCount,
+    filteredImages: filtersHook.filteredImages,
+    setIsDownloadingStarred: stateHook.setIsDownloadingStarred,
   });
 
   // Mobile interactions hook (updated to work with optimized state)
@@ -480,6 +482,8 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
               // Propagate to parent to trigger server-side refetch
               onStarredFilterChange?.(next);
             }}
+            onDownloadStarred={actionsHook.handleDownloadStarred}
+            isDownloadingStarred={stateHook.state.isDownloadingStarred}
             
             // Shot filter props
             showShotFilter={showShotFilter}

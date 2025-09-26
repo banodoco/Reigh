@@ -24,6 +24,7 @@ export interface ImageGalleryState {
   addingToShotImageId: string | null;
   addingToShotWithoutPositionImageId: string | null;
   downloadingImageId: string | null;
+  isDownloadingStarred: boolean;
   
   // Mobile state
   mobileActiveImageId: string | null;
@@ -51,6 +52,7 @@ export type ImageGalleryStateAction =
   | { type: 'SET_ADDING_TO_SHOT_IMAGE_ID'; payload: string | null }
   | { type: 'SET_ADDING_TO_SHOT_WITHOUT_POSITION_IMAGE_ID'; payload: string | null }
   | { type: 'SET_DOWNLOADING_IMAGE_ID'; payload: string | null }
+  | { type: 'SET_DOWNLOADING_STARRED'; payload: boolean }
   | { type: 'SET_MOBILE_ACTIVE_IMAGE_ID'; payload: string | null }
   | { type: 'SET_MOBILE_POPOVER_OPEN_IMAGE_ID'; payload: string | null }
   | { type: 'SET_BACKFILL_LOADING'; payload: boolean }
@@ -84,6 +86,7 @@ const createInitialState = (
   addingToShotImageId: null,
   addingToShotWithoutPositionImageId: null,
   downloadingImageId: null,
+  isDownloadingStarred: false,
   
   // Mobile state
   mobileActiveImageId: null,
@@ -199,6 +202,9 @@ const imageGalleryStateReducer = (
     case 'SET_DOWNLOADING_IMAGE_ID':
       return { ...state, downloadingImageId: action.payload };
       
+    case 'SET_DOWNLOADING_STARRED':
+      return { ...state, isDownloadingStarred: action.payload };
+      
     case 'SET_MOBILE_ACTIVE_IMAGE_ID':
       return { ...state, mobileActiveImageId: action.payload };
       
@@ -222,6 +228,7 @@ const imageGalleryStateReducer = (
         addingToShotImageId: null,
         addingToShotWithoutPositionImageId: null,
         downloadingImageId: null,
+        isDownloadingStarred: false,
         mobileActiveImageId: null,
         mobilePopoverOpenImageId: null,
       };
@@ -259,6 +266,7 @@ export interface UseImageGalleryStateOptimizedReturn {
   setAddingToShotImageId: (id: string | null) => void;
   setAddingToShotWithoutPositionImageId: (id: string | null) => void;
   setDownloadingImageId: (id: string | null) => void;
+  setIsDownloadingStarred: (downloading: boolean) => void;
   setMobileActiveImageId: (id: string | null) => void;
   setMobilePopoverOpenImageId: (id: string | null) => void;
   setIsBackfillLoading: (loading: boolean) => void;
@@ -340,6 +348,8 @@ export const useImageGalleryStateOptimized = ({
       dispatch({ type: 'SET_ADDING_TO_SHOT_WITHOUT_POSITION_IMAGE_ID', payload: id }),
     setDownloadingImageId: (id: string | null) => 
       dispatch({ type: 'SET_DOWNLOADING_IMAGE_ID', payload: id }),
+    setIsDownloadingStarred: (downloading: boolean) => 
+      dispatch({ type: 'SET_DOWNLOADING_STARRED', payload: downloading }),
     setMobileActiveImageId: (id: string | null) => 
       dispatch({ type: 'SET_MOBILE_ACTIVE_IMAGE_ID', payload: id }),
     setMobilePopoverOpenImageId: (id: string | null) => 

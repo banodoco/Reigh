@@ -1,7 +1,8 @@
 import React from "react";
-import { Star } from "lucide-react";
+import { Star, Download, Loader2 } from "lucide-react";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
+import { Button } from "@/shared/components/ui/button";
 import { ImageGalleryPagination } from "@/shared/components/ImageGalleryPagination";
 import { ShotFilter } from "@/shared/components/ShotFilter";
 import { ImageGalleryFilters } from "./ImageGalleryFilters";
@@ -25,6 +26,8 @@ export interface ImageGalleryHeaderProps {
   hideTopFilters?: boolean;
   showStarredOnly: boolean;
   onStarredFilterChange?: (starredOnly: boolean) => void;
+  onDownloadStarred?: () => void;
+  isDownloadingStarred?: boolean;
   
   // Shot filter props
   showShotFilter?: boolean;
@@ -76,6 +79,8 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
   hideTopFilters = false,
   showStarredOnly,
   onStarredFilterChange,
+  onDownloadStarred,
+  isDownloadingStarred = false,
   
   // Shot filter props
   showShotFilter = false,
@@ -127,23 +132,41 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
           compact={true}
           isBottom={false}
           rightContent={!hideTopFilters ? (
-            <div className="flex items-center space-x-2">
-                <Checkbox 
-                    id="starred-filter-gallery"
-                    checked={showStarredOnly}
-                    onCheckedChange={(checked) => {
-                        const newStarredOnly = Boolean(checked);
-                        onStarredFilterChange?.(newStarredOnly);
-                    }}
-                    className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
-                />
-                <Label 
-                    htmlFor="starred-filter-gallery" 
-                    className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
-                >
-                    <Star className="h-3 w-3" />
-                    <span>Starred</span>
-                </Label>
+            <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="starred-filter-gallery"
+                        checked={showStarredOnly}
+                        onCheckedChange={(checked) => {
+                            const newStarredOnly = Boolean(checked);
+                            onStarredFilterChange?.(newStarredOnly);
+                        }}
+                        className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
+                    />
+                    <Label 
+                        htmlFor="starred-filter-gallery" 
+                        className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
+                    >
+                        <Star className="h-3 w-3" />
+                        <span>Starred</span>
+                    </Label>
+                </div>
+                {onDownloadStarred && showStarredOnly && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onDownloadStarred}
+                        disabled={isDownloadingStarred}
+                        className={`text-xs h-6 px-2 ${whiteText ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        {isDownloadingStarred ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                            <Download className="h-3 w-3 mr-1" />
+                        )}
+                        <span>Download all starred</span>
+                    </Button>
+                )}
             </div>
           ) : undefined}
         />
@@ -158,23 +181,41 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
         
           {/* Starred Filter on the right */}
           {!hideTopFilters && (
-            <div className="flex items-center space-x-2">
-                <Checkbox 
-                    id="starred-filter-gallery-single"
-                    checked={showStarredOnly}
-                    onCheckedChange={(checked) => {
-                        const newStarredOnly = Boolean(checked);
-                        onStarredFilterChange?.(newStarredOnly);
-                    }}
-                    className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
-                />
-                <Label 
-                    htmlFor="starred-filter-gallery-single" 
-                    className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
-                >
-                    <Star className="h-3 w-3" />
-                    <span>Starred</span>
-                </Label>
+            <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="starred-filter-gallery-single"
+                        checked={showStarredOnly}
+                        onCheckedChange={(checked) => {
+                            const newStarredOnly = Boolean(checked);
+                            onStarredFilterChange?.(newStarredOnly);
+                        }}
+                        className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
+                    />
+                    <Label 
+                        htmlFor="starred-filter-gallery-single" 
+                        className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
+                    >
+                        <Star className="h-3 w-3" />
+                        <span>Starred</span>
+                    </Label>
+                </div>
+                {onDownloadStarred && showStarredOnly && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onDownloadStarred}
+                        disabled={isDownloadingStarred}
+                        className={`text-xs h-6 px-2 ${whiteText ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        {isDownloadingStarred ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                            <Download className="h-3 w-3 mr-1" />
+                        )}
+                        <span>Download all starred</span>
+                    </Button>
+                )}
             </div>
           )}
         </div>

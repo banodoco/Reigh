@@ -27,6 +27,8 @@ export interface UseImageGalleryActionsProps {
   isServerPagination: boolean;
   setIsBackfillLoading: (loading: boolean) => void;
   setBackfillSkeletonCount: (count: number) => void;
+  filteredImages: GeneratedImageWithMetadata[];
+  setIsDownloadingStarred: (downloading: boolean) => void;
 }
 
 export interface UseImageGalleryActionsReturn {
@@ -35,6 +37,7 @@ export interface UseImageGalleryActionsReturn {
   handleCloseLightbox: () => void;
   handleImageSaved: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   handleDownloadImage: (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => Promise<void>;
+  handleDownloadStarred: () => Promise<void>;
   handleShowTick: (imageId: string) => void;
   handleShowSecondaryTick: (imageId: string) => void;
   handleShotChange: (shotId: string) => void;
@@ -63,6 +66,8 @@ export const useImageGalleryActions = ({
   isServerPagination,
   setIsBackfillLoading,
   setBackfillSkeletonCount,
+  filteredImages,
+  setIsDownloadingStarred,
 }: UseImageGalleryActionsProps): UseImageGalleryActionsReturn => {
   
   const { toast } = useToast();
@@ -338,6 +343,151 @@ export const useImageGalleryActions = ({
     }
   }, [isServerPagination, serverPage]);
 
+  const handleDownloadStarred = useCallback(async () => {
+    // Get starred images from filtered images
+    const starredImages = filteredImages.filter(image => image.starred);
+    
+    if (starredImages.length === 0) {
+      toast({
+        title: "No starred images",
+        description: "No starred images found to download.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Sort chronologically by createdAt, fallback to id for deterministic ordering
+    const sortedImages = [...starredImages].sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      
+      if (dateA !== dateB) {
+        return dateA - dateB; // Ascending order (oldest first)
+      }
+      
+      // Fallback to ID comparison for consistent ordering
+      return a.id.localeCompare(b.id);
+    });
+
+    setIsDownloadingStarred(true);
+    
+    try {
+      // Dynamic import JSZip
+      const JSZipModule = await import('jszip');
+      const zip = new JSZipModule.default();
+      
+      toast({
+        title: "Starting download",
+        description: `Processing ${sortedImages.length} starred images...`
+      });
+
+      // Process images sequentially to avoid overwhelming the server
+      for (let i = 0; i < sortedImages.length; i++) {
+        const image = sortedImages[i];
+        const accessibleImageUrl = getDisplayUrl(image.url);
+        
+        try {
+          // Fetch the image blob
+          const response = await fetch(accessibleImageUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+          }
+          
+          const blob = await response.blob();
+          
+          // Determine file extension
+          let fileExtension = 'png'; // Default fallback
+          const contentType = blob.type || image.metadata?.content_type;
+          
+          if (contentType) {
+            if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+              fileExtension = 'jpg';
+            } else if (contentType.includes('png')) {
+              fileExtension = 'png';
+            } else if (contentType.includes('webp')) {
+              fileExtension = 'webp';
+            } else if (contentType.includes('gif')) {
+              fileExtension = 'gif';
+            } else if (image.isVideo) {
+              if (contentType.includes('mp4')) {
+                fileExtension = 'mp4';
+              } else if (contentType.includes('webm')) {
+                fileExtension = 'webm';
+              } else {
+                fileExtension = 'mp4'; // Default for videos
+              }
+            }
+          } else if (image.isVideo) {
+            fileExtension = 'mp4'; // Default for videos when no content type
+          }
+          
+          // Generate zero-padded filename
+          const paddedNumber = String(i + 1).padStart(3, '0');
+          const filename = `${paddedNumber}.${fileExtension}`;
+          
+          // Add to zip
+          zip.file(filename, blob);
+          
+          // Update progress
+          if ((i + 1) % 5 === 0 || i === sortedImages.length - 1) {
+            toast({
+              title: "Processing images",
+              description: `Processed ${i + 1}/${sortedImages.length} images...`
+            });
+          }
+        } catch (error) {
+          console.error(`Error processing image ${i + 1}:`, error);
+          // Continue with other images, don't fail the entire operation
+          toast({
+            title: "Image processing error",
+            description: `Failed to process image ${i + 1}, continuing with others...`,
+            variant: "destructive"
+          });
+        }
+      }
+      
+      // Generate zip file
+      toast({
+        title: "Creating zip file",
+        description: "Finalizing download..."
+      });
+      
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      
+      // Create download
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      
+      // Generate filename with current date
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+      a.download = `starred-images-${dateStr}.zip`;
+      
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download complete",
+        description: `Successfully downloaded ${sortedImages.length} starred images.`
+      });
+      
+    } catch (error) {
+      console.error("Error downloading starred images:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast({
+        title: "Download failed",
+        description: `Could not create zip file. ${errorMessage}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsDownloadingStarred(false);
+    }
+  }, [filteredImages, toast, setIsDownloadingStarred]);
+
   // Cleanup backfill timeout on unmount
   useEffect(() => {
     return () => {
@@ -353,6 +503,7 @@ export const useImageGalleryActions = ({
     handleCloseLightbox,
     handleImageSaved,
     handleDownloadImage,
+    handleDownloadStarred,
     handleShowTick,
     handleShowSecondaryTick,
     handleShotChange,
