@@ -42,7 +42,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     tasksPaneWidth 
   } = usePanes();
 
-  const gridColsClass = {
+  const mobileGridColsClass = {
     2: 'grid-cols-2',
     3: 'grid-cols-3',
     4: 'grid-cols-4',
@@ -188,7 +188,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
   return (
     <>
-      <div className={cn("grid gap-3", gridColsClass)}>
+      <div className={cn("grid gap-3", mobileGridColsClass)}>
         {images.map((image, index) => {
           const imageKey = (image as any).shotImageEntryId ?? (image as any).id;
           const isSelected = mobileSelectedIds.includes(imageKey as string);
