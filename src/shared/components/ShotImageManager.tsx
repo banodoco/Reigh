@@ -1049,229 +1049,33 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Desktop/non-mobile logic continues below
   const shouldSkipConfirmation = imageDeletionSettings.skipConfirmation;
-    
+
+  if (!images || images.length === 0) {
     return (
-      <div ref={outerRef} className="relative"
-        onClick={(e)=>{
-          const target=e.target as HTMLElement;
-          if(!target.closest('[data-mobile-item]')){
-            setMobileSelectedIds([]);
-          }
-        }}>
-        {/* Temporarily bypass ProgressiveLoadingManager for mobile too */}
-        {(() => {
-          console.log(`[DEBUG] BYPASSING MOBILE PROGRESSIVE LOADING - mobileSelectedIds.length=${mobileSelectedIds.length}`);
-          return (
-            <div className={cn("grid gap-3", `grid-cols-${mobileColumns}`)}>
-              {currentImages.map((image, index) => {
-                const imageKey = (image as any).shotImageEntryId ?? (image as any).id;
-                const isSelected = mobileSelectedIds.includes(imageKey as string);
-                const isLastItem = index === currentImages.length - 1;
-                const loadingStrategy = getImageLoadingStrategy(index, {
-                  isMobile,
-                  totalImages: currentImages.length,
-                  isPreloaded: false,
-                });
-                const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
-                
-                // Helper function to check if placing selected items at this index would result in actual movement
-                const wouldActuallyMove = (targetIndex: number) => {
-                  // Get indices of selected items
-                  const selectedIndices = mobileSelectedIds
-                    .map(id => currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id))
-                    .filter(idx => idx !== -1)
-                    .sort((a, b) => a - b);
-                  
-                  if (selectedIndices.length === 0) return false;
-                  
-                  // For multiple items selected, be more permissive - allow movement to more positions
-                  // since we're moving them as a group and the logic is more complex
-                  if (selectedIndices.length > 1) {
-                    return true; // Allow movement to any non-selected position
-                  }
-                  
-                  // For single item selection, apply the strict adjacency rules
-                  const firstSelectedIndex = selectedIndices[0];
-                  const lastSelectedIndex = selectedIndices[selectedIndices.length - 1];
-                  
-                  // If targeting before the first selected item and it's immediately before
-                  if (targetIndex === firstSelectedIndex) return false;
-                  
-                  // If targeting after the last selected item and it's immediately after
-                  if (targetIndex === lastSelectedIndex + 1) return false;
-                  
-                  return true;
-                };
-                
-                const showLeftArrow = mobileSelectedIds.length > 0 && !isSelected && wouldActuallyMove(index);
-                const showRightArrow = mobileSelectedIds.length > 0 && isLastItem && !isSelected && wouldActuallyMove(index + 1);
-                
-                return (
-                  <React.Fragment key={(image as any).shotImageEntryId ?? (image as any).id}>
-                    <div className="relative">
-                      <MobileImageItem
-                         image={image}
-                         isSelected={isSelected}
-                         index={index}
-                         onMobileTap={() => {
-                           console.log('[SelectionDebug:ShotImageManager] Mobile tap triggered', {
-                             imageId: (imageKey || '').toString().substring(0, 8),
-                             currentlySelected: mobileSelectedIds.includes(imageKey as string),
-                             totalSelected: mobileSelectedIds.length,
-                             timestamp: Date.now()
-                           });
-                           handleMobileTap(imageKey as string, index);
-                         }}
-                         onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
-                         onDuplicate={onImageDuplicate}
-                         hideDeleteButton={mobileSelectedIds.length > 0}
-                         duplicatingImageId={duplicatingImageId}
-                         duplicateSuccessImageId={duplicateSuccessImageId}
-                         shouldLoad={shouldLoad}
-                         projectAspectRatio={projectAspectRatio}
-                       />
-                       
-                      {/* Move button on left side of each non-selected item */}
-                      {showLeftArrow && (
-                        <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className="h-12 w-6 rounded-full p-0"
-                            onClick={() => {
-                              console.log('[MobileReorder] 📱 Arrow button clicked:', { targetIndex: index, selectedCount: mobileSelectedIds.length });
-                              handleMobileMoveHere(index);
-                            }}
-                            onPointerDown={e=>e.stopPropagation()}
-                            title={index === 0 ? "Move to beginning" : "Move here"}
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-
-                      {/* Move to end button on right side of last item (if not selected) */}
-                      {showRightArrow && (
-                        <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
-                          <Button
-                            size="icon"
-                            variant="secondary"
-                            className="h-12 w-6 rounded-full p-0"
-                            onClick={() => {
-                              console.log('[MobileReorder] 📱 Arrow button clicked (end):', { targetIndex: index + 1, selectedCount: mobileSelectedIds.length });
-                              handleMobileMoveHere(index + 1);
-                            }}
-                            onPointerDown={e=>e.stopPropagation()}
-                            title="Move to end"
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-        {/* Floating Action Bar for Multiple Selection (Mobile) */}
-        {mobileSelectedIds.length >= 1 && (() => {
-          // Calculate horizontal constraints based on locked panes (same pattern as ImageGenerationToolPage)
-          const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
-          const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
-          
-          return (
-            <div 
-              className="fixed bottom-6 z-50 flex justify-center"
-              style={{
-                left: `${leftOffset}px`,
-                right: `${rightOffset}px`,
-                paddingLeft: '16px',
-                paddingRight: '16px',
-              }}
-            >
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
-                <span className="text-sm font-light text-gray-700 dark:text-gray-300">
-                  {mobileSelectedIds.length} selected
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMobileSelectedIds([])}
-                    className="text-sm"
-                  >
-                    {mobileSelectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      setPendingDeleteIds([...mobileSelectedIds]); // Preserve selected IDs
-                      setConfirmOpen(true);
-                    }}
-                    className="text-sm"
-                  >
-                    {mobileSelectedIds.length === 1 ? 'Delete' : 'Delete All'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Delete Confirmation Dialog (Mobile) */}
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Images</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete {pendingDeleteIds.length} selected image{pendingDeleteIds.length > 1 ? 's' : ''}? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                onClick={() => {
-                  setConfirmOpen(false);
-                  setPendingDeleteIds([]); // Clear pending IDs when cancelled
-                }}
-              >
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => performBatchDelete(pendingDeleteIds)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete {pendingDeleteIds.length} Image{pendingDeleteIds.length > 1 ? 's' : ''}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        
-        {lightboxIndex !== null && currentImages[lightboxIndex] && (
-          <MediaLightbox
-            media={currentImages[lightboxIndex]}
-            onClose={() => setLightboxIndex(null)}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
-            showNavigation={true}
-            showImageEditTools={true}
-            showDownload={true}
-            showMagicEdit={true}
-            hasNext={lightboxIndex < currentImages.length - 1}
-            hasPrevious={lightboxIndex > 0}
-            starred={(currentImages[lightboxIndex] as any).starred || false}
-            onMagicEdit={onMagicEdit}
-          />
-        )}
-      </div>
+      <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+        No images to display. 
+        <span className="block text-sm mt-1 opacity-75">Upload images or 
+        <span className="font-medium text-blue-600 dark:text-blue-400 ml-1"
+        >generate images</span>
+        </span>
+      </p>
     );
   }
 
-  console.log(`[DEBUG] REACHED MAIN RETURN - selectedIds.length=${selectedIds.length}`);
+  const gridColsClass = {
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+    4: 'grid-cols-4',
+    5: 'grid-cols-5',
+    6: 'grid-cols-6',
+    7: 'grid-cols-7',
+    8: 'grid-cols-8',
+    9: 'grid-cols-9',
+    10: 'grid-cols-10',
+    11: 'grid-cols-11',
+    12: 'grid-cols-12',
+  }[columns] || 'grid-cols-4';
+
   return (
     <DndContext
       sensors={sensors}
@@ -1280,121 +1084,48 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={currentImages.map((img) => img.shotImageEntryId)} strategy={rectSortingStrategy}>
-        {/* Temporarily bypass ProgressiveLoadingManager to fix selection highlighting */}
-        {(() => {
-          console.log(`[DEBUG] BYPASSING PROGRESSIVE LOADING - selectedIds.length=${selectedIds.length}`);
-          return (
-            <div 
-              className={cn("grid gap-3", gridColsClass)}
-              onDoubleClick={(e) => {
-                // Only deselect if double-clicking on the grid itself, not on an image
-                if (e.target === e.currentTarget) {
-                  setSelectedIds([]);
-    setLastSelectedIndex(null);
-                  setMobileSelectedIds([]);
-                }
-              }}
-            >
-              {(() => {
-                console.log(`[DEBUG] ABOUT TO EXECUTE MAPPING - currentImages.length=${currentImages.length} selectedIds.length=${selectedIds.length}`);
-                return currentImages.map((image, index) => {
-                  console.log(`[DEBUG] MAPPING EXECUTING for image ${index} with selectedIds.length=${selectedIds.length}`);
-                  const shouldLoad = true; // Force load immediately to mirror ShotsPane behavior
-                const imageKey = ((image as any).shotImageEntryId ?? (image as any).id) as string;
-                
-                // FORCE FRESH STATE ACCESS - use refs to avoid stale closures
-                const freshSelectedIds = selectedIdsRef.current;
-                const freshMobileSelectedIds = mobileSelectedIdsRef.current;
-                
-                const desktopSelected = freshSelectedIds.includes(imageKey);
-                const mobileSelected = freshMobileSelectedIds.includes(imageKey);
-                const finalSelected = desktopSelected || mobileSelected;
-                
-                // DEEP CALCULATION TRACE - EVERY SINGLE RENDER
-                if (selectedIds.length > 0 || freshSelectedIds.length > 0) {
-                  console.log(`[DEBUG] SELECTION ACTIVE - Image ${imageKey.substring(0, 8)} selectedIds.length=${selectedIds.length} freshSelectedIds.length=${freshSelectedIds.length} finalSelected=${finalSelected}`);
-                }
-                if (selectedIds.length > 0 || mobileSelectedIds.length > 0) {
-                  console.log(`[DEEP_CALC_TRACE] Image ${imageKey.substring(0, 8)}:`, {
-                    imageKey_full: imageKey,
-                    imageKey_length: imageKey.length,
-                    selectedIds_array: selectedIds,
-                    selectedIds_count: selectedIds.length,
-                    mobileSelectedIds_array: mobileSelectedIds,
-                    includes_check_desktop: selectedIds.includes(imageKey),
-                    includes_check_mobile: mobileSelectedIds.includes(imageKey),
-                    desktopSelected,
-                    mobileSelected,
-                    finalSelected,
-                    typeof_imageKey: typeof imageKey,
-                    typeof_selectedIds_0: typeof selectedIds[0],
-                    strict_equality_check: selectedIds.map(id => ({ id, equals: id === imageKey, typeof: typeof id }))
-                  });
-                }
-                console.log('[SelectionDebug:Map/Desktop] DEEP DESKTOP TRACE', {
-                  imageId: (image.shotImageEntryId || '').toString().substring(0, 8),
-                  imageKey: ((image as any).shotImageEntryId ?? (image as any).id),
-                  desktopSelected,
-                  mobileSelected,
-                  finalSelected,
-                  selectedIds: selectedIds.map(id => id.substring(0, 8)),
-                  selectedIdsFullValues: selectedIds,
-                  selectedIdsStringified: JSON.stringify(selectedIds),
-                  selectedIdsLengths: selectedIds.map(id => id?.length ?? 0),
-                  imageKeyLength: (((image as any).shotImageEntryId ?? (image as any).id) as string)?.length ?? 0,
-                  equalityDiagnostics: selectedIds.map(sel => ({
-                    short: sel.substring(0,8),
-                    equals: sel === (((image as any).shotImageEntryId ?? (image as any).id) as string),
-                    localeCompare: sel.localeCompare(((image as any).shotImageEntryId ?? (image as any).id) as string),
-                  })),
-                  mobileSelectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
-                  selectedIdsIncludesImageKey: selectedIds.includes(((image as any).shotImageEntryId ?? (image as any).id)),
-                  mobileSelectedIdsIncludesImageKey: mobileSelectedIds.includes(((image as any).shotImageEntryId ?? (image as any).id)),
-                  rawImage: {
-                    shotImageEntryId: (image as any).shotImageEntryId,
-                    id: (image as any).id,
-                    hasIdField: 'id' in image,
-                    hasShotImageEntryIdField: 'shotImageEntryId' in image,
-                  }
-                });
-                return (
-                  <SortableImageItem
-                    key={image.shotImageEntryId}
-                    image={image}
-                    isSelected={finalSelected}
-                    isDragDisabled={isMobile}
-                    onPointerDown={(e) => {
-                      if (isMobile) return;
-                    }}
-                    onClick={isMobile ? undefined : (e) => {
-                      console.log('[SelectionDebug:ShotImageManager] Passing click to SortableImageItem', {
-                        imageKey: imageKey.substring(0, 8),
-                        fullImageKey: imageKey,
-                        isMobile,
-                        generationMode,
-                        timestamp: Date.now()
-                      });
-                      handleItemClick(imageKey, e);
-                    }}
-                    onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
-                    onDuplicate={onImageDuplicate}
-                    timeline_frame={(image as any).timeline_frame ?? (index * 50)}
-                    onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
-                    onMobileTap={isMobile ? () => handleMobileTap(image.shotImageEntryId, index) : undefined}
-                    skipConfirmation={imageDeletionSettings.skipConfirmation}
-                    onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
-                    duplicatingImageId={duplicatingImageId}
-                    duplicateSuccessImageId={duplicateSuccessImageId}
-                    shouldLoad={shouldLoad}
-                    projectAspectRatio={projectAspectRatio}
-                  />
-                );
-              });
-              })()}
-            </div>
-          );
-        })()}
+        <div 
+          className={cn("grid gap-3", gridColsClass)}
+          onDoubleClick={(e) => {
+            // Only deselect if double-clicking on the grid itself, not on an image
+            if (e.target === e.currentTarget) {
+              setSelectedIds([]);
+              setLastSelectedIndex(null);
+            }
+          }}
+        >
+          {currentImages.map((image, index) => {
+            const shouldLoad = true;
+            const imageKey = ((image as any).shotImageEntryId ?? (image as any).id) as string;
+            
+            const desktopSelected = selectedIds.includes(imageKey);
+            const finalSelected = desktopSelected;
+            
+            return (
+              <SortableImageItem
+                key={image.shotImageEntryId}
+                image={image}
+                isSelected={finalSelected}
+                isDragDisabled={isMobile}
+                onClick={isMobile ? undefined : (e) => {
+                  handleItemClick(imageKey, e);
+                }}
+                onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
+                onDuplicate={onImageDuplicate}
+                timeline_frame={(image as any).timeline_frame ?? (index * 50)}
+                onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
+                skipConfirmation={imageDeletionSettings.skipConfirmation}
+                onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
+                duplicatingImageId={duplicatingImageId}
+                duplicateSuccessImageId={duplicateSuccessImageId}
+                shouldLoad={shouldLoad}
+                projectAspectRatio={projectAspectRatio}
+              />
+            );
+          })}
+        </div>
       </SortableContext>
+      
       <DragOverlay>
         {activeId && activeImage ? (
           <>
@@ -1406,6 +1137,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           </>
         ) : null}
       </DragOverlay>
+      
       {lightboxIndex !== null && currentImages[lightboxIndex] && (
         <MediaLightbox
           media={currentImages[lightboxIndex]}
@@ -1426,7 +1158,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
       {/* Floating Action Bar for Multiple Selection (Desktop) */}
       {selectedIds.length >= 1 && (() => {
-        // Calculate horizontal constraints based on locked panes (same pattern as ImageGenerationToolPage)
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         
@@ -1445,32 +1176,32 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 {selectedIds.length} selected
               </span>
               <div className="flex gap-2">
-                               <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={() => setSelectedIds([])}
-                   className="text-sm"
-                 >
-                   {selectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
-                 </Button>
-                 <Button
-                   variant="destructive"
-                   size="sm"
-                   onClick={() => {
-                     setPendingDeleteIds([...selectedIds]); // Preserve selected IDs
-                     setConfirmOpen(true);
-                   }}
-                   className="text-sm"
-                 >
-                   {selectedIds.length === 1 ? 'Delete' : 'Delete All'}
-                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedIds([])}
+                  className="text-sm"
+                >
+                  {selectedIds.length === 1 ? 'Deselect' : 'Deselect All'}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    setPendingDeleteIds([...selectedIds]);
+                    setConfirmOpen(true);
+                  }}
+                  className="text-sm"
+                >
+                  {selectedIds.length === 1 ? 'Delete' : 'Delete All'}
+                </Button>
               </div>
             </div>
           </div>
         );
       })()}
 
-      {/* Shared Delete Confirmation Dialog for both Mobile and Desktop */}
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1482,7 +1213,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setConfirmOpen(false);
-              setPendingDeleteIds([]); // Clear pending IDs when cancelled
+              setPendingDeleteIds([]);
             }}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => performBatchDelete(pendingDeleteIds)}
@@ -1495,310 +1226,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       </AlertDialog>
     </DndContext>
   );
-};
-
-// Lightweight non-sortable image item used in mobile batch mode to avoid
-// relying on dnd-kit context (which isn't mounted in that view).
-interface MobileImageItemProps {
-  image: GenerationRow;
-  isSelected: boolean;
-  index: number; // Add index for position calculation
-  onClick?: (event: React.MouseEvent) => void;
-  onDoubleClick?: () => void;
-  onMobileTap?: () => void;
-  onDelete: () => void; // Fixed: properly typed delete function
-  onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void; // Add duplicate function
-  hideDeleteButton?: boolean;
-  duplicatingImageId?: string | null;
-  duplicateSuccessImageId?: string | null;
-  shouldLoad?: boolean;
-  projectAspectRatio?: string; // Add project aspect ratio
 }
 
-const MobileImageItem: React.FC<MobileImageItemProps> = ({
-  image,
-  isSelected,
-  index,
-  onClick,
-  onDoubleClick,
-  onMobileTap,
-  onDelete, // Add this
-  onDuplicate,
-  hideDeleteButton,
-  duplicatingImageId,
-  duplicateSuccessImageId,
-  shouldLoad = true,
-  projectAspectRatio,
-}) => {
-  const mobileClassName = cn(
-    'relative bg-muted/50 rounded border p-1 flex flex-col items-center justify-center overflow-hidden shadow-sm cursor-pointer transition-all duration-200',
-    { 
-      'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15': isSelected,
-      'opacity-60 animate-pulse': image.isOptimistic, // Visual feedback for optimistic updates
-    },
-  );
-
-  console.log('[SelectionDebug:MobileImageItem] DEEP MOBILE RENDER TRACE', {
-    imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
-    isSelected,
-    index,
-    hideDeleteButton,
-    hasOnMobileTap: !!onMobileTap,
-    mobileClassName,
-    classNameIncludes: {
-      hasRing4: mobileClassName.includes('ring-4'),
-      hasRingOrange: mobileClassName.includes('ring-orange-500'),
-      hasBgOrange: mobileClassName.includes('bg-orange-500/15'),
-      hasBorderOrange: mobileClassName.includes('border-orange-500'),
-    },
-    conditionalResult: isSelected ? 'ring-4 ring-offset-2 ring-orange-500 border-orange-500 bg-orange-500/15' : 'NO_SELECTION_CLASSES',
-    timestamp: Date.now()
-  });
-  // Progressive loading for shot image manager
-  const progressiveEnabled = isProgressiveLoadingEnabled();
-  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
-    progressiveEnabled ? image.thumbUrl : null,
-    image.imageUrl,
-    {
-      priority: false, // Not high priority in shot manager
-      lazy: true,
-      enabled: progressiveEnabled && shouldLoad,
-      crossfadeMs: 200
-    }
-  );
-
-  // Use progressive src if available, otherwise fallback to display URL
-  const imageUrl = image.thumbUrl || image.imageUrl;
-  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(imageUrl);
-  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
-
-  // Image loading state management
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageLoadError, setImageLoadError] = useState(false);
-
-  // [VideoLoadSpeedIssue] PERFORMANCE FIX: Removed excessive per-image logging
-  // This was causing severe performance issues with large image sets
-  const debugId = `[MobileImageItem-${index}:${image.id?.substring(0, 8)}]`;
-
-  // Calculate aspect ratio for placeholder
-  const getAspectRatioStyle = () => {
-    // Try to get dimensions from image metadata first
-    let width = (image as any).metadata?.width;
-    let height = (image as any).metadata?.height;
-    
-    // If not found, try to extract from resolution string
-    if (!width || !height) {
-      const resolution = (image as any).metadata?.originalParams?.orchestrator_details?.resolution;
-      if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
-        const [w, h] = resolution.split('x').map(Number);
-        if (!isNaN(w) && !isNaN(h)) {
-          width = w;
-          height = h;
-        }
-      }
-    }
-    
-    // If we have image dimensions, use them
-    if (width && height) {
-      const aspectRatio = width / height;
-      return { aspectRatio: `${aspectRatio}` };
-    }
-    
-    // Fall back to project aspect ratio if available
-    if (projectAspectRatio) {
-      const [w, h] = projectAspectRatio.split(':').map(Number);
-      if (!isNaN(w) && !isNaN(h)) {
-        const aspectRatio = w / h;
-        return { aspectRatio: `${aspectRatio}` };
-      }
-    }
-    
-    // Default to square aspect ratio
-    return { aspectRatio: '1' };
-  };
-
-  // Track state changes over time
-  useEffect(() => {
-    console.log(`${debugId} 🔄 State changed`, {
-      shouldLoad,
-      imageLoaded,
-      imageLoadError,
-      displayUrl: displayUrl?.substring(0, 50) + '...',
-      isPlaceholder: displayUrl === '/placeholder.svg',
-      hasDisplayUrl: !!displayUrl,
-      timestamp: Date.now()
-    });
-  }, [shouldLoad, imageLoaded, imageLoadError, displayUrl, debugId]);
-
-  // Track touch position to detect scrolling vs tapping
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!onMobileTap || !touchStartRef.current) return;
-
-    const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-    
-    // Only trigger tap if movement is minimal (< 10px in any direction)
-    // This prevents accidental selection during scrolling
-    if (deltaX < 10 && deltaY < 10) {
-      e.preventDefault();
-      onMobileTap();
-    }
-    
-    touchStartRef.current = null;
-  };
-
-  const aspectRatioStyle = getAspectRatioStyle();
-
-  return (
-    <div
-      className={mobileClassName}
-      style={aspectRatioStyle}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      data-mobile-item="true"
-      data-selected={isSelected}
-      data-image-id={((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8)}
-    >
-      {/* Show actual image when loaded and shouldLoad is true */}
-      {imageLoaded && shouldLoad && !imageLoadError ? (
-        (() => {
-          console.log(`${debugId} 🖼️ Showing actual image`, {
-            shouldLoad,
-            imageLoaded,
-            imageLoadError,
-            displayUrl: displayUrl?.substring(0, 50) + '...',
-            timestamp: Date.now()
-          });
-          return (
-            <img
-              ref={progressiveRef}
-              src={displayUrl}
-              alt={`Image ${image.id}`}
-              className={cn(
-                "w-full h-full object-cover rounded-sm transition-opacity duration-200",
-                // Progressive loading visual states
-                progressiveEnabled && isThumbShowing && "opacity-95",
-                progressiveEnabled && isFullLoaded && "opacity-100"
-              )}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              draggable={false}
-            />
-          );
-        })()
-      ) : null}
-      
-      {/* Hidden image for loading detection */}
-      {shouldLoad && displayUrl && displayUrl !== '/placeholder.svg' ? (
-        <img
-          src={displayUrl}
-          alt=""
-          style={{ display: 'none' }}
-          onLoad={() => {
-            // [VideoLoadSpeedIssue] Removed excessive logging for performance
-            setImageLoaded(true);
-            setImageLoadError(false);
-          }}
-          onError={() => {
-            // [VideoLoadSpeedIssue] Keep error logging but reduce verbosity
-            console.error(`${debugId} ❌ Image failed to load`);
-            setImageLoadError(true);
-          }}
-        />
-      ) : null}
-      
-      {/* Show loading spinner or placeholder */}
-      {shouldLoad && !imageLoaded && !imageLoadError ? (
-        <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
-          <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
-        </div>
-      ) : null}
-      
-      {/* Show error state */}
-      {imageLoadError ? (
-        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-          <div className="text-center">
-            <div className="text-lg mb-1">⚠️</div>
-            <div className="text-xs">Failed to load</div>
-          </div>
-        </div>
-      ) : null}
-      
-      {/* Show placeholder when shouldLoad is false */}
-      {!shouldLoad ? (
-        <div className="w-full h-full bg-muted animate-pulse">
-        </div>
-      ) : null}
-      
-      {!hideDeleteButton && (
-        <>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute bottom-2 left-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsMagicEditOpen(true);
-            }}
-            title="Magic Edit"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="destructive"
-            size="icon"
-            className="absolute top-2 right-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Remove image from shot"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute top-2 left-2 h-7 w-7 p-0 rounded-full opacity-70 hover:opacity-100 transition-opacity z-10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDuplicate?.(image.shotImageEntryId, (image as any).timeline_frame ?? (index * 50));
-            }}
-            disabled={duplicatingImageId === image.shotImageEntryId}
-            title="Duplicate image"
-          >
-            {duplicatingImageId === image.shotImageEntryId ? (
-              <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
-            ) : duplicateSuccessImageId === image.shotImageEntryId ? (
-              <Check className="h-3.5 w-3.5" />
-            ) : (
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            )}
-          </Button>
-        </>
-      )}
-      <MagicEditModal
-        isOpen={isMagicEditOpen}
-        imageUrl={displayUrl!}
-        onClose={() => setIsMagicEditOpen(false)}
-        shotGenerationId={image.shotImageEntryId}
-      />
-    </div>
-  );
-};
-
-// Memoize ShotImageManager with custom comparison to prevent unnecessary re-renders
-// Temporarily remove React.memo to allow internal state re-renders
-const ShotImageManager = ShotImageManagerComponent;
-
-export default ShotImageManager; 
+export default ShotImageManager;
