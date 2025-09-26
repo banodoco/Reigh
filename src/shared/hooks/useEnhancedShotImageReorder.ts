@@ -12,6 +12,7 @@ export const useEnhancedShotImageReorder = (
     shotGenerations: any[];
     getImagesForMode: (mode: 'batch' | 'timeline') => any[];
     exchangePositions: (genIdA: string, genIdB: string) => Promise<void>;
+    exchangePositionsNoReload: (shotGenIdA: string, shotGenIdB: string) => Promise<void>;
     batchExchangePositions: (exchanges: Array<{ generationIdA: string; generationIdB: string }>) => Promise<void>;
     deleteItem: (genId: string) => Promise<void>;
     loadPositions: () => Promise<void>;
@@ -25,6 +26,7 @@ export const useEnhancedShotImageReorder = (
     shotGenerations,
     getImagesForMode,
     exchangePositions,
+    exchangePositionsNoReload,
     batchExchangePositions,
     deleteItem,
     loadPositions,

@@ -697,6 +697,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     getPositionsForMode,
     getImagesForMode,
     exchangePositions,
+    exchangePositionsNoReload,
     batchExchangePositions,
     deleteItem,
     addItem,
