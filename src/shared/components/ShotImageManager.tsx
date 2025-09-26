@@ -461,15 +461,24 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Preserve multi-selection when initiating a drag with ⌘/Ctrl pressed
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
-    console.log('[DragDebug:ShotImageManager] Drag started', { 
-      activeId: active.id,
+    const draggedItemId = active.id as string;
+    
+    // Find the dragged item details
+    const draggedItem = currentImages.find(img => img.shotImageEntryId === draggedItemId);
+    
+    console.log('[BatchModeReorderFlow] [DRAG_START] 🚀 Batch mode drag initiated:', {
+      draggedItemId: draggedItemId.substring(0, 8),
+      draggedGenerationId: draggedItem?.id?.substring(0, 8),
+      currentPosition: currentImages.findIndex(img => img.shotImageEntryId === draggedItemId),
+      totalItems: currentImages.length,
+      timeline_frame: draggedItem?.timeline_frame,
       selectedIds: selectedIds.length,
       mobileSelectedIds: mobileSelectedIds.length,
       timestamp: Date.now()
     });
 
     // Record the item being dragged so we can show a preview
-    setActiveId(active.id as string);
+    setActiveId(draggedItemId);
 
     // If the drag was started while the modifier key (⌘ on macOS, Ctrl on Windows/Linux)
     // is pressed we **do not** clear the existing selection. This allows users to
@@ -492,9 +501,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    console.log('[DragDebug:ShotImageManager] Drag ended', { 
-      activeId: active.id,
-      overId: over?.id,
+    const draggedItemId = active.id as string;
+    const targetItemId = over?.id as string;
+    
+    console.log('[BatchModeReorderFlow] [DRAG_END] 🎯 Batch mode drag completed:', {
+      draggedItemId: draggedItemId.substring(0, 8),
+      targetItemId: targetItemId?.substring(0, 8),
+      hasValidTarget: !!over && active.id !== over.id,
       selectedIds: selectedIds.length,
       timestamp: Date.now()
     });
@@ -502,7 +515,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     setActiveId(null);
     
     if (!over || active.id === over.id) {
-      console.log('[DragDebug:ShotImageManager] Drag ended with no change - same position');
+      console.log('[BatchModeReorderFlow] [NO_CHANGE] ℹ️ No reorder needed - same position or invalid target');
       return;
     }
 
@@ -517,16 +530,35 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     if (!activeIsSelected || selectedIds.length <= 1) {
       const oldIndex = currentImages.findIndex((img) => img.shotImageEntryId === active.id);
       const newIndex = currentImages.findIndex((img) => img.shotImageEntryId === over.id);
-      console.log('[DragDebug:ShotImageManager] Single item drag', { 
+      
+      const draggedItem = currentImages[oldIndex];
+      const targetItem = currentImages[newIndex];
+      
+      console.log('[BatchModeReorderFlow] [SINGLE_ITEM_DRAG] 📍 Single item drag details:', { 
         oldIndex, 
         newIndex, 
-        willReorder: oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex 
+        willReorder: oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex,
+        draggedItem: {
+          generationId: draggedItem?.id?.substring(0, 8),
+          shotGenerationId: draggedItem?.shotImageEntryId?.substring(0, 8),
+          timeline_frame: draggedItem?.timeline_frame
+        },
+        targetItem: {
+          generationId: targetItem?.id?.substring(0, 8),
+          shotGenerationId: targetItem?.shotImageEntryId?.substring(0, 8),
+          timeline_frame: targetItem?.timeline_frame
+        }
       });
       
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         // 1. Update optimistic order immediately for instant visual feedback
         const newOrder = arrayMove(currentImages, oldIndex, newIndex);
-        console.log('[DragDebug:ShotImageManager] Updating optimistic order immediately');
+        
+        console.log('[BatchModeReorderFlow] [OPTIMISTIC_UPDATE] 🔄 Updating optimistic order:', {
+          originalOrder: currentImages.map((img, i) => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
+          newOrder: newOrder.map((img, i) => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
+          timestamp: Date.now()
+        });
         
         // Increment reconciliation ID to track this specific update
         setReconciliationId(prev => prev + 1);
@@ -534,8 +566,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         setOptimisticOrder(newOrder);
         
         // 2. Notify parent so React state becomes eventually consistent
-        console.log('[DragDebug:ShotImageManager] Calling onImageReorder for single item');
-        stableOnImageReorder(newOrder.map((img) => img.shotImageEntryId));
+        const orderedShotImageEntryIds = newOrder.map((img) => img.shotImageEntryId);
+        console.log('[BatchModeReorderFlow] [CALLING_PARENT] 📞 Calling onImageReorder for single item:', {
+          orderedShotImageEntryIds: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
+          timestamp: Date.now()
+        });
+        stableOnImageReorder(orderedShotImageEntryIds);
       }
       setSelectedIds([]);
     setLastSelectedIndex(null);

@@ -288,6 +288,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   // Exchange positions without reloading (for batch operations)
   const exchangePositionsNoReload = useCallback(async (shotGenerationIdA: string, shotGenerationIdB: string) => {
     if (!shotId) {
+      console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] ❌ No shotId provided');
       return;
     }
 
@@ -298,13 +299,25 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     const frameA = itemA?.timeline_frame || 0;
     const frameB = itemB?.timeline_frame || 0;
 
+    console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] 🔀 Exchanging timeline frames:', {
+      shotGenA: shotGenerationIdA.substring(0, 8),
+      shotGenB: shotGenerationIdB.substring(0, 8),
+      genA: itemA?.generation_id?.substring(0, 8),
+      genB: itemB?.generation_id?.substring(0, 8),
+      frameA,
+      frameB,
+      willSkip: frameA === frameB,
+      timestamp: Date.now()
+    });
+
     // Skip no-op exchange (items already have same timeline_frame)
     if (frameA === frameB) {
+      console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] ⏭️ Skipping - same timeline_frame');
       return;
     }
 
-
     try {
+      console.log('[BatchModeReorderFlow] [SQL_CALL] 📞 Calling exchange_timeline_frames RPC...');
       // Use exchange_timeline_frames with shot_generation IDs for precise targeting
       const { data, error } = await (supabase as any).rpc('exchange_timeline_frames', {
         p_shot_id: shotId,
@@ -312,14 +325,17 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         p_shot_generation_id_b: shotGenerationIdB
       });
 
-      if (error) throw error;
+      if (error) {
+        console.log('[BatchModeReorderFlow] [SQL_ERROR] ❌ RPC failed:', error);
+        throw error;
+      }
 
-
+      console.log('[BatchModeReorderFlow] [SQL_SUCCESS] ✅ exchange_timeline_frames completed');
       // No position reload - caller will handle this
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to exchange positions';
-      console.error('[exchangePositionsNoReload] Error:', errorMessage);
+      console.error('[BatchModeReorderFlow] [EXCHANGE_ERROR] ❌ Exchange failed:', errorMessage);
       throw err;
     }
   }, [shotId, shotGenerations]);
@@ -327,12 +343,24 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   // Batch exchange positions - performs multiple exchanges then reloads once
   const batchExchangePositions = useCallback(async (exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }>) => {
     if (!shotId) {
+      console.log('[BatchModeReorderFlow] [BATCH_EXCHANGE] ❌ No shotId provided');
       return;
     }
 
     if (exchanges.length === 0) {
+      console.log('[BatchModeReorderFlow] [BATCH_EXCHANGE] ❌ No exchanges provided');
       return;
     }
+
+    console.log('[BatchModeReorderFlow] [BATCH_EXCHANGE] 🚀 Starting batch exchange positions:', {
+      shotId: shotId.substring(0, 8),
+      exchangeCount: exchanges.length,
+      exchanges: exchanges.map(ex => ({
+        shotGenA: ex.shotGenerationIdA.substring(0, 8),
+        shotGenB: ex.shotGenerationIdB.substring(0, 8)
+      })),
+      timestamp: Date.now()
+    });
 
 
     // [TimelineItemMoveSummary] - Log batch position exchanges
@@ -346,13 +374,21 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
     try {
       // Perform all exchanges without reloading positions each time
-      for (const exchange of exchanges) {
+      console.log('[BatchModeReorderFlow] [EXCHANGES_START] 🔄 Starting individual exchanges...');
+      for (let i = 0; i < exchanges.length; i++) {
+        const exchange = exchanges[i];
+        console.log('[BatchModeReorderFlow] [EXCHANGE_ITEM] 🔀 Processing exchange', i + 1, 'of', exchanges.length, ':', {
+          shotGenA: exchange.shotGenerationIdA.substring(0, 8),
+          shotGenB: exchange.shotGenerationIdB.substring(0, 8)
+        });
         await exchangePositionsNoReload(exchange.shotGenerationIdA, exchange.shotGenerationIdB);
+        console.log('[BatchModeReorderFlow] [EXCHANGE_COMPLETE] ✅ Exchange', i + 1, 'completed');
       }
 
-
+      console.log('[BatchModeReorderFlow] [RELOAD_POSITIONS] 🔄 All exchanges complete, reloading positions...');
       // Single reload after all exchanges are done
       await loadPositions({ reason: 'reorder' });
+      console.log('[BatchModeReorderFlow] [RELOAD_COMPLETE] ✅ Position reload completed');
 
       // Log the batch exchange summary after reload
       const positionsAfter = shotGenerations
