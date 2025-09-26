@@ -24,6 +24,7 @@ export interface MagicEditTaskParams {
   enable_sync_mode?: boolean; // Default to false
   max_wait_seconds?: number; // Default to 300
   enable_base64_output?: boolean; // Default to false
+  tool_type?: string; // Optional: override tool type for generation association
 }
 
 /**
@@ -43,6 +44,7 @@ export interface BatchMagicEditTaskParams {
   enable_sync_mode?: boolean;
   max_wait_seconds?: number;
   enable_base64_output?: boolean;
+  tool_type?: string; // Optional: override tool type for generation association
 }
 
 /**
@@ -150,6 +152,11 @@ function buildMagicEditTaskParams(
   // Always add add_in_position as false for magic edit tasks (unpositioned by default)
   taskParams.add_in_position = false;
 
+  // Add tool_type override if provided (for generation association)
+  if (params.tool_type) {
+    taskParams.tool_type = params.tool_type;
+  }
+
   return taskParams;
 }
 
@@ -230,6 +237,7 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
         enable_sync_mode: params.enable_sync_mode,
         max_wait_seconds: params.max_wait_seconds,
         enable_base64_output: params.enable_base64_output,
+        tool_type: params.tool_type, // Pass through tool type override
       } as MagicEditTaskParams;
     });
 

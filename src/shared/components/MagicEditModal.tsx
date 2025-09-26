@@ -35,6 +35,8 @@ interface MagicEditModalProps {
   onClose: () => void;
   // Optional shot generation context for prompt persistence
   shotGenerationId?: string;
+  // Optional tool type override - when provided, forces the generation to use this tool type
+  toolTypeOverride?: string;
 }
 
 const MagicEditModal: React.FC<MagicEditModalProps> = ({
@@ -43,6 +45,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   imageDimensions,
   onClose,
   shotGenerationId,
+  toolTypeOverride,
 }) => {
   const isMobile = useIsMobile();
   
@@ -103,9 +106,10 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
         seed: 11111, // Base seed, will be incremented for each image
         shot_id: shotId, // Associate with shot if available (currentShotId takes priority over magicEditShotId)
+        tool_type: toolTypeOverride, // Override tool type if provided (e.g., 'image-generation' when used in ImageGenerationToolPage)
       };
       
-      console.log(`[MagicEditModal] Creating tasks with shot_id: ${shotId} (currentShotId: ${currentShotId}, magicEditShotId: ${magicEditShotId})`);
+      console.log(`[MagicEditModal] Creating tasks with shot_id: ${shotId} (currentShotId: ${currentShotId}, magicEditShotId: ${magicEditShotId}), tool_type override: ${toolTypeOverride}`);
 
       const results = await createBatchMagicEditTasks(batchParams);
       

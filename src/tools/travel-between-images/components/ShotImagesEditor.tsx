@@ -308,17 +308,17 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     <Card className="w-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg font-light">
-            Input Images
-            {settingsError && (
-              <div className="text-sm text-destructive mt-1">
-                {settingsError}
-              </div>
-            )}
-          </CardTitle>
-          
           <div className="flex items-center gap-2">
-            {/* Download All Images Button */}
+            <CardTitle className="text-base sm:text-lg font-light">
+              Input Images
+              {settingsError && (
+                <div className="text-sm text-destructive mt-1">
+                  {settingsError}
+                </div>
+              )}
+            </CardTitle>
+            
+            {/* Download All Images Button - Icon only, next to title */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -327,14 +327,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     size="sm"
                     onClick={handleDownloadAllImages}
                     disabled={isDownloadingImages || !images || images.length === 0}
-                    className="text-xs h-8 px-2 text-muted-foreground hover:text-foreground"
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                   >
                     {isDownloadingImages ? (
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      <Download className="h-3 w-3 mr-1" />
+                      <Download className="h-3 w-3" />
                     )}
-                    <span className="hidden sm:inline">Download all</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -342,7 +341,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            
+          </div>
+          
+          <div className="flex items-center gap-2">
             {/* Generation Mode Toggle - Hidden on mobile */}
             {!isMobile && (
               <ToggleGroup
