@@ -150,6 +150,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     setTimeout(() => setShowTickForImageId(null), 2000);
   };
 
+  // Fetch task type information including content_type
+  const { data: taskTypeInfo } = useTaskType(task.taskType);
+
   // Use display_name from task_types table, with fallback to legacy logic
   const displayTaskType = taskTypeInfo?.display_name || getTaskDisplayName(task.taskType);
   const abbreviatedTaskType = getAbbreviatedTaskName(displayTaskType);
@@ -163,9 +166,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     const promptText = parsed?.orchestrator_details?.prompt || parsed?.prompt || '';
     return { parsed, promptText };
   }, [task.params]);
-
-  // Fetch task type information including content_type
-  const { data: taskTypeInfo } = useTaskType(task.taskType);
 
   // Consolidated task type detection using content_type from database
   const taskInfo = useMemo(() => {
