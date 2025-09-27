@@ -1251,9 +1251,9 @@ export default function HomePage() {
                 <p className="text-sm leading-relaxed">
                   Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references</strong>:
                 </p>
-                <div className="grid grid-cols-2 items-stretch gap-4">
+                {/* <div className="grid grid-cols-2 items-stretch gap-4">
                   {/* Left part: 4 inputs in 2x2 grid */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* <div className="grid grid-cols-2 gap-3">
                     {multiSquareIndices.map(i => (
                       <div key={i} className="bg-muted/20 border rounded-lg aspect-square flex items-center justify-center text-xs text-muted-foreground">
                         Square {i}
@@ -1261,20 +1261,20 @@ export default function HomePage() {
                     ))}
                   </div>
                   {/* Right part: Output square, stretched to match height */}
-                  <div className="bg-muted/20 border rounded-lg aspect-square flex items-center justify-center text-xs text-muted-foreground">
+                  {/* <div className="bg-muted/20 border rounded-lg aspect-square flex items-center justify-center text-xs text-muted-foreground">
                     Square Output
                   </div>
-                </div>
+                </div> */}
               </div>
 
               {/* Section 3 - Structural Control */}
-              <div className="space-y-3 mt-4 mb-4">
+              {/* <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
                   Using images to steer video in combination with structural control can allow for deep control and intentionality:
                 </p>
                 <div className="flex items-center gap-3 w-full">
                   {/* 2 images stacked */}
-                  <div className="flex flex-col gap-1 flex-1">
+                  {/* <div className="flex flex-col gap-1 flex-1">
                     <div className="bg-muted/20 border rounded-lg w-full aspect-video flex items-center justify-center text-xs text-muted-foreground">
                       Image 1
                     </div>
@@ -1284,19 +1284,19 @@ export default function HomePage() {
                   </div>
                   <span className="text-sm text-muted-foreground flex-shrink-0">+</span>
                   {/* Structural guide video placeholder */}
-                  <div className="bg-muted/20 border rounded-lg flex-1 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                  {/* <div className="bg-muted/20 border rounded-lg flex-1 aspect-video flex items-center justify-center text-xs text-muted-foreground">
                     Guide Video
                   </div>
                   <span className="text-sm text-muted-foreground flex-shrink-0">=</span>
                   {/* Output */}
-                  <div className="bg-muted/20 border rounded-lg flex-1 aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                  {/* <div className="bg-muted/20 border rounded-lg flex-1 aspect-video flex items-center justify-center text-xs text-muted-foreground">
                     Output
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* Section 4 - LoRAs */}
-              <div className="space-y-3 mt-4 mb-4">
+              {/* <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
                   Combining those with LoRAs can allow for artists to discover a style that's truly their own:
                 </p>
@@ -1304,17 +1304,17 @@ export default function HomePage() {
                   {motionExamples.map(example => (
                     <div key={example.id} className="relative">
                       {/* Label attached across the bottom */}
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-light text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
+                      {/* <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-muted/60 backdrop-blur-sm px-4 py-0.5 text-xs font-light text-muted-foreground rounded-full border border-muted whitespace-nowrap text-center">
                         {example.label}
                       </div>
                       {/* Thumbnail */}
-                      <div className="bg-muted/20 border rounded-lg aspect-video flex items-center justify-center text-xs text-muted-foreground">
+                      {/* <div className="bg-muted/20 border rounded-lg aspect-video flex items-center justify-center text-xs text-muted-foreground">
                         16:9 Example {example.id}
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              </div> */}
 
               {/* Closing message & CTA */}
               <div className="space-y-3 mb-8">

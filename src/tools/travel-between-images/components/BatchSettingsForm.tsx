@@ -193,7 +193,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                           ? 'Turbo mode requires 1-2 images only'
                           : turboMode 
                             ? 'Using fast WAN 2.2 model for quick results (81 frames)' 
-                            : 'Using high-quality Lightning model for best results'
+                            : 'Run with an inflexible but fast and high-quality model'
                         }
                       </p>
                     </div>
