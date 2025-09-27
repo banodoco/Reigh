@@ -306,11 +306,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const imagesToShow = travelData.imageUrls.slice(0, 4);
   const extraImageCount = Math.max(0, travelData.imageUrls.length - imagesToShow.length);
 
-  // Extract shot_id for Travel Between Images tasks
+  // Extract shot_id for video tasks
   const shotId: string | null = React.useMemo(() => {
-    if (task.taskType !== 'travel_orchestrator') return null;
-    return (task.params as any)?.orchestrator_details?.shot_id || null;
-  }, [task]);
+    if (!taskInfo.isVideoTask) return null;
+    
+    const params = task.params as any;
+    
+    // Try different locations where shot_id might be stored based on task type
+    return (
+      params?.orchestrator_details?.shot_id ||           // travel_orchestrator, wan_2_2_i2v
+      params?.full_orchestrator_payload?.shot_id ||      // travel_stitch, wan_2_2_i2v fallback
+      params?.shot_id ||                                 // direct shot_id
+      null
+    );
+  }, [task, taskInfo.isVideoTask]);
 
   // Navigation setup
   const navigate = useNavigate();
