@@ -228,6 +228,34 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleContent>
               <div className="w-full lg:w-80 space-y-4 bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 lg:hidden">
+                {/* Creativity slider - moved into advanced */}
+                <div>
+                  <div className="text-center mb-3">
+                    <span className="font-light text-sm">Level of creativity</span>
+                  </div>
+                  <div className="relative mb-0">
+                    <Slider
+                      id="gen_temperature_mobile"
+                      value={[temperature]}
+                      onValueChange={handleTemperatureChange}
+                      min={0.4}
+                      max={1.2}
+                      step={0.2}
+                      disabled={!hasApiKey || isGenerating}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                      <span>1</span>
+                      <span>5</span>
+                    </div>
+                  </div>
+                  <div className="text-center -mt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {selectedTemperatureOption?.description || 'Good balance of creativity'}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Rules/Constraints - moved into advanced */}
                 <div>
           <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
@@ -345,36 +373,8 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           />
         </div>
 
-                {/* Creativity slider - moved into advanced */}
-                <div>
-                  <div className="text-center mb-3">
-                    <span className="font-light text-sm">Level of creativity</span>
-      </div>
-                  <div className="relative mb-0">
-                    <Slider
-                      id="gen_temperature"
-                      value={[temperature]}
-                      onValueChange={handleTemperatureChange}
-                      min={0.4}
-                      max={1.2}
-                      step={0.2}
-            disabled={!hasApiKey || isGenerating}
-            className="w-full"
-          />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                      <span>1</span>
-                      <span>5</span>
-                    </div>
-                  </div>
-                  <div className="text-center -mt-1">
-                    <span className="text-xs text-muted-foreground">
-                      {selectedTemperatureOption?.description || 'Good balance of creativity'}
-                    </span>
-                  </div>
-                </div>
-
                 {/* Checkboxes - moved into advanced */}
-                <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                   <div className="flex items-center space-x-2">
                     <Checkbox 
                       id="gen_includeExistingContext" 
@@ -424,6 +424,34 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         {/* Advanced settings - sidebar on desktop only */}
         {showAdvanced && (
           <div className="hidden lg:block w-80 space-y-4 bg-accent/30 border border-accent-foreground/10 rounded-lg p-4">
+              {/* Creativity slider - moved into advanced */}
+              <div>
+                <div className="text-center mb-3">
+                  <span className="font-light text-sm">Level of creativity</span>
+                </div>
+                <div className="relative mb-0">
+                  <Slider
+                    id="gen_temperature"
+                    value={[temperature]}
+                    onValueChange={handleTemperatureChange}
+                    min={0.4}
+                    max={1.2}
+                    step={0.2}
+                    disabled={!hasApiKey || isGenerating}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                    <span>1</span>
+                    <span>5</span>
+                  </div>
+                </div>
+                <div className="text-center -mt-1">
+                  <span className="text-xs text-muted-foreground">
+                    {selectedTemperatureOption?.description || 'Good balance of creativity'}
+                  </span>
+                </div>
+              </div>
+
               {/* Rules/Constraints - moved into advanced */}
               <div>
                 <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
@@ -541,36 +569,8 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 />
               </div>
 
-              {/* Creativity slider - moved into advanced */}
-              <div>
-            <div className="text-center mb-3">
-                  <span className="font-light text-sm">Level of creativity</span>
-            </div>
-            <div className="relative mb-0">
-              <Slider
-                id="gen_temperature"
-                value={[temperature]}
-                onValueChange={handleTemperatureChange}
-                min={0.4}
-                max={1.2}
-                step={0.2}
-                disabled={!hasApiKey || isGenerating}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                <span>1</span>
-                <span>5</span>
-              </div>
-            </div>
-            <div className="text-center -mt-1">
-              <span className="text-xs text-muted-foreground">
-                {selectedTemperatureOption?.description || 'Good balance of creativity'}
-              </span>
-            </div>
-          </div>
-
               {/* Checkboxes - moved into advanced */}
-              <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
             <div className="flex items-center space-x-2">
                 <Checkbox 
                     id="gen_includeExistingContext" 

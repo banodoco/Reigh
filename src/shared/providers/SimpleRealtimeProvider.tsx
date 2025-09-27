@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { simpleRealtimeManager } from '@/shared/realtime/SimpleRealtimeManager';
@@ -29,6 +29,10 @@ interface SimpleRealtimeProviderProps {
 export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps) {
   const { selectedProjectId } = useProject();
   const queryClient = useQueryClient();
+  
+  // Debounce invalidations to prevent query cancellation storms
+  const invalidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingEventsRef = useRef<number>(0);
   
   const [state, setState] = useState<SimpleRealtimeContextType>({
     isConnected: false,
@@ -124,6 +128,8 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations (all variants)', 'shots', 'unpositioned-count', 'project-video-counts'],
         timestamp: Date.now()
       });
+      
+      // Task updates are less frequent, so invalidate immediately
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
       // Use predicate to invalidate all unified-generations queries (including shot-specific ones)
@@ -150,15 +156,69 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations (all variants)', 'shots', 'unpositioned-count', 'project-video-counts'],
         timestamp: Date.now()
       });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
-      // Use predicate to invalidate all unified-generations queries (including shot-specific ones)
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === 'unified-generations'
+      
+      // [InvalidationDiag] Count events and use shorter timeout with forced execution
+      pendingEventsRef.current += 1;
+      const eventCount = pendingEventsRef.current;
+      
+      console.log('[InvalidationDiag] 📨 NEW TASK EVENT:', {
+        eventCount,
+        eventDetail: event.detail,
+        timestamp: Date.now()
       });
-      queryClient.invalidateQueries({ queryKey: ['shots'] });
-      queryClient.invalidateQueries({ queryKey: ['unpositioned-count'] });
-      queryClient.invalidateQueries({ queryKey: ['project-video-counts'] });
+
+      // Clear any existing timeout
+      if (invalidationTimeoutRef.current) {
+        clearTimeout(invalidationTimeoutRef.current);
+      }
+
+      // Use shorter timeout and force execution after 16 events (matching task count)
+      const shouldForceExecute = eventCount >= 16;
+      const timeoutMs = shouldForceExecute ? 50 : 200; // Very short timeout if we hit expected count
+      
+      if (shouldForceExecute) {
+        console.log('[InvalidationDiag] 🚀 FORCING IMMEDIATE EXECUTION - received expected number of events');
+      }
+
+      invalidationTimeoutRef.current = setTimeout(() => {
+        try {
+          const invalidationStart = Date.now();
+          const activeQueries = queryClient.getQueryCache().getAll().length;
+          
+          console.log('[InvalidationDiag] 🔄 EXECUTING DEBOUNCED INVALIDATIONS:', {
+            trigger: shouldForceExecute ? 'forced-after-16-events' : 'debounced',
+            eventsProcessed: pendingEventsRef.current,
+            activeQueriesBeforeInvalidation: activeQueries,
+            timestamp: invalidationStart
+          });
+
+          queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
+          // Use predicate to invalidate all unified-generations queries (including shot-specific ones)
+          queryClient.invalidateQueries({ 
+            predicate: (query) => query.queryKey[0] === 'unified-generations'
+          });
+          queryClient.invalidateQueries({ queryKey: ['shots'] });
+          queryClient.invalidateQueries({ queryKey: ['unpositioned-count'] });
+          queryClient.invalidateQueries({ queryKey: ['project-video-counts'] });
+          
+          const invalidationEnd = Date.now();
+          console.log('[InvalidationDiag] ✅ DEBOUNCED INVALIDATIONS COMPLETE:', {
+            duration: `${invalidationEnd - invalidationStart}ms`,
+            eventsProcessed: pendingEventsRef.current,
+            activeQueriesAfterInvalidation: queryClient.getQueryCache().getAll().length,
+            timestamp: invalidationEnd
+          });
+          
+          // Reset counter
+          pendingEventsRef.current = 0;
+        } catch (error) {
+          console.error('[InvalidationDiag] ❌ DEBOUNCED INVALIDATION ERROR:', error);
+          pendingEventsRef.current = 0;
+        } finally {
+          invalidationTimeoutRef.current = null;
+        }
+      }, timeoutMs);
     };
 
     window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
@@ -167,6 +227,12 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     return () => {
       window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);
       window.removeEventListener('realtime:task-new', handleNewTask as EventListener);
+      
+      // Clean up any pending invalidation timeout
+      if (invalidationTimeoutRef.current) {
+        clearTimeout(invalidationTimeoutRef.current);
+        invalidationTimeoutRef.current = null;
+      }
     };
   }, [queryClient]);
 

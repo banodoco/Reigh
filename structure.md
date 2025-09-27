@@ -250,6 +250,13 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 
 Reigh uses an async task queue for AI workloads. For the complete flow diagram and implementation details, see [docs/structure_detail/task_worker_lifecycle.md](docs/structure_detail/task_worker_lifecycle.md).
 
+### Task Types & Content Classification
+
+The `task_types` table includes a `content_type` field that classifies tasks by their output:
+- **`image`**: Tasks that produce image content (single_image, image_edit, etc.)
+- **`video`**: Tasks that produce video content (travel_stitch, travel_orchestrator, etc.)  
+- **`NULL`**: Tasks that don't produce direct content output (lora_training, utility tasks)
+
 ### External Workers
 **Headless-Wan2GP** handles all AI processing tasks via GPU-accelerated Python environment. Supports local CUDA and cloud scaling. Complete setup and task flow details: [`task_worker_lifecycle.md`](docs/structure_detail/task_worker_lifecycle.md).
 

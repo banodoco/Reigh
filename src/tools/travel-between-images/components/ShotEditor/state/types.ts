@@ -58,7 +58,7 @@ export interface SteerableMotionSettings {
 // Default values for steerable motion settings - single source of truth
 export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   negative_prompt: '',
-  model_name: 'vace_fun_14B_2_2',
+  model_name: 'lightning_baseline_2_2_2',
   seed: 789,
   debug: true,
   apply_reward_lora: false,
@@ -121,6 +121,10 @@ export interface ShotEditorProps {
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   enhancePrompt: boolean;
   onEnhancePromptChange: (enhance: boolean) => void;
+  turboMode: boolean;
+  onTurboModeChange: (turbo: boolean) => void;
+  amountOfMotion: number;
+  onAmountOfMotionChange: (motion: number) => void;
   // Mode selection removed - now hardcoded to use specific model
   // Navigation props
   onPreviousShot?: () => void;

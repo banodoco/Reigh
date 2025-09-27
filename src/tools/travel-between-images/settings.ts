@@ -14,6 +14,8 @@ export interface VideoTravelSettings {
   enhancePrompt: boolean;
   generationMode: 'batch' | 'by-pair' | 'timeline';
   selectedModel?: 'wan-2.1' | 'wan-2.2';
+  turboMode: boolean;
+  amountOfMotion: number; // 0-100 range for UI
   // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;
@@ -40,6 +42,8 @@ export const videoTravelSettings = {
     generationMode: 'batch' as const,
     enhancePrompt: false,
     selectedModel: 'wan-2.1' as const,
+    turboMode: false,
+    amountOfMotion: 50,
     selectedMode: 'Zippy Supreme' as const,
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   },

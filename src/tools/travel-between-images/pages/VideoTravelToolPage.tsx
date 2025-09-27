@@ -36,6 +36,7 @@ import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloade
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -121,6 +122,10 @@ const VideoTravelToolPage: React.FC = () => {
   // Get current project's aspect ratio
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
+  
+  // Get generation location settings to auto-disable turbo mode when not in cloud
+  const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+  const isCloudGenerationEnabled = generationMethods.inCloud && !generationMethods.onComputer;
   
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
@@ -263,6 +268,18 @@ const VideoTravelToolPage: React.FC = () => {
     setEnhancePrompt(enhance);
   }, []);
 
+  const handleTurboModeChange = useCallback((turbo: boolean) => {
+    if (!hasLoadedInitialSettings.current) return;
+    userHasInteracted.current = true;
+    setTurboMode(turbo);
+  }, []);
+
+  const handleAmountOfMotionChange = useCallback((motion: number) => {
+    if (!hasLoadedInitialSettings.current) return;
+    userHasInteracted.current = true;
+    setAmountOfMotion(motion);
+  }, []);
+
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
@@ -397,6 +414,8 @@ const VideoTravelToolPage: React.FC = () => {
   const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
+  const [turboMode, setTurboMode] = useState<boolean>(false);
+  const [amountOfMotion, setAmountOfMotion] = useState<number>(50); // 0-100 range for UI, defaults to 50
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
   // Mode selection removed - now hardcoded to use specific model
@@ -745,6 +764,8 @@ const VideoTravelToolPage: React.FC = () => {
       setCustomWidth(settingsToApply.customWidth);
       setCustomHeight(settingsToApply.customHeight);
       setEnhancePrompt(settingsToApply.enhancePrompt || false);
+      setTurboMode(settingsToApply.turboMode || false);
+      setAmountOfMotion(settingsToApply.amountOfMotion ?? 50); // Default to 50 if not present
       setVideoPairConfigs(settingsToApply.pairConfigs || []);
       setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
       setPairConfigs(settingsToApply.pairConfigs || []);
@@ -762,6 +783,15 @@ const VideoTravelToolPage: React.FC = () => {
     userHasInteracted.current = false;
     lastSavedSettingsRef.current = null;
   }, [selectedShot?.id]);
+
+  // Auto-disable turbo mode when not using cloud generation
+  useEffect(() => {
+    if (!isCloudGenerationEnabled && turboMode) {
+      console.log('[VideoTravelToolPage] Auto-disabling turbo mode - not using cloud generation');
+      setTurboMode(false);
+      userHasInteracted.current = true; // Mark as user interaction to save the change
+    }
+  }, [isCloudGenerationEnabled, turboMode]);
 
 
 
@@ -1087,6 +1117,8 @@ const VideoTravelToolPage: React.FC = () => {
     customHeight,
     steerableMotionSettings,
     enhancePrompt,
+    turboMode,
+    amountOfMotion,
     generationMode,
     pairConfigs,
     // selectedMode removed - now hardcoded to use specific model
@@ -1102,6 +1134,8 @@ const VideoTravelToolPage: React.FC = () => {
           customHeight,
           steerableMotionSettings,
           enhancePrompt,
+          turboMode,
+          amountOfMotion,
           generationMode,
           pairConfigs,
           // selectedMode removed - now hardcoded to use specific model
@@ -1389,6 +1423,10 @@ const VideoTravelToolPage: React.FC = () => {
               availableLoras={availableLoras}
               enhancePrompt={enhancePrompt}
               onEnhancePromptChange={handleEnhancePromptChange}
+              turboMode={turboMode}
+              onTurboModeChange={handleTurboModeChange}
+              amountOfMotion={amountOfMotion}
+              onAmountOfMotionChange={handleAmountOfMotionChange}
               generationMode={generationMode}
               onGenerationModeChange={handleGenerationModeChange}
 

@@ -4,9 +4,10 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
-import { Trash2 } from "lucide-react";
+import { Trash2, Images } from "lucide-react";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
+import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
 
 interface ModelSectionProps {
   isGenerating: boolean;
@@ -57,100 +58,10 @@ const StyleReferenceSection: React.FC<{
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [imageError, setImageError] = React.useState(false);
   const [isDraggingOver, setIsDraggingOver] = React.useState(false);
-  const [validationError, setValidationError] = React.useState<string | null>(null);
-  const [showValidationError, setShowValidationError] = React.useState(false);
-  const [lastValidationState, setLastValidationState] = React.useState<'valid' | 'invalid' | null>(null);
-  const validationTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const errorShowTimeRef = React.useRef<number | null>(null);
+  const [showDatasetBrowser, setShowDatasetBrowser] = React.useState(false);
 
-  // Helper function to show validation error with auto-hide (prevents flickering)
-  const showValidationErrorMessage = React.useCallback((message: string) => {
-    // Only show error if we're transitioning from valid to invalid state
-    if (lastValidationState === 'invalid') {
-      return; // Already showing error, don't restart animation
-    }
-    
-    setLastValidationState('invalid');
-    errorShowTimeRef.current = Date.now(); // Record when error was shown
-    
-    // Clear any existing timeout
-    if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current);
-    }
-    
-    // Set the error message and show it
-    setValidationError(message);
-    setShowValidationError(true);
-    
-    // Auto-hide after 3 seconds
-    validationTimeoutRef.current = setTimeout(() => {
-      setShowValidationError(false);
-      // Clear the message after fade out animation completes
-      setTimeout(() => {
-        setValidationError(null);
-        setLastValidationState(null);
-        errorShowTimeRef.current = null;
-      }, 300); // Match the CSS transition duration
-    }, 3000);
-  }, [lastValidationState]);
 
-  // Helper function to clear validation error (respects minimum 2-second display time)
-  const clearValidationError = React.useCallback(() => {
-    // Don't change validation state to 'valid' immediately - wait for the minimum time
-    
-    // Check if error has been shown for at least 2 seconds
-    if (errorShowTimeRef.current && showValidationError) {
-      const timeShown = Date.now() - errorShowTimeRef.current;
-      const minimumDisplayTime = 2000; // 2 seconds
-      
-      if (timeShown < minimumDisplayTime) {
-        // Wait for the remaining time before hiding
-        const remainingTime = minimumDisplayTime - timeShown;
-        
-        if (validationTimeoutRef.current) {
-          clearTimeout(validationTimeoutRef.current);
-        }
-        
-        validationTimeoutRef.current = setTimeout(() => {
-          setShowValidationError(false);
-          setTimeout(() => {
-            setValidationError(null);
-            setLastValidationState(null);
-            errorShowTimeRef.current = null;
-          }, 300); // Match the CSS transition duration
-        }, remainingTime);
-        
-        return; // Don't hide immediately
-      }
-    }
-    
-    // Error has been shown for 2+ seconds or not currently showing, hide immediately
-    if (validationTimeoutRef.current) {
-      clearTimeout(validationTimeoutRef.current);
-    }
-    
-    if (showValidationError) {
-      setShowValidationError(false);
-      setTimeout(() => {
-        setValidationError(null);
-        setLastValidationState(null);
-        errorShowTimeRef.current = null;
-      }, 300); // Match the CSS transition duration
-    } else {
-      // Not currently showing, just reset state
-      setLastValidationState(null);
-      errorShowTimeRef.current = null;
-    }
-  }, [showValidationError]);
 
-  // Cleanup timeout on unmount
-  React.useEffect(() => {
-    return () => {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Reset loading states when image changes
   React.useEffect(() => {
@@ -221,9 +132,8 @@ const StyleReferenceSection: React.FC<{
                   </>
                 )
               ) : (
-                /* Upload area with same aspect ratio as image */
+                /* Simple file upload area */
                 <div className="w-full aspect-square relative">
-                  {/* Custom square upload area that matches image dimensions */}
                   <div 
                     className={`w-full h-full border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors p-4
                       ${isDraggingOver ? 'border-primary bg-primary/10' : 'border-muted-foreground/30'}
@@ -281,6 +191,21 @@ const StyleReferenceSection: React.FC<{
                   </div>
                 </div>
               )}
+              
+              {/* Browse Dataset Images Button - Always visible */}
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDatasetBrowser(true)}
+                  disabled={isGenerating || isUploadingStyleReference}
+                  className="w-full"
+                >
+                  <Images className="h-4 w-4 mr-2" />
+                  Browse images
+                </Button>
+              </div>
             </div>
             <div className={`flex-1 pt-2 space-y-4 ${!styleReferenceImage ? 'opacity-50 pointer-events-none' : ''}`}>
               <SliderWithValue
@@ -300,11 +225,10 @@ const StyleReferenceSection: React.FC<{
                   // Block if total < 0.5 (no exceptions)
                   if (newTotal < 0.5) {
                     console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Style change would make total < 0.5 (${newTotal})`);
-                    showValidationErrorMessage("Both strengths must add up to more than 0.5");
+                    // Simple console warning instead of UI validation
                     return;
                   }
                   console.log(`[StrengthValidationDebug] ✅ ALLOWED: Style change accepted (total = ${newTotal})`);
-                  clearValidationError(); // Clear error on successful change
                   onStyleStrengthChange(value);
                 }}
                 min={0.0}
@@ -330,11 +254,10 @@ const StyleReferenceSection: React.FC<{
                   // Block if total < 0.5 (no exceptions)
                   if (newTotal < 0.5) {
                     console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Subject change would make total < 0.5 (${newTotal})`);
-                    showValidationErrorMessage("Both strengths must add up to more than 0.5");
+                    // Simple console warning instead of UI validation
                     return;
                   }
                   console.log(`[StrengthValidationDebug] ✅ ALLOWED: Subject change accepted (total = ${newTotal})`);
-                  clearValidationError(); // Clear error on successful change
                   onSubjectStrengthChange(value);
                 }}
                 min={0.0}
@@ -343,22 +266,6 @@ const StyleReferenceSection: React.FC<{
                 disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
                 numberInputClassName="w-10"
               />
-              {/* Validation error message with fade animation */}
-              {validationError && (
-                <div 
-                  className={`text-red-500 text-sm font-medium transition-all duration-300 ease-in-out transform ${
-                    showValidationError 
-                      ? 'opacity-100 translate-y-0' 
-                      : 'opacity-0 -translate-y-1'
-                  }`}
-                  style={{
-                    maxHeight: showValidationError ? '2rem' : '0',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {validationError}
-                </div>
-              )}
               {/* Show subject description only when subject strength > 0 AND image is uploaded */}
               {subjectStrength > 0 && styleReferenceImage && (
                 <div className="space-y-2">
@@ -397,6 +304,13 @@ const StyleReferenceSection: React.FC<{
         </div>
       </div>
     </div>
+    
+    {/* Dataset Browser Modal */}
+    <DatasetBrowserModal
+      isOpen={showDatasetBrowser}
+      onOpenChange={setShowDatasetBrowser}
+      onImageSelect={onStyleUpload}
+    />
   </div>
   );
 };

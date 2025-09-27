@@ -17,6 +17,7 @@ import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 interface BatchSettingsFormProps {
   batchVideoPrompt: string;
@@ -51,8 +52,16 @@ interface BatchSettingsFormProps {
   randomSeed: boolean;
   onRandomSeedChange: (value: boolean) => void;
   
+  // Turbo mode props
+  turboMode: boolean;
+  onTurboModeChange: (value: boolean) => void;
+  
   // Image count for conditional UI
   imageCount?: number;
+  
+  // Amount of motion props (0-100 range for UI)
+  amountOfMotion: number;
+  onAmountOfMotionChange: (value: number) => void;
   // selectedMode removed - now hardcoded to use specific model
 }
 
@@ -83,10 +92,21 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   showStepsNotification,
   randomSeed,
   onRandomSeedChange,
+  turboMode,
+  onTurboModeChange,
   imageCount = 0,
-  selectedMode,
+  amountOfMotion,
+  onAmountOfMotionChange,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
+
+    // Get generation location settings to conditionally show turbo mode
+    const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+    const isCloudGenerationEnabled = generationMethods.inCloud && !generationMethods.onComputer;
+    
+    // Check if turbo mode should be disabled due to too many images
+    const hasTooManyImages = imageCount > 2;
+    const isTurboModeDisabled = hasTooManyImages;
 
     return (
         <div className="space-y-4">
@@ -146,12 +166,53 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             </div>
             
 
+            {/* Turbo Mode Toggle - only show when cloud generation is enabled */}
+            {isCloudGenerationEnabled && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border ${isTurboModeDisabled ? 'opacity-50' : ''}`}>
+                    <Switch
+                      id="turbo-mode"
+                      checked={turboMode && !isTurboModeDisabled}
+                      disabled={isTurboModeDisabled}
+                      onCheckedChange={(checked) => {
+                        if (isTurboModeDisabled) return;
+                        onTurboModeChange(checked);
+                        // Auto-set frames to 81 when turbo mode is enabled
+                        if (checked && batchVideoFrames !== 81) {
+                          onBatchVideoFramesChange(81);
+                        }
+                      }}
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="turbo-mode" className={`font-medium ${isTurboModeDisabled ? 'cursor-not-allowed' : ''}`}>
+                        Turbo Mode
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {isTurboModeDisabled 
+                          ? 'Turbo mode requires 1-2 images only'
+                          : turboMode 
+                            ? 'Using fast WAN 2.2 model for quick results (81 frames)' 
+                            : 'Using high-quality Lightning model for best results'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                {isTurboModeDisabled && (
+                  <TooltipContent>
+                    <p>Turbo mode is only possible with 1-2 images</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            )}
             
             <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
                 {!isTimelineMode && (
                   <div className="relative">
                     <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
                       {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
+                      {turboMode && <span className="text-sm text-muted-foreground ml-2">(Fixed at 81 in Turbo Mode)</span>}
                     </Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -170,6 +231,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       step={1}
                       value={[batchVideoFrames]}
                       onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                      disabled={turboMode}
+                      className={turboMode ? 'opacity-50' : ''}
                     />
                   </div>
                 )}
@@ -199,35 +262,59 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             </div>
 
 
-            {/* Steps slider in its own row */}
-            <div className="grid grid-cols-1 gap-4 items-end">
-              <div className="relative">
-                <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation steps: {batchVideoSteps}</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Slider
-                  id="batchVideoSteps"
-                  min={1}
-                  max={30}
-                  step={1}
-                  value={[batchVideoSteps]}
-                  onValueChange={(value) => onBatchVideoStepsChange(value[0])}
-                />
-                {showStepsNotification && (
-                  <p className="text-sm text-yellow-600 mt-1">
-                    Note: We recommend 6 steps for optimal performance
-                  </p>
-                )}
+            {/* Steps and Amount of Motion sliders in a row - hidden in turbo mode */}
+            {!turboMode && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="relative">
+                  <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation steps: {batchVideoSteps}</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                        <Info className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Slider
+                    id="batchVideoSteps"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={[batchVideoSteps]}
+                    onValueChange={(value) => onBatchVideoStepsChange(value[0])}
+                  />
+                  {showStepsNotification && (
+                    <p className="text-sm text-yellow-600 mt-1">
+                      Note: We recommend 6 steps for optimal performance
+                    </p>
+                  )}
+                </div>
+                
+                <div className="relative">
+                  <Label htmlFor="amountOfMotion" className="text-sm font-light block mb-1">Amount of motion (experimental): {amountOfMotion}</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                        <Info className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Controls the amount of motion in the generated video. <br /> 0 = minimal motion, 100 = maximum motion.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Slider
+                    id="amountOfMotion"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[amountOfMotion]}
+                    onValueChange={(value) => onAmountOfMotionChange(value[0])}
+                  />
+                </div>
               </div>
-            </div>
+            )}
             
             <div className="pt-6 pb-8 sm:pt-4 sm:pb-0">
               <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>

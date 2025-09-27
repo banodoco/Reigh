@@ -496,12 +496,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   };
 
   const handleNewGenerate = async (formData: any) => {
-    console.log('[ImageGeneration] handleNewGenerate called with:', {
+    const generateStartTime = Date.now();
+    const generateId = `gen-${generateStartTime}-${Math.random().toString(36).slice(2, 6)}`;
+    
+    console.log(`[GenerationDiag:${generateId}] 🚀 GENERATION START:`, {
       selectedProjectId,
       generationMode: formData.generationMode,
       promptCount: formData.prompts?.length,
       imagesPerPrompt: formData.imagesPerPrompt,
       hasBatchTaskParams: !!formData.batchTaskParams,
+      timestamp: generateStartTime
     });
 
     if (!selectedProjectId) {
@@ -532,6 +536,13 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
       // Invalidate generations to ensure they refresh when tasks complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
+      
+      const generateDuration = Date.now() - generateStartTime;
+      console.log(`[GenerationDiag:${generateId}] ✅ GENERATION COMPLETE:`, {
+        duration: `${generateDuration}ms`,
+        tasksCreated: batchTaskParams?.prompts?.length * batchTaskParams?.imagesPerPrompt || 0,
+        timestamp: Date.now()
+      });
       
       console.log('[ImageGeneration] Image generation tasks created successfully');
       setLocalJustQueued(true);

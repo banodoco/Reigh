@@ -166,7 +166,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const shouldLoadTasks = !!selectedProjectId;
   
   // Realtime connection status
-  const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError } = useSimpleRealtime();
+  const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError, lastTaskUpdate, lastNewTask } = useSimpleRealtime();
   
   // [TasksPaneRealtimeDebug] Track realtime connection and task loading conditions
   console.log('[TasksPaneRealtimeDebug]', {
@@ -470,6 +470,47 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     totalTasksInView: (displayPaginatedData as any)?.tasks?.length || 0,
     timestamp: Date.now()
   });
+
+  // [TaskDisplayDiag] Only log when there are actual changes to avoid noise
+  const currentDisplayState = {
+    paginatedTasksCount: paginatedData?.tasks?.length || 0,
+    displayTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
+    isLoadingState: isPaginatedLoading,
+    connected: realtimeConnected
+  };
+  
+  // Only log if something meaningful changed
+  const prevStateRef = React.useRef(currentDisplayState);
+  const hasStateChanged = JSON.stringify(currentDisplayState) !== JSON.stringify(prevStateRef.current);
+  
+  if (hasStateChanged) {
+    console.log('[TaskDisplayDiag] 📊 UI STATE CHANGED:', {
+      queryStates: {
+        paginatedLoading: isPaginatedLoading,
+        paginatedError: !!paginatedError,
+        paginatedDataExists: !!paginatedData,
+        paginatedTasksCount: paginatedData?.tasks?.length || 0,
+        statusCountsLoading: isStatusCountsLoading,
+        statusCountsError: !!statusCountsError
+      },
+      displayLogic: {
+        shouldShowTasks: shouldLoadTasks,
+        hasDisplayData: !!displayPaginatedData,
+        displayTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
+        isLoadingState: isPaginatedLoading,
+        isErrorState: !!paginatedError
+      },
+      realtimeHealth: {
+        connected: realtimeConnected,
+        connecting: realtimeConnecting,
+        error: realtimeError?.message || null,
+        lastUpdate: lastTaskUpdate?.timestamp || 'never',
+        lastNewTask: lastNewTask?.timestamp || 'never'
+      },
+      timestamp: Date.now()
+    });
+    prevStateRef.current = currentDisplayState;
+  }
   
   // NOTE: Mismatch detection is now handled by the unified polling system
   // which provides more robust detection and automatic resolution

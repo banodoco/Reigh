@@ -13,8 +13,9 @@ const TASKS_QUERY_KEY = 'tasks';
 // Pagination configuration constants
 const PAGINATION_CONFIG = {
   // For Processing tasks that need custom sorting
-  PROCESSING_FETCH_MULTIPLIER: 3,
-  PROCESSING_MAX_FETCH: 500,
+  // Reduced multiplier to avoid slow 150+ task fetches
+  PROCESSING_FETCH_MULTIPLIER: 2,
+  PROCESSING_MAX_FETCH: 100,
   // Default limits
   DEFAULT_LIMIT: 50,
 } as const;
@@ -285,7 +286,20 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const query = useQuery<PaginatedTasksResponse, Error>({
     // CRITICAL: Use page-based cache keys like gallery
     queryKey: [TASKS_QUERY_KEY, 'paginated', effectiveProjectId, page, limit, status],
-    queryFn: async () => {
+    queryFn: async (queryContext) => {
+      const startTime = Date.now();
+      const queryId = `query-${startTime}-${Math.random().toString(36).slice(2, 8)}`;
+      
+      console.log(`[TaskQueryDiag:${queryId}] 🚀 QUERY START:`, {
+        projectId: effectiveProjectId,
+        page,
+        limit,
+        status,
+        queryKey: queryContext.queryKey,
+        signal: !!queryContext.signal,
+        aborted: queryContext.signal?.aborted,
+        timestamp: startTime
+      });
       // [TasksPaneCountMismatch] Log function entry params to catch limit corruption
       console.log('[TasksPaneCountMismatch]', {
         context: 'usePaginatedTasks:queryFn-entry',
@@ -358,10 +372,19 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       }
 
       if (needsCustomSorting) {
-        // For Processing tasks: fetch more records to allow correct client-side sorting
-        // Defensive override: ensure we never under-fetch due to an unexpectedly small limit
+        // For Processing tasks: Use progressive loading strategy
+        // Start with a reasonable chunk size, expand if needed for first page
         const effectiveBaseLimit = Math.max(limit, PAGINATION_CONFIG.DEFAULT_LIMIT);
-        const fetchLimit = Math.min(effectiveBaseLimit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH);
+        let fetchLimit;
+        
+        if (page === 1) {
+          // First page: fetch more to get a good sample for sorting, but cap it reasonably
+          fetchLimit = Math.min(effectiveBaseLimit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH);
+        } else {
+          // Subsequent pages: use standard pagination since first page established sort order
+          fetchLimit = effectiveBaseLimit;
+        }
+        
         if (effectiveBaseLimit !== limit) {
           console.warn('[TasksPaneCountMismatch]', {
             context: 'usePaginatedTasks:limit-override-for-processing',
@@ -370,7 +393,8 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
             receivedLimit: limit,
             effectiveBaseLimit,
             fetchLimit,
-            reason: 'Processing view requires adequate sample size for client-side sort',
+            strategy: page === 1 ? 'first-page-expanded' : 'standard-pagination',
+            reason: 'Processing view progressive loading',
             timestamp: Date.now()
           });
         }
@@ -566,7 +590,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     enabled: !!effectiveProjectId,
     // CRITICAL: Gallery cache settings - prevent background refetches
     // Keep previous page's data visible during refetches to avoid UI blanks
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: PaginatedTasksResponse | undefined) => previousData,
     gcTime: 5 * 60 * 1000, // 5 minutes  
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

@@ -46,6 +46,8 @@ export interface TravelBetweenImagesTaskParams {
   dimension_source?: 'project' | 'firstImage' | 'custom';
   // Additional parameter sent by ShotEditor
   random_seed?: boolean;
+  turbo_mode?: boolean;
+  amount_of_motion?: number;
 }
 
 /**
@@ -53,7 +55,7 @@ export interface TravelBetweenImagesTaskParams {
  */
 const DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES = {
   colour_match_videos: false,
-  model_name: "vace_14B",
+  model_name: "base_tester_model",
   seed: 789,
   steps: 20,
   apply_reward_lora: false,
@@ -72,6 +74,7 @@ const DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES = {
   accelerated_mode: false,
   generation_mode: "batch" as const,
   dimension_source: "project" as const,
+  amount_of_motion: 0.5, // Default to 0.5 (equivalent to UI value of 50)
 };
 
 /**
@@ -181,6 +184,7 @@ function buildTravelBetweenImagesPayload(
     accelerated_mode: params.accelerated_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.accelerated_mode,
     generation_mode: params.generation_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.generation_mode,
     dimension_source: params.dimension_source ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.dimension_source,
+    amount_of_motion: params.amount_of_motion ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.amount_of_motion,
   };
 
   // Attach additional_loras mapping if provided (matching original logic)
@@ -227,13 +231,13 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       runId
     );
 
-    // 5. Determine task type based on selected model name
-    const isWan22 = params.model_name === 'vace_14B_fake_cocktail_2_2';
-    const taskType = isWan22 ? 'wan_2_2_i2v' : 'travel_orchestrator';
+  // 5. Determine task type based on turbo mode
+  const isTurboMode = params.turbo_mode === true;
+  const taskType = isTurboMode ? 'wan_2_2_i2v' : 'travel_orchestrator';
     
     console.log("[createTravelBetweenImagesTask] Task type determination:", {
       modelName: params.model_name,
-      isWan22,
+      turboMode: isTurboMode,
       taskType
     });
 

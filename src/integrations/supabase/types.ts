@@ -496,6 +496,7 @@ export type Database = {
           base_cost_per_second: number
           billing_type: string
           category: string
+          content_type: string | null
           cost_factors: Json | null
           created_at: string
           description: string | null
@@ -512,6 +513,7 @@ export type Database = {
           base_cost_per_second: number
           billing_type?: string
           category: string
+          content_type?: string | null
           cost_factors?: Json | null
           created_at?: string
           description?: string | null
@@ -528,6 +530,7 @@ export type Database = {
           base_cost_per_second?: number
           billing_type?: string
           category?: string
+          content_type?: string | null
           cost_factors?: Json | null
           created_at?: string
           description?: string | null

@@ -67,6 +67,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   availableLoras,
   enhancePrompt,
   onEnhancePromptChange,
+  turboMode,
+  onTurboModeChange,
+  amountOfMotion,
+  onAmountOfMotionChange,
   generationMode,
   onGenerationModeChange,
   // selectedMode and onModeChange removed - now hardcoded to use specific model
@@ -734,17 +738,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [accelerated, steerableMotionSettings.model_name, getRecommendedSteps, onBatchVideoStepsChange, actions]);
 
-  // Always ensure we use the hardcoded model
+  // Set model based on turbo mode
   useEffect(() => {
-    const hardcodedModel = 'vace_fun_14B_cocktail_lightning';
-    if (steerableMotionSettings.model_name !== hardcodedModel) {
-      console.log(`[ShotEditor] Setting model to hardcoded: ${hardcodedModel}`);
+    const targetModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
+    if (steerableMotionSettings.model_name !== targetModel) {
+      console.log(`[ShotEditor] Setting model based on turbo mode: ${targetModel} (turbo: ${turboMode})`);
       onSteerableMotionSettingsChange({ 
-        model_name: hardcodedModel,
+        model_name: targetModel,
         apply_causvid: false
       });
     }
-  }, [steerableMotionSettings.model_name, onSteerableMotionSettingsChange]);
+  }, [turboMode, steerableMotionSettings.model_name, onSteerableMotionSettingsChange]);
 
   // Update editing name when selected shot changes
   useEffect(() => {
@@ -901,11 +905,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [simpleFilteredImages.length, batchVideoContext, onBatchVideoContextChange]);
 
+  // Auto-disable turbo mode when there are more than 2 images
+  useEffect(() => {
+    if (simpleFilteredImages.length > 2 && turboMode) {
+      console.log(`[ShotEditor] Auto-disabling turbo mode - too many images (${simpleFilteredImages.length} > 2)`);
+      onTurboModeChange(false);
+    }
+  }, [simpleFilteredImages.length, turboMode, onTurboModeChange]);
+
   // All modes are always available - no restrictions based on image count
 
-  // Always use the hardcoded model
-  const getHardcodedModelName = () => {
-    return 'vace_fun_14B_cocktail_lightning';
+  // Get model based on turbo mode
+  const getModelName = () => {
+    return turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
   };
 
   // Mode synchronization removed - now hardcoded to use specific model
@@ -1254,8 +1266,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       negativePrompts = [steerableMotionSettings.negative_prompt];
     }
 
-    // Always use the hardcoded model for task creation
-    const actualModelName = getHardcodedModelName();
+    // Use model based on turbo mode for task creation
+    const actualModelName = getModelName();
     
     const requestBody: any = {
       project_id: projectId,
@@ -1287,6 +1299,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       generation_mode: generationMode,
       accelerated_mode: accelerated,
       random_seed: randomSeed,
+      turbo_mode: turboMode,
+      // Convert UI amount of motion (0-100) to task value (0.0-1.0)
+      amount_of_motion: amountOfMotion / 100.0,
       // selected_mode removed - now hardcoded to use specific model
     };
 
@@ -1495,6 +1510,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             showStepsNotification={state.showStepsNotification}
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
+                            turboMode={turboMode}
+                            onTurboModeChange={onTurboModeChange}
+                            amountOfMotion={amountOfMotion}
+                            onAmountOfMotionChange={onAmountOfMotionChange}
                             imageCount={simpleFilteredImages.length}
                         />
                         
