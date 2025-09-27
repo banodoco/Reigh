@@ -150,8 +150,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     setTimeout(() => setShowTickForImageId(null), 2000);
   };
 
-  // Map certain task types to more user-friendly names for display purposes
-  const displayTaskType = getTaskDisplayName(task.taskType);
+  // Use display_name from task_types table, with fallback to legacy logic
+  const displayTaskType = taskTypeInfo?.display_name || getTaskDisplayName(task.taskType);
   const abbreviatedTaskType = getAbbreviatedTaskName(displayTaskType);
 
   // Consolidated parameter parsing
