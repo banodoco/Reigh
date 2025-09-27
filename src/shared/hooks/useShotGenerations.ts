@@ -48,15 +48,29 @@ export const useShotGenerations = (
       // Transform to match GenerationRow interface
       const items: GenerationRow[] = (data || [])
         .filter(sg => sg.generation)
-        .map(sg => ({
-          ...sg.generation,
-          shotImageEntryId: sg.id,
-          shot_generation_id: sg.id,
-          position: Math.floor((sg.timeline_frame ?? 0) / 50),
-          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
-          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-          thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
-        }));
+        .map(sg => {
+          // [MagicEditTaskDebug] Log magic edit generations from database
+          if (sg.generation?.type === 'image_edit' || sg.generation?.params?.tool_type === 'magic-edit') {
+            console.log('[MagicEditTaskDebug] Magic edit generation from database:', {
+              generation_id: sg.generation?.id?.substring(0, 8),
+              shot_generation_id: sg.id.substring(0, 8),
+              timeline_frame: sg.timeline_frame,
+              type: sg.generation?.type,
+              tool_type: sg.generation?.params?.tool_type,
+              created_at: sg.generation?.created_at
+            });
+          }
+          
+          return {
+            ...sg.generation,
+            shotImageEntryId: sg.id,
+            shot_generation_id: sg.id,
+            position: Math.floor((sg.timeline_frame ?? 0) / 50),
+            timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
+            imageUrl: sg.generation?.location || sg.generation?.imageUrl,
+            thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
+          };
+        });
 
       return {
         items,

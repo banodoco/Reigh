@@ -204,23 +204,61 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
                        (img.location && img.location.endsWith('.mp4')) ||
                        (img.imageUrl && img.imageUrl.endsWith('.mp4'));
         
-        
         return !isVideo; // Exclude videos, just like original system
       });
 
-
     if (mode === 'timeline') {
-      // Sort by timeline_frame, fallback to calculated frame
-      return images.sort((a, b) => {
-        const frameA = a.timeline_frame ?? 0;
-        const frameB = b.timeline_frame ?? 0;
+      // CRITICAL FIX: For timeline mode, only include items with valid timeline_frame
+      // This prevents unpositioned items (timeline_frame = NULL) from appearing on timeline
+      const positionedImages = images.filter(img => {
+        const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined;
+        
+        // [MagicEditTaskDebug] Log filtering decisions for magic edit generations
+        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
+          console.log('[MagicEditTaskDebug] Timeline mode filtering magic edit generation:', {
+            id: img.id?.substring(0, 8),
+            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
+            timeline_frame: img.timeline_frame,
+            hasTimelineFrame,
+            willAppearOnTimeline: hasTimelineFrame,
+            type: img.type
+          });
+        }
+        
+        return hasTimelineFrame;
+      });
+      
+      // Sort positioned images by timeline_frame
+      return positionedImages.sort((a, b) => {
+        const frameA = a.timeline_frame!; // Safe to use ! since we filtered for non-null
+        const frameB = b.timeline_frame!;
         return frameA - frameB;
       });
     } else {
-      // Batch mode now also sorts by timeline_frame for consistent ordering
-      return images.sort((a, b) => {
-        const frameA = a.timeline_frame ?? 0;
-        const frameB = b.timeline_frame ?? 0;
+      // Batch mode also filters out unpositioned items for normal display
+      // Unpositioned items should only appear in the dedicated unpositioned filter
+      const positionedImages = images.filter(img => {
+        const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined;
+        
+        // [MagicEditTaskDebug] Log filtering decisions for magic edit generations in batch mode
+        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
+          console.log('[MagicEditTaskDebug] Batch mode filtering magic edit generation:', {
+            id: img.id?.substring(0, 8),
+            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
+            timeline_frame: img.timeline_frame,
+            hasTimelineFrame,
+            willAppearInBatch: hasTimelineFrame,
+            type: img.type
+          });
+        }
+        
+        return hasTimelineFrame;
+      });
+      
+      // Sort positioned images by timeline_frame
+      return positionedImages.sort((a, b) => {
+        const frameA = a.timeline_frame!; // Safe to use ! since we filtered for non-null
+        const frameB = b.timeline_frame!;
         return frameA - frameB;
       });
     }

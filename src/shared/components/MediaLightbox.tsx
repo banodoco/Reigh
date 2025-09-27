@@ -69,6 +69,8 @@ interface MediaLightboxProps {
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
   // Shot navigation functionality
   onNavigateToShot?: (shot: Shot) => void;
+  // Tool type override for magic edit
+  toolTypeOverride?: string;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -107,6 +109,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onCreateShot,
   // Shot navigation functionality
   onNavigateToShot,
+  // Tool type override for magic edit
+  toolTypeOverride,
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -1037,6 +1041,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <MagicEditLauncher
                           imageUrl={displayUrl}
                           imageDimensions={imageDimensions}
+                          toolTypeOverride={toolTypeOverride}
                         />
                       )}
 
@@ -1473,6 +1478,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <MagicEditLauncher
                       imageUrl={displayUrl}
                       imageDimensions={imageDimensions}
+                      toolTypeOverride={toolTypeOverride}
                     />
                   )}
 

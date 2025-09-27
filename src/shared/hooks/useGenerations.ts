@@ -280,7 +280,7 @@ export async function fetchGenerations(
       }
     }
     
-    const baseItem = {
+    const baseItem: GeneratedImageWithMetadata = {
       id: item.id,
       url: mainUrl,
       thumbUrl: thumbnailUrl, // Use thumbnail_url if available, fallback to main URL
@@ -291,27 +291,37 @@ export async function fetchGenerations(
       createdAt: item.created_at,
       isVideo: item.type?.includes('video'),
       starred: item.starred || false,
+      position: null,
+      timeline_frame: null,
     };
     
     // Include shot association data from LEFT JOIN
     const shotGenerations = item.shot_generations || [];
     
+    const normalizePosition = (timelineFrame: number | null | undefined) => {
+      if (timelineFrame === null || timelineFrame === undefined) return null;
+      return Math.floor(timelineFrame / 50);
+    };
+
     if (shotGenerations.length > 0) {
       // Optimize: Only create full associations array if there are multiple shots
       // For single shot, use simpler structure
       if (shotGenerations.length === 1) {
         const singleShot = shotGenerations[0];
+        const timelineFrame = singleShot.timeline_frame;
         return {
           ...baseItem,
           shot_id: singleShot.shot_id,
-          position: Math.floor((singleShot.timeline_frame ?? 0) / 50),
+          position: normalizePosition(timelineFrame),
+          timeline_frame: timelineFrame,
         };
       }
       
       // Multiple shots: include all associations for positioning checks
       const allAssociations = shotGenerations.map(sg => ({
         shot_id: sg.shot_id,
-        timeline_frame: sg.timeline_frame
+        timeline_frame: sg.timeline_frame,
+        position: normalizePosition(sg.timeline_frame),
       }));
       
       // When filtering by specific shot, use that shot as primary
@@ -322,11 +332,14 @@ export async function fetchGenerations(
           primaryShot = matchingShot;
         }
       }
+
+      const primaryTimelineFrame = primaryShot.timeline_frame;
       
       return {
         ...baseItem,
         shot_id: primaryShot.shot_id,
-        position: Math.floor((primaryShot.timeline_frame ?? 0) / 50),
+        position: normalizePosition(primaryTimelineFrame),
+        timeline_frame: primaryTimelineFrame,
         all_shot_associations: allAssociations,
       };
     }

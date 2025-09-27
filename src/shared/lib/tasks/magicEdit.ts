@@ -151,6 +151,13 @@ function buildMagicEditTaskParams(
 
   // Always add add_in_position as false for magic edit tasks (unpositioned by default)
   taskParams.add_in_position = false;
+  
+  console.log('[MagicEditTaskDebug] Creating magic edit task with params:', {
+    shot_id: params.shot_id,
+    add_in_position: false,
+    tool_type: params.tool_type,
+    taskParams: taskParams
+  });
 
   // Add tool_type override if provided (for generation association)
   if (params.tool_type) {

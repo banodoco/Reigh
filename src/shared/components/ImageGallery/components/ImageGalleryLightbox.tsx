@@ -51,6 +51,9 @@ export interface ImageGalleryLightboxProps {
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
   // Shot navigation
   onNavigateToShot?: (shot: Shot) => void;
+  
+  // Tool type override for magic edit
+  toolTypeOverride?: string;
 }
 
 export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
@@ -86,6 +89,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   onShowTaskDetails,
   onCreateShot,
   onNavigateToShot,
+  toolTypeOverride,
 }) => {
   
   // Calculate navigation availability for MediaLightbox
@@ -172,6 +176,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           onShowTaskDetails={isMobile ? onShowTaskDetails : undefined}
           onCreateShot={onCreateShot}
           onNavigateToShot={onNavigateToShot}
+          toolTypeOverride={toolTypeOverride}
         />
       )}
 

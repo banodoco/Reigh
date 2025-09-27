@@ -846,6 +846,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const filtered = sourceImages
       .filter(img => {
         const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+        
+        // [MagicEditTaskDebug] Log magic edit generations to see their timeline_frame values
+        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
+          console.log('[MagicEditTaskDebug] Magic edit generation filtering:', {
+            id: img.id.substring(0, 8),
+            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
+            timeline_frame: (img as any).timeline_frame,
+            hasTimelineFrame,
+            willBeIncludedInTimeline: hasTimelineFrame,
+            type: img.type,
+            tool_type: (img as any).params?.tool_type
+          });
+        }
+        
         return hasTimelineFrame;
       })
       .filter(img => {

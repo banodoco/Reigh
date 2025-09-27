@@ -705,6 +705,7 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
         onShowTaskDetails={handleShowTaskDetails}
         onCreateShot={onCreateShot}
         onNavigateToShot={handleNavigateToShot}
+        toolTypeOverride={currentToolType}
       />
     </TooltipProvider>
   );

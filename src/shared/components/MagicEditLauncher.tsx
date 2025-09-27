@@ -8,6 +8,7 @@ import MagicEditModal from '@/shared/components/MagicEditModal';
 interface MagicEditLauncherProps {
   imageUrl: string;
   imageDimensions?: { width: number; height: number } | null;
+  toolTypeOverride?: string;
 }
 
 /**
@@ -15,7 +16,7 @@ interface MagicEditLauncherProps {
  * 1. A sparkles button shown in the lightbox controls
  * 2. The MagicEditModal component handles its own dialog
  */
-const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDimensions }) => {
+const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDimensions, toolTypeOverride }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -41,6 +42,7 @@ const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDi
         imageUrl={imageUrl}
         imageDimensions={imageDimensions ?? undefined}
         onClose={() => setIsOpen(false)}
+        toolTypeOverride={toolTypeOverride}
       />
     </>
   );

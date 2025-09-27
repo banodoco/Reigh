@@ -4,7 +4,8 @@ import { getDisplayUrl } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { Trash2, Copy, Sparkles, Check } from "lucide-react";
 import { MagicEditModal } from "@/shared/components/MagicEditModal";
-import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
+// import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
+const TIMELINE_HORIZONTAL_PADDING = 20; // Fallback constant
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -160,6 +161,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
+    console.log('[MagicEditPromptDebug] TimelineItem Magic Edit clicked:', {
+      imageId: image.id.substring(0, 8),
+      shotImageEntryId: image.shotImageEntryId.substring(0, 8),
+      framePosition,
+      imageUrl: image.imageUrl?.substring(0, 50) + '...'
+    });
     setIsMagicEditOpen(true);
   };
   // Calculate position as pixel offset with padding adjustment
@@ -351,7 +358,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         <MagicEditModal
           isOpen={isMagicEditOpen}
           imageUrl={getDisplayUrl(image.imageUrl)}
-          onClose={() => setIsMagicEditOpen(false)}
+          onClose={() => {
+            console.log('[MagicEditPromptDebug] TimelineItem Magic Edit modal closed for:', {
+              imageId: image.id.substring(0, 8),
+              shotImageEntryId: image.shotImageEntryId.substring(0, 8)
+            });
+            setIsMagicEditOpen(false);
+          }}
           shotGenerationId={image.shotImageEntryId}
         />
       </div>

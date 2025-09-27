@@ -834,6 +834,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
         onShowTaskDetails={handleShowTaskDetails}
         onCreateShot={onCreateShot}
         onNavigateToShot={handleNavigateToShot}
+        toolTypeOverride={currentToolType}
       />
     </TooltipProvider>
   );
