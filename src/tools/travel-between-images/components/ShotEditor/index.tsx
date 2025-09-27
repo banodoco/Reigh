@@ -1404,6 +1404,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             generationMode={generationMode}
             onGenerationModeChange={onGenerationModeChange}
             selectedShotId={selectedShot.id}
+            shotName={selectedShot.name}
             batchVideoFrames={batchVideoFrames}
             batchVideoContext={batchVideoContext}
             onImageReorder={handleReorderImagesInShot}

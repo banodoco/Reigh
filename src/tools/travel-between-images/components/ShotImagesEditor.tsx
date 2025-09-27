@@ -27,6 +27,8 @@ interface ShotImagesEditorProps {
   onGenerationModeChange: (mode: "batch" | "timeline") => void;
   /** Selected shot id */
   selectedShotId: string;
+  /** Shot name for download filename */
+  shotName?: string;
   /** Frame spacing (frames between key-frames) */
   batchVideoFrames: number;
   /** Context frames value */
@@ -88,6 +90,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   generationMode,
   onGenerationModeChange,
   selectedShotId,
+  shotName,
   batchVideoFrames,
   batchVideoContext,
   onImageReorder,
@@ -266,10 +269,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       a.style.display = 'none';
       a.href = url;
       
-      // Generate filename with current date
+      // Generate filename with shot name and timestamp
       const now = new Date();
-      const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
-      a.download = `shot-images-${dateStr}.zip`;
+      const timestamp = now.toISOString().slice(0, 16).replace(/[:-]/g, '').replace('T', '-');
+      const sanitizedShotName = shotName ? shotName.replace(/[^a-zA-Z0-9-_]/g, '-') : 'shot';
+      a.download = `${sanitizedShotName}-${timestamp}.zip`;
       
       document.body.appendChild(a);
       a.click();

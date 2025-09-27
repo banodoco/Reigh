@@ -73,9 +73,9 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
     getLastMagicEditPrompt,
     isLoading: isLoadingMetadata
   } = useShotGenerationMetadata({
-    shotId: currentShotId || '',
+    shotId: currentShotId || '', // This is still needed for some operations but not for enabling the hook
     shotGenerationId: shotGenerationId || '',
-    enabled: !!shotGenerationId && !!currentShotId
+    enabled: !!shotGenerationId // Only require shotGenerationId to enable the hook
   });
 
   const handleMagicEditGenerate = async () => {
@@ -187,7 +187,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   useEffect(() => {
     if (isOpen && shotGenerationId && !isLoadingMetadata) {
       const lastPrompt = getLastMagicEditPrompt();
-      if (lastPrompt && !magicEditPrompt) {
+      if (lastPrompt && lastPrompt.trim() !== magicEditPrompt.trim()) {
         setMagicEditPrompt(lastPrompt);
         console.log('[MagicEditModal] Loaded last saved prompt for shot generation:', {
           shotGenerationId: shotGenerationId.substring(0, 8),
@@ -195,7 +195,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         });
       }
     }
-  }, [isOpen, shotGenerationId, isLoadingMetadata, getLastMagicEditPrompt, magicEditPrompt]);
+  }, [isOpen, shotGenerationId, isLoadingMetadata, getLastMagicEditPrompt]);
 
   // Reset magicEditShotId if the selected shot no longer exists (e.g., was deleted)
   useEffect(() => {

@@ -33,7 +33,7 @@ export function useShotGenerationMetadata({
 
   // Load metadata from database
   useEffect(() => {
-    if (!enabled || !shotId || !shotGenerationId) {
+    if (!enabled || !shotGenerationId) {
       setIsLoading(false);
       return;
     }
@@ -72,11 +72,11 @@ export function useShotGenerationMetadata({
 
     loadMetadata();
     return () => { cancelled = true; };
-  }, [shotId, shotGenerationId, enabled]);
+  }, [shotGenerationId, enabled]);
 
   // Update metadata in database
   const updateMetadata = useCallback(async (updates: Partial<ShotGenerationMetadata>) => {
-    if (!shotId || !shotGenerationId || isUpdating) {
+    if (!shotGenerationId || isUpdating) {
       return;
     }
 
@@ -98,12 +98,14 @@ export function useShotGenerationMetadata({
       // Update local state
       setMetadata(newMetadata);
 
-      // Invalidate related queries to trigger UI updates
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      // Invalidate related queries to trigger UI updates (only if shotId is available)
+      if (shotId) {
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      }
 
       console.log('[useShotGenerationMetadata] Successfully updated metadata for generation:', {
-        shotId: shotId.substring(0, 8),
+        shotId: shotId ? shotId.substring(0, 8) : 'N/A',
         shotGenerationId: shotGenerationId.substring(0, 8),
         updates
       });
