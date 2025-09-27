@@ -28,6 +28,7 @@ import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useTaskType } from '@/shared/hooks/useTaskType';
 
 // Function to create abbreviated task names for tight spaces
 const getAbbreviatedTaskName = (fullName: string): string => {
@@ -163,21 +164,37 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     return { parsed, promptText };
   }, [task.params]);
 
-  // Consolidated task type detection (moved earlier to avoid hoisting issues)
+  // Fetch task type information including content_type
+  const { data: taskTypeInfo } = useTaskType(task.taskType);
+
+  // Consolidated task type detection using content_type from database
   const taskInfo = useMemo(() => {
-    const isTravelTask = task.taskType === 'travel_orchestrator';
-    const isSingleImageTask = ['single_image', 'edit_travel_kontext', 'edit_travel_flux'].includes(task.taskType);
-    const isCompletedTravelTask = isTravelTask && task.status === 'Complete';
-    // Show tooltips for all stages of travel and image tasks
-    const showsTooltip = (isTravelTask || isSingleImageTask);
+    const contentType = taskTypeInfo?.content_type;
+    const isVideoTask = contentType === 'video';
+    const isImageTask = contentType === 'image';
+    const isCompletedVideoTask = isVideoTask && task.status === 'Complete';
+    const isCompletedImageTask = isImageTask && task.status === 'Complete';
+    // Show tooltips for all video and image tasks
+    const showsTooltip = (isVideoTask || isImageTask);
     
-    return { isTravelTask, isSingleImageTask, isCompletedTravelTask, showsTooltip };
-  }, [task.taskType, task.status]);
+    return { 
+      isVideoTask, 
+      isImageTask, 
+      isCompletedVideoTask, 
+      isCompletedImageTask,
+      showsTooltip,
+      contentType,
+      // Legacy properties for backward compatibility (can be removed later)
+      isTravelTask: isVideoTask, 
+      isSingleImageTask: isImageTask,
+      isCompletedTravelTask: isCompletedVideoTask
+    };
+  }, [taskTypeInfo?.content_type, task.status]);
 
   // Check if this is a successful Image Generation task with output
   const hasGeneratedImage = React.useMemo(() => {
-    return taskInfo.isSingleImageTask && task.status === 'Complete' && task.outputLocation;
-  }, [taskInfo.isSingleImageTask, task.status, task.outputLocation]);
+    return taskInfo.isImageTask && task.status === 'Complete' && task.outputLocation;
+  }, [taskInfo.isImageTask, task.status, task.outputLocation]);
 
   // Fetch the actual generation record for this task
   // Use the generalized bridge for task-to-generation mapping
@@ -279,12 +296,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
   // Extract travel-specific data
   const travelData = React.useMemo(() => {
-    if (!taskInfo.isTravelTask) return { imageUrls: [], videoOutputs: null };
+    if (!taskInfo.isVideoTask) return { imageUrls: [], videoOutputs: null };
     return {
       imageUrls: taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || [],
       videoOutputs: taskParams.parsed?.outputs || null
     };
-  }, [taskInfo.isTravelTask, taskParams.parsed]);
+  }, [taskInfo.isVideoTask, taskParams.parsed]);
 
   const imagesToShow = travelData.imageUrls.slice(0, 4);
   const extraImageCount = Math.max(0, travelData.imageUrls.length - imagesToShow.length);
@@ -465,14 +482,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     e.preventDefault();
     
     // For travel tasks - open video if available
-    if (taskInfo.isTravelTask && taskInfo.isCompletedTravelTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+    if (taskInfo.isVideoTask && taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
       setVideoLightboxIndex(0);
       setShowVideoLightbox(true);
       return;
     }
     
     // For image generation tasks - open image if available
-    if (taskInfo.isSingleImageTask && generationData) {
+    if (taskInfo.isImageTask && generationData) {
       setShowLightbox(true);
       return;
     }
@@ -533,7 +550,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               >
                 Visit Shot
               </Button>
-              {taskInfo.isCompletedTravelTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && (
+              {taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -665,7 +682,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       )}
 
       {/* Action button overlay for image generation tasks on hover - desktop only */}
-      {isHoveringTaskItem && taskInfo.isSingleImageTask && generationData && !isMobile && (
+      {isHoveringTaskItem && taskInfo.isImageTask && generationData && !isMobile && (
         <div 
           className="absolute inset-0 bg-black/20 backdrop-blur-[1px] rounded flex items-center justify-center"
           onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to parent
@@ -686,7 +703,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // ENHANCED Debug logging for single image tasks - why no tooltip?
   // IMPORTANT: This useEffect must be called before any conditional returns to follow Rules of Hooks
   React.useEffect(() => {
-    if (taskInfo.isSingleImageTask) {
+    if (taskInfo.isImageTask) {
       console.log('[TaskTooltipDebug] Single image task tooltip analysis:', {
         taskId: task.id,
         taskType: task.taskType,
@@ -706,33 +723,33 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         hasTaskParams: !!task.params,
         taskParamsPreview: task.params ? (typeof task.params === 'string' ? 'STRING_PARAMS' : Object.keys(task.params).join(',')) : null,
         conditionBreakdown: {
-          isImageTask: taskInfo.isSingleImageTask,
+          isImageTask: taskInfo.isImageTask,
           hasMetadata: !!actualGeneration?.metadata,
           isComplete: task.status === 'Complete',
           hasParamsOrPrompt: !!(task.params || taskParams.promptText),
           showsTooltip: taskInfo.showsTooltip
         },
         shouldShowTooltip: taskInfo.showsTooltip,
-        WHY_NO_TOOLTIP: !taskInfo.isSingleImageTask ? 'NOT_IMAGE_TASK' : 'SHOULD_SHOW',
+        WHY_NO_TOOLTIP: !taskInfo.isImageTask ? 'NOT_IMAGE_TASK' : 'SHOULD_SHOW',
         timestamp: Date.now()
       });
     }
-  }, [taskInfo.isSingleImageTask, task.id, task.taskType, task.status, actualGeneration, task.outputLocation, taskParams.promptText, task.params]);
+  }, [taskInfo.isImageTask, task.id, task.taskType, task.status, actualGeneration, task.outputLocation, taskParams.promptText, task.params]);
 
   // Unified tooltip wrapper for both travel and image tasks
   // Don't show tooltips on mobile to improve performance and UX
   if (taskInfo.showsTooltip && !isMobile) {
-    const isTravel = taskInfo.isTravelTask;
-    const hasClickableContent = isTravel ? 
-      (taskInfo.isCompletedTravelTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) : 
+    const isTravel = taskInfo.isVideoTask;
+    const hasClickableContent = taskInfo.isVideoTask ? 
+      (taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) : 
       !!generationData;
     
     const handleTooltipClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (isTravel && hasClickableContent) {
+      if (taskInfo.isVideoTask && hasClickableContent) {
         setVideoLightboxIndex(0);
         setShowVideoLightbox(true);
-      } else if (!isTravel && hasClickableContent) {
+      } else if (!taskInfo.isVideoTask && hasClickableContent) {
         setShowLightbox(true);
       }
     };
@@ -746,7 +763,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           side="left" 
           className={cn(
             "p-0 border-0 bg-background/95 backdrop-blur-sm",
-            isTravel ? "max-w-lg" : "max-w-md"
+            taskInfo.isVideoTask ? "max-w-lg" : "max-w-md"
           )}
           sideOffset={15}
           collisionPadding={10}
@@ -755,7 +772,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             className="relative cursor-pointer hover:bg-background/90 transition-colors rounded-lg group"
             onClick={handleTooltipClick}
           >
-            {isTravel ? (
+            {taskInfo.isVideoTask ? (
               <SharedTaskDetails
                 task={task}
                 inputImages={travelData.imageUrls}
@@ -781,7 +798,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             {hasClickableContent && (
               <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-zinc-900/90 via-zinc-800/60 to-transparent p-2 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="text-xs text-zinc-100 text-center font-medium drop-shadow-md">
-                  {isTravel ? "Click to view video" : "Click to view image"}
+                  {taskInfo.isVideoTask ? "Click to view video" : "Click to view image"}
                 </div>
               </div>
             )}
