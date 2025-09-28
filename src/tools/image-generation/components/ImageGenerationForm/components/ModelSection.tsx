@@ -17,6 +17,7 @@ interface ModelSectionProps {
   subjectDescription: string;
   inThisScene: boolean;
   isUploadingStyleReference: boolean;
+  isMobile?: boolean;
   onStyleUpload: (files: File[]) => void;
   onStyleRemove: () => void;
   onStyleStrengthChange: (value: number) => void;
@@ -34,6 +35,7 @@ const StyleReferenceSection: React.FC<{
   inThisScene: boolean;
   isUploadingStyleReference: boolean;
   isGenerating: boolean;
+  isMobile?: boolean;
   onStyleUpload: (files: File[]) => void;
   onStyleRemove: () => void;
   onStyleStrengthChange: (value: number) => void;
@@ -48,6 +50,7 @@ const StyleReferenceSection: React.FC<{
   inThisScene,
   isUploadingStyleReference,
   isGenerating,
+  isMobile = false,
   onStyleUpload,
   onStyleRemove,
   onStyleStrengthChange,
@@ -86,11 +89,11 @@ const StyleReferenceSection: React.FC<{
 
     {/* Style Reference Upload */}
     <div className="space-y-3">
-      {/* Always show the same layout with image on left, controls on right */}
+      {/* Responsive layout: horizontal on desktop, vertical on mobile */}
       <div className="w-full">
         <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
-          <div className="flex items-start space-x-4">
-            <div className="relative w-48 flex-shrink-0">
+          <div className={`flex items-start ${isMobile ? 'flex-col space-y-4' : 'space-x-4'}`}>
+            <div className={`relative flex-shrink-0 ${isMobile ? 'w-full' : 'w-48'}`}>
               {styleReferenceImage ? (
                 showSkeleton ? (
                   /* Skeleton loading state */
@@ -207,65 +210,72 @@ const StyleReferenceSection: React.FC<{
                 </Button>
               </div>
             </div>
-            <div className={`flex-1 pt-2 space-y-4 ${!styleReferenceImage ? 'opacity-50 pointer-events-none' : ''}`}>
-              <SliderWithValue
-                label="Style strength"
-                value={styleReferenceStrength}
-                onChange={(value) => {
-                  // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                  const newTotal = value + subjectStrength;
-                  console.log(`[StrengthValidationDebug] Style change attempt:`, {
-                    newStyleValue: value,
-                    currentSubjectValue: subjectStrength,
-                    newTotal: newTotal,
-                    isNewTotalInvalid: newTotal < 0.5,
-                    shouldBlock: newTotal < 0.5
-                  });
-                  
-                  // Block if total < 0.5 (no exceptions)
-                  if (newTotal < 0.5) {
-                    console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Style change would make total < 0.5 (${newTotal})`);
-                    // Simple console warning instead of UI validation
-                    return;
-                  }
-                  console.log(`[StrengthValidationDebug] ✅ ALLOWED: Style change accepted (total = ${newTotal})`);
-                  onStyleStrengthChange(value);
-                }}
-                min={0.0}
-                max={2.0}
-                step={0.1}
-                disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                numberInputClassName="w-10"
-              />
-              <SliderWithValue
-                label="Subject strength"
-                value={subjectStrength}
-                onChange={(value) => {
-                  // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                  const newTotal = styleReferenceStrength + value;
-                  console.log(`[StrengthValidationDebug] Subject change attempt:`, {
-                    currentStyleValue: styleReferenceStrength,
-                    newSubjectValue: value,
-                    newTotal: newTotal,
-                    isNewTotalInvalid: newTotal < 0.5,
-                    shouldBlock: newTotal < 0.5
-                  });
-                  
-                  // Block if total < 0.5 (no exceptions)
-                  if (newTotal < 0.5) {
-                    console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Subject change would make total < 0.5 (${newTotal})`);
-                    // Simple console warning instead of UI validation
-                    return;
-                  }
-                  console.log(`[StrengthValidationDebug] ✅ ALLOWED: Subject change accepted (total = ${newTotal})`);
-                  onSubjectStrengthChange(value);
-                }}
-                min={0.0}
-                max={2.0}
-                step={0.1}
-                disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                numberInputClassName="w-10"
-              />
+            <div className={`${isMobile ? 'w-full' : 'flex-1'} space-y-4 ${isMobile ? '' : 'pt-2'} ${!styleReferenceImage ? 'opacity-50 pointer-events-none' : ''}`}>
+              {/* Style and Subject strength sliders - side by side on mobile, stacked on desktop */}
+              <div className={`${isMobile ? 'flex gap-4' : 'space-y-4'}`}>
+                <div className={isMobile ? 'flex-1' : ''}>
+                  <SliderWithValue
+                    label="Style strength"
+                    value={styleReferenceStrength}
+                    onChange={(value) => {
+                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                      const newTotal = value + subjectStrength;
+                      console.log(`[StrengthValidationDebug] Style change attempt:`, {
+                        newStyleValue: value,
+                        currentSubjectValue: subjectStrength,
+                        newTotal: newTotal,
+                        isNewTotalInvalid: newTotal < 0.5,
+                        shouldBlock: newTotal < 0.5
+                      });
+                      
+                      // Block if total < 0.5 (no exceptions)
+                      if (newTotal < 0.5) {
+                        console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Style change would make total < 0.5 (${newTotal})`);
+                        // Simple console warning instead of UI validation
+                        return;
+                      }
+                      console.log(`[StrengthValidationDebug] ✅ ALLOWED: Style change accepted (total = ${newTotal})`);
+                      onStyleStrengthChange(value);
+                    }}
+                    min={0.0}
+                    max={2.0}
+                    step={0.1}
+                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                    numberInputClassName="w-10"
+                  />
+                </div>
+                <div className={isMobile ? 'flex-1' : ''}>
+                  <SliderWithValue
+                    label="Subject strength"
+                    value={subjectStrength}
+                    onChange={(value) => {
+                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                      const newTotal = styleReferenceStrength + value;
+                      console.log(`[StrengthValidationDebug] Subject change attempt:`, {
+                        currentStyleValue: styleReferenceStrength,
+                        newSubjectValue: value,
+                        newTotal: newTotal,
+                        isNewTotalInvalid: newTotal < 0.5,
+                        shouldBlock: newTotal < 0.5
+                      });
+                      
+                      // Block if total < 0.5 (no exceptions)
+                      if (newTotal < 0.5) {
+                        console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Subject change would make total < 0.5 (${newTotal})`);
+                        // Simple console warning instead of UI validation
+                        return;
+                      }
+                      console.log(`[StrengthValidationDebug] ✅ ALLOWED: Subject change accepted (total = ${newTotal})`);
+                      onSubjectStrengthChange(value);
+                    }}
+                    min={0.0}
+                    max={2.0}
+                    step={0.1}
+                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                    numberInputClassName="w-10"
+                  />
+                </div>
+              </div>
               {/* Show subject description only when subject strength > 0 AND image is uploaded */}
               {subjectStrength > 0 && styleReferenceImage && (
                 <div className="space-y-2">
@@ -323,6 +333,7 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
   subjectDescription,
   inThisScene,
   isUploadingStyleReference,
+  isMobile = false,
   onStyleUpload,
   onStyleRemove,
   onStyleStrengthChange,
@@ -341,6 +352,7 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
         inThisScene={inThisScene}
         isUploadingStyleReference={isUploadingStyleReference}
         isGenerating={isGenerating}
+        isMobile={isMobile}
         onStyleUpload={onStyleUpload}
         onStyleRemove={onStyleRemove}
         onStyleStrengthChange={onStyleStrengthChange}

@@ -144,6 +144,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [styleReferenceOverride, setStyleReferenceOverride] = useState<string | null | undefined>(undefined);
   
   const { selectedProjectId } = useProject();
+  const isMobile = useIsMobile();
   
   // Access user's generation settings to detect local generation
   const {
@@ -1037,8 +1038,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Main Content Layout */}
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Left Column */}
+        <div className={`flex gap-6 ${isMobile ? 'flex-col' : 'flex-col md:flex-row'}`}>
+          {/* Left Column - Prompts and Shot Selector */}
           <div className="flex-1 space-y-6">
             <PromptsSection
               prompts={prompts}
@@ -1083,7 +1084,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             />
           </div>
           
-          {/* Right Column */}
+          {/* Right Column - Reference Image and Settings */}
           <ModelSection
             isGenerating={isGenerating}
             styleReferenceImage={styleReferenceImageDisplay}
@@ -1092,6 +1093,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             subjectDescription={subjectDescription}
             inThisScene={inThisScene}
             isUploadingStyleReference={isUploadingStyleReference}
+            isMobile={isMobile}
             onStyleUpload={handleStyleReferenceUpload}
             onStyleRemove={handleRemoveStyleReference}
             onStyleStrengthChange={handleStyleStrengthChange}

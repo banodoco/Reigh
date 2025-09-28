@@ -22,6 +22,7 @@ import { useAllShotGenerations, useUnpositionedGenerationsCount } from '@/shared
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Import modular components and hooks
 import { ShotEditorProps, GenerationsPaneSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './state/types';
@@ -87,6 +88,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 }) => {
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
+  const queryClient = useQueryClient();
   const { getApiKey } = useApiKeys();
   
   // Load complete shot data and images
@@ -1160,6 +1162,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
+    // CRITICAL: Refresh shot data from database before task submission to ensure we have the latest images
+    console.log('[TaskSubmission] Refreshing shot data before video generation...');
+    try {
+      // Invalidate and wait for fresh data
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      await queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+      
+      // Also refresh the shot-specific data if we have the hook available
+      if (onShotImagesUpdate) {
+        onShotImagesUpdate();
+      }
+      
+      console.log('[TaskSubmission] Shot data refreshed successfully');
+      
+      // Small delay to ensure state propagation completes
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error) {
+      console.error('[TaskSubmission] Failed to refresh shot data:', error);
+      toast.error('Failed to refresh image data. Please try again.');
+      return;
+    }
+
     let resolution: string | undefined = undefined;
 
     if ((dimensionSource || 'project') === 'firstImage' && simpleFilteredImages.length > 0) {
@@ -1352,8 +1377,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     enhancePrompt,
     openaiApiKey,
     randomSeed,
+    turboMode,
+    amountOfMotion,
     // selectedMode removed - now hardcoded to use specific model
-    loraManager.selectedLoras
+    loraManager.selectedLoras,
+    queryClient,
+    onShotImagesUpdate
   ]);
 
   // Opens the Generations pane focused on un-positioned images for the current shot
