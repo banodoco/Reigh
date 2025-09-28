@@ -76,7 +76,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
   // Debug selection state on each render (commented out for performance)
   // React.useEffect(() => {
-// console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
+  //   console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
   //     selectedIdsCount: selectedIds.length,
   //     selectedIds: selectedIds.map(id => id.substring(0, 8)),
   //     selectedIdsFullValues: selectedIds,
@@ -102,7 +102,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Wrap setSelectedIds to force re-render
   const setSelectedIdsWithRerender = useCallback((newIds: string[] | ((prev: string[]) => string[])) => {
-// console.log(`[DEBUG] setSelectedIdsWithRerender called`);
+    // console.log(`[DEBUG] setSelectedIdsWithRerender called`);
     setSelectedIds(newIds);
     setRenderCounter(prev => prev + 1);
   }, []);
@@ -127,7 +127,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
   
-// console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
+  // console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -149,12 +149,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Enhanced reconciliation with debouncing, tracking IDs, and timeout-based recovery
   // This prevents the component from getting stuck in inconsistent optimistic states
   useEffect(() => {
-// console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
-    //   newLength: images.length,
-    //   isOptimisticUpdate,
-    //   reconciliationId,
-    //   timestamp: Date.now()
-    // });
+    console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
+      newLength: images.length,
+      isOptimisticUpdate,
+      reconciliationId,
+      timestamp: Date.now()
+    });
     
     // Clear any pending reconciliation timeout
     if (reconciliationTimeoutRef.current) {
@@ -163,7 +163,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     
     // If we're in the middle of an optimistic update, use debounced reconciliation
     if (isOptimisticUpdate) {
-// console.log('[DragDebug:ShotImageManager] Skipping immediate sync - optimistic update in progress');
+      console.log('[DragDebug:ShotImageManager] Skipping immediate sync - optimistic update in progress');
       
       const currentReconciliationId = reconciliationId;
       
@@ -171,7 +171,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       reconciliationTimeoutRef.current = setTimeout(() => {
         // Check if this reconciliation is still current
         if (currentReconciliationId !== reconciliationId) {
-// console.log('[DragDebug:ShotImageManager] Reconciliation cancelled - newer reconciliation in progress');
+          console.log('[DragDebug:ShotImageManager] Reconciliation cancelled - newer reconciliation in progress');
           return;
         }
         
@@ -180,31 +180,31 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         const parentOrder = images.map(img => img.shotImageEntryId).join(',');
         
         if (currentOrder === parentOrder) {
-// console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
+          console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
           setIsOptimisticUpdate(false);
           // Parent is now consistent, we can sync only if different reference
           if (optimisticOrder !== images) {
             setOptimisticOrder(images);
           }
         } else {
-// console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
+          console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
           
           // Safety check: if optimistic update has been active for more than 5 seconds, force reconciliation
           const optimisticStartTime = Date.now() - 5000; // 5 seconds ago
           if (optimisticStartTime > Date.now()) {
-            // console.warn('[DragDebug:ShotImageManager] Forcing reconciliation - optimistic update too long');
+            console.warn('[DragDebug:ShotImageManager] Forcing reconciliation - optimistic update too long');
             setIsOptimisticUpdate(false);
             setOptimisticOrder(images);
           }
         }
       }, 100); // 100ms debounce
     } else {
-// console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
+      console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
       // Only update if the reference is actually different
       if (optimisticOrder !== images) {
         setOptimisticOrder(images);
       } else {
-// console.log('[DragDebug:ShotImageManager] Skipping sync - same reference');
+        console.log('[DragDebug:ShotImageManager] Skipping sync - same reference');
       }
     }
   }, [images, isOptimisticUpdate, reconciliationId, optimisticOrder]);
@@ -251,17 +251,17 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     (ids: string[]) => {
       if (ids.length === 0) return;
       
-// console.log('[OPTIMISTIC_DELETE] Starting optimistic batch delete for mobile', {
+      console.log('[OPTIMISTIC_DELETE] Starting optimistic batch delete for mobile', {
         idsToDelete: ids.map(id => id.substring(0, 8)),
         totalCount: ids.length,
         currentImagesCount: currentImages.length
       });
       
       // Let parent handle optimistic updates to avoid dual state systems
-// console.log('[OPTIMISTIC_DELETE] Delegating optimistic update to parent ShotEditor');
+      console.log('[OPTIMISTIC_DELETE] Delegating optimistic update to parent ShotEditor');
       
       // Clear selection and UI state for immediate feedback
-// console.log('[CLEAR_TRACE] Clearing selection in performBatchDelete');
+      console.log('[CLEAR_TRACE] Clearing selection in performBatchDelete');
       setMobileSelectedIds([]);
       setSelectedIds([]);
       setLastSelectedIndex(null);
@@ -282,13 +282,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Individual delete function that clears selection if needed
   const handleIndividualDelete = React.useCallback(
     (id: string) => {
-// console.log('[OPTIMISTIC_DELETE] Starting optimistic individual delete for mobile', {
+      console.log('[OPTIMISTIC_DELETE] Starting optimistic individual delete for mobile', {
         idToDelete: id.substring(0, 8),
         currentImagesCount: currentImages.length
       });
       
       // Let parent handle optimistic updates to avoid dual state systems
-// console.log('[OPTIMISTIC_DELETE] Delegating individual delete optimistic update to parent ShotEditor');
+      console.log('[OPTIMISTIC_DELETE] Delegating individual delete optimistic update to parent ShotEditor');
       
       // Clear selection if the deleted item was selected
       setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
@@ -354,11 +354,11 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     
     // Safety check: ensure we have valid images during re-renders
     if (!currentImages || currentImages.length === 0 || index >= currentImages.length) {
-// console.log('[DragDebug:ShotImageManager] Skipping mobile tap - invalid state during re-render');
+      console.log('[DragDebug:ShotImageManager] Skipping mobile tap - invalid state during re-render');
       return;
     }
     
-// console.log('[MobileDebug:ShotImageManager] Mobile tap detected:', {
+    console.log('[MobileDebug:ShotImageManager] Mobile tap detected:', {
       id: id.substring(0, 8),
       timeDiff,
       isSameImage,
@@ -368,7 +368,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     
     if (timeDiff < 300 && timeDiff > 10 && isSameImage && lastTouchTimeRef.current > 0) {
       // Double tap detected on SAME image
-// console.log('[MobileDebug:ShotImageManager] ✅ Double-tap on same image! Opening lightbox');
+      console.log('[MobileDebug:ShotImageManager] ✅ Double-tap on same image! Opening lightbox');
       const image = currentImages[index];
       if (image?.imageUrl) {
         setLightboxIndex(index);
@@ -447,7 +447,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Find the dragged item details
     const draggedItem = currentImages.find(img => img.shotImageEntryId === draggedItemId);
     
-// console.log('[BatchModeReorderFlow] [DRAG_START] 🚀 Batch mode drag initiated:', {
+    console.log('[BatchModeReorderFlow] [DRAG_START] 🚀 Batch mode drag initiated:', {
       draggedItemId: draggedItemId.substring(0, 8),
       draggedGenerationId: draggedItem?.id?.substring(0, 8),
       currentPosition: currentImages.findIndex(img => img.shotImageEntryId === draggedItemId),
@@ -473,8 +473,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
     if (!isModifierPressed && !selectedIds.includes(active.id as string)) {
       // Starting a regular drag on an un-selected item -> clear previous selection
-// console.log('[DragDebug:ShotImageManager] Clearing selection during drag start');
-// console.log('[CLEAR_TRACE] Clearing selection in handleDragStart');
+      console.log('[DragDebug:ShotImageManager] Clearing selection during drag start');
+      console.log('[CLEAR_TRACE] Clearing selection in handleDragStart');
       setSelectedIds([]);
     setLastSelectedIndex(null);
     }
@@ -485,7 +485,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const draggedItemId = active.id as string;
     const targetItemId = over?.id as string;
     
-// console.log('[BatchModeReorderFlow] [DRAG_END] 🎯 Batch mode drag completed:', {
+    console.log('[BatchModeReorderFlow] [DRAG_END] 🎯 Batch mode drag completed:', {
       draggedItemId: draggedItemId.substring(0, 8),
       targetItemId: targetItemId?.substring(0, 8),
       hasValidTarget: !!over && active.id !== over.id,
@@ -496,13 +496,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     setActiveId(null);
     
     if (!over || active.id === over.id) {
-// console.log('[BatchModeReorderFlow] [NO_CHANGE] ℹ️ No reorder needed - same position or invalid target');
+      console.log('[BatchModeReorderFlow] [NO_CHANGE] ℹ️ No reorder needed - same position or invalid target');
       return;
     }
 
     // Safety check: ensure we have valid images and callbacks during re-renders
     if (!currentImages || currentImages.length === 0) {
-// console.log('[DragDebug:ShotImageManager] Skipping reorder - invalid state during re-render');
+      console.log('[DragDebug:ShotImageManager] Skipping reorder - invalid state during re-render');
       return;
     }
 
@@ -515,7 +515,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       const draggedItem = currentImages[oldIndex];
       const targetItem = currentImages[newIndex];
       
-// console.log('[BatchModeReorderFlow] [SINGLE_ITEM_DRAG] 📍 Single item drag details:', { 
+      console.log('[BatchModeReorderFlow] [SINGLE_ITEM_DRAG] 📍 Single item drag details:', { 
         oldIndex, 
         newIndex, 
         willReorder: oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex,
@@ -535,7 +535,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // 1. Update optimistic order immediately for instant visual feedback
         const newOrder = arrayMove(currentImages, oldIndex, newIndex);
         
-// console.log('[BatchModeReorderFlow] [OPTIMISTIC_UPDATE] 🔄 Updating optimistic order:', {
+        console.log('[BatchModeReorderFlow] [OPTIMISTIC_UPDATE] 🔄 Updating optimistic order:', {
           originalOrder: currentImages.map((img, i) => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
           newOrder: newOrder.map((img, i) => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
           timestamp: Date.now()
@@ -548,7 +548,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         
         // 2. Notify parent so React state becomes eventually consistent
         const orderedShotImageEntryIds = newOrder.map((img) => img.shotImageEntryId);
-// console.log('[BatchModeReorderFlow] [CALLING_PARENT] 📞 Calling onImageReorder for single item:', {
+        console.log('[BatchModeReorderFlow] [CALLING_PARENT] 📞 Calling onImageReorder for single item:', {
           orderedShotImageEntryIds: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
           timestamp: Date.now()
         });
@@ -560,7 +560,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     }
 
     // Multi-drag logic
-// console.log('[DragDebug:ShotImageManager] Multi-drag reorder', { selectedCount: selectedIds.length });
+    console.log('[DragDebug:ShotImageManager] Multi-drag reorder', { selectedCount: selectedIds.length });
 
     const overIndex = currentImages.findIndex((img) => img.shotImageEntryId === over.id);
     const activeIndex = currentImages.findIndex((img) => img.shotImageEntryId === active.id);
@@ -633,14 +633,14 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const newOrder = newItems.map(img => img.shotImageEntryId).join(',');
     
     if (currentOrder === newOrder) {
-// console.log('[DragDebug:ShotImageManager] Multi-drag resulted in no change - skipping update');
+      console.log('[DragDebug:ShotImageManager] Multi-drag resulted in no change - skipping update');
       setSelectedIds([]);
     setLastSelectedIndex(null);
       return;
     }
 
     // 1. Update optimistic order immediately for instant visual feedback
-// console.log('[DragDebug:ShotImageManager] Updating optimistic order for multi-drag');
+    console.log('[DragDebug:ShotImageManager] Updating optimistic order for multi-drag');
     
     // Increment reconciliation ID to track this specific update
     setReconciliationId(prev => prev + 1);
@@ -648,7 +648,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     setOptimisticOrder(newItems);
     
     // 2. Notify parent so React state becomes eventually consistent
-// console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
+    console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
     stableOnImageReorder(newItems.map((img) => img.shotImageEntryId));
     setSelectedIds([]);
     setLastSelectedIndex(null);
@@ -670,7 +670,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   }, [currentImages]);
 
   const handleItemClick = useCallback((imageKey: string, event: React.MouseEvent) => {
-// console.log('[SelectionDebug:ShotImageManager] handleItemClick called', {
+    console.log('[SelectionDebug:ShotImageManager] handleItemClick called', {
       imageKey: imageKey.substring(0, 8),
       fullImageKey: imageKey,
       isMobile,
@@ -687,7 +687,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Mobile behavior for batch mode
     if (isMobile && generationMode === 'batch') {
       const wasSelected = mobileSelectedIds.includes(imageKey);
-// console.log('[SelectionDebug:ShotImageManager] Mobile batch mode selection', {
+      console.log('[SelectionDebug:ShotImageManager] Mobile batch mode selection', {
         imageKey: imageKey.substring(0, 8),
         wasSelected,
         action: wasSelected ? 'deselect' : 'select'
@@ -697,7 +697,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // Clicking on selected image deselects it
         setMobileSelectedIds(prev => {
           const newSelection = prev.filter(selectedId => selectedId !== imageKey);
-// console.log('[SelectionDebug:ShotImageManager] Mobile deselection result', {
+          console.log('[SelectionDebug:ShotImageManager] Mobile deselection result', {
             previousCount: prev.length,
             newCount: newSelection.length,
             removedId: imageKey.substring(0, 8)
@@ -708,7 +708,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // Add to selection
         setMobileSelectedIds(prev => {
           const newSelection = [...prev, imageKey];
-// console.log('[SelectionDebug:ShotImageManager] Mobile selection result', {
+          console.log('[SelectionDebug:ShotImageManager] Mobile selection result', {
             previousCount: prev.length,
             newCount: newSelection.length,
             addedId: imageKey.substring(0, 8)
@@ -723,7 +723,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const currentIndex = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === imageKey);
     
     // Desktop behavior
-// console.log('[SelectionDebug:ShotImageManager] Desktop behavior triggered', {
+    console.log('[SelectionDebug:ShotImageManager] Desktop behavior triggered', {
       imageKey: imageKey.substring(0, 8),
       currentIndex,
       hasModifierKey: event.metaKey || event.ctrlKey,
@@ -734,7 +734,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     if (event.metaKey || event.ctrlKey) {
       // Command+click behavior
       const isCurrentlySelected = selectedIds.includes(imageKey);
-// console.log('[SelectionDebug:ShotImageManager] Command/Ctrl+click behavior', {
+      console.log('[SelectionDebug:ShotImageManager] Command/Ctrl+click behavior', {
         imageKey: imageKey.substring(0, 8),
         isCurrentlySelected,
         hasLastSelectedIndex: lastSelectedIndex !== null,
@@ -744,7 +744,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       if (lastSelectedIndex !== null && lastSelectedIndex !== currentIndex && selectedIds.length > 0) {
         // Range operation: select or deselect range between lastSelectedIndex and currentIndex
         const rangeIds = getImageRange(lastSelectedIndex, currentIndex);
-// console.log('[SelectionDebug:ShotImageManager] Range operation', {
+        console.log('[SelectionDebug:ShotImageManager] Range operation', {
           fromIndex: lastSelectedIndex,
           toIndex: currentIndex,
           rangeSize: rangeIds.length,
@@ -756,7 +756,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           // Deselect range: remove all images in the range from selection
           setSelectedIds((prev) => {
             const newSelection = prev.filter(selectedId => !rangeIds.includes(selectedId));
-// console.log('[SelectionDebug:ShotImageManager] Range deselection result', {
+            console.log('[SelectionDebug:ShotImageManager] Range deselection result', {
               previousCount: prev.length,
               newCount: newSelection.length,
               deselectedCount: rangeIds.length
@@ -771,7 +771,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           // Select range: add all images in the range to selection
           setSelectedIdsWithRerender((prev) => {
             const newSelection = Array.from(new Set([...prev, ...rangeIds]));
-// console.log('[SelectionDebug:ShotImageManager] Range selection result', {
+            console.log('[SelectionDebug:ShotImageManager] Range selection result', {
               previousCount: prev.length,
               newCount: newSelection.length,
               addedCount: rangeIds.length
@@ -783,7 +783,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         }
       } else {
         // Regular Ctrl/Cmd+click: Toggle individual selection
-// console.log('[SelectionDebug:ShotImageManager] Individual toggle selection', {
+        console.log('[SelectionDebug:ShotImageManager] Individual toggle selection', {
           imageKey: imageKey.substring(0, 8),
           isCurrentlySelected,
           action: isCurrentlySelected ? 'deselect' : 'select'
@@ -793,7 +793,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           if (isCurrentlySelected) {
             // Deselecting: remove from selection
             const newSelection = prev.filter((selectedId) => selectedId !== imageKey);
-// console.log('[SelectionDebug:ShotImageManager] Individual deselection result', {
+            console.log('[SelectionDebug:ShotImageManager] Individual deselection result', {
               previousCount: prev.length,
               newCount: newSelection.length,
               removedId: imageKey.substring(0, 8)
@@ -807,7 +807,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             // Selecting: add to selection
             setLastSelectedIndex(currentIndex);
             const newSelection = [...prev, imageKey];
-// console.log('[SelectionDebug:ShotImageManager] Individual selection result', {
+            console.log('[SelectionDebug:ShotImageManager] Individual selection result', {
               previousCount: prev.length,
               newCount: newSelection.length,
               addedId: imageKey.substring(0, 8),
@@ -819,7 +819,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       }
     } else {
       // Single click: Toggle individual selection (don't clear others)
-// console.log('[SelectionDebug:ShotImageManager] Regular click behavior (no modifier)', {
+      console.log('[SelectionDebug:ShotImageManager] Regular click behavior (no modifier)', {
         imageKey: imageKey.substring(0, 8),
         currentIndex,
         currentlySelected: selectedIds.includes(imageKey)
@@ -830,7 +830,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         if (isSelected) {
           // Deselecting: remove only this item
           const newSelection = prev.filter((selectedId) => selectedId !== imageKey);
-// console.log('[SelectionDebug:ShotImageManager] Regular click deselection result', {
+          console.log('[SelectionDebug:ShotImageManager] Regular click deselection result', {
             previousCount: prev.length,
             newCount: newSelection.length,
             removedId: imageKey.substring(0, 8)
@@ -844,7 +844,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           // Selecting: add to existing selection
           setLastSelectedIndex(currentIndex);
           const newSelection = [...prev, imageKey];
-// console.log('[SelectionDebug:ShotImageManager] Regular click selection result', {
+          console.log('[SelectionDebug:ShotImageManager] Regular click selection result', {
             previousCount: prev.length,
             newCount: newSelection.length,
             addedId: imageKey.substring(0, 8),
@@ -878,9 +878,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
   const activeImage = activeId ? currentImages.find((img) => img.shotImageEntryId === activeId) : null;
 
-// console.log(`[DEBUG] Checking images condition - images.length=${images?.length} selectedIds.length=${selectedIds.length}`);
+  console.log(`[DEBUG] Checking images condition - images.length=${images?.length} selectedIds.length=${selectedIds.length}`);
   if (!images || images.length === 0) {
-// console.log(`[DEBUG] EARLY RETURN - No images`);
+    console.log(`[DEBUG] EARLY RETURN - No images`);
     return (
       <p className="text-sm text-muted-foreground">
         No images to display - <span 
@@ -894,11 +894,11 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Mobile reordering function - integrates with unified position system
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
     if (mobileSelectedIds.length === 0) {
-// console.log('[MobileReorder] No items selected for reordering');
+      console.log('[MobileReorder] No items selected for reordering');
       return;
     }
 
-// console.log('[MobileReorder] 🔄 STARTING mobile reorder:', {
+    console.log('[MobileReorder] 🔄 STARTING mobile reorder:', {
       selectedCount: mobileSelectedIds.length,
       selectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
       targetIndex,
@@ -921,7 +921,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       }).filter(item => item.image && item.currentIndex !== -1);
 
       if (selectedItems.length === 0) {
-// console.log('[MobileReorder] No valid selected items found');
+        console.log('[MobileReorder] No valid selected items found');
         return;
       }
 
@@ -944,7 +944,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       // Create ordered IDs array for the unified system
       const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
 
-// console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
+      console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
         originalOrder: currentImages.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
         newOrder: orderedIds.map(id => id.substring(0, 8)),
         movedItems: selectedItems.map(item => item.id.substring(0, 8)),
@@ -961,7 +961,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         frame: (img as any).timeline_frame || index
       }));
 
-// console.log('[TimelineItemMoveSummary] Timeline mobile reorder completed', {
+      console.log('[TimelineItemMoveSummary] Timeline mobile reorder completed', {
         moveType: 'mobile_reorder',
         positionsBefore,
         positionsAfter,
@@ -983,7 +983,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       // Clear selection after successful reorder
       setMobileSelectedIds([]);
       
-// console.log('[MobileReorder] ✅ Mobile reorder completed successfully');
+      console.log('[MobileReorder] ✅ Mobile reorder completed successfully');
 
     } catch (error) {
       console.error('[MobileReorder] ❌ Mobile reorder failed:', error);
@@ -991,10 +991,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     }
   }, [mobileSelectedIds, currentImages, onImageReorder]);
 
-// console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
+  console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
   // Mobile batch mode with selection - delegate to specialized component
   if (isMobile && generationMode === 'batch') {
-// console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
+    console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
     return (
       <ShotImageManagerMobile
         images={images}
