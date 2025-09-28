@@ -143,7 +143,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             variant="secondary"
             className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white z-30"
             onClick={(e) => {
-              e.preventDefault();
               e.stopPropagation();
               console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON CLICKED!', { index, onOpenLightbox: !!onOpenLightbox });
               if (onOpenLightbox) {
@@ -152,18 +151,20 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
                 console.error('[MobileImageItem] onOpenLightbox is not defined!');
               }
             }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON TOUCH START!', { index });
-            }}
             onTouchEnd={(e) => {
-              e.preventDefault();
               e.stopPropagation();
               console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON TOUCH END!', { index });
+              if (onOpenLightbox) {
+                onOpenLightbox(index);
+              }
             }}
             title="View Full Size"
-            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 999 }}
+            style={{ 
+              pointerEvents: 'auto', 
+              position: 'relative', 
+              zIndex: 999,
+              touchAction: 'manipulation'
+            }}
           >
             <Eye className="h-3 w-3" />
           </Button>
