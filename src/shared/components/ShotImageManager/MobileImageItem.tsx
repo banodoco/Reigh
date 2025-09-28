@@ -95,25 +95,45 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
       const target = e.target as HTMLElement;
       const isButton = target.closest('button') !== null;
       
+      console.log('[MobileImageItem] Touch end detected', { 
+        isButton, 
+        deltaX, 
+        deltaY, 
+        targetTag: target.tagName,
+        targetClass: target.className 
+      });
+      
       // Don't trigger mobile tap if touching a button
       if (!isButton) {
         const currentTime = Date.now();
         const timeSinceLastTap = currentTime - lastTapTimeRef.current;
         
-        // Double-tap detection (within 300ms)
-        if (timeSinceLastTap < 300) {
+        console.log('[MobileImageItem] Processing tap', { 
+          currentTime, 
+          lastTapTime: lastTapTimeRef.current, 
+          timeSinceLastTap, 
+          currentTapCount: tapCountRef.current 
+        });
+        
+        // Double-tap detection (within 500ms - increased window)
+        if (timeSinceLastTap < 500 && timeSinceLastTap > 0) {
           tapCountRef.current += 1;
+          console.log('[MobileImageItem] Tap count incremented:', tapCountRef.current, 'Time since last:', timeSinceLastTap);
           if (tapCountRef.current === 2) {
             // Double-tap detected - open image lightbox
-            console.log('[MobileImageItem] Double-tap detected, opening image lightbox');
+            console.log('[MobileImageItem] 🎯 Double-tap detected, opening image lightbox', { index, onOpenLightbox: !!onOpenLightbox });
             if (onOpenLightbox) {
               onOpenLightbox(index);
+            } else {
+              console.warn('[MobileImageItem] ❌ onOpenLightbox prop is missing!');
             }
             tapCountRef.current = 0; // Reset tap count
+            lastTapTimeRef.current = 0; // Reset timestamp
             return;
           }
         } else {
           tapCountRef.current = 1; // Reset to single tap
+          console.log('[MobileImageItem] Single tap detected, time since last:', timeSinceLastTap);
         }
         
         lastTapTimeRef.current = currentTime;
@@ -121,10 +141,11 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         // Single tap - handle selection (with delay to allow for double-tap)
         setTimeout(() => {
           if (tapCountRef.current === 1) {
+            console.log('[MobileImageItem] Executing single tap action');
             onMobileTap();
             tapCountRef.current = 0;
           }
-        }, 300);
+        }, 500); // Increased delay to match double-tap window
       }
     }
     
