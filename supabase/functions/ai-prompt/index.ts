@@ -59,7 +59,7 @@ IMPORTANT GUIDELINES:
 - Each prompt should be specifically designed for AI image generation
 - Add detail that expands or adds to the user's instruction (unless they request otherwise)
 - Focus on visual elements like composition, lighting, colors, and atmosphere
-- CHARACTER GUIDANCE: Only mention specific character details unless requested - if the user asks for character descriptions provide them. Use consistent character descriptions across prompts.
+- CHARACTER GUIDANCE: Only mention specific character details iv requested - if the user asks for them. If they provide a character description use it consistently across prompts. If they ask you to generate characters, give them unique character names and descriptions for each prompt.
 - STYLE GUIDANCE: Only mention specific artistic styles (photography, anime, oil painting, digital art) if specifically requested.
 - SCENE GUIDANCE: ALWAYS specifically describe the scene and environment - if the user doesn't specify, you should always describe the scene and environment in detail.
 
