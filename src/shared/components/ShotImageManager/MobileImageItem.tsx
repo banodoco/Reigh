@@ -101,9 +101,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
     <>
       <div
         className={cn(
-          "relative group cursor-pointer transition-all duration-200 rounded-lg overflow-hidden border-2",
+          "relative group cursor-pointer transition-all duration-200 rounded-lg overflow-hidden border-4",
           isSelected 
-            ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800" 
+            ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800" 
             : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
         )}
         onTouchStart={handleTouchStart}
@@ -125,14 +125,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           loading="lazy"
         />
 
-        {/* Selection overlay */}
-        {isSelected && (
-          <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
-            <div className="bg-blue-500 rounded-full p-2">
-              <Check className="h-4 w-4 text-white" />
-            </div>
-          </div>
-        )}
+        {/* Selection overlay - removed blue tick */}
 
         {/* Action buttons */}
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

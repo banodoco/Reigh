@@ -1228,7 +1228,7 @@ export default function HomePage() {
               </div>
 
               {/* Style Toggle */}
-              <div className="mt-6 mb-8">
+              {/* <div className="mt-6 mb-8">
                 <div className="flex flex-wrap sm:flex-nowrap justify-center gap-2">
                   {Object.keys(exampleStyles).map((style) => (
                     <button
@@ -1244,12 +1244,12 @@ export default function HomePage() {
                     </button>
                   ))}
                 </div>
-              </div>
+              </div> */}
 
               {/* Section 2 */}
               <div className="space-y-3 mt-4 mb-4">
                 <p className="text-sm leading-relaxed">
-                  Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references</strong>:
+                  Just as a songwriter might uncover infinite nuance to be found in six strings, we believe an entire artform lies waiting in the AI-driven journey between images - especially with the ability <strong>generate precise images based on references.</strong>
                 </p>
                 {/* <div className="grid grid-cols-2 items-stretch gap-4">
                   {/* Left part: 4 inputs in 2x2 grid */}
