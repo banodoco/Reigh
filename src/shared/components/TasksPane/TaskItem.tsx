@@ -483,17 +483,17 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     return travelData.videoOutputs || [];
   }, [travelData.videoOutputs]);
 
-  // Handler for mobile tap - directly open content
+  // Handler for mobile tap - jump to shot for video tasks, open content for image tasks
   const handleMobileTap = (e: React.MouseEvent) => {
     if (!isMobile) return; // Only handle on mobile
     
     e.stopPropagation();
     e.preventDefault();
     
-    // For travel tasks - open video if available
-    if (taskInfo.isVideoTask && taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
-      setVideoLightboxIndex(0);
-      setShowVideoLightbox(true);
+    // For video tasks - jump to the shot if available
+    if (taskInfo.isVideoTask && shotId) {
+      setCurrentShotId(shotId);
+      navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });
       return;
     }
     
