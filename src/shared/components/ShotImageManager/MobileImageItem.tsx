@@ -5,7 +5,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Sparkles } from 'lucide-react';
+import { Trash2, Copy, Check, Sparkles, Eye } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
@@ -28,8 +28,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 }) => {
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const lastTapTimeRef = useRef<number>(0);
-  const tapCountRef = useRef<number>(0);
   
   // Progressive loading setup
   const progressiveEnabled = isProgressiveLoadingEnabled();
@@ -95,57 +93,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
       const target = e.target as HTMLElement;
       const isButton = target.closest('button') !== null;
       
-      console.log('[MobileImageItem] Touch end detected', { 
-        isButton, 
-        deltaX, 
-        deltaY, 
-        targetTag: target.tagName,
-        targetClass: target.className 
-      });
-      
       // Don't trigger mobile tap if touching a button
       if (!isButton) {
-        const currentTime = Date.now();
-        const timeSinceLastTap = currentTime - lastTapTimeRef.current;
-        
-        console.log('[MobileImageItem] Processing tap', { 
-          currentTime, 
-          lastTapTime: lastTapTimeRef.current, 
-          timeSinceLastTap, 
-          currentTapCount: tapCountRef.current 
-        });
-        
-        // Double-tap detection (within 500ms - increased window)
-        if (timeSinceLastTap < 500 && timeSinceLastTap > 0) {
-          tapCountRef.current += 1;
-          console.log('[MobileImageItem] Tap count incremented:', tapCountRef.current, 'Time since last:', timeSinceLastTap);
-          if (tapCountRef.current === 2) {
-            // Double-tap detected - open image lightbox
-            console.log('[MobileImageItem] 🎯 Double-tap detected, opening image lightbox', { index, onOpenLightbox: !!onOpenLightbox });
-            if (onOpenLightbox) {
-              onOpenLightbox(index);
-            } else {
-              console.warn('[MobileImageItem] ❌ onOpenLightbox prop is missing!');
-            }
-            tapCountRef.current = 0; // Reset tap count
-            lastTapTimeRef.current = 0; // Reset timestamp
-            return;
-          }
-        } else {
-          tapCountRef.current = 1; // Reset to single tap
-          console.log('[MobileImageItem] Single tap detected, time since last:', timeSinceLastTap);
-        }
-        
-        lastTapTimeRef.current = currentTime;
-        
-        // Single tap - handle selection (with delay to allow for double-tap)
-        setTimeout(() => {
-          if (tapCountRef.current === 1) {
-            console.log('[MobileImageItem] Executing single tap action');
-            onMobileTap();
-            tapCountRef.current = 0;
-          }
-        }, 500); // Increased delay to match double-tap window
+        onMobileTap();
       }
     }
     
@@ -185,8 +135,27 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Selection overlay - removed blue tick */}
 
-        {/* Action buttons - always visible on mobile for better accessibility */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity">
+        {/* Bottom left action buttons */}
+        <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 transition-opacity">
+          {/* Lightbox button */}
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-8 w-8 bg-white/90 hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenLightbox) {
+                onOpenLightbox(index);
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+            }}
+            title="View Full Size"
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+
           {/* Magic Edit button */}
           <Button
             size="icon"
@@ -203,6 +172,10 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           >
             <Sparkles className="h-3 w-3" />
           </Button>
+        </div>
+
+        {/* Top right action buttons */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity">
 
           {/* Duplicate button */}
           {onDuplicate && (
