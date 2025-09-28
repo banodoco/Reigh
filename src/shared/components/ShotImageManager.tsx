@@ -74,24 +74,24 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   renderCountRef.current++;
 
 
-  // Debug selection state on each render
-  React.useEffect(() => {
-    // console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
-      selectedIdsCount: selectedIds.length,
-      selectedIds: selectedIds.map(id => id.substring(0, 8)),
-      selectedIdsFullValues: selectedIds,
-      mobileSelectedIdsCount: mobileSelectedIds.length,
-      mobileSelectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
-      mobileSelectedIdsFullValues: mobileSelectedIds,
-      isMobile,
-      generationMode,
-      currentImages_length: currentImages.length,
-      images_length: images.length,
-      will_return_early: (!images || images.length === 0),
-      will_return_mobile: (isMobile && generationMode === 'batch'),
-      timestamp: Date.now()
-    });
-  });
+  // Debug selection state on each render (commented out for performance)
+  // React.useEffect(() => {
+  //   console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
+  //     selectedIdsCount: selectedIds.length,
+  //     selectedIds: selectedIds.map(id => id.substring(0, 8)),
+  //     selectedIdsFullValues: selectedIds,
+  //     mobileSelectedIdsCount: mobileSelectedIds.length,
+  //     mobileSelectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
+  //     mobileSelectedIdsFullValues: mobileSelectedIds,
+  //     isMobile,
+  //     generationMode,
+  //     currentImages_length: currentImages.length,
+  //     images_length: images.length,
+  //     will_return_early: (!images || images.length === 0),
+  //     will_return_mobile: (isMobile && generationMode === 'batch'),
+  //     timestamp: Date.now()
+  //   });
+  // });
   // State for drag and drop
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
