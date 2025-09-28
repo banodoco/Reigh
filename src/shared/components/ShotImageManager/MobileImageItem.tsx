@@ -19,6 +19,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   onMobileTap,
   onDelete,
   onDuplicate,
+  onOpenLightbox,
   hideDeleteButton = false,
   duplicatingImageId,
   duplicateSuccessImageId,
@@ -103,9 +104,11 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         if (timeSinceLastTap < 300) {
           tapCountRef.current += 1;
           if (tapCountRef.current === 2) {
-            // Double-tap detected - open Magic Edit modal
-            console.log('[MobileImageItem] Double-tap detected, opening Magic Edit modal');
-            setIsMagicEditOpen(true);
+            // Double-tap detected - open image lightbox
+            console.log('[MobileImageItem] Double-tap detected, opening image lightbox');
+            if (onOpenLightbox) {
+              onOpenLightbox(index);
+            }
             tapCountRef.current = 0; // Reset tap count
             return;
           }

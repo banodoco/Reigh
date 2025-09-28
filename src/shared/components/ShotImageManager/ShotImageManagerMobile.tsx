@@ -21,6 +21,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   onBatchImageDelete,
   onImageDuplicate,
   onImageReorder,
+  onOpenLightbox,
   columns = 4,
   duplicatingImageId,
   duplicateSuccessImageId,
@@ -251,6 +252,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   onMobileTap={() => handleMobileTap(imageKey as string, index)}
                   onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
                   onDuplicate={onImageDuplicate}
+                  onOpenLightbox={onOpenLightbox}
                   hideDeleteButton={mobileSelectedIds.length > 0}
                   duplicatingImageId={duplicatingImageId}
                   duplicateSuccessImageId={duplicateSuccessImageId}
@@ -308,7 +310,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         
         return (
           <div 
-            className="fixed bottom-6 z-50 flex justify-center"
+            className="fixed bottom-20 z-50 flex justify-center"
             style={{
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,

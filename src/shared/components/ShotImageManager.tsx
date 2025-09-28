@@ -1022,6 +1022,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         onBatchImageDelete={onBatchImageDelete}
         onImageDuplicate={onImageDuplicate}
         onImageReorder={onImageReorder}
+        onOpenLightbox={setLightboxIndex}
         columns={columns}
         generationMode={generationMode}
         onImageSaved={onImageSaved}
