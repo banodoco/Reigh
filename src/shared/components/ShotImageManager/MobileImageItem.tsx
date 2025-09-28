@@ -144,8 +144,11 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             className="h-8 w-8 bg-white/90 hover:bg-white"
             onClick={(e) => {
               e.stopPropagation();
+              console.log('[MobileImageItem] Lightbox button clicked:', { index, onOpenLightbox: !!onOpenLightbox });
               if (onOpenLightbox) {
                 onOpenLightbox(index);
+              } else {
+                console.error('[MobileImageItem] onOpenLightbox is not defined!');
               }
             }}
             onTouchEnd={(e) => {
