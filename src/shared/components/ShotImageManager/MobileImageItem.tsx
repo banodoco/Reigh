@@ -27,6 +27,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 }) => {
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTapTimeRef = useRef<number>(0);
+  const tapCountRef = useRef<number>(0);
   
   // Progressive loading setup
   const progressiveEnabled = isProgressiveLoadingEnabled();
@@ -88,7 +90,39 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
     
     // Only trigger tap if movement is minimal (not a scroll)
     if (deltaX < 10 && deltaY < 10) {
-      onMobileTap();
+      // Check if the touch target is a button or button child
+      const target = e.target as HTMLElement;
+      const isButton = target.closest('button') !== null;
+      
+      // Don't trigger mobile tap if touching a button
+      if (!isButton) {
+        const currentTime = Date.now();
+        const timeSinceLastTap = currentTime - lastTapTimeRef.current;
+        
+        // Double-tap detection (within 300ms)
+        if (timeSinceLastTap < 300) {
+          tapCountRef.current += 1;
+          if (tapCountRef.current === 2) {
+            // Double-tap detected - open Magic Edit modal
+            console.log('[MobileImageItem] Double-tap detected, opening Magic Edit modal');
+            setIsMagicEditOpen(true);
+            tapCountRef.current = 0; // Reset tap count
+            return;
+          }
+        } else {
+          tapCountRef.current = 1; // Reset to single tap
+        }
+        
+        lastTapTimeRef.current = currentTime;
+        
+        // Single tap - handle selection (with delay to allow for double-tap)
+        setTimeout(() => {
+          if (tapCountRef.current === 1) {
+            onMobileTap();
+            tapCountRef.current = 0;
+          }
+        }, 300);
+      }
     }
     
     touchStartRef.current = null;
@@ -127,8 +161,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Selection overlay - removed blue tick */}
 
-        {/* Action buttons */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action buttons - always visible on mobile for better accessibility */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity">
           {/* Magic Edit button */}
           <Button
             size="icon"
@@ -137,6 +171,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               setIsMagicEditOpen(true);
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
             }}
             title="Magic Edit"
           >
@@ -152,6 +189,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 onDuplicate((image as any).shotImageEntryId ?? (image as any).id, (image as any).timeline_frame || index);
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
               }}
               disabled={isDuplicating}
               title="Duplicate"
@@ -175,6 +215,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
               }}
               title="Delete"
             >
