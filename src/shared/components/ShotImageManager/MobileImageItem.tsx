@@ -136,15 +136,16 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         {/* Selection overlay - removed blue tick */}
 
         {/* Bottom left action buttons */}
-        <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 transition-opacity">
+        <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 transition-opacity z-20">
           {/* Lightbox button */}
           <Button
             size="icon"
             variant="secondary"
-            className="h-8 w-8 bg-white/90 hover:bg-white"
+            className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white z-30"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
-              console.log('[MobileImageItem] Lightbox button onClick:', { index, onOpenLightbox: !!onOpenLightbox });
+              console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON CLICKED!', { index, onOpenLightbox: !!onOpenLightbox });
               if (onOpenLightbox) {
                 onOpenLightbox(index);
               } else {
@@ -152,16 +153,17 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               }
             }}
             onTouchStart={(e) => {
+              e.preventDefault();
               e.stopPropagation();
-              console.log('[MobileImageItem] Lightbox button onTouchStart:', { index, onOpenLightbox: !!onOpenLightbox });
-              if (onOpenLightbox) {
-                onOpenLightbox(index);
-              }
+              console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON TOUCH START!', { index });
             }}
             onTouchEnd={(e) => {
+              e.preventDefault();
               e.stopPropagation();
+              console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON TOUCH END!', { index });
             }}
             title="View Full Size"
+            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 999 }}
           >
             <Eye className="h-3 w-3" />
           </Button>

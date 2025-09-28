@@ -27,7 +27,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
 }) => {
-  console.log('[ShotImageManagerMobile] onOpenLightbox prop:', !!onOpenLightbox);
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
