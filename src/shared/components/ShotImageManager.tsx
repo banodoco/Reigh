@@ -71,32 +71,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
+  renderCountRef.current++;
 
-  React.useEffect(() => {
-    renderCountRef.current++;
-    // Only log when there are many re-renders (potential issue)
-    if (renderCountRef.current > 5 && renderCountRef.current % 5 === 0) {
-      console.log('[PERF] ShotImageManager excessive renders:', {
-        renderCount: renderCountRef.current,
-        imagesCount: images.length,
-        columns,
-        generationMode
-      });
-    }
-  });
-
-  // Component mount tracker
-  React.useEffect(() => {
-    const componentId = Math.random().toString(36).substr(2, 9);
-    console.log(`[MOUNT_TRACE] ShotImageManager MOUNTED with id: ${componentId}`);
-    return () => {
-      console.log(`[MOUNT_TRACE] ShotImageManager UNMOUNTED with id: ${componentId}`);
-    };
-  }, []);
 
   // Debug selection state on each render
   React.useEffect(() => {
-    console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
+    // console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
       selectedIdsCount: selectedIds.length,
       selectedIds: selectedIds.map(id => id.substring(0, 8)),
       selectedIdsFullValues: selectedIds,
@@ -122,7 +102,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Wrap setSelectedIds to force re-render
   const setSelectedIdsWithRerender = useCallback((newIds: string[] | ((prev: string[]) => string[])) => {
-    console.log(`[DEBUG] setSelectedIdsWithRerender called`);
+    // console.log(`[DEBUG] setSelectedIdsWithRerender called`);
     setSelectedIds(newIds);
     setRenderCounter(prev => prev + 1);
   }, []);
@@ -147,7 +127,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
   
-  console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
+  // console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 

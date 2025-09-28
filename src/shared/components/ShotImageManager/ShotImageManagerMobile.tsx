@@ -73,11 +73,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       const serverIds = images.map(img => (img as any).shotImageEntryId ?? (img as any).id).join(',');
       
       if (optimisticIds === serverIds) {
-        console.log('[MobileOptimistic] Server caught up with optimistic state');
         setIsOptimisticUpdate(false);
         setOptimisticOrder([]);
       } else {
-        console.log('[MobileOptimistic] Server state differs - keeping optimistic state temporarily');
         
         // Safety timeout: force reconciliation after 5 seconds
         const timeout = setTimeout(() => {
@@ -111,16 +109,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Mobile reordering function
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
     if (mobileSelectedIds.length === 0) {
-      console.log('[MobileReorder] No items selected for reordering');
       return;
     }
-
-    console.log('[MobileReorder] 🔄 STARTING mobile reorder:', {
-      selectedCount: mobileSelectedIds.length,
-      selectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
-      targetIndex,
-      currentImagesLength: images.length
-    });
 
     try {
       // Get the selected images and their current indices
@@ -131,7 +121,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       }).filter(item => item.image && item.currentIndex !== -1);
 
       if (selectedItems.length === 0) {
-        console.log('[MobileReorder] No valid selected items found');
         return;
       }
 
@@ -154,12 +143,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       // Create ordered IDs array for the unified system
       const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
 
-      console.log('[MobileReorder] 🎯 Applying optimistic update:', {
-        originalOrder: currentImages.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
-        newOrder: orderedIds.map(id => id.substring(0, 8)),
-        movedItems: selectedItems.map(item => item.id.substring(0, 8)),
-        targetIndex
-      });
 
       // 1. Apply optimistic update immediately for instant visual feedback
       setReconciliationId(prev => prev + 1);
@@ -172,7 +155,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       // 3. Call server update
       await onImageReorder(orderedIds);
       
-      console.log('[MobileReorder] ✅ Mobile reorder completed successfully');
 
     } catch (error) {
       console.error('[MobileReorder] ❌ Mobile reorder failed:', error);
@@ -268,7 +250,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       variant="secondary"
                       className="h-12 w-6 rounded-full p-0"
                       onClick={() => {
-                        console.log('[MobileReorder] 📱 Arrow button clicked:', { targetIndex: index, selectedCount: mobileSelectedIds.length });
                         handleMobileMoveHere(index);
                       }}
                       onPointerDown={e => e.stopPropagation()}
@@ -287,7 +268,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       variant="secondary"
                       className="h-12 w-6 rounded-full p-0"
                       onClick={() => {
-                        console.log('[MobileReorder] 📱 Arrow button clicked (end):', { targetIndex: index + 1, selectedCount: mobileSelectedIds.length });
                         handleMobileMoveHere(index + 1);
                       }}
                       onPointerDown={e => e.stopPropagation()}
