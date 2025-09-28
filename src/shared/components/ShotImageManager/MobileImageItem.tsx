@@ -3,7 +3,7 @@
  * Extracted from ShotImageManager for better organization
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Trash2, Copy, Check, Sparkles, Eye } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
@@ -27,7 +27,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   projectAspectRatio,
 }) => {
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   
   // Progressive loading setup
   const progressiveEnabled = isProgressiveLoadingEnabled();
@@ -76,30 +75,19 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
     return { aspectRatio: '1' };
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const isButton = target.closest('button') !== null;
+
+    if (!isButton) {
+      onMobileTap();
+    }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    
-    const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-    
-    // Only trigger tap if movement is minimal (not a scroll)
-    if (deltaX < 10 && deltaY < 10) {
-      // Check if the touch target is a button or button child
-      const target = e.target as HTMLElement;
-      const isButton = target.closest('button') !== null;
-      
-      // Don't trigger mobile tap if touching a button
-      if (!isButton) {
-        onMobileTap();
-      }
+  const handleOpenLightbox = () => {
+    if (onOpenLightbox) {
+      onOpenLightbox(index);
     }
-    
-    touchStartRef.current = null;
   };
 
   const isDuplicating = duplicatingImageId === ((image as any).shotImageEntryId ?? (image as any).id);
@@ -114,8 +102,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             ? "border-blue-500 ring-4 ring-blue-200 dark:ring-blue-800" 
             : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
         )}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        onClick={handleContainerClick}
         style={getAspectRatioStyle()}
       >
         {/* Image */}
@@ -136,35 +123,17 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         {/* Selection overlay - removed blue tick */}
 
         {/* Bottom left action buttons */}
-        <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 transition-opacity z-20">
+        <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 transition-opacity">
           {/* Lightbox button */}
           <Button
             size="icon"
             variant="secondary"
-            className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white z-30"
+            className="h-8 w-8 bg-white/90 hover:bg-white"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON CLICKED!', { index, onOpenLightbox: !!onOpenLightbox });
-              if (onOpenLightbox) {
-                onOpenLightbox(index);
-              } else {
-                console.error('[MobileImageItem] onOpenLightbox is not defined!');
-              }
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
-              console.log('[MobileImageItem] 🔴 RED LIGHTBOX BUTTON TOUCH END!', { index });
-              if (onOpenLightbox) {
-                onOpenLightbox(index);
-              }
+              handleOpenLightbox();
             }}
             title="View Full Size"
-            style={{ 
-              pointerEvents: 'auto', 
-              position: 'relative', 
-              zIndex: 999,
-              touchAction: 'manipulation'
-            }}
           >
             <Eye className="h-3 w-3" />
           </Button>
@@ -177,9 +146,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               setIsMagicEditOpen(true);
-            }}
-            onTouchEnd={(e) => {
-              e.stopPropagation();
             }}
             title="Magic Edit"
           >
@@ -225,9 +191,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
               }}
               title="Delete"
             >
