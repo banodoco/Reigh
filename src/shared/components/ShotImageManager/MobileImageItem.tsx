@@ -118,7 +118,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           className={cn(
             "w-full h-full object-cover transition-opacity duration-300",
             !shouldLoad && "bg-gray-100 dark:bg-gray-800",
-            progressiveEnabled && isThumbShowing && !isFullLoaded && "filter blur-sm",
+            // Remove blur effect on mobile - it's too aggressive and causes poor UX
+            // progressiveEnabled && isThumbShowing && !isFullLoaded && "filter blur-sm",
             progressiveEnabled && isFullLoaded && "filter blur-none"
           )}
           loading="lazy"

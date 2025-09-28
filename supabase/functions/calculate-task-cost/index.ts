@@ -107,6 +107,43 @@ serve(async (req)=>{
         task_id: task.id
       });
     }
+
+    // Check if this is an orchestrator task - calculate cost based on sub-task durations
+    const { data: subTasks, error: subTasksError } = await supabaseAdmin
+      .from('tasks')
+      .select(`
+        id,
+        generation_started_at,
+        generation_processed_at,
+        status
+      `)
+      .eq('params->>orchestrator_task_id_ref', task_id)
+      .eq('status', 'Complete');
+
+    let durationSeconds;
+    if (subTasks && subTasks.length > 0) {
+      // This is an orchestrator task with sub-tasks - sum their durations
+      console.log(`Task ${task_id} is orchestrator with ${subTasks.length} sub-tasks, calculating cost from sub-task durations`);
+      
+      let totalSubTaskDuration = 0;
+      for (const subTask of subTasks) {
+        if (subTask.generation_started_at && subTask.generation_processed_at) {
+          const subStartTime = new Date(subTask.generation_started_at);
+          const subEndTime = new Date(subTask.generation_processed_at);
+          const subDuration = Math.max(1, Math.ceil((subEndTime.getTime() - subStartTime.getTime()) / 1000));
+          totalSubTaskDuration += subDuration;
+          console.log(`Sub-task ${subTask.id}: ${subDuration}s`);
+        }
+      }
+      
+      durationSeconds = totalSubTaskDuration;
+      console.log(`Total orchestrator duration from ${subTasks.length} sub-tasks: ${durationSeconds}s`);
+    } else {
+      // Regular task - use its own duration
+      const startTime = new Date(task.generation_started_at);
+      const endTime = new Date(task.generation_processed_at);
+      durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
+    }
     // Get task type configuration
     const { data: taskType, error: taskTypeError } = await supabaseAdmin.from('task_types').select('*').eq('name', task.task_type).eq('is_active', true).single();
     if (taskTypeError || !taskType) {
@@ -147,10 +184,6 @@ serve(async (req)=>{
         note: 'Default cost used - no task type configuration found'
       });
     }
-    // Calculate duration in seconds
-    const startTime = new Date(task.generation_started_at);
-    const endTime = new Date(task.generation_processed_at);
-    const durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
     // Calculate cost based on task type configuration
     const cost = calculateTaskCost(taskType.billing_type, taskType.base_cost_per_second, taskType.unit_cost, durationSeconds, taskType.cost_factors, task.params);
     // Validate cost calculation

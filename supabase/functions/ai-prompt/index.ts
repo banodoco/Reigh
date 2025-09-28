@@ -59,8 +59,8 @@ IMPORTANT GUIDELINES:
 - Each prompt should be specifically designed for AI image generation
 - Add detail that expands or adds to the user's instruction (unless they request otherwise)
 - Focus on visual elements like composition, lighting, colors, and atmosphere
-- CHARACTER GUIDANCE: If there's a character or specific subject, doo NOT mention anything specific about it unless specifically requested - assume an image reference is provided and refer to them simply as 'she', 'he', 'it', 'the dog', etc. without detail. ALWAYS use a consistnt description of the character or subject across different prompts.
-- STYLE GUIDANCE: Do NOT mention specific artistic styles (like 'photography', 'anime', 'oil painting', 'digital art', etc.) unless the user specifically asks for it
+- CHARACTER GUIDANCE: Only mention specific character details unless requested - if the user asks for character descriptions provide them. Use consistent character descriptions across prompts.
+- STYLE GUIDANCE: Only mention specific artistic styles (photography, anime, oil painting, digital art) if specifically requested.
 - SCENE GUIDANCE: ALWAYS specifically describe the scene and environment - if the user doesn't specify, you should always describe the scene and environment in detail.
 
 CRITICAL FORMATTING REQUIREMENTS:
@@ -75,14 +75,18 @@ CRITICAL FORMATTING REQUIREMENTS:
           detailedInstructions += `
 
 FORMAT EXAMPLE (${numberToGenerate} prompts):
-The dragon is soaring through storm clouds with lightning illuminating its scales, below massive skyscrapers are visible through the clouds
-The woman is standing on sand dunes under a starry night sky, the nights sky is clear and the moon is visible behind them.
-A futuristic cyberpunk cityscape at night with neon reflections on wet streets, the city is lit up by neon lights with a bridge visible in the background.`;
+[if the user tells you to refer to a dragon] The dragon is soaring through storm clouds with lightning illuminating its scales, below massive skyscrapers are visible through the clouds
+[if the user asks you to come up with a female German character] A woman named Gracie Marr, she's tall, blonde, and has delicate mousey features. She's standing on sand dunes under a starry night sky, the nights sky is clear and the moon is visible behind them.
+[if the user asks you to come up with a playful style] A picture of a dog in a mix of crayons and marker, reminiscent of a modern childlike version of a work of Klimt.
+[if the user asks you to refer to an old man doing chores] The old man is doing chores in his garden, he's wearing a red shirt and blue pants. He's watering the plants with a watering can. He's wearing a red hat and a red jacket.
+[if the user asks you to come up with a futuristic style] An angular modernist painting in the style of Akira Kurosawa's The Hidden Fortress.`;
         }
 
         detailedInstructions += `
 
 YOUR OUTPUT (${numberToGenerate} prompts):
+
+Reminder: here's the user request: "${overallPromptText || "Please generate general image prompts based on the overall goal and rules."}" - make sure to respect that precisely.
 
 IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do not include any commentary, explanations, or additional text.`;
 

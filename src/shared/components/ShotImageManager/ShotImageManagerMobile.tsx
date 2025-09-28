@@ -33,6 +33,11 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   const currentDialogSkipChoiceRef = useRef(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   
+  // Optimistic update state for mobile reordering
+  const [optimisticOrder, setOptimisticOrder] = useState<any[]>([]);
+  const [isOptimisticUpdate, setIsOptimisticUpdate] = useState(false);
+  const [reconciliationId, setReconciliationId] = useState(0);
+  
   const isMobile = useIsMobile();
   const { imageDeletionSettings } = useUserUIState();
   const { 
@@ -55,6 +60,37 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     11: 'grid-cols-11',
     12: 'grid-cols-12',
   }[columns] || 'grid-cols-4';
+
+  // Use optimistic order if available, otherwise use props images
+  const currentImages = isOptimisticUpdate && optimisticOrder.length > 0 ? optimisticOrder : images;
+
+  // Reconcile optimistic state with server state when images prop changes
+  React.useEffect(() => {
+    if (isOptimisticUpdate && images && images.length > 0) {
+      // Check if server state matches optimistic state
+      const optimisticIds = optimisticOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id).join(',');
+      const serverIds = images.map(img => (img as any).shotImageEntryId ?? (img as any).id).join(',');
+      
+      if (optimisticIds === serverIds) {
+        console.log('[MobileOptimistic] Server caught up with optimistic state');
+        setIsOptimisticUpdate(false);
+        setOptimisticOrder([]);
+      } else {
+        console.log('[MobileOptimistic] Server state differs - keeping optimistic state temporarily');
+        
+        // Safety timeout: force reconciliation after 5 seconds
+        const timeout = setTimeout(() => {
+          if (isOptimisticUpdate) {
+            console.warn('[MobileOptimistic] Forcing reconciliation - optimistic update took too long');
+            setIsOptimisticUpdate(false);
+            setOptimisticOrder([]);
+          }
+        }, 5000);
+        
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [images, isOptimisticUpdate, optimisticOrder]);
 
   // Mobile tap handler for selection
   const handleMobileTap = useCallback((imageId: string, index: number) => {
@@ -88,8 +124,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     try {
       // Get the selected images and their current indices
       const selectedItems = mobileSelectedIds.map(id => {
-        const image = images.find(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
-        const index = images.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
+        const image = currentImages.find(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
+        const index = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
         return { id, image, currentIndex: index };
       }).filter(item => item.image && item.currentIndex !== -1);
 
@@ -102,7 +138,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       selectedItems.sort((a, b) => a.currentIndex - b.currentIndex);
 
       // Create new order by moving selected items to target position
-      const newOrder = [...images];
+      const newOrder = [...currentImages];
       
       // Remove selected items from their current positions (in reverse order to maintain indices)
       selectedItems.reverse().forEach(item => {
@@ -117,18 +153,23 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       // Create ordered IDs array for the unified system
       const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
 
-      console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
-        originalOrder: images.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
+      console.log('[MobileReorder] 🎯 Applying optimistic update:', {
+        originalOrder: currentImages.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
         newOrder: orderedIds.map(id => id.substring(0, 8)),
         movedItems: selectedItems.map(item => item.id.substring(0, 8)),
         targetIndex
       });
 
-      // Use the unified position system
-      await onImageReorder(orderedIds);
+      // 1. Apply optimistic update immediately for instant visual feedback
+      setReconciliationId(prev => prev + 1);
+      setIsOptimisticUpdate(true);
+      setOptimisticOrder(newOrder);
 
-      // Clear selection after successful reorder
+      // 2. Clear selection immediately for better UX
       setMobileSelectedIds([]);
+
+      // 3. Call server update
+      await onImageReorder(orderedIds);
       
       console.log('[MobileReorder] ✅ Mobile reorder completed successfully');
 
@@ -165,7 +206,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     if (mobileSelectedIds.length === 0) return false;
     
     const selectedIndices = mobileSelectedIds
-      .map(id => images.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id))
+      .map(id => currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id))
       .filter(idx => idx !== -1)
       .sort((a, b) => a - b);
     
@@ -173,9 +214,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     const maxSelected = selectedIndices[selectedIndices.length - 1];
     
     return insertIndex < minSelected || insertIndex > maxSelected + 1;
-  }, [mobileSelectedIds, images]);
+  }, [mobileSelectedIds, currentImages]);
 
-  if (!images || images.length === 0) {
+  if (!currentImages || currentImages.length === 0) {
     return (
       <p className="text-center text-gray-500 dark:text-gray-400 py-8">
         No images to display. 
@@ -191,10 +232,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   return (
     <>
       <div className={cn("grid gap-3", mobileGridColsClass)}>
-        {images.map((image, index) => {
+        {currentImages.map((image, index) => {
           const imageKey = (image as any).shotImageEntryId ?? (image as any).id;
           const isSelected = mobileSelectedIds.includes(imageKey as string);
-          const isLastItem = index === images.length - 1;
+          const isLastItem = index === currentImages.length - 1;
           
           // Show arrow buttons based on selection state and movement logic
           const showLeftArrow = mobileSelectedIds.length > 0 && !isSelected && wouldActuallyMove(index);

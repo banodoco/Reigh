@@ -361,7 +361,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
           project: projectLookup[task.project_id] || 'Unknown Project',
           status: task.status,
           duration: duration ? `${duration}s` : '',
-          cost: costEntry ? `$${(Math.abs(costEntry.amount) / 100).toFixed(3)}` : 'Free',
+          cost: costEntry ? `$${Math.abs(costEntry.amount).toFixed(3)}` : 'Free',
         };
       });
 
@@ -1044,7 +1044,7 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
                               task.cost ? 'text-red-600' : 'text-gray-400'
                             }`}
                           >
-                            {task.cost ? `$${(parseFloat(task.cost.toString()) / 100).toFixed(3)}` : 'Free'}
+                            {task.cost ? `$${parseFloat(task.cost.toString()).toFixed(3)}` : 'Free'}
                           </TableCell>
                         </TableRow>
                       ))}
