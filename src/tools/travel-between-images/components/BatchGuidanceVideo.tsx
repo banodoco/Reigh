@@ -297,7 +297,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
           {/* Treatment mode */}
           <div className="space-y-2">
             <Label className="text-sm">How would you like to use the guidance video?</Label>
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3">
               <div className="flex-shrink-0" style={{ width: '200px' }}>
                 <Select value={treatment} onValueChange={onTreatmentChange}>
                   <SelectTrigger className="h-9 w-full">
@@ -317,7 +317,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex-1 text-xs text-muted-foreground pt-2 leading-relaxed">
+              <div className="flex-1 text-xs text-muted-foreground leading-relaxed">
                 {treatment === 'adjust' ? adjustModeDescription : clipModeDescription}
               </div>
             </div>
