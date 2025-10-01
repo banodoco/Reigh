@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, Suspense, useMemo, useLayoutEffect, useCallback, startTransition } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/state/types';
 import { useCreateShot, useHandleExternalImageDrop, useUpdateShotName } from '@/shared/hooks/useShots';
@@ -106,13 +106,16 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 
 const VideoTravelToolPage: React.FC = () => {
-  // [VideoTravelDebug] Comparison logs to understand difference
+  // [VideoTravelDebug] Reduced logging - only log first few renders and major milestones
   const VIDEO_DEBUG_TAG = '[VideoTravelDebug]';
   const videoRenderCount = useRef(0);
   const videoMountTime = useRef(Date.now());
   videoRenderCount.current += 1;
   
-  console.log(`${VIDEO_DEBUG_TAG} === RENDER START #${videoRenderCount.current} === ${Date.now() - videoMountTime.current}ms since mount`);
+  // Only log first 5 renders and every 10th render after that to reduce noise
+  if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
+    console.log(`${VIDEO_DEBUG_TAG} === RENDER START #${videoRenderCount.current} === ${Date.now() - videoMountTime.current}ms since mount`);
+  }
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -133,26 +136,20 @@ const VideoTravelToolPage: React.FC = () => {
   // Preload all shot video counts for the project
   const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
   
-  // Debug project video counts cache
+  // Debug project video counts cache - reduced logging
+  const hasLoggedCacheState = useRef(false);
   React.useEffect(() => {
-    console.log('[ProjectVideoCountsDebug] Cache state in VideoTravelToolPage:', {
-      selectedProjectId,
-      isLoadingProjectCounts,
-      projectCountsError: projectCountsError?.message,
-      getShotVideoCountExists: !!getShotVideoCount,
-      timestamp: Date.now()
-    });
-    
-    if (selectedProjectId && getShotVideoCount) {
-      // Test the cache with current shot
-      const testCount = getShotVideoCount(selectedShot?.id || null);
-      console.log('[ProjectVideoCountsDebug] Test cache lookup:', {
-        selectedShotId: selectedShot?.id,
-        testCount,
+    if (!hasLoggedCacheState.current && selectedProjectId && getShotVideoCount) {
+      hasLoggedCacheState.current = true;
+      console.log('[ProjectVideoCountsDebug] Cache state in VideoTravelToolPage:', {
+        selectedProjectId,
+        isLoadingProjectCounts,
+        projectCountsError: projectCountsError?.message,
+        getShotVideoCountExists: !!getShotVideoCount,
         timestamp: Date.now()
       });
     }
-  }, [selectedProjectId, isLoadingProjectCounts, projectCountsError, getShotVideoCount, selectedShot?.id]);
+  }, [selectedProjectId, getShotVideoCount, isLoadingProjectCounts, projectCountsError]);
   
   // Task queue notifier is now handled inside ShotEditor component
   
@@ -175,25 +172,29 @@ const VideoTravelToolPage: React.FC = () => {
     projectUISettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
 
-  // [VideoTravelDebug] Log the data loading states
-  console.log(`${VIDEO_DEBUG_TAG} Data loading states:`, {
-    shotsCount: shots?.length,
-    shotsLoadingRaw,
-    selectedProjectId,
-    fromContext: 'useVideoTravelData->useShots(context)'
-  });
+  // [VideoTravelDebug] Log the data loading states - reduced frequency
+  if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
+    console.log(`${VIDEO_DEBUG_TAG} Data loading states:`, {
+      shotsCount: shots?.length,
+      shotsLoadingRaw,
+      selectedProjectId,
+      fromContext: 'useVideoTravelData->useShots(context)'
+    });
+  }
 
-  // [VideoTravelDebug] Log what shots we're passing to ShotListDisplay
+  // [VideoTravelDebug] Log what shots we're passing to ShotListDisplay - only once when shots first load
+  const hasLoggedShots = useRef(false);
   React.useEffect(() => {
-    if (shots && shots.length > 0) {
+    if (shots && shots.length > 0 && !hasLoggedShots.current) {
+      hasLoggedShots.current = true;
       console.log(`${VIDEO_DEBUG_TAG} === SHOTS BEING PASSED TO DISPLAY ===`, {
         shotsArrayLength: shots.length,
         querySource: 'useVideoTravelData->useShots()',
         timestamp: Date.now()
       });
       
-      // [VideoTravelDebug] Log each shot individually to avoid array collapse
-      shots.slice(0, 10).forEach((shot, index) => {
+      // [VideoTravelDebug] Log first 3 shots only to reduce noise
+      shots.slice(0, 3).forEach((shot, index) => {
         console.log(`${VIDEO_DEBUG_TAG} Passing ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${shot.position}`);
       });
     }
@@ -348,17 +349,20 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [hashShotId, selectedProjectId, shotsLoadingRaw, shots]);
 
-  // If deep-linked to a shot, set current shot id immediately to prevent list-clearing logic
+  // CONSOLIDATED: Handle hash-based shot selection and project resolution in one effect
+  // This prevents race conditions between multiple effects competing to set state
   useEffect(() => {
-    if (hashShotId && !currentShotId) {
+    if (!hashShotId) return;
+    
+    // Set current shot ID immediately if not already set
+    if (!currentShotId) {
       setCurrentShotId(hashShotId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hashShotId]);
-
-  // Resolve selected project from shot when deep-linking
-  useEffect(() => {
-    if (!hashShotId || selectedProjectId) return;
+    
+    // If we already have a project selected, we're done
+    if (selectedProjectId) return;
+    
+    // Resolve project from shot when deep-linking
     let cancelled = false;
     (async () => {
       try {
@@ -389,18 +393,25 @@ const VideoTravelToolPage: React.FC = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [hashShotId, selectedProjectId, setSelectedProjectId, navigate]);
+  }, [hashShotId, currentShotId, selectedProjectId, setSelectedProjectId, navigate, setCurrentShotId]);
 
   // Data fetching is now handled by the useVideoTravelData hook above
   
   // Final loading flag used by the page - memoized to prevent rapid changes
+  // Track loading state changes to reduce logging noise
+  const lastLoadingState = useRef<string>('');
   const isLoading = useMemo(() => {
     const loading = shotsLoadingRaw || initializingFromHash;
-    console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
-      loading,
-      shotsLoadingRaw,
-      initializingFromHash
-    });
+    // Only log loading decision changes, not every render
+    const loadingStateKey = `${loading}-${shotsLoadingRaw}-${initializingFromHash}`;
+    if (lastLoadingState.current !== loadingStateKey) {
+      lastLoadingState.current = loadingStateKey;
+      console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
+        loading,
+        shotsLoadingRaw,
+        initializingFromHash
+      });
+    }
     return loading;
   }, [shotsLoadingRaw, initializingFromHash]);
 
@@ -547,17 +558,22 @@ const VideoTravelToolPage: React.FC = () => {
     shouldShowShotEditor
   });
 
-  // [VideoTravelDebug] Log preloader state
+  // [VideoTravelDebug] Log preloader state - only on significant changes
+  const lastPreloaderState = useRef<string>('');
   React.useEffect(() => {
     if (selectedProjectId) {
-      console.log(`${VIDEO_DEBUG_TAG} Preloader state:`, {
-        isProcessing: preloaderState.isProcessingQueue,
-        queueLength: preloaderState.queueLength,
-        cacheUtilization: `${preloaderState.preloadedProjectUrls}/${preloaderState.targetCacheSize} (${preloaderState.cacheUtilization}%)`,
-        selectedProjectId
-      });
+      const currentState = `${preloaderState.isProcessingQueue}-${preloaderState.queueLength}-${preloaderState.cacheUtilization}`;
+      if (lastPreloaderState.current !== currentState) {
+        lastPreloaderState.current = currentState;
+        console.log(`${VIDEO_DEBUG_TAG} Preloader state:`, {
+          isProcessing: preloaderState.isProcessingQueue,
+          queueLength: preloaderState.queueLength,
+          cacheUtilization: `${preloaderState.preloadedProjectUrls}/${preloaderState.targetCacheSize} (${preloaderState.cacheUtilization}%)`,
+          selectedProjectId
+        });
+      }
     }
-  }, [preloaderState.isProcessingQueue, preloaderState.queueLength, preloaderState.preloadedProjectUrls, preloaderState.targetCacheSize, preloaderState.cacheUtilization, selectedProjectId]);
+  }, [preloaderState.isProcessingQueue, preloaderState.queueLength, preloaderState.cacheUtilization, selectedProjectId]);
   
   // Calculate navigation state with memoization
   const navigationState = useMemo(() => {
@@ -720,6 +736,7 @@ const VideoTravelToolPage: React.FC = () => {
   }, []);
 
   // Update state when settings are loaded from database (or confirmed absent)
+  // OPTIMIZATION: Use React.startTransition to batch state updates and reduce renders
   useEffect(() => {
     if (!isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
@@ -755,24 +772,27 @@ const VideoTravelToolPage: React.FC = () => {
         }
       }
       
-      setVideoControlMode(settingsToApply.videoControlMode || 'batch');
-      setBatchVideoPrompt(settingsToApply.batchVideoPrompt || '');
-      setBatchVideoFrames(settingsToApply.batchVideoFrames || 60);
-      setBatchVideoContext(settingsToApply.batchVideoContext || 10);
-      setBatchVideoSteps(settingsToApply.batchVideoSteps || 4);
-      setDimensionSource(settingsToApply.dimensionSource || 'firstImage');
-      setCustomWidth(settingsToApply.customWidth);
-      setCustomHeight(settingsToApply.customHeight);
-      setEnhancePrompt(settingsToApply.enhancePrompt || false);
-      setTurboMode(settingsToApply.turboMode || false);
-      setAmountOfMotion(settingsToApply.amountOfMotion ?? 50); // Default to 50 if not present
-      setVideoPairConfigs(settingsToApply.pairConfigs || []);
-      setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
-      setPairConfigs(settingsToApply.pairConfigs || []);
-      // selectedMode removed - now hardcoded to use specific model
-      setSteerableMotionSettings({
-        ...(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS),
-        apply_causvid: false // Force apply_causvid to false regardless of saved settings
+      // CRITICAL FIX: Batch all state updates using startTransition to prevent cascade renders
+      startTransition(() => {
+        setVideoControlMode(settingsToApply.videoControlMode || 'batch');
+        setBatchVideoPrompt(settingsToApply.batchVideoPrompt || '');
+        setBatchVideoFrames(settingsToApply.batchVideoFrames || 60);
+        setBatchVideoContext(settingsToApply.batchVideoContext || 10);
+        setBatchVideoSteps(settingsToApply.batchVideoSteps || 4);
+        setDimensionSource(settingsToApply.dimensionSource || 'firstImage');
+        setCustomWidth(settingsToApply.customWidth);
+        setCustomHeight(settingsToApply.customHeight);
+        setEnhancePrompt(settingsToApply.enhancePrompt || false);
+        setTurboMode(settingsToApply.turboMode || false);
+        setAmountOfMotion(settingsToApply.amountOfMotion ?? 50); // Default to 50 if not present
+        setVideoPairConfigs(settingsToApply.pairConfigs || []);
+        setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
+        setPairConfigs(settingsToApply.pairConfigs || []);
+        // selectedMode removed - now hardcoded to use specific model
+        setSteerableMotionSettings({
+          ...(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS),
+          apply_causvid: false // Force apply_causvid to false regardless of saved settings
+        });
       });
     }
   }, [settings, isLoadingSettings, selectedShot?.id, updateSettings]);
@@ -864,13 +884,16 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotImagesForCalculation]);
 
   // Update videoPairConfigs when computed configs change
+  // OPTIMIZATION: Use React.startTransition to prevent blocking renders
   const videoPairConfigsRef = useRef(videoPairConfigs);
   videoPairConfigsRef.current = videoPairConfigs;
   
   useEffect(() => {
     // Only update if the configs have actually changed to prevent infinite loops
     if (!deepEqual(videoPairConfigsRef.current, computedVideoPairConfigs)) {
-      setVideoPairConfigs(computedVideoPairConfigs);
+      startTransition(() => {
+        setVideoPairConfigs(computedVideoPairConfigs);
+      });
     }
   }, [computedVideoPairConfigs]);
 
@@ -891,6 +914,7 @@ const VideoTravelToolPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // CONSOLIDATED: Handle shot selection logic in one effect to prevent race conditions
   useEffect(() => {
     // Only attempt to auto-select a shot if we navigated here via a shot click
     if (!viaShotClick) {
@@ -900,8 +924,10 @@ const VideoTravelToolPage: React.FC = () => {
     // Case 1: No current shot ID - clear selection
     if (!currentShotId) {
       if (selectedShot) {
-        setSelectedShot(null);
-        setVideoPairConfigs([]);
+        startTransition(() => {
+          setSelectedShot(null);
+          setVideoPairConfigs([]);
+        });
       }
       return;
     }
@@ -919,23 +945,15 @@ const VideoTravelToolPage: React.FC = () => {
       } else {
         // Shot not found, redirect to main view
         console.log(`[VideoTravelTool] Shot ${currentShotId} not found, redirecting to main view`);
-        setSelectedShot(null);
-        setVideoPairConfigs([]);
-        setCurrentShotId(null);
+        startTransition(() => {
+          setSelectedShot(null);
+          setVideoPairConfigs([]);
+          setCurrentShotId(null);
+        });
         navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
       }
     }
-  }, [currentShotId, shots, viaShotClick, navigate, location.pathname]); // Removed selectedShot from deps to avoid loops
-
-  // NEW: Immediately select shot on mount if we have the data
-  useEffect(() => {
-    if (viaShotClick && currentShotId && shots && !selectedShot) {
-      const shotToSelect = shots.find(shot => shot.id === currentShotId);
-      if (shotToSelect) {
-        setSelectedShot(shotToSelect);
-      }
-    }
-  }, [viaShotClick, currentShotId, shots, selectedShot]);
+  }, [currentShotId, shots, viaShotClick, navigate, location.pathname, selectedShot, setCurrentShotId]);
 
   const handleShotSelect = (shot: Shot) => {
     // Reset videos view when selecting a shot
@@ -1051,7 +1069,12 @@ const VideoTravelToolPage: React.FC = () => {
           projectId: selectedProjectId,
         });
         
-        newShot = result.shot;
+        // Transform the database response to match Shot interface
+        newShot = {
+          ...result.shot,
+          images: [], // New shot starts with no images
+          position: 0 // New shots start at position 0, will be updated by the backend
+        } as Shot;
         
         // Refetch shots to update the list
         await refetchShots();

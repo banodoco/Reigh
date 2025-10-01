@@ -50,6 +50,20 @@ export function timeEnd(tag: string, label: string): void {
 // Dedicated onRender callback for React Profiler so callers don't need to re-implement it.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function reactProfilerOnRender(...rawArgs: any[]): void {
+  // Import debugConfig dynamically to avoid circular dependencies
+  try {
+    const { debugConfig } = require('./debugConfig');
+    if (!debugConfig.isEnabled('reactProfiler')) {
+      return; // Skip logging if ReactProfiler debugging is disabled
+    }
+  } catch {
+    // Fallback to environment variable if debugConfig is not available
+    const flag = (typeof import.meta !== 'undefined' && import.meta.env) ? (import.meta.env.VITE_DEBUG_REACT_PROFILER as string | undefined) : process.env.VITE_DEBUG_REACT_PROFILER;
+    if (flag !== 'true' && flag !== '1') {
+      return;
+    }
+  }
+  
   const [id, phase, actualDuration, baseDuration, startTime, commitTime, interactions] = rawArgs;
   log('ReactProfiler', {
     id,
