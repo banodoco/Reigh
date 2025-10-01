@@ -309,40 +309,29 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
           {/* Treatment mode */}
           <div className="space-y-2">
             <Label className="text-sm">How would you like to use the guidance video?</Label>
-            <div className="w-full">
-              <Select value={treatment} onValueChange={onTreatmentChange}>
-                <SelectTrigger className="h-9 w-full">
-                  <SelectValue>
-                    {treatment === 'adjust' 
-                      ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' video to timeline'
-                      : 'Use video frames as-is'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="adjust">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="font-medium">
-                        {totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} video to timeline
-                      </div>
-                      {adjustModeDescription && (
-                        <div className="text-xs text-muted-foreground">
-                          {adjustModeDescription}
-                        </div>
-                      )}
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="clip">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="font-medium">Use video frames as-is</div>
-                      {clipModeDescription && (
-                        <div className="text-xs text-muted-foreground">
-                          {clipModeDescription}
-                        </div>
-                      )}
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0" style={{ width: '200px' }}>
+                <Select value={treatment} onValueChange={onTreatmentChange}>
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue>
+                      {treatment === 'adjust' 
+                        ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
+                        : 'Use as-is'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="adjust">
+                      {totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline
+                    </SelectItem>
+                    <SelectItem value="clip">
+                      Use video frames as-is
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 text-xs text-muted-foreground pt-2 leading-relaxed">
+                {treatment === 'adjust' ? adjustModeDescription : clipModeDescription}
+              </div>
             </div>
           </div>
 
