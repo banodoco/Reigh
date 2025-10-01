@@ -38,6 +38,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
+import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -95,6 +96,91 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { shots } = useShots(); // Get shots from context for shot metadata
   const selectedShot = shots?.find(shot => shot.id === selectedShotId);
   
+  // Structure video persistence using separate tool settings (per-shot basis)
+  const { 
+    settings: structureVideoSettings, 
+    update: updateStructureVideoSettings,
+    isLoading: isStructureVideoSettingsLoading 
+  } = useToolSettings<{
+    path?: string;
+    metadata?: VideoMetadata;
+    treatment?: 'adjust' | 'clip';
+    motionStrength?: number;
+  }>('travel-structure-video', { 
+    projectId, 
+    shotId: selectedShot?.id,
+    enabled: !!selectedShot?.id 
+  });
+
+  // Structure video state
+  const [structureVideoPath, setStructureVideoPath] = useState<string | null>(null);
+  const [structureVideoMetadata, setStructureVideoMetadata] = useState<VideoMetadata | null>(null);
+  const [structureVideoTreatment, setStructureVideoTreatment] = useState<'adjust' | 'clip'>('adjust');
+  const [structureVideoMotionStrength, setStructureVideoMotionStrength] = useState<number>(1.0);
+  const [hasInitializedStructureVideo, setHasInitializedStructureVideo] = useState<string | null>(null);
+
+  // Reset initialization state when shot changes
+  useEffect(() => {
+    if (selectedShot?.id !== hasInitializedStructureVideo) {
+      setHasInitializedStructureVideo(null);
+    }
+  }, [selectedShot?.id, hasInitializedStructureVideo]);
+
+  // Load structure video from settings when shot loads
+  useEffect(() => {
+    if (!hasInitializedStructureVideo && !isStructureVideoSettingsLoading && selectedShot?.id) {
+      if (structureVideoSettings?.path && structureVideoSettings?.metadata) {
+        console.log('[ShotEditor] Loading structure video from settings:', structureVideoSettings);
+        setStructureVideoPath(structureVideoSettings.path);
+        setStructureVideoMetadata(structureVideoSettings.metadata);
+        setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
+        setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
+      } else {
+        // No saved structure video - initialize with defaults
+        setStructureVideoPath(null);
+        setStructureVideoMetadata(null);
+        setStructureVideoTreatment('adjust');
+        setStructureVideoMotionStrength(1.0);
+      }
+      setHasInitializedStructureVideo(selectedShot.id);
+    }
+  }, [structureVideoSettings, isStructureVideoSettingsLoading, selectedShot?.id, hasInitializedStructureVideo]);
+
+  // Handler for structure video changes with auto-save
+  const handleStructureVideoChange = useCallback((
+    videoPath: string | null,
+    metadata: VideoMetadata | null,
+    treatment: 'adjust' | 'clip',
+    motionStrength: number
+  ) => {
+    console.log('[ShotEditor] Structure video changed:', {
+      videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
+      metadata,
+      treatment,
+      motionStrength
+    });
+    
+    setStructureVideoPath(videoPath);
+    if (metadata) {
+      setStructureVideoMetadata(metadata);
+    }
+    setStructureVideoTreatment(treatment);
+    setStructureVideoMotionStrength(motionStrength);
+
+    // Save to database
+    if (videoPath && metadata) {
+      updateStructureVideoSettings('shot', {
+        path: videoPath,
+        metadata,
+        treatment,
+        motionStrength
+      });
+    } else {
+      // Clear structure video
+      updateStructureVideoSettings('shot', {});
+    }
+  }, [updateStructureVideoSettings]);
+
   // PERFORMANCE OPTIMIZATION: Prefetch adjacent shots for faster navigation
   React.useEffect(() => {
     if (!shots || !selectedShotId) return;
@@ -1340,6 +1426,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     if (resolution) {
       requestBody.resolution = resolution;
     }
+
+    // Add structure video params if available
+    if (structureVideoPath) {
+      console.log('[Generation] Adding structure video to task:', {
+        videoPath: structureVideoPath,
+        treatment: structureVideoTreatment,
+        motionStrength: structureVideoMotionStrength
+      });
+      requestBody.structure_video_path = structureVideoPath;
+      requestBody.structure_video_treatment = structureVideoTreatment;
+      requestBody.structure_video_motion_strength = structureVideoMotionStrength;
+    }
     
     setIsSteerableMotionEnqueuing(true);
     setSteerableMotionJustQueued(false);
@@ -1462,6 +1560,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             generationMode={generationMode}
             onGenerationModeChange={onGenerationModeChange}
             selectedShotId={selectedShot.id}
+            projectId={projectId}
             shotName={selectedShot.name}
             batchVideoFrames={batchVideoFrames}
             batchVideoContext={batchVideoContext}
@@ -1496,6 +1595,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onDefaultPromptChange={onBatchVideoPromptChange}
             defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
             onDefaultNegativePromptChange={(value) => onSteerableMotionSettingsChange({ negative_prompt: value })}
+            // Structure video props
+            structureVideoPath={structureVideoPath}
+            structureVideoMetadata={structureVideoMetadata}
+            structureVideoTreatment={structureVideoTreatment}
+            structureVideoMotionStrength={structureVideoMotionStrength}
+            onStructureVideoChange={handleStructureVideoChange}
           />
         </div>
 

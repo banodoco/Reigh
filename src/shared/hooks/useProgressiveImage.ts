@@ -63,7 +63,8 @@ export const useProgressiveImage = (
   // Helper function to cancel active session
   const cancelActiveSession = useCallback((reason: string) => {
     if (activeSessionRef.current?.isActive) {
-      console.log(`🧹 [ProgressiveImage] Canceling session: ${reason}`);
+      // Silently cancel session - no need to log this frequent operation
+      // console.log(`🧹 [ProgressiveImage] Canceling session: ${reason}`);
       activeSessionRef.current.abortController.abort();
       activeSessionRef.current.timeouts.forEach(timeout => clearTimeout(timeout));
       activeSessionRef.current.isActive = false;
@@ -294,7 +295,8 @@ export const useProgressiveImage = (
         // Thumbnail failed to load - fall back to loading full image directly
         if (!isSessionActive(session)) return;
         
-        console.warn('[ProgressiveImage] Thumbnail failed to load, falling back to full image:', thumbErr.message);
+        // Silently fall back to full image - no need to log this common scenario
+        // console.warn('[ProgressiveImage] Thumbnail failed to load, falling back to full image:', thumbErr.message);
         
         if (hasFull) {
           safeSetState(session, () => {

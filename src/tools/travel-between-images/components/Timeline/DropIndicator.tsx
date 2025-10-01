@@ -20,9 +20,11 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
     return null;
   }
 
-  // Use same positioning calculation as TimelineItem
-  const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
-  const pixelPosition = TIMELINE_HORIZONTAL_PADDING + ((dropTargetFrame - fullMin) / fullRange) * effectiveWidth;
+  // Use same positioning calculation as TimelineItem (with image centering)
+  const imageHalfWidth = 48; // Half of 96px image width for centering
+  const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth;
+  const effectiveWidth = containerWidth - (paddingOffset * 2);
+  const pixelPosition = paddingOffset + ((dropTargetFrame - fullMin) / fullRange) * effectiveWidth;
   const leftPercent = (pixelPosition / containerWidth) * 100;
 
   return (

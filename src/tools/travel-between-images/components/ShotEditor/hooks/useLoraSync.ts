@@ -71,7 +71,10 @@ export const useLoraSync = ({
   const lastEffectRunRef = useRef<string>('');
   useEffect(() => {
     // Create a unique key for this effect run to prevent duplicate processing
-    const effectKey = `${selectedShot?.id}-${isShotLoraSettingsLoading}-${hasInitializedShot}-${availableLoras.length}`;
+    // Include serialized settings to detect actual changes
+    const shotLorasKey = JSON.stringify(shotLoraSettings?.loras || []);
+    const projectLorasKey = JSON.stringify(projectLoraSettings?.loras || []);
+    const effectKey = `${selectedShot?.id}-${isShotLoraSettingsLoading}-${hasInitializedShot}-${availableLoras.length}-${shotLorasKey}-${projectLorasKey}`;
     
     // Skip if this exact combination has already been processed
     if (effectKey === lastEffectRunRef.current) {

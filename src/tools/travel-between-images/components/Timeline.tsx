@@ -64,6 +64,7 @@ import TimelineContainer from "./Timeline/TimelineContainer";
 // Main Timeline component props
 export interface TimelineProps {
   shotId: string;
+  projectId?: string;
   frameSpacing: number;
   contextFrames: number;
   onImageReorder: (orderedIds: string[]) => void;
@@ -112,6 +113,17 @@ export interface TimelineProps {
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
+  // Structure video props (matches backend parameter names)
+  structureVideoPath?: string | null;
+  structureVideoMetadata?: import("@/shared/lib/videoUploader").VideoMetadata | null;
+  structureVideoTreatment?: 'adjust' | 'clip';
+  structureVideoMotionStrength?: number;
+  onStructureVideoChange?: (
+    videoPath: string | null,
+    metadata: import("@/shared/lib/videoUploader").VideoMetadata | null,
+    treatment: 'adjust' | 'clip',
+    motionStrength: number
+  ) => void;
 }
 
 /**
@@ -119,6 +131,7 @@ export interface TimelineProps {
  */
 const Timeline: React.FC<TimelineProps> = ({
   shotId,
+  projectId,
   frameSpacing,
   contextFrames,
   onImageReorder,
@@ -142,7 +155,13 @@ const Timeline: React.FC<TimelineProps> = ({
   onImageDuplicate,
   duplicatingImageId,
   duplicateSuccessImageId,
-  projectAspectRatio
+  projectAspectRatio,
+  // Structure video props
+  structureVideoPath,
+  structureVideoMetadata,
+  structureVideoTreatment,
+  structureVideoMotionStrength,
+  onStructureVideoChange
 }) => {
   
   // Core state
@@ -251,6 +270,8 @@ const Timeline: React.FC<TimelineProps> = ({
     goNext,
     goPrev,
     closeLightbox,
+    handleDesktopDoubleClick,
+    handleMobileTap,
     hasNext,
     hasPrevious,
     showNavigation
@@ -277,6 +298,7 @@ const Timeline: React.FC<TimelineProps> = ({
       {/* Timeline Container - includes both controls and timeline */}
       <TimelineContainer
         shotId={shotId}
+        projectId={projectId}
         images={images}
         contextFrames={contextFrames}
         framePositions={displayPositions}
@@ -289,14 +311,21 @@ const Timeline: React.FC<TimelineProps> = ({
         setIsDragInProgress={setIsDragInProgress}
         onPairClick={onPairClick}
         pairPrompts={actualPairPrompts}
-                defaultPrompt={defaultPrompt}
-                defaultNegativePrompt={defaultNegativePrompt}
+        defaultPrompt={defaultPrompt}
+        defaultNegativePrompt={defaultNegativePrompt}
         onImageDelete={onImageDelete}
         onImageDuplicate={onImageDuplicate}
-                duplicatingImageId={duplicatingImageId}
-                duplicateSuccessImageId={duplicateSuccessImageId}
-                projectAspectRatio={projectAspectRatio}
-              />
+        duplicatingImageId={duplicatingImageId}
+        duplicateSuccessImageId={duplicateSuccessImageId}
+        projectAspectRatio={projectAspectRatio}
+        handleDesktopDoubleClick={handleDesktopDoubleClick}
+        handleMobileTap={handleMobileTap}
+        structureVideoPath={structureVideoPath}
+        structureVideoMetadata={structureVideoMetadata}
+        structureVideoTreatment={structureVideoTreatment}
+        structureVideoMotionStrength={structureVideoMotionStrength}
+        onStructureVideoChange={onStructureVideoChange}
+      />
 
       {/* Lightbox */}
       {lightboxIndex !== null && currentLightboxImage && (

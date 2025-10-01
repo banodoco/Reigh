@@ -6,13 +6,14 @@ import ShotImageManager from "@/shared/components/ShotImageManager";
 import Timeline from "./Timeline"; // Main timeline component with drag/drop and image actions
 import { Button } from "@/shared/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
-import FileInput from "@/shared/components/FileInput";
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
 import PairPromptModal from "./Timeline/PairPromptModal";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getDisplayUrl } from '@/shared/lib/utils';
+import type { VideoMetadata } from '@/shared/lib/videoUploader';
+import { BatchGuidanceVideo } from './BatchGuidanceVideo';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -27,6 +28,8 @@ interface ShotImagesEditorProps {
   onGenerationModeChange: (mode: "batch" | "timeline") => void;
   /** Selected shot id */
   selectedShotId: string;
+  /** Project id for video uploads */
+  projectId?: string;
   /** Shot name for download filename */
   shotName?: string;
   /** Frame spacing (frames between key-frames) */
@@ -79,6 +82,17 @@ interface ShotImagesEditorProps {
   /** Default negative prompt for timeline pairs (from existing generation settings) */
   defaultNegativePrompt?: string;
   onDefaultNegativePromptChange?: (prompt: string) => void;
+  /** Structure video props - passed from parent for task generation */
+  structureVideoPath?: string | null;
+  structureVideoMetadata?: VideoMetadata | null;
+  structureVideoTreatment?: 'adjust' | 'clip';
+  structureVideoMotionStrength?: number;
+  onStructureVideoChange?: (
+    videoPath: string | null,
+    metadata: VideoMetadata | null,
+    treatment: 'adjust' | 'clip',
+    motionStrength: number
+  ) => void;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -90,6 +104,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   generationMode,
   onGenerationModeChange,
   selectedShotId,
+  projectId,
   shotName,
   batchVideoFrames,
   batchVideoContext,
@@ -117,6 +132,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onDefaultPromptChange,
   defaultNegativePrompt = "",
   onDefaultNegativePromptChange,
+  // Structure video props
+  structureVideoPath: propStructureVideoPath,
+  structureVideoMetadata: propStructureVideoMetadata,
+  structureVideoTreatment: propStructureVideoTreatment = 'adjust',
+  structureVideoMotionStrength: propStructureVideoMotionStrength = 1.0,
+  onStructureVideoChange: propOnStructureVideoChange,
 }) => {
   // Force mobile to use batch mode regardless of desktop setting
   const effectiveGenerationMode = isMobile ? 'batch' : generationMode;
@@ -375,6 +396,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               <Timeline
                 key={`timeline-${selectedShotId}-${memoizedShotGenerations.length}-${images.length}`}
                 shotId={selectedShotId}
+                projectId={projectId}
                 frameSpacing={batchVideoFrames}
                 contextFrames={batchVideoContext}
                 onImageReorder={onImageReorder}
@@ -407,54 +429,84 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 }}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
+                // Structure video props
+                structureVideoPath={propStructureVideoPath}
+                structureVideoMetadata={propStructureVideoMetadata}
+                structureVideoTreatment={propStructureVideoTreatment}
+                structureVideoMotionStrength={propStructureVideoMotionStrength}
+                onStructureVideoChange={propOnStructureVideoChange}
               />
               </>
             ) : (
-              <ShotImageManager
-                images={images}
-                onImageDelete={handleDelete}
-                onBatchImageDelete={onBatchImageDelete}
-                onImageDuplicate={onImageDuplicate}
-                onImageReorder={handleReorder}
-                columns={columns}
-                generationMode={isMobile ? "batch" : generationMode}
-                onImageSaved={onImageSaved}
-                onMagicEdit={(imageUrl, prompt, numImages) => {
-                  // TODO: Wire through real magic-edit handler later.
-                  console.log("Magic Edit:", { imageUrl, prompt, numImages });
-                }}
-                duplicatingImageId={duplicatingImageId}
-                duplicateSuccessImageId={duplicateSuccessImageId}
-                projectAspectRatio={projectAspectRatio}
-              />
+              <>
+                {/* Batch mode structure video */}
+                {selectedShotId && projectId && propOnStructureVideoChange && (
+                  <BatchGuidanceVideo
+                    shotId={selectedShotId}
+                    projectId={projectId}
+                    videoUrl={propStructureVideoPath}
+                    videoMetadata={propStructureVideoMetadata}
+                    treatment={propStructureVideoTreatment}
+                    motionStrength={propStructureVideoMotionStrength}
+                    imageCount={images.length}
+                    timelineFramePositions={images.map(img => (img as any).timeline_frame || 0).filter(f => typeof f === 'number')}
+                    onVideoUploaded={(videoUrl, metadata) => {
+                      propOnStructureVideoChange(
+                        videoUrl,
+                        metadata,
+                        propStructureVideoTreatment,
+                        propStructureVideoMotionStrength
+                      );
+                    }}
+                    onTreatmentChange={(treatment) => {
+                      if (propStructureVideoPath && propStructureVideoMetadata) {
+                        propOnStructureVideoChange(
+                          propStructureVideoPath,
+                          propStructureVideoMetadata,
+                          treatment,
+                          propStructureVideoMotionStrength
+                        );
+                      }
+                    }}
+                    onMotionStrengthChange={(strength) => {
+                      if (propStructureVideoPath && propStructureVideoMetadata) {
+                        propOnStructureVideoChange(
+                          propStructureVideoPath,
+                          propStructureVideoMetadata,
+                          propStructureVideoTreatment,
+                          strength
+                        );
+                      }
+                    }}
+                  />
+                )}
+                
+                {/* Subheader for input images */}
+                <h3 className="text-sm font-semibold mb-2 text-foreground">Input Images</h3>
+                
+                <ShotImageManager
+                  images={images}
+                  onImageDelete={handleDelete}
+                  onBatchImageDelete={onBatchImageDelete}
+                  onImageDuplicate={onImageDuplicate}
+                  onImageReorder={handleReorder}
+                  columns={columns}
+                  generationMode={isMobile ? "batch" : generationMode}
+                  onImageSaved={onImageSaved}
+                  onMagicEdit={(imageUrl, prompt, numImages) => {
+                    // TODO: Wire through real magic-edit handler later.
+                    console.log("Magic Edit:", { imageUrl, prompt, numImages });
+                  }}
+                  duplicatingImageId={duplicatingImageId}
+                  duplicateSuccessImageId={duplicateSuccessImageId}
+                  projectAspectRatio={projectAspectRatio}
+                  onImageUpload={onImageUpload}
+                  isUploadingImage={isUploadingImage}
+                />
+              </>
             )}
           </div>
         )}
-
-        {/* Upload Input - Moved below images */}
-        <div className="mt-4">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="w-full">
-                  <FileInput
-                    key={fileInputKey}
-                    onFileChange={(files) => { onImageUpload(files); }}
-                    acceptTypes={["image"]}
-                    multiple
-                    disabled={isUploadingImage}
-                    label={isUploadingImage ? "Uploading..." : "Add Images"}
-                    className="w-full"
-                    suppressAcceptedTypes
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Upload new images to this shot</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
 
         {/* Helper for un-positioned generations - Reserve space during loading to prevent layout shift */}
         <div className="mx-1 mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>

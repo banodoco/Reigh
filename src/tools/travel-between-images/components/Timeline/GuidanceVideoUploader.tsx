@@ -1,0 +1,140 @@
+import React, { useState } from 'react';
+import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Video } from 'lucide-react';
+import { toast } from 'sonner';
+import { uploadVideoToStorage, extractVideoMetadata, VideoMetadata } from '@/shared/lib/videoUploader';
+
+interface GuidanceVideoUploaderProps {
+  shotId: string;
+  projectId: string;
+  onVideoUploaded: (videoUrl: string | null, metadata: VideoMetadata | null) => void;
+  currentVideoUrl?: string | null;
+}
+
+export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
+  shotId,
+  projectId,
+  onVideoUploaded,
+  currentVideoUrl
+}) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please upload an MP4, WebM, or MOV file.');
+      return;
+    }
+
+    // Validate file size (max 200MB)
+    const maxSizeMB = 200;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > maxSizeMB) {
+      toast.error(`File too large. Maximum size is ${maxSizeMB}MB (file is ${fileSizeMB.toFixed(1)}MB)`);
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      // 1. Extract metadata
+      console.log('[GuidanceVideo] Extracting metadata...');
+      const metadata = await extractVideoMetadata(file);
+      console.log('[GuidanceVideo] Metadata extracted:', metadata);
+      setUploadProgress(25);
+      
+      // 2. Upload to storage
+      console.log('[GuidanceVideo] Uploading to storage...');
+      const videoUrl = await uploadVideoToStorage(file, projectId);
+      console.log('[GuidanceVideo] Upload complete:', videoUrl);
+      setUploadProgress(100);
+      
+      // 3. Notify parent
+      onVideoUploaded(videoUrl, metadata);
+      
+      toast.success('Structure video uploaded successfully');
+    } catch (error) {
+      console.error('[GuidanceVideo] Upload failed:', error);
+      toast.error(`Failed to upload video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveVideo = () => {
+    onVideoUploaded(null, null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    toast.success('Structure video removed');
+  };
+  
+  if (currentVideoUrl) {
+    // Don't show uploader if video is already uploaded (settings are in the strip)
+    return null;
+  }
+
+  return (
+    <div className="relative w-full">
+      {/* Placeholder strip with upload button overlaid */}
+      <div className="relative h-28 bg-gradient-to-b from-muted/30 to-muted/10 border-l border-r border-t rounded-t overflow-hidden mb-0">
+        {/* Upload button overlaid on top-right */}
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime"
+            onChange={handleFileSelect}
+            disabled={isUploading}
+            className="hidden"
+            id={`video-upload-${shotId}`}
+          />
+          <Label htmlFor={`video-upload-${shotId}`} className="m-0 cursor-pointer">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isUploading}
+              className="h-6 text-[10px] px-2 py-0"
+              asChild
+            >
+              <span className="flex items-center gap-1.5">
+                <Video className="h-3 w-3" />
+                {isUploading ? 'Uploading...' : 'Upload Video'}
+              </span>
+            </Button>
+          </Label>
+        </div>
+
+        {/* Center message */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <Video className="h-10 w-10 text-muted-foreground/30" />
+          <span className="text-xs text-muted-foreground">
+            {isUploading ? `Uploading... ${uploadProgress}%` : 'No structure video uploaded'}
+          </span>
+          {isUploading && (
+            <div className="w-48 bg-muted rounded-full h-1.5">
+              <div 
+                className="bg-primary h-1.5 rounded-full transition-all"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+

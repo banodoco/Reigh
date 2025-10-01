@@ -3,24 +3,29 @@ import { GenerationRow } from '@/types/shots';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { calculateMaxGap, getPairInfo, getTimelineDimensions } from './utils/timeline-utils';
 import { timelineDebugger } from './utils/timeline-debug';
+import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 // Import components
-import TimelineControls from './TimelineControls';
 import TimelineRuler from './TimelineRuler';
 import DropIndicator from './DropIndicator';
 import PairRegion from './PairRegion';
 import TimelineItem from './TimelineItem';
+import { GuidanceVideoStrip } from './GuidanceVideoStrip';
+import { GuidanceVideoUploader } from './GuidanceVideoUploader';
 import { TIMELINE_HORIZONTAL_PADDING } from './constants';
+import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
 
 // Import hooks
 import { useZoom } from './hooks/useZoom';
 import { useFileDrop } from './hooks/useFileDrop';
 import { useTimelineDrag } from './hooks/useTimelineDrag';
 import { useGlobalEvents } from './hooks/useGlobalEvents';
-import { useLightbox } from './hooks/useLightbox';
 
 interface TimelineContainerProps {
   shotId: string;
+  projectId?: string;
   images: GenerationRow[];
   contextFrames: number;
   framePositions: Map<string, number>;
@@ -43,10 +48,25 @@ interface TimelineContainerProps {
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
+  // Lightbox handlers
+  handleDesktopDoubleClick: (idx: number) => void;
+  handleMobileTap: (idx: number) => void;
+  // Structure video props
+  structureVideoPath?: string | null;
+  structureVideoMetadata?: VideoMetadata | null;
+  structureVideoTreatment?: 'adjust' | 'clip';
+  structureVideoMotionStrength?: number;
+  onStructureVideoChange?: (
+    videoPath: string | null,
+    metadata: VideoMetadata | null,
+    treatment: 'adjust' | 'clip',
+    motionStrength: number
+  ) => void;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
   shotId,
+  projectId,
   images,
   contextFrames,
   framePositions,
@@ -65,8 +85,36 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   onImageDuplicate,
   duplicatingImageId,
   duplicateSuccessImageId,
-  projectAspectRatio
+  projectAspectRatio,
+  handleDesktopDoubleClick,
+  handleMobileTap,
+  structureVideoPath,
+  structureVideoMetadata,
+  structureVideoTreatment = 'adjust',
+  structureVideoMotionStrength = 1.0,
+  onStructureVideoChange
 }) => {
+  // Local state for reset gap and pending context
+  const [resetGap, setResetGap] = useState<number>(10);
+  const [pendingContext, setPendingContext] = useState<number>(contextFrames);
+  const maxGap = Math.max(1, 81 - pendingContext);
+  
+  // Sync pending context when actual context changes externally
+  useEffect(() => {
+    setPendingContext(contextFrames);
+  }, [contextFrames]);
+  
+  // Adjust resetGap when pendingContext changes to keep it within valid range
+  useEffect(() => {
+    if (resetGap > maxGap) {
+      setResetGap(maxGap);
+    }
+  }, [pendingContext, maxGap, resetGap]);
+  
+  // Handle reset button click
+  const handleReset = () => {
+    onResetFrames(resetGap, pendingContext);
+  };
   
   // Refs
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -83,7 +131,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
   // Get actual container dimensions for calculations
   const containerRect = containerRef.current?.getBoundingClientRect() || null;
-  const containerWidth = containerRef.current?.clientWidth || 1000;
+  const baseContainerWidth = containerRef.current?.clientWidth || 1000;
+  // Adjust container width for zoom level to match video strip calculations
+  const containerWidth = baseContainerWidth;
 
   // Drag hook
   const {
@@ -130,6 +180,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleWheel,
   } = useZoom({ fullMin, fullMax, fullRange });
 
+  // Force re-render when zoom changes to update containerWidth measurement
+  const [, forceUpdate] = useState({});
+  useEffect(() => {
+    // Small delay to allow DOM to reflow after zoom change
+    const timer = setTimeout(() => {
+      forceUpdate({});
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [zoomLevel]);
+
   // File drop hook
   const {
     isFileOver,
@@ -139,21 +199,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleDragLeave,
     handleDrop,
   } = useFileDrop({ onImageDrop, fullMin, fullRange });
-
-  // Lightbox hook
-  const {
-    lightboxIndex,
-    currentLightboxImage,
-    goNext,
-    goPrev,
-    openLightbox,
-    closeLightbox,
-    handleMobileTap,
-    handleDesktopDoubleClick,
-    hasNext,
-    hasPrevious,
-    showNavigation
-  } = useLightbox({ images, shotId, isMobile });
 
   // Simple drag state tracking - remove excessive logging
 
@@ -193,18 +238,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
   return (
     <div className="w-full overflow-x-hidden">
-      {/* Controls */}
-      <TimelineControls
-        contextFrames={contextFrames}
-        onContextFramesChange={onContextFramesChange}
-        zoomLevel={zoomLevel}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onZoomReset={handleZoomReset}
-        onZoomToStart={handleZoomToStart}
-        onResetFrames={onResetFrames}
-      />
-
       {/* Timeline */}
       <div
         ref={timelineRef}
@@ -218,6 +251,44 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* Zoom controls at top inside box */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomReset}
+            disabled={zoomLevel <= 1}
+            className="h-7 text-xs px-2"
+          >
+            Reset
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 1}
+            className="h-7 w-7 p-0"
+          >
+            −
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomIn}
+            className="h-7 w-7 p-0"
+          >
+            +
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomToStart}
+            className="h-7 text-xs px-2"
+          >
+            ← Start
+          </Button>
+        </div>
         {/* Drop position indicator */}
         <DropIndicator
           isVisible={isFileOver}
@@ -226,6 +297,47 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           fullRange={fullRange}
           containerWidth={containerWidth}
         />
+
+        {/* Structure video strip or uploader */}
+        {shotId && projectId && onStructureVideoChange && (
+          <>
+            {structureVideoPath && structureVideoMetadata ? (
+              <GuidanceVideoStrip
+                videoUrl={structureVideoPath}
+                videoMetadata={structureVideoMetadata}
+                treatment={structureVideoTreatment}
+                motionStrength={structureVideoMotionStrength}
+                onTreatmentChange={(treatment) => {
+                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
+                }}
+                onMotionStrengthChange={(strength) => {
+                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength);
+                }}
+                onRemove={() => {
+                  onStructureVideoChange(null, null, 'adjust', 1.0);
+                }}
+                fullMin={fullMin}
+                fullMax={fullMax}
+                fullRange={fullRange}
+                containerWidth={containerWidth}
+                zoomLevel={zoomLevel}
+                timelineFrameCount={images.length}
+                frameSpacing={contextFrames}
+              />
+            ) : (
+              <GuidanceVideoUploader
+                shotId={shotId}
+                projectId={projectId}
+                onVideoUploaded={(videoUrl, metadata) => {
+                  if (videoUrl && metadata) {
+                    onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength);
+                  }
+                }}
+                currentVideoUrl={structureVideoPath}
+              />
+            )}
+          </>
+        )}
 
         {/* Ruler */}
         <TimelineRuler
@@ -236,18 +348,19 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           containerWidth={containerWidth}
         />
 
-        {/* Timeline container */}
+        {/* Timeline container - visually connected to structure video above */}
         <div
           ref={containerRef}
           id="timeline-container"
-          className="relative h-32 mb-8"
+          className={`relative h-32 mb-8 ${shotId && projectId && onStructureVideoChange ? 'border-l border-r border-b rounded-b bg-gradient-to-b from-muted/5 to-transparent' : ''}`}
           onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
           style={{
             width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
             minWidth: "100%",
             userSelect: 'none',
-            paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`, // Add left buffer space
-            paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`, // Add right buffer space
+            paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
+            paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
+            marginTop: (shotId && projectId && onStructureVideoChange) ? '-1px' : '0', // Overlap border for seamless connection
           }}
         >
           {/* Pair visualizations */}
@@ -417,6 +530,45 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               />
             );
           })}
+        </div>
+
+        {/* Gap and Context controls in bottom-left corner */}
+        <div className="absolute bottom-12 left-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
+          {/* Gap to reset (on left) */}
+          <div className="flex items-center gap-1.5">
+            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
+            <Slider
+              value={[resetGap]}
+              onValueChange={([value]) => setResetGap(value)}
+              min={1}
+              max={maxGap}
+              step={1}
+              className="w-16 h-4"
+            />
+          </div>
+
+          {/* Context frames (on right) */}
+          <div className="flex items-center gap-1.5">
+            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Context: {pendingContext}</Label>
+            <Slider
+              value={[pendingContext]}
+              onValueChange={([value]) => setPendingContext(value)}
+              min={1}
+              max={24}
+              step={1}
+              className="w-16 h-4"
+            />
+          </div>
+
+          {/* Reset button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            className="h-6 text-[10px] px-2"
+          >
+            Reset
+          </Button>
         </div>
       </div>
     </div>

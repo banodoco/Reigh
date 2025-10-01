@@ -21,6 +21,8 @@ src/tools/travel-between-images/
 │   │   ├── TimelineRuler.tsx          # Frame ruler display
 │   │   ├── DropIndicator.tsx          # File drop visual feedback
 │   │   ├── PairRegion.tsx             # Video pair visualization
+│   │   ├── GuidanceVideoUploader.tsx  # Structure video upload UI
+│   │   ├── GuidanceVideoStrip.tsx     # Structure video display with hover scrubbing
 │   │   ├── hooks/
 │   │   │   ├── useFileDrop.ts         # File drag/drop logic
 │   │   │   ├── useFramePositions.ts   # Frame position management
@@ -244,6 +246,66 @@ while (hasMore) {
 - Client-side sorting instead of database ordering for flexibility
 
 **Optimistic Updates**: ShotEditor uses optimistic state updates with conflict resolution to prevent UI flickering during reordering and editing operations.
+
+---
+
+## 🎥 Structure Video (ControlNet)
+
+> **Status**: ✅ Implemented | **Added**: 2025-10
+
+The timeline supports uploading a **structure video** (also called guidance video) to control motion during generation. This feature enables precise control over camera movement and object motion by providing a reference video that guides the generation process.
+
+### Components
+
+**GuidanceVideoUploader** (`Timeline/GuidanceVideoUploader.tsx`)
+- Upload interface with file validation (MP4, WebM, MOV, max 200MB)
+- Treatment mode selector: `adjust` (stretch/compress) or `clip` (use frames in range)
+- Motion strength slider: 0.0 (no motion) to 2.0 (amplified), default 1.0
+- Uses `videoUploader.ts` utility (follows `imageUploader.ts` pattern)
+
+**GuidanceVideoStrip** (`Timeline/GuidanceVideoStrip.tsx`)
+- Displays video above timeline with canvas-based rendering
+- Hover-to-scrub functionality for frame-accurate preview
+- Real-time frame mapping based on treatment mode
+- Visual indicators for playback speed and motion strength
+
+### Treatment Modes
+
+**Adjust Mode** (Default)
+- Time-stretches video to match timeline duration
+- Slows down or speeds up playback to align with timeline frames
+- Server handles actual frame interpolation during generation
+- Client-side display is visual-only, no image deletion
+
+**Clip Mode**
+- Direct 1:1 frame mapping between timeline and video
+- Shows frames in range, clips overflow or indicates gaps
+- Useful when video duration matches timeline exactly
+
+### Task Integration
+
+Structure video parameters are added to `TravelBetweenImagesTaskParams`:
+```typescript
+{
+  structure_video_path?: string | null;              // S3/Storage URL
+  structure_video_treatment?: 'adjust' | 'clip';     // Frame mismatch handling
+  structure_video_motion_strength?: number;          // 0.0-2.0, motion influence
+}
+```
+
+**Storage**: Videos uploaded to `image_uploads` bucket at path `guidance-videos/{projectId}/{timestamp}-{random}.{ext}`
+
+**State Management**: Per-shot state in `ShotEditor`, passed down through `ShotImagesEditor` → `Timeline` → `TimelineContainer` → `TimelineControls` and `GuidanceVideoStrip`
+
+**Video Metadata Extraction**: Uses HTML5 Video API to extract duration, estimated frame rate (30fps default), dimensions, and file size
+
+### Implementation Notes
+
+- Structure video state resets when switching shots (not persisted across navigation)
+- Metadata extraction happens client-side before upload
+- Frame calculation uses `TIMELINE_HORIZONTAL_PADDING` constant for accurate positioning
+- Canvas rendering optimizes hover scrubbing performance
+- Seek debouncing prevents excessive video seek operations
 
 ---
 

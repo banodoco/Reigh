@@ -361,31 +361,10 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     }
   };
 
-  // Log the raw shot images data to understand what we're getting
-  console.log('[ShotImageDebug] Processing shot images:', {
-    shotId: shot.id.substring(0, 8),
-    shotName: shot.name,
-    totalImages: shot.images?.length || 0,
-    sampleImages: shot.images?.slice(0, 3).map(img => ({
-      shotImageEntryId: img.shotImageEntryId,
-      type: img.type,
-      hasImageUrl: !!img.imageUrl,
-      hasLocation: !!img.location,
-      timeline_frame: (img as any).timeline_frame,
-      position: (img as any).position
-    })) || []
-  });
-
   // Match ShotEditor/ShotsPane: show only positioned, non-video images sorted by timeline_frame
   const positionedImages = (shot.images || [])
     .filter(img => {
       const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
-      console.log('[ShotImageDebug] Filtering image:', {
-        shotImageEntryId: img.shotImageEntryId,
-        timeline_frame: (img as any).timeline_frame,
-        hasTimelineFrame,
-        type: img.type
-      });
       return hasTimelineFrame;
     })
     .filter(img => {
@@ -401,18 +380,6 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     });
 
   const imagesToShow: GenerationRow[] = positionedImages.slice(0, 5);
-  
-  console.log('[ShotImageDebug] Final images to show:', {
-    shotId: shot.id.substring(0, 8),
-    shotName: shot.name,
-    positionedImagesCount: positionedImages.length,
-    imagesToShowCount: imagesToShow.length,
-    finalImages: imagesToShow.map(img => ({
-      shotImageEntryId: img.shotImageEntryId,
-      hasImageUrl: !!img.imageUrl,
-      timeline_frame: (img as any).timeline_frame
-    }))
-  });
   
   // Calculate how many placeholder blocks we need to fill to 5 total slots
   const maxSlots = 5;

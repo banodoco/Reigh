@@ -4,6 +4,7 @@ import { Slider } from "@/shared/components/ui/slider";
 import { Label } from "@/shared/components/ui/label";
 import { Info, ZoomOut, ZoomIn, RotateCcw, MoveLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 interface TimelineControlsProps {
   contextFrames: number;
@@ -14,6 +15,18 @@ interface TimelineControlsProps {
   onZoomReset: () => void;
   onZoomToStart: () => void;
   onResetFrames?: (gap: number, contextFrames: number) => void;
+  // Structure video props
+  shotId?: string;
+  projectId?: string;
+  structureVideoPath?: string | null;
+  structureVideoTreatment?: 'adjust' | 'clip';
+  structureVideoMotionStrength?: number;
+  onStructureVideoChange?: (
+    videoPath: string | null,
+    metadata: VideoMetadata | null,
+    treatment: 'adjust' | 'clip',
+    motionStrength: number
+  ) => void;
 }
 
 const TimelineControls: React.FC<TimelineControlsProps> = ({
@@ -25,6 +38,12 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
   onZoomReset,
   onZoomToStart,
   onResetFrames,
+  shotId,
+  projectId,
+  structureVideoPath,
+  structureVideoTreatment = 'adjust',
+  structureVideoMotionStrength = 1.0,
+  onStructureVideoChange,
 }) => {
   const [resetGap, setResetGap] = React.useState<number>(10);
   // Separate pending context frames from active context frames
@@ -43,7 +62,9 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
     }
   }, [pendingContextFrames, maxGap, resetGap]);
   return (
-    <div className="flex items-center justify-between mb-3 gap-6">
+    <div className="flex flex-col gap-3 mb-3">
+      {/* Timeline controls */}
+      <div className="flex items-center justify-between gap-6">
         <div className="flex items-center gap-4 flex-1">
           <div className="w-64">
             <Label htmlFor="resetGap" className="text-sm font-light">
@@ -173,6 +194,7 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
             </TooltipContent>
           </Tooltip>
         </div>
+      </div>
     </div>
   );
 };

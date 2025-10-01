@@ -27,6 +27,20 @@ export interface VideoTravelSettings {
   // Store the shot images as part of settings
   shotImageIds?: string[];
   // selectedLoras removed - now managed directly in ShotEditor with separate persistence
+  // Structure video settings (per-shot basis)
+  structureVideo?: {
+    path: string;
+    metadata: {
+      duration_seconds: number;
+      frame_rate: number;
+      total_frames: number;
+      width: number;
+      height: number;
+      file_size: number;
+    };
+    treatment: 'adjust' | 'clip';
+    motionStrength: number;
+  };
 }
 
 export const videoTravelSettings = {

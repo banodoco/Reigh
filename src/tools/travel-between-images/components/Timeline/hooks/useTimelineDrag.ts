@@ -344,19 +344,14 @@ export const useTimelineDrag = ({
   ]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, imageId: string, containerRef: React.RefObject<HTMLDivElement>) => {
-    e.preventDefault();
+    // Don't preventDefault immediately - allow double-click to work
+    // We'll prevent text selection via CSS user-select: none instead
     const container = containerRef.current;
     if (!container) return;
 
     // Ensure we start with a fresh, accurate mouse position for this drag
     // This prevents reusing a stale value from a previous drag session
     currentMousePosRef.current = { x: e.clientX, y: e.clientY };
-
-    // CRITICAL: Set drag in progress flag IMMEDIATELY to prevent query invalidation reloads
-    if (setIsDragInProgress) {
-      console.log('[TimelineMovementDebug] 🚀 DRAG STARTED - Setting isDragInProgress = true to prevent query reloads');
-      setIsDragInProgress(true);
-    }
 
     // Prevent phantom drags
     const now = Date.now();
@@ -479,6 +474,12 @@ export const useTimelineDrag = ({
       timestamp: e.timeStamp,
       timestampISO: new Date().toISOString()
     });
+
+    // CRITICAL: Set drag in progress flag to prevent query invalidation reloads
+    if (setIsDragInProgress) {
+      console.log('[TimelineMovementDebug] 🚀 DRAG STARTED - Setting isDragInProgress = true to prevent query reloads');
+      setIsDragInProgress(true);
+    }
 
     setDragState({
       isDragging: true,

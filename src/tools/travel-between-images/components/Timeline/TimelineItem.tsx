@@ -170,7 +170,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     setIsMagicEditOpen(true);
   };
   // Calculate position as pixel offset with padding adjustment
-  const paddingOffset = TIMELINE_HORIZONTAL_PADDING; // Left padding from container
+  const imageHalfWidth = 48; // Half of 96px image width for centering
+  const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth; // Left padding from container + half image width
   const effectiveWidth = timelineWidth - (paddingOffset * 2); // Subtract both left and right padding
   const pixelPosition = paddingOffset + ((framePosition - fullMinFrames) / fullRange) * effectiveWidth;
 

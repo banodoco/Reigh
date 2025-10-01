@@ -242,7 +242,7 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 |---------|----------|---------|
 | **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments |
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
-| **lib/** utilities | `/src/shared/lib/` | Image upload, auth, math helpers |
+| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns |
 
 ---
 

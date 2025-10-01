@@ -116,7 +116,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           <div className="flex items-center justify-center">
             <div className="flex items-center space-x-2">
               <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>
-                Input Images
+                Guidance
               </p>
               <span className={`${config.textSize} text-muted-foreground`}>
                 ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})

@@ -120,15 +120,22 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           loading="lazy"
         />
 
+        {/* Frame number overlay - bottom (matching timeline style) */}
+        {(image as any).timeline_frame !== undefined && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
+            <span className="inline-block">{(image as any).timeline_frame}</span>
+          </div>
+        )}
+
         {/* Selection overlay - removed blue tick */}
 
-        {/* Bottom left action buttons */}
-        <div className="absolute bottom-2 left-2 flex gap-1 opacity-100 transition-opacity">
+        {/* Top left action buttons - all 4 icons evenly spaced */}
+        <div className="absolute top-2 left-2 right-2 flex justify-between opacity-100 transition-opacity px-1">
           {/* Lightbox button */}
           <Button
             size="icon"
             variant="secondary"
-            className="h-8 w-8 bg-white/90 hover:bg-white"
+            className="h-8 w-8 bg-white/75 hover:bg-white/90"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenLightbox();
@@ -142,7 +149,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           <Button
             size="icon"
             variant="secondary"
-            className="h-8 w-8 bg-white/90 hover:bg-white"
+            className="h-8 w-8 bg-white/75 hover:bg-white/90"
             onClick={(e) => {
               e.stopPropagation();
               setIsMagicEditOpen(true);
@@ -151,17 +158,13 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           >
             <Sparkles className="h-3 w-3" />
           </Button>
-        </div>
-
-        {/* Top right action buttons */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity">
 
           {/* Duplicate button */}
           {onDuplicate && (
             <Button
               size="icon"
               variant="secondary"
-              className="h-8 w-8 bg-white/90 hover:bg-white"
+              className="h-8 w-8 bg-white/75 hover:bg-white/90"
               onClick={(e) => {
                 e.stopPropagation();
                 onDuplicate((image as any).shotImageEntryId ?? (image as any).id, (image as any).timeline_frame || index);
@@ -187,7 +190,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             <Button
               size="icon"
               variant="destructive"
-              className="h-8 w-8"
+              className="h-8 w-8 bg-red-500/75 hover:bg-red-500/90"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
