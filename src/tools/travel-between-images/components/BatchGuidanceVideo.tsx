@@ -49,12 +49,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   const minFrame = timelineFramePositions.length > 0 ? Math.min(...timelineFramePositions) : 0;
   const maxFrame = timelineFramePositions.length > 0 ? Math.max(...timelineFramePositions) : 0;
   const timelineFrames = maxFrame - minFrame + 1;
-  
-  // For display: calculate which video frames are used
   const totalVideoFrames = videoMetadata?.total_frames || 0;
-  const usedFramesText = treatment === 'adjust' 
-    ? `${totalVideoFrames} frames (all)` 
-    : `${Math.min(maxFrame + 1, totalVideoFrames)} of ${totalVideoFrames} frames`;
   
   // Calculate adjust mode description (stretch/compress)
   const adjustModeDescription = (() => {
@@ -62,10 +57,10 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     
     if (totalVideoFrames > timelineFrames) {
       const framesToDrop = totalVideoFrames - timelineFrames;
-      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress to ${timelineFrames} frames`;
+      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to ${timelineFrames} frames.`;
     } else if (totalVideoFrames < timelineFrames) {
       const framesToDuplicate = timelineFrames - totalVideoFrames;
-      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch to ${timelineFrames} frames`;
+      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to ${timelineFrames} frames.`;
     } else {
       return `Video matches timeline (${timelineFrames} frames)`;
     }
@@ -77,10 +72,10 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     
     if (totalVideoFrames > timelineFrames) {
       const unusedFrames = totalVideoFrames - timelineFrames;
-      return `Your video has ${totalVideoFrames} frames, so ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} at the end won't be used`;
+      return `Your video has ${totalVideoFrames} frames while your input images cover ${timelineFrames}, so ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} at the end won't be used.`;
     } else if (totalVideoFrames < timelineFrames) {
       const uncoveredFrames = timelineFrames - totalVideoFrames;
-      return `Your video is ${totalVideoFrames} frames, so the last ${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'} of the timeline will be unguided`;
+      return `Your video is ${totalVideoFrames} frames while your input images cover ${timelineFrames}, so the last ${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'} of the timeline will be unguided.`;
     } else {
       return `Video matches timeline (${timelineFrames} frames)`;
     }
@@ -299,13 +294,6 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
 
         {/* Settings panel - right two thirds */}
         <div className="flex-1 p-4 bg-muted/20 flex flex-col gap-4">
-          {/* Video info at top */}
-          {videoMetadata && (
-            <div className="text-sm text-muted-foreground">
-              {videoMetadata.duration_seconds.toFixed(1)}s • {usedFramesText} • {videoMetadata.width}×{videoMetadata.height}
-            </div>
-          )}
-
           {/* Treatment mode */}
           <div className="space-y-2">
             <Label className="text-sm">How would you like to use the guidance video?</Label>
