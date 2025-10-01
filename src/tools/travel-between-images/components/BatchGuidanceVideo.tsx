@@ -48,12 +48,43 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   // Calculate frame range based on timeline positions
   const minFrame = timelineFramePositions.length > 0 ? Math.min(...timelineFramePositions) : 0;
   const maxFrame = timelineFramePositions.length > 0 ? Math.max(...timelineFramePositions) : 0;
+  const timelineFrames = maxFrame - minFrame + 1;
   
   // For display: calculate which video frames are used
   const totalVideoFrames = videoMetadata?.total_frames || 0;
   const usedFramesText = treatment === 'adjust' 
     ? `${totalVideoFrames} frames (all)` 
     : `${Math.min(maxFrame + 1, totalVideoFrames)} of ${totalVideoFrames} frames`;
+  
+  // Calculate adjust mode description (stretch/compress)
+  const adjustModeDescription = (() => {
+    if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+    
+    if (totalVideoFrames > timelineFrames) {
+      const framesToDrop = totalVideoFrames - timelineFrames;
+      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress to ${timelineFrames} frames`;
+    } else if (totalVideoFrames < timelineFrames) {
+      const framesToDuplicate = timelineFrames - totalVideoFrames;
+      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch to ${timelineFrames} frames`;
+    } else {
+      return `Video matches timeline (${timelineFrames} frames)`;
+    }
+  })();
+  
+  // Calculate clip mode description (as-is)
+  const clipModeDescription = (() => {
+    if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+    
+    if (totalVideoFrames > timelineFrames) {
+      const unusedFrames = totalVideoFrames - timelineFrames;
+      return `Your video has ${totalVideoFrames} frames, so ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} at the end won't be used`;
+    } else if (totalVideoFrames < timelineFrames) {
+      const uncoveredFrames = timelineFrames - totalVideoFrames;
+      return `Your video is ${totalVideoFrames} frames, so the last ${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'} of the timeline will be unguided`;
+    } else {
+      return `Video matches timeline (${timelineFrames} frames)`;
+    }
+  })();
 
   // Draw a specific timeline frame to the canvas
   const drawTimelineFrame = useCallback((timelineFrame: number) => {
@@ -278,21 +309,37 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
           {/* Treatment mode */}
           <div className="space-y-2">
             <Label className="text-sm">How would you like to use the guidance video?</Label>
-            <div className="w-1/2">
+            <div className="w-full">
               <Select value={treatment} onValueChange={onTreatmentChange}>
                 <SelectTrigger className="h-9 w-full">
                   <SelectValue>
                     {treatment === 'adjust' 
-                      ? 'Stretch/compress video to match timeline' 
+                      ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' video to timeline'
                       : 'Use video frames as-is'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="adjust">
-                    Stretch/compress video to match timeline
+                    <div className="flex flex-col gap-0.5">
+                      <div className="font-medium">
+                        {totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} video to timeline
+                      </div>
+                      {adjustModeDescription && (
+                        <div className="text-xs text-muted-foreground">
+                          {adjustModeDescription}
+                        </div>
+                      )}
+                    </div>
                   </SelectItem>
                   <SelectItem value="clip">
-                    Use video frames as-is
+                    <div className="flex flex-col gap-0.5">
+                      <div className="font-medium">Use video frames as-is</div>
+                      {clipModeDescription && (
+                        <div className="text-xs text-muted-foreground">
+                          {clipModeDescription}
+                        </div>
+                      )}
+                    </div>
                   </SelectItem>
                 </SelectContent>
               </Select>
