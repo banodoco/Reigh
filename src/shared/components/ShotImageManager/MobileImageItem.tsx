@@ -85,8 +85,17 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   };
 
   const handleOpenLightbox = () => {
+    console.log('[MobileImageItemDebug] Eye button clicked:', {
+      index,
+      imageId: (image as any).id?.substring(0, 8),
+      hasOnOpenLightbox: !!onOpenLightbox,
+      timestamp: Date.now()
+    });
     if (onOpenLightbox) {
+      console.log('[MobileImageItemDebug] Calling onOpenLightbox with index:', index);
       onOpenLightbox(index);
+    } else {
+      console.warn('[MobileImageItemDebug] onOpenLightbox is not defined!');
     }
   };
 

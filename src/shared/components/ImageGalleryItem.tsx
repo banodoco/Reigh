@@ -1067,29 +1067,14 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       <>
           {/* Add to Shot UI - Top Left */}
           {simplifiedShotOptions.length > 0 && onAddToLastShot && (
-          <div className={`absolute top-2 left-2 flex flex-col items-start gap-1 transition-opacity z-20 ${
-            isMobile ? (mobileActiveImageId === image.id ? 'opacity-100' : 'opacity-0') : 'opacity-0 group-hover:opacity-100'
-          }`}>
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               {isVideoContent && image.shot_id ? (
                   /* Show clickable shot name for videos */
                   <button 
                       className="px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs transition-colors"
                       onClick={() => {
-                          console.log('[VideoGalleryButtonDebug] Shot name button clicked!', {
-                            imageId: image.id?.substring(0, 8),
-                            shot_id: image.shot_id?.substring(0, 8),
-                            simplifiedShotOptionsCount: simplifiedShotOptions.length,
-                            timestamp: Date.now()
-                          });
                           const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
-                          console.log('[VideoGalleryButtonDebug] Target shot lookup:', {
-                            found: !!targetShot,
-                            targetShotId: targetShot?.id?.substring(0, 8),
-                            targetShotName: targetShot?.name,
-                            timestamp: Date.now()
-                          });
                           if (targetShot) {
-                              console.log('[VideoGalleryButtonDebug] Calling navigateToShot with:', targetShot.name);
                               navigateToShot(targetShot as any, { scrollToTop: true });
                           }
                       }}

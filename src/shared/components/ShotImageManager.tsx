@@ -55,6 +55,7 @@ export interface ShotImageManagerProps {
   projectAspectRatio?: string; // Add project aspect ratio
   onImageUpload?: (files: File[]) => void; // Handler for image upload
   isUploadingImage?: boolean; // Upload loading state
+  onOpenLightbox?: (index: number) => void; // Handler to open lightbox at specific index
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -71,6 +72,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
   onImageUpload,
+  onOpenLightbox,
   isUploadingImage,
 }) => {
   // Light performance tracking for ShotImageManager
@@ -130,6 +132,18 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // State for range selection (Command+click)
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
+  
+  // Debug lightbox state changes (must be after isMobile is declared)
+  React.useEffect(() => {
+    console.log('[MobileImageItemDebug] lightboxIndex changed:', {
+      lightboxIndex,
+      hasImage: lightboxIndex !== null && !!currentImages[lightboxIndex],
+      imageId: lightboxIndex !== null && currentImages[lightboxIndex] ? (currentImages[lightboxIndex] as any).id?.substring(0, 8) : 'none',
+      isMobile,
+      generationMode,
+      timestamp: Date.now()
+    });
+  }, [lightboxIndex, isMobile, generationMode]);
   
   // console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
   const outerRef = useRef<HTMLDivElement>(null);
@@ -1000,21 +1014,45 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   if (isMobile && generationMode === 'batch') {
     console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
     return (
-      <ShotImageManagerMobile
-        images={images}
-        onImageDelete={onImageDelete}
-        onBatchImageDelete={onBatchImageDelete}
-        onImageDuplicate={onImageDuplicate}
-        onImageReorder={onImageReorder}
-        onOpenLightbox={setLightboxIndex}
-        columns={columns}
-        generationMode={generationMode}
-        onImageSaved={onImageSaved}
-        onMagicEdit={onMagicEdit}
-        duplicatingImageId={duplicatingImageId}
-        duplicateSuccessImageId={duplicateSuccessImageId}
-        projectAspectRatio={projectAspectRatio}
-      />
+      <>
+        <ShotImageManagerMobile
+          images={images}
+          onImageDelete={onImageDelete}
+          onBatchImageDelete={onBatchImageDelete}
+          onImageDuplicate={onImageDuplicate}
+          onImageReorder={onImageReorder}
+          onOpenLightbox={onOpenLightbox || setLightboxIndex}
+          columns={columns}
+          generationMode={generationMode}
+          onImageSaved={onImageSaved}
+          onMagicEdit={onMagicEdit}
+          duplicatingImageId={duplicatingImageId}
+          duplicateSuccessImageId={duplicateSuccessImageId}
+          projectAspectRatio={projectAspectRatio}
+        />
+        
+        {/* MediaLightbox for mobile - must be rendered here since we return early */}
+        {lightboxIndex !== null && currentImages[lightboxIndex] && (
+          <MediaLightbox
+            media={currentImages[lightboxIndex]}
+            onClose={() => {
+              console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
+              setLightboxIndex(null);
+            }}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
+            showNavigation={true}
+            showImageEditTools={true}
+            showDownload={true}
+            showMagicEdit={true}
+            hasNext={lightboxIndex < currentImages.length - 1}
+            hasPrevious={lightboxIndex > 0}
+            starred={(currentImages[lightboxIndex] as any).starred || false}
+            onMagicEdit={onMagicEdit}
+          />
+        )}
+      </>
     );
   }
   
