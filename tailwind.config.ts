@@ -21,7 +21,7 @@ export default {
 		},
 		extend: {
 			fontSize: {
-				'sm': ['0.675rem', '1.25rem'],
+				'sm': ['0.875rem', '1.25rem'],
 			},
 			fontFamily: {
 				'cocogoose': ['"Cocogoose"', '"CocogooseNumbers"', '"Inter"', 'system-ui', '-apple-system', '"BlinkMacSystemFont"', '"Segoe UI"', '"Roboto"', 'sans-serif'],

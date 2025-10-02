@@ -816,6 +816,24 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       
       console.log('[RefSettings] ➕ Creating new reference:', newReference);
       
+      // Optimistic UI update
+      try {
+        queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+          const next = { 
+            ...(prev || {}), 
+            references: [...references, newReference],
+            selectedReferenceIdByShot: {
+              ...selectedReferenceIdByShot,
+              [effectiveShotId]: newReference.id
+            }
+          };
+          console.log('[RefSettings] ⚡ Applied optimistic cache update for new reference', { next });
+          return next;
+        });
+      } catch (e) {
+        console.warn('[RefSettings] Failed to set optimistic cache data', e);
+      }
+      
       // Add the new reference and select it for the current shot
       await updateProjectImageSettings('project', {
         references: [...references, newReference],
@@ -836,7 +854,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } finally {
       setIsUploadingStyleReference(false);
     }
-  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, references]);
+  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, references, queryClient]);
 
   // Handle selecting a reference for the current shot
   const handleSelectReference = useCallback(async (referenceId: string) => {
@@ -882,13 +900,29 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
     });
     
+    // Optimistic UI update
+    try {
+      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+        const next = { 
+          ...(prev || {}), 
+          references: filteredReferences,
+          selectedReferenceIdByShot: updatedSelections
+        };
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference deletion', { next });
+        return next;
+      });
+    } catch (e) {
+      console.warn('[RefSettings] Failed to set optimistic cache data', e);
+    }
+    
+    // Persist to database (debounced)
     await updateProjectImageSettings('project', {
       references: filteredReferences,
       selectedReferenceIdByShot: updatedSelections
     });
     
     markAsInteracted();
-  }, [references, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted]);
+  }, [references, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
   
   // Handle updating a reference's name
   const handleUpdateReferenceName = useCallback(async (referenceId: string, name: string) => {
@@ -899,11 +933,26 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         : ref
     );
     
+    // Optimistic UI update
+    try {
+      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+        const next = { 
+          ...(prev || {}), 
+          references: updatedReferences
+        };
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference name', { next });
+        return next;
+      });
+    } catch (e) {
+      console.warn('[RefSettings] Failed to set optimistic cache data', e);
+    }
+    
+    // Persist to database (debounced)
     await updateProjectImageSettings('project', {
       references: updatedReferences
     });
     markAsInteracted();
-  }, [references, updateProjectImageSettings, markAsInteracted]);
+  }, [references, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
   
   // Handle updating a reference's settings
   const handleUpdateReference = useCallback(async (referenceId: string, updates: Partial<ReferenceImage>) => {
@@ -914,13 +963,27 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         : ref
     );
     
+    // Optimistic UI update
+    try {
+      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+        const next = { 
+          ...(prev || {}), 
+          references: updatedReferences
+        };
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference settings', { next });
+        return next;
+      });
+    } catch (e) {
+      console.warn('[RefSettings] Failed to set optimistic cache data', e);
+    }
+    
     console.log('[RefSettings] ⏳ Saving to database (debounced 300ms)...');
     await updateProjectImageSettings('project', {
       references: updatedReferences
     });
     console.log('[RefSettings] ✅ Update call completed (actual DB write may still be pending due to debounce)');
     markAsInteracted();
-  }, [references, updateProjectImageSettings, markAsInteracted]);
+  }, [references, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
   
   // Handle removing style reference image (legacy - now removes selected reference)
   const handleRemoveStyleReference = useCallback(async () => {

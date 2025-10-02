@@ -4,7 +4,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
-import { Trash2, Images, Plus, Check, X } from "lucide-react";
+import { Trash2, Images, Plus, Check, X, Upload } from "lucide-react";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
@@ -41,7 +41,6 @@ interface ReferenceSelectorProps {
   onSelectReference: (id: string) => void;
   onAddReference: (files: File[]) => void;
   onDeleteReference: (id: string) => void;
-  onUpdateReferenceName: (id: string, name: string) => void;
   isGenerating: boolean;
   isUploadingStyleReference: boolean;
 }
@@ -52,32 +51,11 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   onSelectReference,
   onAddReference,
   onDeleteReference,
-  onUpdateReferenceName,
   isGenerating,
   isUploadingStyleReference,
 }) => {
-  const [editingNameId, setEditingNameId] = React.useState<string | null>(null);
-  const [editingName, setEditingName] = React.useState<string>("");
-  const selectedReference = references.find(r => r.id === selectedReferenceId);
-
-  const handleStartEditName = (ref: ReferenceImage, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingNameId(ref.id);
-    setEditingName(ref.name);
-  };
-
-  const handleSaveName = (refId: string) => {
-    if (editingName.trim()) {
-      onUpdateReferenceName(refId, editingName.trim());
-    }
-    setEditingNameId(null);
-  };
-
-  const handleCancelEditName = () => {
-    setEditingNameId(null);
-    setEditingName("");
-  };
-
+  const [isDraggingOverAdd, setIsDraggingOverAdd] = React.useState(false);
+  
   return (
     <div className="space-y-3">
       {/* Thumbnail gallery */}
@@ -144,14 +122,47 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
         {/* Add reference button */}
         <label 
           className={cn(
-            "aspect-square flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-colors",
+            "aspect-square flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200",
             isGenerating || isUploadingStyleReference
               ? "border-gray-200 cursor-not-allowed opacity-50"
-              : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
+              : isDraggingOverAdd
+                ? "border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg"
+                : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
           )}
           title="Add new reference"
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isGenerating && !isUploadingStyleReference) {
+              setIsDraggingOverAdd(true);
+            }
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDraggingOverAdd(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDraggingOverAdd(false);
+            if (!isGenerating && !isUploadingStyleReference) {
+              const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+              if (files.length > 0) {
+                onAddReference(files);
+              }
+            }
+          }}
         >
-          <Plus className="h-6 w-6 text-gray-400" />
+          {isDraggingOverAdd ? (
+            <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400 animate-bounce" />
+          ) : (
+            <Plus className="h-6 w-6 text-gray-400" />
+          )}
           <input
             type="file"
             accept="image/*"
@@ -165,59 +176,6 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
           />
         </label>
       </div>
-      
-      {/* Selected reference name (editable) */}
-      {selectedReference && (
-        <div className="space-y-1">
-          {editingNameId === selectedReference.id ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSaveName(selectedReference.id);
-                  } else if (e.key === 'Escape') {
-                    handleCancelEditName();
-                  }
-                }}
-                className="flex-1 h-8 text-sm"
-                placeholder="Reference name"
-                autoFocus
-                disabled={isGenerating}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleSaveName(selectedReference.id)}
-                className="h-8 px-2"
-              >
-                <Check className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleCancelEditName}
-                className="h-8 px-2"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div
-              className="text-sm font-medium px-2 py-1 rounded cursor-text hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              onClick={(e) => !isGenerating && handleStartEditName(selectedReference, e)}
-              title="Click to edit name"
-            >
-              {selectedReference.name}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -288,7 +246,7 @@ const StyleReferenceSection: React.FC<{
   const showSkeleton = isUploadingStyleReference;
 
   // Show the new multi-reference UI if handlers are provided
-  const showMultiReference = onSelectReference && onDeleteReference && onUpdateReferenceName;
+  const showMultiReference = onSelectReference && onDeleteReference;
 
   return (
   <div className="space-y-2">
@@ -304,7 +262,6 @@ const StyleReferenceSection: React.FC<{
         onSelectReference={onSelectReference}
         onAddReference={onStyleUpload}
         onDeleteReference={onDeleteReference}
-        onUpdateReferenceName={onUpdateReferenceName}
         isGenerating={isGenerating}
         isUploadingStyleReference={isUploadingStyleReference}
       />

@@ -354,7 +354,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 <Select value={structureVideoTreatment} onValueChange={(treatment: 'adjust' | 'clip') => {
                   onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
                 }}>
-                  <SelectTrigger className="h-6 w-[140px] text-[9px] px-2 py-0 border-muted-foreground/30">
+                  <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                     <SelectValue>
                       {structureVideoTreatment === 'adjust' 
                         ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
