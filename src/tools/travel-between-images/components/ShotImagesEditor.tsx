@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { getDisplayUrl } from '@/shared/lib/utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 import { BatchGuidanceVideo } from './BatchGuidanceVideo';
+import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -324,7 +325,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base sm:text-lg font-light">
-              Input Images
+              Guidance
               {settingsError && (
                 <div className="text-sm text-destructive mt-1">
                   {settingsError}
@@ -439,9 +440,38 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               </>
             ) : (
               <>
+                {/* Subheader for input images */}
+                <div className="mb-4">
+                  <SectionHeader title="Input Images" theme="blue" />
+                </div>
+                
+                <ShotImageManager
+                  images={images}
+                  onImageDelete={handleDelete}
+                  onBatchImageDelete={onBatchImageDelete}
+                  onImageDuplicate={onImageDuplicate}
+                  onImageReorder={handleReorder}
+                  columns={columns}
+                  generationMode={isMobile ? "batch" : generationMode}
+                  onImageSaved={onImageSaved}
+                  onMagicEdit={(imageUrl, prompt, numImages) => {
+                    // TODO: Wire through real magic-edit handler later.
+                    console.log("Magic Edit:", { imageUrl, prompt, numImages });
+                  }}
+                  duplicatingImageId={duplicatingImageId}
+                  duplicateSuccessImageId={duplicateSuccessImageId}
+                  projectAspectRatio={projectAspectRatio}
+                  onImageUpload={onImageUpload}
+                  isUploadingImage={isUploadingImage}
+                />
+                
                 {/* Batch mode structure video */}
                 {selectedShotId && projectId && propOnStructureVideoChange && (
-                  <BatchGuidanceVideo
+                  <>
+                    <div className="mb-4 mt-6">
+                      <SectionHeader title="Guidance Video" theme="green" />
+                    </div>
+                    <BatchGuidanceVideo
                     shotId={selectedShotId}
                     projectId={projectId}
                     videoUrl={propStructureVideoPath}
@@ -479,30 +509,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       }
                     }}
                   />
+                  </>
                 )}
-                
-                {/* Subheader for input images */}
-                <h3 className="text-sm font-semibold mb-2 text-foreground">Input Images</h3>
-                
-                <ShotImageManager
-                  images={images}
-                  onImageDelete={handleDelete}
-                  onBatchImageDelete={onBatchImageDelete}
-                  onImageDuplicate={onImageDuplicate}
-                  onImageReorder={handleReorder}
-                  columns={columns}
-                  generationMode={isMobile ? "batch" : generationMode}
-                  onImageSaved={onImageSaved}
-                  onMagicEdit={(imageUrl, prompt, numImages) => {
-                    // TODO: Wire through real magic-edit handler later.
-                    console.log("Magic Edit:", { imageUrl, prompt, numImages });
-                  }}
-                  duplicatingImageId={duplicatingImageId}
-                  duplicateSuccessImageId={duplicateSuccessImageId}
-                  projectAspectRatio={projectAspectRatio}
-                  onImageUpload={onImageUpload}
-                  isUploadingImage={isUploadingImage}
-                />
               </>
             )}
           </div>

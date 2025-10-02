@@ -203,9 +203,6 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     // Upload prompt - responsive width
     return (
       <div className="mb-4">
-        {/* Subheader */}
-        <h3 className="text-sm font-semibold mb-2 text-foreground">Motion Guidance Video</h3>
-        
         <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
           <div className="flex flex-col items-center gap-3 text-center">
             <Video className="h-8 w-8 text-muted-foreground" />
@@ -253,13 +250,10 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   // Video display with settings
   return (
     <div className="mb-4">
-      {/* Subheader */}
-      <h3 className="text-sm font-semibold mb-2 text-foreground">Motion Guidance Video</h3>
-      
       <div className="border rounded-lg overflow-hidden bg-background">
-        <div className="flex">
-        {/* Video preview - left third */}
-        <div className="w-1/3 relative bg-black aspect-video flex-shrink-0 flex flex-col">
+        <div className="flex flex-col md:flex-row">
+        {/* Video preview - top on mobile, left third on desktop */}
+        <div className="w-full md:w-1/3 relative bg-black aspect-video flex-shrink-0 flex flex-col">
           {/* Hidden video element for seeking */}
           <video
             ref={videoRef}
@@ -292,13 +286,26 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
           </div>
         </div>
 
-        {/* Settings panel - right two thirds */}
+        {/* Remove Video button - below video on mobile only */}
+        <div className="md:hidden p-3 border-t">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={handleRemoveVideo}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Remove Video
+          </Button>
+        </div>
+
+        {/* Settings panel - below on mobile, right two thirds on desktop */}
         <div className="flex-1 p-4 bg-muted/20 flex flex-col gap-4">
           {/* Treatment mode */}
           <div className="space-y-2">
             <Label className="text-sm">How would you like to use the guidance video?</Label>
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0" style={{ width: '200px' }}>
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              <div className="flex-shrink-0 w-full md:w-[200px]">
                 <Select value={treatment} onValueChange={onTreatmentChange}>
                   <SelectTrigger className="h-9 w-full">
                     <SelectValue>
@@ -344,8 +351,8 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
 
-          {/* Delete button at bottom */}
-          <div className="mt-auto pt-2">
+          {/* Delete button at bottom - desktop only */}
+          <div className="mt-auto pt-2 hidden md:block">
             <Button
               variant="outline"
               size="sm"

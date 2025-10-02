@@ -65,6 +65,12 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Use optimistic order if available, otherwise use props images
   const currentImages = isOptimisticUpdate && optimisticOrder.length > 0 ? optimisticOrder : images;
 
+  // Dispatch selection state to hide pane controls on mobile
+  React.useEffect(() => {
+    const hasSelection = mobileSelectedIds.length > 0;
+    window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: hasSelection }));
+  }, [mobileSelectedIds.length]);
+
   // Reconcile optimistic state with server state when images prop changes
   React.useEffect(() => {
     if (isOptimisticUpdate && images && images.length > 0) {
@@ -290,12 +296,13 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         
         return (
           <div 
-            className="fixed bottom-20 z-50 flex justify-center"
+            className="fixed z-50 flex justify-center"
             style={{
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,
               paddingLeft: '16px',
               paddingRight: '16px',
+              bottom: '64px', // Higher on mobile
             }}
           >
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">

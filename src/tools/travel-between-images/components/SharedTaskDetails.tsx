@@ -110,7 +110,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
 
   return (
     <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
-      {/* Input Images Section */}
+      {/* Guidance Images Section */}
       {inputImages.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-center">

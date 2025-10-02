@@ -387,7 +387,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
           {/* Treatment selector */}
           <Select value={treatment} onValueChange={onTreatmentChange}>
-            <SelectTrigger className="h-6 w-[90px] text-[10px] px-2 py-0 border-muted-foreground/30">
+            <SelectTrigger className="h-6 w-[140px] text-[9px] px-2 py-0 border-muted-foreground/30">
               <SelectValue>
                 {treatment === 'adjust' 
                   ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'

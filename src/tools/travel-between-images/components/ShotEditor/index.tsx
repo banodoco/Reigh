@@ -1747,7 +1747,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {(!state.isEditingName) && isSticky && (() => {
         // Position right below the global header with minimal gap
         const globalHeaderHeight = isMobile ? 60 : 96; // Match actual global header heights
-        const gap = isMobile ? 4 : 8; // Small positive gap on both mobile and desktop
+        const gap = isMobile ? -16 : 8; // Negative gap on mobile to push up, small gap on desktop
         const topPosition = globalHeaderHeight + gap;
         
         // Calculate horizontal constraints based on locked panes

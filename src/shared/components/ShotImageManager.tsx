@@ -149,6 +149,14 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  // Dispatch selection state to hide pane controls on mobile
+  useEffect(() => {
+    if (isMobile) {
+      const hasSelection = mobileSelectedIds.length > 0;
+      window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: hasSelection }));
+    }
+  }, [mobileSelectedIds.length, isMobile]);
+
   // Optimistic local order state - shows immediate drag results
   const [optimisticOrder, setOptimisticOrder] = useState<GenerationRow[]>(images);
   const [isOptimisticUpdate, setIsOptimisticUpdate] = useState(false);
@@ -1225,15 +1233,17 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       {selectedIds.length >= 1 && (() => {
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
+        const bottomOffset = isMobile ? 46 : 54; // Push higher on mobile (less from bottom)
         
         return (
           <div 
-            className="fixed bottom-[54px] z-50 flex justify-center"
+            className="fixed z-50 flex justify-center"
             style={{
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,
               paddingLeft: '16px',
               paddingRight: '16px',
+              bottom: `${bottomOffset}px`,
             }}
           >
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-3">
