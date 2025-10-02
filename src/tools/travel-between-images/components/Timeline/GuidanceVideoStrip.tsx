@@ -99,14 +99,44 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const seekingRef = useRef(false);
   
-  // Calculate timeline duration
+  // Calculate timeline duration and frames
   const ASSUMED_TIMELINE_FPS = 24;
   const timelineDuration = (fullMax - fullMin) / ASSUMED_TIMELINE_FPS;
+  const timelineFrames = fullMax - fullMin + 1;
+  const totalVideoFrames = videoMetadata?.total_frames || 0;
   
   // Calculate playback speed for adjust mode
   const playbackSpeed = treatment === 'adjust' 
     ? videoMetadata.duration_seconds / timelineDuration 
     : 1.0;
+  
+  // Calculate adjust mode description (stretch/compress)
+  const adjustModeDescription = (() => {
+    if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+    
+    if (totalVideoFrames > timelineFrames) {
+      const framesToDrop = totalVideoFrames - timelineFrames;
+      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+    } else if (totalVideoFrames < timelineFrames) {
+      const framesToDuplicate = timelineFrames - totalVideoFrames;
+      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+    } else {
+      return `Video matches timeline (${timelineFrames} frames)`;
+    }
+  })();
+  
+  // Calculate clip mode description (as-is)
+  const clipModeDescription = (() => {
+    if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+    
+    if (totalVideoFrames > timelineFrames) {
+      return `We'll use the first ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} of your ${totalVideoFrames}-frame guide video.`;
+    } else if (totalVideoFrames < timelineFrames) {
+      return `Your guide video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'}, but your timeline spans ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'}. The video will guide the first ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} only.`;
+    } else {
+      return `Video matches timeline (${timelineFrames} frames)`;
+    }
+  })();
 
   // Extract frames from video when it loads or treatment changes
   useEffect(() => {
@@ -321,7 +351,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   }, [treatment, containerWidth, fullMin, fullMax, videoMetadata, currentFrame, isVideoReady, seekToFrame]);
   
   return (
-    <div className="relative w-full">
+    <div className="w-full">
       {/* Floating preview box above video strip */}
       {isHovering && isVideoReady && (
         <div 
@@ -353,40 +383,28 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         </div>
       )}
 
-      {/* Structure video strip with controls overlaid */}
-      <div 
-        ref={stripContainerRef}
-        className="relative h-28 bg-gradient-to-b from-muted/30 to-muted/10 border-l border-r border-t rounded-t overflow-hidden mb-0"
-        style={{
-          width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
-          minWidth: '100%',
-          paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
-          paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
-        }}
-        onMouseMove={handleMouseMove}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-      >
-        {/* Controls overlaid on top-right */}
-        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
+      {/* Clip/Motion controls at top-right (aligned with zoom controls) */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
           {/* Treatment selector */}
           <Select value={treatment} onValueChange={onTreatmentChange}>
             <SelectTrigger className="h-6 w-[90px] text-[10px] px-2 py-0 border-muted-foreground/30">
               <SelectValue>
-                {treatment === 'adjust' ? 'Adjust' : 'Clip'}
+                {treatment === 'adjust' 
+                  ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
+                  : 'Use video as is'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="adjust">
                 <div className="flex flex-col gap-0.5 py-1">
-                  <span className="text-xs font-medium">Adjust</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">Stretch/compress video to match timeline duration</span>
+                  <span className="text-xs font-medium">{totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{adjustModeDescription}</span>
                 </div>
               </SelectItem>
               <SelectItem value="clip">
                 <div className="flex flex-col gap-0.5 py-1">
-                  <span className="text-xs font-medium">Clip</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">Use video frames as-is within timeline range</span>
+                  <span className="text-xs font-medium">Use video as is</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{clipModeDescription}</span>
                 </div>
               </SelectItem>
             </SelectContent>
@@ -425,8 +443,22 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           >
             <X className="h-3 w-3" />
           </Button>
-        </div>
+      </div>
 
+      {/* Structure video strip */}
+      <div 
+        ref={stripContainerRef}
+        className="relative h-28 bg-gradient-to-b from-muted/30 to-muted/10 border-l border-r border-t rounded-t overflow-hidden mb-0 mt-6"
+        style={{
+          width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
+          minWidth: '100%',
+          paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
+          paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         {/* Hidden video element for frame extraction and preview */}
         <video
           ref={videoRef}

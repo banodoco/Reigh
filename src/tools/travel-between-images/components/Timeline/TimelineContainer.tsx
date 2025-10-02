@@ -16,6 +16,7 @@ import { TIMELINE_HORIZONTAL_PADDING } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
+import { Plus } from 'lucide-react';
 
 // Import hooks
 import { useZoom } from './hooks/useZoom';
@@ -98,6 +99,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const [resetGap, setResetGap] = useState<number>(10);
   const [pendingContext, setPendingContext] = useState<number>(contextFrames);
   const maxGap = Math.max(1, 81 - pendingContext);
+  
+  // File input ref for Add Images button
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Sync pending context when actual context changes externally
   useEffect(() => {
@@ -244,14 +248,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
           isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
         }`}
-        style={{ minHeight: "200px", paddingBottom: "3rem" }}
+        style={{ minHeight: "200px", paddingBottom: "5.5rem" }}
         onWheel={handleWheel}
         onDragEnter={handleDragEnter}
         onDragOver={(e) => handleDragOver(e, containerRef)}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* Zoom controls at top inside box */}
+        {/* Zoom controls at top */}
         <div className="flex items-center gap-2 mb-3">
           <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
           <Button
@@ -532,9 +536,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           })}
         </div>
 
-        {/* Gap and Context controls in bottom-left corner */}
-        <div className="absolute bottom-12 left-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
-          {/* Gap to reset (on left) */}
+        {/* Gap and Context controls below ruler */}
+        <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit">
+          {/* Gap to reset */}
           <div className="flex items-center gap-1.5">
             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
             <Slider
@@ -547,7 +551,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             />
           </div>
 
-          {/* Context frames (on right) */}
+          {/* Context frames */}
           <div className="flex items-center gap-1.5">
             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Context: {pendingContext}</Label>
             <Slider
@@ -570,6 +574,40 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             Reset
           </Button>
         </div>
+
+        {/* Add Images button in bottom right */}
+        {onImageDrop && (
+          <div className="absolute bottom-4 right-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  onImageDrop(files);
+                  e.target.value = ''; // Reset input
+                }
+              }}
+              className="hidden"
+              id="timeline-image-upload"
+            />
+            <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs px-3 bg-background/95 backdrop-blur-sm shadow-md border-border/50"
+                asChild
+              >
+                <span className="flex items-center gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Images
+                </span>
+              </Button>
+            </Label>
+          </div>
+        )}
       </div>
     </div>
   );

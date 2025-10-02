@@ -57,10 +57,10 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     
     if (totalVideoFrames > timelineFrames) {
       const framesToDrop = totalVideoFrames - timelineFrames;
-      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to ${timelineFrames} frames.`;
+      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
     } else if (totalVideoFrames < timelineFrames) {
       const framesToDuplicate = timelineFrames - totalVideoFrames;
-      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to ${timelineFrames} frames.`;
+      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
     } else {
       return `Video matches timeline (${timelineFrames} frames)`;
     }
@@ -304,7 +304,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                     <SelectValue>
                       {treatment === 'adjust' 
                         ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
-                        : 'Use as-is'}
+                        : 'Use video as is'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -312,7 +312,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                       {totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline
                     </SelectItem>
                     <SelectItem value="clip">
-                      Use video frames as-is
+                      Use video as is
                     </SelectItem>
                   </SelectContent>
                 </Select>
