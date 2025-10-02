@@ -4,10 +4,12 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
-import { Trash2, Images } from "lucide-react";
+import { Trash2, Images, Plus, Check, X } from "lucide-react";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
+import { cn } from "@/shared/lib/utils";
+import { ReferenceImage } from "../types";
 
 interface ModelSectionProps {
   isGenerating: boolean;
@@ -24,8 +26,201 @@ interface ModelSectionProps {
   onSubjectStrengthChange: (value: number) => void;
   onSubjectDescriptionChange: (value: string) => void;
   onInThisSceneChange: (value: boolean) => void;
+  // New multiple references props
+  references?: ReferenceImage[];
+  selectedReferenceId?: string | null;
+  onSelectReference?: (id: string) => void;
+  onDeleteReference?: (id: string) => void;
+  onUpdateReferenceName?: (id: string, name: string) => void;
 }
 
+// ReferenceSelector Component - shows thumbnail gallery of references
+interface ReferenceSelectorProps {
+  references: ReferenceImage[];
+  selectedReferenceId: string | null;
+  onSelectReference: (id: string) => void;
+  onAddReference: (files: File[]) => void;
+  onDeleteReference: (id: string) => void;
+  onUpdateReferenceName: (id: string, name: string) => void;
+  isGenerating: boolean;
+  isUploadingStyleReference: boolean;
+}
+
+const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
+  references,
+  selectedReferenceId,
+  onSelectReference,
+  onAddReference,
+  onDeleteReference,
+  onUpdateReferenceName,
+  isGenerating,
+  isUploadingStyleReference,
+}) => {
+  const [editingNameId, setEditingNameId] = React.useState<string | null>(null);
+  const [editingName, setEditingName] = React.useState<string>("");
+  const selectedReference = references.find(r => r.id === selectedReferenceId);
+
+  const handleStartEditName = (ref: ReferenceImage, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingNameId(ref.id);
+    setEditingName(ref.name);
+  };
+
+  const handleSaveName = (refId: string) => {
+    if (editingName.trim()) {
+      onUpdateReferenceName(refId, editingName.trim());
+    }
+    setEditingNameId(null);
+  };
+
+  const handleCancelEditName = () => {
+    setEditingNameId(null);
+    setEditingName("");
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Thumbnail gallery */}
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+        {references.map(ref => {
+          const isSelected = selectedReferenceId === ref.id;
+          const imageUrl = ref.styleReferenceImageOriginal || ref.styleReferenceImage;
+          
+          return (
+            <div
+              key={ref.id}
+              className={cn(
+                "relative cursor-pointer rounded-lg border-2 overflow-hidden group",
+                "aspect-square transition-all hover:scale-105",
+                isSelected 
+                  ? "border-purple-500 ring-2 ring-purple-500 shadow-lg" 
+                  : "border-gray-300 hover:border-purple-300"
+              )}
+              onClick={() => !isGenerating && onSelectReference(ref.id)}
+              title={ref.name}
+            >
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={ref.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                  <Images className="h-6 w-6 text-gray-400" />
+                </div>
+              )}
+              
+              {/* Selected indicator */}
+              {isSelected && (
+                <div className="absolute inset-0 bg-purple-500/20 flex items-center justify-center pointer-events-none">
+                  <div className="bg-purple-600 rounded-full p-1">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+              )}
+              
+              {/* Delete button - show on hover or always on mobile */}
+              {!isGenerating && references.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onDeleteReference(ref.id);
+                  }}
+                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 
+                             opacity-0 group-hover:opacity-100 transition-opacity
+                             hover:bg-red-600 z-10"
+                  title="Delete reference"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+        
+        {/* Add reference button */}
+        <label 
+          className={cn(
+            "aspect-square flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-colors",
+            isGenerating || isUploadingStyleReference
+              ? "border-gray-200 cursor-not-allowed opacity-50"
+              : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
+          )}
+          title="Add new reference"
+        >
+          <Plus className="h-6 w-6 text-gray-400" />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              if (files.length > 0) onAddReference(files);
+              e.target.value = ''; // Reset input
+            }}
+            disabled={isGenerating || isUploadingStyleReference}
+          />
+        </label>
+      </div>
+      
+      {/* Selected reference name (editable) */}
+      {selectedReference && (
+        <div className="space-y-1">
+          {editingNameId === selectedReference.id ? (
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveName(selectedReference.id);
+                  } else if (e.key === 'Escape') {
+                    handleCancelEditName();
+                  }
+                }}
+                className="flex-1 h-8 text-sm"
+                placeholder="Reference name"
+                autoFocus
+                disabled={isGenerating}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => handleSaveName(selectedReference.id)}
+                className="h-8 px-2"
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelEditName}
+                className="h-8 px-2"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div
+              className="text-sm font-medium px-2 py-1 rounded cursor-text hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              onClick={(e) => !isGenerating && handleStartEditName(selectedReference, e)}
+              title="Click to edit name"
+            >
+              {selectedReference.name}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const StyleReferenceSection: React.FC<{
   styleReferenceImage: string | null;
@@ -42,6 +237,12 @@ const StyleReferenceSection: React.FC<{
   onSubjectStrengthChange: (value: number) => void;
   onSubjectDescriptionChange: (value: string) => void;
   onInThisSceneChange: (value: boolean) => void;
+  // New multiple references props
+  references?: ReferenceImage[];
+  selectedReferenceId?: string | null;
+  onSelectReference?: (id: string) => void;
+  onDeleteReference?: (id: string) => void;
+  onUpdateReferenceName?: (id: string, name: string) => void;
 }> = ({
   styleReferenceImage,
   styleReferenceStrength,
@@ -57,6 +258,11 @@ const StyleReferenceSection: React.FC<{
   onSubjectStrengthChange,
   onSubjectDescriptionChange,
   onInThisSceneChange,
+  references = [],
+  selectedReferenceId = null,
+  onSelectReference,
+  onDeleteReference,
+  onUpdateReferenceName,
 }) => {
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [imageError, setImageError] = React.useState(false);
@@ -81,13 +287,55 @@ const StyleReferenceSection: React.FC<{
   // Only show skeleton during upload process, not during normal image loading
   const showSkeleton = isUploadingStyleReference;
 
+  // Show the new multi-reference UI if handlers are provided
+  const showMultiReference = onSelectReference && onDeleteReference && onUpdateReferenceName;
+
   return (
   <div className="space-y-2">
     <div className="space-y-1">
       <SectionHeader title="Reference" theme="purple" />
     </div>
 
-    {/* Style Reference Upload */}
+    {/* New Multiple References UI */}
+    {showMultiReference && references.length > 0 && (
+      <ReferenceSelector
+        references={references}
+        selectedReferenceId={selectedReferenceId}
+        onSelectReference={onSelectReference}
+        onAddReference={onStyleUpload}
+        onDeleteReference={onDeleteReference}
+        onUpdateReferenceName={onUpdateReferenceName}
+        isGenerating={isGenerating}
+        isUploadingStyleReference={isUploadingStyleReference}
+      />
+    )}
+    
+    {/* Show add first reference button if no references exist */}
+    {showMultiReference && references.length === 0 && (
+      <div className="space-y-3">
+        <FileInput
+          onFileChange={onStyleUpload}
+          acceptTypes={['image']}
+          disabled={isGenerating || isUploadingStyleReference}
+          label="Upload your first reference image"
+          className="w-full"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowDatasetBrowser(true)}
+          disabled={isGenerating || isUploadingStyleReference}
+          className="w-full"
+        >
+          <Images className="h-4 w-4 mr-2" />
+          Browse images
+        </Button>
+      </div>
+    )}
+
+    {/* Legacy Single Reference Upload (fallback when multi-reference not available) */}
+    {!showMultiReference && (
     <div className="space-y-3">
       {/* Responsive layout: horizontal on desktop, vertical on mobile */}
       <div className="w-full">
@@ -210,110 +458,92 @@ const StyleReferenceSection: React.FC<{
                 </Button>
               </div>
             </div>
-            <div className={`${isMobile ? 'w-full' : 'flex-1'} space-y-4 ${isMobile ? '' : 'pt-2'} ${!styleReferenceImage ? 'opacity-50 pointer-events-none' : ''}`}>
-              {/* Style and Subject strength sliders - side by side on mobile, stacked on desktop */}
-              <div className={`${isMobile ? 'flex gap-4' : 'space-y-4'}`}>
-                <div className={isMobile ? 'flex-1' : ''}>
-                  <SliderWithValue
-                    label="Style strength"
-                    value={styleReferenceStrength}
-                    onChange={(value) => {
-                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                      const newTotal = value + subjectStrength;
-                      console.log(`[StrengthValidationDebug] Style change attempt:`, {
-                        newStyleValue: value,
-                        currentSubjectValue: subjectStrength,
-                        newTotal: newTotal,
-                        isNewTotalInvalid: newTotal < 0.5,
-                        shouldBlock: newTotal < 0.5
-                      });
-                      
-                      // Block if total < 0.5 (no exceptions)
-                      if (newTotal < 0.5) {
-                        console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Style change would make total < 0.5 (${newTotal})`);
-                        // Simple console warning instead of UI validation
-                        return;
-                      }
-                      console.log(`[StrengthValidationDebug] ✅ ALLOWED: Style change accepted (total = ${newTotal})`);
-                      onStyleStrengthChange(value);
-                    }}
-                    min={0.0}
-                    max={2.0}
-                    step={0.1}
-                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                    numberInputClassName="w-10"
-                  />
-                </div>
-                <div className={isMobile ? 'flex-1' : ''}>
-                  <SliderWithValue
-                    label="Subject strength"
-                    value={subjectStrength}
-                    onChange={(value) => {
-                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                      const newTotal = styleReferenceStrength + value;
-                      console.log(`[StrengthValidationDebug] Subject change attempt:`, {
-                        currentStyleValue: styleReferenceStrength,
-                        newSubjectValue: value,
-                        newTotal: newTotal,
-                        isNewTotalInvalid: newTotal < 0.5,
-                        shouldBlock: newTotal < 0.5
-                      });
-                      
-                      // Block if total < 0.5 (no exceptions)
-                      if (newTotal < 0.5) {
-                        console.log(`[StrengthValidationDebug] 🚫 BLOCKED: Subject change would make total < 0.5 (${newTotal})`);
-                        // Simple console warning instead of UI validation
-                        return;
-                      }
-                      console.log(`[StrengthValidationDebug] ✅ ALLOWED: Subject change accepted (total = ${newTotal})`);
-                      onSubjectStrengthChange(value);
-                    }}
-                    min={0.0}
-                    max={2.0}
-                    step={0.1}
-                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                    numberInputClassName="w-10"
-                  />
-                </div>
-              </div>
-              {/* Show subject description only when subject strength > 0 AND image is uploaded */}
-              {subjectStrength > 0 && styleReferenceImage && (
-                <div className="space-y-2">
-                  <Label htmlFor="subject-description" className="text-sm font-medium">
-                    Subject description
-                  </Label>
-                  <div className="flex items-center space-x-3">
-                    <Input
-                      id="subject-description"
-                      type="text"
-                      value={subjectDescription}
-                      onChange={(e) => onSubjectDescriptionChange(e.target.value)}
-                      placeholder="girl, monster, teapot..."
-                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      className="flex-1"
-                    />
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="in-this-scene"
-                        checked={inThisScene}
-                        onCheckedChange={onInThisSceneChange}
-                        disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      />
-                      <Label 
-                        htmlFor="in-this-scene" 
-                        className="text-sm font-medium cursor-pointer whitespace-nowrap"
-                      >
-                        In this scene
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
     </div>
+    )}
+    {/* End legacy single reference section */}
+    
+    {/* Settings for selected reference (shown for both multi and legacy) */}
+    {styleReferenceImage && (
+      <div className="space-y-4">
+        {/* Style and Subject strength sliders - side by side */}
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <SliderWithValue
+              label="Style strength"
+              value={styleReferenceStrength}
+              onChange={(value) => {
+                // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                const newTotal = value + subjectStrength;
+                if (newTotal < 0.5) {
+                  return;
+                }
+                onStyleStrengthChange(value);
+              }}
+              min={0.0}
+              max={2.0}
+              step={0.1}
+              disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+              numberInputClassName="w-10"
+            />
+          </div>
+          <div className="flex-1">
+            <SliderWithValue
+              label="Subject strength"
+              value={subjectStrength}
+              onChange={(value) => {
+                // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                const newTotal = styleReferenceStrength + value;
+                if (newTotal < 0.5) {
+                  return;
+                }
+                onSubjectStrengthChange(value);
+              }}
+              min={0.0}
+              max={2.0}
+              step={0.1}
+              disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+              numberInputClassName="w-10"
+            />
+          </div>
+        </div>
+        {/* Show subject description only when subject strength > 0 */}
+        {subjectStrength > 0 && styleReferenceImage && (
+          <div className="space-y-2">
+            <Label htmlFor="subject-description" className="text-sm font-medium">
+              Subject description
+            </Label>
+            <div className="flex items-center space-x-3">
+              <Input
+                id="subject-description"
+                type="text"
+                value={subjectDescription}
+                onChange={(e) => onSubjectDescriptionChange(e.target.value)}
+                placeholder="girl, monster, teapot..."
+                disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                className="flex-1"
+              />
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="in-this-scene"
+                  checked={inThisScene}
+                  onCheckedChange={onInThisSceneChange}
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                />
+                <Label 
+                  htmlFor="in-this-scene" 
+                  className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                >
+                  In this scene
+                </Label>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
     
     {/* Dataset Browser Modal */}
     <DatasetBrowserModal
@@ -340,6 +570,11 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
   onSubjectStrengthChange,
   onSubjectDescriptionChange,
   onInThisSceneChange,
+  references,
+  selectedReferenceId,
+  onSelectReference,
+  onDeleteReference,
+  onUpdateReferenceName,
 }) => {
   return (
     <div className="flex-1">
@@ -359,6 +594,11 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
         onSubjectStrengthChange={onSubjectStrengthChange}
         onSubjectDescriptionChange={onSubjectDescriptionChange}
         onInThisSceneChange={onInThisSceneChange}
+        references={references}
+        selectedReferenceId={selectedReferenceId}
+        onSelectReference={onSelectReference}
+        onDeleteReference={onDeleteReference}
+        onUpdateReferenceName={onUpdateReferenceName}
       />
     </div>
   );

@@ -22,6 +22,7 @@ import { BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGenerati
 import { processStyleReferenceForAspectRatioString } from "@/shared/lib/styleReferenceProcessor";
 import { resolveProjectResolution } from "@/shared/lib/taskCreation";
 import { uploadImageToStorage } from "@/shared/lib/imageUploader";
+import { nanoid } from 'nanoid';
 
 // Import extracted components
 import { PromptsSection } from "./components/PromptsSection";
@@ -37,6 +38,7 @@ import {
   PromptEntry,
   PersistedFormSettings,
   ProjectImageSettings,
+  ReferenceImage,
 } from "./types";
 
 // Lazy load modals to improve initial bundle size and performance
@@ -142,6 +144,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Optimistic local override for style reference image so UI updates immediately
   // undefined => no override, use settings; string|null => explicit override
   const [styleReferenceOverride, setStyleReferenceOverride] = useState<string | null | undefined>(undefined);
+  // Associated shot for image generation
+  const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
   
   const { selectedProjectId } = useProject();
   const isMobile = useIsMobile();
@@ -169,12 +173,38 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Always use qwen-image model (model selector removed)
   const selectedModel = 'qwen-image';
-  const rawStyleReferenceImage = projectImageSettings?.styleReferenceImage || null; // For generation
-  const rawStyleReferenceImageOriginal = projectImageSettings?.styleReferenceImageOriginal || null; // For display
-  const currentStyleStrength = projectImageSettings?.styleReferenceStrength ?? 1.0;
-  const currentSubjectStrength = projectImageSettings?.subjectStrength ?? 0.0;
-  const currentSubjectDescription = projectImageSettings?.subjectDescription || '';
-  const currentInThisScene = projectImageSettings?.inThisScene ?? false;
+  
+  // Get the effective shot ID for storage (use 'none' for null)
+  const effectiveShotId = associatedShotId || 'none';
+  
+  // Get references array and selected reference for current shot
+  const references = projectImageSettings?.references ?? [];
+  const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? {};
+  const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
+  const selectedReference = references.find(ref => ref.id === selectedReferenceId) || null;
+  
+  // Debug logging for reference state
+  useEffect(() => {
+    console.log('[RefSettings] 📊 Current state:', {
+      effectiveShotId,
+      referencesCount: references.length,
+      selectedReferenceId,
+      hasSelectedReference: !!selectedReference,
+      selectedReferenceName: selectedReference?.name,
+      selectedReferenceStrength: selectedReference?.styleReferenceStrength,
+      selectedSubjectStrength: selectedReference?.subjectStrength,
+      allReferenceIds: references.map(r => r.id),
+      allShotSelections: selectedReferenceIdByShot
+    });
+  }, [effectiveShotId, references, selectedReferenceId, selectedReference, selectedReferenceIdByShot]);
+  
+  // For backward compatibility with single reference (used in display)
+  const rawStyleReferenceImage = selectedReference?.styleReferenceImage || projectImageSettings?.styleReferenceImage || null;
+  const rawStyleReferenceImageOriginal = selectedReference?.styleReferenceImageOriginal || projectImageSettings?.styleReferenceImageOriginal || null;
+  const currentStyleStrength = selectedReference?.styleReferenceStrength ?? projectImageSettings?.styleReferenceStrength ?? 1.0;
+  const currentSubjectStrength = selectedReference?.subjectStrength ?? projectImageSettings?.subjectStrength ?? 0.0;
+  const currentSubjectDescription = selectedReference?.subjectDescription ?? projectImageSettings?.subjectDescription ?? '';
+  const currentInThisScene = selectedReference?.inThisScene ?? projectImageSettings?.inThisScene ?? false;
   
   // Display image (use original if available, fallback to processed)
   const styleReferenceImageDisplay = useMemo(() => {
@@ -201,6 +231,46 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     return imageToDisplay;
   }, [styleReferenceOverride, rawStyleReferenceImageOriginal, rawStyleReferenceImage]);
+
+  // Auto-select first reference if we have references but no valid selected reference for this shot
+  useEffect(() => {
+    if (references.length > 0 && projectImageSettings) {
+      // Case 1: No selectedReferenceId for this shot
+      if (!selectedReferenceId) {
+        console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(no ID set)');
+        updateProjectImageSettings('project', {
+          selectedReferenceIdByShot: {
+            ...selectedReferenceIdByShot,
+            [effectiveShotId]: references[0].id
+          }
+        });
+      }
+      // Case 2: selectedReferenceId exists but doesn't match any reference (stale/corrupted)
+      else if (!selectedReference) {
+        console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(stale ID)');
+        updateProjectImageSettings('project', {
+          selectedReferenceIdByShot: {
+            ...selectedReferenceIdByShot,
+            [effectiveShotId]: references[0].id
+          }
+        });
+      }
+    }
+  }, [effectiveShotId, references, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
+
+  // Sync local state with selected reference settings
+  useEffect(() => {
+    console.log('[RefSettings] 🔄 Syncing local state from DB/selected reference:', {
+      styleStrength: currentStyleStrength,
+      subjectStrength: currentSubjectStrength,
+      subjectDescription: currentSubjectDescription,
+      inThisScene: currentInThisScene
+    });
+    setStyleReferenceStrength(currentStyleStrength);
+    setSubjectStrength(currentSubjectStrength);
+    setSubjectDescription(currentSubjectDescription);
+    setInThisScene(currentInThisScene);
+  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene]);
 
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
@@ -274,6 +344,77 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     migrateBase64ToUrl();
   }, [rawStyleReferenceImage, selectedProjectId, updateProjectImageSettings]);
   
+  // Migrate legacy single reference to array format AND project-wide selection to shot-specific
+  useEffect(() => {
+    const migrateLegacyReference = async () => {
+      if (!projectImageSettings || !selectedProjectId) return;
+      
+      let needsMigration = false;
+      let updates: Partial<ProjectImageSettings> = {};
+      
+      // Migration 1: Flat reference properties -> references array
+      const hasLegacyFlatFormat = projectImageSettings.styleReferenceImage && 
+                                  !projectImageSettings.references;
+      
+      if (hasLegacyFlatFormat) {
+        console.log('[RefSettings] 🔧 Migrating legacy flat reference to array format');
+        needsMigration = true;
+        
+        const legacyReference: ReferenceImage = {
+          id: nanoid(),
+          name: "Reference 1",
+          styleReferenceImage: projectImageSettings.styleReferenceImage || null,
+          styleReferenceImageOriginal: projectImageSettings.styleReferenceImageOriginal || null,
+          styleReferenceStrength: projectImageSettings.styleReferenceStrength ?? 1.0,
+          subjectStrength: projectImageSettings.subjectStrength ?? 0.0,
+          subjectDescription: projectImageSettings.subjectDescription ?? "",
+          inThisScene: projectImageSettings.inThisScene ?? false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        updates.references = [legacyReference];
+        updates.selectedReferenceIdByShot = { [effectiveShotId]: legacyReference.id };
+        
+        // Clear old flat properties
+        updates.styleReferenceImage = undefined;
+        updates.styleReferenceImageOriginal = undefined;
+        updates.styleReferenceStrength = undefined;
+        updates.subjectStrength = undefined;
+        updates.subjectDescription = undefined;
+        updates.inThisScene = undefined;
+        updates.selectedReferenceId = undefined;
+      }
+      
+      // Migration 2: Project-wide selectedReferenceId -> shot-specific selectedReferenceIdByShot
+      const hasLegacyProjectWideSelection = projectImageSettings.selectedReferenceId && 
+                                            !projectImageSettings.selectedReferenceIdByShot;
+      
+      if (hasLegacyProjectWideSelection && !hasLegacyFlatFormat) {
+        console.log('[RefSettings] 🔧 Migrating project-wide selection to shot-specific');
+        needsMigration = true;
+        
+        // Apply the old project-wide selection to the current shot
+        updates.selectedReferenceIdByShot = {
+          [effectiveShotId]: projectImageSettings.selectedReferenceId
+        };
+        updates.selectedReferenceId = undefined;
+      }
+      
+      if (needsMigration) {
+        try {
+          await updateProjectImageSettings('project', updates);
+          console.log('[RefSettings] ✅ Successfully migrated legacy reference settings');
+          toast.success('Reference settings migrated to new format');
+        } catch (error) {
+          console.error('[RefSettings] ❌ Failed to migrate legacy reference:', error);
+        }
+      }
+    };
+    
+    migrateLegacyReference();
+  }, [effectiveShotId, projectImageSettings, selectedProjectId, updateProjectImageSettings]);
+  
   // Mark that we've visited this page in the session
   React.useEffect(() => {
     try {
@@ -287,9 +428,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Text to prepend/append to every prompt
   const [beforeEachPromptText, setBeforeEachPromptText] = useState("");
   const [afterEachPromptText, setAfterEachPromptText] = useState("");
-
-  // Associated shot
-  const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
 
   // Removed unused currentShotId that was causing unnecessary re-renders
@@ -320,7 +458,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
-  const availableLoras: LoraModel[] = publicLorasData?.map(resource => resource.metadata) || [];
+  const availableLoras: LoraModel[] = (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
 
   // LoRA management using the modularized hook with new generalized approach
   const loraManager = useLoraManager(availableLoras, {
@@ -334,9 +472,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     disableAutoLoad: true, // Disable auto-load since we handle our own default logic
   });
 
-  // Get the effective shot ID for storage (use 'none' for null)
-  const effectiveShotId = associatedShotId || 'none';
-  
   // Get current prompts for the selected shot
   const prompts = promptsByShot[effectiveShotId] || [];
   
@@ -555,9 +690,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }));
 
   // Apply default LoRAs using the new generalized approach
+  // NOTE: Disabled since we're now always using qwen-image model
   useEffect(() => { 
     if (
-      selectedModel === 'wan-local' && 
+      false && // Disabled - always using qwen-image
       ready &&
       !defaultsApplied.current && 
       availableLoras.length > 0 && 
@@ -664,39 +800,133 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const processedUploadedUrl = await uploadImageToStorage(processedFile);
       console.log('[StyleRefDebug] Upload completed, URL:', processedUploadedUrl);
       
-      // Save both URLs - original for display, processed for generation
-      console.log('[StyleRefDebug] Saving URLs:', {
-        original: originalUploadedUrl,
-        processed: processedUploadedUrl
+      // Create a new reference
+      const newReference: ReferenceImage = {
+        id: nanoid(),
+        name: `Reference ${(references.length + 1)}`,
+        styleReferenceImage: processedUploadedUrl,
+        styleReferenceImageOriginal: originalUploadedUrl,
+        styleReferenceStrength: 1.0,
+        subjectStrength: 0.0,
+        subjectDescription: "",
+        inThisScene: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      console.log('[RefSettings] ➕ Creating new reference:', newReference);
+      
+      // Add the new reference and select it for the current shot
+      await updateProjectImageSettings('project', {
+        references: [...references, newReference],
+        selectedReferenceIdByShot: {
+          ...selectedReferenceIdByShot,
+          [effectiveShotId]: newReference.id
+        }
       });
       
-      await updateProjectImageSettings('project', {
-        styleReferenceImage: processedUploadedUrl, // Used for generation
-        styleReferenceImageOriginal: originalUploadedUrl // Used for display
-      });
       markAsInteracted();
       // Optimistically reflect the original uploaded image for display
       setStyleReferenceOverride(originalUploadedUrl);
       
-      console.log('[StyleRefDebug] Style reference upload completed successfully!');
+      console.log('[RefSettings] ✅ Style reference upload completed successfully!');
     } catch (error) {
       console.error('Error uploading style reference:', error);
-      // No toasts on failure per request
+      toast.error('Failed to upload reference image');
     } finally {
       setIsUploadingStyleReference(false);
     }
-  }, [updateProjectImageSettings, markAsInteracted, selectedProjectId]);
+  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, references]);
 
-  // Handle removing style reference image
-  const handleRemoveStyleReference = useCallback(async () => {
-    // Optimistically clear immediately
-    setStyleReferenceOverride(null);
+  // Handle selecting a reference for the current shot
+  const handleSelectReference = useCallback(async (referenceId: string) => {
+    console.log('[RefSettings] 🔀 Selecting reference for shot', effectiveShotId, ':', referenceId);
+    
+    // Optimistic UI update
+    const optimisticUpdate = {
+      ...selectedReferenceIdByShot,
+      [effectiveShotId]: referenceId
+    };
+    
+    try {
+      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+        const next = { 
+          ...(prev || {}), 
+          selectedReferenceIdByShot: optimisticUpdate
+        };
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference selection', { next });
+        return next;
+      });
+    } catch (e) {
+      console.warn('[RefSettings] Failed to set optimistic cache data', e);
+    }
+    
+    // Persist to database (debounced)
     await updateProjectImageSettings('project', {
-      styleReferenceImage: null,
-      styleReferenceImageOriginal: null
+      selectedReferenceIdByShot: optimisticUpdate
     });
     markAsInteracted();
-  }, [updateProjectImageSettings, markAsInteracted]);
+  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
+  
+  // Handle deleting a reference
+  const handleDeleteReference = useCallback(async (referenceId: string) => {
+    console.log('[RefSettings] 🗑️ Deleting reference:', referenceId);
+    const filteredReferences = references.filter(ref => ref.id !== referenceId);
+    
+    // Update all shot selections that had this reference selected
+    const updatedSelections = { ...selectedReferenceIdByShot };
+    Object.keys(updatedSelections).forEach(shotId => {
+      if (updatedSelections[shotId] === referenceId) {
+        // Select first remaining reference or null
+        updatedSelections[shotId] = filteredReferences[0]?.id ?? null;
+      }
+    });
+    
+    await updateProjectImageSettings('project', {
+      references: filteredReferences,
+      selectedReferenceIdByShot: updatedSelections
+    });
+    
+    markAsInteracted();
+  }, [references, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted]);
+  
+  // Handle updating a reference's name
+  const handleUpdateReferenceName = useCallback(async (referenceId: string, name: string) => {
+    console.log('[RefSettings] ✏️ Updating reference name:', referenceId, name);
+    const updatedReferences = references.map(ref =>
+      ref.id === referenceId
+        ? { ...ref, name, updatedAt: new Date().toISOString() }
+        : ref
+    );
+    
+    await updateProjectImageSettings('project', {
+      references: updatedReferences
+    });
+    markAsInteracted();
+  }, [references, updateProjectImageSettings, markAsInteracted]);
+  
+  // Handle updating a reference's settings
+  const handleUpdateReference = useCallback(async (referenceId: string, updates: Partial<ReferenceImage>) => {
+    console.log('[RefSettings] 💾 Updating reference settings:', { referenceId, updates });
+    const updatedReferences = references.map(ref =>
+      ref.id === referenceId
+        ? { ...ref, ...updates, updatedAt: new Date().toISOString() }
+        : ref
+    );
+    
+    console.log('[RefSettings] ⏳ Saving to database (debounced 300ms)...');
+    await updateProjectImageSettings('project', {
+      references: updatedReferences
+    });
+    console.log('[RefSettings] ✅ Update call completed (actual DB write may still be pending due to debounce)');
+    markAsInteracted();
+  }, [references, updateProjectImageSettings, markAsInteracted]);
+  
+  // Handle removing style reference image (legacy - now removes selected reference)
+  const handleRemoveStyleReference = useCallback(async () => {
+    if (!selectedReferenceId) return;
+    await handleDeleteReference(selectedReferenceId);
+  }, [selectedReferenceId, handleDeleteReference]);
 
   // Handle model change
   const handleModelChange = useCallback(async (value: GenerationMode) => {
@@ -736,38 +966,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Handle style reference strength change
   const handleStyleStrengthChange = useCallback(async (value: number) => {
+    if (!selectedReferenceId) return;
     setStyleReferenceStrength(value);
-    await updateProjectImageSettings('project', {
-      styleReferenceStrength: value
-    });
-    markAsInteracted();
-  }, [updateProjectImageSettings, markAsInteracted]);
+    await handleUpdateReference(selectedReferenceId, { styleReferenceStrength: value });
+  }, [selectedReferenceId, handleUpdateReference]);
 
   // Handle subject strength change
   const handleSubjectStrengthChange = useCallback(async (value: number) => {
+    if (!selectedReferenceId) return;
     setSubjectStrength(value);
-    await updateProjectImageSettings('project', {
-      subjectStrength: value
-    });
-    markAsInteracted();
-  }, [updateProjectImageSettings, markAsInteracted]);
+    await handleUpdateReference(selectedReferenceId, { subjectStrength: value });
+  }, [selectedReferenceId, handleUpdateReference]);
 
   // Handle subject description change
   const handleSubjectDescriptionChange = useCallback(async (value: string) => {
+    if (!selectedReferenceId) return;
     setSubjectDescription(value);
-    await updateProjectImageSettings('project', {
-      subjectDescription: value
-    });
-    markAsInteracted();
-  }, [updateProjectImageSettings, markAsInteracted]);
+    await handleUpdateReference(selectedReferenceId, { subjectDescription: value });
+  }, [selectedReferenceId, handleUpdateReference]);
 
   const handleInThisSceneChange = useCallback(async (value: boolean) => {
+    if (!selectedReferenceId) return;
     setInThisScene(value);
-    await updateProjectImageSettings('project', {
-      inThisScene: value
-    });
-    markAsInteracted();
-  }, [updateProjectImageSettings, markAsInteracted]);
+    await handleUpdateReference(selectedReferenceId, { inThisScene: value });
+  }, [selectedReferenceId, handleUpdateReference]);
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
     markAsInteracted();
@@ -842,15 +1064,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
 
     // Map selected LoRAs to the format expected by the task creation (only for wan-local)
-    const lorasForApi = selectedModel === 'wan-local' 
-      ? loraManager.selectedLoras.map(lora => ({
-          path: lora.path,
-          strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0
-        }))
-      : [];
+    // NOTE: Disabled since we're now always using qwen-image model (which doesn't support LoRAs)
+    const lorasForApi: any[] = [];
 
     // Debug: Log what style reference we're about to send
-    if (selectedModel === 'qwen-image' && styleReferenceImageGeneration) {
+    if (styleReferenceImageGeneration) {
       console.log('[ImageGenerationForm] Style reference being sent to task:', {
         isUrl: styleReferenceImageGeneration.startsWith('http'),
         isBase64: styleReferenceImageGeneration.startsWith('data:'),
@@ -873,11 +1091,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       imagesPerPrompt, 
       loras: lorasForApi,
       shot_id: associatedShotId || undefined, // Convert null to undefined for the helper
-      model_name: selectedModel === 'wan-local' ? 'wan-2.2' : 'qwen-image',
+      model_name: 'qwen-image', // Always qwen-image now
       // Set steps: user-selected value for local generation (including Qwen), or undefined for cloud defaults
       steps: isLocalGenerationEnabled ? steps : undefined,
       // Add style reference for Qwen.Image
-      ...(selectedModel === 'qwen-image' && styleReferenceImageGeneration && {
+      ...(styleReferenceImageGeneration && {
         style_reference_image: styleReferenceImageGeneration,
         style_reference_strength: currentStyleStrength,
         subject_reference_image: styleReferenceImageGeneration, // Same image for now
@@ -1100,6 +1318,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onSubjectStrengthChange={handleSubjectStrengthChange}
             onSubjectDescriptionChange={handleSubjectDescriptionChange}
             onInThisSceneChange={handleInThisSceneChange}
+            // New multiple references props
+            references={references}
+            selectedReferenceId={selectedReferenceId}
+            onSelectReference={handleSelectReference}
+            onDeleteReference={handleDeleteReference}
+            onUpdateReferenceName={handleUpdateReferenceName}
           />
         </div>
 

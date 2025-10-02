@@ -1314,16 +1314,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     if (generationMode === 'timeline') {
       // Timeline positions are now managed by useEnhancedShotPositions
       // Frame gaps will be extracted from the database-driven positions
-      const sortedPositions: Array<{id: string, pos: number}> = [];
       
-      const frameGaps = [];
-      for (let i = 0; i < sortedPositions.length - 1; i++) {
-        const gap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
-        frameGaps.push(gap);
-      }
-      
-      // Fetch pair prompts from database for timeline generation
+      // Fetch shot generations with timeline positions from database for timeline generation
       let pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
+      let sortedPositions: Array<{id: string, pos: number}> = [];
       
       try {
         const { data: shotGenerationsData, error } = await supabase
@@ -1333,8 +1327,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           .order('timeline_frame', { ascending: true });
 
         if (error) {
-          console.error('[Generation] Error fetching pair prompts:', error);
+          console.error('[Generation] Error fetching shot generations:', error);
         } else if (shotGenerationsData) {
+          // Build sorted positions from timeline_frame data
+          sortedPositions = shotGenerationsData
+            .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined)
+            .map(sg => ({
+              id: sg.generation_id || sg.id,
+              pos: sg.timeline_frame!
+            }))
+            .sort((a, b) => a.pos - b.pos);
+          
+          console.log('[Generation] Timeline mode - Sorted positions from database:', sortedPositions);
+          
           // Extract pair prompts from metadata
           for (let i = 0; i < shotGenerationsData.length - 1; i++) {
             const firstItem = shotGenerationsData[i];
@@ -1348,8 +1353,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           }
         }
       } catch (err) {
-        console.error('[Generation] Error fetching pair prompts:', err);
+        console.error('[Generation] Error fetching shot generations:', err);
       }
+      
+      // Calculate frame gaps from sorted positions
+      const frameGaps = [];
+      for (let i = 0; i < sortedPositions.length - 1; i++) {
+        const gap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
+        frameGaps.push(gap);
+      }
+      
+      console.log('[Generation] Timeline mode - Calculated frame gaps:', frameGaps);
 
       basePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
         // Use pair-specific prompt if available, otherwise fall back to default

@@ -35,12 +35,35 @@ src/tools/image-generation/
 
 ### `ImageGenerationForm.tsx`
 **Simplified generation form**
+- **Model**: Qwen.Image model for image generation
 - **Inputs**: Prompts, images-per-prompt, before/after prompt text
-- **Features**: Wan LoRA picker integration, collapsible form UI
+- **Features**: 
+  - Multiple reference images with per-shot selection
+  - Collapsible form UI
+  - Shot association for organizing generated images
 
-- **State**: Persistent via `usePersistentToolState` (including form expand/collapse state)
+- **State**: Persistent via `usePersistentToolState` (including form expand/collapse state, prompts per shot)
 - **UX**: Form can be collapsed to save space, state persisted per project
 - **Sticky UI**: When collapsed, shows sticky button that attaches to top of screen while scrolling
+
+### Multiple Reference Images
+**Shot-specific reference management**
+- **Storage**: Array of reference images stored at project level
+- **Selection**: Each shot can have its own selected reference
+- **UI**: Responsive grid layout (4 columns mobile, 5-6 desktop) with thumbnail gallery
+- **Features**:
+  - Click to select reference (optimistic UI updates)
+  - Add new references via upload or dataset browser
+  - Delete references (auto-selects next available)
+  - Editable reference names
+  - Visual selection indicator with purple border
+- **Settings per reference**:
+  - Style strength (0.0-2.0)
+  - Subject strength (0.0-2.0) 
+  - Subject description (text input)
+  - "In this scene" flag (checkbox)
+- **Storage**: Original images stored in Supabase storage, both processed and original versions maintained
+- **Migration**: Automatic migration from legacy single reference format
 
 ### `PromptGenerationControls.tsx`
 **AI-powered prompt management interface**

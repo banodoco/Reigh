@@ -2334,6 +2334,13 @@
     display: none !important;
   }
 
+  /* Custom override for lg:text-sm */
+  @media (min-width: 1024px) {
+    .lg\:text-sm {
+      font-size: 0.575rem !important;
+      line-height: 1.25rem !important;
+    }
+  }
 }
 
 /* Custom override for modal inputs */

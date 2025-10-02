@@ -303,7 +303,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
         <div className="flex-1 p-4 bg-muted/20 flex flex-col gap-4">
           {/* Treatment mode */}
           <div className="space-y-2">
-            <Label className="text-sm">How would you like to use the guidance video?</Label>
+            <Label className="text-sm">How would you like to cut the guidance video to match the timeline?</Label>
             <div className="flex flex-col md:flex-row md:items-center gap-3">
               <div className="flex-shrink-0 w-full md:w-[200px]">
                 <Select value={treatment} onValueChange={onTreatmentChange}>

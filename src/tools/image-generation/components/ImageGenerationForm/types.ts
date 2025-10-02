@@ -46,9 +46,30 @@ export interface PersistedFormSettings {
   associatedShotId?: string | null;
 }
 
+// Individual reference image with its own settings
+export interface ReferenceImage {
+  id: string; // Unique identifier (use nanoid())
+  name: string; // User-editable display name
+  styleReferenceImage: string | null; // Processed URL for generation
+  styleReferenceImageOriginal: string | null; // Original URL for display
+  styleReferenceStrength: number; // 0.1 - 2.0
+  subjectStrength: number; // 0.0 - 2.0
+  subjectDescription: string; // Text description
+  inThisScene: boolean; // Boolean flag
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+}
+
 // Project-level settings for model and style reference
 export interface ProjectImageSettings {
   selectedModel?: GenerationMode;
+  
+  // Multi-reference structure (shot-specific selection)
+  selectedReferenceIdByShot?: Record<string, string | null>; // Map of shotId -> referenceId
+  references?: ReferenceImage[]; // Array of references (project-wide)
+  
+  // Legacy structures (deprecated, kept for migration)
+  selectedReferenceId?: string | null; // Old project-wide selection (deprecated)
   styleReferenceImage?: string | null; // URL of processed style reference image (used for generation)
   styleReferenceImageOriginal?: string | null; // URL of original uploaded image (used for display)
   styleReferenceStrength?: number; // Style strength slider value

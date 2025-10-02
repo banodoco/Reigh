@@ -146,7 +146,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     const extractFrames = async () => {
       console.log('[GuidanceVideoStrip] Extracting frames for treatment:', treatment);
       setIsExtractingFrames(true);
-      setIsVideoReady(false);
+      // Don't set isVideoReady to false - keep old frames visible during re-extraction
       
       // Wait for video to be ready
       if (video.readyState < 2) {
@@ -177,6 +177,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         
         if (!ctx) {
           console.error('[GuidanceVideoStrip] Failed to get canvas context');
+          setIsExtractingFrames(false);
           return;
         }
         
@@ -226,14 +227,17 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           console.log(`[GuidanceVideoStrip] Extracted frame ${i + 1}/${numFrames} (frame ${frameIndex}) [${treatment} mode]`);
         }
         
-        setFrameImages(extractedFrames);
-        setDisplayFrameImages(extractedFrames); // Update display with new frames
-        setIsVideoReady(true);
+        // Only update if we successfully extracted frames
+        if (extractedFrames.length > 0) {
+          setFrameImages(extractedFrames);
+          setDisplayFrameImages(extractedFrames); // Update display with new frames
+          setIsVideoReady(true);
+        }
         setIsExtractingFrames(false);
         console.log('[GuidanceVideoStrip] Frame extraction complete for', treatment, 'mode');
       } catch (error) {
         console.error('[GuidanceVideoStrip] Error extracting frames:', error);
-        setIsVideoReady(false);
+        // Keep existing frames on error, don't clear them
         setIsExtractingFrames(false);
       }
     };
@@ -246,6 +250,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     const handleError = (e: Event) => {
       console.error('[GuidanceVideoStrip] Video load error:', e);
       setIsVideoReady(false);
+      setIsExtractingFrames(false);
     };
 
     if (video.readyState >= 2) {
@@ -355,11 +360,12 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       {/* Floating preview box above video strip */}
       {isHovering && isVideoReady && (
         <div 
-          className="fixed z-50 pointer-events-none"
+          className="fixed pointer-events-none"
           style={{
             left: `${hoverPosition.x}px`,
             top: `${hoverPosition.y - 200}px`, // Position above cursor (adjusted for taller preview)
-            transform: 'translateX(-50%)'
+            transform: 'translateX(-50%)',
+            zIndex: 9999
           }}
         >
           <div className="bg-background border-2 border-primary rounded-lg shadow-2xl overflow-hidden">
@@ -382,68 +388,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           </div>
         </div>
       )}
-
-      {/* Clip/Motion controls at top-right (aligned with zoom controls) */}
-      <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50">
-          {/* Treatment selector */}
-          <Select value={treatment} onValueChange={onTreatmentChange}>
-            <SelectTrigger className="h-6 w-[140px] text-[9px] px-2 py-0 border-muted-foreground/30">
-              <SelectValue>
-                {treatment === 'adjust' 
-                  ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
-                  : 'Use video as is'}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="adjust">
-                <div className="flex flex-col gap-0.5 py-1">
-                  <span className="text-xs font-medium">{totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">{adjustModeDescription}</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="clip">
-                <div className="flex flex-col gap-0.5 py-1">
-                  <span className="text-xs font-medium">Use video as is</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">{clipModeDescription}</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Motion strength compact display */}
-          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
-            <span className="text-muted-foreground">Motion:</span>
-            <span className={`font-medium ${
-              motionStrength < 0.5 ? 'text-amber-500' :
-              motionStrength > 1.5 ? 'text-blue-500' :
-              'text-foreground'
-            }`}>
-              {motionStrength.toFixed(1)}x
-            </span>
-          </div>
-
-          {/* Motion strength slider (compact) */}
-          <div className="w-16">
-            <Slider
-              value={[motionStrength]}
-              onValueChange={([value]) => onMotionStrengthChange(value)}
-              min={0}
-              max={2}
-              step={0.1}
-              className="h-4"
-            />
-          </div>
-
-          {/* Delete button */}
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-6 w-6 p-0 opacity-80 hover:opacity-100 ml-0.5"
-            onClick={onRemove}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-      </div>
 
       {/* Structure video strip */}
       <div 

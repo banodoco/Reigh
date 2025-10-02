@@ -16,7 +16,8 @@ import { TIMELINE_HORIZONTAL_PADDING } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
-import { Plus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Plus, X } from 'lucide-react';
 
 // Import hooks
 import { useZoom } from './hooks/useZoom';
@@ -241,58 +242,234 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const maxAllowedGap = calculateMaxGap(contextFrames);
 
   return (
-    <div className="w-full overflow-x-hidden">
+    <div className="w-full overflow-x-hidden relative">
+      {/* Fixed corner controls - positioned relative to visible viewport */}
+      {/* Top-left: Zoom controls */}
+      <div className="absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto">
+        <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomReset}
+          disabled={zoomLevel <= 1}
+          className="h-7 text-xs px-2"
+        >
+          Reset
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomOut}
+          disabled={zoomLevel <= 1}
+          className="h-7 w-7 p-0"
+        >
+          −
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomIn}
+          className="h-7 w-7 p-0"
+        >
+          +
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleZoomToStart}
+          className="h-7 text-xs px-2"
+        >
+          ← Start
+        </Button>
+      </div>
+
+      {/* Bottom-left: Gap and Context controls */}
+      <div 
+        className="absolute left-8 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto"
+        style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
+      >
+        {/* Gap to reset */}
+        <div className="flex items-center gap-1.5">
+          <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
+          <Slider
+            value={[resetGap]}
+            onValueChange={([value]) => setResetGap(value)}
+            min={1}
+            max={maxGap}
+            step={1}
+            className="w-16 h-4"
+          />
+        </div>
+
+        {/* Context frames */}
+        <div className="flex items-center gap-1.5">
+          <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Context: {pendingContext}</Label>
+          <Slider
+            value={[pendingContext]}
+            onValueChange={([value]) => setPendingContext(value)}
+            min={1}
+            max={24}
+            step={1}
+            className="w-16 h-4"
+          />
+        </div>
+
+        {/* Reset button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReset}
+          className="h-6 text-[10px] px-2"
+        >
+          Reset
+        </Button>
+      </div>
+
+      {/* Top-right: Video treatment controls (only when structure video is present) */}
+      {structureVideoPath && structureVideoMetadata && onStructureVideoChange && (
+        <div className="absolute right-8 top-4 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 pointer-events-auto">
+          {(() => {
+            const totalVideoFrames = structureVideoMetadata.total_frames;
+            const timelineFrames = images.length > 0 ? images.length : 1;
+            const adjustModeDescription = (() => {
+              if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+              if (totalVideoFrames > timelineFrames) {
+                const framesToDrop = totalVideoFrames - timelineFrames;
+                return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+              } else if (totalVideoFrames < timelineFrames) {
+                const framesToDuplicate = timelineFrames - totalVideoFrames;
+                return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+              } else {
+                return `Video matches timeline (${timelineFrames} frames)`;
+              }
+            })();
+            const clipModeDescription = (() => {
+              if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+              return `Video will be used as-is. ${totalVideoFrames > timelineFrames ? `Last ${totalVideoFrames - timelineFrames} frame${totalVideoFrames - timelineFrames === 1 ? '' : 's'} won't be used.` : totalVideoFrames < timelineFrames ? `Video ends at frame ${totalVideoFrames}.` : ''}`;
+            })();
+            
+            return (
+              <>
+                {/* Treatment selector */}
+                <Select value={structureVideoTreatment} onValueChange={(treatment: 'adjust' | 'clip') => {
+                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
+                }}>
+                  <SelectTrigger className="h-6 w-[140px] text-[9px] px-2 py-0 border-muted-foreground/30">
+                    <SelectValue>
+                      {structureVideoTreatment === 'adjust' 
+                        ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
+                        : 'Use video as is'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="adjust">
+                      <div className="flex flex-col gap-0.5 py-1">
+                        <span className="text-xs font-medium">{totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline</span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">{adjustModeDescription}</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="clip">
+                      <div className="flex flex-col gap-0.5 py-1">
+                        <span className="text-xs font-medium">Use video as is</span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">{clipModeDescription}</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Motion strength compact display */}
+                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
+                  <span className="text-muted-foreground">Motion:</span>
+                  <span className={`font-medium ${
+                    structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
+                    structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
+                    'text-foreground'
+                  }`}>
+                    {structureVideoMotionStrength.toFixed(1)}x
+                  </span>
+                </div>
+
+                {/* Motion strength slider (compact) */}
+                <div className="w-16">
+                  <Slider
+                    value={[structureVideoMotionStrength]}
+                    onValueChange={([value]) => {
+                      onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value);
+                    }}
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    className="h-4"
+                  />
+                </div>
+
+                {/* Delete button */}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-80 hover:opacity-100 ml-0.5"
+                  onClick={() => {
+                    onStructureVideoChange(null, null, 'adjust', 1.0);
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Bottom-right: Add Images button */}
+      {onImageDrop && (
+        <div 
+          className="absolute right-8 z-20 pointer-events-auto"
+          style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              if (files.length > 0) {
+                onImageDrop(files);
+                e.target.value = ''; // Reset input
+              }
+            }}
+            className="hidden"
+            id="timeline-image-upload"
+          />
+          <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs px-3 bg-background/95 backdrop-blur-sm shadow-md border-border/50"
+              asChild
+            >
+              <span className="flex items-center gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                Add Images
+              </span>
+            </Button>
+          </Label>
+        </div>
+      )}
+
       {/* Timeline */}
       <div
         ref={timelineRef}
         className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
           isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
         }`}
-        style={{ minHeight: "200px", paddingBottom: "5.5rem" }}
+        style={{ minHeight: "200px", paddingTop: "3rem", paddingBottom: "5.5rem" }}
         onWheel={handleWheel}
         onDragEnter={handleDragEnter}
         onDragOver={(e) => handleDragOver(e, containerRef)}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {/* Zoom controls at top */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomReset}
-            disabled={zoomLevel <= 1}
-            className="h-7 text-xs px-2"
-          >
-            Reset
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomOut}
-            disabled={zoomLevel <= 1}
-            className="h-7 w-7 p-0"
-          >
-            −
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomIn}
-            className="h-7 w-7 p-0"
-          >
-            +
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomToStart}
-            className="h-7 text-xs px-2"
-          >
-            ← Start
-          </Button>
-        </div>
         {/* Drop position indicator */}
         <DropIndicator
           isVisible={isFileOver}
@@ -535,79 +712,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             );
           })}
         </div>
-
-        {/* Gap and Context controls below ruler */}
-        <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit">
-          {/* Gap to reset */}
-          <div className="flex items-center gap-1.5">
-            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
-            <Slider
-              value={[resetGap]}
-              onValueChange={([value]) => setResetGap(value)}
-              min={1}
-              max={maxGap}
-              step={1}
-              className="w-16 h-4"
-            />
-          </div>
-
-          {/* Context frames */}
-          <div className="flex items-center gap-1.5">
-            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Context: {pendingContext}</Label>
-            <Slider
-              value={[pendingContext]}
-              onValueChange={([value]) => setPendingContext(value)}
-              min={1}
-              max={24}
-              step={1}
-              className="w-16 h-4"
-            />
-          </div>
-
-          {/* Reset button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReset}
-            className="h-6 text-[10px] px-2"
-          >
-            Reset
-          </Button>
-        </div>
-
-        {/* Add Images button in bottom right */}
-        {onImageDrop && (
-          <div className="absolute bottom-4 right-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length > 0) {
-                  onImageDrop(files);
-                  e.target.value = ''; // Reset input
-                }
-              }}
-              className="hidden"
-              id="timeline-image-upload"
-            />
-            <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs px-3 bg-background/95 backdrop-blur-sm shadow-md border-border/50"
-                asChild
-              >
-                <span className="flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5" />
-                  Add Images
-                </span>
-              </Button>
-            </Label>
-          </div>
-        )}
       </div>
     </div>
   );
