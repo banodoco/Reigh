@@ -403,6 +403,15 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
+        {/* Delete button in top-right corner */}
+        <Button
+          variant="destructive"
+          size="sm"
+          className="absolute top-2 right-2 z-20 h-6 w-6 p-0 opacity-80 hover:opacity-100"
+          onClick={onRemove}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
         {/* Hidden video element for frame extraction and preview */}
         <video
           ref={videoRef}

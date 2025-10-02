@@ -25,16 +25,22 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   duplicateSuccessImageId,
   shouldLoad = true,
   projectAspectRatio,
+  frameNumber,
 }) => {
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   
   // Progressive loading setup
   const progressiveEnabled = isProgressiveLoadingEnabled();
-  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage({
-    thumbUrl: image.thumbUrl || image.imageUrl,
-    fullUrl: image.imageUrl,
-    enabled: progressiveEnabled && shouldLoad,
-  });
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled ? image.thumbUrl : null,
+    image.imageUrl,
+    {
+      priority: false,
+      lazy: true,
+      enabled: progressiveEnabled && shouldLoad,
+      crossfadeMs: 200
+    }
+  );
 
   const displayImageUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(image.thumbUrl || image.imageUrl);
 
@@ -130,9 +136,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         />
 
         {/* Frame number overlay - bottom (matching timeline style) */}
-        {(image as any).timeline_frame !== undefined && (
+        {frameNumber !== undefined && (
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
-            <span className="inline-block">{(image as any).timeline_frame}</span>
+            <span className="inline-block">{frameNumber}</span>
           </div>
         )}
 

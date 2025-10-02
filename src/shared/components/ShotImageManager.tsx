@@ -56,6 +56,7 @@ export interface ShotImageManagerProps {
   onImageUpload?: (files: File[]) => void; // Handler for image upload
   isUploadingImage?: boolean; // Upload loading state
   onOpenLightbox?: (index: number) => void; // Handler to open lightbox at specific index
+  batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -74,6 +75,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   onImageUpload,
   onOpenLightbox,
   isUploadingImage,
+  batchVideoFrames = 60,
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
@@ -1037,6 +1039,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           duplicatingImageId={duplicatingImageId}
           duplicateSuccessImageId={duplicateSuccessImageId}
           projectAspectRatio={projectAspectRatio}
+          batchVideoFrames={batchVideoFrames}
         />
         
         {/* MediaLightbox for mobile - must be rendered here since we return early */}
@@ -1118,6 +1121,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             const desktopSelected = selectedIds.includes(imageKey);
             const finalSelected = desktopSelected;
             
+            // Calculate frame number as position * frames per pair
+            const frameNumber = index * batchVideoFrames;
+            
             return (
               <SortableImageItem
                 key={image.shotImageEntryId}
@@ -1129,7 +1135,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 }}
                 onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
                 onDuplicate={onImageDuplicate}
-                timeline_frame={(image as any).timeline_frame ?? (index * 50)}
+                timeline_frame={frameNumber}
                 onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
                 skipConfirmation={imageDeletionSettings.skipConfirmation}
                 onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}

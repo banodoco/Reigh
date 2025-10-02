@@ -25,6 +25,7 @@ interface PairRegionProps {
   pairNegativePrompt?: string;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  showLabel: boolean;
 }
 
 const PairRegion: React.FC<PairRegionProps> = ({
@@ -45,6 +46,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
   pairNegativePrompt,
   defaultPrompt,
   defaultNegativePrompt,
+  showLabel,
 }) => {
   const pairColorSchemes = [
     { bg: 'bg-blue-50', border: 'border-blue-300', context: 'bg-blue-200/60', text: 'text-blue-700', line: 'bg-blue-400' },
@@ -110,53 +112,55 @@ const PairRegion: React.FC<PairRegionProps> = ({
         }}
       />
 
-      {/* Pair label */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200`}
-            style={{
-              left: `${(startPercent + endPercent) / 2}%`,
-              transform: 'translate(-50%, -50%)',
-              transition: isDragging ? 'none' : 'left 0.2s ease-out',
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onPairClick?.(index, {
-                index,
-                frames: actualFrames,
-                startFrame: startFrame,
-                endFrame: endFrame,
-              });
-            }}
-          >
-            <div className="flex items-center gap-1.5">
-              <span>Pair {index + 1} • {actualFrames}f</span>
-              <Pencil 
-                className={`h-3 w-3 ${hasCustomPrompt ? colorScheme.text : 'text-gray-400'} ${hasCustomPrompt ? 'opacity-100' : 'opacity-60'}`}
-              />
-            </div>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <div className="max-w-xs">
-            <div className="space-y-2">
-              <div>
-                <span className="font-medium">Prompt:</span>
-                <p className="text-sm">
-                  {pairPrompt && pairPrompt.trim() ? pairPrompt.trim() : '[default]'}
-                </p>
-              </div>
-              <div>
-                <span className="font-medium">Negative:</span>
-                <p className="text-sm">
-                  {pairNegativePrompt && pairNegativePrompt.trim() ? pairNegativePrompt.trim() : '[default]'}
-                </p>
+      {/* Pair label - only show if there's enough space */}
+      {showLabel && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={`absolute top-1/2 text-sm font-light ${colorScheme.text} bg-white/90 px-3 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm cursor-pointer hover:bg-white hover:shadow-md transition-all duration-200`}
+              style={{
+                left: `${(startPercent + endPercent) / 2}%`,
+                transform: 'translate(-50%, -50%)',
+                transition: isDragging ? 'none' : 'left 0.2s ease-out',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPairClick?.(index, {
+                  index,
+                  frames: actualFrames,
+                  startFrame: startFrame,
+                  endFrame: endFrame,
+                });
+              }}
+            >
+              <div className="flex items-center gap-1.5">
+                <span>Pair {index + 1} • {actualFrames}f</span>
+                <Pencil 
+                  className={`h-3 w-3 ${hasCustomPrompt ? colorScheme.text : 'text-gray-400'} ${hasCustomPrompt ? 'opacity-100' : 'opacity-60'}`}
+                />
               </div>
             </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="max-w-xs">
+              <div className="space-y-2">
+                <div>
+                  <span className="font-medium">Prompt:</span>
+                  <p className="text-sm">
+                    {pairPrompt && pairPrompt.trim() ? pairPrompt.trim() : '[default]'}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">Negative:</span>
+                  <p className="text-sm">
+                    {pairNegativePrompt && pairNegativePrompt.trim() ? pairNegativePrompt.trim() : '[default]'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
 
       {/* Generation boundary lines */}
       <div

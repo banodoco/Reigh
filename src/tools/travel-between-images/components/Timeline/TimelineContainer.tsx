@@ -17,7 +17,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 // Import hooks
 import { useZoom } from './hooks/useZoom';
@@ -241,6 +241,37 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const numPairs = Math.max(0, images.length - 1);
   const maxAllowedGap = calculateMaxGap(contextFrames);
 
+  // Calculate whether to show pair labels globally
+  // Check if the average pair has enough space for labels
+  const calculateShowPairLabels = () => {
+    if (images.length < 2) return false;
+    
+    // Calculate average pair width in pixels
+    const sortedPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
+    let totalPairWidth = 0;
+    let pairCount = 0;
+    
+    for (let i = 0; i < sortedPositions.length - 1; i++) {
+      const [, startFrame] = sortedPositions[i];
+      const [, endFrame] = sortedPositions[i + 1];
+      const frameWidth = endFrame - startFrame;
+      
+      // Convert to pixels
+      const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+      const pixelWidth = (frameWidth / fullRange) * effectiveWidth * zoomLevel;
+      
+      totalPairWidth += pixelWidth;
+      pairCount++;
+    }
+    
+    const avgPairWidth = pairCount > 0 ? totalPairWidth / pairCount : 0;
+    const minLabelWidth = 100; // Minimum pixels needed for label to be comprehensible
+    
+    return avgPairWidth >= minLabelWidth;
+  };
+  
+  const showPairLabels = calculateShowPairLabels();
+
   return (
     <div className="w-full overflow-x-hidden relative">
       {/* Fixed corner controls - positioned relative to visible viewport */}
@@ -325,98 +356,104 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         </Button>
       </div>
 
-      {/* Top-right: Video treatment controls (only when structure video is present) */}
-      {structureVideoPath && structureVideoMetadata && onStructureVideoChange && (
+      {/* Top-right: Video upload and treatment controls */}
+      {shotId && projectId && onStructureVideoChange && (
         <div className="absolute right-8 top-4 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 pointer-events-auto">
-          {(() => {
-            const totalVideoFrames = structureVideoMetadata.total_frames;
-            const timelineFrames = images.length > 0 ? images.length : 1;
-            const adjustModeDescription = (() => {
-              if (totalVideoFrames === 0 || timelineFrames === 0) return '';
-              if (totalVideoFrames > timelineFrames) {
-                const framesToDrop = totalVideoFrames - timelineFrames;
-                return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
-              } else if (totalVideoFrames < timelineFrames) {
-                const framesToDuplicate = timelineFrames - totalVideoFrames;
-                return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
-              } else {
-                return `Video matches timeline (${timelineFrames} frames)`;
-              }
-            })();
-            const clipModeDescription = (() => {
-              if (totalVideoFrames === 0 || timelineFrames === 0) return '';
-              return `Video will be used as-is. ${totalVideoFrames > timelineFrames ? `Last ${totalVideoFrames - timelineFrames} frame${totalVideoFrames - timelineFrames === 1 ? '' : 's'} won't be used.` : totalVideoFrames < timelineFrames ? `Video ends at frame ${totalVideoFrames}.` : ''}`;
-            })();
-            
-            return (
-              <>
-                {/* Treatment selector */}
-                <Select value={structureVideoTreatment} onValueChange={(treatment: 'adjust' | 'clip') => {
-                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
-                }}>
-                  <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                    <SelectValue>
-                      {structureVideoTreatment === 'adjust' 
-                        ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
-                        : 'Use video as is'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="adjust">
-                      <div className="flex flex-col gap-0.5 py-1">
-                        <span className="text-xs font-medium">{totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">{adjustModeDescription}</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="clip">
-                      <div className="flex flex-col gap-0.5 py-1">
-                        <span className="text-xs font-medium">Use video as is</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">{clipModeDescription}</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+          {structureVideoPath && structureVideoMetadata ? (
+            // Video treatment controls (when video is present)
+            <>
+              {(() => {
+                const totalVideoFrames = structureVideoMetadata.total_frames;
+                const timelineFrames = images.length > 0 ? images.length : 1;
+                const adjustModeDescription = (() => {
+                  if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+                  if (totalVideoFrames > timelineFrames) {
+                    const framesToDrop = totalVideoFrames - timelineFrames;
+                    return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+                  } else if (totalVideoFrames < timelineFrames) {
+                    const framesToDuplicate = timelineFrames - totalVideoFrames;
+                    return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+                  } else {
+                    return `Video matches timeline (${timelineFrames} frames)`;
+                  }
+                })();
+                const clipModeDescription = (() => {
+                  if (totalVideoFrames === 0 || timelineFrames === 0) return '';
+                  return `Video will be used as-is. ${totalVideoFrames > timelineFrames ? `Last ${totalVideoFrames - timelineFrames} frame${totalVideoFrames - timelineFrames === 1 ? '' : 's'} won't be used.` : totalVideoFrames < timelineFrames ? `Video ends at frame ${totalVideoFrames}.` : ''}`;
+                })();
+                
+                return (
+                  <>
+                    {/* Treatment selector */}
+                    <Select value={structureVideoTreatment} onValueChange={(treatment: 'adjust' | 'clip') => {
+                      onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
+                    }}>
+                      <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                        <SelectValue>
+                          {structureVideoTreatment === 'adjust' 
+                            ? (totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
+                            : 'Use video as is'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="adjust">
+                          <div className="flex flex-col gap-0.5 py-1">
+                            <span className="text-xs font-medium">{totalVideoFrames > timelineFrames ? 'Compress' : totalVideoFrames < timelineFrames ? 'Stretch' : 'Match'} to timeline</span>
+                            <span className="text-[10px] text-muted-foreground leading-tight">{adjustModeDescription}</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="clip">
+                          <div className="flex flex-col gap-0.5 py-1">
+                            <span className="text-xs font-medium">Use video as is</span>
+                            <span className="text-[10px] text-muted-foreground leading-tight">{clipModeDescription}</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                {/* Motion strength compact display */}
-                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
-                  <span className="text-muted-foreground">Motion:</span>
-                  <span className={`font-medium ${
-                    structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
-                    structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
-                    'text-foreground'
-                  }`}>
-                    {structureVideoMotionStrength.toFixed(1)}x
-                  </span>
-                </div>
+                    {/* Motion strength compact display */}
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
+                      <span className="text-muted-foreground">Motion:</span>
+                      <span className={`font-medium ${
+                        structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
+                        structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
+                        'text-foreground'
+                      }`}>
+                        {structureVideoMotionStrength.toFixed(1)}x
+                      </span>
+                    </div>
 
-                {/* Motion strength slider (compact) */}
-                <div className="w-16">
-                  <Slider
-                    value={[structureVideoMotionStrength]}
-                    onValueChange={([value]) => {
-                      onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value);
-                    }}
-                    min={0}
-                    max={2}
-                    step={0.1}
-                    className="h-4"
-                  />
-                </div>
-
-                {/* Delete button */}
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="h-6 w-6 p-0 opacity-80 hover:opacity-100 ml-0.5"
-                  onClick={() => {
-                    onStructureVideoChange(null, null, 'adjust', 1.0);
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            );
-          })()}
+                    {/* Motion strength slider (compact) */}
+                    <div className="w-16">
+                      <Slider
+                        value={[structureVideoMotionStrength]}
+                        onValueChange={([value]) => {
+                          onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value);
+                        }}
+                        min={0}
+                        max={2}
+                        step={0.1}
+                        className="h-4"
+                      />
+                    </div>
+                  </>
+                );
+              })()}
+            </>
+          ) : (
+            // Upload button (when no video is present)
+            <GuidanceVideoUploader
+              shotId={shotId}
+              projectId={projectId}
+              onVideoUploaded={(videoUrl, metadata) => {
+                if (videoUrl && metadata) {
+                  onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength);
+                }
+              }}
+              currentVideoUrl={structureVideoPath}
+              compact={true}
+            />
+          )}
         </div>
       )}
 
@@ -463,7 +500,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
           isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
         }`}
-        style={{ minHeight: "200px", paddingTop: "3rem", paddingBottom: "5.5rem" }}
+        style={{ 
+          minHeight: "200px", 
+          paddingTop: structureVideoPath && structureVideoMetadata ? "3rem" : "4.5rem", 
+          paddingBottom: "5.5rem" 
+        }}
         onWheel={handleWheel}
         onDragEnter={handleDragEnter}
         onDragOver={(e) => handleDragOver(e, containerRef)}
@@ -479,45 +520,30 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           containerWidth={containerWidth}
         />
 
-        {/* Structure video strip or uploader */}
-        {shotId && projectId && onStructureVideoChange && (
-          <>
-            {structureVideoPath && structureVideoMetadata ? (
-              <GuidanceVideoStrip
-                videoUrl={structureVideoPath}
-                videoMetadata={structureVideoMetadata}
-                treatment={structureVideoTreatment}
-                motionStrength={structureVideoMotionStrength}
-                onTreatmentChange={(treatment) => {
-                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
-                }}
-                onMotionStrengthChange={(strength) => {
-                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength);
-                }}
-                onRemove={() => {
-                  onStructureVideoChange(null, null, 'adjust', 1.0);
-                }}
-                fullMin={fullMin}
-                fullMax={fullMax}
-                fullRange={fullRange}
-                containerWidth={containerWidth}
-                zoomLevel={zoomLevel}
-                timelineFrameCount={images.length}
-                frameSpacing={contextFrames}
-              />
-            ) : (
-              <GuidanceVideoUploader
-                shotId={shotId}
-                projectId={projectId}
-                onVideoUploaded={(videoUrl, metadata) => {
-                  if (videoUrl && metadata) {
-                    onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength);
-                  }
-                }}
-                currentVideoUrl={structureVideoPath}
-              />
-            )}
-          </>
+        {/* Structure video strip */}
+        {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+          <GuidanceVideoStrip
+            videoUrl={structureVideoPath}
+            videoMetadata={structureVideoMetadata}
+            treatment={structureVideoTreatment}
+            motionStrength={structureVideoMotionStrength}
+            onTreatmentChange={(treatment) => {
+              onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength);
+            }}
+            onMotionStrengthChange={(strength) => {
+              onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength);
+            }}
+            onRemove={() => {
+              onStructureVideoChange(null, null, 'adjust', 1.0);
+            }}
+            fullMin={fullMin}
+            fullMax={fullMax}
+            fullRange={fullRange}
+            containerWidth={containerWidth}
+            zoomLevel={zoomLevel}
+            timelineFrameCount={images.length}
+            frameSpacing={contextFrames}
+          />
         )}
 
         {/* Ruler */}
@@ -650,6 +676,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 pairNegativePrompt={pairPrompts?.[index]?.negativePrompt}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
+                showLabel={showPairLabels}
               />
             );
           })}

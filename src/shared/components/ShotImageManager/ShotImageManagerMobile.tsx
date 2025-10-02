@@ -26,6 +26,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
+  batchVideoFrames = 60,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -226,6 +227,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
           const isSelected = mobileSelectedIds.includes(imageKey as string);
           const isLastItem = index === currentImages.length - 1;
           
+          // Calculate frame number as position * frames per pair
+          const frameNumber = index * batchVideoFrames;
+          
           // Show arrow buttons based on selection state and movement logic
           const showLeftArrow = mobileSelectedIds.length > 0 && !isSelected && wouldActuallyMove(index);
           const showRightArrow = mobileSelectedIds.length > 0 && isLastItem && !isSelected && wouldActuallyMove(index + 1);
@@ -246,6 +250,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   duplicateSuccessImageId={duplicateSuccessImageId}
                   shouldLoad={true}
                   projectAspectRatio={projectAspectRatio}
+                  frameNumber={frameNumber}
                 />
                 
                 {/* Move button on left side of each non-selected item */}

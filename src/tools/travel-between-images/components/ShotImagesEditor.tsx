@@ -463,6 +463,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   projectAspectRatio={projectAspectRatio}
                   onImageUpload={onImageUpload}
                   isUploadingImage={isUploadingImage}
+                  batchVideoFrames={batchVideoFrames}
                 />
                 
                 {/* Batch mode structure video */}
@@ -479,7 +480,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     treatment={propStructureVideoTreatment}
                     motionStrength={propStructureVideoMotionStrength}
                     imageCount={images.length}
-                    timelineFramePositions={images.map(img => (img as any).timeline_frame || 0).filter(f => typeof f === 'number')}
+                    timelineFramePositions={images.map((img, index) => index * batchVideoFrames)}
                     onVideoUploaded={(videoUrl, metadata) => {
                       propOnStructureVideoChange(
                         videoUrl,

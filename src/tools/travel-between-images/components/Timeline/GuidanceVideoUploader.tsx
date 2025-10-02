@@ -10,13 +10,15 @@ interface GuidanceVideoUploaderProps {
   projectId: string;
   onVideoUploaded: (videoUrl: string | null, metadata: VideoMetadata | null) => void;
   currentVideoUrl?: string | null;
+  compact?: boolean; // When true, only shows the upload button (no empty state placeholder)
 }
 
 export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
   shotId,
   projectId,
   onVideoUploaded,
-  currentVideoUrl
+  currentVideoUrl,
+  compact = false
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -87,6 +89,38 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
     return null;
   }
 
+  // Compact mode: just the upload button (for top-right corner)
+  if (compact) {
+    return (
+      <>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime"
+          onChange={handleFileSelect}
+          disabled={isUploading}
+          className="hidden"
+          id={`video-upload-${shotId}`}
+        />
+        <Label htmlFor={`video-upload-${shotId}`} className="m-0 cursor-pointer">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isUploading}
+            className="h-6 text-[10px] px-2 py-0"
+            asChild
+          >
+            <span className="flex items-center gap-1.5">
+              <Video className="h-3 w-3" />
+              {isUploading ? `${uploadProgress}%` : 'Upload guidance video'}
+            </span>
+          </Button>
+        </Label>
+      </>
+    );
+  }
+
+  // Full mode: placeholder strip with centered message (for empty state)
   return (
     <div className="relative w-full">
       {/* Placeholder strip with upload button overlaid */}
@@ -112,7 +146,7 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
             >
               <span className="flex items-center gap-1.5">
                 <Video className="h-3 w-3" />
-                {isUploading ? 'Uploading...' : 'Upload Video'}
+                {isUploading ? 'Uploading...' : 'Upload guidance video'}
               </span>
             </Button>
           </Label>

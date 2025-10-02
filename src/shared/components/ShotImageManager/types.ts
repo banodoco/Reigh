@@ -18,6 +18,7 @@ export interface BaseShotImageManagerProps {
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
+  batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
 }
 
 export interface MobileImageItemProps {
@@ -33,4 +34,5 @@ export interface MobileImageItemProps {
   duplicateSuccessImageId?: string | null;
   shouldLoad?: boolean;
   projectAspectRatio?: string;
+  frameNumber?: number; // Frame number to display at bottom
 }
