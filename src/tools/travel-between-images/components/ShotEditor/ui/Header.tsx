@@ -3,7 +3,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Shot } from "@/types/shots";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -59,8 +59,19 @@ export const Header: React.FC<HeaderProps> = ({
     <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
       {/* Desktop layout */}
       <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
-        {/* Empty spacer for left side to keep center aligned */}
-        <div className="flex-1" />
+        {/* Back button on the left */}
+        <div className="flex-1 flex justify-start">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onBack}
+            className="flex items-center gap-1"
+            title="Back to shots"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </Button>
+        </div>
         
         {/* Desktop shot name with navigation buttons - centered */}
         <div className="flex items-center justify-center">
@@ -136,6 +147,20 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile layout - centered */}
       <div className="sm:hidden space-y-2">
+        {/* Back button on mobile */}
+        <div className="flex justify-start px-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onBack}
+            className="flex items-center gap-1"
+            title="Back to shots"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </Button>
+        </div>
+        
         {/* Shot name with navigation buttons centered */}
         <div className="flex justify-center px-3">
           {isEditingName ? (
