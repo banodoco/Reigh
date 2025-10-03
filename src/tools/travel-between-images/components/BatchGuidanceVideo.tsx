@@ -334,8 +334,8 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
 
-          {/* Structure type and Motion strength side by side */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Structure type and Motion strength - stacked on mobile, side by side on desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Structure type selector */}
             {onStructureTypeChange && (
               <div className="space-y-2">

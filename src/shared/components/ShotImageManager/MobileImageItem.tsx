@@ -145,7 +145,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         {/* Selection overlay - removed blue tick */}
 
         {/* Top left action buttons - all 4 icons evenly spaced */}
-        <div className="absolute top-2 left-2 right-2 flex justify-between opacity-100 transition-opacity px-1">
+        <div className="absolute top-2 left-1 right-1 flex justify-between opacity-100 transition-opacity">
           {/* Lightbox button */}
           <Button
             size="icon"
