@@ -30,10 +30,10 @@ interface PromptGenerationControlsProps {
 }
 
 const temperatureOptions = [
-  { value: 0.4, label: 'Predictable', description: 'Consistent, expected results' },
-  { value: 0.6, label: 'Interesting', description: 'Some variation with coherence' },
-  { value: 0.8, label: 'Balanced', description: 'Good balance of creativity' },
-  { value: 1.0, label: 'Chaotic', description: 'Wild and unexpected ideas' },
+  { value: 0.4, label: 'Predictable', description: 'Very consistent' },
+  { value: 0.6, label: 'Interesting', description: 'Some variation' },
+  { value: 0.8, label: 'Balanced', description: 'Balanced creativity' },
+  { value: 1.0, label: 'Chaotic', description: 'Wild & unexpected' },
   { value: 1.2, label: 'Insane', description: 'Maximum randomness' },
 ];
 
@@ -228,34 +228,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleContent>
               <div className="w-full lg:w-80 space-y-4 bg-accent/30 border border-accent-foreground/10 rounded-lg p-4 lg:hidden">
-                {/* Creativity slider - moved into advanced */}
-                <div>
-                  <div className="text-center mb-3">
-                    <span className="font-light text-sm">Level of creativity</span>
-                  </div>
-                  <div className="relative mb-0">
-                    <Slider
-                      id="gen_temperature_mobile"
-                      value={[temperature]}
-                      onValueChange={handleTemperatureChange}
-                      min={0.4}
-                      max={1.2}
-                      step={0.2}
-                      disabled={!hasApiKey || isGenerating}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                      <span>1</span>
-                      <span>5</span>
-                    </div>
-                  </div>
-                  <div className="text-center -mt-1">
-                    <span className="text-xs text-muted-foreground">
-                      {selectedTemperatureOption?.description || 'Good balance of creativity'}
-                    </span>
-                  </div>
-                </div>
-
                 {/* Rules/Constraints - moved into advanced */}
                 <div>
           <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
@@ -373,6 +345,34 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           />
         </div>
 
+                {/* Creativity slider - moved into advanced */}
+                <div>
+                  <div className="text-center mb-3">
+                    <span className="font-light text-sm">Level of creativity</span>
+                  </div>
+                  <div className="relative mb-0">
+                    <Slider
+                      id="gen_temperature_mobile"
+                      value={[temperature]}
+                      onValueChange={handleTemperatureChange}
+                      min={0.4}
+                      max={1.2}
+                      step={0.2}
+                      disabled={!hasApiKey || isGenerating}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                      <span>1</span>
+                      <span>5</span>
+                    </div>
+                  </div>
+                  <div className="text-center -mt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {selectedTemperatureOption?.description || 'Good balance of creativity'}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Checkboxes - moved into advanced */}
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                   <div className="flex items-center space-x-2">
@@ -424,34 +424,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         {/* Advanced settings - sidebar on desktop only */}
         {showAdvanced && (
           <div className="hidden lg:block w-80 space-y-4 bg-accent/30 border border-accent-foreground/10 rounded-lg p-4">
-              {/* Creativity slider - moved into advanced */}
-              <div>
-                <div className="text-center mb-3">
-                  <span className="font-light text-sm">Level of creativity</span>
-                </div>
-                <div className="relative mb-0">
-                  <Slider
-                    id="gen_temperature"
-                    value={[temperature]}
-                    onValueChange={handleTemperatureChange}
-                    min={0.4}
-                    max={1.2}
-                    step={0.2}
-                    disabled={!hasApiKey || isGenerating}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                    <span>1</span>
-                    <span>5</span>
-                  </div>
-                </div>
-                <div className="text-center -mt-1">
-                  <span className="text-xs text-muted-foreground">
-                    {selectedTemperatureOption?.description || 'Good balance of creativity'}
-                  </span>
-                </div>
-              </div>
-
               {/* Rules/Constraints - moved into advanced */}
               <div>
                 <Label htmlFor="gen_rulesToRememberText" className="mb-2 block">Rules/Constraints</Label>
@@ -569,37 +541,68 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                 />
               </div>
 
-              {/* Checkboxes - moved into advanced */}
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-            <div className="flex items-center space-x-2">
-                <Checkbox 
-                    id="gen_includeExistingContext" 
-                    checked={includeExistingContext} 
-                    onCheckedChange={(checked) => {
-                      const next = Boolean(checked);
-                      setIncludeExistingContext(next);
-                      emitChange({ includeExistingContext: next });
-                    }} 
-                    disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
-                />
-                <Label htmlFor="gen_includeExistingContext" className="font-normal">
-                    Include current prompts
-                </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-                <Checkbox 
-                    id="gen_replaceCurrentPrompts" 
-                    checked={replaceCurrentPrompts} 
-                    onCheckedChange={(checked) => {
-                      const next = Boolean(checked);
-                      setReplaceCurrentPrompts(next);
-                      emitChange({ replaceCurrentPrompts: next });
-                    }} 
-                    disabled={!hasApiKey || isGenerating}
-                />
-                <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal">Replace current prompts</Label>
-            </div>
-        </div>
+              {/* Creativity slider and checkboxes side-by-side */}
+              <div className="flex gap-4">
+                {/* Creativity slider on left - 50% width */}
+                <div className="flex-1">
+                  <div className="text-center mb-3">
+                    <span className="font-light text-sm">Level of creativity</span>
+                  </div>
+                  <div className="relative mb-0">
+                    <Slider
+                      id="gen_temperature"
+                      value={[temperature]}
+                      onValueChange={handleTemperatureChange}
+                      min={0.4}
+                      max={1.2}
+                      step={0.2}
+                      disabled={!hasApiKey || isGenerating}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                      <span>1</span>
+                      <span>5</span>
+                    </div>
+                  </div>
+                  <div className="text-center -mt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {selectedTemperatureOption?.description || 'Good balance of creativity'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Checkboxes stacked on right - 50% width */}
+                <div className="flex-1 flex flex-col gap-3 justify-center">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="gen_includeExistingContext" 
+                      checked={includeExistingContext} 
+                      onCheckedChange={(checked) => {
+                        const next = Boolean(checked);
+                        setIncludeExistingContext(next);
+                        emitChange({ includeExistingContext: next });
+                      }} 
+                      disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
+                    />
+                    <Label htmlFor="gen_includeExistingContext" className="font-normal text-sm">
+                      Include current prompts
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="gen_replaceCurrentPrompts" 
+                      checked={replaceCurrentPrompts} 
+                      onCheckedChange={(checked) => {
+                        const next = Boolean(checked);
+                        setReplaceCurrentPrompts(next);
+                        emitChange({ replaceCurrentPrompts: next });
+                      }} 
+                      disabled={!hasApiKey || isGenerating}
+                    />
+                    <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal text-sm">Replace current prompts</Label>
+                  </div>
+                </div>
+              </div>
       </div>
         )}
       </div>
