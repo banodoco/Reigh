@@ -1562,6 +1562,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onNameKeyDown={handleNameKeyDown}
         onEditingNameChange={actions.setEditingNameValue}
         projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+        projectId={projectId}
       />
       </div>
 

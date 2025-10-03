@@ -6,6 +6,7 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface HeaderProps {
   selectedShot: Shot;
@@ -24,6 +25,7 @@ interface HeaderProps {
   onNameKeyDown: (e: React.KeyboardEvent) => void;
   onEditingNameChange: (value: string) => void;
   projectAspectRatio?: string;
+  projectId?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,8 +45,10 @@ export const Header: React.FC<HeaderProps> = ({
   onNameKeyDown,
   onEditingNameChange,
   projectAspectRatio,
+  projectId,
 }) => {
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
 
   const handleAspectRatioChange = async (newAspectRatio: string) => {
     if (selectedShot?.id) {
@@ -52,6 +56,11 @@ export const Header: React.FC<HeaderProps> = ({
         .from('shots')
         .update({ aspect_ratio: newAspectRatio } as any)
         .eq('id', selectedShot.id);
+      
+      // Invalidate shots query to trigger refetch and update UI
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      }
     }
   };
 
