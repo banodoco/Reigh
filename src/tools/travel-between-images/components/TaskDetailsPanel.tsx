@@ -10,6 +10,7 @@ import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
 import { Check, X } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
+import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 
 interface TaskDetailsPanelProps {
   task: Task | null;
@@ -39,7 +40,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   onClose
 }) => {
   const isMobile = useIsMobile();
-  const [showDetailedParams, setShowDetailedParams] = useState(true);
+  const [showDetailedParams, setShowDetailedParams] = useState(false);
   const [showAllImages, setShowAllImages] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
@@ -109,18 +110,48 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
         <div className="space-y-6">
           {/* Generation Summary Section */}
           <div className="space-y-3">
-            <SharedTaskDetails
-              task={task}
-              inputImages={inputImages}
-              variant="panel"
-              isMobile={isMobile}
-              showAllImages={showAllImages}
-              onShowAllImagesChange={setShowAllImages}
-              showFullPrompt={showFullPrompt}
-              onShowFullPromptChange={setShowFullPrompt}
-              showFullNegativePrompt={showFullNegativePrompt}
-              onShowFullNegativePromptChange={setShowFullNegativePrompt}
-            />
+            {(() => {
+              // Detect if this is a video travel task or image generation task
+              const isVideoTravelTask = task.taskType === 'travel_orchestrator' || 
+                                       task.taskType?.includes('travel') ||
+                                       inputImages.length > 0;
+              
+              if (isVideoTravelTask) {
+                return (
+                  <SharedTaskDetails
+                    task={task}
+                    inputImages={inputImages}
+                    variant="panel"
+                    isMobile={isMobile}
+                    showAllImages={showAllImages}
+                    onShowAllImagesChange={setShowAllImages}
+                    showFullPrompt={showFullPrompt}
+                    onShowFullPromptChange={setShowFullPrompt}
+                    showFullNegativePrompt={showFullNegativePrompt}
+                    onShowFullNegativePromptChange={setShowFullNegativePrompt}
+                  />
+                );
+              } else {
+                // Image generation task
+                return (
+                  <SharedMetadataDetails
+                    metadata={{
+                      prompt: task.params?.prompt,
+                      tool_type: task.taskType,
+                      originalParams: task.params,
+                      ...(task.params as any)
+                    }}
+                    variant="panel"
+                    isMobile={isMobile}
+                    showFullPrompt={showFullPrompt}
+                    onShowFullPromptChange={setShowFullPrompt}
+                    showFullNegativePrompt={showFullNegativePrompt}
+                    onShowFullNegativePromptChange={setShowFullNegativePrompt}
+                    showUserImage={true}
+                  />
+                );
+              }
+            })()}
           </div>
           
           <div className="space-y-3">

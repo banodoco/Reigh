@@ -1,33 +1,5 @@
 import React from 'react';
-import { Check, X } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
-
-// Helper function to map model names to display names
-const getModelDisplayName = (modelName: string | undefined): string => {
-  if (!modelName) return 'Unknown';
-  
-  // Current models based on turbo mode
-  if (modelName === 'lightning_baseline_2_2_2') {
-    return 'Lightning Model (High Quality)';
-  }
-  if (modelName === 'vace_14B_fake_cocktail_2_2') {
-    return 'WAN 2.2 (Turbo)';
-  }
-  
-  // Legacy model names for backward compatibility
-  switch (modelName) {
-    case 'vace_fun_14B_cocktail_lightning':
-      return 'Optimized Model (Legacy)';
-    case 'vace_fun_14B_2_2':
-      return 'Full Throttle (Legacy)';
-    case 'vace_fun_14B_cocktail_2_2':
-      return 'Steady Sprint (Legacy)';
-    case 'vace_14B':
-      return 'Legacy Model';
-    default:
-      return modelName;
-  }
-};
 
 interface SharedTaskDetailsProps {
   task: any;
@@ -109,13 +81,19 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   }[variant];
 
   return (
-    <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+    <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
+      {/* Header */}
+      <div>
+        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-foreground`}>Video Travel</h3>
+        <div className="border-t border-muted-foreground/20 mt-2"></div>
+      </div>
+
       {/* Guidance Images Section */}
       {inputImages.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center justify-center">
+          <div className="flex items-center">
             <div className="flex items-center space-x-2">
-              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>
                 Guidance
               </p>
               <span className={`${config.textSize} text-muted-foreground`}>
@@ -151,6 +129,50 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           </div>
         </div>
       )}
+
+      {/* Style Reference Image Section */}
+      {(() => {
+        // Check multiple possible locations for style reference data
+        const styleImage = task?.params?.style_reference_image || 
+                          orchestratorDetails?.style_reference_image;
+        const styleStrength = task?.params?.style_reference_strength ?? 
+                             orchestratorDetails?.style_reference_strength;
+        const subjectStrength = task?.params?.subject_strength ?? 
+                               orchestratorDetails?.subject_strength;
+        
+        const hasStyleReference = styleImage && styleImage !== '';
+        
+        if (!hasStyleReference) return null;
+        
+        return (
+          <div className="space-y-2">
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>
+              Style Reference
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="relative group flex-shrink-0" style={{ width: '80px', height: '80px' }}>
+                <img 
+                  src={styleImage} 
+                  alt="Style reference" 
+                  className="w-full h-full object-cover rounded border shadow-sm transition-transform group-hover:scale-105"
+                />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                {styleStrength !== undefined && styleStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Style: {Math.round(styleStrength * 100)}%
+                  </div>
+                )}
+                {subjectStrength !== undefined && subjectStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Subject: {Math.round(subjectStrength * 100)}%
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       
       {/* Prompts and Technical Settings */}
       <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
@@ -158,14 +180,14 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         <div className="space-y-3">
           {/* Prompt */}
           {(() => {
-            const prompt = orchestratorPayload?.base_prompts_expanded?.[0] || task?.params?.prompt;
+            const prompt = orchestratorDetails?.base_prompts_expanded?.[0] || orchestratorPayload?.base_prompts_expanded?.[0] || task?.params?.prompt;
             if (prompt) {
               const shouldTruncate = prompt.length > config.promptLength;
               const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, config.promptLength) + '...';
               return (
                 <div className="space-y-1">
-                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
-                  <p className={`${config.textSize} ${config.fontWeight} break-words whitespace-pre-wrap leading-relaxed`}>
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
                     {displayText}
                   </p>
                   {shouldTruncate && onShowFullPromptChange && (
@@ -183,8 +205,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             } else {
               return (
                 <div className="space-y-1">
-                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
-                  <p className={`${config.textSize} ${config.fontWeight} break-words whitespace-pre-wrap leading-relaxed`}>
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
                     None
                   </p>
                 </div>
@@ -194,14 +216,14 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           
           {/* Negative Prompt */}
           {(() => {
-            const negativePrompt = orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt;
+            const negativePrompt = orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt;
             if (negativePrompt && negativePrompt !== 'N/A') {
               const shouldTruncate = negativePrompt.length > config.negativePromptLength;
               const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
               return (
                 <div className="space-y-1">
-                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
-                  <p className={`${config.textSize} ${config.fontWeight} break-words whitespace-pre-wrap leading-relaxed`}>
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
                     {displayText}
                   </p>
                   {shouldTruncate && onShowFullNegativePromptChange && (
@@ -219,79 +241,42 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             } else {
               return (
                 <div className="space-y-1">
-                  <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
-                  <p className={`${config.textSize} ${config.fontWeight} break-words whitespace-pre-wrap leading-relaxed`}>
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
                     None
                   </p>
                 </div>
               );
             }
           })()}
-
-          {/* Model - placed below negative prompt */}
-          <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>
-              {getModelDisplayName(orchestratorPayload?.model_name || task?.params?.model_name)}
-            </p>
-          </div>
         </div>
         
         {/* Technical Settings */}
         <div className={`grid gap-2 ${config.gridCols}`}>
           <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Steps</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>
-              {orchestratorPayload?.steps || task?.params?.num_inference_steps || 'N/A'}
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps</p>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+              {orchestratorDetails?.steps || orchestratorPayload?.steps || task?.params?.num_inference_steps || 'N/A'}
             </p>
           </div>
           <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Resolution</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>{task?.params?.parsed_resolution_wh || 'N/A'}</p>
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>Resolution</p>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh || 'N/A'}</p>
           </div>
           <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Frames / Segment</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>
-              {orchestratorPayload?.segment_frames_expanded?.[0] || task?.params?.segment_frames_expanded || 'N/A'}
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>Frames / Segment</p>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+              {orchestratorDetails?.segment_frames_expanded?.[0] || orchestratorPayload?.segment_frames_expanded?.[0] || task?.params?.segment_frames_expanded || 'N/A'}
             </p>
           </div>
           <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Context Frames</p>
-            <p className={`${config.textSize} ${config.fontWeight}`}>
-              {task?.params?.frame_overlap_settings_expanded?.[0] || orchestratorPayload?.frame_overlap_expanded?.[0] || task?.params?.frame_overlap_expanded || 'N/A'}
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>Amount of Motion</p>
+            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+              {(() => {
+                const motion = orchestratorDetails?.amount_of_motion ?? orchestratorPayload?.amount_of_motion ?? task?.params?.amount_of_motion;
+                return motion !== undefined && motion !== null ? `${Math.round(motion * 100)}%` : 'N/A';
+              })()}
             </p>
-          </div>
-          <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Accelerated</p>
-            <div className="flex items-center space-x-1">
-              {(orchestratorPayload?.accelerated_mode || task?.params?.accelerated_mode) === true ? (
-                <div className="flex items-center space-x-1 text-green-600">
-                  <Check className={config.iconSize} />
-                  <span className={`${config.textSize} ${config.fontWeight}`}>True</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 text-red-500">
-                  <X className={config.iconSize} />
-                  <span className={`${config.textSize} ${config.fontWeight}`}>False</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>StyleBoost</p>
-            <div className="flex items-center space-x-1">
-              {(orchestratorPayload?.use_styleboost_loras || task?.params?.use_styleboost_loras) === true ? (
-                <div className="flex items-center space-x-1 text-green-600">
-                  <Check className={config.iconSize} />
-                  <span className={`${config.textSize} ${config.fontWeight}`}>True</span>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1 text-red-500">
-                  <X className={config.iconSize} />
-                  <span className={`${config.textSize} ${config.fontWeight}`}>False</span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -300,7 +285,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       {additionalLoras && Object.keys(additionalLoras).length > 0 && (
         <div className="pt-2 border-t border-muted-foreground/20">
           <div className="space-y-2">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>LoRAs Used</p>
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs Used</p>
             <div className="space-y-1">
               {Object.entries(additionalLoras).slice(0, config.maxLoras).map(([url, strength]) => {
                 const fileName = url.split('/').pop() || 'Unknown';

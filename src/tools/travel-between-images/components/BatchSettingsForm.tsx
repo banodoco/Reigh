@@ -279,17 +279,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   </Tooltip>
                   <Slider
                     id="batchVideoSteps"
-                    min={1}
-                    max={30}
-                    step={1}
+                    min={3}
+                    max={12}
+                    step={3}
                     value={[batchVideoSteps]}
                     onValueChange={(value) => onBatchVideoStepsChange(value[0])}
                   />
-                  {showStepsNotification && (
-                    <p className="text-sm text-yellow-600 mt-1">
-                      Note: We recommend 6 steps for optimal performance
-                    </p>
-                  )}
                 </div>
                 
                 <div className="relative">

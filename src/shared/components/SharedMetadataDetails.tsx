@@ -115,11 +115,17 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                                metadata.userProvidedImageUrl;
 
   return (
-    <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
+    <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
+      {/* Header */}
+      <div>
+        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-foreground`}>Image Generation</h3>
+        <div className="border-t border-muted-foreground/20 mt-2"></div>
+      </div>
+
       {/* User Provided Image */}
       {showUserImage && metadata.userProvidedImageUrl && (
         <div className="space-y-2">
-          <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>
+          <p className={`${config.textSize} font-medium text-muted-foreground`}>
             Reference Image
           </p>
           <div className="flex justify-center">
@@ -132,15 +138,61 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
           </div>
         </div>
       )}
+
+      {/* Style Reference Image Section */}
+      {(() => {
+        // Check multiple possible locations for style reference data
+        // metadata.originalParams is the task params (when passed from TaskItem)
+        // metadata itself might have the params directly (from ImageGallery generations.params)
+        const styleImage = (metadata as any).style_reference_image || 
+                          (metadata as any).originalParams?.style_reference_image;
+        const styleStrength = (metadata as any).style_reference_strength ?? 
+                             (metadata as any).originalParams?.style_reference_strength;
+        const subjectStrength = (metadata as any).subject_strength ?? 
+                               (metadata as any).originalParams?.subject_strength;
+        
+        const hasStyleReference = styleImage && styleImage !== '';
+        
+        if (!hasStyleReference) return null;
+        
+        return (
+          <div className="space-y-2">
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>
+              Style Reference
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="relative group flex-shrink-0" style={{ width: '80px', height: '80px' }}>
+                <img 
+                  src={styleImage} 
+                  alt="Style reference" 
+                  className="w-full h-full object-cover rounded border shadow-sm transition-transform group-hover:scale-105"
+                />
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                {styleStrength !== undefined && styleStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Style: {Math.round(styleStrength * 100)}%
+                  </div>
+                )}
+                {subjectStrength !== undefined && subjectStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Subject: {Math.round(subjectStrength * 100)}%
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       
       {/* Prompts and Generation Settings */}
-      <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 lg:grid-cols-3'}`}>
+      <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1' : 'grid-cols-1'}`}>
         {/* Prompts Section */}
-        <div className="space-y-3 lg:col-span-2">
+        <div className="space-y-3">
           {/* Prompt */}
           {prompt ? (
             <div className="space-y-1">
-              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
               {(() => {
                 const shouldTruncate = prompt.length > config.promptLength;
                 const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, config.promptLength) + '...';
@@ -165,7 +217,7 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
             </div>
           ) : (
             <div className="space-y-1">
-              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Prompt</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
               <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>None</p>
             </div>
           )}
@@ -173,7 +225,7 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
           {/* Negative Prompt */}
           {negativePrompt && negativePrompt !== 'N/A' ? (
             <div className="space-y-1">
-              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
               {(() => {
                 const shouldTruncate = negativePrompt.length > config.negativePromptLength;
                 const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
@@ -198,25 +250,10 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
             </div>
           ) : negativePrompt ? (
             <div className="space-y-1">
-              <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Negative Prompt</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
               <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>None</p>
             </div>
           ) : null}
-        </div>
-        
-        {/* Model and Dimensions Section */}
-        <div className="space-y-3 lg:col-span-1">
-          <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Model</p>
-            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-              {getModelDisplayName(model)}
-            </p>
-          </div>
-          
-          <div className="space-y-1">
-            <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground ${config.labelCase}`}>Dimensions</p>
-            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{dimensions || 'N/A'}</p>
-          </div>
         </div>
       </div>
 
