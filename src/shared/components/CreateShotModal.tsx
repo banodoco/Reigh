@@ -13,24 +13,19 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import FileInput from '@/shared/components/FileInput';
-import { ASPECT_RATIO_TO_RESOLUTION, parseRatio, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { toast } from 'sonner';
-
-export interface DimensionSettings {
-  dimensionSource: 'project' | 'firstImage' | 'custom';
-  customWidth?: number;
-  customHeight?: number;
-}
+import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 
 interface CreateShotModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (shotName: string, files: File[], dimensionSettings: DimensionSettings) => Promise<void>;
+  onSubmit: (shotName: string, files: File[], aspectRatio: string | null) => Promise<void>;
   isLoading?: boolean;
   defaultShotName?: string;
   projectAspectRatio?: string;
-  initialDimensionSettings?: DimensionSettings;
+  initialAspectRatio?: string | null;
 }
 
 const CreateShotModal: React.FC<CreateShotModalProps> = ({ 
@@ -40,42 +35,23 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   isLoading, 
   defaultShotName,
   projectAspectRatio,
-  initialDimensionSettings
+  initialAspectRatio
 }) => {
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('project');
-  const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
-  const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
+  const [aspectRatio, setAspectRatio] = useState<string>('');
   const isMobile = useIsMobile();
   
   // Modal styling
   const modal = useMediumModal();
-
-  // Get project dimensions for display
-  const projectDimensions = projectAspectRatio ? ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio] : undefined;
   
-  // Parse project dimensions for default custom values
-  const projectDimensionsParsed = projectDimensions ? projectDimensions.split('x').map(d => parseInt(d.trim())) : [768, 512];
-  
-  // Initialize from project settings when modal opens
+  // Initialize aspect ratio from props when modal opens
   useEffect(() => {
-    if (isOpen && initialDimensionSettings) {
-      setDimensionSource(initialDimensionSettings.dimensionSource || 'project');
-      if (initialDimensionSettings.dimensionSource === 'custom') {
-        setCustomWidth(initialDimensionSettings.customWidth);
-        setCustomHeight(initialDimensionSettings.customHeight);
-      }
+    if (isOpen) {
+      // Use initialAspectRatio if provided, otherwise fall back to projectAspectRatio, otherwise default to '3:2'
+      setAspectRatio(initialAspectRatio || projectAspectRatio || '3:2');
     }
-  }, [isOpen, initialDimensionSettings]);
-  
-  // When switching to custom mode, pre-fill with project dimensions if not already set
-  useEffect(() => {
-    if (dimensionSource === 'custom' && !customWidth && !customHeight && projectDimensionsParsed) {
-      setCustomWidth(projectDimensionsParsed[0]);
-      setCustomHeight(projectDimensionsParsed[1]);
-    }
-  }, [dimensionSource, customWidth, customHeight, projectDimensionsParsed]);
+  }, [isOpen, initialAspectRatio, projectAspectRatio]);
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
@@ -84,53 +60,36 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
     }
     
     try {
-      // Process files with cropping if needed
+      // Process files with cropping based on aspect ratio
       let processedFiles = files;
       
-      if (files.length > 0 && dimensionSource !== 'firstImage') {
-        const cropPromises = files.map(async (file, index) => {
-          try {
-            let targetAspectRatio: number | undefined;
-            
-            if (dimensionSource === 'project' && projectAspectRatio) {
-              // Use project aspect ratio
-              targetAspectRatio = parseRatio(projectAspectRatio);
-            } else if (dimensionSource === 'custom' && customWidth && customHeight) {
-              // Use custom dimensions
-              targetAspectRatio = customWidth / customHeight;
-            }
-            
-            if (targetAspectRatio && !isNaN(targetAspectRatio)) {
+      if (files.length > 0 && aspectRatio) {
+        const targetAspectRatio = parseRatio(aspectRatio);
+        
+        if (!isNaN(targetAspectRatio)) {
+          const cropPromises = files.map(async (file) => {
+            try {
               const result = await cropImageToProjectAspectRatio(file, targetAspectRatio);
               if (result) {
                 return result.croppedFile;
               }
+              return file; // Return original if cropping fails
+            } catch (error) {
+              console.error(`Failed to crop image ${file.name}:`, error);
+              toast.error(`Failed to crop ${file.name}`);
+              return file; // Return original on error
             }
-            return file; // Return original if cropping fails
-          } catch (error) {
-            console.error(`Failed to crop image ${file.name}:`, error);
-            toast.error(`Failed to crop ${file.name}`);
-            return file; // Return original on error
-          }
-        });
-        
-        processedFiles = await Promise.all(cropPromises);
+          });
+          
+          processedFiles = await Promise.all(cropPromises);
+        }
       }
       
-      // Prepare dimension settings
-      const dimensionSettings: DimensionSettings = {
-        dimensionSource,
-        customWidth: dimensionSource === 'custom' ? customWidth : undefined,
-        customHeight: dimensionSource === 'custom' ? customHeight : undefined,
-      };
-      
-      await onSubmit(finalShotName, processedFiles, dimensionSettings);
+      await onSubmit(finalShotName, processedFiles, aspectRatio || null);
       // Only clear the form and close if submission was successful
       setShotName('');
       setFiles([]);
-      setDimensionSource('project');
-      setCustomWidth(undefined);
-      setCustomHeight(undefined);
+      setAspectRatio(projectAspectRatio || '3:2');
       onClose();
     } catch (error) {
       // Let the parent component handle the error display
@@ -141,9 +100,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   const handleClose = () => {
     setShotName('');
     setFiles([]);
-    setDimensionSource('project');
-    setCustomWidth(undefined);
-    setCustomHeight(undefined);
+    setAspectRatio(projectAspectRatio || '3:2');
     onClose();
   };
 
@@ -182,83 +139,16 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
               label="Starting Images (Optional)"
             />
             
-            {/* Dimension Selection */}
+            {/* Aspect Ratio Selection */}
             <div className="space-y-2 pt-2 border-t">
-              <Label className="text-sm font-medium">What size would you like to use?</Label>
-              
-              <div className="space-y-2">
-                {/* Project dimensions option */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="dimension-project"
-                    name="dimension-source"
-                    value="project"
-                    checked={dimensionSource === 'project'}
-                    onChange={(e) => setDimensionSource('project')}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <label htmlFor="dimension-project" className="text-sm cursor-pointer">
-                    Based on project dimension {projectDimensions ? `(${projectDimensions.replace('x', ' × ')})` : ''}
-                  </label>
-                </div>
-                
-                {/* First image option */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="dimension-first-image"
-                    name="dimension-source"
-                    value="firstImage"
-                    checked={dimensionSource === 'firstImage'}
-                    onChange={(e) => setDimensionSource('firstImage')}
-                    className="w-4 h-4 text-blue-600"
-                  />
-                  <label htmlFor="dimension-first-image" className="text-sm cursor-pointer">
-                    Based on first image
-                  </label>
-                </div>
-                
-                {/* Custom option */}
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id="dimension-custom"
-                      name="dimension-source"
-                      value="custom"
-                      checked={dimensionSource === 'custom'}
-                      onChange={(e) => setDimensionSource('custom')}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <label htmlFor="dimension-custom" className="text-sm cursor-pointer">
-                      Custom
-                    </label>
-                  </div>
-                  
-                  {dimensionSource === 'custom' && (
-                    <div className={`ml-6 flex items-center gap-2 ${modal.isMobile ? 'flex-col items-start' : ''}`}>
-                      <Input
-                        type="number"
-                        placeholder="Width"
-                        value={customWidth || ''}
-                        onChange={(e) => setCustomWidth(e.target.value ? parseInt(e.target.value) : undefined)}
-                        className="w-24"
-                        min="1"
-                      />
-                      <span className="text-sm text-muted-foreground">×</span>
-                      <Input
-                        type="number"
-                        placeholder="Height"
-                        value={customHeight || ''}
-                        onChange={(e) => setCustomHeight(e.target.value ? parseInt(e.target.value) : undefined)}
-                        className="w-24"
-                        min="1"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <Label htmlFor="shot-aspect-ratio" className="text-sm font-medium">What size would you like to use?</Label>
+              <AspectRatioSelector
+                value={aspectRatio}
+                onValueChange={setAspectRatio}
+                disabled={isLoading}
+                id="shot-aspect-ratio"
+                showVisualizer={true}
+              />
             </div>
           </div>
         </div>

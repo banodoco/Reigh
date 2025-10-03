@@ -66,6 +66,7 @@ export const shots = pgTable('shots', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  aspectRatio: text('aspect_ratio'), // Aspect ratio for shot video generation
   settings: jsonb('settings'), // Store tool settings as JSONB
   position: integer('position').notNull().default(1), // Position for manual ordering
 });

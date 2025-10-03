@@ -21,6 +21,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { supabase } from '@/integrations/supabase/client';
 
 const ShotsPaneComponent: React.FC = () => {
   const { selectedProjectId, projects } = useProject();
@@ -228,7 +229,7 @@ const ShotsPaneComponent: React.FC = () => {
     onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
   });
 
-  const handleCreateShot = async (shotName: string, files: File[], dimensionSettings: { dimensionSource: 'project' | 'firstImage' | 'custom'; customWidth?: number; customHeight?: number; }) => {
+  const handleCreateShot = async (shotName: string, files: File[], aspectRatio: string | null) => {
     if (!selectedProjectId) {
       alert("Please select a project first.");
       return;
@@ -249,35 +250,34 @@ const ShotsPaneComponent: React.FC = () => {
         // The shot should be available in the cache after the mutation
         const updatedShots = shots?.concat() || [];
         createdShot = updatedShots.find(shot => shot.id === createdShotId) || { id: createdShotId, name: shotName };
+        
+        // Update shot with aspect ratio if provided
+        if (aspectRatio && createdShotId) {
+          await supabase
+            .from('shots')
+            .update({ aspect_ratio: aspectRatio } as any)
+            .eq('id', createdShotId);
+        }
       }
     } else {
-      const newShotResult = await createShotMutation.mutateAsync({ name: shotName, projectId: selectedProjectId });
+      const newShotResult = await createShotMutation.mutateAsync({ 
+        name: shotName, 
+        projectId: selectedProjectId,
+        aspectRatio: aspectRatio || undefined,
+      } as any);
       createdShot = newShotResult?.shot || null;
     }
 
-    // Apply project defaults with dimension settings to the newly created shot if available
-    if (createdShot?.id && (projectSettings || projectUISettings || dimensionSettings)) {
+    // Apply project defaults to the newly created shot if available
+    if (createdShot?.id && (projectSettings || projectUISettings)) {
       const defaultsToApply = {
         ...(projectSettings || {}),
-        // Apply dimension settings
-        dimensionSource: dimensionSettings.dimensionSource,
-        customWidth: dimensionSettings.customWidth,
-        customHeight: dimensionSettings.customHeight,
         // Include UI settings in a special key that will be handled separately
         _uiSettings: projectUISettings || {}
       };
       // Store the new shot ID to apply defaults when settings load
       sessionStorage.setItem(`apply-project-defaults-${createdShot.id}`, JSON.stringify(defaultsToApply));
-      console.log('[ShotsPane] Marked shot for project defaults application with dimension settings:', createdShot.id);
-      
-      // Save dimension settings to project settings for future shots
-      if (selectedProjectId && updateProjectSettings) {
-        updateProjectSettings('project', {
-          dimensionSource: dimensionSettings.dimensionSource,
-          customWidth: dimensionSettings.customWidth,
-          customHeight: dimensionSettings.customHeight,
-        });
-      }
+      console.log('[ShotsPane] Marked shot for project defaults application:', createdShot.id);
     }
 
     // Navigate to the newly created shot
@@ -424,11 +424,7 @@ const ShotsPaneComponent: React.FC = () => {
             isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
             defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
             projectAspectRatio={projectAspectRatio}
-            initialDimensionSettings={{
-              dimensionSource: projectSettings?.dimensionSource || 'project',
-              customWidth: projectSettings?.customWidth,
-              customHeight: projectSettings?.customHeight,
-            }}
+            initialAspectRatio={null}
           />
         </div>
       </div>

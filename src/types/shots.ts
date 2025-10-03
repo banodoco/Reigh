@@ -19,6 +19,7 @@ export interface Shot {
   created_at?: string; // Optional, matches the DB schema
   updated_at?: string | null; // Optional, matches the DB schema
   project_id?: string; // Add project_id here
+  aspect_ratio?: string | null; // Aspect ratio for shot video generation
   position: number; // Position for manual ordering
 }
 

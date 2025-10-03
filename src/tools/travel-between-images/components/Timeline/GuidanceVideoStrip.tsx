@@ -180,10 +180,12 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       }
       
       try {
-        // Calculate how many frames to extract (one every ~60-80px for good coverage)
-        const stripWidth = containerWidth * zoomLevel;
-        const frameWidth = 80; // Target width for each frame thumbnail
-        const numFrames = Math.max(8, Math.min(30, Math.floor(stripWidth / frameWidth)));
+        // Extract frames based on treatment mode
+        // In adjust mode: video is stretched/compressed to fit timeline, so extract timelineFrames thumbnails
+        // In clip mode: video plays as-is, so extract totalVideoFrames thumbnails (all video frames)
+        const numFrames = treatment === 'adjust' 
+          ? timelineFrames 
+          : totalVideoFrames;
         
         const extractedFrames: string[] = [];
         const canvas = document.createElement('canvas');
@@ -280,7 +282,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('error', handleError);
     };
-  }, [videoUrl, videoMetadata, containerWidth, zoomLevel, treatment, fullMin, fullMax]);
+  }, [videoUrl, videoMetadata, containerWidth, treatment, fullMin, fullMax]);
   
   const isCanvasBlank = useCallback((canvas: HTMLCanvasElement): boolean => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });

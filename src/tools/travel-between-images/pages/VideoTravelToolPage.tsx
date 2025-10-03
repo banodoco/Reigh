@@ -1031,7 +1031,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [shotToEdit, selectedShot]);
 
-  const handleModalSubmitCreateShot = async (name: string, files: File[], dimensionSettings: { dimensionSource: 'project' | 'firstImage' | 'custom'; customWidth?: number; customHeight?: number; }) => {
+  const handleModalSubmitCreateShot = async (name: string, files: File[], aspectRatio: string | null) => {
     if (!selectedProjectId) {
       console.error("[VideoTravelToolPage] Cannot create shot: No project selected");
       return;
@@ -1067,7 +1067,8 @@ const VideoTravelToolPage: React.FC = () => {
         const result = await createShotMutation.mutateAsync({
           name,
           projectId: selectedProjectId,
-        });
+          aspectRatio: aspectRatio || undefined,
+        } as any);
         
         // Transform the database response to match Shot interface
         newShot = {
@@ -1080,32 +1081,30 @@ const VideoTravelToolPage: React.FC = () => {
         await refetchShots();
       }
       
+      // Update shot with aspect ratio if created via file upload
+      if (files.length > 0 && aspectRatio && newShot.id) {
+        await supabase
+          .from('shots')
+          .update({ aspect_ratio: aspectRatio } as any)
+          .eq('id', newShot.id);
+        
+        // Update local shot object
+        newShot.aspect_ratio = aspectRatio;
+      }
+      
       // Select the newly created shot
       setSelectedShot(newShot);
       setCurrentShotId(newShot.id);
       
-      // Mark this shot as needing project defaults applied with dimension settings
-      if (projectSettings || projectUISettings || dimensionSettings) {
+      // Mark this shot as needing project defaults applied
+      if (projectSettings || projectUISettings) {
         const defaultsToApply = {
           ...(projectSettings || {}),
-          // Apply dimension settings
-          dimensionSource: dimensionSettings.dimensionSource,
-          customWidth: dimensionSettings.customWidth,
-          customHeight: dimensionSettings.customHeight,
           // Include UI settings in a special key that will be handled separately
           _uiSettings: projectUISettings || {}
         };
         // Store the new shot ID to apply defaults when settings load
         sessionStorage.setItem(`apply-project-defaults-${newShot.id}`, JSON.stringify(defaultsToApply));
-        
-        // Save dimension settings to project settings for future shots
-        if (selectedProjectId && updateProjectSettings) {
-          updateProjectSettings('project', {
-            dimensionSource: dimensionSettings.dimensionSource,
-            customWidth: dimensionSettings.customWidth,
-            customHeight: dimensionSettings.customHeight,
-          });
-        }
       }
       
       // Modal will auto-close on successful submission
@@ -1500,11 +1499,7 @@ const VideoTravelToolPage: React.FC = () => {
         isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
         projectAspectRatio={projectAspectRatio}
-        initialDimensionSettings={{
-          dimensionSource: projectSettings?.dimensionSource || 'project',
-          customWidth: projectSettings?.customWidth,
-          customHeight: projectSettings?.customHeight,
-        }}
+        initialAspectRatio={null}
       />
     </div>
   );

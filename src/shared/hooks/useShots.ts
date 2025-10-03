@@ -32,9 +32,10 @@ export const useCreateShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ name, projectId, shouldSelectAfterCreation = true, position }: {
+    mutationFn: async ({ name, projectId, aspectRatio, shouldSelectAfterCreation = true, position }: {
       name: string;
       projectId: string;
+      aspectRatio?: string | null;
       shouldSelectAfterCreation?: boolean;
       position?: number;
     }) => {
@@ -70,6 +71,19 @@ export const useCreateShot = () => {
       const result = data as { shot_id: string; success: boolean } | null;
       if (!result?.success || !result.shot_id) {
         throw new Error('Failed to create shot at position');
+      }
+
+      // Update shot with aspect ratio if provided
+      if (aspectRatio) {
+        const { error: updateError } = await supabase
+          .from('shots')
+          .update({ aspect_ratio: aspectRatio })
+          .eq('id', result.shot_id);
+        
+        if (updateError) {
+          console.error('Error updating shot aspect ratio:', updateError);
+          // Don't throw - shot was created successfully, aspect ratio is optional
+        }
       }
 
       const { data: shotData, error: fetchError } = await supabase

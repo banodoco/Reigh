@@ -46,6 +46,7 @@ export interface Shot {
   id: string;
   name: string;
   project_id: string;
+  aspect_ratio?: string | null;
   created_at: string;
   updated_at?: string;
   settings?: Record<string, unknown>;
