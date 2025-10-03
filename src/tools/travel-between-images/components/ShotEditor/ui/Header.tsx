@@ -51,17 +51,30 @@ export const Header: React.FC<HeaderProps> = ({
   const queryClient = useQueryClient();
 
   const handleAspectRatioChange = async (newAspectRatio: string) => {
-    if (selectedShot?.id) {
-      await supabase
-        .from('shots')
-        .update({ aspect_ratio: newAspectRatio } as any)
-        .eq('id', selectedShot.id);
-      
-      // Invalidate shots query to trigger refetch and update UI
-      if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      }
-    }
+    if (!selectedShot?.id || !projectId) return;
+    
+    // Optimistically update the cache immediately for instant UI feedback
+    queryClient.setQueryData(['shots', projectId], (oldData: any) => {
+      if (!oldData) return oldData;
+      return oldData.map((shot: Shot) => 
+        shot.id === selectedShot.id 
+          ? { ...shot, aspect_ratio: newAspectRatio }
+          : shot
+      );
+    });
+    
+    // Update database in the background
+    supabase
+      .from('shots')
+      .update({ aspect_ratio: newAspectRatio } as any)
+      .eq('id', selectedShot.id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to update aspect ratio:', error);
+          // Revert on error by invalidating cache
+          queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        }
+      });
   };
 
   return (
