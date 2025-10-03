@@ -55,6 +55,11 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   const timelineFrames = maxFrame - minFrame + 1;
   const totalVideoFrames = videoMetadata?.total_frames || 0;
   
+  // Calculate video coverage for clip mode
+  const videoCoversFrames = treatment === 'clip' ? Math.min(totalVideoFrames, timelineFrames) : timelineFrames;
+  const lastCoveredFrame = treatment === 'clip' ? minFrame + videoCoversFrames - 1 : maxFrame;
+  const isFrameBeyondVideoCoverage = treatment === 'clip' && currentTimelineFrame > lastCoveredFrame;
+  
   // Calculate adjust mode description (stretch/compress)
   const adjustModeDescription = (() => {
     if (totalVideoFrames === 0 || timelineFrames === 0) return '';
@@ -100,8 +105,9 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
       const normalizedPosition = timelineRange > 0 ? (timelineFrame - minFrame) / timelineRange : 0;
       videoFrame = Math.floor(normalizedPosition * (videoMetadata.total_frames - 1));
     } else {
-      // Clip mode: direct 1:1 mapping (timeline frame = video frame)
-      videoFrame = Math.min(timelineFrame, videoMetadata.total_frames - 1);
+      // Clip mode: 1:1 mapping from timeline start, clamped to video length
+      const offsetFromStart = timelineFrame - minFrame;
+      videoFrame = Math.min(offsetFromStart, videoMetadata.total_frames - 1);
     }
 
     const fps = videoMetadata.frame_rate;
@@ -272,6 +278,20 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             ref={canvasRef}
             className="w-full h-full object-contain"
           />
+          
+          {/* Overlay message when beyond video coverage */}
+          {isFrameBeyondVideoCoverage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-black/80 text-white px-4 py-3 rounded-lg text-center max-w-[80%]">
+                <p className="text-sm font-medium">
+                  The guidance video only covers {videoCoversFrames} frame{videoCoversFrames === 1 ? '' : 's'}
+                </p>
+                <p className="text-xs text-white/70 mt-1">
+                  (frames {minFrame}-{lastCoveredFrame})
+                </p>
+              </div>
+            </div>
+          )}
           
           {/* Frame scrubber at bottom */}
           <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-2 space-y-1">
