@@ -1320,8 +1320,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Main Content Layout */}
         <div className={`flex gap-6 ${isMobile ? 'flex-col' : 'flex-col md:flex-row'}`}>
-          {/* Left Column - Prompts and Shot Selector */}
+          {/* Left Column - Shot Selector and Prompts */}
           <div className="flex-1 space-y-6">
+            <ShotSelector
+              shots={shots}
+              associatedShotId={associatedShotId}
+              isGenerating={isGenerating}
+              hasApiKey={hasApiKey}
+              onChangeShot={handleShotChange}
+              onClearShot={() => {
+                markAsInteracted();
+                setAssociatedShotId(null);
+              }}
+              onOpenCreateShot={() => setIsCreateShotModalOpen(true)}
+              onJumpToShot={navigateToShot}
+            />
+
             <PromptsSection
               prompts={prompts}
               ready={ready}
@@ -1348,20 +1362,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 markAsInteracted();
                 setAfterEachPromptText('');
               }}
-            />
-
-            <ShotSelector
-              shots={shots}
-              associatedShotId={associatedShotId}
-              isGenerating={isGenerating}
-              hasApiKey={hasApiKey}
-              onChangeShot={handleShotChange}
-              onClearShot={() => {
-                markAsInteracted();
-                setAssociatedShotId(null);
-              }}
-              onOpenCreateShot={() => setIsCreateShotModalOpen(true)}
-              onJumpToShot={navigateToShot}
             />
           </div>
           

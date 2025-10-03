@@ -80,13 +80,13 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   
   // Always show full prompt by default (user wants to see full text, not summary)
   let displayText = isEditingFullPrompt ? localFullPrompt : promptEntry.fullPrompt;
-  let currentPlaceholder = `Enter your detailed prompt #${index + 1}...`;
+  let currentPlaceholder = `Enter prompt #${index + 1}...`;
   let isShowingShort = false;
 
   if (isEditingFullPrompt) {
-    currentPlaceholder = `Editing detailed prompt #${index + 1}...`;
+    currentPlaceholder = `Editing prompt #${index + 1}...`;
   } else {
-    currentPlaceholder = `Enter your detailed prompt #${index + 1}...`;
+    currentPlaceholder = `Enter prompt #${index + 1}...`;
   }
 
   // Debounced auto-resize function to prevent excessive reflows
