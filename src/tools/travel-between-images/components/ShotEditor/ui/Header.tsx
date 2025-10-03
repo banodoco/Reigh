@@ -62,10 +62,10 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Back button on the left */}
         <div className="flex-1 flex justify-start">
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm" 
             onClick={onBack}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 border-2"
             title="Back to shots"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -150,10 +150,10 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Back button on mobile */}
         <div className="flex justify-start px-3">
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm" 
             onClick={onBack}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 border-2"
             title="Back to shots"
           >
             <ArrowLeft className="h-4 w-4" />
