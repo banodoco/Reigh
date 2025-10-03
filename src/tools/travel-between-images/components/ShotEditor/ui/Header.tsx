@@ -49,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const updateTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const handleAspectRatioChange = async (newAspectRatio: string) => {
     if (!selectedShot?.id || !projectId) return;
@@ -63,19 +64,35 @@ export const Header: React.FC<HeaderProps> = ({
       );
     });
     
-    // Update database in the background
-    supabase
-      .from('shots')
-      .update({ aspect_ratio: newAspectRatio } as any)
-      .eq('id', selectedShot.id)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to update aspect ratio:', error);
-          // Revert on error by invalidating cache
-          queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-        }
-      });
+    // Clear any pending database update
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    // Debounce database update to avoid race conditions with rapid changes
+    updateTimeoutRef.current = setTimeout(() => {
+      supabase
+        .from('shots')
+        .update({ aspect_ratio: newAspectRatio } as any)
+        .eq('id', selectedShot.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Failed to update aspect ratio:', error);
+            // Revert on error by invalidating cache
+            queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+          }
+        });
+    }, 300); // Wait 300ms after last change before updating database
   };
+  
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
