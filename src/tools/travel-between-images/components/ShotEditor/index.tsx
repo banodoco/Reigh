@@ -1281,7 +1281,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     let resolution: string | undefined = undefined;
 
-    if ((dimensionSource || 'project') === 'firstImage' && simpleFilteredImages.length > 0) {
+    // Priority 1: Check if shot has an aspect ratio set
+    if (selectedShot?.aspect_ratio) {
+      resolution = ASPECT_RATIO_TO_RESOLUTION[selectedShot.aspect_ratio];
+      if (!resolution) {
+        console.warn(`Shot aspect ratio "${selectedShot.aspect_ratio}" not found in ASPECT_RATIO_TO_RESOLUTION, falling back to dimension source`);
+      }
+    }
+
+    // Priority 2: If no shot aspect ratio, use dimension source settings
+    if (!resolution && (dimensionSource || 'project') === 'firstImage' && simpleFilteredImages.length > 0) {
       try {
         const firstImage = simpleFilteredImages[0];
         const imageUrl = getDisplayUrl(firstImage.imageUrl);
@@ -1299,7 +1308,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
     }
 
-    if (dimensionSource === 'custom') {
+    if (!resolution && dimensionSource === 'custom') {
       if (customWidth && customHeight) {
         resolution = `${customWidth}x${customHeight}`;        
       } else {
