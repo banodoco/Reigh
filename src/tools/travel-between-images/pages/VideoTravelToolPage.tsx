@@ -33,7 +33,7 @@ import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
-import { useGenerations } from '@/shared/hooks/useGenerations';
+import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -445,10 +445,28 @@ const VideoTravelToolPage: React.FC = () => {
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // Video deletion handling
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+  const deleteGenerationMutation = useDeleteGeneration();
+  
   // Search helper functions
   const clearSearch = useCallback(() => {
     setShotSearchQuery('');
   }, []);
+  
+  // Video deletion handler
+  const handleDeleteVideo = useCallback(async (id: string) => {
+    setDeletingVideoId(id);
+    try {
+      await deleteGenerationMutation.mutateAsync(id);
+      // Refresh the videos list after deletion
+      // The mutation already handles query invalidation via DataFreshnessManager
+    } catch (error) {
+      console.error('[VideoTravelToolPage] Error deleting video:', error);
+    } finally {
+      setDeletingVideoId(null);
+    }
+  }, [deleteGenerationMutation]);
   
   // Filter shots based on search query
   const filteredShots = useMemo(() => {
@@ -1420,6 +1438,8 @@ const VideoTravelToolPage: React.FC = () => {
                   <ImageGallery
                     images={videosData?.items || []}
                     allShots={shots || []}
+                    onDelete={handleDeleteVideo}
+                    isDeleting={deletingVideoId}
                     onAddToLastShot={async () => false} // No-op for video gallery
                     onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
                     currentToolType="travel-between-images"
