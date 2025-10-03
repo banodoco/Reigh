@@ -501,7 +501,8 @@ const VideoTravelToolPage: React.FC = () => {
   // Fetch all videos generated with travel-between-images tool type
   const { 
     data: videosData, 
-    isLoading: videosLoading, 
+    isLoading: videosLoading,
+    isFetching: videosFetching,
     error: videosError 
   } = useGenerations(
     selectedProjectId, 
@@ -1354,33 +1355,64 @@ const VideoTravelToolPage: React.FC = () => {
         <>
           {showVideosView ? (
             // Show SkeletonGallery when loading videos or when no data yet
-            (!selectedProjectId || (videosLoading && (!videosData?.items || videosData.items.length === 0))) ? (
-              <div className="px-4 pb-2">
-                <SkeletonGallery
-                  count={12}
-                  columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
-                  showControls={true}
-                  projectAspectRatio={projectAspectRatio}
-                />
-              </div>
-            ) : (
-              <div className="px-4 pb-2">
-                <ImageGallery
-                  images={videosData?.items || []}
-                  allShots={shots || []}
-                  onAddToLastShot={async () => false} // No-op for video gallery
-                  onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
-                  currentToolType="travel-between-images"
-                  initialMediaTypeFilter="video"
-                  initialToolTypeFilter={true}
-                  currentToolTypeName="Travel Between Images"
-                  showShotFilter={true}
-                  initialShotFilter="all"
-                  columnsPerRow={3}
-                  itemsPerPage={12}
-                />
-              </div>
-            )
+            // IMPROVED: Show skeleton immediately when loading starts, with actual count if available
+            (() => {
+              const hasValidData = videosData?.items && videosData.items.length > 0;
+              const isLoadingOrFetching = videosLoading || videosFetching;
+              const hasNeverFetched = videosData === undefined; // First load - query hasn't run yet
+              
+              // Show skeleton if:
+              // 1. No project selected, OR
+              // 2. Currently loading/fetching and no valid data, OR
+              // 3. Never fetched yet (initial state when query first enables)
+              const shouldShowSkeleton = !selectedProjectId || (isLoadingOrFetching && !hasValidData) || hasNeverFetched;
+              
+              // Use actual count if available, otherwise default to 12
+              const skeletonCount = videosData?.total || 12;
+              
+              console.log('[VideoViewSkeleton] Rendering decision:', {
+                showVideosView,
+                selectedProjectId,
+                videosLoading,
+                videosFetching,
+                hasValidData,
+                hasNeverFetched,
+                videosDataIsUndefined: videosData === undefined,
+                shouldShowSkeleton,
+                skeletonCount,
+                videosDataTotal: videosData?.total,
+                videosDataItemsLength: videosData?.items?.length,
+                timestamp: Date.now()
+              });
+              
+              return shouldShowSkeleton ? (
+                <div className="px-4 pb-2">
+                  <SkeletonGallery
+                    count={skeletonCount}
+                    columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
+                    showControls={true}
+                    projectAspectRatio={projectAspectRatio}
+                  />
+                </div>
+              ) : (
+                <div className="px-4 pb-2">
+                  <ImageGallery
+                    images={videosData?.items || []}
+                    allShots={shots || []}
+                    onAddToLastShot={async () => false} // No-op for video gallery
+                    onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                    currentToolType="travel-between-images"
+                    initialMediaTypeFilter="video"
+                    initialToolTypeFilter={true}
+                    currentToolTypeName="Travel Between Images"
+                    showShotFilter={true}
+                    initialShotFilter="all"
+                    columnsPerRow={3}
+                    itemsPerPage={12}
+                  />
+                </div>
+              );
+            })()
           ) : (
             hasNoSearchResults ? (
               <div className="px-4 py-10 text-center text-muted-foreground">
