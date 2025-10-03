@@ -84,7 +84,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
       {/* Header */}
       <div>
-        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-foreground`}>Video Travel</h3>
+        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-muted-foreground`}>Video Travel</h3>
         <div className="border-t border-muted-foreground/20 mt-2"></div>
       </div>
 
@@ -96,7 +96,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               <p className={`${config.textSize} font-medium text-muted-foreground`}>
                 Guidance
               </p>
-              <span className={`${config.textSize} text-muted-foreground`}>
+              <span className={`${config.textSize} text-foreground`}>
                 ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})
               </span>
             </div>
