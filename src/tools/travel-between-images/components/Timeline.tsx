@@ -118,11 +118,13 @@ export interface TimelineProps {
   structureVideoMetadata?: import("@/shared/lib/videoUploader").VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
   structureVideoMotionStrength?: number;
+  structureVideoType?: 'flow' | 'canny' | 'depth';
   onStructureVideoChange?: (
     videoPath: string | null,
     metadata: import("@/shared/lib/videoUploader").VideoMetadata | null,
     treatment: 'adjust' | 'clip',
-    motionStrength: number
+    motionStrength: number,
+    structureType: 'flow' | 'canny' | 'depth'
   ) => void;
 }
 
@@ -161,6 +163,7 @@ const Timeline: React.FC<TimelineProps> = ({
   structureVideoMetadata,
   structureVideoTreatment,
   structureVideoMotionStrength,
+  structureVideoType,
   onStructureVideoChange
 }) => {
   
@@ -324,6 +327,7 @@ const Timeline: React.FC<TimelineProps> = ({
         structureVideoMetadata={structureVideoMetadata}
         structureVideoTreatment={structureVideoTreatment}
         structureVideoMotionStrength={structureVideoMotionStrength}
+        structureVideoType={structureVideoType}
         onStructureVideoChange={onStructureVideoChange}
       />
 

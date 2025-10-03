@@ -1,9 +1,11 @@
 import React, { useRef, useState } from "react";
 import { GenerationRow } from "@/types/shots";
-import { getDisplayUrl } from "@/shared/lib/utils";
+import { getDisplayUrl, cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { Trash2, Copy, Sparkles, Check } from "lucide-react";
 import { MagicEditModal } from "@/shared/components/MagicEditModal";
+import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
+import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
 // import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
 const TIMELINE_HORIZONTAL_PADDING = 20; // Fallback constant
 
@@ -108,6 +110,22 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   };
 
   const aspectRatioStyle = getAspectRatioStyle();
+
+  // Progressive loading for timeline images
+  const progressiveEnabled = isProgressiveLoadingEnabled();
+  const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
+    progressiveEnabled ? image.thumbUrl : null,
+    image.imageUrl,
+    {
+      priority: false, // Timeline images load progressively
+      lazy: true,
+      enabled: progressiveEnabled && shouldLoad,
+      crossfadeMs: 180
+    }
+  );
+
+  // Use progressive src if available, otherwise fallback to display URL
+  const displayImageUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(image.thumbUrl || image.imageUrl);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -267,12 +285,19 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           }}
         >
           <img
-            src={shouldLoad ? getDisplayUrl(image.imageUrl) : '/placeholder.svg'}
+            ref={progressiveRef}
+            src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
             alt={`Frame ${displayFrame}`}
-            className="w-full h-full object-cover"
+            className={cn(
+              "w-full h-full object-cover transition-all duration-200",
+              // Progressive loading visual states
+              progressiveEnabled && isThumbShowing && "opacity-95",
+              progressiveEnabled && isFullLoaded && "opacity-100"
+            )}
             draggable={false}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
+            loading="lazy"
           />
 
           {/* Hover action buttons */}

@@ -88,11 +88,13 @@ interface ShotImagesEditorProps {
   structureVideoMetadata?: VideoMetadata | null;
   structureVideoTreatment?: 'adjust' | 'clip';
   structureVideoMotionStrength?: number;
+  structureVideoType?: 'flow' | 'canny' | 'depth';
   onStructureVideoChange?: (
     videoPath: string | null,
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
-    motionStrength: number
+    motionStrength: number,
+    structureType: 'flow' | 'canny' | 'depth'
   ) => void;
 }
 
@@ -138,6 +140,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   structureVideoMetadata: propStructureVideoMetadata,
   structureVideoTreatment: propStructureVideoTreatment = 'adjust',
   structureVideoMotionStrength: propStructureVideoMotionStrength = 1.0,
+  structureVideoType: propStructureVideoType = 'flow',
   onStructureVideoChange: propOnStructureVideoChange,
 }) => {
   // Force mobile to use batch mode regardless of desktop setting
@@ -435,6 +438,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoMetadata={propStructureVideoMetadata}
                 structureVideoTreatment={propStructureVideoTreatment}
                 structureVideoMotionStrength={propStructureVideoMotionStrength}
+                structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
               />
               </>
@@ -479,6 +483,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     videoMetadata={propStructureVideoMetadata}
                     treatment={propStructureVideoTreatment}
                     motionStrength={propStructureVideoMotionStrength}
+                    structureType={propStructureVideoType}
                     imageCount={images.length}
                     timelineFramePositions={images.map((img, index) => index * batchVideoFrames)}
                     onVideoUploaded={(videoUrl, metadata) => {
@@ -486,7 +491,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         videoUrl,
                         metadata,
                         propStructureVideoTreatment,
-                        propStructureVideoMotionStrength
+                        propStructureVideoMotionStrength,
+                        propStructureVideoType
                       );
                     }}
                     onTreatmentChange={(treatment) => {
@@ -495,7 +501,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           propStructureVideoPath,
                           propStructureVideoMetadata,
                           treatment,
-                          propStructureVideoMotionStrength
+                          propStructureVideoMotionStrength,
+                          propStructureVideoType
                         );
                       }
                     }}
@@ -505,7 +512,19 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           propStructureVideoPath,
                           propStructureVideoMetadata,
                           propStructureVideoTreatment,
-                          strength
+                          strength,
+                          propStructureVideoType
+                        );
+                      }
+                    }}
+                    onStructureTypeChange={(type) => {
+                      if (propStructureVideoPath && propStructureVideoMetadata) {
+                        propOnStructureVideoChange(
+                          propStructureVideoPath,
+                          propStructureVideoMetadata,
+                          propStructureVideoTreatment,
+                          propStructureVideoMotionStrength,
+                          type
                         );
                       }
                     }}

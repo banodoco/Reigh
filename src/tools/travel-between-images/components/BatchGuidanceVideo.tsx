@@ -14,9 +14,11 @@ interface BatchGuidanceVideoProps {
   videoMetadata: VideoMetadata | null;
   treatment: 'adjust' | 'clip';
   motionStrength: number;
+  structureType?: 'flow' | 'canny' | 'depth';
   onVideoUploaded: (videoUrl: string | null, metadata: VideoMetadata | null) => void;
   onTreatmentChange: (treatment: 'adjust' | 'clip') => void;
   onMotionStrengthChange: (strength: number) => void;
+  onStructureTypeChange?: (type: 'flow' | 'canny' | 'depth') => void;
   imageCount?: number; // Number of images in the batch
   timelineFramePositions?: number[]; // Actual frame positions from timeline
 }
@@ -28,9 +30,11 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   videoMetadata,
   treatment,
   motionStrength,
+  structureType = 'flow',
   onVideoUploaded,
   onTreatmentChange,
   onMotionStrengthChange,
+  onStructureTypeChange,
   imageCount = 0,
   timelineFramePositions = []
 }) => {
@@ -57,12 +61,12 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     
     if (totalVideoFrames > timelineFrames) {
       const framesToDrop = totalVideoFrames - timelineFrames;
-      return `We'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+      return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
     } else if (totalVideoFrames < timelineFrames) {
       const framesToDuplicate = timelineFrames - totalVideoFrames;
-      return `We'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
+      return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to the ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} your input images cover.`;
     } else {
-      return `Video matches timeline (${timelineFrames} frames)`;
+      return `Perfect! Your input video has ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'}, matching your timeline exactly.`;
     }
   })();
   
@@ -72,12 +76,12 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     
     if (totalVideoFrames > timelineFrames) {
       const unusedFrames = totalVideoFrames - timelineFrames;
-      return `Your video has ${totalVideoFrames} frames while your input images cover ${timelineFrames}, so ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} at the end won't be used.`;
+      return `Your video will guide all ${timelineFrames} frame${timelineFrames === 1 ? '' : 's'} of your timeline. The last ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} of your video (frame${unusedFrames === 1 ? '' : 's'} ${timelineFrames + 1}-${totalVideoFrames}) will be ignored.`;
     } else if (totalVideoFrames < timelineFrames) {
       const uncoveredFrames = timelineFrames - totalVideoFrames;
-      return `Your video is ${totalVideoFrames} frames while your input images cover ${timelineFrames}, so the last ${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'} of the timeline will be unguided.`;
+      return `Your video will guide the first ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} of your timeline. The last ${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'} (frame${uncoveredFrames === 1 ? '' : 's'} ${totalVideoFrames + 1}-${timelineFrames}) won't have video guidance.`;
     } else {
-      return `Video matches timeline (${timelineFrames} frames)`;
+      return `Perfect! Your video length matches your timeline exactly (${timelineFrames} frame${timelineFrames === 1 ? '' : 's'}).`;
     }
   })();
 
@@ -330,24 +334,54 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
 
-          {/* Motion strength */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Strength of motion guidance</Label>
-              <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
-            </div>
-            <Slider
-              value={[motionStrength]}
-              onValueChange={([value]) => onMotionStrengthChange(value)}
-              min={0}
-              max={2}
-              step={0.1}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>0x (No motion)</span>
-              <span>1x (Original)</span>
-              <span>2x (Strong)</span>
+          {/* Structure type and Motion strength side by side */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Structure type selector */}
+            {onStructureTypeChange && (
+              <div className="space-y-2">
+                <Label className="text-sm">What type of guidance would you like to use?</Label>
+                <Select value={structureType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+                  onStructureTypeChange(type);
+                }}>
+                  <SelectTrigger className="h-9 w-full text-sm">
+                    <SelectValue>
+                      {structureType === 'flow' ? 'Optical flow' : structureType === 'canny' ? 'Canny' : 'Depth'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="flow">
+                      <span className="text-sm">Optical flow</span>
+                    </SelectItem>
+                    <SelectItem value="canny">
+                      <span className="text-sm">Canny</span>
+                    </SelectItem>
+                    <SelectItem value="depth">
+                      <span className="text-sm">Depth</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Motion strength */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Strength of motion guidance</Label>
+                <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
+              </div>
+              <Slider
+                value={[motionStrength]}
+                onValueChange={([value]) => onMotionStrengthChange(value)}
+                min={0}
+                max={2}
+                step={0.1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0x (No motion)</span>
+                <span>1x (Original)</span>
+                <span>2x (Strong)</span>
+              </div>
             </div>
           </div>
 

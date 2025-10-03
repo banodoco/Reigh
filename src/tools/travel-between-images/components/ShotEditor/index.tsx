@@ -106,6 +106,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     metadata?: VideoMetadata;
     treatment?: 'adjust' | 'clip';
     motionStrength?: number;
+    structureType?: 'flow' | 'canny' | 'depth';
   }>('travel-structure-video', { 
     projectId, 
     shotId: selectedShot?.id,
@@ -117,6 +118,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [structureVideoMetadata, setStructureVideoMetadata] = useState<VideoMetadata | null>(null);
   const [structureVideoTreatment, setStructureVideoTreatment] = useState<'adjust' | 'clip'>('adjust');
   const [structureVideoMotionStrength, setStructureVideoMotionStrength] = useState<number>(1.0);
+  const [structureVideoType, setStructureVideoType] = useState<'flow' | 'canny' | 'depth'>('flow');
   const [hasInitializedStructureVideo, setHasInitializedStructureVideo] = useState<string | null>(null);
 
   // Reset initialization state when shot changes
@@ -135,12 +137,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         setStructureVideoMetadata(structureVideoSettings.metadata);
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
+        setStructureVideoType(structureVideoSettings.structureType || 'flow');
       } else {
         // No saved structure video - initialize with defaults
         setStructureVideoPath(null);
         setStructureVideoMetadata(null);
         setStructureVideoTreatment('adjust');
         setStructureVideoMotionStrength(1.0);
+        setStructureVideoType('flow');
       }
       setHasInitializedStructureVideo(selectedShot.id);
     }
@@ -151,13 +155,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     videoPath: string | null,
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
-    motionStrength: number
+    motionStrength: number,
+    structureType: 'flow' | 'canny' | 'depth'
   ) => {
     console.log('[ShotEditor] Structure video changed:', {
       videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
       metadata,
       treatment,
-      motionStrength
+      motionStrength,
+      structureType
     });
     
     setStructureVideoPath(videoPath);
@@ -166,6 +172,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     setStructureVideoTreatment(treatment);
     setStructureVideoMotionStrength(motionStrength);
+    setStructureVideoType(structureType);
 
     // Save to database
     if (videoPath && metadata) {
@@ -173,7 +180,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         path: videoPath,
         metadata,
         treatment,
-        motionStrength
+        motionStrength,
+        structureType
       });
     } else {
       // Clear structure video
@@ -1446,11 +1454,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.log('[Generation] Adding structure video to task:', {
         videoPath: structureVideoPath,
         treatment: structureVideoTreatment,
-        motionStrength: structureVideoMotionStrength
+        motionStrength: structureVideoMotionStrength,
+        structureType: structureVideoType
       });
       requestBody.structure_video_path = structureVideoPath;
       requestBody.structure_video_treatment = structureVideoTreatment;
       requestBody.structure_video_motion_strength = structureVideoMotionStrength;
+      requestBody.structure_video_type = structureVideoType;
     }
     
     setIsSteerableMotionEnqueuing(true);
@@ -1614,6 +1624,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             structureVideoMetadata={structureVideoMetadata}
             structureVideoTreatment={structureVideoTreatment}
             structureVideoMotionStrength={structureVideoMotionStrength}
+            structureVideoType={structureVideoType}
             onStructureVideoChange={handleStructureVideoChange}
           />
         </div>

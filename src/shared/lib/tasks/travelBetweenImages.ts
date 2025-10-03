@@ -52,6 +52,7 @@ export interface TravelBetweenImagesTaskParams {
   structure_video_path?: string | null;              // Path to structure video (S3/Storage URL)
   structure_video_treatment?: 'adjust' | 'clip';     // How to handle frame mismatches
   structure_video_motion_strength?: number;          // 0.0 = no motion, 1.0 = full motion, >1.0 = amplified
+  structure_video_type?: 'flow' | 'canny' | 'depth'; // Type of structure extraction: optical flow, canny edges, or depth map
 }
 
 /**
