@@ -331,69 +331,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               <CollapsibleContent className="pt-0">
                 <Card>
                   <CardContent className="space-y-4 pt-6">
-                    <div>
-                      <Label className="text-sm font-light block mb-2">Dimension source:</Label>
-                  <RadioGroup
-                    value={dimensionSource || 'project'}
-                    onValueChange={(value) => {
-                      const newSource = value as 'project' | 'firstImage' | 'custom';
-                      onDimensionSourceChange(newSource);
-                      if (newSource === 'custom' && (!customWidth || !customHeight)) {
-                        const project = projects.find(p => p.id === selectedProjectId);
-                        if (project && project.aspectRatio) {
-                          const res = ASPECT_RATIO_TO_RESOLUTION[project.aspectRatio];
-                          if (res) {
-                            const [width, height] = res.split('x').map(Number);
-                            onCustomWidthChange(width);
-                            onCustomHeightChange(height);
-                          }
-                        }
-                      }
-                    }}
-                    className="flex flex-wrap gap-x-4 gap-y-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="project" id="r_project" />
-                      <Label htmlFor="r_project">Use Project Dimensions</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="firstImage" id="r_firstImage" />
-                      <Label htmlFor="r_firstImage">Use First Image Dimensions</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="custom" id="r_custom" />
-                      <Label htmlFor="r_custom">Custom</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                {dimensionSource === 'custom' && (
-                  <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/20">
-                    <div>
-                      <Label htmlFor="customWidth">Width</Label>
-                      <Input
-                        id="customWidth"
-                        type="number"
-                        value={customWidth || ''}
-                        onChange={(e) => onCustomWidthChange(parseInt(e.target.value, 10) || undefined)}
-                        placeholder="e.g., 1024"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="customHeight">Height</Label>
-                      <Input
-                        id="customHeight"
-                        type="number"
-                        value={customHeight || ''}
-                        onChange={(e) => onCustomHeightChange(parseInt(e.target.value, 10) || undefined)}
-                        placeholder="e.g., 576"
-                      />
-                    </div>
-                    {(customWidth || 0) > 2048 || (customHeight || 0) > 2048 ? (
-                      <p className="col-span-2 text-sm text-destructive">Warning: Very large dimensions may lead to slow generation or failures.</p>
-                    ) : null}
-                  </div>
-                )}
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center space-x-2">
                     <Switch

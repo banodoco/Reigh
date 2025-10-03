@@ -4,6 +4,8 @@ import { Input } from "@/shared/components/ui/input";
 import { Shot } from "@/types/shots";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HeaderProps {
   selectedShot: Shot;
@@ -21,6 +23,7 @@ interface HeaderProps {
   onNameCancel: (e?: React.MouseEvent) => void;
   onNameKeyDown: (e: React.KeyboardEvent) => void;
   onEditingNameChange: (value: string) => void;
+  projectAspectRatio?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -39,13 +42,26 @@ export const Header: React.FC<HeaderProps> = ({
   onNameCancel,
   onNameKeyDown,
   onEditingNameChange,
+  projectAspectRatio,
 }) => {
   const isMobile = useIsMobile();
+
+  const handleAspectRatioChange = async (newAspectRatio: string) => {
+    if (selectedShot?.id) {
+      await supabase
+        .from('shots')
+        .update({ aspect_ratio: newAspectRatio } as any)
+        .eq('id', selectedShot.id);
+    }
+  };
 
   return (
     <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
       {/* Desktop layout */}
-      <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
+      <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
+        {/* Empty spacer for left side to keep center aligned */}
+        <div className="flex-1" />
+        
         {/* Desktop shot name with navigation buttons - centered */}
         <div className="flex items-center justify-center">
           {isEditingName ? (
@@ -107,10 +123,19 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+        
+        {/* Aspect Ratio Selector on the right */}
+        <div className="flex-1 flex justify-end">
+          <AspectRatioSelector
+            value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
+            onValueChange={handleAspectRatioChange}
+            showVisualizer={true}
+          />
+        </div>
       </div>
 
       {/* Mobile layout - centered */}
-      <div className="sm:hidden">
+      <div className="sm:hidden space-y-2">
         {/* Shot name with navigation buttons centered */}
         <div className="flex justify-center px-3">
           {isEditingName ? (
@@ -173,6 +198,17 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+        
+        {/* Aspect Ratio Selector below shot name on mobile */}
+        {!isEditingName && (
+          <div className="flex justify-center px-3">
+            <AspectRatioSelector
+              value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
+              onValueChange={handleAspectRatioChange}
+              showVisualizer={true}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
