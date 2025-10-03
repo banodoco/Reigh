@@ -187,8 +187,6 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
 
       // Notify parent
       onVideoUploaded(uploadedVideoUrl, metadata);
-
-      toast.success('Structure video uploaded successfully');
     } catch (error) {
       console.error('[BatchGuidanceVideo] Upload failed:', error);
       toast.error(`Failed to upload video: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -206,7 +204,6 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    toast.success('Structure video removed');
   };
 
   if (!videoUrl) {

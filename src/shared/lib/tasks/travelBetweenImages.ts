@@ -197,6 +197,7 @@ function buildTravelBetweenImagesPayload(
     orchestratorPayload.structure_video_path = params.structure_video_path;
     orchestratorPayload.structure_video_treatment = params.structure_video_treatment ?? 'adjust';
     orchestratorPayload.structure_video_motion_strength = params.structure_video_motion_strength ?? 1.0;
+    orchestratorPayload.structure_video_type = params.structure_video_type ?? 'flow';
   }
 
   // Attach additional_loras mapping if provided (matching original logic)

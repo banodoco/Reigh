@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 
 interface SharedTaskDetailsProps {
@@ -26,6 +26,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   showFullNegativePrompt = false,
   onShowFullNegativePromptChange,
 }) => {
+  const [videoLoaded, setVideoLoaded] = useState(false);
   // Helper to safely access orchestrator payload from multiple possible locations
   const orchestratorPayload = task?.params?.full_orchestrator_payload as any;
   const orchestratorDetails = task?.params?.orchestrator_details as any;
@@ -94,7 +95,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           <div className="flex items-center">
             <div className="flex items-center space-x-2">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>
-                Guidance
+                Image Guidance
               </p>
               <span className={`${config.textSize} text-foreground`}>
                 ({inputImages.length} image{inputImages.length !== 1 ? 's' : ''})
@@ -129,6 +130,101 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           </div>
         </div>
       )}
+
+      {/* Video Guidance Section */}
+      {(() => {
+        // Check for video guidance data
+        const videoPath = orchestratorDetails?.structure_video_path || task?.params?.structure_video_path;
+        const videoType = orchestratorDetails?.structure_video_type || task?.params?.structure_video_type;
+        const videoTreatment = orchestratorDetails?.structure_video_treatment || task?.params?.structure_video_treatment;
+        const motionStrength = orchestratorDetails?.structure_video_motion_strength ?? task?.params?.structure_video_motion_strength;
+        const resolution = orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh;
+        
+        const hasVideoGuidance = videoPath && videoPath !== '';
+        
+        if (!hasVideoGuidance) return null;
+        
+        // Calculate aspect ratio from resolution
+        let aspectRatio = 1; // Default to square
+        if (resolution) {
+          const [width, height] = resolution.split('x').map(Number);
+          if (width && height) {
+            aspectRatio = width / height;
+          }
+        }
+        const videoWidth = 160;
+        const videoHeight = videoWidth / aspectRatio;
+        
+        return (
+          <div className="space-y-2">
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>
+              Video Guidance
+            </p>
+            <div className="flex items-start gap-3">
+              <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: `${videoWidth}px`, height: `${videoHeight}px` }}>
+                {!videoLoaded ? (
+                  <div 
+                    className="w-full h-full bg-black rounded border shadow-sm flex items-center justify-center"
+                    onClick={() => setVideoLoaded(true)}
+                  >
+                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <video 
+                      src={videoPath}
+                      className="w-full h-full object-cover rounded border shadow-sm"
+                      loop
+                      muted
+                      playsInline
+                      autoPlay
+                      onClick={(e) => {
+                        const video = e.currentTarget;
+                        if (video.paused) {
+                          video.play();
+                        } else {
+                          video.pause();
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 rounded-full p-2">
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                {videoType && (
+                  <div className={`${config.textSize} ${config.fontWeight}`}>
+                    <span className="text-muted-foreground">Type: </span>
+                    <span className="text-foreground capitalize">{videoType}</span>
+                  </div>
+                )}
+                {videoTreatment && (
+                  <div className={`${config.textSize} ${config.fontWeight}`}>
+                    <span className="text-muted-foreground">Treatment: </span>
+                    <span className="text-foreground capitalize">{videoTreatment}</span>
+                  </div>
+                )}
+                {motionStrength !== undefined && motionStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight}`}>
+                    <span className="text-muted-foreground">Motion Strength: </span>
+                    <span className="text-foreground">{Math.round(motionStrength * 100)}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Style Reference Image Section */}
       {(() => {

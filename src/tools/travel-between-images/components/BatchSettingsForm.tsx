@@ -288,7 +288,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
                 
                 <div className="relative">
-                  <Label htmlFor="amountOfMotion" className="text-sm font-light block mb-1">Amount of motion (experimental): {amountOfMotion}</Label>
+                  <Label htmlFor="amountOfMotion" className="text-sm font-light block mb-1">Amount of motion: {amountOfMotion}</Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">

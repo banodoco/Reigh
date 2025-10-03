@@ -61,8 +61,6 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
       
       // 3. Notify parent
       onVideoUploaded(videoUrl, metadata);
-      
-      toast.success('Structure video uploaded successfully');
     } catch (error) {
       console.error('[GuidanceVideo] Upload failed:', error);
       toast.error(`Failed to upload video: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -81,7 +79,6 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    toast.success('Structure video removed');
   };
   
   if (currentVideoUrl) {
