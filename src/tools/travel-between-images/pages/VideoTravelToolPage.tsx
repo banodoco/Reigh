@@ -438,6 +438,9 @@ const VideoTravelToolPage: React.FC = () => {
   // Add state for toggling between shots and videos view
   const [showVideosView, setShowVideosView] = useState<boolean>(false);
   
+  // Track when we've just switched to videos view to prevent empty state flash
+  const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
+  
   // Search functionality for shots
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -515,6 +518,18 @@ const VideoTravelToolPage: React.FC = () => {
     }
   );
 
+  // Clear videosViewJustEnabled flag when data loads
+  React.useEffect(() => {
+    if (showVideosView && videosViewJustEnabled && videosData?.items) {
+      // Data has loaded, clear the flag
+      setVideosViewJustEnabled(false);
+      console.log('[VideoViewTransition] Data loaded, clearing videosViewJustEnabled flag', {
+        itemsCount: videosData.items.length,
+        timestamp: Date.now()
+      });
+    }
+  }, [showVideosView, videosViewJustEnabled, videosData?.items]);
+  
   // [VideoThumbnailIssue] Log what data we're passing to ImageGallery
   React.useEffect(() => {
     if (showVideosView && videosData?.items) {
@@ -679,9 +694,17 @@ const VideoTravelToolPage: React.FC = () => {
               </h1>
               <button
                 onClick={(e) => {
-                  setShowVideosView(!showVideosView);
+                  const willShowVideos = !showVideosView;
+                  setShowVideosView(willShowVideos);
+                  
+                  // Set flag when switching TO videos view to prevent empty state flash
+                  if (willShowVideos) {
+                    setVideosViewJustEnabled(true);
+                    console.log('[VideoViewTransition] Switching to videos view, setting videosViewJustEnabled=true');
+                  }
+                  
                   // Clear search when switching views
-                  if (!showVideosView) {
+                  if (willShowVideos) {
                     setShotSearchQuery('');
                   }
                   e.currentTarget.blur(); // Remove focus immediately after click
@@ -1355,17 +1378,16 @@ const VideoTravelToolPage: React.FC = () => {
         <>
           {showVideosView ? (
             // Show SkeletonGallery when loading videos or when no data yet
-            // IMPROVED: Show skeleton immediately when loading starts, with actual count if available
+            // IMPROVED: Track view transition to prevent empty state flash
             (() => {
               const hasValidData = videosData?.items && videosData.items.length > 0;
               const isLoadingOrFetching = videosLoading || videosFetching;
-              const hasNeverFetched = videosData === undefined; // First load - query hasn't run yet
               
               // Show skeleton if:
               // 1. No project selected, OR
               // 2. Currently loading/fetching and no valid data, OR
-              // 3. Never fetched yet (initial state when query first enables)
-              const shouldShowSkeleton = !selectedProjectId || (isLoadingOrFetching && !hasValidData) || hasNeverFetched;
+              // 3. We just switched to videos view (videosViewJustEnabled flag)
+              const shouldShowSkeleton = !selectedProjectId || (isLoadingOrFetching && !hasValidData) || videosViewJustEnabled;
               
               // Use actual count if available, otherwise default to 12
               const skeletonCount = videosData?.total || 12;
@@ -1376,8 +1398,7 @@ const VideoTravelToolPage: React.FC = () => {
                 videosLoading,
                 videosFetching,
                 hasValidData,
-                hasNeverFetched,
-                videosDataIsUndefined: videosData === undefined,
+                videosViewJustEnabled,
                 shouldShowSkeleton,
                 skeletonCount,
                 videosDataTotal: videosData?.total,

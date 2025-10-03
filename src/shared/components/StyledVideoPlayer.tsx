@@ -150,7 +150,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       {/* Clickable overlay for play/pause */}
       <div 
         className="absolute inset-0 video-clickable-area"
-        style={{ pointerEvents: showControls ? 'none' : 'all' }}
+        style={{ pointerEvents: (showControls && isPlaying) ? 'none' : 'all' }}
       />
 
       {/* Custom Controls Overlay */}
@@ -162,12 +162,12 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       >
         {/* Play/Pause Button Overlay - Center */}
         {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Button
               variant="secondary"
               size="lg"
               onClick={togglePlayPause}
-              className="bg-black/70 hover:bg-black/90 text-white h-16 w-16 rounded-full p-0 shadow-wes border border-white/20"
+              className="bg-black/70 hover:bg-black/90 text-white h-16 w-16 rounded-full p-0 shadow-wes border border-white/20 pointer-events-auto"
             >
               <Play className="h-8 w-8 ml-1" fill="currentColor" />
             </Button>
