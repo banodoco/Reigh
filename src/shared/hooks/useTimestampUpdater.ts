@@ -32,8 +32,8 @@ class TimestampManager {
     const now = Date.now();
     const age = now - date.getTime();
     
-    // Less than 5 minutes old: update every 30 seconds
-    if (age < 5 * 60 * 1000) return 30;
+    // Less than 5 minutes old: update every 10 seconds (more responsive for fresh content)
+    if (age < 5 * 60 * 1000) return 10;
     
     // Less than 1 hour old: update every 60 seconds  
     if (age < 60 * 60 * 1000) return 60;
@@ -63,9 +63,13 @@ class TimestampManager {
     
     // Start timer if this is the first callback for this interval
     if (callbacks.size === 1) {
-      console.log(`[TimestampManager] Starting timer for ${interval}s interval`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TimestampManager] Starting timer for ${interval}s interval`);
+      }
       const timer = setInterval(() => {
-        console.log(`[TimestampManager] Timer tick for ${interval}s interval, ${callbacks.size} callbacks`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TimestampManager] Timer tick for ${interval}s interval, ${callbacks.size} callbacks`);
+        }
         // Batch all callbacks for this interval
         callbacks.forEach(cb => cb());
       }, interval * 1000);
@@ -149,13 +153,28 @@ export function useTimestampVisibility(ref: React.RefObject<HTMLElement>) {
   
   useEffect(() => {
     const element = ref.current;
-    if (!element || !('IntersectionObserver' in window)) {
+    if (!element) {
+      // If element not mounted yet, stay visible
+      return;
+    }
+    
+    if (!('IntersectionObserver' in window)) {
+      // If IntersectionObserver not supported, always consider visible
+      setIsVisible(true);
       return;
     }
     
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsVisible(entry.isIntersecting);
+        const newVisibility = entry.isIntersecting;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[TimestampVisibility] Visibility changed:', {
+            isIntersecting: newVisibility,
+            intersectionRatio: entry.intersectionRatio,
+            timestamp: Date.now()
+          });
+        }
+        setIsVisible(newVisibility);
       },
       {
         // Consider visible when 10% is showing

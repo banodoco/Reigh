@@ -33,12 +33,31 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
   // Track visibility for performance (only update visible timestamps)
   const isVisible = useTimestampVisibility(elementRef);
   
+  // Determine if we should enable updates
+  const shouldUpdate = isVisible && (!isMobile || !showOnHover || isHovered);
+  
   // Get live-updating timestamp trigger
   const { updateTrigger } = useTimestampUpdater({
     date,
-    isVisible: isVisible && (!isMobile || !showOnHover || isHovered),
+    isVisible: shouldUpdate,
     disabled: false
   });
+  
+  // Debug logging for timestamp updates (development only)
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && updateTrigger > 0) {
+      console.log('[TimeStamp] Update triggered:', {
+        updateTrigger,
+        isVisible,
+        shouldUpdate,
+        isMobile,
+        showOnHover,
+        isHovered,
+        date: date.toISOString(),
+        timestamp: Date.now()
+      });
+    }
+  }, [updateTrigger, isVisible, shouldUpdate, isMobile, showOnHover, isHovered, date]);
 
   const positionClasses = {
     'top-left': 'top-2 left-2',

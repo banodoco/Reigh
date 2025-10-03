@@ -166,12 +166,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => {
-    console.log('[ShotEditor] Structure video changed:', {
+    console.log('[ShotEditor] [DEBUG] handleStructureVideoChange called:', {
       videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
-      metadata,
+      hasMetadata: !!metadata,
       treatment,
       motionStrength,
-      structureType
+      structureType,
+      previousStructureType: structureVideoType // Show what it was before
     });
     
     setStructureVideoPath(videoPath);
@@ -181,6 +182,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setStructureVideoTreatment(treatment);
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);
+    
+    console.log('[ShotEditor] [DEBUG] State setters called, new structureType should be:', structureType);
 
     // Save to database
     if (videoPath && metadata) {
@@ -192,8 +195,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         structureType
       });
     } else {
-      // Clear structure video
-      updateStructureVideoSettings('shot', {});
+      // Clear structure video - explicitly set fields to null to ensure deletion
+      updateStructureVideoSettings('shot', {
+        path: null,
+        metadata: null,
+        treatment: null,
+        motionStrength: null,
+        structureType: null
+      });
     }
   }, [updateStructureVideoSettings]);
 
@@ -1467,6 +1476,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
 
     // Add structure video params if available
+    console.log('[Generation] [DEBUG] Structure video state at generation time:', {
+      structureVideoPath,
+      structureVideoType,
+      structureVideoTreatment,
+      structureVideoMotionStrength,
+      willAddToRequest: !!structureVideoPath
+    });
+    
     if (structureVideoPath) {
       console.log('[Generation] Adding structure video to task:', {
         videoPath: structureVideoPath,
@@ -1521,7 +1538,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // selectedMode removed - now hardcoded to use specific model
     loraManager.selectedLoras,
     queryClient,
-    onShotImagesUpdate
+    onShotImagesUpdate,
+    // Structure video state - CRITICAL: must be included or callback uses stale values
+    structureVideoPath,
+    structureVideoType,
+    structureVideoTreatment,
+    structureVideoMotionStrength
   ]);
 
   // Opens the Generations pane focused on un-positioned images for the current shot

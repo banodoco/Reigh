@@ -155,13 +155,47 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
         
         if (!hasStyleReference) return null;
         
+        // Calculate aspect ratio from dimensions - check multiple sources
+        let aspectRatio = 1; // Default to square
+        
+        // Try to get resolution from metadata.resolution field first (for image generation tasks)
+        const metadataResolution = (metadata as any).resolution || 
+                                   (metadata as any).originalParams?.resolution;
+        
+        if (metadata.width && metadata.height) {
+          aspectRatio = metadata.width / metadata.height;
+        } else if (metadataResolution) {
+          // Parse resolution like "1152x864"
+          const match = metadataResolution.match(/(\d+)[×x](\d+)/);
+          if (match) {
+            const [, width, height] = match;
+            aspectRatio = parseInt(width) / parseInt(height);
+          }
+        } else if (dimensions) {
+          // Parse dimensions like "1152×864" or "1152x864"
+          const match = dimensions.match(/(\d+)[×x](\d+)/);
+          if (match) {
+            const [, width, height] = match;
+            aspectRatio = parseInt(width) / parseInt(height);
+          }
+        } else if (resolution) {
+          // Parse resolution like "1152x864"
+          const match = resolution.match(/(\d+)[×x](\d+)/);
+          if (match) {
+            const [, width, height] = match;
+            aspectRatio = parseInt(width) / parseInt(height);
+          }
+        }
+        const imageWidth = 120;
+        const imageHeight = imageWidth / aspectRatio;
+        
         return (
           <div className="space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>
-              Style Reference
+              Reference
             </p>
             <div className="flex items-center gap-3">
-              <div className="relative group flex-shrink-0" style={{ width: '80px', height: '80px' }}>
+              <div className="relative group flex-shrink-0" style={{ width: `${imageWidth}px`, height: `${imageHeight}px` }}>
                 <img 
                   src={styleImage} 
                   alt="Style reference" 

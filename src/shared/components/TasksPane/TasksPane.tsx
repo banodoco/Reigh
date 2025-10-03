@@ -582,6 +582,25 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       return;
     }
 
+    // Optimistically update all processing tasks to 'Cancelled' status immediately
+    // This will hide "Check Progress" buttons instantly
+    const queryKey = ['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE];
+    const previousData = queryClient.getQueryData(queryKey);
+    
+    queryClient.setQueryData(queryKey, (oldData: any) => {
+      if (!oldData?.tasks) return oldData;
+      
+      return {
+        ...oldData,
+        tasks: oldData.tasks.map((task: any) => {
+          if (task.status === 'Queued' || task.status === 'In Progress') {
+            return { ...task, status: 'Cancelled' };
+          }
+          return task;
+        }),
+      };
+    });
+
     cancelAllPendingMutation.mutate(selectedProjectId, {
       onSuccess: (data) => {
         toast({
@@ -599,6 +618,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       },
       onError: (error) => {
         console.error('Cancel-All failed:', error);
+        // Revert the optimistic update on error
+        queryClient.setQueryData(queryKey, previousData);
         toast({
           title: 'Cancellation Failed',
           description: (error as Error).message || 'Could not cancel all active tasks.',

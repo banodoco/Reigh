@@ -133,12 +133,23 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
 
       {/* Video Guidance Section */}
       {(() => {
-        // Check for video guidance data
-        const videoPath = orchestratorDetails?.structure_video_path || task?.params?.structure_video_path;
-        const videoType = orchestratorDetails?.structure_video_type || task?.params?.structure_video_type;
-        const videoTreatment = orchestratorDetails?.structure_video_treatment || task?.params?.structure_video_treatment;
-        const motionStrength = orchestratorDetails?.structure_video_motion_strength ?? task?.params?.structure_video_motion_strength;
-        const resolution = orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh;
+        // Check for video guidance data in multiple locations
+        // Priority: orchestratorDetails > orchestratorPayload > task.params
+        const videoPath = orchestratorDetails?.structure_video_path || 
+                         orchestratorPayload?.structure_video_path || 
+                         task?.params?.structure_video_path;
+        const videoType = orchestratorDetails?.structure_video_type || 
+                         orchestratorPayload?.structure_video_type || 
+                         task?.params?.structure_video_type;
+        const videoTreatment = orchestratorDetails?.structure_video_treatment || 
+                              orchestratorPayload?.structure_video_treatment || 
+                              task?.params?.structure_video_treatment;
+        const motionStrength = orchestratorDetails?.structure_video_motion_strength ?? 
+                              orchestratorPayload?.structure_video_motion_strength ?? 
+                              task?.params?.structure_video_motion_strength;
+        const resolution = orchestratorDetails?.parsed_resolution_wh || 
+                          orchestratorPayload?.parsed_resolution_wh || 
+                          task?.params?.parsed_resolution_wh;
         
         const hasVideoGuidance = videoPath && videoPath !== '';
         
@@ -216,7 +227,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 )}
                 {motionStrength !== undefined && motionStrength !== null && (
                   <div className={`${config.textSize} ${config.fontWeight}`}>
-                    <span className="text-muted-foreground">Motion Strength: </span>
+                    <span className="text-muted-foreground">Guidance Strength: </span>
                     <span className="text-foreground">{Math.round(motionStrength * 100)}%</span>
                   </div>
                 )}
@@ -235,18 +246,30 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                              orchestratorDetails?.style_reference_strength;
         const subjectStrength = task?.params?.subject_strength ?? 
                                orchestratorDetails?.subject_strength;
+        const resolution = orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh;
         
         const hasStyleReference = styleImage && styleImage !== '';
         
         if (!hasStyleReference) return null;
         
+        // Calculate aspect ratio from resolution
+        let aspectRatio = 1; // Default to square
+        if (resolution) {
+          const [width, height] = resolution.split('x').map(Number);
+          if (width && height) {
+            aspectRatio = width / height;
+          }
+        }
+        const imageWidth = 120;
+        const imageHeight = imageWidth / aspectRatio;
+        
         return (
           <div className="space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>
-              Style Reference
+              Reference
             </p>
             <div className="flex items-center gap-3">
-              <div className="relative group flex-shrink-0" style={{ width: '80px', height: '80px' }}>
+              <div className="relative group flex-shrink-0" style={{ width: `${imageWidth}px`, height: `${imageHeight}px` }}>
                 <img 
                   src={styleImage} 
                   alt="Style reference" 

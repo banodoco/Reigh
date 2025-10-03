@@ -33,7 +33,7 @@ import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
-import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
+import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -74,6 +74,14 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     enabled: !!projectId 
   });
 
+  // Fetch current shot's LoRA settings to use as defaults for new shots
+  const shotLoraSettingsQuery = useToolSettings<{
+    loras?: { id: string; strength: number }[];
+  }>('travel-loras', { 
+    shotId: selectedShotId || null,
+    enabled: !!selectedShotId 
+  });
+
   return {
     // Shots data
     shots, // Full shots data for both ShotEditor and ShotListDisplay (from context)
@@ -100,6 +108,9 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 
     // Project UI settings data
     projectUISettings: projectUISettingsQuery.settings,
+
+    // Current shot's LoRA settings (for inheriting to new shots)
+    shotLoraSettings: shotLoraSettingsQuery.settings,
   };
 };
 
@@ -169,7 +180,8 @@ const VideoTravelToolPage: React.FC = () => {
     updateProjectSettings,
     projectSettingsLoading,
     projectSettingsUpdating,
-    projectUISettings
+    projectUISettings,
+    shotLoraSettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
 
   // [VideoTravelDebug] Log the data loading states - reduced frequency
@@ -445,28 +457,10 @@ const VideoTravelToolPage: React.FC = () => {
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Video deletion handling
-  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
-  const deleteGenerationMutation = useDeleteGeneration();
-  
   // Search helper functions
   const clearSearch = useCallback(() => {
     setShotSearchQuery('');
   }, []);
-  
-  // Video deletion handler
-  const handleDeleteVideo = useCallback(async (id: string) => {
-    setDeletingVideoId(id);
-    try {
-      await deleteGenerationMutation.mutateAsync(id);
-      // Refresh the videos list after deletion
-      // The mutation already handles query invalidation via DataFreshnessManager
-    } catch (error) {
-      console.error('[VideoTravelToolPage] Error deleting video:', error);
-    } finally {
-      setDeletingVideoId(null);
-    }
-  }, [deleteGenerationMutation]);
   
   // Filter shots based on search query
   const filteredShots = useMemo(() => {
@@ -1139,6 +1133,8 @@ const VideoTravelToolPage: React.FC = () => {
       setCurrentShotId(newShot.id);
       
       // Mark this shot as needing project defaults applied
+      // IMPORTANT: This captures the "last edited" state from the previous shot,
+      // NOT just the saved project defaults. This ensures LoRA removals persist.
       if (projectSettings || projectUISettings) {
         const defaultsToApply = {
           ...(projectSettings || {}),
@@ -1147,6 +1143,38 @@ const VideoTravelToolPage: React.FC = () => {
         };
         // Store the new shot ID to apply defaults when settings load
         sessionStorage.setItem(`apply-project-defaults-${newShot.id}`, JSON.stringify(defaultsToApply));
+      }
+      
+      // Save current shot's LoRA settings to the new shot (if any)
+      // This ensures new shots inherit the "last edited" LoRAs, not stale project defaults
+      if (shotLoraSettings?.loras !== undefined) {
+        // Save LoRAs from the current shot to the new shot using Supabase directly
+        // This happens before the shot editor loads, so it will use these LoRAs
+        console.log('[VideoTravelToolPage] Saving current shot LoRAs to new shot:', shotLoraSettings.loras);
+        (async () => {
+          try {
+            const { data: currentShot } = await supabase
+              .from('shots')
+              .select('settings')
+              .eq('id', newShot.id)
+              .single();
+            
+            const currentSettings = (currentShot?.settings as any) || {};
+            await supabase
+              .from('shots')
+              .update({
+                settings: {
+                  ...currentSettings,
+                  'travel-loras': {
+                    loras: shotLoraSettings.loras
+                  }
+                }
+              })
+              .eq('id', newShot.id);
+          } catch (error) {
+            console.error('[VideoTravelToolPage] Failed to save LoRAs to new shot:', error);
+          }
+        })();
       }
       
       // Modal will auto-close on successful submission
@@ -1438,8 +1466,6 @@ const VideoTravelToolPage: React.FC = () => {
                   <ImageGallery
                     images={videosData?.items || []}
                     allShots={shots || []}
-                    onDelete={handleDeleteVideo}
-                    isDeleting={deletingVideoId}
                     onAddToLastShot={async () => false} // No-op for video gallery
                     onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
                     currentToolType="travel-between-images"

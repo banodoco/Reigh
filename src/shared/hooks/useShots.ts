@@ -1428,9 +1428,14 @@ export const useDeleteShot = () => {
       return shotId;
     },
     onSuccess: (_, { projectId, shotId }) => {
-      // Emit domain event for shot deletion
-      // Shot deletion events are now handled by DataFreshnessManager via realtime events
-
+      // Immediately invalidate cache to update UI
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      // Also invalidate unified generations cache
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
+      // Invalidate project-video-counts since deleting a shot affects counts
+      queryClient.invalidateQueries({ queryKey: ['project-video-counts', projectId] });
+      
+      console.log('[DeleteShot] Invalidated query cache for immediate UI update', { projectId, shotId });
     },
     onError: (error: Error) => {
       console.error('Error deleting shot:', error);

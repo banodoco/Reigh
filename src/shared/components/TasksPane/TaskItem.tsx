@@ -22,7 +22,7 @@ import { useProcessingTimestamp, useCompletedTimestamp } from '@/shared/hooks/us
 import { GenerationRow } from '@/types/shots';
 import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
@@ -73,6 +73,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const completedTime = useCompletedTimestamp({
     generationProcessedAt: task.generationProcessedAt || (task as any).generation_processed_at
   });
+
+  // Query client for optimistic updates
+  const queryClient = useQueryClient();
 
   // Mutations
   const cancelTaskMutation = useCancelTask(selectedProjectId);
@@ -294,14 +297,71 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     } as GenerationRow;
   }, [hasGeneratedImage, actualGeneration, task.id]);
 
+  // State to control when to fetch video generations (on hover)
+  const [shouldFetchVideo, setShouldFetchVideo] = useState(false);
+  
+  // State to track if user clicked the button (not just hovered)
+  const [waitingForVideoToOpen, setWaitingForVideoToOpen] = useState(false);
+  
+  // Fetch video generations for video tasks - only when hovering
+  const { data: videoGenerations, isLoading: isLoadingVideoGen } = useQuery({
+    queryKey: ['video-generations-for-task', task.id, task.outputLocation],
+    queryFn: async () => {
+      if (!taskInfo.isVideoTask || task.status !== 'Complete') return null;
+      
+      // Try to find generation by output location first (most reliable)
+      if (task.outputLocation) {
+        const { data: byLocation, error: locError } = await supabase
+          .from('generations')
+          .select('*')
+          .eq('location', task.outputLocation)
+          .eq('project_id', task.projectId);
+        
+        if (!locError && byLocation && byLocation.length > 0) {
+          return byLocation;
+        }
+      }
+      
+      // Fallback: Search by task ID in the tasks JSONB array
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .filter('tasks', 'cs', JSON.stringify([task.id]))
+        .eq('project_id', task.projectId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[ShowVideoDebug] Error fetching video generations:', error);
+        return null;
+      }
+      
+      return data || [];
+    },
+    enabled: shouldFetchVideo && taskInfo.isVideoTask && task.status === 'Complete',
+  });
+
   // Extract travel-specific data
   const travelData = React.useMemo(() => {
     if (!taskInfo.isVideoTask) return { imageUrls: [], videoOutputs: null };
+    
+    const imageUrls = taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || [];
+    
+    // Convert video generations from database to GenerationRow format
+    const videoOutputs = videoGenerations?.map(gen => ({
+      id: gen.id,
+      location: gen.location,
+      imageUrl: gen.location,
+      thumbUrl: gen.thumbnail_url || gen.location,
+      type: gen.type || 'video',
+      createdAt: gen.created_at,
+      metadata: gen.params || {},
+    } as GenerationRow)) || null;
+    
     return {
-      imageUrls: taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || [],
-      videoOutputs: taskParams.parsed?.outputs || null
+      imageUrls,
+      videoOutputs
     };
-  }, [taskInfo.isVideoTask, taskParams.parsed]);
+  }, [taskInfo.isVideoTask, taskParams.parsed, videoGenerations]);
 
   const imagesToShow = travelData.imageUrls.slice(0, 4);
   const extraImageCount = Math.max(0, travelData.imageUrls.length - imagesToShow.length);
@@ -328,6 +388,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // State for hover functionality
   const [isHoveringTaskItem, setIsHoveringTaskItem] = useState<boolean>(false);
   
+  // Trigger video fetch when hovering over completed video tasks
+  useEffect(() => {
+    if (isHoveringTaskItem && taskInfo.isCompletedVideoTask && !shouldFetchVideo) {
+      setShouldFetchVideo(true);
+    }
+  }, [isHoveringTaskItem, taskInfo.isCompletedVideoTask, shouldFetchVideo]);
+  
   // State for video lightbox
   const [showVideoLightbox, setShowVideoLightbox] = useState<boolean>(false);
   const [videoLightboxIndex, setVideoLightboxIndex] = useState<number>(0);
@@ -336,9 +403,35 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
 
   const handleCancel = () => {
+    // Optimistically update this task to 'Cancelled' status immediately
+    // This will hide the "Check Progress" button instantly
+    const taskId = task.id;
+    
+    // Update all paginated queries that might contain this task
+    queryClient.setQueriesData(
+      { queryKey: ['tasks', 'paginated', selectedProjectId] },
+      (oldData: any) => {
+        if (!oldData?.tasks) return oldData;
+        
+        return {
+          ...oldData,
+          tasks: oldData.tasks.map((t: any) => {
+            if (t.id === taskId) {
+              return { ...t, status: 'Cancelled' };
+            }
+            return t;
+          }),
+        };
+      }
+    );
+    
     // Cancel task (subtasks will be automatically cancelled if this is an orchestrator)
     cancelTaskMutation.mutate(task.id, {
       onError: (error) => {
+        // Revert the optimistic update on error
+        // The task status will be restored when queries are refetched
+        queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated', selectedProjectId] });
+        
         toast({
           title: 'Cancellation Failed',
           description: error.message || 'Could not cancel the task.',
@@ -373,7 +466,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       console.log('[PollingBreakageIssue] TaskItem progress check completed successfully');
       
       if (tasks) {
-        computeAndShowProgress(tasks);
+        computeAndShowProgress(tasks as any);
       } else {
         console.log('[TaskProgressDebug] No data available for progress computation');
         toast({
@@ -456,11 +549,26 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const handleViewVideo = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    
+    // If video data is already loaded, open immediately
     if (travelData.videoOutputs && travelData.videoOutputs.length > 0) {
       setVideoLightboxIndex(0);
       setShowVideoLightbox(true);
+    } else {
+      // If not loaded yet, trigger fetch and mark that we're waiting to open
+      setShouldFetchVideo(true);
+      setWaitingForVideoToOpen(true);
     }
   };
+  
+  // Auto-open lightbox when video data becomes available after clicking (not just hovering)
+  useEffect(() => {
+    if (waitingForVideoToOpen && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      setVideoLightboxIndex(0);
+      setShowVideoLightbox(true);
+      setWaitingForVideoToOpen(false); // Reset the flag
+    }
+  }, [travelData.videoOutputs, waitingForVideoToOpen]);
 
   // Handler for opening image lightbox
   const handleViewImage = (e: React.MouseEvent) => {
@@ -559,14 +667,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
               >
                 Visit Shot
               </Button>
-              {taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && (
+              {taskInfo.isCompletedVideoTask && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleViewVideo}
-                  className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
+                  disabled={isLoadingVideoGen}
+                  className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all disabled:opacity-50"
                 >
-                  View Video
+                  {isLoadingVideoGen ? 'Loading...' : 'Show Video'}
                 </Button>
               )}
             </div>

@@ -518,15 +518,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       }
                     }}
                     onStructureTypeChange={(type) => {
-                      if (propStructureVideoPath && propStructureVideoMetadata) {
-                        propOnStructureVideoChange(
-                          propStructureVideoPath,
-                          propStructureVideoMetadata,
-                          propStructureVideoTreatment,
-                          propStructureVideoMotionStrength,
-                          type
-                        );
-                      }
+                      // Always save structure type selection, even if no video uploaded yet
+                      // When video is uploaded, it will use the pre-selected type
+                      propOnStructureVideoChange(
+                        propStructureVideoPath,
+                        propStructureVideoMetadata,
+                        propStructureVideoTreatment,
+                        propStructureVideoMotionStrength,
+                        type
+                      );
                     }}
                   />
                   </>
