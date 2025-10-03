@@ -96,6 +96,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { shots } = useShots(); // Get shots from context for shot metadata
   const selectedShot = shots?.find(shot => shot.id === selectedShotId);
   
+  // Compute effective aspect ratio: prioritize shot-level over project-level
+  // This ensures videos in VideoOutputsGallery, items in Timeline, and other components
+  // use the shot's aspect ratio when set, otherwise fall back to project aspect ratio
+  const effectiveAspectRatio = useMemo(() => {
+    const projectAspectRatio = projects.find(p => p.id === projectId)?.aspectRatio;
+    return selectedShot?.aspect_ratio || projectAspectRatio;
+  }, [selectedShot?.aspect_ratio, projects, projectId]);
+  
   // Structure video persistence using separate tool settings (per-shot basis)
   const { 
     settings: structureVideoSettings, 
@@ -1561,7 +1569,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onNameCancel={handleNameCancel}
         onNameKeyDown={handleNameKeyDown}
         onEditingNameChange={actions.setEditingNameValue}
-        projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+        projectAspectRatio={effectiveAspectRatio}
         projectId={projectId}
       />
       </div>
@@ -1578,7 +1586,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           shotKey={selectedShotId}
           getShotVideoCount={getShotVideoCount}
           invalidateVideoCountsCache={invalidateVideoCountsCache}
-          projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+          projectAspectRatio={effectiveAspectRatio}
           localZeroHint={videoOutputs.length === 0}
         />
       </div>
@@ -1615,7 +1623,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 isMobile={isMobile}
                 {...({ columns: mobileColumns } as any)}
                 shotImages={contextImages}
-                projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+                projectAspectRatio={effectiveAspectRatio}
               />
             }
             unpositionedGenerationsCount={unpositionedGenerationsCount}
@@ -1625,7 +1633,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             isUploadingImage={state.isUploadingImage}
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
-            projectAspectRatio={projects.find(p => p.id === projectId)?.aspectRatio}
+            projectAspectRatio={effectiveAspectRatio}
             defaultPrompt={batchVideoPrompt}
             onDefaultPromptChange={onBatchVideoPromptChange}
             defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}

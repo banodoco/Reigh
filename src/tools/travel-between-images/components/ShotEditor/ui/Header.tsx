@@ -54,14 +54,17 @@ export const Header: React.FC<HeaderProps> = ({
   const handleAspectRatioChange = async (newAspectRatio: string) => {
     if (!selectedShot?.id || !projectId) return;
     
-    // Optimistically update the cache immediately for instant UI feedback
-    queryClient.setQueryData(['shots', projectId], (oldData: any) => {
-      if (!oldData) return oldData;
-      return oldData.map((shot: Shot) => 
-        shot.id === selectedShot.id 
-          ? { ...shot, aspect_ratio: newAspectRatio }
-          : shot
-      );
+    // Optimistically update ALL shots cache variants (with different maxImagesPerShot values)
+    // This ensures both desktop (maxImagesPerShot=0) and mobile (maxImagesPerShot=2) caches are updated
+    [0, 2].forEach(maxImages => {
+      queryClient.setQueryData(['shots', projectId, maxImages], (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.map((shot: Shot) => 
+          shot.id === selectedShot.id 
+            ? { ...shot, aspect_ratio: newAspectRatio }
+            : shot
+        );
+      });
     });
     
     // Clear any pending database update
@@ -78,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
         .then(({ error }) => {
           if (error) {
             console.error('Failed to update aspect ratio:', error);
-            // Revert on error by invalidating cache
+            // Revert on error by invalidating all shots caches
             queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
           }
         });
@@ -184,52 +187,49 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Mobile layout - centered */}
-      <div className="sm:hidden space-y-2">
-        {/* Back button on mobile */}
-        <div className="flex justify-start px-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onBack}
-            className="flex items-center gap-1 border-2"
-            title="Back to shots"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
-          </Button>
-        </div>
-        
-        {/* Shot name with navigation buttons centered */}
-        <div className="flex justify-center px-3">
-          {isEditingName ? (
-            // Hide navigation buttons when editing on mobile too - centered editing controls
-            <div className="flex items-center justify-center space-x-2 w-full">
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={(e) => onNameCancel(e)}
-                onMouseDown={(e) => e.preventDefault()}
-                className="flex-shrink-0"
-              >
-                Cancel
-              </Button>
-              <Input
-                value={editingName}
-                onChange={(e) => onEditingNameChange(e.target.value)}
-                onKeyDown={onNameKeyDown}
-                onBlur={onNameSave}
-                className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 flex-1 max-w-[135px] text-center"
-                autoFocus
-                maxLength={30}
-              />
-              <Button size="sm" variant="outline" onClick={onNameSave} className="flex-shrink-0">
-                Save
-              </Button>
-            </div>
-          ) : (
-            // Show navigation buttons with better spacing on mobile
-            <div className="flex items-center space-x-2">
+      {/* Mobile layout - all on one row */}
+      <div className="sm:hidden">
+        {isEditingName ? (
+          // Editing mode - centered editing controls
+          <div className="flex items-center justify-center space-x-2 px-3">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={(e) => onNameCancel(e)}
+              onMouseDown={(e) => e.preventDefault()}
+              className="flex-shrink-0"
+            >
+              Cancel
+            </Button>
+            <Input
+              value={editingName}
+              onChange={(e) => onEditingNameChange(e.target.value)}
+              onKeyDown={onNameKeyDown}
+              onBlur={onNameSave}
+              className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 flex-1 max-w-[135px] text-center"
+              autoFocus
+              maxLength={30}
+            />
+            <Button size="sm" variant="outline" onClick={onNameSave} className="flex-shrink-0">
+              Save
+            </Button>
+          </div>
+        ) : (
+          // Normal mode - back button, name with chevrons, and aspect ratio all on one row
+          <div className="flex items-center justify-between px-3">
+            {/* Back button on the left */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onBack}
+              className="flex items-center border-2 flex-shrink-0 px-2"
+              title="Back to shots"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            
+            {/* Shot name with navigation buttons - tighter spacing */}
+            <div className="flex items-center space-x-1">
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -242,7 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-xl font-semibold text-primary truncate text-center px-2 w-[135px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-base font-semibold text-primary truncate text-center px-1 max-w-[100px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
@@ -260,17 +260,15 @@ export const Header: React.FC<HeaderProps> = ({
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-          )}
-        </div>
-        
-        {/* Aspect Ratio Selector below shot name on mobile */}
-        {!isEditingName && (
-          <div className="flex justify-center px-3">
-            <AspectRatioSelector
-              value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
-              onValueChange={handleAspectRatioChange}
-              showVisualizer={true}
-            />
+            
+            {/* Aspect Ratio Selector on the right */}
+            <div className="flex-shrink-0">
+              <AspectRatioSelector
+                value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
+                onValueChange={handleAspectRatioChange}
+                showVisualizer={false}
+              />
+            </div>
           </div>
         )}
       </div>

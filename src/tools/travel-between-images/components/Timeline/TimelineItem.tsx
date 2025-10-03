@@ -277,11 +277,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         <div
           className={`relative border-2 ${isDragging ? "border-primary/50" : "border-primary"} rounded-lg overflow-hidden group`}
           style={{
-            width: '96px', // Fixed width for consistent button positioning
-            height: '96px', // Fixed height for consistent button positioning
+            width: '120px', // Fixed width for consistent button positioning
+            maxHeight: '120px', // Prevent tall portrait images from overflowing
+            // Height controlled by aspectRatio for proper display
             transform: isHovered || isDragging ? 'scale(1.05)' : 'scale(1)',
             transition: isDragging ? 'none' : 'all 0.2s ease-out',
-            ...aspectRatioStyle, // Apply aspect ratio directly to container
+            ...aspectRatioStyle, // Apply aspect ratio to control height
           }}
         >
           <img

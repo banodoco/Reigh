@@ -87,17 +87,18 @@ export const useGenerationActions = ({
     const cropToProjectSize = (uploadSettings?.cropToProjectSize ?? true);
     let projectAspectRatio: number | null = null;
     if (cropToProjectSize) {
+      // Prioritize shot aspect ratio over project aspect ratio
       const currentProject = projects.find(p => p.id === projectId);
-      const aspectRatioStr = currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
-      if (currentProject && aspectRatioStr) {
+      const aspectRatioStr = selectedShot?.aspect_ratio || currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
+      if (aspectRatioStr) {
         projectAspectRatio = parseRatio(aspectRatioStr);
         if (isNaN(projectAspectRatio)) {
-          toast.error(`Invalid project aspect ratio: ${aspectRatioStr}`);
+          toast.error(`Invalid aspect ratio: ${aspectRatioStr}`);
           actions.setUploadingImage(false);
           return;
         }
       } else {
-        toast.error("Cannot crop to project size: Project aspect ratio not found.");
+        toast.error("Cannot crop: No aspect ratio found for shot or project.");
         actions.setUploadingImage(false);
         return;
       }
@@ -482,8 +483,36 @@ export const useGenerationActions = ({
     }
 
     try {
+      // Crop images to shot aspect ratio before uploading
+      let processedFiles = files;
+      
+      // Prioritize shot aspect ratio over project aspect ratio
+      const currentProject = projects.find(p => p.id === projectId);
+      const aspectRatioStr = selectedShot?.aspect_ratio || currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
+      
+      if (aspectRatioStr && uploadSettings?.cropToProjectSize !== false) {
+        const targetAspectRatio = parseRatio(aspectRatioStr);
+        
+        if (!isNaN(targetAspectRatio)) {
+          const cropPromises = files.map(async (file) => {
+            try {
+              const result = await cropImageToProjectAspectRatio(file, targetAspectRatio);
+              if (result) {
+                return result.croppedFile;
+              }
+              return file; // Return original if cropping fails
+            } catch (error) {
+              console.error(`Failed to crop image ${file.name}:`, error);
+              return file; // Return original on error
+            }
+          });
+          
+          processedFiles = await Promise.all(cropPromises);
+        }
+      }
+      
       const result = await handleExternalImageDropMutation.mutateAsync({
-        imageFiles: files,
+        imageFiles: processedFiles,
         targetShotId: selectedShot.id,
         currentProjectQueryKey: projectId,
         currentShotCount: 0 // Not needed when adding to existing shot
@@ -508,7 +537,7 @@ export const useGenerationActions = ({
       // Let Timeline component handle the error display via re-throw
       throw error; 
     }
-  }, [selectedShot?.id, projectId, batchVideoFrames, actions, handleExternalImageDropMutation, onShotImagesUpdate]);
+  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, batchVideoFrames, actions, handleExternalImageDropMutation, onShotImagesUpdate]);
 
   return {
     handleImageUploadToShot,
