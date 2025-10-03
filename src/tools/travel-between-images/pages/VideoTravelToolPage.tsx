@@ -1031,7 +1031,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [shotToEdit, selectedShot]);
 
-  const handleModalSubmitCreateShot = async (name: string, files: File[]) => {
+  const handleModalSubmitCreateShot = async (name: string, files: File[], dimensionSettings: { dimensionSource: 'project' | 'firstImage' | 'custom'; customWidth?: number; customHeight?: number; }) => {
     if (!selectedProjectId) {
       console.error("[VideoTravelToolPage] Cannot create shot: No project selected");
       return;
@@ -1084,10 +1084,14 @@ const VideoTravelToolPage: React.FC = () => {
       setSelectedShot(newShot);
       setCurrentShotId(newShot.id);
       
-      // Mark this shot as needing project defaults applied
-      if (projectSettings || projectUISettings) {
+      // Mark this shot as needing project defaults applied with dimension settings
+      if (projectSettings || projectUISettings || dimensionSettings) {
         const defaultsToApply = {
           ...(projectSettings || {}),
+          // Apply dimension settings
+          dimensionSource: dimensionSettings.dimensionSource,
+          customWidth: dimensionSettings.customWidth,
+          customHeight: dimensionSettings.customHeight,
           // Include UI settings in a special key that will be handled separately
           _uiSettings: projectUISettings || {}
         };
@@ -1486,6 +1490,7 @@ const VideoTravelToolPage: React.FC = () => {
         onSubmit={handleModalSubmitCreateShot}
         isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
+        projectAspectRatio={projectAspectRatio}
       />
     </div>
   );

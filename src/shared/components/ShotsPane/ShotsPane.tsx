@@ -23,8 +23,12 @@ import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 const ShotsPaneComponent: React.FC = () => {
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
   const { shots, isLoading, error } = useShots();
+  
+  // Get current project's aspect ratio
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const location = useLocation();
   // Pagination state
@@ -224,7 +228,7 @@ const ShotsPaneComponent: React.FC = () => {
     onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
   });
 
-  const handleCreateShot = async (shotName: string, files: File[]) => {
+  const handleCreateShot = async (shotName: string, files: File[], dimensionSettings: { dimensionSource: 'project' | 'firstImage' | 'custom'; customWidth?: number; customHeight?: number; }) => {
     if (!selectedProjectId) {
       alert("Please select a project first.");
       return;
@@ -251,16 +255,20 @@ const ShotsPaneComponent: React.FC = () => {
       createdShot = newShotResult?.shot || null;
     }
 
-    // Apply project defaults to the newly created shot if available
-    if (createdShot?.id && (projectSettings || projectUISettings)) {
+    // Apply project defaults with dimension settings to the newly created shot if available
+    if (createdShot?.id && (projectSettings || projectUISettings || dimensionSettings)) {
       const defaultsToApply = {
         ...(projectSettings || {}),
+        // Apply dimension settings
+        dimensionSource: dimensionSettings.dimensionSource,
+        customWidth: dimensionSettings.customWidth,
+        customHeight: dimensionSettings.customHeight,
         // Include UI settings in a special key that will be handled separately
         _uiSettings: projectUISettings || {}
       };
       // Store the new shot ID to apply defaults when settings load
       sessionStorage.setItem(`apply-project-defaults-${createdShot.id}`, JSON.stringify(defaultsToApply));
-      console.log('[ShotsPane] Marked shot for project defaults application:', createdShot.id);
+      console.log('[ShotsPane] Marked shot for project defaults application with dimension settings:', createdShot.id);
     }
 
     // Navigate to the newly created shot
@@ -406,6 +414,7 @@ const ShotsPaneComponent: React.FC = () => {
             onSubmit={handleCreateShot}
             isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
             defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
+            projectAspectRatio={projectAspectRatio}
           />
         </div>
       </div>
