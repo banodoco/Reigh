@@ -40,7 +40,7 @@ const ShotsPaneComponent: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch project-level settings for defaults when creating new shots
-  const { settings: projectSettings } = useToolSettings<VideoTravelSettings>(
+  const { settings: projectSettings, update: updateProjectSettings } = useToolSettings<VideoTravelSettings>(
     'travel-between-images',
     { projectId: selectedProjectId, enabled: !!selectedProjectId }
   );
@@ -269,6 +269,15 @@ const ShotsPaneComponent: React.FC = () => {
       // Store the new shot ID to apply defaults when settings load
       sessionStorage.setItem(`apply-project-defaults-${createdShot.id}`, JSON.stringify(defaultsToApply));
       console.log('[ShotsPane] Marked shot for project defaults application with dimension settings:', createdShot.id);
+      
+      // Save dimension settings to project settings for future shots
+      if (selectedProjectId && updateProjectSettings) {
+        updateProjectSettings('project', {
+          dimensionSource: dimensionSettings.dimensionSource,
+          customWidth: dimensionSettings.customWidth,
+          customHeight: dimensionSettings.customHeight,
+        });
+      }
     }
 
     // Navigate to the newly created shot
@@ -415,6 +424,11 @@ const ShotsPaneComponent: React.FC = () => {
             isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
             defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
             projectAspectRatio={projectAspectRatio}
+            initialDimensionSettings={{
+              dimensionSource: projectSettings?.dimensionSource || 'project',
+              customWidth: projectSettings?.customWidth,
+              customHeight: projectSettings?.customHeight,
+            }}
           />
         </div>
       </div>

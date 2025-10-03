@@ -30,6 +30,7 @@ interface CreateShotModalProps {
   isLoading?: boolean;
   defaultShotName?: string;
   projectAspectRatio?: string;
+  initialDimensionSettings?: DimensionSettings;
 }
 
 const CreateShotModal: React.FC<CreateShotModalProps> = ({ 
@@ -38,7 +39,8 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   onSubmit, 
   isLoading, 
   defaultShotName,
-  projectAspectRatio 
+  projectAspectRatio,
+  initialDimensionSettings
 }) => {
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -52,6 +54,28 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
 
   // Get project dimensions for display
   const projectDimensions = projectAspectRatio ? ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio] : undefined;
+  
+  // Parse project dimensions for default custom values
+  const projectDimensionsParsed = projectDimensions ? projectDimensions.split('x').map(d => parseInt(d.trim())) : [768, 512];
+  
+  // Initialize from project settings when modal opens
+  useEffect(() => {
+    if (isOpen && initialDimensionSettings) {
+      setDimensionSource(initialDimensionSettings.dimensionSource || 'project');
+      if (initialDimensionSettings.dimensionSource === 'custom') {
+        setCustomWidth(initialDimensionSettings.customWidth);
+        setCustomHeight(initialDimensionSettings.customHeight);
+      }
+    }
+  }, [isOpen, initialDimensionSettings]);
+  
+  // When switching to custom mode, pre-fill with project dimensions if not already set
+  useEffect(() => {
+    if (dimensionSource === 'custom' && !customWidth && !customHeight && projectDimensionsParsed) {
+      setCustomWidth(projectDimensionsParsed[0]);
+      setCustomHeight(projectDimensionsParsed[1]);
+    }
+  }, [dimensionSource, customWidth, customHeight, projectDimensionsParsed]);
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();

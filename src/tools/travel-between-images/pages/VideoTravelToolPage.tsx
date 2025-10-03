@@ -1097,6 +1097,15 @@ const VideoTravelToolPage: React.FC = () => {
         };
         // Store the new shot ID to apply defaults when settings load
         sessionStorage.setItem(`apply-project-defaults-${newShot.id}`, JSON.stringify(defaultsToApply));
+        
+        // Save dimension settings to project settings for future shots
+        if (selectedProjectId && updateProjectSettings) {
+          updateProjectSettings('project', {
+            dimensionSource: dimensionSettings.dimensionSource,
+            customWidth: dimensionSettings.customWidth,
+            customHeight: dimensionSettings.customHeight,
+          });
+        }
       }
       
       // Modal will auto-close on successful submission
@@ -1491,6 +1500,11 @@ const VideoTravelToolPage: React.FC = () => {
         isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
         projectAspectRatio={projectAspectRatio}
+        initialDimensionSettings={{
+          dimensionSource: projectSettings?.dimensionSource || 'project',
+          customWidth: projectSettings?.customWidth,
+          customHeight: projectSettings?.customHeight,
+        }}
       />
     </div>
   );
