@@ -252,7 +252,11 @@ const VideoTravelToolPage: React.FC = () => {
   }, []);
 
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
-    if (!hasLoadedInitialSettings.current) return;
+    if (!hasLoadedInitialSettings.current) {
+      console.log('[BatchVideoSteps] Ignoring change - settings not loaded yet:', steps);
+      return;
+    }
+    console.log('[BatchVideoSteps] User changing steps to:', steps);
     userHasInteracted.current = true;
     setBatchVideoSteps(steps);
   }, []);
@@ -809,6 +813,12 @@ const VideoTravelToolPage: React.FC = () => {
       }
       
       // CRITICAL FIX: Batch all state updates using startTransition to prevent cascade renders
+      console.log('[BatchVideoSteps] Loading settings:', {
+        fromDB: settingsToApply.batchVideoSteps,
+        willSetTo: settingsToApply.batchVideoSteps || 4,
+        shotId: selectedShot?.id?.substring(0, 8)
+      });
+      
       startTransition(() => {
         setVideoControlMode(settingsToApply.videoControlMode || 'batch');
         setBatchVideoPrompt(settingsToApply.batchVideoPrompt || '');
@@ -832,13 +842,6 @@ const VideoTravelToolPage: React.FC = () => {
       });
     }
   }, [settings, isLoadingSettings, selectedShot?.id, updateSettings]);
-
-  // Reset loaded flag when switching shots
-  useEffect(() => {
-    hasLoadedInitialSettings.current = false;
-    userHasInteracted.current = false;
-    lastSavedSettingsRef.current = null;
-  }, [selectedShot?.id]);
 
   // Auto-disable turbo mode when not using cloud generation
   useEffect(() => {
@@ -1247,6 +1250,36 @@ const VideoTravelToolPage: React.FC = () => {
           // selectedLoras removed - now managed directly in ShotEditor
   ]);
 
+  // Reset loaded flag when switching shots - MUST be after currentSettings is defined
+  useEffect(() => {
+    // Flush any pending saves before resetting
+    if (saveTimeoutRef.current) {
+      console.log('[BatchVideoSteps] Flushing pending save before shot switch');
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+      
+      // Immediately save if there are pending changes
+      if (hasLoadedInitialSettings.current && userHasInteracted.current && currentSettings) {
+        if (!deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
+          console.log('[BatchVideoSteps] Immediately saving before shot switch:', {
+            batchVideoSteps: currentSettings.batchVideoSteps,
+            shotId: selectedShot?.id?.substring(0, 8)
+          });
+          lastSavedSettingsRef.current = currentSettings;
+          updateSettings('shot', currentSettings);
+          if (selectedProjectId && updateProjectSettings) {
+            updateProjectSettings('project', currentSettings);
+          }
+        }
+      }
+    }
+    
+    console.log('[BatchVideoSteps] Resetting flags for shot:', selectedShot?.id?.substring(0, 8));
+    hasLoadedInitialSettings.current = false;
+    userHasInteracted.current = false;
+    lastSavedSettingsRef.current = null;
+  }, [selectedShot?.id, currentSettings, settings, updateSettings, selectedProjectId, updateProjectSettings]);
+
   // Save settings to database whenever they change (optimized)
   useEffect(() => {
     if (selectedShot?.id && hasLoadedInitialSettings.current && userHasInteracted.current) {
@@ -1258,17 +1291,24 @@ const VideoTravelToolPage: React.FC = () => {
       // Debounce the save
       saveTimeoutRef.current = setTimeout(() => {
         // Check if we just saved these exact settings
-        if (lastSavedSettingsRef.current && deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(lastSavedSettingsRef.current))) {          
+        if (lastSavedSettingsRef.current && deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(lastSavedSettingsRef.current))) {
+          console.log('[BatchVideoSteps] Skipping save - settings unchanged');
           return;
         }
 
         if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
+          console.log('[BatchVideoSteps] Saving settings to DB:', {
+            batchVideoSteps: currentSettings.batchVideoSteps,
+            shotId: selectedShot?.id?.substring(0, 8)
+          });
           lastSavedSettingsRef.current = currentSettings;
           // Save to both shot and project levels
           updateSettings('shot', currentSettings);
           if (selectedProjectId && updateProjectSettings) {
             updateProjectSettings('project', currentSettings);
           }
+        } else {
+          console.log('[BatchVideoSteps] Skipping save - already updating or no changes');
         }
       }, 200); // Reduced wait time for better performance
     }

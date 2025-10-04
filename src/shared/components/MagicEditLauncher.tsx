@@ -33,7 +33,7 @@ const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDi
             <Sparkles className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Magic Edit</TooltipContent>
+        <TooltipContent className="z-[100001]">Magic Edit</TooltipContent>
       </Tooltip>
 
       {/* Modal */}

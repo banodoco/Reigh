@@ -39,6 +39,7 @@ import {
   PersistedFormSettings,
   ProjectImageSettings,
   ReferenceImage,
+  ReferenceMode,
 } from "./types";
 
 // Lazy load modals to improve initial bundle size and performance
@@ -140,6 +141,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [subjectStrength, setSubjectStrength] = useState<number>(0.0);
   const [subjectDescription, setSubjectDescription] = useState<string>('');
   const [inThisScene, setInThisScene] = useState<boolean>(false);
+  const [referenceMode, setReferenceMode] = useState<ReferenceMode>('custom');
+  const pendingReferenceModeUpdate = useRef<ReferenceMode | null>(null);
   const [isUploadingStyleReference, setIsUploadingStyleReference] = useState<boolean>(false);
   // Optimistic local override for style reference image so UI updates immediately
   // undefined => no override, use settings; string|null => explicit override
@@ -183,6 +186,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
   const selectedReference = references.find(ref => ref.id === selectedReferenceId) || null;
   
+  // Clear pending mode update when switching references
+  const prevSelectedReferenceId = useRef(selectedReferenceId);
+  useEffect(() => {
+    if (prevSelectedReferenceId.current !== selectedReferenceId) {
+      console.log('[RefSettings] 🔄 Reference changed, clearing pending mode update');
+      pendingReferenceModeUpdate.current = null;
+      prevSelectedReferenceId.current = selectedReferenceId;
+    }
+  }, [selectedReferenceId]);
+  
   // Debug logging for reference state
   useEffect(() => {
     console.log('[RefSettings] 📊 Current state:', {
@@ -205,6 +218,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const currentSubjectStrength = selectedReference?.subjectStrength ?? projectImageSettings?.subjectStrength ?? 0.0;
   const currentSubjectDescription = selectedReference?.subjectDescription ?? projectImageSettings?.subjectDescription ?? '';
   const currentInThisScene = selectedReference?.inThisScene ?? projectImageSettings?.inThisScene ?? false;
+  const currentReferenceMode = (selectedReference?.referenceMode ?? 'custom') as ReferenceMode;
   
   // Display image (use original if available, fallback to processed)
   const styleReferenceImageDisplay = useMemo(() => {
@@ -258,19 +272,46 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [effectiveShotId, references, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
 
-  // Sync local state with selected reference settings
+  // Sync local state with selected reference settings (only when values actually change)
   useEffect(() => {
     console.log('[RefSettings] 🔄 Syncing local state from DB/selected reference:', {
       styleStrength: currentStyleStrength,
       subjectStrength: currentSubjectStrength,
       subjectDescription: currentSubjectDescription,
-      inThisScene: currentInThisScene
+      inThisScene: currentInThisScene,
+      referenceMode: currentReferenceMode,
+      pendingModeUpdate: pendingReferenceModeUpdate.current
     });
-    setStyleReferenceStrength(currentStyleStrength);
-    setSubjectStrength(currentSubjectStrength);
-    setSubjectDescription(currentSubjectDescription);
-    setInThisScene(currentInThisScene);
-  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene]);
+    
+    // Only update if values are different to avoid overriding optimistic updates
+    if (styleReferenceStrength !== currentStyleStrength) {
+      setStyleReferenceStrength(currentStyleStrength);
+    }
+    if (subjectStrength !== currentSubjectStrength) {
+      setSubjectStrength(currentSubjectStrength);
+    }
+    if (subjectDescription !== currentSubjectDescription) {
+      setSubjectDescription(currentSubjectDescription);
+    }
+    if (inThisScene !== currentInThisScene) {
+      setInThisScene(currentInThisScene);
+    }
+    
+    // For reference mode: check if database caught up with pending update
+    if (pendingReferenceModeUpdate.current && currentReferenceMode === pendingReferenceModeUpdate.current) {
+      // Database now matches our pending update, clear the pending flag
+      console.log('[RefSettings] ✅ Database caught up with pending mode update:', currentReferenceMode);
+      pendingReferenceModeUpdate.current = null;
+    }
+    
+    // Only sync from database if no pending update
+    if (!pendingReferenceModeUpdate.current && referenceMode !== currentReferenceMode) {
+      console.log('[RefSettings] 🔄 Syncing mode from database:', currentReferenceMode);
+      setReferenceMode(currentReferenceMode);
+    } else if (pendingReferenceModeUpdate.current) {
+      console.log('[RefSettings] ⏸️ Skipping mode sync, pending update in progress');
+    }
+  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, referenceMode]);
 
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
@@ -369,6 +410,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           subjectStrength: projectImageSettings.subjectStrength ?? 0.0,
           subjectDescription: projectImageSettings.subjectDescription ?? "",
           inThisScene: projectImageSettings.inThisScene ?? false,
+          referenceMode: 'custom',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -810,6 +852,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subjectStrength: 0.0,
         subjectDescription: "",
         inThisScene: false,
+        referenceMode: 'custom',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -1052,6 +1095,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (!selectedReferenceId) return;
     setInThisScene(value);
     await handleUpdateReference(selectedReferenceId, { inThisScene: value });
+  }, [selectedReferenceId, handleUpdateReference]);
+
+  const handleReferenceModeChange = useCallback(async (mode: ReferenceMode) => {
+    if (!selectedReferenceId) return;
+    console.log('[RefSettings] 🎯 User changed mode to:', mode);
+    pendingReferenceModeUpdate.current = mode; // Track pending update to prevent flicker
+    setReferenceMode(mode); // Optimistic local update
+    await handleUpdateReference(selectedReferenceId, { referenceMode: mode });
   }, [selectedReferenceId, handleUpdateReference]);
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
@@ -1381,6 +1432,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onSubjectStrengthChange={handleSubjectStrengthChange}
             onSubjectDescriptionChange={handleSubjectDescriptionChange}
             onInThisSceneChange={handleInThisSceneChange}
+            referenceMode={referenceMode}
+            onReferenceModeChange={handleReferenceModeChange}
             // New multiple references props
             references={references}
             selectedReferenceId={selectedReferenceId}

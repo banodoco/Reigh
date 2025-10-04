@@ -4,12 +4,13 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
+import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Trash2, Images, Plus, Check, X, Upload } from "lucide-react";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
 import { cn } from "@/shared/lib/utils";
-import { ReferenceImage } from "../types";
+import { ReferenceImage, ReferenceMode } from "../types";
 
 interface ModelSectionProps {
   isGenerating: boolean;
@@ -59,7 +60,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   return (
     <div className="space-y-3">
       {/* Thumbnail gallery */}
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {references.map(ref => {
           const isSelected = selectedReferenceId === ref.id;
           const imageUrl = ref.styleReferenceImageOriginal || ref.styleReferenceImage;
@@ -195,6 +196,8 @@ const StyleReferenceSection: React.FC<{
   onSubjectStrengthChange: (value: number) => void;
   onSubjectDescriptionChange: (value: string) => void;
   onInThisSceneChange: (value: boolean) => void;
+  referenceMode?: ReferenceMode;
+  onReferenceModeChange?: (mode: ReferenceMode) => void;
   // New multiple references props
   references?: ReferenceImage[];
   selectedReferenceId?: string | null;
@@ -216,6 +219,8 @@ const StyleReferenceSection: React.FC<{
   onSubjectStrengthChange,
   onSubjectDescriptionChange,
   onInThisSceneChange,
+  referenceMode = 'custom',
+  onReferenceModeChange,
   references = [],
   selectedReferenceId = null,
   onSelectReference,
@@ -254,8 +259,164 @@ const StyleReferenceSection: React.FC<{
       <SectionHeader title="Reference" theme="purple" />
     </div>
 
-    {/* New Multiple References UI */}
-    {showMultiReference && references.length > 0 && (
+    {/* New Multiple References UI - Two column layout when reference exists */}
+    {showMultiReference && references.length > 0 && styleReferenceImage && (
+      <div className={`flex gap-4 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+        {/* Left side - Thumbnails and Settings */}
+        <div className="flex-1 space-y-4">
+          <ReferenceSelector
+            references={references}
+            selectedReferenceId={selectedReferenceId}
+            onSelectReference={onSelectReference}
+            onAddReference={onStyleUpload}
+            onDeleteReference={onDeleteReference}
+            isGenerating={isGenerating}
+            isUploadingStyleReference={isUploadingStyleReference}
+          />
+          
+          {/* Settings below thumbnails */}
+          <div className="space-y-4">
+            {/* Reference Mode Selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">How would you like to use this reference?</Label>
+              <RadioGroup 
+                value={referenceMode} 
+                onValueChange={(value) => {
+                  if (!onReferenceModeChange) return;
+                  const mode = value as ReferenceMode;
+                  onReferenceModeChange(mode);
+                  
+                  // Auto-set values based on mode
+                  if (mode === 'style') {
+                    onStyleStrengthChange(1.1);
+                    onSubjectStrengthChange(0);
+                  } else if (mode === 'subject') {
+                    onStyleStrengthChange(0);
+                    onSubjectStrengthChange(1.1);
+                  } else if (mode === 'style-character') {
+                    onStyleStrengthChange(0.5);
+                    onSubjectStrengthChange(1.0);
+                  }
+                  // For 'custom', don't auto-change values
+                }}
+                className="flex flex-wrap gap-3"
+                disabled={isGenerating || isUploadingStyleReference}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="style" id="mode-style" />
+                  <Label htmlFor="mode-style" className="cursor-pointer font-normal">Style</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="subject" id="mode-subject" />
+                  <Label htmlFor="mode-subject" className="cursor-pointer font-normal">Subject</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="style-character" id="mode-style-character" />
+                  <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + character</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="custom" id="mode-custom" />
+                  <Label htmlFor="mode-custom" className="cursor-pointer font-normal">Custom</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Style and Subject strength sliders - only show in custom mode */}
+            {referenceMode === 'custom' && (
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <SliderWithValue
+                  label="Style strength"
+                  value={styleReferenceStrength}
+                  onChange={(value) => {
+                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                    const newTotal = value + subjectStrength;
+                    if (newTotal < 0.5) {
+                      return;
+                    }
+                    onStyleStrengthChange(value);
+                  }}
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  numberInputClassName="w-10"
+                />
+              </div>
+              <div className="flex-1">
+                <SliderWithValue
+                  label="Subject strength"
+                  value={subjectStrength}
+                  onChange={(value) => {
+                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                    const newTotal = styleReferenceStrength + value;
+                    if (newTotal < 0.5) {
+                      return;
+                    }
+                    onSubjectStrengthChange(value);
+                  }}
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  numberInputClassName="w-10"
+                />
+              </div>
+            </div>
+            )}
+            
+            {/* Show subject description only when subject strength > 0 */}
+            {subjectStrength > 0 && styleReferenceImage && (
+            <div className="space-y-2">
+              <Label htmlFor="subject-description" className="text-sm font-medium">
+                Which character from this image?
+              </Label>
+              <div className="flex items-center space-x-3">
+                <Input
+                  id="subject-description"
+                  type="text"
+                  value={subjectDescription}
+                  onChange={(e) => onSubjectDescriptionChange(e.target.value)}
+                  placeholder="girl, monster, teapot..."
+                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  className="flex-1"
+                />
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="in-this-scene"
+                    checked={inThisScene}
+                    onCheckedChange={onInThisSceneChange}
+                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                  />
+                  <Label 
+                    htmlFor="in-this-scene" 
+                    className="text-sm font-medium cursor-pointer whitespace-nowrap"
+                  >
+                    In this scene
+                  </Label>
+                </div>
+              </div>
+            </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Right side - Large preview */}
+        <div className="flex-1">
+          <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
+            <img
+              src={styleReferenceImage}
+              alt="Selected reference"
+              className="w-full h-full object-contain"
+              style={{ objectFit: 'contain' }}
+            />
+          </div>
+        </div>
+      </div>
+    )}
+    
+    {/* Show thumbnails only when no image selected */}
+    {showMultiReference && references.length > 0 && !styleReferenceImage && (
       <ReferenceSelector
         references={references}
         selectedReferenceId={selectedReferenceId}
@@ -422,86 +583,6 @@ const StyleReferenceSection: React.FC<{
     )}
     {/* End legacy single reference section */}
     
-    {/* Settings for selected reference (shown for both multi and legacy) */}
-    {styleReferenceImage && (
-      <div className="space-y-4">
-        {/* Style and Subject strength sliders - side by side */}
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <SliderWithValue
-              label="Style strength"
-              value={styleReferenceStrength}
-              onChange={(value) => {
-                // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                const newTotal = value + subjectStrength;
-                if (newTotal < 0.5) {
-                  return;
-                }
-                onStyleStrengthChange(value);
-              }}
-              min={0.0}
-              max={2.0}
-              step={0.1}
-              disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-              numberInputClassName="w-10"
-            />
-          </div>
-          <div className="flex-1">
-            <SliderWithValue
-              label="Subject strength"
-              value={subjectStrength}
-              onChange={(value) => {
-                // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                const newTotal = styleReferenceStrength + value;
-                if (newTotal < 0.5) {
-                  return;
-                }
-                onSubjectStrengthChange(value);
-              }}
-              min={0.0}
-              max={2.0}
-              step={0.1}
-              disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-              numberInputClassName="w-10"
-            />
-          </div>
-        </div>
-        {/* Show subject description only when subject strength > 0 */}
-        {subjectStrength > 0 && styleReferenceImage && (
-          <div className="space-y-2">
-            <Label htmlFor="subject-description" className="text-sm font-medium">
-              Subject description
-            </Label>
-            <div className="flex items-center space-x-3">
-              <Input
-                id="subject-description"
-                type="text"
-                value={subjectDescription}
-                onChange={(e) => onSubjectDescriptionChange(e.target.value)}
-                placeholder="girl, monster, teapot..."
-                disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                className="flex-1"
-              />
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="in-this-scene"
-                  checked={inThisScene}
-                  onCheckedChange={onInThisSceneChange}
-                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                />
-                <Label 
-                  htmlFor="in-this-scene" 
-                  className="text-sm font-medium cursor-pointer whitespace-nowrap"
-                >
-                  In this scene
-                </Label>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-    
     {/* Dataset Browser Modal */}
     <DatasetBrowserModal
       isOpen={showDatasetBrowser}
@@ -512,7 +593,10 @@ const StyleReferenceSection: React.FC<{
   );
 };
 
-export const ModelSection: React.FC<ModelSectionProps> = ({
+export const ModelSection: React.FC<ModelSectionProps & {
+  referenceMode?: ReferenceMode;
+  onReferenceModeChange?: (mode: ReferenceMode) => void;
+}> = ({
   isGenerating,
   styleReferenceImage,
   styleReferenceStrength,
@@ -527,6 +611,8 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
   onSubjectStrengthChange,
   onSubjectDescriptionChange,
   onInThisSceneChange,
+  referenceMode,
+  onReferenceModeChange,
   references,
   selectedReferenceId,
   onSelectReference,
@@ -551,6 +637,8 @@ export const ModelSection: React.FC<ModelSectionProps> = ({
         onSubjectStrengthChange={onSubjectStrengthChange}
         onSubjectDescriptionChange={onSubjectDescriptionChange}
         onInThisSceneChange={onInThisSceneChange}
+        referenceMode={referenceMode}
+        onReferenceModeChange={onReferenceModeChange}
         references={references}
         selectedReferenceId={selectedReferenceId}
         onSelectReference={onSelectReference}

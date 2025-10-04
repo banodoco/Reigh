@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star, ImagePlus, Loader2 } from 'lucide-react';
 import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -17,6 +17,11 @@ import { useCreateShotWithImage } from '@/shared/hooks/useShots';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled, getLightboxPrefetchCount } from '@/shared/settings/progressiveLoading';
+import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { nanoid } from 'nanoid';
+import { processStyleReferenceForAspectRatioString } from '@/shared/lib/styleReferenceProcessor';
+import { resolveProjectResolution } from '@/shared/lib/taskCreation';
+import { dataURLtoFile } from '@/shared/lib/utils';
 
 interface ShotOption {
   id: string;
@@ -130,6 +135,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Hooks for atomic shot creation with image
   const { selectedProjectId } = useProject();
   const createShotWithImageMutation = useCreateShotWithImage();
+  
+  // Hook for managing project image settings (references)
+  const {
+    settings: projectImageSettings,
+    update: updateProjectImageSettings,
+  } = useToolSettings<any>('project-image-settings', {
+    projectId: selectedProjectId,
+    enabled: !!selectedProjectId
+  });
+  
+  // State for adding to references
+  const [isAddingToReferences, setIsAddingToReferences] = useState(false);
+  const [addToReferencesSuccess, setAddToReferencesSuccess] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
@@ -727,6 +745,105 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  // Handle adding to references
+  const handleAddToReferences = async () => {
+    if (!selectedProjectId || isVideo) {
+      toast.error('Cannot add videos to references');
+      return;
+    }
+
+    setIsAddingToReferences(true);
+    try {
+      const imageUrl = media.location || media.imageUrl;
+      if (!imageUrl) {
+        throw new Error('No image URL available');
+      }
+
+      console.log('[AddToReferences] Starting to add image to references:', imageUrl);
+
+      // Fetch the image as blob
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      
+      // Convert to File for processing
+      const originalFile = new File([blob], `reference-${Date.now()}.png`, { type: 'image/png' });
+      
+      // Upload original image
+      const originalUploadedUrl = await uploadImageToStorage(originalFile);
+      
+      // Convert blob to data URL for processing
+      const reader = new FileReader();
+      const dataURL = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      
+      // Process the image to match project aspect ratio
+      let processedDataURL = dataURL;
+      const { aspectRatio } = await resolveProjectResolution(selectedProjectId);
+      console.log('[AddToReferences] Processing for aspect ratio:', aspectRatio);
+      
+      const processed = await processStyleReferenceForAspectRatioString(dataURL, aspectRatio);
+      if (processed) {
+        processedDataURL = processed;
+      }
+      
+      // Convert processed data URL back to File for upload
+      const processedFile = dataURLtoFile(processedDataURL, `reference-processed-${Date.now()}.png`);
+      if (!processedFile) {
+        throw new Error('Failed to convert processed image to file');
+      }
+      
+      // Upload processed version
+      const processedUploadedUrl = await uploadImageToStorage(processedFile);
+      
+      // Get existing references
+      const references = projectImageSettings?.references || [];
+      
+      // Create new reference
+      const newReference = {
+        id: nanoid(),
+        name: `Reference ${references.length + 1}`,
+        styleReferenceImage: processedUploadedUrl,
+        styleReferenceImageOriginal: originalUploadedUrl,
+        styleReferenceStrength: 1.0,
+        subjectStrength: 0.0,
+        subjectDescription: '',
+        inThisScene: false,
+        referenceMode: 'custom',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      console.log('[AddToReferences] Created new reference:', newReference);
+      
+      // Add to references array
+      await updateProjectImageSettings('project', {
+        references: [...references, newReference]
+      });
+      
+      console.log('[AddToReferences] Successfully added to references');
+      
+      // Show success state
+      setAddToReferencesSuccess(true);
+      
+      // Reset success state after 2 seconds
+      setTimeout(() => {
+        setAddToReferencesSuccess(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('[AddToReferences] Error adding to references:', error);
+      toast.error('Failed to add to references');
+    } finally {
+      setIsAddingToReferences(false);
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={500}>
       <DialogPrimitive.Root 
@@ -1037,6 +1154,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                       </Button>
 
+                      {/* Add to References Button - Desktop Task Details View */}
+                      {!isVideo && selectedProjectId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleAddToReferences}
+                              disabled={isAddingToReferences || addToReferencesSuccess}
+                              className={`transition-colors ${
+                                addToReferencesSuccess 
+                                  ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                                  : 'bg-black/50 hover:bg-black/70 text-white'
+                              }`}
+                            >
+                              {isAddingToReferences ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : addToReferencesSuccess ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <ImagePlus className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">
+                            {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+
                       {!isVideo && showMagicEdit && (
                         <MagicEditLauncher
                           imageUrl={displayUrl}
@@ -1058,7 +1205,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 <FlipHorizontal className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Flip horizontally</TooltipContent>
+                            <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
                           </Tooltip>
 
                           {hasChanges && (
@@ -1074,7 +1221,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   <Save className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
+                              <TooltipContent className="z-[100001]">{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
                             </Tooltip>
                           )}
                         </>
@@ -1095,7 +1242,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               <Download className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
+                          <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
                         </Tooltip>
                       )}
                     </div>
@@ -1136,47 +1283,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                     ) : (
                                       <PlusCircle className="h-4 w-4" />
                                     )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Add to shot</TooltipContent>
-                              </Tooltip>
-                            </>
-                          )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="z-[100001]">Add to shot</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
 
-                          {/* Apply Settings */}
-                          {onApplySettings && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={handleApplySettings}
-                                  className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
-                                >
-                                  <Settings className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Apply settings</TooltipContent>
-                            </Tooltip>
-                          )}
+                      {/* Apply Settings */}
+                      {onApplySettings && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleApplySettings}
+                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
+                        </Tooltip>
+                      )}
 
-                          {/* Delete */}
-                          {onDelete && !isVideo && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={handleDelete}
-                                  disabled={isDeleting === media.id}
-                                  className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Delete image</TooltipContent>
-                            </Tooltip>
-                          )}
+                      {/* Delete */}
+                      {onDelete && !isVideo && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleDelete}
+                              disabled={isDeleting === media.id}
+                              className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Delete image</TooltipContent>
+                        </Tooltip>
+                      )}
                         </div>
                       </div>
                     )}
@@ -1303,6 +1450,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       >
                         <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                       </Button>
+
+                      {/* Add to References Button - Mobile Task Details View */}
+                      {!isVideo && selectedProjectId && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleAddToReferences}
+                          disabled={isAddingToReferences || addToReferencesSuccess}
+                          className={`transition-colors ${
+                            addToReferencesSuccess 
+                              ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                              : 'bg-black/50 hover:bg-black/70 text-white'
+                          }`}
+                        >
+                          {isAddingToReferences ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : addToReferencesSuccess ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <ImagePlus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
 
                     {/* Mobile navigation */}
@@ -1469,6 +1639,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
                   </Button>
 
+                  {/* Add to References Button - Regular View */}
+                  {!isVideo && selectedProjectId && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleAddToReferences}
+                          disabled={isAddingToReferences || addToReferencesSuccess}
+                          className={`transition-colors ${
+                            addToReferencesSuccess 
+                              ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                              : 'bg-black/50 hover:bg-black/70 text-white'
+                          }`}
+                        >
+                          {isAddingToReferences ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : addToReferencesSuccess ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <ImagePlus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">
+                        {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
                   {!isVideo && showMagicEdit && (
                     <MagicEditLauncher
                       imageUrl={displayUrl}
@@ -1490,7 +1690,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             <FlipHorizontal className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Flip horizontally</TooltipContent>
+                        <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
                       </Tooltip>
 
                       {hasChanges && (
@@ -1506,7 +1706,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               <Save className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
+                          <TooltipContent className="z-[100001]">{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
                         </Tooltip>
                       )}
                     </>
@@ -1527,7 +1727,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <Download className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Download {isVideo ? 'video' : 'image'}</TooltipContent>
+                      <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
                     </Tooltip>
                   )}
 
@@ -1584,47 +1784,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 ) : (
                                   <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                 )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Add to shot</TooltipContent>
-                          </Tooltip>
-                        </>
-                      )}
-
-                      {/* Apply Settings */}
-                      {onApplySettings && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleApplySettings}
-                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-7 sm:h-8 px-2 sm:px-3"
-                            >
-                              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Apply settings</TooltipContent>
+                          <TooltipContent className="z-[100001]">Add to shot</TooltipContent>
                         </Tooltip>
-                      )}
+                      </>
+                    )}
 
-                      {/* Delete */}
-                      {onDelete && !isVideo && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleDelete}
-                              disabled={isDeleting === media.id}
-                              className="bg-red-600/80 hover:bg-red-600 text-white h-7 sm:h-8 px-2 sm:px-3"
-                            >
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Delete image</TooltipContent>
-                        </Tooltip>
-                      )}
+                    {/* Apply Settings */}
+                    {onApplySettings && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleApplySettings}
+                            className="bg-purple-600/80 hover:bg-purple-600 text-white h-7 sm:h-8 px-2 sm:px-3"
+                          >
+                            <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
+                      </Tooltip>
+                    )}
+
+                    {/* Delete */}
+                    {onDelete && !isVideo && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleDelete}
+                            disabled={isDeleting === media.id}
+                            className="bg-red-600/80 hover:bg-red-600 text-white h-7 sm:h-8 px-2 sm:px-3"
+                          >
+                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="z-[100001]">Delete image</TooltipContent>
+                      </Tooltip>
+                    )}
                     </div>
                   </div>
                 )}

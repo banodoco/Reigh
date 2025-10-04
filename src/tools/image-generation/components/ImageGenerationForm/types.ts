@@ -46,6 +46,9 @@ export interface PersistedFormSettings {
   associatedShotId?: string | null;
 }
 
+// Reference mode type
+export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'custom';
+
 // Individual reference image with its own settings
 export interface ReferenceImage {
   id: string; // Unique identifier (use nanoid())
@@ -56,6 +59,7 @@ export interface ReferenceImage {
   subjectStrength: number; // 0.0 - 2.0
   subjectDescription: string; // Text description
   inThisScene: boolean; // Boolean flag
+  referenceMode?: ReferenceMode; // How to use this reference
   createdAt: string; // ISO timestamp
   updatedAt: string; // ISO timestamp
 }
