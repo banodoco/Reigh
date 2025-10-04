@@ -455,12 +455,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs px-3 bg-background/95 backdrop-blur-sm shadow-md border-border/50"
+              className="h-8 text-xs px-3 sm:px-2 lg:px-3 bg-background/95 backdrop-blur-sm shadow-md border-border/50"
               asChild
             >
               <span className="flex items-center gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
-                Add Images
+                <span className="sm:hidden lg:inline">Add Images</span>
               </span>
             </Button>
           </Label>

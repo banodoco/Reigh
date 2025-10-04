@@ -510,7 +510,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}
                     whiteText
-                    columnsPerRow={isMobile ? 3 : 6}
+                    columnsPerRow={6}
                     initialMediaTypeFilter={mediaTypeFilter}
                     onMediaTypeFilterChange={setMediaTypeFilter}
                     initialStarredFilter={starredOnly}

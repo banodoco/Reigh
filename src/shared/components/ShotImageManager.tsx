@@ -53,7 +53,7 @@ export interface ShotImageManagerProps {
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string; // Add project aspect ratio
-  onImageUpload?: (files: File[]) => void; // Handler for image upload
+  onImageUpload?: (files: File[]) => Promise<void>; // Handler for image upload
   isUploadingImage?: boolean; // Upload loading state
   onOpenLightbox?: (index: number) => void; // Handler to open lightbox at specific index
   batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
@@ -1040,6 +1040,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           duplicateSuccessImageId={duplicateSuccessImageId}
           projectAspectRatio={projectAspectRatio}
           batchVideoFrames={batchVideoFrames}
+          onImageUpload={onImageUpload}
+          isUploadingImage={isUploadingImage}
         />
         
         {/* MediaLightbox for mobile - must be rendered here since we return early */}
@@ -1195,7 +1197,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                   )}
                 >
                   <div className="text-3xl text-muted-foreground">+</div>
-                  <div className="text-xs text-muted-foreground font-medium">
+                  <div className="text-xs text-muted-foreground font-medium sm:hidden lg:block">
                     {isUploadingImage ? 'Uploading...' : 'Add Images'}
                   </div>
                 </label>

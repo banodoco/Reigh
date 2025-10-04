@@ -19,6 +19,8 @@ export interface BaseShotImageManagerProps {
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
   batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
+  onImageUpload?: (files: File[]) => Promise<void>;
+  isUploadingImage?: boolean;
 }
 
 export interface MobileImageItemProps {

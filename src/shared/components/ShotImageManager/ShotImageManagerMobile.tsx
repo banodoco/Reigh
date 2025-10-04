@@ -27,6 +27,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
   batchVideoFrames = 60,
+  onImageUpload,
+  isUploadingImage,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -292,6 +294,62 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
             </React.Fragment>
           );
         })}
+        
+        {/* Add Images card - appears as next item in grid */}
+        {onImageUpload && (() => {
+          // Calculate aspect ratio to match project settings
+          const getAspectRatioStyle = () => {
+            // Use project aspect ratio if available
+            if (projectAspectRatio) {
+              const [w, h] = projectAspectRatio.split(':').map(Number);
+              if (!isNaN(w) && !isNaN(h)) {
+                const aspectRatio = w / h;
+                return { aspectRatio: `${aspectRatio}` };
+              }
+            }
+            
+            // Default to square aspect ratio
+            return { aspectRatio: '1' };
+          };
+
+          const aspectRatioStyle = getAspectRatioStyle();
+
+          return (
+            <div className="relative" style={aspectRatioStyle}>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
+                    onImageUpload(files);
+                    e.target.value = ''; // Reset input
+                  }
+                }}
+                className="hidden"
+                id="mobile-grid-image-upload"
+                disabled={isUploadingImage}
+              />
+              <label
+                htmlFor="mobile-grid-image-upload"
+                className={cn(
+                  "absolute inset-0 flex flex-col items-center justify-center gap-2",
+                  "border-2 border-dashed rounded-lg cursor-pointer",
+                  "transition-all duration-200",
+                  isUploadingImage
+                    ? "border-muted-foreground/30 bg-muted/30 cursor-not-allowed"
+                    : "border-muted-foreground/40 bg-muted/20 hover:border-primary hover:bg-primary/5"
+                )}
+              >
+                <div className="text-3xl text-muted-foreground">+</div>
+                <div className="text-xs text-muted-foreground font-medium sm:hidden lg:block">
+                  {isUploadingImage ? 'Uploading...' : 'Add Images'}
+                </div>
+              </label>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Floating Action Bar for Multiple Selection */}

@@ -441,6 +441,25 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
               />
+              
+              {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
+              <div className="mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>
+                {unpositionedGenerationsCount > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed">
+                    <div className="text-sm text-muted-foreground">
+                      {unpositionedGenerationsCount} unpositioned generation{unpositionedGenerationsCount !== 1 ? 's' : ''}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={onOpenUnpositionedPane}
+                      className="text-xs"
+                    >
+                      View & Position
+                    </Button>
+                  </div>
+                )}
+              </div>
               </>
             ) : (
               <>
@@ -469,6 +488,25 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   isUploadingImage={isUploadingImage}
                   batchVideoFrames={batchVideoFrames}
                 />
+                
+                {/* Helper for un-positioned generations - in batch mode, show after input images */}
+                <div className="mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>
+                  {unpositionedGenerationsCount > 0 && (
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed">
+                      <div className="text-sm text-muted-foreground">
+                        {unpositionedGenerationsCount} unpositioned generation{unpositionedGenerationsCount !== 1 ? 's' : ''}
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={onOpenUnpositionedPane}
+                        className="text-xs"
+                      >
+                        View & Position
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Batch mode structure video */}
                 {selectedShotId && projectId && propOnStructureVideoChange && (
@@ -535,25 +573,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             )}
           </div>
         )}
-
-        {/* Helper for un-positioned generations - Reserve space during loading to prevent layout shift */}
-        <div className="mx-1 mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>
-          {unpositionedGenerationsCount > 0 && (
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-dashed">
-              <div className="text-sm text-muted-foreground">
-                {unpositionedGenerationsCount} unpositioned generation{unpositionedGenerationsCount !== 1 ? 's' : ''}
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onOpenUnpositionedPane}
-                className="text-xs"
-              >
-                View & Position
-              </Button>
-            </div>
-          )}
-        </div>
       </CardContent>
 
       {/* Pair Prompt Modal */}
