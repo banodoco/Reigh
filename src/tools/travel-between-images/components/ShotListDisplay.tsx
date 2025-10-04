@@ -29,6 +29,7 @@ interface ShotListDisplayProps {
   onSelectShot: (shot: Shot) => void;
   onCreateNewShot?: () => void;
   shots?: Shot[]; // Optional - if not provided, will use context
+  sortMode?: 'ordered' | 'newest' | 'oldest'; // Sort mode for shots
 }
 
 
@@ -37,6 +38,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   onSelectShot,
   onCreateNewShot,
   shots: propShots,
+  sortMode = 'ordered',
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -61,11 +63,31 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
       return baseList;
     }
     
-    const sorted = [...baseList].sort((a, b) => (a.position || 0) - (b.position || 0));
+    // Apply sorting based on sortMode
+    let sorted: Shot[];
+    if (sortMode === 'newest') {
+      // Sort by created_at descending (newest first)
+      sorted = [...baseList].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+    } else if (sortMode === 'oldest') {
+      // Sort by created_at ascending (oldest first)
+      sorted = [...baseList].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateA - dateB;
+      });
+    } else {
+      // Default 'ordered' mode - sort by position
+      sorted = [...baseList].sort((a, b) => (a.position || 0) - (b.position || 0));
+    }
     
     // Only log if debug flag is enabled to reduce mobile console overhead
     if (process.env.NODE_ENV === 'development') {
       console.log(`${REORDER_DEBUG_TAG} Frontend sorting applied:`, {
+        sortMode,
         originalFirst: baseList[0]?.name,
         sortedFirst: sorted[0]?.name,
         originalFirstPosition: baseList[0]?.position,
@@ -74,7 +96,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
       });
     }
     return sorted;
-  }, [propShots, optimisticShots, reorderShotsMutation.isPending]);
+  }, [propShots, optimisticShots, reorderShotsMutation.isPending, sortMode]);
 
   // Clear optimistic overlay when mutation settles
   React.useEffect(() => {
@@ -383,6 +405,9 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
     );
   }
 
+  // Determine if dragging should be disabled (when not in 'ordered' mode or during mutation)
+  const isDragDisabled = sortMode !== 'ordered' || reorderShotsMutation.isPending;
+
   return (
     <DndContext
       sensors={sensors}
@@ -404,7 +429,8 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 shot={shot}
                 onSelectShot={() => onSelectShot(shot)}
                 currentProjectId={currentProjectId}
-                isDragDisabled={reorderShotsMutation.isPending}
+                isDragDisabled={isDragDisabled}
+                disabledReason={sortMode !== 'ordered' ? 'Only available in ordered mode' : undefined}
                 shouldLoadImages={true} // Always load images since they're from context
                 shotIndex={index}
                 projectAspectRatio={currentProject?.aspectRatio}

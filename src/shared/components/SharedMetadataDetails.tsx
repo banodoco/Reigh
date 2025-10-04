@@ -122,14 +122,6 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
 
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
-      {/* Header */}
-      <div>
-        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-muted-foreground`}>
-          {isQwenImageEdit ? 'Image Edit' : 'Image Generation'}
-        </h3>
-        <div className="border-t border-muted-foreground/20 mt-2"></div>
-      </div>
-
       {/* Qwen Image Edit Source Image */}
       {showUserImage && isQwenImageEdit && qwenSourceImage && (
         <div className="space-y-2">

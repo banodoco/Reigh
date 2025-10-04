@@ -466,6 +466,9 @@ const VideoTravelToolPage: React.FC = () => {
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // Sort mode for shots
+  const [shotSortMode, setShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('ordered');
+  
   // Search helper functions
   const clearSearch = useCallback(() => {
     setShotSearchQuery('');
@@ -766,6 +769,40 @@ const VideoTravelToolPage: React.FC = () => {
                   </Button>
                 )}
               </div>
+              
+              {/* Sort mode buttons */}
+              <div className="flex items-center space-x-2 mt-4 mb-1">
+                <button
+                  onClick={() => setShotSortMode('ordered')}
+                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
+                    shotSortMode === 'ordered' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  Ordered
+                </button>
+                <button
+                  onClick={() => setShotSortMode('newest')}
+                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
+                    shotSortMode === 'newest' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  Newest First
+                </button>
+                <button
+                  onClick={() => setShotSortMode('oldest')}
+                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
+                    shotSortMode === 'oldest' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  Oldest First
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -773,7 +810,7 @@ const VideoTravelToolPage: React.FC = () => {
       setHeader(headerContent);
     }
     // Only clear header on component unmount, not on every effect re-run
-  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView, shotSearchQuery, clearSearch]);
+  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView, shotSearchQuery, clearSearch, shotSortMode]);
 
   // Clean up header on component unmount
   useLayoutEffect(() => {
@@ -1644,6 +1681,7 @@ const VideoTravelToolPage: React.FC = () => {
                 onSelectShot={handleShotSelect}
                 onCreateNewShot={() => setIsCreateShotModalOpen(true)}
                 shots={filteredShots}
+                sortMode={shotSortMode}
               />
             )
           )}

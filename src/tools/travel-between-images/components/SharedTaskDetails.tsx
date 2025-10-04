@@ -83,12 +83,6 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
 
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'}`}>
-      {/* Header */}
-      <div>
-        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-muted-foreground`}>Video Travel</h3>
-        <div className="border-t border-muted-foreground/20 mt-2"></div>
-      </div>
-
       {/* Guidance Images Section */}
       {inputImages.length > 0 && (
         <div className="space-y-2">

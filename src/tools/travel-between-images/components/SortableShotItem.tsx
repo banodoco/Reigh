@@ -9,6 +9,7 @@ interface SortableShotItemProps {
   onSelectShot: () => void;
   currentProjectId: string | null;
   isDragDisabled?: boolean;
+  disabledReason?: string;
   shouldLoadImages?: boolean;
   shotIndex?: number;
   projectAspectRatio?: string;
@@ -19,6 +20,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   onSelectShot,
   currentProjectId,
   isDragDisabled = false,
+  disabledReason,
   shouldLoadImages = true,
   shotIndex = 0,
   projectAspectRatio,
@@ -72,6 +74,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
           ...listeners,
           disabled: isDragDisabled,
         }}
+        dragDisabledReason={disabledReason}
         shouldLoadImages={shouldLoadImages}
         shotIndex={shotIndex}
         projectAspectRatio={projectAspectRatio}

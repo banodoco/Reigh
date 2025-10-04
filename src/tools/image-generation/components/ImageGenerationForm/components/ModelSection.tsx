@@ -284,20 +284,8 @@ const StyleReferenceSection: React.FC<{
                 onValueChange={(value) => {
                   if (!onReferenceModeChange) return;
                   const mode = value as ReferenceMode;
+                  // onReferenceModeChange now handles mode + auto-setting strength values in one batch
                   onReferenceModeChange(mode);
-                  
-                  // Auto-set values based on mode
-                  if (mode === 'style') {
-                    onStyleStrengthChange(1.1);
-                    onSubjectStrengthChange(0);
-                  } else if (mode === 'subject') {
-                    onStyleStrengthChange(0);
-                    onSubjectStrengthChange(1.1);
-                  } else if (mode === 'style-character') {
-                    onStyleStrengthChange(0.5);
-                    onSubjectStrengthChange(1.0);
-                  }
-                  // For 'custom', don't auto-change values
                 }}
                 className="flex flex-wrap gap-3"
                 disabled={isGenerating || isUploadingStyleReference}

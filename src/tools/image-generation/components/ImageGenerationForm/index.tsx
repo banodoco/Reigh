@@ -186,15 +186,44 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
   const selectedReference = references.find(ref => ref.id === selectedReferenceId) || null;
   
-  // Clear pending mode update when switching references
+  // Clear pending mode update when switching references AND force sync
   const prevSelectedReferenceId = useRef(selectedReferenceId);
   useEffect(() => {
-    if (prevSelectedReferenceId.current !== selectedReferenceId) {
-      console.log('[RefSettings] 🔄 Reference changed, clearing pending mode update');
+    const hasChanged = prevSelectedReferenceId.current !== selectedReferenceId;
+    const prevId = prevSelectedReferenceId.current;
+    
+    if (hasChanged) {
+      console.log('[RefSettings] 🔄 Reference changed from', prevId, 'to', selectedReferenceId);
+      console.log('[RefSettings] 🔄 Clearing pending mode update and forcing mode sync');
       pendingReferenceModeUpdate.current = null;
+      
+      // Look up the reference directly to ensure we have the latest data
+      // Also check the optimistic cache in case there's a pending write
+      if (selectedReferenceId) {
+        const newSelectedRef = references.find(ref => ref.id === selectedReferenceId);
+        if (newSelectedRef) {
+          const newMode = newSelectedRef.referenceMode ?? 'custom';
+          console.log('[RefSettings] 🎯 Force syncing mode for new reference:', {
+            refId: selectedReferenceId,
+            refName: newSelectedRef.name,
+            newMode,
+            allModes: references.map(r => ({ id: r.id, mode: r.referenceMode }))
+          });
+          
+          // Force sync all settings for this reference
+          setReferenceMode(newMode);
+          setStyleReferenceStrength(newSelectedRef.styleReferenceStrength);
+          setSubjectStrength(newSelectedRef.subjectStrength);
+          setSubjectDescription(newSelectedRef.subjectDescription);
+          setInThisScene(newSelectedRef.inThisScene);
+        } else {
+          console.warn('[RefSettings] ⚠️ Could not find reference with ID:', selectedReferenceId, 'in references:', references.map(r => r.id));
+        }
+      }
+      
       prevSelectedReferenceId.current = selectedReferenceId;
     }
-  }, [selectedReferenceId]);
+  }, [selectedReferenceId, references]);
   
   // Debug logging for reference state
   useEffect(() => {
@@ -206,7 +235,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       selectedReferenceName: selectedReference?.name,
       selectedReferenceStrength: selectedReference?.styleReferenceStrength,
       selectedSubjectStrength: selectedReference?.subjectStrength,
+      selectedReferenceMode: selectedReference?.referenceMode,
       allReferenceIds: references.map(r => r.id),
+      allReferenceModes: references.map(r => ({ id: r.id, name: r.name, mode: r.referenceMode })),
       allShotSelections: selectedReferenceIdByShot
     });
   }, [effectiveShotId, references, selectedReferenceId, selectedReference, selectedReferenceIdByShot]);
@@ -275,25 +306,33 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Sync local state with selected reference settings (only when values actually change)
   useEffect(() => {
     console.log('[RefSettings] 🔄 Syncing local state from DB/selected reference:', {
+      selectedReferenceId,
+      selectedReferenceName: selectedReference?.name,
       styleStrength: currentStyleStrength,
       subjectStrength: currentSubjectStrength,
       subjectDescription: currentSubjectDescription,
       inThisScene: currentInThisScene,
-      referenceMode: currentReferenceMode,
+      localReferenceMode: referenceMode,
+      dbReferenceMode: currentReferenceMode,
+      modeNeedsSync: referenceMode !== currentReferenceMode,
       pendingModeUpdate: pendingReferenceModeUpdate.current
     });
     
     // Only update if values are different to avoid overriding optimistic updates
     if (styleReferenceStrength !== currentStyleStrength) {
+      console.log('[RefSettings] 📝 Updating local styleReferenceStrength:', currentStyleStrength);
       setStyleReferenceStrength(currentStyleStrength);
     }
     if (subjectStrength !== currentSubjectStrength) {
+      console.log('[RefSettings] 📝 Updating local subjectStrength:', currentSubjectStrength);
       setSubjectStrength(currentSubjectStrength);
     }
     if (subjectDescription !== currentSubjectDescription) {
+      console.log('[RefSettings] 📝 Updating local subjectDescription:', currentSubjectDescription);
       setSubjectDescription(currentSubjectDescription);
     }
     if (inThisScene !== currentInThisScene) {
+      console.log('[RefSettings] 📝 Updating local inThisScene:', currentInThisScene);
       setInThisScene(currentInThisScene);
     }
     
@@ -306,12 +345,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     // Only sync from database if no pending update
     if (!pendingReferenceModeUpdate.current && referenceMode !== currentReferenceMode) {
-      console.log('[RefSettings] 🔄 Syncing mode from database:', currentReferenceMode);
+      console.log('[RefSettings] 📝 Syncing mode from database:', { from: referenceMode, to: currentReferenceMode });
       setReferenceMode(currentReferenceMode);
     } else if (pendingReferenceModeUpdate.current) {
-      console.log('[RefSettings] ⏸️ Skipping mode sync, pending update in progress');
+      console.log('[RefSettings] ⏸️ Skipping mode sync, pending update in progress:', pendingReferenceModeUpdate.current);
+    } else if (referenceMode === currentReferenceMode) {
+      console.log('[RefSettings] ✅ Mode already in sync:', referenceMode);
     }
-  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, referenceMode]);
+  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, referenceMode, selectedReferenceId, selectedReference?.name]);
 
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
@@ -1006,6 +1047,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         : ref
     );
     
+    // Log what we're about to save
+    const updatedRef = updatedReferences.find(r => r.id === referenceId);
+    console.log('[RefSettings] 📤 Will save reference to DB:', {
+      id: updatedRef?.id,
+      name: updatedRef?.name,
+      referenceMode: updatedRef?.referenceMode,
+      styleStrength: updatedRef?.styleReferenceStrength,
+      subjectStrength: updatedRef?.subjectStrength
+    });
+    
     // Optimistic UI update
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
@@ -1013,7 +1064,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           ...(prev || {}), 
           references: updatedReferences
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference settings', { next });
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference settings', { 
+          updatedRefInCache: updatedReferences.find(r => r.id === referenceId)
+        });
         return next;
       });
     } catch (e) {
@@ -1100,9 +1153,39 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const handleReferenceModeChange = useCallback(async (mode: ReferenceMode) => {
     if (!selectedReferenceId) return;
     console.log('[RefSettings] 🎯 User changed mode to:', mode);
-    pendingReferenceModeUpdate.current = mode; // Track pending update to prevent flicker
-    setReferenceMode(mode); // Optimistic local update
-    await handleUpdateReference(selectedReferenceId, { referenceMode: mode });
+    
+    // Build update object with mode AND auto-set strength values
+    const updates: Partial<ReferenceImage> = {
+      referenceMode: mode
+    };
+    
+    // Auto-set strength values based on mode (same logic as RadioGroup)
+    if (mode === 'style') {
+      updates.styleReferenceStrength = 1.1;
+      updates.subjectStrength = 0;
+    } else if (mode === 'subject') {
+      updates.styleReferenceStrength = 0;
+      updates.subjectStrength = 1.1;
+    } else if (mode === 'style-character') {
+      updates.styleReferenceStrength = 0.5;
+      updates.subjectStrength = 1.0;
+    }
+    // For 'custom', don't auto-change strength values
+    
+    console.log('[RefSettings] 🎯 Batched update for mode change:', updates);
+    
+    // Optimistic local updates
+    pendingReferenceModeUpdate.current = mode;
+    setReferenceMode(mode);
+    if (updates.styleReferenceStrength !== undefined) {
+      setStyleReferenceStrength(updates.styleReferenceStrength);
+    }
+    if (updates.subjectStrength !== undefined) {
+      setSubjectStrength(updates.subjectStrength);
+    }
+    
+    // Single batched update to avoid race conditions
+    await handleUpdateReference(selectedReferenceId, updates);
   }, [selectedReferenceId, handleUpdateReference]);
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {

@@ -14,6 +14,7 @@ import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { cn } from '@/shared/lib/utils';
 import { isImageCached, setImageCacheStatus } from '@/shared/lib/imageCacheManager';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -23,6 +24,7 @@ interface VideoShotDisplayProps {
     disabled?: boolean;
     [key: string]: any; // For drag attributes and listeners
   };
+  dragDisabledReason?: string;
   shouldLoadImages?: boolean;
   shotIndex?: number;
   projectAspectRatio?: string;
@@ -229,7 +231,7 @@ const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspec
   );
 };
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, shouldLoadImages = true, shotIndex = 0, projectAspectRatio }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio }) => {
   // Click ripple effect
   const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
   
@@ -440,16 +442,38 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
           <div className="flex items-center space-x-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             {/* Drag Handle Button */}
             {dragHandleProps && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 cursor-grab active:cursor-grabbing"
-                disabled={dragHandleProps.disabled}
-                title="Drag to reorder"
-                {...dragHandleProps}
-              >
-                <GripVertical className="h-4 w-4" />
-              </Button>
+              dragHandleProps.disabled && dragDisabledReason ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 cursor-not-allowed opacity-50"
+                          disabled={true}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{dragDisabledReason}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 cursor-grab active:cursor-grabbing"
+                  disabled={dragHandleProps.disabled}
+                  title="Drag to reorder"
+                  {...dragHandleProps}
+                >
+                  <GripVertical className="h-4 w-4" />
+                </Button>
+              )
             )}
             {!isEditingName && (
                <Button variant="ghost" size="icon" onClick={handleNameEditToggle} className="h-8 w-8">
