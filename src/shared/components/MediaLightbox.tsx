@@ -859,7 +859,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               showTaskDetails && !isMobile
                 ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details
                 : isMobile 
-                  ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto" // Mobile: no animations
+                  ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full h-auto" // Mobile: full width
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onPointerDownOutside={(event) => {
