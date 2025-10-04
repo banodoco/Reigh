@@ -1362,15 +1362,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             ) : (
               // Original layout without task details
               <div 
-                className="flex flex-col items-center justify-center"
+                className="flex flex-col items-center justify-center w-full"
                 style={{
-                  maxHeight: '95vh',
-                  maxWidth: '95vw',
-                  width: 'auto'
+                  maxHeight: '95vh'
                 }}
               >
               <div 
-                className="relative flex items-center justify-center"
+                className="relative flex items-center justify-center w-full"
               >
               {/* Navigation Controls - Left Arrow */}
               {showNavigation && onPrevious && hasPrevious && (
