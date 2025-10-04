@@ -19,11 +19,16 @@ export const useShotGenerations = (
     queryKey: ['unified-generations', 'shot', shotId],
     enabled: !!shotId,
     initialPageParam: 0,
-    queryFn: async ({ pageParam, signal }: { pageParam: number; signal?: AbortSignal }) => {
-      // Check if request was cancelled before starting
-      if (signal?.aborted) {
-        throw new Error('Request was cancelled');
+    // Add retry logic for aborted requests (same as useAllShotGenerations)
+    retry: (failureCount, error) => {
+      if (error instanceof Error && (error.message.includes('aborted') || error.message.includes('cancelled'))) {
+        return failureCount < 3;
       }
+      return false;
+    },
+    retryDelay: (attemptIndex) => Math.min(100 * Math.pow(2, attemptIndex), 1000),
+    queryFn: async ({ pageParam, signal }: { pageParam: number; signal?: AbortSignal }) => {
+      // Don't throw immediately on abort - let the fetch fail naturally
 
       const { data, error } = await supabase
         .from('shot_generations')
@@ -168,11 +173,20 @@ export const useAllShotGenerations = (
   return useQuery({
     queryKey: ['unified-generations', 'shot', stableShotId],
     enabled: isEnabled,
-    queryFn: async ({ signal }) => {
-      // Check if request was cancelled before starting
-      if (signal?.aborted) {
-        throw new Error('Request was cancelled');
+    // CRITICAL: Add retry logic for aborted requests to prevent "signal is aborted without reason" errors
+    // When mutations invalidate queries, in-flight requests get cancelled. Retry ensures we eventually get the data.
+    retry: (failureCount, error) => {
+      // Retry aborted requests up to 3 times
+      if (error instanceof Error && (error.message.includes('aborted') || error.message.includes('cancelled'))) {
+        return failureCount < 3;
       }
+      // Don't retry other errors
+      return false;
+    },
+    retryDelay: (attemptIndex) => Math.min(100 * Math.pow(2, attemptIndex), 1000), // Exponential backoff: 100ms, 200ms, 400ms
+    queryFn: async ({ signal }) => {
+      // Don't throw immediately on abort - let the fetch fail naturally
+      // This prevents the "signal is aborted without reason" error from being thrown manually
       console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
       let allGenerations: any[] = [];
       let offset = 0;
@@ -203,13 +217,11 @@ export const useAllShotGenerations = (
           console.warn('[useAllShotGenerations] Invalid shot ID or query parameters:', { shotId, error: initialError });
           return [];
         }
+        // Let abort errors fail naturally so retry logic can handle them
         throw initialError;
       }
 
-      // Check again after first query
-      if (signal?.aborted) {
-        throw new Error('Request was cancelled');
-      }
+      // Don't manually check for abort - let the natural error flow handle it
 
       if (initialData) {
         allGenerations = initialData;

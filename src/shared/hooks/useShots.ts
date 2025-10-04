@@ -727,10 +727,12 @@ export const useAddImageToShot = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-        // FIX: Re-enable shot-specific invalidation so newly added images appear immediately
-        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
-        console.log('[PositionFix] ✅ Invalidating shot-specific query after add operation');
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        // FIX: Re-enable shot-specific invalidation with small delay to let in-flight queries complete
+        // This prevents "signal is aborted without reason" errors from rapid invalidations
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add operation');
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        }, 50); // 50ms delay allows in-flight queries to complete or fail naturally
       }
     },
     onError: (error: Error) => {
@@ -811,10 +813,11 @@ export const useAddImageToShotWithoutPosition = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-        // FIX: Re-enable shot-specific invalidation so newly added images appear immediately
-        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
-        console.log('[PositionFix] ✅ Invalidating shot-specific query after add without position operation');
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        // FIX: Re-enable shot-specific invalidation with small delay to prevent abort errors
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add without position operation');
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        }, 50);
       }
     },
     onError: (error: Error) => {
@@ -1333,10 +1336,11 @@ export const useDuplicateImageInShot = () => {
       // Also invalidate unpositioned-count in case duplication affects positions
       queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-      // FIX: Re-enable shot-specific invalidation so newly duplicated images appear immediately
-      // The timeline drag system uses optimistic updates to prevent UI jumps during drag
-      console.log('[PositionFix] ✅ Invalidating shot-specific query after duplicate operation');
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+      // FIX: Re-enable shot-specific invalidation with small delay to prevent abort errors
+      console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after duplicate operation');
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+      }, 50);
     }
   });
 };
@@ -1403,10 +1407,11 @@ export const useRemoveImageFromShot = () => {
         // Ensure unpositioned-count updates after deletion
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
 
-        // FIX: Re-enable shot-specific invalidation so removed images disappear immediately
-        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
-        console.log('[PositionFix] ✅ Invalidating shot-specific query after remove operation');
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
+        // FIX: Re-enable shot-specific invalidation with small delay to prevent abort errors
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after remove operation');
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
+        }, 50);
       }
     },
   });
@@ -1547,10 +1552,11 @@ export const useUpdateShotImageOrder = () => {
         // Also invalidate unified generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
 
-        // FIX: Re-enable shot-specific invalidation so newly created shot images appear immediately
-        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
-        console.log('[PositionFix] ✅ Invalidating shot-specific query after create operation');
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+        // FIX: Re-enable shot-specific invalidation with small delay to prevent abort errors
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create operation');
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+        }, 50);
       }
     },
   });
@@ -1619,10 +1625,11 @@ export const useCreateShotWithImage = () => {
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.projectId] });
 
       if (data.shotId) {
-        // FIX: Re-enable shot-specific invalidation so newly created shot with image appears immediately
-        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
-        console.log('[PositionFix] ✅ Invalidating shot-specific query after create shot with image operation');
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
+        // FIX: Re-enable shot-specific invalidation with small delay to prevent abort errors
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create shot with image operation');
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
+        }, 50);
       }
     },
     onError: (error: Error) => {
