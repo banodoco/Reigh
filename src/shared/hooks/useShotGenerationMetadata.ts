@@ -33,15 +33,21 @@ export function useShotGenerationMetadata({
 
   // Load metadata from database
   useEffect(() => {
-    console.log('[MagicEditPromptDebug] useShotGenerationMetadata useEffect triggered:', {
+    console.log('[MagicEditPromptPersist] 🔌 HOOK useEffect triggered:', {
       enabled,
       shotId: shotId ? shotId.substring(0, 8) : 'N/A',
       shotGenerationId: shotGenerationId ? shotGenerationId.substring(0, 8) : 'N/A',
-      willLoad: !!(enabled && shotGenerationId)
+      willLoad: !!(enabled && shotGenerationId),
+      timestamp: Date.now()
     });
 
     if (!enabled || !shotGenerationId) {
-      console.log('[MagicEditPromptDebug] Skipping metadata load - conditions not met');
+      console.log('[MagicEditPromptPersist] ⏭️  SKIPPING metadata load - conditions not met:', {
+        enabled,
+        hasShotGenerationId: !!shotGenerationId,
+        reason: !enabled ? 'Hook disabled' : 'No shotGenerationId',
+        timestamp: Date.now()
+      });
       setIsLoading(false);
       return;
     }
@@ -50,7 +56,10 @@ export function useShotGenerationMetadata({
 
     const loadMetadata = async () => {
       try {
-        console.log('[MagicEditPromptDebug] Loading metadata for shotGenerationId:', shotGenerationId.substring(0, 8));
+        console.log('[MagicEditPromptPersist] 📥 LOADING metadata from DB:', {
+          shotGenerationId: shotGenerationId.substring(0, 8),
+          timestamp: Date.now()
+        });
         
         const { data, error } = await supabase
           .from('shot_generations')
@@ -59,10 +68,12 @@ export function useShotGenerationMetadata({
           .single();
 
         if (error) {
-          console.warn('[MagicEditPromptDebug] Error loading metadata:', {
+          console.error('[MagicEditPromptPersist] ❌ DB LOAD ERROR:', {
             shotGenerationId: shotGenerationId.substring(0, 8),
             error: error.message,
-            code: error.code
+            code: error.code,
+            details: error,
+            timestamp: Date.now()
           });
           if (!cancelled) {
             setMetadata({});
@@ -72,11 +83,21 @@ export function useShotGenerationMetadata({
         }
 
         const loadedMetadata = (data?.metadata as ShotGenerationMetadata) || {};
-        console.log('[MagicEditPromptDebug] Successfully loaded metadata:', {
+        console.log('[MagicEditPromptPersist] ✅ DB LOAD SUCCESS:', {
           shotGenerationId: shotGenerationId.substring(0, 8),
           hasMetadata: !!data?.metadata,
-          lastMagicEditPrompt: loadedMetadata.lastMagicEditPrompt || 'N/A',
-          magicEditPromptsCount: loadedMetadata.magicEditPrompts?.length || 0
+          hasLastMagicEditPrompt: !!loadedMetadata.lastMagicEditPrompt,
+          lastMagicEditPromptLength: loadedMetadata.lastMagicEditPrompt?.length || 0,
+          lastMagicEditPromptPreview: loadedMetadata.lastMagicEditPrompt 
+            ? loadedMetadata.lastMagicEditPrompt.substring(0, 50) + '...' 
+            : 'none',
+          magicEditPromptsCount: loadedMetadata.magicEditPrompts?.length || 0,
+          allPrompts: loadedMetadata.magicEditPrompts?.map(p => ({
+            promptPreview: p.prompt.substring(0, 30) + '...',
+            timestamp: p.timestamp,
+            numImages: p.numImages
+          })) || [],
+          timestamp: Date.now()
         });
 
         if (!cancelled) {
@@ -84,7 +105,11 @@ export function useShotGenerationMetadata({
           setIsLoading(false);
         }
       } catch (err) {
-        console.error('[useShotGenerationMetadata] Unexpected error:', err);
+        console.error('[MagicEditPromptPersist] 💥 UNEXPECTED ERROR:', {
+          error: err instanceof Error ? err.message : err,
+          stack: err instanceof Error ? err.stack : undefined,
+          timestamp: Date.now()
+        });
         if (!cancelled) {
           setMetadata({});
           setIsLoading(false);
@@ -98,7 +123,29 @@ export function useShotGenerationMetadata({
 
   // Update metadata in database
   const updateMetadata = useCallback(async (updates: Partial<ShotGenerationMetadata>) => {
+    console.log('[MagicEditPromptPersist] 💾 UPDATE METADATA called:', {
+      shotGenerationId: shotGenerationId ? shotGenerationId.substring(0, 8) : 'N/A',
+      shotId: shotId ? shotId.substring(0, 8) : 'N/A',
+      isUpdating,
+      hasShotGenerationId: !!shotGenerationId,
+      willUpdate: !!(shotGenerationId && !isUpdating),
+      updateKeys: Object.keys(updates),
+      updates: {
+        ...updates,
+        // Preview prompt if it's being updated
+        lastMagicEditPrompt: updates.lastMagicEditPrompt 
+          ? updates.lastMagicEditPrompt.substring(0, 50) + '...'
+          : undefined
+      },
+      timestamp: Date.now()
+    });
+    
     if (!shotGenerationId || isUpdating) {
+      console.log('[MagicEditPromptPersist] ⏭️  SKIPPING UPDATE:', {
+        reason: !shotGenerationId ? 'No shotGenerationId' : 'Already updating',
+        isUpdating,
+        timestamp: Date.now()
+      });
       return;
     }
 
@@ -107,13 +154,24 @@ export function useShotGenerationMetadata({
     try {
       const newMetadata = { ...metadata, ...updates };
       
+      console.log('[MagicEditPromptPersist] 💾 UPDATING DB...', {
+        shotGenerationId: shotGenerationId.substring(0, 8),
+        timestamp: Date.now()
+      });
+      
       const { error } = await supabase
         .from('shot_generations')
         .update({ metadata: newMetadata })
         .eq('id', shotGenerationId);
 
       if (error) {
-        console.error('[useShotGenerationMetadata] Error updating metadata:', error);
+        console.error('[MagicEditPromptPersist] ❌ DB UPDATE ERROR:', {
+          shotGenerationId: shotGenerationId.substring(0, 8),
+          error: error.message,
+          code: error.code,
+          details: error,
+          timestamp: Date.now()
+        });
         throw error;
       }
 
@@ -122,18 +180,32 @@ export function useShotGenerationMetadata({
 
       // Invalidate related queries to trigger UI updates (only if shotId is available)
       if (shotId) {
+        console.log('[MagicEditPromptPersist] 🔄 Invalidating queries:', {
+          shotId: shotId.substring(0, 8),
+          queryKeys: [
+            ['unified-generations', 'shot', shotId],
+            ['shot-generations', shotId]
+          ],
+          timestamp: Date.now()
+        });
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
       }
 
-      console.log('[useShotGenerationMetadata] Successfully updated metadata for generation:', {
+      console.log('[MagicEditPromptPersist] ✅ DB UPDATE SUCCESS:', {
         shotId: shotId ? shotId.substring(0, 8) : 'N/A',
         shotGenerationId: shotGenerationId.substring(0, 8),
-        updates
+        updateKeys: Object.keys(updates),
+        newMetadataKeys: Object.keys(newMetadata),
+        timestamp: Date.now()
       });
 
     } catch (error) {
-      console.error('[useShotGenerationMetadata] Failed to update metadata:', error);
+      console.error('[MagicEditPromptPersist] 💥 UPDATE FAILED:', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: Date.now()
+      });
       throw error;
     } finally {
       setIsUpdating(false);
@@ -142,11 +214,16 @@ export function useShotGenerationMetadata({
 
   // Convenience method to add a magic edit prompt
   const addMagicEditPrompt = useCallback(async (prompt: string, numImages?: number) => {
-    console.log('[MagicEditPromptDebug] addMagicEditPrompt called:', {
+    console.log('[MagicEditPromptPersist] 💾 ADD PROMPT called:', {
       shotGenerationId: shotGenerationId ? shotGenerationId.substring(0, 8) : 'N/A',
       promptLength: prompt.length,
+      promptPreview: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''),
       numImages,
-      existingPromptsCount: metadata.magicEditPrompts?.length || 0
+      existingPromptsCount: metadata.magicEditPrompts?.length || 0,
+      currentLastPrompt: metadata.lastMagicEditPrompt 
+        ? metadata.lastMagicEditPrompt.substring(0, 30) + '...'
+        : 'none',
+      timestamp: Date.now()
     });
 
     const newPromptEntry = {
@@ -161,25 +238,37 @@ export function useShotGenerationMetadata({
     // Keep only the last 10 prompts to prevent unbounded growth
     const trimmedPrompts = updatedPrompts.slice(-10);
 
+    console.log('[MagicEditPromptPersist] 💾 CALLING updateMetadata with new prompts:', {
+      totalPrompts: trimmedPrompts.length,
+      newPromptTimestamp: newPromptEntry.timestamp,
+      willSetLastPrompt: prompt.substring(0, 30) + '...',
+      timestamp: Date.now()
+    });
+
     await updateMetadata({
       magicEditPrompts: trimmedPrompts,
       lastMagicEditPrompt: prompt
     });
     
-    console.log('[MagicEditPromptDebug] addMagicEditPrompt completed:', {
+    console.log('[MagicEditPromptPersist] ✅ ADD PROMPT completed:', {
       shotGenerationId: shotGenerationId ? shotGenerationId.substring(0, 8) : 'N/A',
       newPromptsCount: trimmedPrompts.length,
-      lastPromptSet: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '')
+      lastPromptSet: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''),
+      timestamp: Date.now()
     });
   }, [metadata, updateMetadata, shotGenerationId]);
 
   // Get the most recent magic edit prompt
   const getLastMagicEditPrompt = useCallback((): string => {
     const prompt = metadata.lastMagicEditPrompt || '';
-    console.log('[MagicEditPromptDebug] getLastMagicEditPrompt called:', {
+    console.log('[MagicEditPromptPersist] 📥 GET LAST PROMPT called:', {
       shotGenerationId: shotGenerationId ? shotGenerationId.substring(0, 8) : 'N/A',
+      hasPrompt: !!prompt,
       promptLength: prompt.length,
-      hasPrompt: !!prompt
+      promptPreview: prompt ? prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '') : 'none',
+      allMetadataKeys: Object.keys(metadata),
+      magicEditPromptsCount: metadata.magicEditPrompts?.length || 0,
+      timestamp: Date.now()
     });
     return prompt;
   }, [metadata, shotGenerationId]);

@@ -55,6 +55,25 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const [magicEditNumImages, setMagicEditNumImages] = useState(1);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
+  
+  // Log when modal is opened/closed
+  useEffect(() => {
+    if (isOpen) {
+      console.log('[MagicEditPromptPersist] 🚀 MODAL OPENED with props:', {
+        hasImageUrl: !!imageUrl,
+        hasImageDimensions: !!imageDimensions,
+        hasShotGenerationId: !!shotGenerationId,
+        shotGenerationIdPrefix: shotGenerationId?.substring(0, 8),
+        hasToolTypeOverride: !!toolTypeOverride,
+        toolTypeOverride,
+        timestamp: Date.now()
+      });
+    } else {
+      console.log('[MagicEditPromptPersist] 🚪 MODAL CLOSED', {
+        timestamp: Date.now()
+      });
+    }
+  }, [isOpen, shotGenerationId, toolTypeOverride, imageUrl, imageDimensions]);
 
   // Project context functionality
   const { selectedProjectId } = useProject();
@@ -76,6 +95,16 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
     shotId: currentShotId || '',
     shotGenerationId: shotGenerationId || '',
     enabled: !!shotGenerationId && !!currentShotId
+  });
+  
+  console.log('[MagicEditPromptPersist] Hook initialized:', {
+    hasShotGenerationId: !!shotGenerationId,
+    hasCurrentShotId: !!currentShotId,
+    enabled: !!shotGenerationId && !!currentShotId,
+    shotGenerationIdPrefix: shotGenerationId?.substring(0, 8),
+    currentShotIdPrefix: currentShotId?.substring(0, 8),
+    isLoadingMetadata,
+    timestamp: Date.now()
   });
 
   const handleMagicEditGenerate = async () => {
@@ -116,18 +145,46 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       console.log(`[MagicEditForm] Created ${results.length} magic edit tasks`);
       
       // Save the prompt to shot generation metadata if we have the context
+      console.log('[MagicEditPromptPersist] 💾 ATTEMPTING TO SAVE prompt:', {
+        hasShotGenerationId: !!shotGenerationId,
+        hasCurrentShotId: !!currentShotId,
+        shotGenerationId: shotGenerationId?.substring(0, 8),
+        currentShotId: currentShotId?.substring(0, 8),
+        promptLength: magicEditPrompt.trim().length,
+        numImages: magicEditNumImages,
+        willAttemptSave: !!(shotGenerationId && currentShotId),
+        timestamp: Date.now()
+      });
+      
       if (shotGenerationId && currentShotId) {
         try {
+          console.log('[MagicEditPromptPersist] 💾 CALLING addMagicEditPrompt...');
           await addMagicEditPrompt(magicEditPrompt.trim(), magicEditNumImages);
-          console.log('[MagicEditModal] Saved prompt to shot generation metadata:', {
+          console.log('[MagicEditPromptPersist] ✅ SAVE SUCCESS:', {
             shotGenerationId: shotGenerationId.substring(0, 8),
+            currentShotId: currentShotId.substring(0, 8),
             promptLength: magicEditPrompt.trim().length,
-            numImages: magicEditNumImages
+            promptPreview: magicEditPrompt.trim().substring(0, 50) + '...',
+            numImages: magicEditNumImages,
+            timestamp: Date.now()
           });
         } catch (error) {
-          console.warn('[MagicEditModal] Failed to save prompt to metadata:', error);
+          console.error('[MagicEditPromptPersist] ❌ SAVE FAILED:', {
+            shotGenerationId: shotGenerationId?.substring(0, 8),
+            currentShotId: currentShotId?.substring(0, 8),
+            error: error instanceof Error ? error.message : error,
+            stack: error instanceof Error ? error.stack : undefined,
+            timestamp: Date.now()
+          });
           // Don't fail the entire operation if metadata save fails
         }
+      } else {
+        console.log('[MagicEditPromptPersist] ⏭️  SKIPPING SAVE - missing context:', {
+          hasShotGenerationId: !!shotGenerationId,
+          hasCurrentShotId: !!currentShotId,
+          reason: !shotGenerationId ? 'No shotGenerationId' : 'No currentShotId',
+          timestamp: Date.now()
+        });
       }
       
       setTasksCreated(true);
@@ -185,15 +242,66 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
 
   // Load last saved prompt when modal opens (for shot generation context)
   useEffect(() => {
+    console.log('[MagicEditPromptPersist] 📥 LOAD EFFECT triggered:', {
+      isOpen,
+      hasShotGenerationId: !!shotGenerationId,
+      shotGenerationIdPrefix: shotGenerationId?.substring(0, 8),
+      isLoadingMetadata,
+      hasCurrentPrompt: !!magicEditPrompt,
+      currentPromptLength: magicEditPrompt?.length || 0,
+      willAttemptLoad: !!(isOpen && shotGenerationId && !isLoadingMetadata),
+      timestamp: Date.now()
+    });
+    
     if (isOpen && shotGenerationId && !isLoadingMetadata) {
+      console.log('[MagicEditPromptPersist] 📥 CALLING getLastMagicEditPrompt...');
       const lastPrompt = getLastMagicEditPrompt();
+      
+      console.log('[MagicEditPromptPersist] 📥 LOAD RESULT:', {
+        hasLastPrompt: !!lastPrompt,
+        lastPromptLength: lastPrompt?.length || 0,
+        lastPromptPreview: lastPrompt ? lastPrompt.substring(0, 50) + '...' : 'none',
+        hasCurrentPrompt: !!magicEditPrompt,
+        currentPromptLength: magicEditPrompt?.length || 0,
+        willSetPrompt: !!(lastPrompt && !magicEditPrompt),
+        shotGenerationId: shotGenerationId.substring(0, 8),
+        timestamp: Date.now()
+      });
+      
       if (lastPrompt && !magicEditPrompt) {
-        setMagicEditPrompt(lastPrompt);
-        console.log('[MagicEditModal] Loaded last saved prompt for shot generation:', {
+        console.log('[MagicEditPromptPersist] ✅ SETTING PROMPT from saved data:', {
           shotGenerationId: shotGenerationId.substring(0, 8),
-          promptLength: lastPrompt.length
+          promptLength: lastPrompt.length,
+          promptPreview: lastPrompt.substring(0, 50) + '...',
+          timestamp: Date.now()
+        });
+        setMagicEditPrompt(lastPrompt);
+      } else if (lastPrompt && magicEditPrompt) {
+        console.log('[MagicEditPromptPersist] ⏭️  SKIPPING LOAD - current prompt exists:', {
+          currentPromptLength: magicEditPrompt.length,
+          savedPromptLength: lastPrompt.length,
+          reason: 'User already has a prompt entered',
+          timestamp: Date.now()
+        });
+      } else if (!lastPrompt) {
+        console.log('[MagicEditPromptPersist] ℹ️  NO SAVED PROMPT found:', {
+          shotGenerationId: shotGenerationId.substring(0, 8),
+          reason: 'No previous prompt saved for this generation',
+          timestamp: Date.now()
         });
       }
+    } else {
+      console.log('[MagicEditPromptPersist] ⏭️  SKIPPING LOAD - conditions not met:', {
+        isOpen,
+        hasShotGenerationId: !!shotGenerationId,
+        isLoadingMetadata,
+        reasons: [
+          !isOpen && 'Modal not open',
+          !shotGenerationId && 'No shotGenerationId',
+          isLoadingMetadata && 'Still loading metadata'
+        ].filter(Boolean),
+        timestamp: Date.now()
+      });
     }
   }, [isOpen, shotGenerationId, isLoadingMetadata, getLastMagicEditPrompt, magicEditPrompt]);
 
@@ -255,7 +363,6 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
           />
           {/* Use DialogPrimitive.Content directly to avoid double overlay */}
           <DialogPrimitive.Content
-            data-pane-control
             data-radix-dialog-content
             className={cn(
               "fixed left-[50%] top-[50%] z-[100003] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
@@ -269,6 +376,10 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
             }}
             onMouseDown={(e) => {
               // Block propagation from modal content to underlying elements
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              // Block click propagation
               e.stopPropagation();
             }}
           >

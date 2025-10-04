@@ -43,7 +43,7 @@ export const VideoHoverPreview = React.memo<VideoHoverPreviewProps>(({
       
       return (
         <div
-          className="fixed z-[10001] pointer-events-auto"
+          className="fixed z-[10001] pointer-events-none"
           style={{
             left: hoverPosition.x,
             top: hoverPosition.positioning === 'below' ? hoverPosition.y + 10 : hoverPosition.y - 10,
@@ -52,7 +52,7 @@ export const VideoHoverPreview = React.memo<VideoHoverPreviewProps>(({
               : 'translateX(-50%) translateY(-100%)',
           }}
         >
-          <div className="bg-background border border-border shadow-lg rounded-lg p-4 max-w-md min-w-80 relative">
+          <div className="bg-background border border-border shadow-lg rounded-lg p-4 max-w-md min-w-80 relative pointer-events-auto">
             {/* Arrow pointing to the button */}
             {hoverPosition.positioning === 'below' ? (
               <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
