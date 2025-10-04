@@ -727,13 +727,14 @@ export const useAddImageToShot = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-        // FIX: Re-enable shot-specific invalidation with delay to respect timeline position locks
-        // Timeline position lock is held for 600ms (500ms lock + 100ms stable clear)
+        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
+        // Query is now disabled during operations via disableRefetch flag in VideoTravelToolPage
         // This prevents both "signal is aborted" errors AND unexpected position resets
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add operation (1s delay)');
+        // 100ms is enough for React's automatic batching without user-perceivable lag
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-        }, 1000); // 1000ms delay ensures timeline position locks have been released
+        }, 100); // 100ms delay for React batch updates, query disabled separately
       }
     },
     onError: (error: Error) => {
@@ -814,11 +815,11 @@ export const useAddImageToShotWithoutPosition = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-        // FIX: Re-enable shot-specific invalidation with delay to respect timeline position locks
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add without position operation (1s delay)');
+        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add without position operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-        }, 1000);
+        }, 100);
       }
     },
     onError: (error: Error) => {
@@ -1337,11 +1338,11 @@ export const useDuplicateImageInShot = () => {
       // Also invalidate unpositioned-count in case duplication affects positions
       queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-      // FIX: Re-enable shot-specific invalidation with delay to respect timeline position locks
-      console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after duplicate operation (1s delay)');
+      // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
+      console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after duplicate operation (100ms delay)');
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-      }, 1000);
+      }, 100);
     }
   });
 };
@@ -1408,11 +1409,11 @@ export const useRemoveImageFromShot = () => {
         // Ensure unpositioned-count updates after deletion
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
 
-        // FIX: Re-enable shot-specific invalidation with delay to respect timeline position locks
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after remove operation (1s delay)');
+        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after remove operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
-        }, 1000);
+        }, 100);
       }
     },
   });
@@ -1553,11 +1554,11 @@ export const useUpdateShotImageOrder = () => {
         // Also invalidate unified generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
 
-        // FIX: Re-enable shot-specific invalidation with delay to respect timeline position locks
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create operation (1s delay)');
+        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-        }, 1000);
+        }, 100);
       }
     },
   });
@@ -1626,11 +1627,11 @@ export const useCreateShotWithImage = () => {
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.projectId] });
 
       if (data.shotId) {
-        // FIX: Re-enable shot-specific invalidation with delay to respect timeline position locks
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create shot with image operation (1s delay)');
+        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create shot with image operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
-        }, 1000);
+        }, 100);
       }
     },
     onError: (error: Error) => {

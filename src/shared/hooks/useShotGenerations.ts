@@ -145,11 +145,21 @@ export const useUnpositionedGenerationsCount = (
 
 // Hook for getting all generations for a shot (non-paginated, for backward compatibility)
 export const useAllShotGenerations = (
-  shotId: string | null
+  shotId: string | null,
+  options?: {
+    // When true, prevents query from refetching during sensitive operations (drag, persist, etc.)
+    disableRefetch?: boolean;
+  }
 ): UseQueryResult<GenerationRow[]> => {
   // [VideoLoadSpeedIssue] AGGRESSIVE THROTTLING: Reduce excessive hook calls
   const stableShotId = React.useMemo(() => shotId, [shotId]);
-  const isEnabled = React.useMemo(() => !!stableShotId, [stableShotId]);
+  const isEnabled = React.useMemo(() => {
+    // Disable query when explicitly requested (e.g., during drag/persist operations)
+    if (options?.disableRefetch) {
+      return false;
+    }
+    return !!stableShotId;
+  }, [stableShotId, options?.disableRefetch]);
   
   // [VideoLoadSpeedIssue] Enhanced logging to track when hook is called
   const lastLogRef = React.useRef(0);
@@ -158,6 +168,7 @@ export const useAllShotGenerations = (
     console.log('[VideoLoadSpeedIssue] useAllShotGenerations hook called:', { 
       shotId: stableShotId, 
       enabled: isEnabled,
+      disableRefetch: options?.disableRefetch,
       timestamp: now 
     });
     lastLogRef.current = now;
@@ -166,13 +177,22 @@ export const useAllShotGenerations = (
   // Throttle logging to avoid infinite loop spam
   const lastLogRef2 = React.useRef(0);
   if (now - lastLogRef2.current > 1000) { // Log max once per second
-    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { shotId: stableShotId, timestamp: now });
+    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { 
+      shotId: stableShotId, 
+      disableRefetch: options?.disableRefetch,
+      timestamp: now 
+    });
     lastLogRef2.current = now;
   }
 
   return useQuery({
     queryKey: ['unified-generations', 'shot', stableShotId],
     enabled: isEnabled,
+    // Prevent automatic refetches during sensitive operations (drag, persist, etc.)
+    // This is in addition to `enabled` flag - provides belt-and-suspenders protection
+    refetchOnMount: !options?.disableRefetch,
+    refetchOnWindowFocus: !options?.disableRefetch,
+    refetchOnReconnect: !options?.disableRefetch,
     // CRITICAL: Add retry logic for aborted requests to prevent "signal is aborted without reason" errors
     // When mutations invalidate queries, in-flight requests get cancelled. Retry ensures we eventually get the data.
     retry: (failureCount, error) => {

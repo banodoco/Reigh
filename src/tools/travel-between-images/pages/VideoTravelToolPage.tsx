@@ -913,12 +913,54 @@ const VideoTravelToolPage: React.FC = () => {
   // Get full image data when editing a shot to avoid thumbnail limitation
   const contextImages = selectedShot?.images || [];
   
+  // STAGE 2: Track when shot operations are in progress to prevent query race conditions
+  // This flag is set when mutations complete and cleared after a safe period
+  // Prevents timeline position resets and "signal is aborted" errors
+  const [isShotOperationInProgress, setIsShotOperationInProgress] = useState(false);
+  const operationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Helper to signal that a shot operation has occurred
+  // This is called after mutations complete to prevent immediate query refetch
+  const signalShotOperation = useCallback(() => {
+    console.log('[OperationTracking] Shot operation detected, disabling query refetch for 100ms');
+    
+    // Clear any existing timeout
+    if (operationTimeoutRef.current) {
+      clearTimeout(operationTimeoutRef.current);
+    }
+    
+    // Set flag to disable query
+    setIsShotOperationInProgress(true);
+    
+    // Clear flag after timeline has had time to complete position updates
+    // 100ms is enough for React's batch updates + timeline's immediate state updates
+    // Much faster than the previous 1000ms approach
+    operationTimeoutRef.current = setTimeout(() => {
+      console.log('[OperationTracking] Re-enabling query refetch after safe period');
+      setIsShotOperationInProgress(false);
+      operationTimeoutRef.current = null;
+    }, 100);
+  }, []);
+  
+  // STAGE 1: Cleanup timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (operationTimeoutRef.current) {
+        clearTimeout(operationTimeoutRef.current);
+      }
+    };
+  }, []);
+  
   // CRITICAL FIX: Use same logic as ShotEditor to prevent data inconsistency
   // Always load full data when in ShotEditor mode to ensure pair configs match generation logic
   const needsFullImageData = shouldShowShotEditor;
   // Always call the hook to prevent hook order issues - the hook internally handles enabling/disabling
   const { data: fullShotImages = [] } = useAllShotGenerations(
-    needsFullImageData ? (selectedShot?.id || null) : null
+    needsFullImageData ? (selectedShot?.id || null) : null,
+    {
+      // Disable refetch during shot operations to prevent race conditions with timeline
+      disableRefetch: isShotOperationInProgress
+    }
   );
   
   // Use full images if available AND needed, otherwise fall back to context images
@@ -1211,12 +1253,17 @@ const VideoTravelToolPage: React.FC = () => {
     }
   };
 
-  const handleShotImagesUpdate = () => {
+  const handleShotImagesUpdate = useCallback(() => {
     if (selectedProjectId && selectedShot?.id) {
       // Invalidate and refetch the shots query to get updated data
       queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+      
+      // STAGE 2: Signal that a shot operation occurred
+      // This prevents the shot-specific query from refetching immediately
+      // Gives timeline time to complete position updates without interference
+      signalShotOperation();
     }
-  };
+  }, [selectedProjectId, selectedShot?.id, queryClient, signalShotOperation]);
   
   // Debug: Manual refresh function
   // const handleManualRefresh = () => {
