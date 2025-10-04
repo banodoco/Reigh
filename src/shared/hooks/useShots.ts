@@ -727,6 +727,13 @@ export const useAddImageToShot = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
+        // STAGE 2 ENHANCEMENT: Emit custom event so VideoTravelToolPage can detect external mutations
+        // This handles the case where GenerationsPane adds an image while user is viewing the shot
+        console.log('[OperationTracking] Emitting shot-mutation-complete event:', { shotId: shot_id.substring(0, 8), type: 'add' });
+        window.dispatchEvent(new CustomEvent('shot-mutation-complete', { 
+          detail: { shotId: shot_id, mutationType: 'add' } 
+        }));
+
         // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
         // Query is now disabled during operations via disableRefetch flag in VideoTravelToolPage
         // This prevents both "signal is aborted" errors AND unexpected position resets
@@ -814,6 +821,12 @@ export const useAddImageToShotWithoutPosition = () => {
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
+
+        // STAGE 2 ENHANCEMENT: Emit custom event for external mutations
+        console.log('[OperationTracking] Emitting shot-mutation-complete event:', { shotId: shot_id.substring(0, 8), type: 'add-without-position' });
+        window.dispatchEvent(new CustomEvent('shot-mutation-complete', { 
+          detail: { shotId: shot_id, mutationType: 'add-without-position' } 
+        }));
 
         // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add without position operation (100ms delay)');
@@ -951,7 +964,22 @@ export const usePositionExistingGenerationInShot = () => {
       
       // Emit domain event for shot-generation change
       if (project_id) {
-        // Shot generation change events are now handled by DataFreshnessManager via realtime events
+        // CRITICAL: Invalidate queries for immediate UI updates
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
+        
+        // STAGE 2 ENHANCEMENT: Emit custom event for external mutations
+        console.log('[OperationTracking] Emitting shot-mutation-complete event:', { shotId: shot_id.substring(0, 8), type: 'position-existing' });
+        window.dispatchEvent(new CustomEvent('shot-mutation-complete', { 
+          detail: { shotId: shot_id, mutationType: 'position-existing' } 
+        }));
+        
+        // FIX: Re-enable shot-specific invalidation with minimal delay
+        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after position existing operation (100ms delay)');
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        }, 100);
       }
     },
     onError: (error: Error) => {

@@ -951,6 +951,33 @@ const VideoTravelToolPage: React.FC = () => {
     };
   }, []);
   
+  // STAGE 2 ENHANCEMENT: Listen for mutations from OTHER components (like GenerationsPane)
+  // When mutations complete in other parts of the app, we need to know about them too
+  useEffect(() => {
+    if (!selectedShot?.id) return;
+    
+    const handleMutationEvent = (event: CustomEvent) => {
+      const { shotId, mutationType } = event.detail || {};
+      
+      // Only react to mutations affecting the currently selected shot
+      if (shotId === selectedShot.id) {
+        console.log('[OperationTracking] External mutation detected for current shot:', {
+          shotId: shotId.substring(0, 8),
+          mutationType,
+          source: 'CustomEvent'
+        });
+        signalShotOperation();
+      }
+    };
+    
+    // Listen for custom events fired by mutations
+    window.addEventListener('shot-mutation-complete' as any, handleMutationEvent as EventListener);
+    
+    return () => {
+      window.removeEventListener('shot-mutation-complete' as any, handleMutationEvent as EventListener);
+    };
+  }, [selectedShot?.id, signalShotOperation]);
+  
   // CRITICAL FIX: Use same logic as ShotEditor to prevent data inconsistency
   // Always load full data when in ShotEditor mode to ensure pair configs match generation logic
   const needsFullImageData = shouldShowShotEditor;
