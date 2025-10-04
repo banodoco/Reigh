@@ -58,6 +58,7 @@ logCredentials();
 export const datasetSupabase = createClient(DATASET_SUPABASE_URL, DATASET_SUPABASE_ANON_KEY, {
   auth: {
     persistSession: false, // Don't persist auth sessions for dataset browsing
+    storageKey: 'sb-dataset-auth', // Use unique storage key to avoid GoTrueClient conflicts
   },
 });
 

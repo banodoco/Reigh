@@ -727,10 +727,10 @@ export const useAddImageToShot = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-        // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during drag operations
-        // This causes the useEnhancedShotPositions hook to reload positions and override user drag
-        console.log('[PositionFix] ⏸️ SKIPPING shot invalidation during add operation - will be handled by timeline drag system');
-        // queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        // FIX: Re-enable shot-specific invalidation so newly added images appear immediately
+        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
+        console.log('[PositionFix] ✅ Invalidating shot-specific query after add operation');
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
       }
     },
     onError: (error: Error) => {
@@ -811,10 +811,10 @@ export const useAddImageToShotWithoutPosition = () => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-        // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during operations
-        // This causes the useEnhancedShotPositions hook to reload positions and override user drag
-        console.log('[PositionFix] ⏸️ SKIPPING shot invalidation during duplicate operation - will be handled by timeline drag system');
-        // queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        // FIX: Re-enable shot-specific invalidation so newly added images appear immediately
+        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
+        console.log('[PositionFix] ✅ Invalidating shot-specific query after add without position operation');
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
       }
     },
     onError: (error: Error) => {
@@ -1333,10 +1333,10 @@ export const useDuplicateImageInShot = () => {
       // Also invalidate unpositioned-count in case duplication affects positions
       queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
 
-      // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during operations
-      // This causes the useEnhancedShotPositions hook to reload positions and override user drag
-      console.log('[PositionFix] ⏸️ SKIPPING shot invalidation during delete operation - will be handled by timeline drag system');
-      // queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+      // FIX: Re-enable shot-specific invalidation so newly duplicated images appear immediately
+      // The timeline drag system uses optimistic updates to prevent UI jumps during drag
+      console.log('[PositionFix] ✅ Invalidating shot-specific query after duplicate operation');
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
     }
   });
 };
@@ -1403,10 +1403,10 @@ export const useRemoveImageFromShot = () => {
         // Ensure unpositioned-count updates after deletion
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
 
-        // ⚠️ DON'T invalidate 'unified-generations', 'shot', shot_id during operations
-        // This causes the useEnhancedShotPositions hook to reload positions and override user drag
-        console.log('[PositionFix] ⏸️ SKIPPING shot invalidation during remove operation - will be handled by timeline drag system');
-        // queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
+        // FIX: Re-enable shot-specific invalidation so removed images disappear immediately
+        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
+        console.log('[PositionFix] ✅ Invalidating shot-specific query after remove operation');
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
       }
     },
   });
@@ -1547,10 +1547,10 @@ export const useUpdateShotImageOrder = () => {
         // Also invalidate unified generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
 
-        // ⚠️ DON'T invalidate 'unified-generations', 'shot', shotId during operations
-        // This causes the useEnhancedShotPositions hook to reload positions and override user drag
-        console.log('[PositionFix] ⏸️ SKIPPING shot invalidation during create operation - will be handled by timeline drag system');
-        // queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+        // FIX: Re-enable shot-specific invalidation so newly created shot images appear immediately
+        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
+        console.log('[PositionFix] ✅ Invalidating shot-specific query after create operation');
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       }
     },
   });
@@ -1619,10 +1619,10 @@ export const useCreateShotWithImage = () => {
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', variables.projectId] });
 
       if (data.shotId) {
-        // ⚠️ DON'T invalidate 'unified-generations', 'shot', data.shotId during operations
-        // This causes the useEnhancedShotPositions hook to reload positions and override user drag
-        console.log('[PositionFix] ⏸️ SKIPPING shot invalidation during create operation - will be handled by timeline drag system');
-        // queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
+        // FIX: Re-enable shot-specific invalidation so newly created shot with image appears immediately
+        // The timeline drag system uses optimistic updates to prevent UI jumps during drag
+        console.log('[PositionFix] ✅ Invalidating shot-specific query after create shot with image operation');
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
       }
     },
     onError: (error: Error) => {
