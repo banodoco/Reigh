@@ -1419,7 +1419,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       try {
         const { data: shotGenerationsData, error } = await supabase
           .from('shot_generations')
-          .select('id, generation_id, timeline_frame, metadata')
+          .select(`
+            id,
+            generation_id,
+            timeline_frame,
+            metadata,
+            generations:generation_id (
+              id,
+              location,
+              type
+            )
+          `)
           .eq('shot_id', selectedShotId)
           .order('timeline_frame', { ascending: true });
 
@@ -1427,8 +1437,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           console.error('[Generation] Error fetching shot generations:', error);
         } else if (shotGenerationsData) {
           // Build sorted positions from timeline_frame data
+          // CRITICAL: Filter out videos to match absoluteImageUrls filtering
           sortedPositions = shotGenerationsData
-            .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined)
+            .filter(sg => {
+              // Has valid timeline frame
+              const hasTimelineFrame = sg.timeline_frame !== null && sg.timeline_frame !== undefined;
+              if (!hasTimelineFrame) return false;
+              
+              // Not a video - must match the filtering logic used for absoluteImageUrls above
+              const gen = sg.generations as any;
+              const isVideo = gen?.type === 'video' ||
+                             gen?.type === 'video_travel_output' ||
+                             (gen?.location && gen.location.endsWith('.mp4'));
+              return !isVideo;
+            })
             .map(sg => ({
               id: sg.generation_id || sg.id,
               pos: sg.timeline_frame!
@@ -1436,6 +1458,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             .sort((a, b) => a.pos - b.pos);
           
           console.log('[Generation] Timeline mode - Sorted positions from database:', sortedPositions);
+          console.log('[Generation] Timeline mode - First image position:', sortedPositions[0]?.pos);
+          console.log('[Generation] Timeline mode - All positions:', sortedPositions.map(sp => sp.pos));
           
           // Extract pair prompts from metadata
           for (let i = 0; i < shotGenerationsData.length - 1; i++) {
@@ -1458,9 +1482,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       for (let i = 0; i < sortedPositions.length - 1; i++) {
         const gap = sortedPositions[i + 1].pos - sortedPositions[i].pos;
         frameGaps.push(gap);
+        console.log(`[Generation] Gap ${i}: position ${sortedPositions[i].pos} -> ${sortedPositions[i + 1].pos} = ${gap} frames`);
       }
       
       console.log('[Generation] Timeline mode - Calculated frame gaps:', frameGaps);
+      console.log('[Generation] Timeline mode - Gap calculation summary:', {
+        totalImages: sortedPositions.length,
+        totalGaps: frameGaps.length,
+        expectedGaps: sortedPositions.length - 1,
+        gapsMatch: frameGaps.length === sortedPositions.length - 1
+      });
 
       basePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
         // Use pair-specific prompt if available, otherwise fall back to default

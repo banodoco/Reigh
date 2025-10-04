@@ -159,6 +159,16 @@ function buildTravelBetweenImagesPayload(
     return fadeDuration ?? defaultValue;
   };
 
+  // Handle random seed generation - if random_seed is true, generate a new random seed
+  // Otherwise use the provided seed or default
+  const finalSeed = params.random_seed 
+    ? Math.floor(Math.random() * 1000000) 
+    : (params.seed ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.seed);
+  
+  if (params.random_seed) {
+    console.log(`[RandomSeed] Generated random seed: ${finalSeed}`);
+  }
+
   // Build orchestrator payload matching the original edge function structure
   const orchestratorPayload: Record<string, unknown> = {
     orchestrator_task_id: taskId,
@@ -171,7 +181,7 @@ function buildTravelBetweenImagesPayload(
     frame_overlap_expanded: frameOverlapExpanded,
     parsed_resolution_wh: finalResolution,
     model_name: params.model_name ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.model_name,
-    seed_base: params.seed ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.seed,
+    seed_base: finalSeed,
     steps: stepsValue,
     apply_reward_lora: params.apply_reward_lora ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.apply_reward_lora,
     colour_match_videos: params.colour_match_videos ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.colour_match_videos,
