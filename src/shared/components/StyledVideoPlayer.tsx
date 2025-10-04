@@ -125,7 +125,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
   return (
     <div 
-      className={cn("relative inline-block", className)}
+      className={cn("relative block", className)}
       style={style}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -142,7 +142,6 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         playsInline={playsInline}
         preload={preload}
         className="max-w-full max-h-full object-contain rounded-lg bg-black/5 cursor-pointer video-clickable-area"
-        style={{ width: "auto", height: "auto" }}
         style={{ width: 'auto', height: 'auto' }}
         onDoubleClick={toggleFullscreen}
       >

@@ -1385,7 +1385,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               )}
 
               {/* Media Content */}
-              <div className="relative">
+              <div className="relative flex items-center justify-center w-full" style={{ maxHeight: '85vh' }}>
                 {isVideo ? (
                   <StyledVideoPlayer
                     src={displayUrl}
@@ -1395,11 +1395,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     autoPlay
                     playsInline
                     preload="auto"
-                    className={cn(
-                      'h-auto w-[95vw] shadow-wes border border-border/20',
-                      isTouchLikeDevice ? 'max-h-[85vh]' : 'max-h-[85vh] sm:max-h-[85vh]'
-                    )}
-                    style={{ maxWidth: '95vw' }}
+                    className="w-full sm:w-[90vw] lg:w-[85vw] shadow-wes border border-border/20"
+                    style={{ maxHeight: '85vh' }}
                   />
                 ) : (
                   <div className="relative">
