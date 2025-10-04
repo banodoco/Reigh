@@ -64,13 +64,24 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId || '');
 
   // Derive input images from multiple possible locations within task params
+  // Strips any surrounding quotes from URLs that may have been improperly stored
   const inputImages: string[] = React.useMemo(() => {
+    const cleanUrl = (url: string): string => {
+      if (typeof url !== 'string') return url;
+      // Remove surrounding quotes if present
+      return url.replace(/^["']|["']$/g, '');
+    };
+    
     const p = (task as any)?.params || {};
-    if (Array.isArray(p.input_images) && p.input_images.length > 0) return p.input_images;
-    if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
-      return p.full_orchestrator_payload.input_image_paths_resolved;
+    if (Array.isArray(p.input_images) && p.input_images.length > 0) {
+      return p.input_images.map(cleanUrl);
     }
-    if (Array.isArray(p.input_image_paths_resolved)) return p.input_image_paths_resolved;
+    if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
+      return p.full_orchestrator_payload.input_image_paths_resolved.map(cleanUrl);
+    }
+    if (Array.isArray(p.input_image_paths_resolved)) {
+      return p.input_image_paths_resolved.map(cleanUrl);
+    }
     return [];
   }, [task]);
 
