@@ -114,16 +114,41 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                                metadata.softEdgeStrength !== undefined || 
                                metadata.userProvidedImageUrl;
 
+  // Check if this is a qwen_image_edit task with source image
+  const isQwenImageEdit = (metadata as any).tool_type === 'qwen_image_edit' || 
+                          (metadata as any).originalParams?.qwen_endpoint === 'qwen-image-edit';
+  const qwenSourceImage = (metadata as any).image || 
+                          (metadata as any).originalParams?.image;
+
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
       {/* Header */}
       <div>
-        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-muted-foreground`}>Image Generation</h3>
+        <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-muted-foreground`}>
+          {isQwenImageEdit ? 'Image Edit' : 'Image Generation'}
+        </h3>
         <div className="border-t border-muted-foreground/20 mt-2"></div>
       </div>
 
+      {/* Qwen Image Edit Source Image */}
+      {showUserImage && isQwenImageEdit && qwenSourceImage && (
+        <div className="space-y-2">
+          <p className={`${config.textSize} font-medium text-muted-foreground`}>
+            Source Image
+          </p>
+          <div className="flex justify-center">
+            <img 
+              src={qwenSourceImage} 
+              alt="Source image for edit"
+              className="w-full h-auto max-h-24 object-contain rounded-sm border"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
+
       {/* User Provided Image */}
-      {showUserImage && metadata.userProvidedImageUrl && (
+      {showUserImage && metadata.userProvidedImageUrl && !isQwenImageEdit && (
         <div className="space-y-2">
           <p className={`${config.textSize} font-medium text-muted-foreground`}>
             Reference Image
