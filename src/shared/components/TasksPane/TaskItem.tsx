@@ -398,6 +398,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // State for video lightbox
   const [showVideoLightbox, setShowVideoLightbox] = useState<boolean>(false);
   const [videoLightboxIndex, setVideoLightboxIndex] = useState<number>(0);
+  
+  // Reset hover state when lightboxes open to prevent persistent hover state
+  useEffect(() => {
+    if (showLightbox || showVideoLightbox) {
+      setIsHoveringTaskItem(false);
+    }
+  }, [showLightbox, showVideoLightbox]);
 
   // Local state to show progress percentage temporarily
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -541,6 +548,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     e.preventDefault(); // Prevent default behavior
     if (!shotId) return;
     
+    // Reset hover state immediately
+    setIsHoveringTaskItem(false);
+    
     setCurrentShotId(shotId);
     navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });
   };
@@ -549,6 +559,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const handleViewVideo = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    
+    // Reset hover state immediately
+    setIsHoveringTaskItem(false);
     
     // If video data is already loaded, open immediately
     if (travelData.videoOutputs && travelData.videoOutputs.length > 0) {
@@ -574,6 +587,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const handleViewImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    
+    // Reset hover state immediately
+    setIsHoveringTaskItem(false);
+    
     if (generationData) {
       setShowLightbox(true);
     }
@@ -864,6 +881,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     
     const handleTooltipClick = (e: React.MouseEvent) => {
       e.stopPropagation();
+      
+      // Reset hover state immediately when clicking tooltip
+      setIsHoveringTaskItem(false);
+      
       if (taskInfo.isVideoTask && hasClickableContent) {
         setVideoLightboxIndex(0);
         setShowVideoLightbox(true);
