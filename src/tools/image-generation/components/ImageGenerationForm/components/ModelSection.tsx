@@ -300,7 +300,7 @@ const StyleReferenceSection: React.FC<{
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="style-character" id="mode-style-character" />
-                  <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + character</Label>
+                  <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + subject</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="custom" id="mode-custom" />
