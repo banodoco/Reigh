@@ -141,8 +141,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         autoPlay={autoPlay}
         playsInline={playsInline}
         preload={preload}
-        className="max-w-full max-h-full object-contain rounded-lg bg-black/5 cursor-pointer video-clickable-area"
-        style={{ width: 'auto', height: 'auto' }}
+        className="w-full h-auto object-contain rounded-lg bg-black/5 cursor-pointer video-clickable-area"
+        style={{ maxHeight: '100%' }}
         onDoubleClick={toggleFullscreen}
       >
         Your browser does not support the video tag.
