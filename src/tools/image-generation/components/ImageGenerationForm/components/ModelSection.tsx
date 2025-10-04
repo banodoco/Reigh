@@ -389,17 +389,19 @@ const StyleReferenceSection: React.FC<{
           </div>
         </div>
         
-        {/* Right side - Large preview */}
-        <div className="flex-1">
-          <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
-            <img
-              src={styleReferenceImage}
-              alt="Selected reference"
-              className="w-full h-full object-contain"
-              style={{ objectFit: 'contain' }}
-            />
+        {/* Right side - Large preview (hidden on mobile) */}
+        {!isMobile && (
+          <div className="flex-1">
+            <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
+              <img
+                src={styleReferenceImage}
+                alt="Selected reference"
+                className="w-full h-full object-contain"
+                style={{ objectFit: 'contain' }}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     )}
     
