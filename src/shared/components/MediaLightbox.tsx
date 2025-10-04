@@ -737,7 +737,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       >
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay 
-            className="fixed inset-0 z-[10000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            className="fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             onPointerDown={(e) => {
               // Completely block all pointer events from reaching underlying elements
               e.preventDefault();
@@ -852,7 +852,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             className={cn(
-              "fixed z-[10000]",
+              "fixed z-[100000]",
               // Disable animations on mobile to prevent blink during zoom/fade
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
