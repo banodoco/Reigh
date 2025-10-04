@@ -10,6 +10,8 @@ import PaymentCancelPage from '@/pages/PaymentCancelPage';
 import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
 // Import VideoTravelToolPage eagerly to avoid dynamic import issues on some mobile browsers (e.g. Safari)
 import VideoTravelToolPage from '@/tools/travel-between-images/pages/VideoTravelToolPage';
+// Import CharacterAnimatePage eagerly for consistency with other main tools
+import CharacterAnimatePage from '@/tools/character-animate/pages/CharacterAnimatePage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditTravelToolPage = lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
@@ -87,6 +89,10 @@ const router = createBrowserRouter([
       {
         path: '/tools/travel-between-images',
         element: <VideoTravelToolPage />, // No Suspense wrapper needed – component is loaded synchronously
+      },
+      {
+        path: '/tools/character-animate',
+        element: <CharacterAnimatePage />, // No Suspense wrapper needed – component is loaded synchronously
       },
       {
         path: '/tools/edit-travel',

@@ -2,20 +2,23 @@
 export { videoTravelSettings } from './travel-between-images/settings';
 export { imageGenerationSettings } from './image-generation/settings';
 export { editTravelSettings } from './edit-travel/settings';
+export { characterAnimateSettings } from './character-animate/settings';
 export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
 import { videoTravelSettings } from './travel-between-images/settings';
 import { imageGenerationSettings } from './image-generation/settings';
 import { editTravelSettings } from './edit-travel/settings';
+import { characterAnimateSettings } from './character-animate/settings';
 import { userPreferencesSettings } from '../shared/settings/userPreferences';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
-import { Paintbrush, Video, Edit } from 'lucide-react';
+import { Paintbrush, Video, Edit, Users } from 'lucide-react';
 
 export const toolsManifest = [
   videoTravelSettings,
   imageGenerationSettings,
   editTravelSettings,
+  characterAnimateSettings,
   userPreferencesSettings,
 ] as const;
 
@@ -68,6 +71,18 @@ export const toolsUIManifest: ToolUIDefinition[] = [
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
     accent: 'wes-yellow',
     ornament: '✧',
+    badge: 'New',
+  },
+  {
+    id: characterAnimateSettings.id,
+    name: 'Character Animate',
+    path: '/tools/character-animate',
+    description: 'Bring characters to life by mapping motion from reference videos onto static images with natural expressions and movements.',
+    environments: [AppEnv.LOCAL, AppEnv.WEB],
+    icon: Users,
+    gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
+    accent: 'wes-sage',
+    ornament: '◉',
     badge: 'New',
   },
 ]; 

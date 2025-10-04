@@ -673,21 +673,52 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
 
+      console.log('[PairPrompts] ✅ Database updated successfully, now updating local state and invalidating cache');
+
       // Update local state
       setShotGenerations(prev => prev.map(sg =>
         sg.id === generationId
           ? { ...sg, metadata: updatedMetadata }
           : sg
       ));
+
+      // CRITICAL: Invalidate query cache to ensure other components see the update
+      // This prevents stale data from being loaded when other operations trigger cache invalidation
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      
+      console.log('[PairPrompts] ✅ Cache invalidated, all components will see the updated pair prompt');
     } catch (err) {
       console.error('[updatePairPrompts] Error:', err);
       throw err;
     }
-  }, [shotId, shotGenerations]);
+  }, [shotId, shotGenerations, queryClient]);
 
   // Get pair prompts in Timeline component format as a reactive value
   const pairPrompts = useMemo((): Record<number, { prompt: string; negativePrompt: string }> => {
-    const sortedGenerations = [...shotGenerations]
+    // CRITICAL: Filter out videos to match the timeline display and generation logic
+    const filteredGenerations = shotGenerations.filter(sg => {
+      // Must have a generation
+      if (!sg.generation) return false;
+      
+      // Filter out videos
+      const isVideo = sg.generation.type === 'video' ||
+                     sg.generation.type === 'video_travel_output' ||
+                     (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+      return !isVideo;
+    });
+
+    console.log('[PairPrompts-GETTER] 📖 Reading pair prompts from shotGenerations:', {
+      totalGenerations: shotGenerations.length,
+      afterVideoFilter: filteredGenerations.length,
+      filteredShotGenIds: filteredGenerations.map(sg => ({
+        id: sg.id.substring(0, 8),
+        timeline_frame: sg.timeline_frame,
+        hasGeneration: !!sg.generation
+      }))
+    });
+
+    const sortedGenerations = [...filteredGenerations]
       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
 
     const pairPromptsData: Record<number, { prompt: string; negativePrompt: string }> = {};
@@ -695,13 +726,34 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     // Each pair is represented by its first item (index in the sorted array)
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
+      console.log(`[PairPrompts-GETTER] 🔍 Checking pair ${i}:`, {
+        shotGenId: firstItem.id.substring(0, 8),
+        timeline_frame: firstItem.timeline_frame,
+        has_pair_prompt: !!firstItem.metadata?.pair_prompt,
+        pair_prompt: firstItem.metadata?.pair_prompt || '(none)',
+        has_pair_negative_prompt: !!firstItem.metadata?.pair_negative_prompt,
+        pair_negative_prompt: firstItem.metadata?.pair_negative_prompt || '(none)'
+      });
+      
       if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
         pairPromptsData[i] = {
           prompt: firstItem.metadata.pair_prompt || '',
           negativePrompt: firstItem.metadata.pair_negative_prompt || '',
         };
+        console.log(`[PairPrompts-GETTER] ✅ Added pair ${i} to pairPromptsData`);
       }
     }
+
+    console.log('[PairPrompts-GETTER] 📊 Final pair prompts data:', {
+      totalPairs: sortedGenerations.length - 1,
+      customPairs: Object.keys(pairPromptsData).length,
+      pairIndexes: Object.keys(pairPromptsData).map(Number),
+      pairPromptsData: Object.entries(pairPromptsData).map(([idx, data]) => ({
+        pairIndex: idx,
+        prompt: data.prompt.substring(0, 30) + '...',
+        negativePrompt: data.negativePrompt.substring(0, 30) + '...'
+      }))
+    });
 
     return pairPromptsData;
   }, [shotGenerations]);
@@ -713,17 +765,61 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
   // Update pair prompts for a specific pair index
   const updatePairPromptsByIndex = useCallback(async (pairIndex: number, prompt: string, negativePrompt: string) => {
-    const sortedGenerations = [...shotGenerations]
+    console.log(`[PairPrompts-SAVE] 💾 START updatePairPromptsByIndex for pair ${pairIndex}`);
+    
+    // CRITICAL: Filter out videos to match the timeline display and generation logic
+    // This ensures pair prompt indexes match the visual pairs in the UI
+    const filteredGenerations = shotGenerations.filter(sg => {
+      // Must have a generation
+      if (!sg.generation) return false;
+      
+      // Filter out videos
+      const isVideo = sg.generation.type === 'video' ||
+                     sg.generation.type === 'video_travel_output' ||
+                     (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+      return !isVideo;
+    });
+
+    console.log(`[PairPrompts-SAVE] 📊 Filtered shotGenerations:`, {
+      totalGenerations: shotGenerations.length,
+      afterVideoFilter: filteredGenerations.length,
+      filteredIds: filteredGenerations.map((sg, idx) => ({
+        arrayIndex: idx,
+        shotGenId: sg.id.substring(0, 8),
+        timeline_frame: sg.timeline_frame
+      }))
+    });
+
+    const sortedGenerations = [...filteredGenerations]
       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
 
+    console.log(`[PairPrompts-SAVE] 📊 After sorting:`, {
+      sortedIds: sortedGenerations.map((sg, idx) => ({
+        arrayIndex: idx,
+        shotGenId: sg.id.substring(0, 8),
+        timeline_frame: sg.timeline_frame
+      }))
+    });
+
     if (pairIndex >= sortedGenerations.length - 1) {
-      console.error('[PairPrompts] Invalid pair index:', pairIndex);
+      console.error('[PairPrompts-SAVE] ❌ Invalid pair index:', pairIndex, 'Total non-video images:', sortedGenerations.length, 'Max valid pair index:', sortedGenerations.length - 2);
       return;
     }
 
     // Get the first item in the pair (the one that stores the prompts)
     const firstItem = sortedGenerations[pairIndex];
+    console.log(`[PairPrompts-SAVE] 💾 Saving pair prompt for pair ${pairIndex}:`, {
+      shotGenId: firstItem.id.substring(0, 8),
+      fullShotGenId: firstItem.id,
+      timeline_frame: firstItem.timeline_frame,
+      prompt: prompt || '(empty)',
+      promptLength: prompt.length,
+      negativePrompt: negativePrompt || '(empty)',
+      negativePromptLength: negativePrompt.length,
+    });
+    
     await updatePairPrompts(firstItem.id, prompt, negativePrompt);
+    console.log(`[PairPrompts-SAVE] ✅ COMPLETED updatePairPromptsByIndex for pair ${pairIndex}`);
   }, [shotGenerations, updatePairPrompts]);
 
   return {

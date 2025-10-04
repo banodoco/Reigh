@@ -381,8 +381,8 @@ export function useToolSettings<T>(
   networkMode: 'online',
   });
 
-  // Log errors for debugging
-  if (error) {
+  // Log errors for debugging (except expected cancellations)
+  if (error && !error?.message?.includes('Request was cancelled')) {
     console.error('[useToolSettings] Query error:', error);
   }
 

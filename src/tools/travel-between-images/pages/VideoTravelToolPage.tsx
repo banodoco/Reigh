@@ -820,8 +820,8 @@ const VideoTravelToolPage: React.FC = () => {
   // Update state when settings are loaded from database (or confirmed absent)
   // OPTIMIZATION: Use React.startTransition to batch state updates and reduce renders
   useEffect(() => {
-    // CRITICAL: Don't load settings if the query was cancelled
-    // This prevents resetting to defaults when rapidly switching shots
+    // CRITICAL FIX: Allow settings initialization even if query was cancelled
+    // We need to mark as loaded to enable user input, using whatever settings we have
     const isQueryCancelled = settingsError?.message?.includes('Request was cancelled');
     
     console.log('[BatchVideoSteps] Settings effect triggered:', {
@@ -829,18 +829,20 @@ const VideoTravelToolPage: React.FC = () => {
       hasLoadedInitialSettings: hasLoadedInitialSettings.current,
       isQueryCancelled,
       shotId: selectedShot?.id?.substring(0, 8),
-      willRun: !isLoadingSettings && !hasLoadedInitialSettings.current && !isQueryCancelled
+      willRun: !isLoadingSettings && !hasLoadedInitialSettings.current
     });
     
-    if (isQueryCancelled) {
-      console.log('[BatchVideoSteps] Skipping settings load - request was cancelled');
-      return;
-    }
-    
+    // Always mark as loaded when not loading, even if query was cancelled
+    // This ensures UI remains editable instead of being permanently locked
     if (!isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
       // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
+
+      // Warn if we're initializing with potentially incomplete data due to cancellation
+      if (isQueryCancelled) {
+        console.warn('[BatchVideoSteps] Initializing with available settings after query cancellation - UI will be editable');
+      }
 
       // Start from existing settings if present, otherwise empty defaults
       let settingsToApply: VideoTravelSettings = (settings as VideoTravelSettings) || ({} as VideoTravelSettings);

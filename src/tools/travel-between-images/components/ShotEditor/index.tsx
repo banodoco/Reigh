@@ -492,6 +492,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const headerContainerRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
   const savedOnApproachRef = useRef(false);
+  
+  // Floating CTA state and refs
+  const ctaContainerRef = useRef<HTMLDivElement>(null);
+  const videoGalleryRef = useRef<HTMLDivElement>(null);
+  const [isCtaFloating, setIsCtaFloating] = useState(false);
 
   useEffect(() => {
     const containerEl = headerContainerRef.current;
@@ -581,6 +586,61 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       savedOnApproachRef.current = false;
     }
   }, [state.isEditingName]);
+  
+  // Floating CTA: Track when user scrolls past video gallery and before reaching original CTA
+  useEffect(() => {
+    const galleryEl = videoGalleryRef.current;
+    const ctaEl = ctaContainerRef.current;
+    if (!galleryEl || !ctaEl) return;
+    
+    let hasScrolledPastGallery = false;
+    let isOriginalCtaVisible = false;
+    
+    const updateFloatingState = () => {
+      // Show floating CTA only when: scrolled past gallery AND original CTA is not visible
+      setIsCtaFloating(hasScrolledPastGallery && !isOriginalCtaVisible);
+    };
+    
+    // Mobile needs smaller margins due to smaller viewport
+    const galleryMargin = isMobile ? '-200px 0px 0px 0px' : '-600px 0px 0px 0px';
+    const ctaMargin = isMobile ? '0px 0px -100px 0px' : '0px 0px -150px 0px';
+    
+    // Track video gallery - show floating CTA when it's scrolled out of view (top is above viewport)
+    const galleryObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          hasScrolledPastGallery = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+          updateFloatingState();
+        });
+      },
+      {
+        threshold: 0,
+        rootMargin: galleryMargin,
+      }
+    );
+    
+    // Track original CTA position - hide floating CTA when reaching the bottom
+    const ctaObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isOriginalCtaVisible = entry.isIntersecting;
+          updateFloatingState();
+        });
+      },
+      {
+        threshold: 0,
+        rootMargin: ctaMargin,
+      }
+    );
+    
+    galleryObserver.observe(galleryEl);
+    ctaObserver.observe(ctaEl);
+    
+    return () => {
+      galleryObserver.disconnect();
+      ctaObserver.disconnect();
+    };
+  }, [isMobile]);
 
   const handleStickyNameClick = useCallback(() => {
     const containerEl = headerContainerRef.current;
@@ -1438,19 +1498,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         } else if (shotGenerationsData) {
           // Build sorted positions from timeline_frame data
           // CRITICAL: Filter out videos to match absoluteImageUrls filtering
-          sortedPositions = shotGenerationsData
-            .filter(sg => {
-              // Has valid timeline frame
-              const hasTimelineFrame = sg.timeline_frame !== null && sg.timeline_frame !== undefined;
-              if (!hasTimelineFrame) return false;
-              
-              // Not a video - must match the filtering logic used for absoluteImageUrls above
-              const gen = sg.generations as any;
-              const isVideo = gen?.type === 'video' ||
-                             gen?.type === 'video_travel_output' ||
-                             (gen?.location && gen.location.endsWith('.mp4'));
-              return !isVideo;
-            })
+          // MUST match the UI filtering logic exactly (only filter videos, NOT timeline_frame)
+          const filteredShotGenerations = shotGenerationsData.filter(sg => {
+            // Must have a generation
+            if (!sg.generations) return false;
+            
+            // Not a video - must match the filtering logic used for absoluteImageUrls above AND the UI
+            const gen = sg.generations as any;
+            const isVideo = gen?.type === 'video' ||
+                           gen?.type === 'video_travel_output' ||
+                           (gen?.location && gen.location.endsWith('.mp4'));
+            return !isVideo;
+          });
+
+          // Build sorted positions ONLY from items with valid timeline_frame
+          // (needed for calculating frame gaps)
+          sortedPositions = filteredShotGenerations
+            .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined)
             .map(sg => ({
               id: sg.generation_id || sg.id,
               pos: sg.timeline_frame!
@@ -1461,17 +1525,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           console.log('[Generation] Timeline mode - First image position:', sortedPositions[0]?.pos);
           console.log('[Generation] Timeline mode - All positions:', sortedPositions.map(sp => sp.pos));
           
-          // Extract pair prompts from metadata
-          for (let i = 0; i < shotGenerationsData.length - 1; i++) {
-            const firstItem = shotGenerationsData[i];
+          // CRITICAL FIX: Extract pair prompts from FILTERED data (not raw data)
+          // This ensures pair prompt indexes match the actual image pairs being generated
+          console.log('[PairPrompts-LOAD] 📚 Starting to extract pair prompts from database:', {
+            totalFilteredGenerations: filteredShotGenerations.length,
+            expectedPairs: filteredShotGenerations.length - 1
+          });
+          
+          for (let i = 0; i < filteredShotGenerations.length - 1; i++) {
+            const firstItem = filteredShotGenerations[i];
             const metadata = firstItem.metadata as any;
+            console.log(`[PairPrompts-LOAD] 🔍 Checking pair ${i}:`, {
+              shotGenId: firstItem.id.substring(0, 8),
+              timeline_frame: firstItem.timeline_frame,
+              has_pair_prompt: !!metadata?.pair_prompt,
+              has_pair_negative_prompt: !!metadata?.pair_negative_prompt
+            });
+            
             if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
               pairPrompts[i] = {
                 prompt: metadata.pair_prompt || '',
                 negativePrompt: metadata.pair_negative_prompt || '',
               };
+              console.log(`[PairPrompts-LOAD] ✅ Loaded pair prompt ${i} from metadata:`, {
+                prompt: metadata.pair_prompt || '(none)',
+                negativePrompt: metadata.pair_negative_prompt || '(none)',
+                shotGenId: firstItem.id.substring(0, 8),
+                timeline_frame: firstItem.timeline_frame
+              });
             }
           }
+          
+          console.log('[PairPrompts-LOAD] 📊 Pair prompts loaded from database:', {
+            totalPairs: filteredShotGenerations.length - 1,
+            customPairs: Object.keys(pairPrompts).length,
+            pairPromptIndexes: Object.keys(pairPrompts).map(Number),
+            allPairPrompts: pairPrompts
+          });
         }
       } catch (err) {
         console.error('[Generation] Error fetching shot generations:', err);
@@ -1493,22 +1583,53 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         gapsMatch: frameGaps.length === sortedPositions.length - 1
       });
 
+      console.log('[PairPrompts-GENERATION] 🎯 Building prompts array:', {
+        totalGaps: frameGaps.length,
+        availablePairPrompts: Object.keys(pairPrompts).length,
+        pairPromptsIndexes: Object.keys(pairPrompts).map(Number),
+        batchVideoPromptDefault: batchVideoPrompt,
+        fullPairPromptsObject: pairPrompts
+      });
+
       basePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
         // Use pair-specific prompt if available, otherwise fall back to default
         const pairPrompt = pairPrompts[index]?.prompt;
         const finalPrompt = (pairPrompt && pairPrompt.trim()) ? pairPrompt.trim() : batchVideoPrompt;
-        console.log(`[Generation] Pair ${index}: Using ${pairPrompt ? 'custom' : 'default'} prompt:`, finalPrompt);
+        console.log(`[PairPrompts-GENERATION] 📝 Pair ${index}:`, {
+          hasPairPrompt: !!pairPrompt,
+          pairPromptRaw: pairPrompt || '(none)',
+          finalPromptUsed: finalPrompt,
+          isCustom: pairPrompt && pairPrompt.trim() ? true : false
+        });
         return finalPrompt;
       }) : [batchVideoPrompt];
+      
       segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
       frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
+      
       negativePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
         // Use pair-specific negative prompt if available, otherwise fall back to default
         const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
         const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : steerableMotionSettings.negative_prompt;
-        console.log(`[Generation] Pair ${index}: Using ${pairNegativePrompt ? 'custom' : 'default'} negative prompt:`, finalNegativePrompt);
+        console.log(`[PairPrompts-GENERATION] 🚫 Pair ${index} negative:`, {
+          hasPairNegativePrompt: !!pairNegativePrompt,
+          pairNegativePromptRaw: pairNegativePrompt || '(none)',
+          finalNegativePromptUsed: finalNegativePrompt,
+          isCustom: pairNegativePrompt && pairNegativePrompt.trim() ? true : false
+        });
         return finalNegativePrompt;
       }) : [steerableMotionSettings.negative_prompt];
+
+      console.log(`[PairPrompts-GENERATION] ✅ Final prompts array:`, {
+        basePrompts,
+        negativePrompts,
+        pairPromptsObject: pairPrompts,
+        summary: basePrompts.map((prompt, idx) => ({
+          pairIndex: idx,
+          promptPreview: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''),
+          isCustom: prompt !== batchVideoPrompt
+        }))
+      });
 
       console.log(`[Generation] Timeline mode - Final prompts:`, { basePrompts, negativePrompts, pairPrompts });
     } else {
@@ -1694,7 +1815,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       </div>
 
       {/* Output Videos Section - Now at the top */}
-      <div className="">
+      <div ref={videoGalleryRef} className="">
         <VideoOutputsGallery 
           projectId={projectId}
           shotId={selectedShotId}
@@ -1867,12 +1988,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     </div>
                 </div>
 
-                {/* Full-width divider and generate button */}
-                <div className="mt-6 pt-6 border-t">
+                {/* Full-width divider and generate button - Original position with ref */}
+                <div ref={ctaContainerRef} className="mt-6 pt-6 border-t">
                   <div className="flex flex-col items-center">
                     {/* Variant Name Input */}
                     <div className="w-full max-w-md mb-4">
-                      <label htmlFor="variant-name" className="block text-sm font-medium text-muted-foreground mb-2">
+                      <label htmlFor="variant-name" className="block text-xs font-medium text-muted-foreground mb-2">
                         Variant Name (optional)
                       </label>
                       <input
@@ -2014,6 +2135,67 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         isOpen={state.isSettingsModalOpen}
         onOpenChange={actions.setSettingsModalOpen}
       />
+      
+      {/* Floating CTA - appears when original position is not visible */}
+      {isCtaFloating && (
+        <div 
+          className="fixed z-[80] animate-in slide-in-from-bottom-4 fade-in duration-300"
+          style={{
+            bottom: isMobile ? '40px' : '60px', // Pushed down on mobile, desktop stays at original position
+            left: isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px',
+            right: isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px',
+          }}
+        >
+          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-3 py-3 max-w-md mx-auto">
+            <div className="flex flex-col items-center gap-2">
+              {/* Variant Name Input */}
+              <div className="w-full">
+                <label htmlFor="variant-name-floating" className="block text-xs font-medium text-muted-foreground mb-2">
+                  Variant Name (optional)
+                </label>
+                <input
+                  id="variant-name-floating"
+                  type="text"
+                  value={variantName}
+                  onChange={(e) => setVariantName(e.target.value)}
+                  placeholder="e.g., high-contrast, bright-colors"
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                />
+              </div>
+              
+              <Button 
+                size="lg" 
+                className="w-full" 
+                variant={steerableMotionJustQueued ? "success" : "default"}
+                onClick={handleGenerateBatch}
+                disabled={isGenerationDisabled}
+              >
+                {steerableMotionJustQueued
+                  ? "Added to queue!"
+                  : isSteerableMotionEnqueuing 
+                    ? 'Creating Tasks...' 
+                    : 'Generate Video'}
+              </Button>
+              {isGenerationDisabledDueToApiKey && (
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  If Enhance Prompt is enabled, you must add an{' '}
+                  <button 
+                    onClick={() => actions.setSettingsModalOpen(true)}
+                    className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    OpenAI API key
+                  </button>
+                </p>
+              )}
+              {!batchVideoPrompt.trim() && !allPairsHavePrompts && (
+                <p className="text-xs text-center text-red-600 mt-2">
+                  Having a prompt is very important for directing the video
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

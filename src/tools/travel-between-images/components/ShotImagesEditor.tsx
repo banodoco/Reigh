@@ -193,6 +193,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     deleteItem,
     loadPositions,
     pairPrompts, // Use reactive pairPrompts value directly
+    updatePairPrompts, // Direct update by shot_generation.id
     updatePairPromptsByIndex
   } = hookData;
   
@@ -580,17 +581,44 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         isOpen={pairPromptModalData.isOpen}
         onClose={() => setPairPromptModalData({ isOpen: false, pairData: null })}
         pairData={pairPromptModalData.pairData}
-        pairPrompt={pairPromptModalData.pairData ? (pairPrompts[pairPromptModalData.pairData.index]?.prompt || "") : ""}
-        pairNegativePrompt={pairPromptModalData.pairData ? (pairPrompts[pairPromptModalData.pairData.index]?.negativePrompt || "") : ""}
+        pairPrompt={(() => {
+          // CRITICAL: Read prompt from the exact shot_generation being displayed
+          // instead of using index-based lookup (which can fail with duplicates)
+          if (!pairPromptModalData.pairData?.startImage?.id) return "";
+          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
+          return shotGen?.metadata?.pair_prompt || "";
+        })()}
+        pairNegativePrompt={(() => {
+          // CRITICAL: Read negative prompt from the exact shot_generation being displayed
+          if (!pairPromptModalData.pairData?.startImage?.id) return "";
+          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
+          return shotGen?.metadata?.pair_negative_prompt || "";
+        })()}
         defaultPrompt={defaultPrompt}
         defaultNegativePrompt={defaultNegativePrompt}
           onSave={async (pairIndex, prompt, negativePrompt) => {
             try {
-              await updatePairPromptsByIndex(pairIndex, prompt, negativePrompt);
-              console.log(`[PairPrompts] Saved prompts for Pair ${pairIndex + 1}:`, { prompt, negativePrompt });
+              // CRITICAL FIX: Use the actual shot_generation.id from the timeline
+              // instead of recalculating it from index (which can be wrong with duplicates)
+              const shotGenerationId = pairPromptModalData.pairData?.startImage?.id;
+              
+              if (!shotGenerationId) {
+                console.error('[PairPrompts] ❌ No shot_generation.id found in pairData:', pairPromptModalData.pairData);
+                return;
+              }
+              
+              console.log(`[PairPrompts] 💾 Saving prompts for Pair ${pairIndex + 1} to shot_generation:`, {
+                shotGenerationId: shotGenerationId.substring(0, 8),
+                fullId: shotGenerationId,
+                prompt,
+                negativePrompt
+              });
+              
+              await updatePairPrompts(shotGenerationId, prompt, negativePrompt);
+              console.log(`[PairPrompts] ✅ Saved prompts for Pair ${pairIndex + 1}`);
               // Timeline now uses shared hook data, so changes are reactive
             } catch (error) {
-              console.error(`[PairPrompts] Failed to save prompts for Pair ${pairIndex + 1}:`, error);
+              console.error(`[PairPrompts] ❌ Failed to save prompts for Pair ${pairIndex + 1}:`, error);
             }
                 }}
               />

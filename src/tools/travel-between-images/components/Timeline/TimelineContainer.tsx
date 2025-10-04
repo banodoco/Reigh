@@ -602,6 +602,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             const generationStartPixel = paddingOffset + ((pair.generationStart - fullMin) / fullRange) * effectiveWidth;
             const generationStartPercent = (generationStartPixel / containerWidth) * 100;
 
+            // CRITICAL: Get the first image in this pair to read its metadata
+            const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
+            
+            // Read pair prompts directly from the image metadata instead of index-based lookup
+            // This ensures we're reading from the exact shot_generation being displayed
+            const pairPromptFromMetadata = (startImage as any)?.metadata?.pair_prompt || '';
+            const pairNegativePromptFromMetadata = (startImage as any)?.metadata?.pair_negative_prompt || '';
+
             return (
               <PairRegion
                 key={`pair-${index}`}
@@ -645,8 +653,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                     } : null
                   });
                 } : undefined}
-                pairPrompt={pairPrompts?.[index]?.prompt}
-                pairNegativePrompt={pairPrompts?.[index]?.negativePrompt}
+                pairPrompt={pairPromptFromMetadata}
+                pairNegativePrompt={pairNegativePromptFromMetadata}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
