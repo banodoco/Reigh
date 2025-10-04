@@ -60,7 +60,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   return (
     <div className="space-y-3">
       {/* Thumbnail gallery */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {references.map(ref => {
           const isSelected = selectedReferenceId === ref.id;
           const imageUrl = ref.styleReferenceImageOriginal || ref.styleReferenceImage;
