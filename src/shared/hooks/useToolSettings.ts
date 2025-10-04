@@ -313,6 +313,7 @@ async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, sign
 export function useToolSettings<T>(toolId: string, context?: { projectId?: string; shotId?: string; enabled?: boolean }): {
   settings: T | undefined;
   isLoading: boolean;
+  error: Error | null;
   update: (scope: SettingsScope, settings: Partial<T>) => void;
   isUpdating: boolean;
 };
@@ -469,6 +470,7 @@ export function useToolSettings<T>(
   return {
     settings: settings as T | undefined,
     isLoading,
+    error: error as Error | null,
     update,
     isUpdating: updateMutation.isPending,
   };

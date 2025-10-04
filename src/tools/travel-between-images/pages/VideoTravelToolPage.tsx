@@ -57,6 +57,9 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
       enabled: !!selectedShotId 
     }
   );
+  
+  // Destructure error separately to ensure it's available
+  const { error: toolSettingsError } = toolSettingsQuery;
 
   const projectSettingsQuery = useToolSettings<VideoTravelSettings>(
     'travel-between-images',
@@ -99,6 +102,7 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
     updateSettings: toolSettingsQuery.update,
     settingsLoading: toolSettingsQuery.isLoading,
     settingsUpdating: toolSettingsQuery.isUpdating,
+    settingsError: toolSettingsError,
 
     // Project settings data
     projectSettings: projectSettingsQuery.settings,
@@ -176,6 +180,7 @@ const VideoTravelToolPage: React.FC = () => {
     updateSettings,
     settingsLoading: isLoadingSettings,
     settingsUpdating: isUpdating,
+    settingsError,
     projectSettings,
     updateProjectSettings,
     projectSettingsLoading,
@@ -778,6 +783,23 @@ const VideoTravelToolPage: React.FC = () => {
   // Update state when settings are loaded from database (or confirmed absent)
   // OPTIMIZATION: Use React.startTransition to batch state updates and reduce renders
   useEffect(() => {
+    // CRITICAL: Don't load settings if the query was cancelled
+    // This prevents resetting to defaults when rapidly switching shots
+    const isQueryCancelled = settingsError?.message?.includes('Request was cancelled');
+    
+    console.log('[BatchVideoSteps] Settings effect triggered:', {
+      isLoadingSettings,
+      hasLoadedInitialSettings: hasLoadedInitialSettings.current,
+      isQueryCancelled,
+      shotId: selectedShot?.id?.substring(0, 8),
+      willRun: !isLoadingSettings && !hasLoadedInitialSettings.current && !isQueryCancelled
+    });
+    
+    if (isQueryCancelled) {
+      console.log('[BatchVideoSteps] Skipping settings load - request was cancelled');
+      return;
+    }
+    
     if (!isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
       // Reset user interaction flag when loading new settings
@@ -816,7 +838,9 @@ const VideoTravelToolPage: React.FC = () => {
       console.log('[BatchVideoSteps] Loading settings:', {
         fromDB: settingsToApply.batchVideoSteps,
         willSetTo: settingsToApply.batchVideoSteps || 4,
-        shotId: selectedShot?.id?.substring(0, 8)
+        shotId: selectedShot?.id?.substring(0, 8),
+        hasLoadedBefore: hasLoadedInitialSettings.current,
+        fullSettings: settingsToApply
       });
       
       startTransition(() => {
@@ -841,7 +865,8 @@ const VideoTravelToolPage: React.FC = () => {
         });
       });
     }
-  }, [settings, isLoadingSettings, selectedShot?.id, updateSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, isLoadingSettings, settingsError, selectedShot?.id]); // Don't include updateSettings - it's unstable and causes loops
 
   // Auto-disable turbo mode when not using cloud generation
   useEffect(() => {
@@ -1251,6 +1276,20 @@ const VideoTravelToolPage: React.FC = () => {
   ]);
 
   // Reset loaded flag when switching shots - MUST be after currentSettings is defined
+  // Use refs to access current values without triggering re-renders
+  const currentSettingsRef = useRef(currentSettings);
+  const settingsRef = useRef(settings);
+  const updateSettingsRef = useRef(updateSettings);
+  const updateProjectSettingsRef = useRef(updateProjectSettings);
+  
+  // Keep refs updated
+  useEffect(() => {
+    currentSettingsRef.current = currentSettings;
+    settingsRef.current = settings;
+    updateSettingsRef.current = updateSettings;
+    updateProjectSettingsRef.current = updateProjectSettings;
+  });
+  
   useEffect(() => {
     // Flush any pending saves before resetting
     if (saveTimeoutRef.current) {
@@ -1259,16 +1298,16 @@ const VideoTravelToolPage: React.FC = () => {
       saveTimeoutRef.current = null;
       
       // Immediately save if there are pending changes
-      if (hasLoadedInitialSettings.current && userHasInteracted.current && currentSettings) {
-        if (!deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
+      if (hasLoadedInitialSettings.current && userHasInteracted.current && currentSettingsRef.current) {
+        if (!deepEqual(sanitizeSettings(currentSettingsRef.current), sanitizeSettings(settingsRef.current))) {
           console.log('[BatchVideoSteps] Immediately saving before shot switch:', {
-            batchVideoSteps: currentSettings.batchVideoSteps,
+            batchVideoSteps: currentSettingsRef.current.batchVideoSteps,
             shotId: selectedShot?.id?.substring(0, 8)
           });
-          lastSavedSettingsRef.current = currentSettings;
-          updateSettings('shot', currentSettings);
-          if (selectedProjectId && updateProjectSettings) {
-            updateProjectSettings('project', currentSettings);
+          lastSavedSettingsRef.current = currentSettingsRef.current;
+          updateSettingsRef.current('shot', currentSettingsRef.current);
+          if (selectedProjectId && updateProjectSettingsRef.current) {
+            updateProjectSettingsRef.current('project', currentSettingsRef.current);
           }
         }
       }
@@ -1278,7 +1317,7 @@ const VideoTravelToolPage: React.FC = () => {
     hasLoadedInitialSettings.current = false;
     userHasInteracted.current = false;
     lastSavedSettingsRef.current = null;
-  }, [selectedShot?.id, currentSettings, settings, updateSettings, selectedProjectId, updateProjectSettings]);
+  }, [selectedShot?.id, selectedProjectId]); // ONLY trigger on shot/project changes
 
   // Save settings to database whenever they change (optimized)
   useEffect(() => {
