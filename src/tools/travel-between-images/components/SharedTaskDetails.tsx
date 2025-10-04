@@ -82,7 +82,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   }[variant];
 
   return (
-    <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
+    <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'}`}>
       {/* Header */}
       <div>
         <h3 className={`${config.textSize} font-semibold uppercase tracking-wide text-muted-foreground`}>Video Travel</h3>

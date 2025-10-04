@@ -1273,6 +1273,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       return;
     }
 
+    // Set loading state immediately to provide instant user feedback
+    setIsSteerableMotionEnqueuing(true);
+    setSteerableMotionJustQueued(false);
+
     // CRITICAL: Refresh shot data from database before task submission to ensure we have the latest images
     console.log('[TaskSubmission] Refreshing shot data before video generation...');
     try {
@@ -1293,6 +1297,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     } catch (error) {
       console.error('[TaskSubmission] Failed to refresh shot data:', error);
       toast.error('Failed to refresh image data. Please try again.');
+      setIsSteerableMotionEnqueuing(false);
       return;
     }
 
@@ -1330,15 +1335,72 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         resolution = `${customWidth}x${customHeight}`;        
       } else {
         toast.error('Custom dimensions are selected, but width or height is not set.');
+        setIsSteerableMotionEnqueuing(false);
         return;
       }
     }
 
     // Use getDisplayUrl to convert relative paths to absolute URLs
-    // IMPORTANT: Use simpleFilteredImages to exclude generated video outputs
-    const absoluteImageUrls = simpleFilteredImages
-      .map((img) => getDisplayUrl(img.imageUrl)) // Use getDisplayUrl here
-      .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
+    // IMPORTANT: Query fresh data directly from database to avoid using stale cached data
+    // This prevents deleted items from appearing in the task
+    let absoluteImageUrls: string[];
+    try {
+      console.log('[TaskSubmission] Fetching fresh image data from database for task...');
+      const { data: freshShotGenerations, error } = await supabase
+        .from('shot_generations')
+        .select(`
+          id,
+          generation_id,
+          timeline_frame,
+          metadata,
+          generations:generation_id (
+            id,
+            location,
+            type
+          )
+        `)
+        .eq('shot_id', selectedShotId)
+        .order('timeline_frame', { ascending: true });
+
+      if (error) {
+        console.error('[TaskSubmission] Error fetching fresh shot data:', error);
+        toast.error('Failed to fetch current images. Please try again.');
+        setIsSteerableMotionEnqueuing(false);
+        return;
+      }
+
+      // Filter and process exactly like simpleFilteredImages does
+      const freshImages = (freshShotGenerations || [])
+        .filter(sg => {
+          // Has valid timeline frame
+          const hasTimelineFrame = sg.timeline_frame !== null && sg.timeline_frame !== undefined;
+          if (!hasTimelineFrame) return false;
+          
+          // Not a video
+          const gen = sg.generations as any;
+          const isVideo = gen?.type === 'video' ||
+                         gen?.type === 'video_travel_output' ||
+                         (gen?.location && gen.location.endsWith('.mp4'));
+          return !isVideo;
+        })
+        .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
+        .map(sg => (sg.generations as any)?.location)
+        .filter((location): location is string => Boolean(location));
+
+      absoluteImageUrls = freshImages
+        .map((location) => getDisplayUrl(location))
+        .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
+
+      console.log('[TaskSubmission] Using fresh image URLs:', {
+        count: absoluteImageUrls.length,
+        urls: absoluteImageUrls.map(url => url.substring(0, 50) + '...')
+      });
+    } catch (err) {
+      console.error('[TaskSubmission] Error fetching fresh image data:', err);
+      toast.error('Failed to prepare task data. Please try again.');
+      setIsSteerableMotionEnqueuing(false);
+      return;
+    }
 
     let basePrompts: string[];
     let segmentFrames: number[];
@@ -1496,9 +1558,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       requestBody.structure_video_motion_strength = structureVideoMotionStrength;
       requestBody.structure_video_type = structureVideoType;
     }
-    
-    setIsSteerableMotionEnqueuing(true);
-    setSteerableMotionJustQueued(false);
     
     try {
       // Use the new client-side travel between images task creation instead of calling the edge function
