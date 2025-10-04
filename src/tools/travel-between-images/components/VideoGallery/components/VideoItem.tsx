@@ -576,6 +576,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
         className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
         showOnHover={false}
       />
+      
+      {/* Variant Name - Bottom Left */}
+      {(video as { name?: string }).name && (
+        <div className="absolute bottom-1 left-2 sm:bottom-2 sm:left-3 z-10 bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md">
+          {(video as { name?: string }).name}
+        </div>
+      )}
     </div>
   );
 });

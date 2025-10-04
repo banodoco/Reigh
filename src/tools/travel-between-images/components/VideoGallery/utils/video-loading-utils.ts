@@ -65,6 +65,7 @@ export const transformUnifiedGenerationsData = (items: any[]): GenerationRow[] =
     metadata: item.metadata,
     shotImageEntryId: item.shotImageEntryId,
     position: item.position,
+    name: item.name, // Include variant name
     // Include task data if available
     ...(item.taskId && { taskId: item.taskId }),
   })) as GenerationRow[];

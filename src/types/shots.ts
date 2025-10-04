@@ -10,6 +10,7 @@ export interface GenerationRow {
   metadata?: Record<string, unknown>; // Added metadata field
   isOptimistic?: boolean;
   shotImageEntryId?: string; // ID from the shot_images table linking shot to generation
+  name?: string; // Optional variant name
 }
 
 export interface Shot {

@@ -122,7 +122,8 @@ async function fetchShotSpecificGenerations({
         type,
         created_at,
         params,
-        starred${includeTaskData ? ',tasks' : ''}
+        starred,
+        name${includeTaskData ? ',tasks' : ''}
       )
     `)
     .eq('shot_id', shotId);
@@ -191,6 +192,7 @@ async function fetchShotSpecificGenerations({
         shotImageEntryId: sg.id,
         position: Math.floor((sg.timeline_frame ?? 0) / 50),
         taskId: includeTaskData && gen.tasks ? (Array.isArray(gen.tasks) ? gen.tasks[0] : gen.tasks) : null,
+        name: gen.name || undefined, // Include generation name if available
       };
       
       // Extract prompt from nested structure

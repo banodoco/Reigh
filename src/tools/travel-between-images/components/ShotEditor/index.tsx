@@ -1257,6 +1257,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Local state for steerable motion task creation
   const [isSteerableMotionEnqueuing, setIsSteerableMotionEnqueuing] = useState(false);
   const [steerableMotionJustQueued, setSteerableMotionJustQueued] = useState(false);
+  const [variantName, setVariantName] = useState('');
 
   // Note: Pair prompts are now managed through the database via ShotImagesEditor
   // The generation logic will need to be updated to fetch pair prompts from the database
@@ -1524,6 +1525,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Convert UI amount of motion (0-100) to task value (0.0-1.0)
       amount_of_motion: amountOfMotion / 100.0,
       // selected_mode removed - now hardcoded to use specific model
+      // Add generation name if provided
+      generation_name: variantName.trim() || undefined,
     };
 
     if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
@@ -1563,6 +1566,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Use the new client-side travel between images task creation instead of calling the edge function
       await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
       
+      // Clear variant name field after successful submission
+      setVariantName('');
+      
       // Show success feedback and update state
       setSteerableMotionJustQueued(true);
       
@@ -1594,6 +1600,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     randomSeed,
     turboMode,
     amountOfMotion,
+    variantName,
     // selectedMode removed - now hardcoded to use specific model
     loraManager.selectedLoras,
     queryClient,
@@ -1832,6 +1839,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 {/* Full-width divider and generate button */}
                 <div className="mt-6 pt-6 border-t">
                   <div className="flex flex-col items-center">
+                    {/* Variant Name Input */}
+                    <div className="w-full max-w-md mb-4">
+                      <label htmlFor="variant-name" className="block text-sm font-medium text-muted-foreground mb-2">
+                        Variant Name (optional)
+                      </label>
+                      <input
+                        id="variant-name"
+                        type="text"
+                        value={variantName}
+                        onChange={(e) => setVariantName(e.target.value)}
+                        placeholder="e.g., high-contrast, bright-colors"
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                      />
+                    </div>
+                    
                     <Button 
                       size="lg" 
                       className="w-full max-w-md" 

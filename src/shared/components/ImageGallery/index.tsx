@@ -83,6 +83,7 @@ export interface GeneratedImageWithMetadata {
   starred?: boolean;
   shot_id?: string;
   position?: number | null;
+  name?: string; // Variant name for the generation
   all_shot_associations?: Array<{ shot_id: string; position: number | null }>;
 }
 

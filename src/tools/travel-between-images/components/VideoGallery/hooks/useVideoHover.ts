@@ -8,6 +8,7 @@ export const useVideoHover = (isMobile: boolean) => {
   const [hoveredVideo, setHoveredVideo] = useState<GenerationRow | null>(null);
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; positioning?: 'above' | 'below' } | null>(null);
   const [isInitialHover, setIsInitialHover] = useState(false);
+  const isHoveringPreviewRef = useRef(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleHoverStart = useCallback((video: GenerationRow, event: React.MouseEvent) => {
@@ -15,10 +16,11 @@ export const useVideoHover = (isMobile: boolean) => {
     
     console.log('[VideoGenMissing] Starting hover for video:', video.id);
     
-    // Clear any existing timeout
+    // Clear any existing timeout and reset preview hover state
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
+    isHoveringPreviewRef.current = false;
     
     // Calculate smart position for tooltip
     const rect = event.currentTarget.getBoundingClientRect();
@@ -59,14 +61,53 @@ export const useVideoHover = (isMobile: boolean) => {
   }, [isMobile]);
 
   const handleHoverEnd = useCallback(() => {
-    console.log('[VideoGenMissing] Ending hover');
+    console.log('[VideoGenMissing] Hover end requested, isHoveringPreview:', isHoveringPreviewRef.current);
+    
+    // If user is hovering over the preview, don't close it
+    if (isHoveringPreviewRef.current) {
+      console.log('[VideoGenMissing] Keeping hover open - user is hovering preview');
+      return;
+    }
+    
+    // Add a small delay to allow transition to the preview
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    hoverTimeoutRef.current = setTimeout(() => {
+      // Double-check if still not hovering preview after delay
+      if (!isHoveringPreviewRef.current) {
+        console.log('[VideoGenMissing] Ending hover after delay');
+        setHoveredVideo(null);
+        setHoverPosition(null);
+        setIsInitialHover(false);
+      }
+    }, 100); // Small delay to allow mouse to move to preview
+  }, []);
+
+  const handlePreviewEnter = useCallback(() => {
+    console.log('[VideoGenMissing] Mouse entered preview');
+    isHoveringPreviewRef.current = true;
+    // Clear any pending close timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
-    setHoveredVideo(null);
-    setHoverPosition(null);
-    setIsInitialHover(false);
+  }, []);
+
+  const handlePreviewLeave = useCallback(() => {
+    console.log('[VideoGenMissing] Mouse left preview');
+    isHoveringPreviewRef.current = false;
+    // Close the preview after a brief delay
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      console.log('[VideoGenMissing] Closing preview after leaving');
+      setHoveredVideo(null);
+      setHoverPosition(null);
+      setIsInitialHover(false);
+    }, 100);
   }, []);
 
   const clearHoverTimeout = useCallback(() => {
@@ -74,6 +115,7 @@ export const useVideoHover = (isMobile: boolean) => {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
+    isHoveringPreviewRef.current = false;
   }, []);
 
   return {
@@ -83,6 +125,8 @@ export const useVideoHover = (isMobile: boolean) => {
     hoverTimeoutRef,
     handleHoverStart,
     handleHoverEnd,
+    handlePreviewEnter,
+    handlePreviewLeave,
     clearHoverTimeout,
     setIsInitialHover
   };

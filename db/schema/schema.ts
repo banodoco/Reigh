@@ -55,6 +55,7 @@ export const generations = pgTable('generations', {
   location: text('location'), // URL/path to the generated content
   type: text('type'), // 'image', 'video', etc.
   thumbnailUrl: text('thumbnail_url'), // URL to thumbnail image extracted from task parameters
+  name: text('name'), // Optional variant name (e.g., "high-contrast", "style-test-1")
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),

@@ -62,6 +62,7 @@ export interface Generation {
   project_id: string;
   tasks?: string[];
   starred?: boolean;
+  name?: string; // Optional variant name
 }
 
 export interface ShotGeneration {

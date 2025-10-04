@@ -230,7 +230,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   
   const hoverHook = useVideoHover(isMobile);
-  const { hoveredVideo, hoverPosition, isInitialHover, handleHoverStart, handleHoverEnd, clearHoverTimeout } = hoverHook;
+  const { hoveredVideo, hoverPosition, isInitialHover, handleHoverStart, handleHoverEnd, handlePreviewEnter, handlePreviewLeave, clearHoverTimeout } = hoverHook;
 
   // ===============================================================================
   // DATA FETCHING
@@ -906,6 +906,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         hoverInputImages={hoverInputImages}
         isMobile={isMobile}
         onOpenDetailsFromHover={handleOpenDetailsFromHover}
+        onPreviewEnter={handlePreviewEnter}
+        onPreviewLeave={handlePreviewLeave}
       />
     </Card>
   );

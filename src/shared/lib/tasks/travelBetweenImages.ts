@@ -53,6 +53,8 @@ export interface TravelBetweenImagesTaskParams {
   structure_video_treatment?: 'adjust' | 'clip';     // How to handle frame mismatches
   structure_video_motion_strength?: number;          // 0.0 = no motion, 1.0 = full motion, >1.0 = amplified
   structure_video_type?: 'flow' | 'canny' | 'depth'; // Type of structure extraction: optical flow, canny edges, or depth map
+  // Variant naming
+  generation_name?: string;                          // Optional variant name for the generation
 }
 
 /**
@@ -190,6 +192,8 @@ function buildTravelBetweenImagesPayload(
     generation_mode: params.generation_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.generation_mode,
     dimension_source: params.dimension_source ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.dimension_source,
     amount_of_motion: params.amount_of_motion ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.amount_of_motion,
+    // Include generation_name in orchestrator payload so it flows to child tasks
+    generation_name: params.generation_name ?? undefined,
   };
 
   // Add structure video parameters if provided
@@ -260,6 +264,8 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       task_type: taskType,
       params: {
         orchestrator_details: orchestratorPayload,
+        // Also store at top level for direct access (redundant but useful for consistency)
+        ...(params.generation_name ? { generation_name: params.generation_name } : {}),
       }
     });
 

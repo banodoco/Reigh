@@ -968,6 +968,15 @@ async function createGenerationFromTask(
     // Generate new UUID for generation
     const newGenerationId = crypto.randomUUID();
     
+    // Extract generation_name from params
+    // Check multiple locations: top-level, orchestrator_details, or full_orchestrator_payload
+    let generationName = taskData.params?.generation_name || 
+                        taskData.params?.orchestrator_details?.generation_name ||
+                        taskData.params?.full_orchestrator_payload?.generation_name ||
+                        undefined;
+    
+    console.log(`[GenMigration] Extracted generation_name: ${generationName}`);
+    
     // Insert generation record
     const generationRecord = {
       id: newGenerationId,
@@ -977,6 +986,7 @@ async function createGenerationFromTask(
       type: generationType,
       project_id: taskData.project_id,
       thumbnail_url: thumbnailUrl,
+      name: generationName, // Add generation name to the record
       created_at: new Date().toISOString()
     };
     
