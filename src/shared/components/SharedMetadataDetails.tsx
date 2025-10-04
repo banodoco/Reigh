@@ -136,7 +136,7 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
           <p className={`${config.textSize} font-medium text-muted-foreground`}>
             Source Image
           </p>
-          <div className="flex justify-center">
+          <div className="flex justify-start">
             <img 
               src={qwenSourceImage} 
               alt="Source image for edit"
