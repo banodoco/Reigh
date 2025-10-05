@@ -1,10 +1,10 @@
-// Character Animate Tool Settings
+// Animate Characters Tool Settings
 export const characterAnimateSettings = {
   id: 'character-animate',
   scope: ['project', 'shot'] as const,
   defaults: {
     mode: 'animate' as 'replace' | 'animate',
-    resolution: '720p' as '480p' | '720p',
+    resolution: '480p' as '480p' | '720p',
     defaultPrompt: 'natural expression; preserve outfit details',
     autoMatchAspectRatio: true,
     randomSeed: true,

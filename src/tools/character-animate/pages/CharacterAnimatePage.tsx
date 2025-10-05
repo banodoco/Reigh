@@ -4,7 +4,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { Upload, Dice5, AlertCircle, Film } from 'lucide-react';
+import { Upload, Film } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,10 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { CharacterAnimateSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
+import { createCharacterAnimateTask } from '@/shared/lib/tasks/characterAnimate';
+import { useGenerations } from '@/shared/hooks/useGenerations';
+import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
+import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 
 const CharacterAnimatePage: React.FC = () => {
   const { toast } = useToast();
@@ -23,16 +27,53 @@ const CharacterAnimatePage: React.FC = () => {
   const [motionVideo, setMotionVideo] = useState<{ url: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [generatedResults, setGeneratedResults] = useState<any[]>([]);
+  const [localMode, setLocalMode] = useState<'animate' | 'replace'>('animate');
   
   const characterImageInputRef = useRef<HTMLInputElement>(null);
   const motionVideoInputRef = useRef<HTMLInputElement>(null);
+  
+  // Track when we've just triggered a generation to prevent empty state flash
+  const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
   
   // Load settings
   const { settings, update: updateSettings } = useToolSettings<CharacterAnimateSettings>(
     'character-animate',
     { projectId: selectedProjectId || null, enabled: !!selectedProjectId }
   );
+  
+  // Get current project for aspect ratio
+  const { projects } = useProject();
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
+  
+  // Fetch all videos generated with character-animate tool type
+  const { 
+    data: videosData, 
+    isLoading: videosLoading,
+    isFetching: videosFetching,
+    error: videosError 
+  } = useGenerations(
+    selectedProjectId, 
+    1, // page
+    100, // limit
+    !!selectedProjectId, // only enable when project is selected
+    {
+      toolType: 'character-animate',
+      mediaType: 'video'
+    }
+  );
+  
+  // Clear videosViewJustEnabled flag when data loads
+  useEffect(() => {
+    if (videosViewJustEnabled && videosData?.items) {
+      // Data has loaded, clear the flag
+      setVideosViewJustEnabled(false);
+      console.log('[CharacterAnimate] Data loaded, clearing videosViewJustEnabled flag', {
+        itemsCount: videosData.items.length,
+        timestamp: Date.now()
+      });
+    }
+  }, [videosViewJustEnabled, videosData?.items]);
   
   // Initialize prompt from settings
   useEffect(() => {
@@ -41,7 +82,7 @@ const CharacterAnimatePage: React.FC = () => {
     }
   }, [settings?.defaultPrompt]);
   
-  // Load saved input image and video from settings
+  // Load saved input image and video from settings, and sync mode
   useEffect(() => {
     if (settings?.inputImageUrl && !characterImage) {
       setCharacterImage({ url: settings.inputImageUrl });
@@ -49,22 +90,21 @@ const CharacterAnimatePage: React.FC = () => {
     if (settings?.inputVideoUrl && !motionVideo) {
       setMotionVideo({ url: settings.inputVideoUrl });
     }
-  }, [settings?.inputImageUrl, settings?.inputVideoUrl]);
-  
-  // Generate new seed
-  const generateNewSeed = useCallback(() => {
-    const newSeed = Math.floor(Math.random() * 1000000);
-    if (selectedProjectId) {
-      updateSettings('project', { ...settings, seed: newSeed, randomSeed: false });
+    if (settings?.mode) {
+      setLocalMode(settings.mode);
     }
-  }, [selectedProjectId, settings, updateSettings]);
+  }, [settings?.inputImageUrl, settings?.inputVideoUrl, settings?.mode]);
   
-  // Initialize seed if needed
-  useEffect(() => {
-    if (settings?.randomSeed && !settings?.seed && selectedProjectId) {
-      generateNewSeed();
-    }
-  }, [settings?.randomSeed, settings?.seed, selectedProjectId, generateNewSeed]);
+  // Always generate a random seed for each generation
+  const generateRandomSeed = useCallback(() => {
+    return Math.floor(Math.random() * 1000000);
+  }, []);
+  
+  // Handle mode change with optimistic update
+  const handleModeChange = useCallback((newMode: 'animate' | 'replace') => {
+    setLocalMode(newMode); // Immediate UI update
+    updateSettings('project', { ...settings, mode: newMode }); // Background persist
+  }, [settings, updateSettings]);
   
   // Handle character image upload
   const handleCharacterImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,39 +210,42 @@ const CharacterAnimatePage: React.FC = () => {
     mutationFn: async () => {
       if (!characterImage) throw new Error('No character image');
       if (!motionVideo) throw new Error('No motion video');
+      if (!selectedProjectId) throw new Error('No project selected');
       
-      // TODO: Implement actual API call to Wan2.2-Animate
-      const response = await fetch('/api/generate-character-animation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          characterImageUrl: characterImage.url,
-          motionVideoUrl: motionVideo.url,
-          prompt: prompt || settings?.defaultPrompt,
-          mode: settings?.mode || 'animate',
-          resolution: settings?.resolution || '720p',
-          seed: settings?.seed,
-        }),
-      });
+      // Create task using the character animate task creation utility
+      const taskParams: import('@/shared/lib/tasks/characterAnimate').CharacterAnimateTaskParams = {
+        project_id: selectedProjectId,
+        character_image_url: characterImage.url,
+        motion_video_url: motionVideo.url,
+        prompt: prompt || settings?.defaultPrompt || 'natural expression; preserve outfit details',
+        mode: localMode, // Use optimistic local mode
+        resolution: '480p', // Always use 480p
+        seed: generateRandomSeed(), // Always use a random seed
+        random_seed: true, // Always random
+      };
       
-      if (!response.ok) throw new Error('Generation failed');
-      return response.json();
+      console.log('[CharacterAnimate] Creating task with params:', taskParams);
+      
+      const result = await createCharacterAnimateTask(taskParams);
+      return result;
     },
     onSuccess: (data) => {
-      setGeneratedResults(prev => [...prev, data]);
       toast({
-        title: 'Animation generated',
-        description: 'Your character animation is ready',
+        title: 'Task created',
+        description: 'Your character animation task has been queued',
       });
       
-      if (settings?.randomSeed) {
-        generateNewSeed();
-      }
+      // Set flag to indicate we just created a task
+      setVideosViewJustEnabled(true);
+      
+      // Invalidate tasks query to show the new task
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
     onError: (error) => {
+      console.error('[CharacterAnimate] Task creation failed:', error);
       toast({
-        title: 'Generation failed',
-        description: error instanceof Error ? error.message : 'Failed to generate animation',
+        title: 'Failed to create task',
+        description: error instanceof Error ? error.message : 'Failed to create animation task',
         variant: 'destructive',
       });
     },
@@ -240,14 +283,48 @@ const CharacterAnimatePage: React.FC = () => {
 
   return (
     <PageFadeIn>
-      <div className="flex flex-col space-y-6 pb-16 px-4 max-w-7xl mx-auto pt-6">
-        <h1 className="text-3xl font-light tracking-tight text-foreground">Character Animate</h1>
+      <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-6">
+        <h1 className="text-3xl font-light tracking-tight text-foreground">Animate Characters</h1>
+        
+        {/* Mode Selection - First */}
+        <div className="space-y-2">
+          <Label>Mode</Label>
+          <div className="flex items-center gap-4">
+            <div className="flex space-x-2 flex-1">
+              <Button
+                variant={localMode === 'animate' ? 'default' : 'outline'}
+                onClick={() => handleModeChange('animate')}
+                className="flex-1"
+              >
+                Animate
+              </Button>
+              <Button
+                variant={localMode === 'replace' ? 'default' : 'outline'}
+                onClick={() => handleModeChange('replace')}
+                className="flex-1"
+              >
+                Replace
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground flex-1">
+              {localMode === 'animate' 
+                ? 'Animate the character in input image with movements from the input video'
+                : 'Replace the character in input video with the character in input image'
+              }
+            </p>
+          </div>
+        </div>
         
         {/* Input Image | Input Video */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Character Image */}
           <div className="space-y-3">
-            <Label className="text-lg font-medium">Input Image</Label>
+            <Label className="text-lg font-medium">
+              {localMode === 'animate' 
+                ? '✨ Character to animate'
+                : '✨ Character to insert'
+              }
+            </Label>
             <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
               {characterImage ? (
                 <img
@@ -293,7 +370,12 @@ const CharacterAnimatePage: React.FC = () => {
 
           {/* Motion Video */}
           <div className="space-y-3">
-            <Label className="text-lg font-medium">Input Video</Label>
+            <Label className="text-lg font-medium">
+              {localMode === 'animate' 
+                ? '🎬 Source of movement'
+                : '🎬 Video to replace character in'
+              }
+            </Label>
             <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
               {motionVideo ? (
                 <video
@@ -350,86 +432,6 @@ const CharacterAnimatePage: React.FC = () => {
               className="resize-none"
             />
           </div>
-
-          {/* Mode & Resolution in one row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Mode Selection */}
-            <div className="space-y-2">
-              <Label>Mode</Label>
-              <div className="flex space-x-2">
-                <Button
-                  variant={settings?.mode === 'replace' ? 'default' : 'outline'}
-                  onClick={() => updateSettings('project', { ...settings, mode: 'replace' })}
-                  className="flex-1"
-                >
-                  Replace
-                </Button>
-                <Button
-                  variant={settings?.mode === 'animate' ? 'default' : 'outline'}
-                  onClick={() => updateSettings('project', { ...settings, mode: 'animate' })}
-                  className="flex-1"
-                >
-                  Animate
-                </Button>
-              </div>
-            </div>
-
-            {/* Resolution */}
-            <div className="space-y-2">
-              <Label>Resolution</Label>
-              <div className="flex space-x-2">
-                <Button
-                  variant={settings?.resolution === '480p' ? 'default' : 'outline'}
-                  onClick={() => updateSettings('project', { ...settings, resolution: '480p' })}
-                  className="flex-1"
-                >
-                  480p
-                </Button>
-                <Button
-                  variant={settings?.resolution === '720p' ? 'default' : 'outline'}
-                  onClick={() => updateSettings('project', { ...settings, resolution: '720p' })}
-                  className="flex-1"
-                >
-                  720p
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Seed Control */}
-          <div className="space-y-2">
-            <Label htmlFor="seed">Seed</Label>
-            <div className="flex items-center space-x-2">
-              <Input
-                id="seed"
-                type="number"
-                value={settings?.seed || ''}
-                onChange={(e) => updateSettings('project', { ...settings, seed: parseInt(e.target.value) || undefined, randomSeed: false })}
-                placeholder="Random"
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={generateNewSeed}
-                title="Generate new random seed"
-              >
-                <Dice5 className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center space-x-2 pl-2">
-                <input
-                  type="checkbox"
-                  id="randomSeed"
-                  checked={settings?.randomSeed || false}
-                  onChange={(e) => updateSettings('project', { ...settings, randomSeed: e.target.checked })}
-                  className="rounded border-border"
-                />
-                <Label htmlFor="randomSeed" className="text-sm font-normal cursor-pointer whitespace-nowrap">
-                  Random each time
-                </Label>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Generate Button */}
@@ -439,36 +441,70 @@ const CharacterAnimatePage: React.FC = () => {
           className="w-full"
           size="lg"
         >
-          {generateAnimationMutation.isPending ? 'Generating...' : 'Generate'}
+          {generateAnimationMutation.isPending ? 'Creating Task...' : 'Generate'}
         </Button>
 
         {/* Results Gallery */}
-        {generatedResults.length > 0 && (
-          <div className="space-y-4 pt-4">
-            <h2 className="text-xl font-medium">
-              Results ({generatedResults.length})
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {generatedResults.map((result, index) => (
-                <div key={index} className="border border-border rounded-lg overflow-hidden bg-card hover:border-primary transition-colors">
-                  <video
-                    src={result.url}
-                    controls
-                    className="w-full aspect-video object-cover bg-black"
-                  />
-                  <div className="p-3 space-y-1">
-                    <p className="text-sm text-muted-foreground">
-                      {result.seed && `Seed: ${result.seed}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date().toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {(() => {
+          const hasValidData = videosData?.items && videosData.items.length > 0;
+          const isLoadingOrFetching = videosLoading || videosFetching;
+          
+          // Show skeleton only if we're loading AND we already have data (refetching)
+          // This prevents showing "Previous Results" when there might not be any data yet
+          const shouldShowSkeleton = (isLoadingOrFetching || videosViewJustEnabled) && hasValidData;
+          
+          if (shouldShowSkeleton) {
+            return (
+              <div className="space-y-4 pt-4 border-t">
+                <h2 className="text-xl font-medium">
+                  Previous Results ({videosData.items.length})
+                </h2>
+                <SkeletonGallery
+                  count={videosData.items.length}
+                  columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
+                  showControls={true}
+                  projectAspectRatio={projectAspectRatio}
+                />
+              </div>
+            );
+          }
+          
+          if (hasValidData) {
+            return (
+              <div className="space-y-4 pt-4 border-t">
+                <h2 className="text-xl font-medium">
+                  Previous Results ({videosData.items.length})
+                </h2>
+                <ImageGallery
+                  images={videosData.items || []}
+                  allShots={[]}
+                  onAddToLastShot={async () => false} // No-op for video gallery
+                  onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                  currentToolType="character-animate"
+                  initialMediaTypeFilter="video"
+                  initialToolTypeFilter={true}
+                  currentToolTypeName="Animate Characters"
+                  showShotFilter={false}
+                  initialShotFilter="all"
+                  columnsPerRow={3}
+                  itemsPerPage={12}
+                />
+              </div>
+            );
+          }
+          
+          // Only show empty state when not loading and no data
+          if (!isLoadingOrFetching) {
+            return (
+              <div className="text-sm text-muted-foreground text-center pt-4 border-t">
+                No animations yet. Create your first one above!
+              </div>
+            );
+          }
+          
+          // While loading for the first time, don't show anything
+          return null;
+        })()}
       </div>
     </PageFadeIn>
   );

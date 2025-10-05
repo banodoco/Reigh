@@ -71,6 +71,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   
   // Track magic edit modal state
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
+  
+  // Track if we just clicked a button to prevent drag from starting
+  const buttonClickedRef = useRef(false);
 
   // Calculate aspect ratio for consistent sizing
   const getAspectRatioStyle = () => {
@@ -179,7 +182,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    console.log('[MagicEditPromptDebug] TimelineItem Magic Edit clicked:', {
+    console.log('[MagicEditClickIssue] ⭐ BUTTON CLICKED - opening modal:', {
       imageId: image.id.substring(0, 8),
       shotImageEntryId: image.shotImageEntryId.substring(0, 8),
       framePosition,
@@ -235,10 +238,74 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         zIndex: isHovered || isDragging ? 20 : 1,
         cursor: 'move',
         boxShadow: isHovered || isDragging ? '0 8px 25px rgba(0, 0, 0, 0.15)' : 'none',
+        // Prevent clicks from reaching items underneath when not hovered
+        pointerEvents: isHovered || isDragging ? 'auto' : 'auto',
       }}
-      onMouseDown={(e) => onMouseDown(e, image.shotImageEntryId)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseDown={(e) => {
+        // [NonDraggableDebug] Log that we reached the TimelineItem onMouseDown handler
+        console.log('[NonDraggableDebug] 📍 TimelineItem onMouseDown FIRED:', {
+          itemId: image.shotImageEntryId.substring(0, 8),
+          framePosition,
+          eventType: e.type,
+          buttons: e.buttons,
+          button: e.button,
+          timestamp: Date.now()
+        });
+
+        // If clicking on a button area while hovered, don't start drag
+        const target = e.target as HTMLElement;
+        const isClickingButton = target.closest('button') || target.closest('[data-click-blocker]');
+        
+        console.log('[MagicEditClickIssue] 🖱️ MOUSEDOWN on timeline item:', {
+          imageId: image.shotImageEntryId.substring(0, 8),
+          framePosition,
+          isHovered,
+          isDragging,
+          isClickingButton: !!isClickingButton,
+          buttonClickedRecently: buttonClickedRef.current,
+          targetTag: (e.target as HTMLElement).tagName,
+          targetClass: (e.target as HTMLElement).className,
+          currentTarget: e.currentTarget.getAttribute('data-item-id')?.substring(0, 8),
+          timestamp: Date.now()
+        });
+        
+        // Check both the DOM and the recent click flag
+        if (isClickingButton || buttonClickedRef.current) {
+          console.log('[NonDraggableDebug] 🛑 BLOCKED by button/blocker:', {
+            itemId: image.shotImageEntryId.substring(0, 8),
+            reason: isClickingButton ? 'DOM check' : 'Recent click flag'
+          });
+          console.log('[MagicEditClickIssue] ✋ BLOCKED - clicking button/blocker, preventing drag', {
+            reason: isClickingButton ? 'DOM check' : 'Recent click flag'
+          });
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        
+        console.log('[NonDraggableDebug] ✅ CALLING onMouseDown handler:', {
+          itemId: image.shotImageEntryId.substring(0, 8),
+          hasHandler: typeof onMouseDown === 'function'
+        });
+        console.log('[MagicEditClickIssue] ✅ ALLOWING - calling onMouseDown for drag');
+        onMouseDown(e, image.shotImageEntryId);
+      }}
+      onMouseEnter={() => {
+        console.log('[MagicEditClickIssue] 🎯 MOUSE ENTER - hovering timeline item:', {
+          imageId: image.shotImageEntryId.substring(0, 8),
+          framePosition,
+          timestamp: Date.now()
+        });
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => {
+        console.log('[MagicEditClickIssue] 👋 MOUSE LEAVE - leaving timeline item:', {
+          imageId: image.shotImageEntryId.substring(0, 8),
+          framePosition,
+          timestamp: Date.now()
+        });
+        setIsHovered(false);
+      }}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onDoubleClick?.();
@@ -304,6 +371,50 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           {/* Hover action buttons */}
           {!isDragging && (
             <>
+              {/* Click blocker for Magic Edit Button to prevent timeline item clicks */}
+              <div
+                data-click-blocker="magic-edit"
+                className="absolute bottom-0 left-0 h-12 w-12 z-[19]"
+                onMouseDown={(e) => {
+                  console.log('[MagicEditClickIssue] 🛡️ BLOCKER MOUSEDOWN triggered:', {
+                    imageId: image.shotImageEntryId.substring(0, 8),
+                    framePosition,
+                    timestamp: Date.now()
+                  });
+                  buttonClickedRef.current = true;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
+                }}
+                onPointerDown={(e) => {
+                  console.log('[MagicEditClickIssue] 🛡️ BLOCKER POINTERDOWN triggered:', {
+                    imageId: image.shotImageEntryId.substring(0, 8),
+                    framePosition,
+                    timestamp: Date.now()
+                  });
+                  buttonClickedRef.current = true;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                  // Reset flag after a short delay (same as mousedown)
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
+                }}
+                onClick={(e) => {
+                  console.log('[MagicEditClickIssue] 🛡️ BLOCKER CLICK triggered:', {
+                    imageId: image.shotImageEntryId.substring(0, 8),
+                    framePosition,
+                    timestamp: Date.now()
+                  });
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+              />
               {/* Magic Edit Button */}
               <Button
                 variant="secondary"
@@ -311,14 +422,34 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 className="absolute bottom-1 left-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
                 onClick={handleMagicEditClick}
                 onMouseDown={(e) => {
+                  console.log('[MagicEditClickIssue] 🔘 BUTTON MOUSEDOWN:', {
+                    imageId: image.shotImageEntryId.substring(0, 8),
+                    framePosition,
+                    timestamp: Date.now()
+                  });
+                  buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  // Reset flag after a short delay
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
                 }}
                 onPointerDown={(e) => {
+                  console.log('[MagicEditClickIssue] 🔘 BUTTON POINTERDOWN:', {
+                    imageId: image.shotImageEntryId.substring(0, 8),
+                    framePosition,
+                    timestamp: Date.now()
+                  });
+                  buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  // Reset flag after a short delay
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
                 }}
                 title="Magic Edit"
               >
@@ -332,14 +463,23 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 className="absolute top-1 right-7 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
                 onClick={handleDuplicateClick}
                 onMouseDown={(e) => {
+                  buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
                 }}
                 onPointerDown={(e) => {
+                  buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  // Reset flag after a short delay
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
                 }}
                 disabled={duplicatingImageId === image.shotImageEntryId}
                 title="Duplicate image"
@@ -360,14 +500,23 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
                 onClick={handleDeleteClick}
                 onMouseDown={(e) => {
+                  buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
                 }}
                 onPointerDown={(e) => {
+                  buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
                   e.nativeEvent.stopImmediatePropagation();
+                  // Reset flag after a short delay
+                  setTimeout(() => {
+                    buttonClickedRef.current = false;
+                  }, 100);
                 }}
                 title="Remove image from shot"
               >

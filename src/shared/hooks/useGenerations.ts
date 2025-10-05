@@ -123,6 +123,7 @@ export async function fetchGenerations(
       created_at,
       params,
       starred,
+      tasks,
       shot_generations(shot_id, timeline_frame)
     `)
     .eq('project_id', projectId);
@@ -280,6 +281,9 @@ export async function fetchGenerations(
       }
     }
     
+    // Extract task ID from tasks array (if available)
+    const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
+    
     const baseItem: GeneratedImageWithMetadata = {
       id: item.id,
       url: mainUrl,
@@ -287,7 +291,10 @@ export async function fetchGenerations(
       prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
               item.params?.prompt || 
               'No prompt',
-      metadata: item.params || {},
+      metadata: {
+        ...(item.params || {}),
+        taskId // Include task ID in metadata for ImageGalleryItem to access
+      },
       createdAt: item.created_at,
       isVideo: item.type?.includes('video'),
       starred: item.starred || false,

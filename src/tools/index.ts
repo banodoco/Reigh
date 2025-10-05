@@ -75,7 +75,7 @@ export const toolsUIManifest: ToolUIDefinition[] = [
   },
   {
     id: characterAnimateSettings.id,
-    name: 'Character Animate',
+    name: 'Animate Characters',
     path: '/tools/character-animate',
     description: 'Bring characters to life by mapping motion from reference videos onto static images with natural expressions and movements.',
     environments: [AppEnv.LOCAL, AppEnv.WEB],

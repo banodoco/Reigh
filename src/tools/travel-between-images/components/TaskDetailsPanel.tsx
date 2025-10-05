@@ -11,6 +11,7 @@ import { Task } from '@/types/tasks';
 import { Check, X } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
+import { useTaskType } from '@/shared/hooks/useTaskType';
 
 interface TaskDetailsPanelProps {
   task: Task | null;
@@ -44,6 +45,9 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   const [showAllImages, setShowAllImages] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
+  
+  // Get task type info from database to check content_type
+  const { data: taskTypeInfo } = useTaskType(task?.taskType || null);
 
 
 
@@ -111,12 +115,19 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
           {/* Generation Summary Section */}
           <div className="space-y-3">
             {(() => {
-              // Detect if this is a video travel task or image generation task
-              const isVideoTravelTask = task.taskType === 'travel_orchestrator' || 
+              // Use content_type from database to determine if this is a video task
+              // This automatically handles all video task types including animate_character
+              const contentType = taskTypeInfo?.content_type;
+              const isVideoTask = contentType === 'video';
+              
+              // Legacy fallback for tasks before content_type was added
+              const isLegacyVideoTask = task.taskType === 'travel_orchestrator' || 
                                        task.taskType?.includes('travel') ||
                                        inputImages.length > 0;
               
-              if (isVideoTravelTask) {
+              const shouldShowVideoDetails = isVideoTask || isLegacyVideoTask;
+              
+              if (shouldShowVideoDetails) {
                 return (
                   <SharedTaskDetails
                     task={task}

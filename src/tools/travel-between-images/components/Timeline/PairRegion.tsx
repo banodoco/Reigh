@@ -73,8 +73,8 @@ const PairRegion: React.FC<PairRegionProps> = ({
         }}
       />
 
-      {/* Context frames region */}
-      {contextFrames > 0 && visibleContextFrames > 0 && index < numPairs - 1 && (
+      {/* Context frames region - COMMENTED OUT */}
+      {/* {contextFrames > 0 && visibleContextFrames > 0 && index < numPairs - 1 && (
         <div
           className={`absolute top-0 bottom-0 ${colorScheme.context} border-r border-dashed ${colorScheme.border.replace('border-', 'border-r-').replace('-300', '-400')} pointer-events-none`}
           style={{
@@ -87,7 +87,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
             Context ({visibleContextFrames}f)
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Connecting lines from pill to timeline items */}
       {/* Left connecting line - from left timeline item to pill */}
@@ -162,8 +162,8 @@ const PairRegion: React.FC<PairRegionProps> = ({
         </Tooltip>
       )}
 
-      {/* Generation boundary lines */}
-      <div
+      {/* Generation boundary lines - COMMENTED OUT */}
+      {/* <div
         className={`absolute top-0 bottom-0 w-[2px] ${colorScheme.line} pointer-events-none z-5`}
         style={{
           left: `${generationStartPercent}%`,
@@ -178,7 +178,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
           transform: 'translateX(-50%)',
           transition: isDragging ? 'none' : 'left 0.2s ease-out',
         }}
-      />
+      /> */}
     </React.Fragment>
   );
 };

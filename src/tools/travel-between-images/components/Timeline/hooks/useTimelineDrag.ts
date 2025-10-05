@@ -344,10 +344,30 @@ export const useTimelineDrag = ({
   ]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, imageId: string, containerRef: React.RefObject<HTMLDivElement>) => {
+    // [NonDraggableDebug] Log EVERY mousedown attempt to track non-draggable items
+    console.log('[NonDraggableDebug] 🖱️ MOUSEDOWN EVENT RECEIVED:', {
+      itemId: imageId.substring(0, 8),
+      eventType: e.type,
+      buttons: e.buttons,
+      button: e.button,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      target: (e.target as HTMLElement)?.tagName,
+      currentTarget: (e.currentTarget as HTMLElement)?.tagName,
+      timestamp: Date.now()
+    });
+
     // Don't preventDefault immediately - allow double-click to work
     // We'll prevent text selection via CSS user-select: none instead
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) {
+      console.log('[NonDraggableDebug] ❌ NO CONTAINER REF:', {
+        itemId: imageId.substring(0, 8),
+        containerRefExists: !!containerRef,
+        containerRefCurrent: !!containerRef.current
+      });
+      return;
+    }
 
     // Ensure we start with a fresh, accurate mouse position for this drag
     // This prevents reusing a stale value from a previous drag session
@@ -392,6 +412,22 @@ export const useTimelineDrag = ({
     });
 
     if (e.buttons !== 1 || dragState.isDragging || dragRefsRef.current.isBlocked || timeSinceLastUp < 50) {
+      console.log('[NonDraggableDebug] ❌ DRAG BLOCKED - Conditions not met:', {
+        itemId: imageId.substring(0, 8),
+        reasons: {
+          wrongButton: e.buttons !== 1,
+          alreadyDragging: dragState.isDragging,
+          isBlocked: dragRefsRef.current.isBlocked,
+          tooSoon: timeSinceLastUp < 50
+        },
+        details: {
+          buttons: e.buttons,
+          isDragging: dragState.isDragging,
+          isBlocked: dragRefsRef.current.isBlocked,
+          timeSinceLastUp,
+          lastMouseUpTime: dragRefsRef.current.lastMouseUpTime
+        }
+      });
       console.log('[DragLifecycle] ❌ DRAG BLOCKED - Drag not allowed:', {
         itemId: imageId.substring(0, 8),
         buttons: e.buttons,

@@ -17,6 +17,7 @@ import { useToast } from "@/shared/hooks/use-toast";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { GeneratedImageWithMetadata, DisplayableMetadata } from "./ImageGallery";
 import SharedMetadataDetails from "./SharedMetadataDetails";
+import { SharedTaskDetails } from "@/tools/travel-between-images/components/SharedTaskDetails";
 import { log } from '@/shared/lib/logger';
 import { cn } from "@/shared/lib/utils";
 import CreateShotModal from "@/shared/components/CreateShotModal";
@@ -27,6 +28,9 @@ import { useLastAffectedShot } from "@/shared/hooks/useLastAffectedShot";
 import { parseRatio } from "@/shared/lib/aspectRatios";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
+import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
+import { useTaskType } from "@/shared/hooks/useTaskType";
+import { useGetTask } from "@/shared/hooks/useTasks";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -118,6 +122,23 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 }) => {
   // Local pending state to scope star button disabled to this item only
   const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
+  
+  // Fetch task data for video tasks to show proper details
+  // Try to get task ID from metadata first (more efficient), fallback to cache query
+  const taskIdFromMetadata = (image.metadata as any)?.taskId;
+  const { data: taskIdMapping } = useTaskFromUnifiedCache(image.id);
+  const taskIdFromCache = typeof taskIdMapping?.taskId === 'string' ? taskIdMapping.taskId : null;
+  const taskId: string | null = taskIdFromMetadata || taskIdFromCache;
+  
+  const { data: taskData } = useGetTask(taskId);
+  
+  const taskType = taskData?.taskType || (image.metadata as any)?.tool_type;
+  const { data: taskTypeInfo } = useTaskType(taskType || null);
+  
+  // Determine if this should show video task details (SharedTaskDetails)
+  // Check if content_type is 'video' from task_types table
+  const isVideoTask = taskTypeInfo?.content_type === 'video';
+  
   // [VideoThumbnailRender] Debug if this component is rendering for videos
   React.useEffect(() => {
     if (image.isVideo && index < 3) {
@@ -1445,12 +1466,23 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         className="z-[10010] max-w-lg p-0 border bg-background shadow-lg rounded-md max-h-96 overflow-y-auto"
                       >
                         {shouldShowMetadata && image.metadata && (
-                          <SharedMetadataDetails
-                            metadata={image.metadata}
-                            variant="panel"
-                            isMobile={true}
-                            showUserImage={true}
-                          />
+                          <>
+                            {isVideoTask && taskData ? (
+                              <SharedTaskDetails
+                                task={taskData}
+                                inputImages={[]}
+                                variant="panel"
+                                isMobile={true}
+                              />
+                            ) : (
+                              <SharedMetadataDetails
+                                metadata={image.metadata}
+                                variant="panel"
+                                isMobile={true}
+                                showUserImage={true}
+                              />
+                            )}
+                          </>
                         )}
                       </PopoverPrimitive.Content>
                     </PopoverPrimitive.Portal>
@@ -1472,12 +1504,23 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       collisionPadding={10}
                     >
                       {shouldShowMetadata && image.metadata && (
-                        <SharedMetadataDetails
-                          metadata={image.metadata}
-                          variant="hover"
-                          isMobile={false}
-                          showUserImage={true}
-                        />
+                        <>
+                          {isVideoTask && taskData ? (
+                            <SharedTaskDetails
+                              task={taskData}
+                              inputImages={[]}
+                              variant="hover"
+                              isMobile={false}
+                            />
+                          ) : (
+                            <SharedMetadataDetails
+                              metadata={image.metadata}
+                              variant="hover"
+                              isMobile={false}
+                              showUserImage={true}
+                            />
+                          )}
+                        </>
                       )}
                     </TooltipContent>
                   </Tooltip>

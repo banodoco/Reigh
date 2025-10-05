@@ -71,5 +71,6 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
     handleZoomToStart,
     handleTimelineDoubleClick,
     handleWheel,
+    setZoomCenter, // Export for external control
   };
 }; 

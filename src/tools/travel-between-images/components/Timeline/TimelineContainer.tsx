@@ -180,6 +180,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Zoom hook
   const {
     zoomLevel,
+    zoomCenter,
+    viewport,
     handleZoomIn,
     handleZoomOut,
     handleZoomReset,
@@ -197,6 +199,38 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     }, 0);
     return () => clearTimeout(timer);
   }, [zoomLevel]);
+
+  // Scroll timeline to center on zoom center when zooming
+  useEffect(() => {
+    if (zoomLevel > 1 && timelineRef.current && containerRef.current) {
+      // Small delay to allow DOM to reflow after zoom, then instantly scroll
+      const timer = setTimeout(() => {
+        const scrollContainer = timelineRef.current;
+        const timelineContainer = containerRef.current;
+        
+        if (!scrollContainer || !timelineContainer) return;
+        
+        // Get dimensions
+        const scrollWidth = timelineContainer.scrollWidth;
+        const scrollContainerWidth = scrollContainer.clientWidth;
+        
+        // Calculate where the zoom center is in pixels within the zoomed timeline
+        const centerFraction = (zoomCenter - fullMin) / fullRange;
+        const centerPixelInZoomedTimeline = centerFraction * scrollWidth;
+        
+        // Scroll so the center point is in the middle of the viewport
+        const targetScroll = centerPixelInZoomedTimeline - (scrollContainerWidth / 2);
+        
+        // Use instant scroll for immediate zoom-to-position effect (no two-step animation)
+        scrollContainer.scrollTo({
+          left: Math.max(0, targetScroll),
+          behavior: 'instant'
+        });
+      }, 10); // Small delay to ensure DOM has reflowed
+      
+      return () => clearTimeout(timer);
+    }
+  }, [zoomLevel, zoomCenter, fullMin, fullRange]);
 
   // File drop hook
   const {

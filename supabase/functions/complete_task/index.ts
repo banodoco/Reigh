@@ -537,14 +537,15 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
       if (!toolTypeInfo) {
         console.error(`[GenMigration] Failed to resolve tool_type for task ${taskIdString}`);
       } else {
-        const { toolType, category: taskCategory } = toolTypeInfo;
-        console.log(`[GenMigration] Task ${taskIdString} resolved to category: ${taskCategory}, tool_type: ${toolType}`);
+        const { toolType, category: taskCategory, contentType } = toolTypeInfo;
+        console.log(`[GenMigration] Task ${taskIdString} resolved to category: ${taskCategory}, tool_type: ${toolType}, content_type: ${contentType}`);
 
         if (taskCategory === 'generation') {
           console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
           const combinedTaskData = {
             ...taskData,
-            tool_type: toolType
+            tool_type: toolType,
+            content_type: contentType
           };
           try {
             await createGenerationFromTask(
@@ -748,16 +749,17 @@ function extractShotAndPosition(params: any): { shotId?: string, addInPosition: 
  * @param supabase - Supabase client
  * @param taskType - The task type (e.g., 'single_image', 'wan_2_2_i2v')
  * @param taskParams - Task parameters that might contain tool_type override
- * @returns Object with resolved tool_type and category, or null if task type not found
+ * @returns Object with resolved tool_type, category, and content_type, or null if task type not found
  */
 async function resolveToolType(supabase: any, taskType: string, taskParams: any): Promise<{
   toolType: string;
   category: string;
+  contentType: 'image' | 'video';
 } | null> {
   // Get default tool_type from task_types table
   const { data: taskTypeData, error: taskTypeError } = await supabase
     .from("task_types")
-    .select("category, tool_type")
+    .select("category, tool_type, content_type")
     .eq("name", taskType)
     .single();
 
@@ -767,6 +769,7 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
   }
 
   let finalToolType = taskTypeData.tool_type;
+  let finalContentType = taskTypeData.content_type || 'image'; // Default to image if not set
   const category = taskTypeData.category;
 
   // Check for tool_type override in params
@@ -777,7 +780,7 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
     // Validate that the override tool_type is a known valid tool type
     const { data: validToolTypes } = await supabase
       .from("task_types")
-      .select("tool_type")
+      .select("tool_type, content_type")
       .not("tool_type", "is", null)
       .eq("is_active", true);
     
@@ -786,6 +789,13 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
     if (validToolTypeSet.has(paramsToolType)) {
       console.log(`[ToolTypeResolver] Using tool_type override: ${paramsToolType} (was: ${finalToolType})`);
       finalToolType = paramsToolType;
+      
+      // Update content_type based on the override tool_type
+      const overrideToolTypeData = validToolTypes?.find(t => t.tool_type === paramsToolType);
+      if (overrideToolTypeData?.content_type) {
+        finalContentType = overrideToolTypeData.content_type;
+        console.log(`[ToolTypeResolver] Using content_type from override: ${finalContentType}`);
+      }
     } else {
       console.log(`[ToolTypeResolver] Invalid tool_type override '${paramsToolType}', using default: ${finalToolType}`);
       console.log(`[ToolTypeResolver] Valid tool types: ${Array.from(validToolTypeSet).join(', ')}`);
@@ -794,21 +804,9 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
 
   return {
     toolType: finalToolType,
-    category
+    category,
+    contentType: finalContentType
   };
-}
-
-/**
- * Determine generation type from tool_type
- */
-function determineGenerationType(toolType: string): 'image' | 'video' {
-  if (toolType === 'image-generation' || toolType === 'magic-edit') {
-    return 'image';
-  } else if (toolType === 'travel-between-images' || toolType === 'edit-travel') {
-    return 'video';
-  } else {
-    return 'image'; // Default to image for unknown tool types
-  }
 }
 
 /**
@@ -954,8 +952,9 @@ async function createGenerationFromTask(
       }
     }
     
-    // Determine generation type
-    const generationType = determineGenerationType(taskData.tool_type);
+    // Use content_type from taskData (already resolved from task_types table)
+    const generationType = taskData.content_type || 'image'; // Default to image if not set
+    console.log(`[GenMigration] Using content_type for generation: ${generationType}`);
     
     // Build generation params
     const generationParams = buildGenerationParams(

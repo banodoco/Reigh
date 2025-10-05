@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppEnv, type AppEnvValue } from '../types/env';
-import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye } from 'lucide-react';
+import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
@@ -9,6 +9,7 @@ import React, { memo } from 'react';
 import { time, timeEnd } from '@/shared/lib/logger';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 // Define process tools (main workflow)
 const processTools = [
@@ -29,6 +30,15 @@ const processTools = [
     icon: Video,
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
     accent: 'wes-mint',
+  },
+  {
+    id: 'character-animate',
+    name: 'Animate Characters',
+    description: 'Bring characters to life by mapping motion from reference videos onto static images.',
+    tool: toolsUIManifest.find(t => t.id === 'character-animate'),
+    icon: Users,
+    gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
+    accent: 'wes-sage',
   },
   {
     id: 'reinvent-videos',
@@ -260,15 +270,24 @@ const ToolSelectorPage: React.FC = () => {
 
   // Initialize video gallery preloader in background
   const preloaderState = useVideoGalleryPreloader();
+  
+  // Get generation method preferences
+  const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: false, inCloud: true });
 
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const isToolVisible = (tool: ToolUIDefinition | null) => {
+  const isToolVisible = (tool: ToolUIDefinition | null, toolId?: string) => {
     if (!tool) return false;
     if (currentEnv === AppEnv.DEV) return true;
+    
+    // Character Animate only shows when using cloud generation
+    if (toolId === 'character-animate') {
+      return tool.environments.includes(currentEnv) && generationMethods.inCloud && !generationMethods.onComputer;
+    }
+    
     return tool.environments.includes(currentEnv);
   };
 
@@ -301,7 +320,7 @@ const ToolSelectorPage: React.FC = () => {
                     <ToolCard
                       item={tool}
                       index={index}
-                      isVisible={isToolVisible(tool.tool)}
+                      isVisible={isToolVisible(tool.tool, tool.id)}
                     />
                   </FadeInSection>
                 ))}
@@ -316,7 +335,7 @@ const ToolSelectorPage: React.FC = () => {
                     <ToolCard
                       item={tool}
                       isSquare
-                      isVisible={isToolVisible(tool.tool)}
+                      isVisible={isToolVisible(tool.tool, tool.id)}
                     />
                   </FadeInSection>
                 ))}

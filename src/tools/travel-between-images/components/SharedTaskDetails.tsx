@@ -27,9 +27,14 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   onShowFullNegativePromptChange,
 }) => {
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [characterVideoLoaded, setCharacterVideoLoaded] = useState(false);
+  
   // Helper to safely access orchestrator payload from multiple possible locations
   const orchestratorPayload = task?.params?.full_orchestrator_payload as any;
   const orchestratorDetails = task?.params?.orchestrator_details as any;
+  
+  // Check if this is a character animate task
+  const isCharacterAnimateTask = task?.taskType === 'animate_character';
   
   // Get LoRAs from the correct location (try all possible paths)
   const additionalLoras = (
@@ -81,10 +86,141 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     },
   }[variant];
 
+  // Character Animate specific data
+  const characterAnimateMode = isCharacterAnimateTask ? (
+    task?.params?.mode || 
+    orchestratorDetails?.mode || 
+    orchestratorPayload?.mode
+  ) : null;
+  
+  const characterImageUrl = isCharacterAnimateTask ? (
+    task?.params?.character_image_url || 
+    orchestratorDetails?.character_image_url || 
+    orchestratorPayload?.character_image_url
+  ) : null;
+  
+  const motionVideoUrl = isCharacterAnimateTask ? (
+    task?.params?.motion_video_url || 
+    orchestratorDetails?.motion_video_url || 
+    orchestratorPayload?.motion_video_url
+  ) : null;
+  
+  const characterPrompt = isCharacterAnimateTask ? (
+    task?.params?.prompt || 
+    orchestratorDetails?.prompt || 
+    orchestratorPayload?.prompt
+  ) : null;
+
+  const characterResolution = isCharacterAnimateTask ? (
+    task?.params?.resolution || 
+    orchestratorDetails?.resolution || 
+    orchestratorPayload?.resolution
+  ) : null;
+
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'}`}>
-      {/* Guidance Images Section */}
-      {inputImages.length > 0 && (
+      {/* Character Animate Task Details */}
+      {isCharacterAnimateTask && (
+        <>
+          {/* Mode Display */}
+          {characterAnimateMode && (
+            <div className="space-y-1 pb-2 border-b border-muted-foreground/20">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Mode</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground capitalize`}>
+                {characterAnimateMode}
+              </p>
+            </div>
+          )}
+
+          {/* Character Image */}
+          {characterImageUrl && (
+            <div className="space-y-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>
+                {characterAnimateMode === 'animate' ? '✨ Character to animate' : '✨ Character to insert'}
+              </p>
+              <div className="relative group flex-shrink-0" style={{ width: '160px' }}>
+                <img 
+                  src={characterImageUrl} 
+                  alt="Character" 
+                  className="w-full object-cover rounded border shadow-sm transition-transform group-hover:scale-105"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Motion Video */}
+          {motionVideoUrl && (
+            <div className="space-y-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>
+                {characterAnimateMode === 'animate' ? '🎬 Source of movement' : '🎬 Video to replace character in'}
+              </p>
+              <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: '160px' }}>
+                {!characterVideoLoaded ? (
+                  <div 
+                    className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
+                    onClick={() => setCharacterVideoLoaded(true)}
+                  >
+                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <video 
+                      src={motionVideoUrl}
+                      className="w-full object-cover rounded border shadow-sm"
+                      loop
+                      muted
+                      playsInline
+                      autoPlay
+                      onClick={(e) => {
+                        const video = e.currentTarget;
+                        if (video.paused) {
+                          video.play();
+                        } else {
+                          video.pause();
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 rounded-full p-2">
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Character Prompt */}
+          {characterPrompt && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                {characterPrompt}
+              </p>
+            </div>
+          )}
+
+          {/* Character Resolution */}
+          {characterResolution && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Resolution</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                {characterResolution}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Guidance Images Section (for non-character-animate tasks) */}
+      {!isCharacterAnimateTask && inputImages.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center">
             <div className="flex items-center space-x-2">
@@ -125,8 +261,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </div>
       )}
 
-      {/* Video Guidance Section */}
-      {(() => {
+      {/* Video Guidance Section (for non-character-animate tasks) */}
+      {!isCharacterAnimateTask && (() => {
         // Check for video guidance data in multiple locations
         // Priority: orchestratorDetails > orchestratorPayload > task.params
         const videoPath = orchestratorDetails?.structure_video_path || 
@@ -231,8 +367,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         );
       })()}
 
-      {/* Style Reference Image Section */}
-      {(() => {
+      {/* Style Reference Image Section (for non-character-animate tasks) */}
+      {!isCharacterAnimateTask && (() => {
         // Check multiple possible locations for style reference data
         const styleImage = task?.params?.style_reference_image || 
                           orchestratorDetails?.style_reference_image;
@@ -287,7 +423,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         );
       })()}
       
-      {/* Prompts and Technical Settings */}
+      {/* Prompts and Technical Settings (for non-character-animate tasks) */}
+      {!isCharacterAnimateTask && (
       <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
         {/* Prompts Section */}
         <div className="space-y-3">
@@ -393,9 +530,10 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           </div>
         </div>
       </div>
+      )}
 
-      {/* LoRAs Section */}
-      {additionalLoras && Object.keys(additionalLoras).length > 0 && (
+      {/* LoRAs Section (for non-character-animate tasks) */}
+      {!isCharacterAnimateTask && additionalLoras && Object.keys(additionalLoras).length > 0 && (
         <div className="pt-2 border-t border-muted-foreground/20">
           <div className="space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs Used</p>

@@ -48,7 +48,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   // Modal styling
   const modal = useMediumModal();
   const [magicEditPrompt, setMagicEditPrompt] = useState('');
-  const [magicEditNumImages, setMagicEditNumImages] = useState(1);
+  const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   
@@ -190,7 +190,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       setTimeout(() => {
         onClose();
         setMagicEditPrompt('');
-        setMagicEditNumImages(1);
+        setMagicEditNumImages(4);
         setMagicEditShotId(null);
         setTasksCreated(false);
       }, 2000); // Wait 2 seconds to show success state
