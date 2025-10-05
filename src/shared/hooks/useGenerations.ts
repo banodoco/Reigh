@@ -443,6 +443,9 @@ export function useGenerations(
     excludePositioned?: boolean;
     starredOnly?: boolean;
     searchTerm?: string;
+  },
+  options?: {
+    disablePolling?: boolean; // Disable smart polling (useful for long-running tasks)
   }
 ) {
   const offset = (page - 1) * limit;
@@ -452,7 +455,11 @@ export function useGenerations(
 
 
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
+  // Can be disabled for tools with long-running tasks to prevent gallery flicker
   const smartPollingConfig = useSmartPollingConfig(['generations', projectId]);
+  const pollingConfig = options?.disablePolling 
+    ? { refetchInterval: false, staleTime: Infinity }
+    : smartPollingConfig;
 
   const result = useQuery<GenerationsPaginatedResponse, Error>({
     queryKey: queryKey,
@@ -466,9 +473,9 @@ export function useGenerations(
     gcTime: 10 * 60 * 1000, // 10 minutes, slightly longer gcTime
     refetchOnWindowFocus: false, // Prevent double-fetches
     
-    // 🎯 SMART POLLING: Intelligent polling based on realtime health
-    ...smartPollingConfig,
-    refetchIntervalInBackground: true, // CRITICAL: Continue polling when tab is not visible
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health (or disabled)
+    ...pollingConfig,
+    refetchIntervalInBackground: !options?.disablePolling, // Only poll in background if polling is enabled
     refetchOnReconnect: false, // Prevent double-fetches
   });
 

@@ -13,7 +13,7 @@ import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { CharacterAnimateSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { createCharacterAnimateTask } from '@/shared/lib/tasks/characterAnimate';
-import { useGenerations } from '@/shared/hooks/useGenerations';
+import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 
@@ -47,12 +47,8 @@ const CharacterAnimatePage: React.FC = () => {
   const projectAspectRatio = currentProject?.aspectRatio;
   
   // Fetch all videos generated with character-animate tool type
-  const { 
-    data: videosData, 
-    isLoading: videosLoading,
-    isFetching: videosFetching,
-    error: videosError 
-  } = useGenerations(
+  // Disable polling to prevent gallery flicker (character-animate tasks are long-running)
+  const generationsQuery = useGenerations(
     selectedProjectId, 
     1, // page
     100, // limit
@@ -60,8 +56,16 @@ const CharacterAnimatePage: React.FC = () => {
     {
       toolType: 'character-animate',
       mediaType: 'video'
+    },
+    {
+      disablePolling: true // Prevent periodic refetching that causes flicker
     }
   );
+  
+  const videosData = generationsQuery.data as GenerationsPaginatedResponse | undefined;
+  const videosLoading = generationsQuery.isLoading;
+  const videosFetching = generationsQuery.isFetching;
+  const videosError = generationsQuery.error;
   
   // Clear videosViewJustEnabled flag when data loads
   useEffect(() => {
@@ -74,6 +78,20 @@ const CharacterAnimatePage: React.FC = () => {
       });
     }
   }, [videosViewJustEnabled, videosData?.items]);
+  
+  // Refresh gallery when returning to the page (since polling is disabled)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && selectedProjectId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ['unified-generations', 'project', selectedProjectId]
+        });
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [selectedProjectId, queryClient]);
   
   // Initialize prompt from settings
   useEffect(() => {
@@ -488,6 +506,8 @@ const CharacterAnimatePage: React.FC = () => {
                   initialShotFilter="all"
                   columnsPerRow={3}
                   itemsPerPage={12}
+                  reducedSpacing={true}
+                  hidePagination={videosData.items.length <= 12}
                 />
               </div>
             );
