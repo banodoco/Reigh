@@ -180,6 +180,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
       // 2. Clear selection immediately for better UX
       setMobileSelectedIds([]);
+      onSelectionChange?.(false);
 
       // 3. Call server update
       await onImageReorder(orderedIds);
@@ -209,9 +210,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     
     // Clear selections and close dialog
     setMobileSelectedIds([]);
+    onSelectionChange?.(false);
     setConfirmOpen(false);
     setPendingDeleteIds([]);
-  }, [onImageDelete, onBatchImageDelete]);
+  }, [onImageDelete, onBatchImageDelete, onSelectionChange]);
 
   // Check if item would actually move
   const wouldActuallyMove = useCallback((insertIndex: number) => {
@@ -396,7 +398,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setMobileSelectedIds([])}
+                  onClick={() => {
+                    setMobileSelectedIds([]);
+                    onSelectionChange?.(false);
+                  }}
                   className="text-sm"
                 >
                   {mobileSelectedIds.length === 1 ? 'Deselect' : 'Deselect All'}

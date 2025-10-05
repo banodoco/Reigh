@@ -317,6 +317,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       setLastSelectedIndex(null);
       setConfirmOpen(false);
       setPendingDeleteIds([]); // Clear pending delete IDs
+      onSelectionChange?.(false);
       
       // Use batch delete handler if available, otherwise fall back to individual deletes
       if (onBatchImageDelete) {
@@ -358,6 +359,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       if (mobileSelectedIds.length === 0) return;
       if (outerRef.current && !outerRef.current.contains(e.target as Node)) {
         setMobileSelectedIds([]);
+        onSelectionChange?.(false);
       }
     };
 
@@ -1272,7 +1274,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       {showSelectionBar && selectedIds.length >= 1 && (() => {
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
-        const bottomOffset = isMobile ? 46 : 54; // Push higher on mobile (less from bottom)
+        const bottomOffset = isMobile ? 46 : 80; // Push higher on desktop
         
         return (
           <div 
@@ -1293,7 +1295,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSelectedIds([])}
+                  onClick={() => {
+                    setSelectedIds([]);
+                    onSelectionChange?.(false);
+                  }}
                   className="text-sm"
                 >
                   {selectedIds.length === 1 ? 'Deselect' : 'Deselect All'}

@@ -2081,11 +2081,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </button>
                       </p>
                     )}
-                    {!batchVideoPrompt.trim() && !allPairsHavePrompts && (
-                      <p className="text-xs text-center text-red-600 mt-2">
-                        Having a prompt is very important for directing the video
-                      </p>
-                    )}
                   </div>
                 </div>
             </CardContent>
@@ -2196,12 +2191,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               : 'animate-out slide-out-to-bottom-4 fade-out'
           }`}
           style={{
-            bottom: isMobile ? '40px' : '60px', // Pushed down on mobile, desktop stays at original position
+            bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
             left: isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px',
             right: isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px',
           }}
         >
-          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-md">
+          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-lg">
             <div className="flex flex-col items-center gap-2">
               {/* Variant Name Input */}
               <div className="w-full">
@@ -2240,11 +2235,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   >
                     OpenAI API key
                   </button>
-                </p>
-              )}
-              {!batchVideoPrompt.trim() && !allPairsHavePrompts && (
-                <p className="text-xs text-center text-red-600 mt-2">
-                  Having a prompt is very important for directing the video
                 </p>
               )}
             </div>
