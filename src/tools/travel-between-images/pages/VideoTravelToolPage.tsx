@@ -290,6 +290,12 @@ const VideoTravelToolPage: React.FC = () => {
     setEnhancePrompt(enhance);
   }, []);
 
+  const handleAutoCreateIndividualPromptsChange = useCallback((autoCreate: boolean) => {
+    if (!hasLoadedInitialSettings.current) return;
+    userHasInteracted.current = true;
+    setAutoCreateIndividualPrompts(autoCreate);
+  }, []);
+
   const handleTurboModeChange = useCallback((turbo: boolean) => {
     if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
@@ -441,11 +447,12 @@ const VideoTravelToolPage: React.FC = () => {
   const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
   const [batchVideoFrames, setBatchVideoFrames] = useState(60);
   const [batchVideoContext, setBatchVideoContext] = useState(10);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(4);
+  const [batchVideoSteps, setBatchVideoSteps] = useState(6);
   const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
   const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
   const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
+  const [autoCreateIndividualPrompts, setAutoCreateIndividualPrompts] = useState<boolean>(true);
   const [turboMode, setTurboMode] = useState<boolean>(false);
   const [amountOfMotion, setAmountOfMotion] = useState<number>(50); // 0-100 range for UI, defaults to 50
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
@@ -887,11 +894,12 @@ const VideoTravelToolPage: React.FC = () => {
         setBatchVideoPrompt(settingsToApply.batchVideoPrompt || '');
         setBatchVideoFrames(settingsToApply.batchVideoFrames || 60);
         setBatchVideoContext(settingsToApply.batchVideoContext || 10);
-        setBatchVideoSteps(settingsToApply.batchVideoSteps || 4);
+        setBatchVideoSteps(settingsToApply.batchVideoSteps || 6);
         setDimensionSource(settingsToApply.dimensionSource || 'firstImage');
         setCustomWidth(settingsToApply.customWidth);
         setCustomHeight(settingsToApply.customHeight);
         setEnhancePrompt(settingsToApply.enhancePrompt || false);
+        setAutoCreateIndividualPrompts(settingsToApply.autoCreateIndividualPrompts ?? true);
         setTurboMode(settingsToApply.turboMode || false);
         setAmountOfMotion(settingsToApply.amountOfMotion ?? 50); // Default to 50 if not present
         setVideoPairConfigs(settingsToApply.pairConfigs || []);
@@ -1363,6 +1371,7 @@ const VideoTravelToolPage: React.FC = () => {
     customHeight,
     steerableMotionSettings,
     enhancePrompt,
+    autoCreateIndividualPrompts,
     turboMode,
     amountOfMotion,
     generationMode,
@@ -1380,6 +1389,7 @@ const VideoTravelToolPage: React.FC = () => {
           customHeight,
           steerableMotionSettings,
           enhancePrompt,
+          autoCreateIndividualPrompts,
           turboMode,
           amountOfMotion,
           generationMode,
@@ -1750,6 +1760,8 @@ const VideoTravelToolPage: React.FC = () => {
               availableLoras={availableLoras}
               enhancePrompt={enhancePrompt}
               onEnhancePromptChange={handleEnhancePromptChange}
+              autoCreateIndividualPrompts={autoCreateIndividualPrompts}
+              onAutoCreateIndividualPromptsChange={handleAutoCreateIndividualPromptsChange}
               turboMode={turboMode}
               onTurboModeChange={handleTurboModeChange}
               amountOfMotion={amountOfMotion}

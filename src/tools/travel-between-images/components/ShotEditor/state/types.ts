@@ -85,6 +85,7 @@ export interface ShotSettings {
   customHeight?: number;
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
+  autoCreateIndividualPrompts: boolean;
   generationMode?: 'batch' | 'timeline';
 }
 
@@ -125,6 +126,9 @@ export interface ShotEditorProps {
   onTurboModeChange: (turbo: boolean) => void;
   amountOfMotion: number;
   onAmountOfMotionChange: (motion: number) => void;
+  // Auto-create individual prompts
+  autoCreateIndividualPrompts: boolean;
+  onAutoCreateIndividualPromptsChange: (autoCreate: boolean) => void;
   // Mode selection removed - now hardcoded to use specific model
   // Navigation props
   onPreviousShot?: () => void;

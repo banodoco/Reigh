@@ -98,6 +98,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Computer type preference (persistent)
   const [computerType, setComputerType] = usePersistentState<string>("computer-type", "linux");
   
+  // Debug logs preference (persistent)
+  const [showDebugLogs, setShowDebugLogs] = usePersistentState<boolean>("show-debug-logs", false);
+  
   // Generation method preferences (database-backed)
   const { 
     value: generationMethods, 
@@ -379,6 +382,7 @@ Please be very specific with file paths, command syntax, and verification steps 
   const getInstallationCommand = () => {
     // Use the actual token from database or freshly generated one
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
+    const debugFlag = showDebugLogs ? ' --debug' : '';
     
     if (computerType === "windows") {
       return `git clone https://github.com/peteromallet/Headless-Wan2GP.git
@@ -390,7 +394,7 @@ pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
 python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA devices: {torch.cuda.device_count()}'); print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
-python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}`;
+python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
     } else {
       // Linux command (existing)
       return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
@@ -404,18 +408,19 @@ pip install --no-cache-dir -r requirements.txt && \\
 python worker.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
-  --supabase-access-token ${token}`;
+  --supabase-access-token ${token}${debugFlag}`;
     }
   };
 
   const getRunCommand = () => {
     // Use the actual token from database or freshly generated one
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
+    const debugFlag = showDebugLogs ? ' --debug' : '';
     
     if (computerType === "windows") {
       return `git pull
 venv\\Scripts\\activate.bat
-python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}`;
+python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
     } else {
       // Linux / Mac command
       return `git pull && \\
@@ -423,7 +428,7 @@ source venv/bin/activate && \\
 python worker.py --db-type supabase \\
   --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
-  --supabase-access-token ${token}`;
+  --supabase-access-token ${token}${debugFlag}`;
     }
   };
 
@@ -687,6 +692,26 @@ python worker.py --db-type supabase \\
                             I've already installed
                           </TabsTrigger>
                         </TabsList>
+
+                        {/* Debug Logs Toggle */}
+                        <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg mb-4">
+                          <div className="flex items-center space-x-2">
+                            <Terminal className="h-4 w-4 text-gray-600" />
+                            <span className="text-sm font-light text-gray-700">Show Debug Logs</span>
+                          </div>
+                          <button
+                            onClick={() => setShowDebugLogs(!showDebugLogs)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              showDebugLogs ? 'bg-blue-600' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                showDebugLogs ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
 
                       <TabsContent value="need-install" className="space-y-4">
                         <div className="space-y-4">

@@ -12,6 +12,7 @@ export interface VideoTravelSettings {
   customHeight?: number;
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
+  autoCreateIndividualPrompts: boolean;
   generationMode: 'batch' | 'by-pair' | 'timeline';
   selectedModel?: 'wan-2.1' | 'wan-2.2';
   turboMode: boolean;
@@ -55,6 +56,7 @@ export const videoTravelSettings = {
     dimensionSource: 'firstImage' as const,
     generationMode: 'batch' as const,
     enhancePrompt: false,
+    autoCreateIndividualPrompts: true,
     selectedModel: 'wan-2.1' as const,
     turboMode: false,
     amountOfMotion: 50,

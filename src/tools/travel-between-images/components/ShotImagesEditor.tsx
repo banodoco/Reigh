@@ -96,6 +96,10 @@ interface ShotImagesEditorProps {
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => void;
+  /** Auto-create individual prompts flag */
+  autoCreateIndividualPrompts?: boolean;
+  /** Callback when selection state changes */
+  onSelectionChange?: (hasSelection: boolean) => void;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -142,6 +146,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   structureVideoMotionStrength: propStructureVideoMotionStrength = 1.0,
   structureVideoType: propStructureVideoType = 'flow',
   onStructureVideoChange: propOnStructureVideoChange,
+  autoCreateIndividualPrompts,
+  onSelectionChange,
 }) => {
   // Force mobile to use batch mode regardless of desktop setting
   const effectiveGenerationMode = isMobile ? 'batch' : generationMode;
@@ -441,6 +447,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoMotionStrength={propStructureVideoMotionStrength}
                 structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
+                autoCreateIndividualPrompts={autoCreateIndividualPrompts}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
@@ -488,6 +495,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onImageUpload={onImageUpload}
                   isUploadingImage={isUploadingImage}
                   batchVideoFrames={batchVideoFrames}
+                  onSelectionChange={onSelectionChange}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

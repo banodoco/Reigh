@@ -73,6 +73,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onTurboModeChange,
   amountOfMotion,
   onAmountOfMotionChange,
+  autoCreateIndividualPrompts,
+  onAutoCreateIndividualPromptsChange,
   generationMode,
   onGenerationModeChange,
   // selectedMode and onModeChange removed - now hardcoded to use specific model
@@ -497,6 +499,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const ctaContainerRef = useRef<HTMLDivElement>(null);
   const videoGalleryRef = useRef<HTMLDivElement>(null);
   const [isCtaFloating, setIsCtaFloating] = useState(false);
+  const [hasActiveSelection, setHasActiveSelection] = useState(false);
+  const [showCtaElement, setShowCtaElement] = useState(false);
+  const ctaHideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const containerEl = headerContainerRef.current;
@@ -587,6 +592,35 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [state.isEditingName]);
   
+  // Manage CTA element visibility with animation delay
+  useEffect(() => {
+    if (isCtaFloating) {
+      // Clear any pending hide timer
+      if (ctaHideTimerRef.current) {
+        clearTimeout(ctaHideTimerRef.current);
+        ctaHideTimerRef.current = null;
+      }
+      // Show immediately when it should float
+      setShowCtaElement(true);
+    } else if (showCtaElement) {
+      // When it should hide, wait for animation to complete before removing from DOM
+      // Clear any existing timer first
+      if (ctaHideTimerRef.current) {
+        clearTimeout(ctaHideTimerRef.current);
+      }
+      ctaHideTimerRef.current = setTimeout(() => {
+        setShowCtaElement(false);
+        ctaHideTimerRef.current = null;
+      }, 300); // Match animation duration
+    }
+    
+    return () => {
+      if (ctaHideTimerRef.current) {
+        clearTimeout(ctaHideTimerRef.current);
+      }
+    };
+  }, [isCtaFloating, showCtaElement]);
+
   // Floating CTA: Track when user scrolls past video gallery and before reaching original CTA
   useEffect(() => {
     const galleryEl = videoGalleryRef.current;
@@ -597,8 +631,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     let isOriginalCtaVisible = false;
     
     const updateFloatingState = () => {
-      // Show floating CTA only when: scrolled past gallery AND original CTA is not visible
-      setIsCtaFloating(hasScrolledPastGallery && !isOriginalCtaVisible);
+      // Show floating CTA only when: scrolled past gallery AND original CTA is not visible AND no active selection
+      const shouldFloat = hasScrolledPastGallery && !isOriginalCtaVisible && !hasActiveSelection;
+      setIsCtaFloating(shouldFloat);
     };
     
     // Mobile needs smaller margins due to smaller viewport
@@ -640,7 +675,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       galleryObserver.disconnect();
       ctaObserver.disconnect();
     };
-  }, [isMobile]);
+  }, [isMobile, hasActiveSelection]);
 
   const handleStickyNameClick = useCallback(() => {
     const containerEl = headerContainerRef.current;
@@ -1666,7 +1701,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       fade_out_duration: steerableMotionSettings.fade_out_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_out_duration,
       after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation ?? DEFAULT_STEERABLE_MOTION_SETTINGS.after_first_post_generation_saturation,
       after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness ?? DEFAULT_STEERABLE_MOTION_SETTINGS.after_first_post_generation_brightness,
-      enhance_prompt: enhancePrompt,
+      enhance_prompt: enhancePrompt || autoCreateIndividualPrompts,
       openai_api_key: enhancePrompt ? openaiApiKey : '',
       // Save UI state settings
       dimension_source: dimensionSource,
@@ -1713,6 +1748,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       requestBody.structure_video_motion_strength = structureVideoMotionStrength;
       requestBody.structure_video_type = structureVideoType;
     }
+    
+    // Debug logging for enhance_prompt parameter
+    console.log("[ShotEditor] enhance_prompt debugging:", {
+      enhancePrompt,
+      autoCreateIndividualPrompts, 
+      enhance_prompt_value: enhancePrompt || autoCreateIndividualPrompts,
+      openai_api_key_provided: !!((enhancePrompt || autoCreateIndividualPrompts) ? openaiApiKey : ''),
+      requestBody_enhance_prompt: requestBody.enhance_prompt
+    });
     
     try {
       // Use the new client-side travel between images task creation instead of calling the edge function
@@ -1836,7 +1880,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         {/* Image Manager */}
         <div className="flex flex-col w-full gap-4">
-          <ShotImagesEditor
+            <ShotImagesEditor
             isModeReady={state.isModeReady}
             settingsError={state.settingsError}
             isMobile={isMobile}
@@ -1874,6 +1918,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={effectiveAspectRatio}
+            onSelectionChange={(hasSelection) => {
+              // Track selection state - floating CTA will auto-hide/show based on this
+              setHasActiveSelection(hasSelection);
+            }}
             defaultPrompt={batchVideoPrompt}
             onDefaultPromptChange={onBatchVideoPromptChange}
             defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
@@ -1885,6 +1933,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             structureVideoMotionStrength={structureVideoMotionStrength}
             structureVideoType={structureVideoType}
             onStructureVideoChange={handleStructureVideoChange}
+            autoCreateIndividualPrompts={autoCreateIndividualPrompts}
           />
         </div>
 
@@ -1933,11 +1982,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             amountOfMotion={amountOfMotion}
                             onAmountOfMotionChange={onAmountOfMotionChange}
                             imageCount={simpleFilteredImages.length}
+                            autoCreateIndividualPrompts={autoCreateIndividualPrompts}
+                            onAutoCreateIndividualPromptsChange={onAutoCreateIndividualPromptsChange}
                         />
                         
                         
                         {/* LoRA Settings (Mobile) */}
-                        <div className="block lg:hidden">
+                        <div className="block lg:hidden mt-6">
                             <div className="mb-4">
                                 <SectionHeader title="LoRAs" theme="purple" />
                             </div>
@@ -2137,9 +2188,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       />
       
       {/* Floating CTA - appears when original position is not visible */}
-      {isCtaFloating && (
+      {showCtaElement && (
         <div 
-          className="fixed z-[80] animate-in slide-in-from-bottom-4 fade-in duration-300 flex justify-center"
+          className={`fixed z-[80] flex justify-center duration-300 ${
+            isCtaFloating 
+              ? 'animate-in slide-in-from-bottom-4 fade-in' 
+              : 'animate-out slide-out-to-bottom-4 fade-out'
+          }`}
           style={{
             bottom: isMobile ? '40px' : '60px', // Pushed down on mobile, desktop stays at original position
             left: isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px',

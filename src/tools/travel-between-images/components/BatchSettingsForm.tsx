@@ -122,7 +122,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 <div className="relative">
                   <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">
                     {isTimelineMode 
-                      ? (autoCreateIndividualPrompts ? 'Append After Individual Prompts:' : 'Default Prompt:')
+                      ? (autoCreateIndividualPrompts ? 'Append After Prompts:' : 'Default Prompt:')
                       : 'Prompt:'
                     }
                   </Label>
@@ -183,9 +183,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
             </div>
             
-            {/* Auto-Create Individual Prompts Toggle - only show in timeline mode */}
-            {isTimelineMode && (
-              <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
+            {/* Auto-Create Individual Prompts Toggle - only show in timeline mode and when turbo mode is disabled */}
+            {isTimelineMode && !turboMode && (
+              <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border mb-2">
                 <Switch
                   id="auto-create-individual-prompts"
                   checked={autoCreateIndividualPrompts}
@@ -195,12 +195,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   <Label htmlFor="auto-create-individual-prompts" className="font-medium">
                     Auto-Create Individual Prompts
                   </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {autoCreateIndividualPrompts
-                      ? 'AI will generate unique prompts for each pair, with your text appended'
-                      : 'Use the same default prompt for all pairs (you can still customize individual pairs)'
-                    }
-                  </p>
                 </div>
               </div>
             )}
@@ -247,36 +241,35 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </Tooltip>
             )}
             
-            <div className={`grid grid-cols-1 gap-4 ${!isTimelineMode && imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
-                {!isTimelineMode && (
-                  <div className="relative">
-                    <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
-                      {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
-                      {turboMode && <span className="text-sm text-muted-foreground ml-2">(Fixed at 81 in Turbo Mode)</span>}
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                          <Info className="h-4 w-4" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                          <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Slider
-                      id="batchVideoFrames"
-                      min={10}
-                      max={81} 
-                      step={1}
-                      value={[batchVideoFrames]}
-                      onValueChange={(value) => onBatchVideoFramesChange(value[0])}
-                      disabled={turboMode}
-                      className={turboMode ? 'opacity-50' : ''}
-                    />
-                  </div>
-                )}
-                {!isTimelineMode && imageCount > 2 && (
+            {!isTimelineMode && (
+              <div className={`grid grid-cols-1 gap-4 ${imageCount > 2 ? 'md:grid-cols-2' : ''}`}>
+                <div className="relative">
+                  <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
+                    {imageCount === 1 ? 'Frames to generate' : 'Frames per pair'}: {batchVideoFrames}
+                    {turboMode && <span className="text-sm text-muted-foreground ml-2">(Fixed at 81 in Turbo Mode)</span>}
+                  </Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                        <Info className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Slider
+                    id="batchVideoFrames"
+                    min={10}
+                    max={81} 
+                    step={1}
+                    value={[batchVideoFrames]}
+                    onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                    disabled={turboMode}
+                    className={turboMode ? 'opacity-50' : ''}
+                  />
+                </div>
+                {imageCount > 2 && (
                   <div className="relative">
                     <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Context frames: {batchVideoContext}</Label>
                     <Tooltip>
@@ -299,7 +292,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     />
                   </div>
                 )}
-            </div>
+              </div>
+            )}
 
 
             {/* Steps and Amount of Motion sliders in a row - hidden in turbo mode */}

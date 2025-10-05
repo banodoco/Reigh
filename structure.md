@@ -283,6 +283,18 @@ See [README.md](README.md) for:
 
 ## 🔄 Recent Updates
 
+### Project Settings Isolation Fix (2024)
+
+**Fixed**: PromptEditorModal AI settings no longer leak between projects when creating new projects.
+
+**Changes Made:**
+- **Enhanced Project Settings Inheritance**: Modified `ProjectContext.tsx` to filter out prompt-editor specific settings (`generationSettings`, `bulkEditSettings`, `activeTab`) and any keys containing "prompt" when copying settings from current project to new project
+- **Disabled AI Settings Persistence**: Temporarily disabled `usePersistentToolState` persistence for PromptEditorModal AI generation settings to prevent cross-project contamination
+- **Project Change Detection**: Added automatic reset of AI generation controls to defaults when switching projects
+- **Comprehensive Filtering**: Ensures new projects start with clean state instead of inheriting AI prompt generation settings, temperatures, model selections, and other AI-related details from previous projects
+
+**Impact**: New projects now start with clean AI generation state, preventing confusion and ensuring each project has its own isolated prompt generation context.
+
 ### Polling Intervals and Resurrection Logic Standardization (2024)
 
 All polling intervals across the codebase have been standardized to use the `useResurrectionPolling` system:

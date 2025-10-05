@@ -21,6 +21,7 @@ export interface BaseShotImageManagerProps {
   batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
+  onSelectionChange?: (hasSelection: boolean) => void; // Callback when selection state changes
 }
 
 export interface MobileImageItemProps {

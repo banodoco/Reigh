@@ -57,6 +57,7 @@ export interface ShotImageManagerProps {
   isUploadingImage?: boolean; // Upload loading state
   onOpenLightbox?: (index: number) => void; // Handler to open lightbox at specific index
   batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
+  onSelectionChange?: (hasSelection: boolean) => void; // Callback when selection state changes
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -76,6 +77,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   onOpenLightbox,
   isUploadingImage,
   batchVideoFrames = 60,
+  onSelectionChange,
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
@@ -107,6 +109,26 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Force re-render tracker to debug render issues
   const [renderCounter, setRenderCounter] = useState(0);
+  
+  // State to control when selection bar should be visible (with delay)
+  const [showSelectionBar, setShowSelectionBar] = useState(false);
+  
+  // Show selection bar with a delay after items are selected
+  useEffect(() => {
+    // Check both desktop and mobile selection states
+    const hasSelection = selectedIds.length > 0 || mobileSelectedIds.length > 0;
+    
+    if (hasSelection) {
+      // Delay showing selection bar to let CTA hide first
+      const timer = setTimeout(() => {
+        setShowSelectionBar(true);
+      }, 200); // 200ms delay for smooth transition
+      return () => clearTimeout(timer);
+    } else {
+      // Hide immediately when deselected
+      setShowSelectionBar(false);
+    }
+  }, [selectedIds.length, mobileSelectedIds.length]);
   
   // Wrap setSelectedIds to force re-render
   const setSelectedIdsWithRerender = useCallback((newIds: string[] | ((prev: string[]) => string[])) => {
@@ -730,6 +752,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             newCount: newSelection.length,
             removedId: imageKey.substring(0, 8)
           });
+          onSelectionChange?.(newSelection.length > 0);
           return newSelection;
         });
       } else {
@@ -741,6 +764,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             newCount: newSelection.length,
             addedId: imageKey.substring(0, 8)
           });
+          onSelectionChange?.(true);
           return newSelection;
         });
       }
@@ -793,6 +817,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             if (newSelection.length === 0) {
               setLastSelectedIndex(null);
             }
+            onSelectionChange?.(newSelection.length > 0);
             return newSelection;
           });
         } else {
@@ -804,6 +829,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               newCount: newSelection.length,
               addedCount: rangeIds.length
             });
+            onSelectionChange?.(true);
             return newSelection;
           });
           // Update last selected to current
@@ -830,6 +856,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             if (newSelection.length === 0) {
               setLastSelectedIndex(null);
             }
+            onSelectionChange?.(newSelection.length > 0);
             return newSelection;
           } else {
             // Selecting: add to selection
@@ -841,6 +868,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               addedId: imageKey.substring(0, 8),
               newLastSelectedIndex: currentIndex
             });
+            onSelectionChange?.(true);
             return newSelection;
           }
         });
@@ -867,11 +895,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           if (newSelection.length === 0) {
             setLastSelectedIndex(null);
           }
+          onSelectionChange?.(newSelection.length > 0);
           return newSelection;
         } else {
           // Selecting: add to existing selection
           setLastSelectedIndex(currentIndex);
           const newSelection = [...prev, imageKey];
+          onSelectionChange?.(true);
           console.log('[SelectionDebug:ShotImageManager] Regular click selection result', {
             previousCount: prev.length,
             newCount: newSelection.length,
@@ -1042,6 +1072,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           batchVideoFrames={batchVideoFrames}
           onImageUpload={onImageUpload}
           isUploadingImage={isUploadingImage}
+          onSelectionChange={onSelectionChange}
         />
         
         {/* MediaLightbox for mobile - must be rendered here since we return early */}
@@ -1238,14 +1269,14 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       )}
 
       {/* Floating Action Bar for Multiple Selection (Desktop) */}
-      {selectedIds.length >= 1 && (() => {
+      {showSelectionBar && selectedIds.length >= 1 && (() => {
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         const bottomOffset = isMobile ? 46 : 54; // Push higher on mobile (less from bottom)
         
         return (
           <div 
-            className="fixed z-50 flex justify-center"
+            className="fixed z-50 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
             style={{
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,

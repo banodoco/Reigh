@@ -29,6 +29,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   batchVideoFrames = 60,
   onImageUpload,
   isUploadingImage,
+  onSelectionChange,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -36,6 +37,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const currentDialogSkipChoiceRef = useRef(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
+  
+  // State to control when selection bar should be visible (with delay)
+  const [showSelectionBar, setShowSelectionBar] = useState(false);
   
   // Optimistic update state for mobile reordering
   const [optimisticOrder, setOptimisticOrder] = useState<any[]>([]);
@@ -68,11 +72,27 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Use optimistic order if available, otherwise use props images
   const currentImages = isOptimisticUpdate && optimisticOrder.length > 0 ? optimisticOrder : images;
 
+  // Show selection bar with a delay after items are selected
+  React.useEffect(() => {
+    if (mobileSelectedIds.length > 0) {
+      // Delay showing selection bar to let CTA hide first
+      const timer = setTimeout(() => {
+        setShowSelectionBar(true);
+      }, 200); // 200ms delay for smooth transition
+      return () => clearTimeout(timer);
+    } else {
+      // Hide immediately when deselected
+      setShowSelectionBar(false);
+    }
+  }, [mobileSelectedIds.length]);
+
   // Dispatch selection state to hide pane controls on mobile
   React.useEffect(() => {
     const hasSelection = mobileSelectedIds.length > 0;
     window.dispatchEvent(new CustomEvent('mobileSelectionActive', { detail: hasSelection }));
-  }, [mobileSelectedIds.length]);
+    // Notify parent component of selection change
+    onSelectionChange?.(hasSelection);
+  }, [mobileSelectedIds.length, onSelectionChange]);
 
   // Reconcile optimistic state with server state when images prop changes
   React.useEffect(() => {
@@ -353,13 +373,13 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       </div>
 
       {/* Floating Action Bar for Multiple Selection */}
-      {mobileSelectedIds.length >= 1 && (() => {
+      {showSelectionBar && mobileSelectedIds.length >= 1 && (() => {
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         
         return (
           <div 
-            className="fixed z-50 flex justify-center"
+            className="fixed z-50 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
             style={{
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,

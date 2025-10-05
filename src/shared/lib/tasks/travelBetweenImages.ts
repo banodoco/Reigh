@@ -206,6 +206,12 @@ function buildTravelBetweenImagesPayload(
     generation_name: params.generation_name ?? undefined,
   };
 
+  // Log the enhance_prompt value that will be sent to orchestrator
+  console.log("[createTravelBetweenImagesTask] Orchestrator payload enhance_prompt:", {
+    enhance_prompt_value: orchestratorPayload.enhance_prompt,
+    openai_api_key_provided: !!(params.openai_api_key ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.openai_api_key)
+  });
+
   // Add structure video parameters if provided
   if (params.structure_video_path) {
     orchestratorPayload.structure_video_path = params.structure_video_path;
@@ -235,6 +241,11 @@ function buildTravelBetweenImagesPayload(
  */
 export async function createTravelBetweenImagesTask(params: TravelBetweenImagesTaskParams): Promise<any> {
   console.log("[createTravelBetweenImagesTask] Creating task with params:", params);
+  console.log("[createTravelBetweenImagesTask] enhance_prompt parameter:", {
+    enhance_prompt: params.enhance_prompt,
+    default_enhance_prompt: DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
+    will_be_set_to: params.enhance_prompt ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt
+  });
 
   try {
     // 1. Validate parameters
