@@ -45,7 +45,9 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
 
     const relativeX = e.clientX - rect.left;
     const clickFrame = pixelToFrame(relativeX, rect.width, fullMin, fullRange);
-    setZoomLevel(3);
+    
+    // Progressive zoom: each double-click zooms in more (1.5x multiplier, max 10x)
+    setZoomLevel(prev => Math.min(prev * 1.5, 10));
     setZoomCenter(clickFrame);
   }, [fullMin, fullRange]);
 

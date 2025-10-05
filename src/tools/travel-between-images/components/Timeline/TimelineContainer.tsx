@@ -316,11 +316,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       <div className="absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto">
         <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
         <Button
-          variant="outline"
+          variant={zoomLevel > 1.5 ? "default" : "outline"}
           size="sm"
           onClick={handleZoomReset}
           disabled={zoomLevel <= 1}
-          className="h-7 text-xs px-2"
+          className={`h-7 text-xs px-2 transition-all ${
+            zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
+            zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
+          }`}
+          style={{
+            transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
+          }}
         >
           Reset
         </Button>
