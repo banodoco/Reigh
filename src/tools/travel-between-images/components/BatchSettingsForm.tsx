@@ -114,6 +114,15 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     const hasTooManyImages = imageCount > 2;
     const isTurboModeDisabled = hasTooManyImages;
 
+    // Debug logging for toggle visibility
+    console.log("[BatchSettingsForm] Auto-Create Individual Prompts toggle visibility:", {
+      isTimelineMode,
+      turboMode,
+      autoCreateIndividualPrompts,
+      shouldShow: !turboMode,
+      imageCount
+    });
+
     return (
         <div className="space-y-4">
 
@@ -183,8 +192,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
             </div>
             
-            {/* Auto-Create Individual Prompts Toggle - only show in timeline mode and when turbo mode is disabled */}
-            {isTimelineMode && !turboMode && (
+            {/* Auto-Create Individual Prompts Toggle - show when turbo mode is disabled */}
+            {!turboMode && (
               <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border mb-2">
                 <Switch
                   id="auto-create-individual-prompts"
@@ -200,45 +209,29 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             )}
             
 
-            {/* Turbo Mode Toggle - only show when cloud generation is enabled */}
-            {isCloudGenerationEnabled && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={`flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border ${isTurboModeDisabled ? 'opacity-50' : ''}`}>
-                    <Switch
-                      id="turbo-mode"
-                      checked={turboMode && !isTurboModeDisabled}
-                      disabled={isTurboModeDisabled}
-                      onCheckedChange={(checked) => {
-                        if (isTurboModeDisabled) return;
-                        onTurboModeChange(checked);
-                        // Auto-set frames to 81 when turbo mode is enabled
-                        if (checked && batchVideoFrames !== 81) {
-                          onBatchVideoFramesChange(81);
-                        }
-                      }}
-                    />
-                    <div className="flex-1">
-                      <Label htmlFor="turbo-mode" className={`font-medium ${isTurboModeDisabled ? 'cursor-not-allowed' : ''}`}>
-                        Turbo Mode
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {isTurboModeDisabled 
-                          ? 'Turbo mode requires 1-2 images only'
-                          : turboMode 
-                            ? 'Using fast WAN 2.2 model for quick results (81 frames)' 
-                            : 'Run with an inflexible but fast and high-quality model'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </TooltipTrigger>
-                {isTurboModeDisabled && (
-                  <TooltipContent>
-                    <p>Turbo mode is only possible with 1-2 images</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
+            {/* Turbo Mode Toggle - only show when cloud generation is enabled and 2 or fewer images */}
+            {isCloudGenerationEnabled && !isTurboModeDisabled && (
+              <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
+                <Switch
+                  id="turbo-mode"
+                  checked={turboMode}
+                  onCheckedChange={(checked) => {
+                    onTurboModeChange(checked);
+                    // Auto-set frames to 81 when turbo mode is enabled
+                    if (checked && batchVideoFrames !== 81) {
+                      onBatchVideoFramesChange(81);
+                    }
+                  }}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="turbo-mode" className="font-medium">
+                    Turbo Mode
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Using fast WAN 2.2 model for quick results (81 frames)
+                  </p>
+                </div>
+              </div>
             )}
             
             {!isTimelineMode && (

@@ -46,6 +46,7 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
   const [selectedImage, setSelectedImage] = useState<DatasetImage | null>(null);
   const [processingImage, setProcessingImage] = useState<number | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
   
 
   // Fetch images
@@ -63,6 +64,7 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
       setImages(result.items);
       setTotalPages(result.totalPages);
       setTotal(result.total);
+      setLoadedImages(new Set()); // Reset loaded images when new data arrives
     } catch (error) {
       console.error('Error fetching dataset images:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -145,10 +147,11 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
     setCurrentPage(1);
   }, []);
 
-  // Reset processing state when modal closes (but keep other state)
+  // Reset processing state and loaded images when modal closes (but keep other state)
   useEffect(() => {
     if (!isOpen) {
       setProcessingImage(null);
+      setLoadedImages(new Set());
     }
   }, [isOpen]);
 
@@ -201,16 +204,25 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
             )}
           </div>
 
-          {/* Loading State */}
+          {/* Loading State - Skeleton Grid */}
           {loading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="ml-2">Loading images...</span>
+            <div className="grid grid-cols-4 gap-3">
+              {Array.from({ length: 16 }).map((_, index) => (
+                <div
+                  key={`skeleton-${index}`}
+                  className="relative rounded-lg overflow-hidden border-2 border-transparent"
+                >
+                  <div className="aspect-square bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 animate-pulse relative">
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-gray-600/20 to-transparent animate-shimmer transform -skew-x-12" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
           {/* Images Grid - 4x4 layout */}
-          {!loading && (
+          {!loading && !connectionError && images.length > 0 && (
             <div className="grid grid-cols-4 gap-3">
               {images.map((image) => (
                 <div
@@ -221,11 +233,24 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
                   onClick={() => handleImageClick(image)}
                 >
                   <div className="aspect-square relative">
+                    {/* Skeleton loader - shown until image loads */}
+                    {!loadedImages.has(image.id) && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 animate-pulse">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-gray-600/20 to-transparent animate-shimmer transform -skew-x-12" />
+                      </div>
+                    )}
                     <img
                       src={image.storage_url}
                       alt={image.prompt || image.filename}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      onLoad={() => {
+                        setLoadedImages(prev => new Set(prev).add(image.id));
+                      }}
+                      onError={() => {
+                        // Also mark as "loaded" on error to hide skeleton
+                        setLoadedImages(prev => new Set(prev).add(image.id));
+                      }}
                     />
                     {processingImage === image.id && (
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
