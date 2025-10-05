@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { pixelToFrame } from "../utils/timeline-utils";
 
 interface UseZoomProps {
@@ -10,6 +10,7 @@ interface UseZoomProps {
 export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState(0);
+  const [isZooming, setIsZooming] = useState(false);
 
   // Calculate zoom viewport
   const getZoomViewport = useCallback(() => {
@@ -28,13 +29,27 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
   }, [fullMin, fullMax, fullRange, zoomLevel, zoomCenter]);
 
   // Zoom controls
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev * 1.5, 10));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev / 1.5, 1));
+  const handleZoomIn = (centerFrame?: number) => {
+    setIsZooming(true);
+    if (typeof centerFrame === 'number') {
+      setZoomCenter(centerFrame);
+    }
+    setZoomLevel(prev => Math.min(prev * 1.5, 10));
+  }
+  const handleZoomOut = (centerFrame?: number) => {
+    setIsZooming(true);
+    if (typeof centerFrame === 'number') {
+      setZoomCenter(centerFrame);
+    }
+    setZoomLevel(prev => Math.max(prev / 1.5, 1));
+  }
   const handleZoomReset = () => {
+    setIsZooming(true);
     setZoomLevel(1);
     setZoomCenter(0);
   };
   const handleZoomToStart = () => {
+    setIsZooming(true);
     setZoomLevel(2);
     setZoomCenter(fullMin + fullRange / 4);
   };
@@ -47,6 +62,7 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
     const clickFrame = pixelToFrame(relativeX, rect.width, fullMin, fullRange);
     
     // Progressive zoom: each double-click zooms in more (1.5x multiplier, max 10x)
+    setIsZooming(true);
     setZoomLevel(prev => Math.min(prev * 1.5, 10));
     setZoomCenter(clickFrame);
   }, [fullMin, fullRange]);
@@ -57,9 +73,17 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
     if (!isHorizontal && Math.abs(e.deltaY) > 0) {
       e.preventDefault();
       const pan = (e.deltaY * fullRange) / 2000;
+      setIsZooming(true);
       setZoomCenter(z => z + pan);
     }
   }, [zoomLevel, fullRange]);
+  
+  useEffect(() => {
+    if (isZooming) {
+      const timer = setTimeout(() => setIsZooming(false), 100); // Reset after a short delay
+      return () => clearTimeout(timer);
+    }
+  }, [isZooming]);
 
   const viewport = getZoomViewport();
 
@@ -74,5 +98,6 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
     handleTimelineDoubleClick,
     handleWheel,
     setZoomCenter, // Export for external control
+    isZooming,
   };
 }; 

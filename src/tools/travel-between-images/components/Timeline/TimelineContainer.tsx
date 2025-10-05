@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { calculateMaxGap, getPairInfo, getTimelineDimensions } from './utils/timeline-utils';
+import { calculateMaxGap, getPairInfo, getTimelineDimensions, pixelToFrame } from './utils/timeline-utils';
 import { timelineDebugger } from './utils/timeline-debug';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
@@ -191,7 +191,37 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleZoomToStart,
     handleTimelineDoubleClick,
     handleWheel,
+    isZooming,
   } = useZoom({ fullMin, fullMax, fullRange });
+
+  // Custom zoom handlers to zoom to center of viewport
+  const handleZoomInToCenter = () => {
+    if (!timelineRef.current || !containerRef.current) return;
+    const scrollContainer = timelineRef.current;
+    const timelineContent = containerRef.current;
+    
+    const scrollCenterPx = scrollContainer.scrollLeft + (scrollContainer.clientWidth / 2);
+    const contentWidth = timelineContent.getBoundingClientRect().width;
+    
+    // Convert the center pixel of the viewport to a frame number
+    const centerFrame = pixelToFrame(scrollCenterPx, contentWidth, fullMin, fullRange);
+    
+    handleZoomIn(centerFrame);
+  };
+
+  const handleZoomOutFromCenter = () => {
+    if (!timelineRef.current || !containerRef.current) return;
+    const scrollContainer = timelineRef.current;
+    const timelineContent = containerRef.current;
+    
+    const scrollCenterPx = scrollContainer.scrollLeft + (scrollContainer.clientWidth / 2);
+    const contentWidth = timelineContent.getBoundingClientRect().width;
+    
+    // Convert the center pixel of the viewport to a frame number
+    const centerFrame = pixelToFrame(scrollCenterPx, contentWidth, fullMin, fullRange);
+    
+    handleZoomOut(centerFrame);
+  };
 
   // Force re-render when zoom changes to update containerWidth measurement
   const [, forceUpdate] = useState({});
@@ -204,7 +234,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   }, [zoomLevel]);
 
   // Scroll timeline to center on zoom center when zooming
+  // IMPORTANT: Don't adjust scroll during drag operations to prevent view jumping
   useEffect(() => {
+    // Skip scroll adjustment if a drag is in progress or if the change is not from zooming
+    if (dragState.isDragging || !isZooming) {
+      return;
+    }
+    
     if (zoomLevel > 1 && timelineRef.current && containerRef.current) {
       // Small delay to allow DOM to reflow after zoom, then instantly scroll
       const timer = setTimeout(() => {
@@ -233,7 +269,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [zoomLevel, zoomCenter, fullMin, fullRange]);
+  }, [zoomLevel, zoomCenter, fullMin, fullRange, dragState.isDragging, isZooming]);
 
   // File drop hook
   const {
@@ -336,7 +372,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={handleZoomOut}
+          onClick={handleZoomOutFromCenter}
           disabled={zoomLevel <= 1}
           className="h-7 w-7 p-0"
         >
@@ -345,7 +381,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={handleZoomIn}
+          onClick={handleZoomInToCenter}
           className="h-7 w-7 p-0"
         >
           +
