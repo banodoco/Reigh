@@ -164,6 +164,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   // Modal styling
   const modal = useExtraLargeModal('promptEditor');
   
+  // CRITICAL: Get project context BEFORE any effects that use it
+  // This must be declared before the useEffect at line 213 to prevent TDZ error
+  const { selectedProjectId } = useProject();
+  
   // Debug mobile modal styling hook result
   console.log(`[PromptEditorModal:MOBILE_STYLING_DEBUG] useExtraLargeModal result:`, {
     isMobile: modal.isMobile,
@@ -264,7 +268,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   // These settings should NOT persist across projects or sessions
   // -------------------------------------------------------------
   // Persist settings to the currently-selected project so they are shared across sessions
-  const { selectedProjectId } = useProject();
+  // (selectedProjectId is now declared earlier to prevent TDZ errors)
 
   // Disable persistence for prompt editor AI settings since they should be session-specific
   const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
@@ -770,7 +774,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
           onScroll={handleScroll}
           onClickCapture={handleInsideInteraction}
           onTouchStartCapture={handleInsideInteraction}
-          className={`${modal.scrollClass}`}
+          className={`${modal.scrollClass} ${modal.isMobile ? 'pt-2' : 'pt-6'}`}
         >
           <Collapsible 
             open={isAIPromptSectionExpanded} 

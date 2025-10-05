@@ -114,6 +114,17 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
 
+  // Debug logging for character-animate
+  useEffect(() => {
+    if (item.id === 'character-animate') {
+      const isComingSoon = item.comingSoon || (!item.tool);
+      const shouldShow = isComingSoon || isVisible;
+      console.log('[CharacterAnimateVisibility] ToolCard:',
+        `isVisible=${isVisible}, isComingSoon=${isComingSoon}, ` +
+        `hasTool=${!!item.tool}, shouldShow=${shouldShow}, WILL_RENDER=${shouldShow}`);
+    }
+  }, [item.id, isVisible, item.comingSoon, item.tool]);
+
   const handlePointerDown = (e: React.PointerEvent) => {
     triggerRipple(e);
     time('NavPerf', `ClickLag:${item.id}`);
@@ -272,7 +283,15 @@ const ToolSelectorPage: React.FC = () => {
   const preloaderState = useVideoGalleryPreloader();
   
   // Get generation method preferences
-  const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: false, inCloud: true });
+  const { value: generationMethods, isLoading: isLoadingGenerationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+  const isCloudGenerationEnabled = generationMethods.inCloud && !generationMethods.onComputer;
+
+  // Debug logging for character-animate visibility
+  useEffect(() => {
+    console.log('[CharacterAnimateVisibility] Generation methods state:', 
+      `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
+      `isLoading=${isLoadingGenerationMethods}, isCloudEnabled=${isCloudGenerationEnabled}, env=${currentEnv}`);
+  }, [generationMethods, isLoadingGenerationMethods, isCloudGenerationEnabled, currentEnv]);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -281,12 +300,26 @@ const ToolSelectorPage: React.FC = () => {
 
   const isToolVisible = (tool: ToolUIDefinition | null, toolId?: string) => {
     if (!tool) return false;
-    if (currentEnv === AppEnv.DEV) return true;
     
     // Character Animate only shows when using cloud generation
+    // This check applies even in DEV mode
     if (toolId === 'character-animate') {
-      return tool.environments.includes(currentEnv) && generationMethods.inCloud && !generationMethods.onComputer;
+      const toolEnvironmentCheck = tool.environments.includes(currentEnv) || currentEnv === AppEnv.DEV;
+      const shouldShow = toolEnvironmentCheck && isCloudGenerationEnabled;
+      
+      console.log('[CharacterAnimateVisibility] Visibility check:',
+        `isLoading=${isLoadingGenerationMethods}, ` +
+        `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
+        `isCloudEnabled=${isCloudGenerationEnabled}, envCheck=${toolEnvironmentCheck}, ` +
+        `shouldShow=${shouldShow}, FINAL=${isLoadingGenerationMethods ? false : shouldShow}`);
+      
+      // Hide during loading to prevent showing with fallback value
+      if (isLoadingGenerationMethods) return false;
+      return shouldShow;
     }
+    
+    // For all other tools, show in DEV mode
+    if (currentEnv === AppEnv.DEV) return true;
     
     return tool.environments.includes(currentEnv);
   };
@@ -315,30 +348,46 @@ const ToolSelectorPage: React.FC = () => {
             {/* Process Column */}
             <div className="w-full c-lg:w-2/3">
               <div className={`flex flex-col ${itemGap} ${topMargin} px-4 py-4`}>
-                {processTools.map((tool, index) => (
-                  <FadeInSection key={tool.id}>
-                    <ToolCard
-                      item={tool}
-                      index={index}
-                      isVisible={isToolVisible(tool.tool, tool.id)}
-                    />
-                  </FadeInSection>
-                ))}
+                {processTools.map((tool, index) => {
+                  const isVisible = isToolVisible(tool.tool, tool.id);
+                  const isComingSoon = tool.comingSoon || (!tool.tool);
+                  const shouldShow = isComingSoon || isVisible;
+                  
+                  if (!shouldShow) return null;
+                  
+                  return (
+                    <FadeInSection key={tool.id}>
+                      <ToolCard
+                        item={tool}
+                        index={index}
+                        isVisible={isVisible}
+                      />
+                    </FadeInSection>
+                  );
+                })}
               </div>
             </div>
 
             {/* Assistant Tools Column */}
             <div className="w-full c-lg:w-1/3">
               <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-4`}>
-                {assistantTools.map((tool, index) => (
-                  <FadeInSection key={tool.id}>
-                    <ToolCard
-                      item={tool}
-                      isSquare
-                      isVisible={isToolVisible(tool.tool, tool.id)}
-                    />
-                  </FadeInSection>
-                ))}
+                {assistantTools.map((tool, index) => {
+                  const isVisible = isToolVisible(tool.tool, tool.id);
+                  const isComingSoon = tool.comingSoon || (!tool.tool);
+                  const shouldShow = isComingSoon || isVisible;
+                  
+                  if (!shouldShow) return null;
+                  
+                  return (
+                    <FadeInSection key={tool.id}>
+                      <ToolCard
+                        item={tool}
+                        isSquare
+                        isVisible={isVisible}
+                      />
+                    </FadeInSection>
+                  );
+                })}
               </div>
             </div>
           </div>

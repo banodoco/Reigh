@@ -1,5 +1,7 @@
 /**
  * Default items per page for different screen sizes
+ * Mobile: 20 (shows 10 rows of 2, or 5 rows of 4 on tablets)
+ * Desktop: 45 (shows 9 rows of 5)
  */
 export const DEFAULT_ITEMS_PER_PAGE = {
   MOBILE: 20,

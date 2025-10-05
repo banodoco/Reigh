@@ -266,8 +266,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, [lastAffectedShotId]);
   
   // Use consistent page sizes with ImageGallery defaults to prevent cache mismatches
-  // Reduce items per page on mobile to speed up initial paint and network usage
-  const itemsPerPage = isMobile ? 12 : 20;
+  // Mobile: 20 (10 rows of 2), Desktop: 20 (4 rows of 5)
+  const itemsPerPage = isMobile ? 20 : 20;
   
   // Use stable object for filters to prevent recreating on every render
   const generationsFilters = useStableObject(() => ({

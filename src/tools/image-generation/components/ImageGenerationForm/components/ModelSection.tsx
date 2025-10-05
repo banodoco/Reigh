@@ -5,7 +5,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
-import { Trash2, Images, Plus, Check, X, Upload, Search } from "lucide-react";
+import { Trash2, Images, Plus, X, Upload, Search } from "lucide-react";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
@@ -89,15 +89,6 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
               ) : (
                 <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                   <Images className="h-6 w-6 text-gray-400" />
-                </div>
-              )}
-              
-              {/* Selected indicator */}
-              {isSelected && (
-                <div className="absolute inset-0 bg-purple-500/20 flex items-center justify-center pointer-events-none">
-                  <div className="bg-purple-600 rounded-full p-1">
-                    <Check className="h-4 w-4 text-white" />
-                  </div>
                 </div>
               )}
               

@@ -1677,7 +1677,7 @@ const VideoTravelToolPage: React.FC = () => {
                     showShotFilter={true}
                     initialShotFilter="all"
                     columnsPerRow={3}
-                    itemsPerPage={12}
+                    itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
                   />
                 </div>
               );

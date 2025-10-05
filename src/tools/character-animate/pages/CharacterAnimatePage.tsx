@@ -16,11 +16,13 @@ import { createCharacterAnimateTask } from '@/shared/lib/tasks/characterAnimate'
 import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 const CharacterAnimatePage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedProjectId } = useProject();
+  const isMobile = useIsMobile();
   
   // Local state for inputs
   const [characterImage, setCharacterImage] = useState<{ url: string; file?: File } | null>(null);
@@ -505,9 +507,9 @@ const CharacterAnimatePage: React.FC = () => {
                   showShotFilter={false}
                   initialShotFilter="all"
                   columnsPerRow={3}
-                  itemsPerPage={12}
+                  itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
                   reducedSpacing={true}
-                  hidePagination={videosData.items.length <= 12}
+                  hidePagination={videosData.items.length <= (isMobile ? 20 : 12)}
                 />
               </div>
             );

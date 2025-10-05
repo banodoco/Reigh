@@ -59,18 +59,28 @@ export const useProgressiveImage = (
   const elementRef = useRef<HTMLElement | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const retryCountRef = useRef(0);
+  const phaseRef = useRef<ImagePhase>('idle'); // Ref for logging without causing re-renders
+
+  // Keep phaseRef in sync with phase state
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
 
   // Helper function to cancel active session
   const cancelActiveSession = useCallback((reason: string) => {
     if (activeSessionRef.current?.isActive) {
-      // Silently cancel session - no need to log this frequent operation
-      // console.log(`🧹 [ProgressiveImage] Canceling session: ${reason}`);
+      console.log(`[ThumbToFullTransition] ⚠️ Canceling session:`, {
+        sessionId: activeSessionRef.current.id,
+        reason,
+        currentPhase: phaseRef.current, // Use ref instead of state to avoid dependency
+        timestamp: Date.now()
+      });
       activeSessionRef.current.abortController.abort();
       activeSessionRef.current.timeouts.forEach(timeout => clearTimeout(timeout));
       activeSessionRef.current.isActive = false;
       activeSessionRef.current = null;
     }
-  }, []);
+  }, []); // No dependencies - stable function reference
 
   // Helper function to create new session
   const createSession = useCallback((): LoadingSession => {
@@ -181,8 +191,24 @@ export const useProgressiveImage = (
   // Main loading logic
   useEffect(() => {
     if (!enabled || !isIntersecting) {
+      console.log('[ThumbToFullTransition] Skipping load:', {
+        enabled,
+        isIntersecting,
+        thumbUrl: thumbUrl?.substring(0, 50),
+        fullUrl: fullUrl?.substring(0, 50),
+        timestamp: Date.now()
+      });
       return;
     }
+
+    console.log('[ThumbToFullTransition] 🚀 Starting progressive load:', {
+      thumbUrl: thumbUrl?.substring(0, 50),
+      fullUrl: fullUrl?.substring(0, 50),
+      priority,
+      lazy,
+      enabled,
+      timestamp: Date.now()
+    });
 
     // Cancel any previous session
     cancelActiveSession('new loading session');
@@ -194,16 +220,26 @@ export const useProgressiveImage = (
     const hasThumb = thumbUrl && thumbUrl !== fullUrl;
     const hasFull = !!fullUrl;
 
+    console.log('[ThumbToFullTransition] URL analysis:', {
+      hasThumb,
+      hasFull,
+      thumbEqualsFullUrl: thumbUrl === fullUrl,
+      timestamp: Date.now()
+    });
+
     if (!hasThumb && !hasFull) {
+      console.log('[ThumbToFullTransition] No URLs available, staying idle');
       setPhase('idle');
       setCurrentSrc('');
       return;
     }
 
     const session = createSession();
+    console.log('[ThumbToFullTransition] Created session:', session.id);
 
     // If no thumbnail or thumbnail equals full URL, load full directly
     if (!hasThumb) {
+      console.log('[ThumbToFullTransition] No thumbnail, loading full image directly');
       if (hasFull) {
         safeSetState(session, () => {
           setPhase('loadingFull');
@@ -212,12 +248,14 @@ export const useProgressiveImage = (
 
         loadImage(fullUrl!, session)
           .then(() => {
+            console.log('[ThumbToFullTransition] ✅ Full image loaded directly');
             safeSetState(session, () => {
               setPhase('full');
               setCurrentSrc(fullUrl!);
             });
           })
           .catch((err) => {
+            console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
             safeSetState(session, () => {
               setPhase('error');
               setError(err.message);
@@ -228,6 +266,7 @@ export const useProgressiveImage = (
     }
 
     // Progressive loading: Load thumbnail FIRST, then full image
+    console.log('[ThumbToFullTransition] 📸 Starting progressive load - Phase 1: Loading thumbnail');
     safeSetState(session, () => {
       setPhase('thumb');
       setCurrentSrc(''); // Don't show anything until thumbnail loads
@@ -236,8 +275,12 @@ export const useProgressiveImage = (
     // Step 1: Load thumbnail first
     loadImage(thumbUrl!, session)
       .then(() => {
-        if (!isSessionActive(session)) return;
+        if (!isSessionActive(session)) {
+          console.log('[ThumbToFullTransition] ⚠️ Session cancelled after thumbnail loaded');
+          return;
+        }
 
+        console.log('[ThumbToFullTransition] ✅ Thumbnail loaded, displaying it now');
         // Show thumbnail once it's loaded
         safeSetState(session, () => {
           setCurrentSrc(thumbUrl!);
@@ -245,23 +288,37 @@ export const useProgressiveImage = (
 
         // If prefetch only, don't continue to full loading
         if (prefetch || !hasFull) {
+          console.log('[ThumbToFullTransition] Stopping at thumbnail (prefetch mode or no full URL)');
           return;
         }
 
         // Step 2: Now start loading full image in background
         const isFullCached = isImageCached(fullUrl!);
+        console.log('[ThumbToFullTransition] 🔄 Phase 2: Starting full image load in background', {
+          isFullCached,
+          priority,
+          willLoadImmediately: isFullCached || priority,
+          timestamp: Date.now()
+        });
         
         const loadFullImage = () => {
+          console.log('[ThumbToFullTransition] 📥 Loading full image...');
           safeSetState(session, () => setPhase('loadingFull'));
 
           loadImage(fullUrl!, session)
             .then(() => {
-              if (!isSessionActive(session)) return;
+              if (!isSessionActive(session)) {
+                console.log('[ThumbToFullTransition] ⚠️ Session cancelled after full image loaded');
+                return;
+              }
 
+              console.log('[ThumbToFullTransition] ✅ Full image loaded successfully');
               // Smooth transition to full image
               if (crossfadeMs > 0) {
+                console.log(`[ThumbToFullTransition] 🎬 Waiting ${crossfadeMs}ms before switching to full image`);
                 const timeout = setTimeout(() => {
                   safeSetState(session, () => {
+                    console.log('[ThumbToFullTransition] 🎉 Switching from thumbnail to full image!');
                     setPhase('full');
                     setCurrentSrc(fullUrl!);
                   });
@@ -269,12 +326,14 @@ export const useProgressiveImage = (
                 session.timeouts.push(timeout);
               } else {
                 safeSetState(session, () => {
+                  console.log('[ThumbToFullTransition] 🎉 Switching from thumbnail to full image (no crossfade)!');
                   setPhase('full');
                   setCurrentSrc(fullUrl!);
                 });
               }
             })
             .catch((err) => {
+              console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
               safeSetState(session, () => {
                 setError(err.message);
                 // Keep showing thumbnail on full image error
@@ -284,19 +343,23 @@ export const useProgressiveImage = (
 
         if (isFullCached || priority) {
           // Load immediately if cached or high priority
+          console.log('[ThumbToFullTransition] Loading full image immediately (cached or priority)');
           loadFullImage();
         } else {
           // Small delay for non-cached images to let thumbnail render first
+          console.log('[ThumbToFullTransition] Delaying full image load by 50ms to let thumbnail render');
           const timeout = setTimeout(loadFullImage, 50);
           session.timeouts.push(timeout);
         }
       })
       .catch((thumbErr) => {
         // Thumbnail failed to load - fall back to loading full image directly
-        if (!isSessionActive(session)) return;
+        if (!isSessionActive(session)) {
+          console.log('[ThumbToFullTransition] ⚠️ Session cancelled after thumbnail failed');
+          return;
+        }
         
-        // Silently fall back to full image - no need to log this common scenario
-        // console.warn('[ProgressiveImage] Thumbnail failed to load, falling back to full image:', thumbErr.message);
+        console.warn('[ThumbToFullTransition] ❌ Thumbnail failed to load, falling back to full image:', thumbErr.message);
         
         if (hasFull) {
           safeSetState(session, () => {
@@ -304,20 +367,24 @@ export const useProgressiveImage = (
             setCurrentSrc('');
           });
 
+          console.log('[ThumbToFullTransition] 🔄 Attempting to load full image directly as fallback');
           loadImage(fullUrl!, session)
             .then(() => {
+              console.log('[ThumbToFullTransition] ✅ Full image loaded as fallback');
               safeSetState(session, () => {
                 setPhase('full');
                 setCurrentSrc(fullUrl!);
               });
             })
             .catch((fullErr) => {
+              console.error('[ThumbToFullTransition] ❌ Both thumbnail and full image failed:', fullErr.message);
               safeSetState(session, () => {
                 setPhase('error');
                 setError(`Both thumbnail and full image failed: ${fullErr.message}`);
               });
             });
         } else {
+          console.error('[ThumbToFullTransition] ❌ Thumbnail failed and no full URL available');
           safeSetState(session, () => {
             setPhase('error');
             setError(`Thumbnail failed to load: ${thumbErr.message}`);
@@ -327,6 +394,7 @@ export const useProgressiveImage = (
 
     return () => {
       if (activeSessionRef.current?.id === session.id) {
+        console.log('[ThumbToFullTransition] 🧹 Cleaning up session:', session.id);
         cancelActiveSession('effect cleanup');
       }
     };

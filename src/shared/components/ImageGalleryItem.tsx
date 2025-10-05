@@ -178,10 +178,29 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     {
       priority: isPriority,
       lazy: !isPriority,
-      enabled: progressiveEnabled && shouldLoad,
+      enabled: progressiveEnabled, // Don't tie to shouldLoad - let the hook complete its transition
       crossfadeMs: 180
     }
   );
+  
+  // [ThumbToFullTransition] Log progressive loading state changes for first few items
+  React.useEffect(() => {
+    if (index < 3) {
+      console.log(`[ThumbToFullTransition] Item ${index} state:`, {
+        imageId: image.id?.substring(0, 8),
+        progressiveEnabled,
+        phase,
+        isThumbShowing,
+        isFullLoaded,
+        progressiveSrc: progressiveSrc?.substring(0, 50),
+        thumbUrl: image.thumbUrl?.substring(0, 50),
+        fullUrl: image.url?.substring(0, 50),
+        isPriority,
+        shouldLoad,
+        timestamp: Date.now()
+      });
+    }
+  }, [progressiveEnabled, phase, isThumbShowing, isFullLoaded, progressiveSrc, isPriority, shouldLoad, index, image.id, image.thumbUrl, image.url]);
   
   // Fallback to legacy behavior if progressive loading is disabled
   const displayUrl = useMemo(() => {
@@ -209,10 +228,28 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     
     // For images, use progressive loading if enabled
     if (progressiveEnabled && progressiveSrc) {
+      if (index < 3) {
+        console.log(`[ThumbToFullTransition] Item ${index} using progressiveSrc:`, {
+          imageId: image.id?.substring(0, 8),
+          progressiveSrc: progressiveSrc?.substring(0, 50),
+          phase,
+          timestamp: Date.now()
+        });
+      }
       return progressiveSrc;
     }
-    return getDisplayUrl(image.thumbUrl || image.url);
-  }, [progressiveEnabled, progressiveSrc, image.thumbUrl, image.url, image.isVideo, image.id, index]);
+    
+    const fallbackUrl = getDisplayUrl(image.thumbUrl || image.url);
+    if (index < 3 && progressiveEnabled) {
+      console.log(`[ThumbToFullTransition] Item ${index} using fallback (no progressiveSrc yet):`, {
+        imageId: image.id?.substring(0, 8),
+        fallbackUrl: fallbackUrl?.substring(0, 50),
+        phase,
+        timestamp: Date.now()
+      });
+    }
+    return fallbackUrl;
+  }, [progressiveEnabled, progressiveSrc, image.thumbUrl, image.url, image.isVideo, image.id, index, phase]);
   // Track loading state for this specific image
   const [imageLoadError, setImageLoadError] = useState<boolean>(false);
   const [imageRetryCount, setImageRetryCount] = useState<number>(0);
@@ -449,40 +486,53 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return displayUrl;
   }, [displayUrl, image.thumbUrl, image.url, imageRetryCount]);
 
-  // Simplified loading system - only responds to progressive loading control
+  // Simplified loading system - responds to progressive loading and URL changes
   useEffect(() => {
     // Generate unique load ID for tracking this specific image load
     const loadId = `load-${image.id}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const isPreloaded = isImageCached(image);
     
-    if (index < 8) {
+    if (index < 3) {
+      console.log(`[ThumbToFullTransition] Item ${index} actualSrc effect:`, {
+        imageId: image.id?.substring(0, 8),
+        shouldLoad,
+        actualSrc: actualSrc?.substring(0, 50),
+        actualDisplayUrl: actualDisplayUrl?.substring(0, 50),
+        willUpdate: actualDisplayUrl !== actualSrc && shouldLoad,
+        timestamp: Date.now()
+      });
     }
     
-    // Only load if progressive loading system says we should AND we haven't loaded yet
-    if (!actualSrc && shouldLoad) {
-      
+    // Update actualSrc when displayUrl changes (for progressive loading transitions)
+    // OR when shouldLoad becomes true for the first time
+    if (shouldLoad && actualDisplayUrl) {
       // Don't load placeholder URLs - they indicate missing/invalid image data
-      if (actualDisplayUrl === '/placeholder.svg' || !actualDisplayUrl) {
+      if (actualDisplayUrl === '/placeholder.svg') {
         setImageLoadError(true);
         return;
       }
       
-      // Only set loading if the image isn't already cached/loaded
-      if (!isPreloaded) {
-        setImageLoading(true);
-      } else {
+      // Update actualSrc if it's different from actualDisplayUrl
+      // This handles both initial load AND progressive thumbnail→full transitions
+      if (actualSrc !== actualDisplayUrl) {
+        if (index < 3) {
+          console.log(`[ThumbToFullTransition] Item ${index} updating actualSrc:`, {
+            imageId: image.id?.substring(0, 8),
+            from: actualSrc?.substring(0, 50),
+            to: actualDisplayUrl?.substring(0, 50),
+            timestamp: Date.now()
+          });
+        }
+        
+        // Only set loading if the image isn't already cached/loaded
+        if (!isPreloaded && !actualSrc) {
+          setImageLoading(true);
+        }
+        
+        setActualSrc(actualDisplayUrl);
       }
-      
-      // No additional delay - progressive loading system handles all timing
-      // Images load immediately when shouldLoad becomes true
-      if (index < 8) {
-      }
-      setActualSrc(actualDisplayUrl);
-      
-    } else if (!shouldLoad) {
-    } else if (actualSrc) {
     }
-  }, [actualSrc, actualDisplayUrl, shouldLoad, image.id, index]);
+  }, [actualSrc, actualDisplayUrl, shouldLoad, image.id, index, isImageCached]);
 
   // Check if we should show metadata details (only when tooltip/popover is open for performance)
   const shouldShowMetadata = useMemo(() => {
