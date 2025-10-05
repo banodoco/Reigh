@@ -5,7 +5,7 @@ import { Label } from "@/shared/components/ui/label";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
-import { Trash2, Images, Plus, Check, X, Upload } from "lucide-react";
+import { Trash2, Images, Plus, Check, X, Upload, Search } from "lucide-react";
 import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
@@ -44,6 +44,7 @@ interface ReferenceSelectorProps {
   onDeleteReference: (id: string) => void;
   isGenerating: boolean;
   isUploadingStyleReference: boolean;
+  onOpenDatasetBrowser: () => void;
 }
 
 const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
@@ -54,6 +55,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   onDeleteReference,
   isGenerating,
   isUploadingStyleReference,
+  onOpenDatasetBrowser,
 }) => {
   const [isDraggingOverAdd, setIsDraggingOverAdd] = React.useState(false);
   
@@ -100,7 +102,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
               )}
               
               {/* Delete button - show on hover or always on mobile */}
-              {!isGenerating && references.length > 1 && (
+              {!isGenerating && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -176,6 +178,26 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
             disabled={isGenerating || isUploadingStyleReference}
           />
         </label>
+        
+        {/* Search reference button */}
+        <button
+          type="button"
+          className={cn(
+            "aspect-square flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200",
+            isGenerating || isUploadingStyleReference
+              ? "border-gray-200 cursor-not-allowed opacity-50"
+              : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
+          )}
+          title="Search reference images"
+          onClick={() => {
+            if (!isGenerating && !isUploadingStyleReference) {
+              onOpenDatasetBrowser();
+            }
+          }}
+          disabled={isGenerating || isUploadingStyleReference}
+        >
+          <Search className="h-6 w-6 text-gray-400" />
+        </button>
       </div>
     </div>
   );
@@ -272,6 +294,7 @@ const StyleReferenceSection: React.FC<{
             onDeleteReference={onDeleteReference}
             isGenerating={isGenerating}
             isUploadingStyleReference={isUploadingStyleReference}
+            onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
           />
           
           {/* Settings below thumbnails */}
@@ -415,6 +438,7 @@ const StyleReferenceSection: React.FC<{
         onDeleteReference={onDeleteReference}
         isGenerating={isGenerating}
         isUploadingStyleReference={isUploadingStyleReference}
+        onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
       />
     )}
     

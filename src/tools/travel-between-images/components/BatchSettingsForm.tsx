@@ -63,6 +63,10 @@ interface BatchSettingsFormProps {
   amountOfMotion: number;
   onAmountOfMotionChange: (value: number) => void;
   // selectedMode removed - now hardcoded to use specific model
+  
+  // Auto-create individual prompts toggle
+  autoCreateIndividualPrompts: boolean;
+  onAutoCreateIndividualPromptsChange: (value: boolean) => void;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -97,6 +101,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   imageCount = 0,
   amountOfMotion,
   onAmountOfMotionChange,
+  autoCreateIndividualPrompts,
+  onAutoCreateIndividualPromptsChange,
 }) => {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
@@ -115,7 +121,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative">
                   <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">
-                    {isTimelineMode ? 'Default Prompt:' : 'Prompt:'}
+                    {isTimelineMode 
+                      ? (autoCreateIndividualPrompts ? 'Append After Individual Prompts:' : 'Default Prompt:')
+                      : 'Prompt:'
+                    }
                   </Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -124,14 +133,23 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>This prompt guides the style and transition for all video segments. <br /> Small changes can have a big impact.</p>
+                      <p>
+                        {autoCreateIndividualPrompts && isTimelineMode 
+                          ? 'This text will be appended after AI-generated individual prompts for each pair.'
+                          : 'This prompt guides the style and transition for all video segments.'
+                        } <br /> Small changes can have a big impact.
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                   <Textarea 
                     id="batchVideoPrompt"
                     value={batchVideoPrompt}
                     onChange={(e) => onBatchVideoPromptChange(e.target.value)}
-                    placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
+                    placeholder={
+                      autoCreateIndividualPrompts && isTimelineMode
+                        ? "Text to append after AI-generated prompts... (e.g., cinematic style, high quality)"
+                        : "Enter a global prompt for all video segments... (e.g., cinematic transition)"
+                    }
                     className="min-h-[70px]"
                     rows={3}
                     clearable
@@ -164,6 +182,28 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   />
                 </div>
             </div>
+            
+            {/* Auto-Create Individual Prompts Toggle - only show in timeline mode */}
+            {isTimelineMode && (
+              <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
+                <Switch
+                  id="auto-create-individual-prompts"
+                  checked={autoCreateIndividualPrompts}
+                  onCheckedChange={onAutoCreateIndividualPromptsChange}
+                />
+                <div className="flex-1">
+                  <Label htmlFor="auto-create-individual-prompts" className="font-medium">
+                    Auto-Create Individual Prompts
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {autoCreateIndividualPrompts
+                      ? 'AI will generate unique prompts for each pair, with your text appended'
+                      : 'Use the same default prompt for all pairs (you can still customize individual pairs)'
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
             
 
             {/* Turbo Mode Toggle - only show when cloud generation is enabled */}

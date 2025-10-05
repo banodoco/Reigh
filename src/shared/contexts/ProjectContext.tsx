@@ -481,7 +481,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
             
             Object.entries(currentProjectData.settings).forEach(([toolId, toolSettings]) => {
               if (typeof toolSettings === 'object' && toolSettings !== null) {
-                // Create a copy of tool settings excluding prompts
+                // Create a copy of tool settings excluding prompts and AI generation details
                 const filteredToolSettings = { ...toolSettings } as any;
                 
                 // Remove prompt-related keys
@@ -491,6 +491,18 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
                 delete filteredToolSettings.beforeEachPromptText;
                 delete filteredToolSettings.afterEachPromptText;
                 delete filteredToolSettings.pairConfigs; // These often contain prompts
+                
+                // Remove prompt-editor specific AI settings that should not be inherited
+                delete filteredToolSettings.generationSettings;
+                delete filteredToolSettings.bulkEditSettings;
+                delete filteredToolSettings.activeTab;
+                
+                // Also filter out any keys that contain "prompt" in their name (case-insensitive)
+                Object.keys(filteredToolSettings).forEach(key => {
+                  if (key.toLowerCase().includes('prompt')) {
+                    delete filteredToolSettings[key];
+                  }
+                });
                 
                 // Only include the tool settings if there's still something left after filtering
                 if (Object.keys(filteredToolSettings).length > 0) {

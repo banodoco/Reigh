@@ -126,6 +126,8 @@ export interface TimelineProps {
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => void;
+  // Auto-create individual prompts flag
+  autoCreateIndividualPrompts?: boolean;
 }
 
 /**
@@ -164,7 +166,8 @@ const Timeline: React.FC<TimelineProps> = ({
   structureVideoTreatment,
   structureVideoMotionStrength,
   structureVideoType,
-  onStructureVideoChange
+  onStructureVideoChange,
+  autoCreateIndividualPrompts
 }) => {
   
   // Core state
@@ -329,6 +332,7 @@ const Timeline: React.FC<TimelineProps> = ({
         structureVideoMotionStrength={structureVideoMotionStrength}
         structureVideoType={structureVideoType}
         onStructureVideoChange={onStructureVideoChange}
+        autoCreateIndividualPrompts={autoCreateIndividualPrompts}
       />
 
       {/* Lightbox */}

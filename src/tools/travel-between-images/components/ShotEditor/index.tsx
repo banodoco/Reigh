@@ -2139,14 +2139,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {/* Floating CTA - appears when original position is not visible */}
       {isCtaFloating && (
         <div 
-          className="fixed z-[80] animate-in slide-in-from-bottom-4 fade-in duration-300"
+          className="fixed z-[80] animate-in slide-in-from-bottom-4 fade-in duration-300 flex justify-center"
           style={{
             bottom: isMobile ? '40px' : '60px', // Pushed down on mobile, desktop stays at original position
             left: isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px',
             right: isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px',
           }}
         >
-          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-3 py-3 max-w-md mx-auto">
+          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-md">
             <div className="flex flex-col items-center gap-2">
               {/* Variant Name Input */}
               <div className="w-full">

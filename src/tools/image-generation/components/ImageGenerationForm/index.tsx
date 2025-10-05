@@ -447,11 +447,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           name: "Reference 1",
           styleReferenceImage: projectImageSettings.styleReferenceImage || null,
           styleReferenceImageOriginal: projectImageSettings.styleReferenceImageOriginal || null,
-          styleReferenceStrength: projectImageSettings.styleReferenceStrength ?? 1.0,
+          styleReferenceStrength: projectImageSettings.styleReferenceStrength ?? 1.1,
           subjectStrength: projectImageSettings.subjectStrength ?? 0.0,
           subjectDescription: projectImageSettings.subjectDescription ?? "",
           inThisScene: projectImageSettings.inThisScene ?? false,
-          referenceMode: 'custom',
+          referenceMode: 'style',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -889,11 +889,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         name: `Reference ${(references.length + 1)}`,
         styleReferenceImage: processedUploadedUrl,
         styleReferenceImageOriginal: originalUploadedUrl,
-        styleReferenceStrength: 1.0,
+        styleReferenceStrength: 1.1,
         subjectStrength: 0.0,
         subjectDescription: "",
         inThisScene: false,
-        referenceMode: 'custom',
+        referenceMode: 'style',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

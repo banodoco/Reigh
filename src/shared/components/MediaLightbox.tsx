@@ -803,30 +803,38 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       
       // Get existing references
       const references = projectImageSettings?.references || [];
+      const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot || {};
       
-      // Create new reference
+      // Create new reference with 'style' mode by default
       const newReference = {
         id: nanoid(),
         name: `Reference ${references.length + 1}`,
         styleReferenceImage: processedUploadedUrl,
         styleReferenceImageOriginal: originalUploadedUrl,
-        styleReferenceStrength: 1.0,
+        styleReferenceStrength: 1.1,
         subjectStrength: 0.0,
         subjectDescription: '',
         inThisScene: false,
-        referenceMode: 'custom',
+        referenceMode: 'style',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       
       console.log('[AddToReferences] Created new reference:', newReference);
       
-      // Add to references array
+      // Determine the effective shot ID (use 'none' for null shot)
+      const effectiveShotId = selectedShotId || 'none';
+      
+      // Add to references array AND set as selected for current shot
       await updateProjectImageSettings('project', {
-        references: [...references, newReference]
+        references: [...references, newReference],
+        selectedReferenceIdByShot: {
+          ...selectedReferenceIdByShot,
+          [effectiveShotId]: newReference.id
+        }
       });
       
-      console.log('[AddToReferences] Successfully added to references');
+      console.log('[AddToReferences] Successfully added and selected reference for shot:', effectiveShotId);
       
       // Show success state
       setAddToReferencesSuccess(true);

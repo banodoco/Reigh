@@ -209,6 +209,29 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
+  // Reset generation and bulk edit settings to defaults when project changes
+  useEffect(() => {
+    console.log(`[PromptEditorModal:PROJECT_CHANGE] Project changed to: ${selectedProjectId}`);
+    // Reset generation settings to defaults when project changes
+    setGenerationControlValues({
+      overallPromptText: '', 
+      rulesToRememberText: '',
+      numberToGenerate: 16, 
+      includeExistingContext: true, 
+      addSummary: true,
+      replaceCurrentPrompts: false,
+      temperature: 0.8,
+      showAdvanced: false,
+    });
+    // Reset bulk edit settings to defaults when project changes
+    setBulkEditControlValues({
+      editInstructions: '', 
+      modelType: 'smart' as AIModelType,
+    });
+    // Reset active tab to generate when project changes
+    setActiveTab('generate');
+  }, [selectedProjectId]);
+
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
     overallPromptText: '', rulesToRememberText: '',
     numberToGenerate: 16, includeExistingContext: true, addSummary: true,
@@ -237,25 +260,27 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   }, []);
 
   // -------------------------------------------------------------
-  // New persistent settings wiring
+  // Persistent settings wiring - DISABLED for AI generation settings
+  // These settings should NOT persist across projects or sessions
   // -------------------------------------------------------------
   // Persist settings to the currently-selected project so they are shared across sessions
   const { selectedProjectId } = useProject();
 
+  // Disable persistence for prompt editor AI settings since they should be session-specific
   const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
     'prompt-editor-controls',
     { projectId: selectedProjectId ?? undefined },
     {
-      generationSettings: [generationControlValues, setGenerationControlValues],
-      // Temporarily disable bulk edit persistence to stop render loops
+      // Temporarily disable all persistence to prevent AI settings from leaking across projects
+      // generationSettings: [generationControlValues, setGenerationControlValues],
       // bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
-      activeTab: [activeTab, setActiveTab],
+      // activeTab: [activeTab, setActiveTab],
     }
   );
 
   // Effect to initialize modal state (prompts) on open – persistence handled by hook
   useEffect(() => {
-    console.log(`[PromptEditorModal:INIT_EFFECT] Effect running. isOpen: ${isOpen}, initialPrompts.length: ${initialPrompts.length}`);
+    console.log(`[PromptEditorModal:INIT_EFFECT] Effect running. isOpen: ${isOpen}, initialPrompts.length: ${initialPrompts.length}, selectedProjectId: ${selectedProjectId}`);
     if (isOpen) {
       console.log(`[PromptEditorModal:INIT_EFFECT] Initializing modal state. Setting prompts from initialPrompts.`);
       setShowScrollToTop(false);
@@ -270,7 +295,7 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
       // Initialize last-saved signature to current to avoid immediate auto-save
       lastSavedSignatureRef.current = JSON.stringify(initialPrompts);
     }
-  }, [isOpen, openWithAIExpanded]); // Only reinitialize when modal opens or AI expanded state changes
+  }, [isOpen, openWithAIExpanded, selectedProjectId]); // Add selectedProjectId to dependencies to reset when project changes
 
   // Auto-save while open: every 3s if changes detected
   useEffect(() => {

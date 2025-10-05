@@ -2,8 +2,15 @@
 // @ts-ignore
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+// @ts-ignore
 import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
+import { authenticateRequest, verifyTaskOwnership, getTaskUserId } from "../_shared/auth.ts";
+// Provide a loose Deno type for local tooling; real type comes at runtime in Edge Functions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
+
 /**
  * Edge function: complete-task
  * 
@@ -13,13 +20,37 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
  * 
  * POST /functions/v1/complete-task
  * Headers: Authorization: Bearer <JWT or PAT>
- * Body: { 
- *   task_id, 
- *   file_data: "base64...", 
- *   filename: "image.png",
- *   first_frame_data?: "base64...",      // Optional thumbnail data
- *   first_frame_filename?: "thumb.png"   // Optional thumbnail filename
- * }
+ * 
+ * SUPPORTS THREE MODES:
+ * 
+ * MODE 1 (LEGACY - JSON with base64): 
+ *   Content-Type: application/json
+ *   Body: { 
+ *     task_id, 
+ *     file_data: "base64...", 
+ *     filename: "image.png",
+ *     first_frame_data?: "base64...",
+ *     first_frame_filename?: "thumb.png"
+ *   }
+ *   Memory: High (base64 + decoded buffer)
+ * 
+ * MODE 2 (STREAMING - multipart/form-data):
+ *   Content-Type: multipart/form-data
+ *   Fields:
+ *     - task_id: string
+ *     - file: File (the main file to upload)
+ *     - first_frame?: File (optional thumbnail)
+ *   Memory: Medium (single file buffer)
+ * 
+ * MODE 3 (PRE-SIGNED URL - Zero Memory):
+ *   Content-Type: application/json
+ *   Body: {
+ *     task_id,
+ *     storage_path: "user_id/filename.mp4",  // From generate-upload-url
+ *     thumbnail_storage_path?: "user_id/thumbnails/thumb.jpg"  // Optional
+ *   }
+ *   Memory: Minimal (file already uploaded to storage)
+ *   Use this for large files (>100MB) - call generate-upload-url first
  * 
  * TOOL TYPE ASSIGNMENT:
  * 1. Default: Uses tool_type from task_types table based on task_type
@@ -31,12 +62,75 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
  * - 401 Unauthorized if no valid token
  * - 403 Forbidden if token invalid or user not authorized
  * - 500 Internal Server Error
- */ serve(async (req)=>{
+ */ 
+serve(async (req)=>{
   if (req.method !== "POST") {
     return new Response("Method not allowed", {
       status: 405
     });
   }
+
+  // Determine content type to choose processing mode
+  const contentType = req.headers.get("content-type") || "";
+  const isMultipart = contentType.includes("multipart/form-data");
+
+  let task_id: string | undefined;
+  let filename: string | undefined;
+  let fileUploadBody: Blob | Uint8Array | undefined;
+  let first_frame_filename: string | undefined;
+  let firstFrameUploadBody: Blob | Uint8Array | undefined;
+  let fileContentType: string | undefined;
+  let firstFrameContentType: string | undefined;
+  let storagePathProvided: string | undefined; // MODE 3: pre-uploaded file
+  let thumbnailPathProvided: string | undefined;
+
+  if (isMultipart) {
+    // MODE 2: Multipart upload (better than base64, but still buffers file)
+    console.log(`[COMPLETE-TASK-DEBUG] Processing multipart/form-data request`);
+    
+    try {
+      const formData = await req.formData();
+      
+      // Extract task_id
+      const taskIdField = formData.get('task_id');
+      if (!taskIdField) {
+        return new Response("task_id field required", { status: 400 });
+      }
+      task_id = String(taskIdField);
+      console.log(`[COMPLETE-TASK-DEBUG] Extracted task_id: ${task_id}`);
+
+      // Extract main file
+      const mainFile = formData.get('file');
+      if (!(mainFile instanceof File)) {
+        return new Response("file field required and must be a File", { status: 400 });
+      }
+
+      filename = mainFile.name || "upload";
+      fileContentType = mainFile.type || undefined;
+      
+      // Convert File to Uint8Array for upload
+      const arrayBuffer = await mainFile.arrayBuffer();
+      fileUploadBody = new Uint8Array(arrayBuffer);
+      
+      console.log(`[COMPLETE-TASK-DEBUG] Multipart upload - file: ${filename}, size: ${fileUploadBody.length} bytes, type: ${fileContentType}`);
+
+      // Extract optional thumbnail
+      const thumbnailField = formData.get('first_frame');
+      if (thumbnailField instanceof File) {
+        first_frame_filename = thumbnailField.name;
+        firstFrameContentType = thumbnailField.type || undefined;
+        const thumbArrayBuffer = await thumbnailField.arrayBuffer();
+        firstFrameUploadBody = new Uint8Array(thumbArrayBuffer);
+        console.log(`[COMPLETE-TASK-DEBUG] Multipart upload - thumbnail: ${first_frame_filename}, size: ${firstFrameUploadBody.length} bytes, type: ${firstFrameContentType}`);
+      }
+
+    } catch (e) {
+      console.error("[COMPLETE-TASK-DEBUG] Multipart parsing error:", e);
+      return new Response(`Failed to parse multipart data: ${e.message}`, { status: 400 });
+    }
+
+  } else {
+    // JSON mode: could be MODE 1 (base64) or MODE 3 (pre-signed URL)
   let body;
   try {
     body = await req.json();
@@ -45,36 +139,124 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
       status: 400
     });
   }
-  const { task_id, file_data, filename, first_frame_data, first_frame_filename } = body;
-  console.log(`[COMPLETE-TASK-DEBUG] Received request with task_id type: ${typeof task_id}, value: ${JSON.stringify(task_id)}`);
+
+    const { 
+      task_id: bodyTaskId, 
+      file_data, 
+      filename: bodyFilename, 
+      first_frame_data, 
+      first_frame_filename: bodyFirstFrameFilename,
+      storage_path,  // MODE 3
+      thumbnail_storage_path  // MODE 3
+    } = body;
+    
+    console.log(`[COMPLETE-TASK-DEBUG] Received JSON request with task_id: ${bodyTaskId}`);
   console.log(`[COMPLETE-TASK-DEBUG] Body keys: ${Object.keys(body)}`);
-  if (!task_id || !file_data || !filename) {
-    return new Response("task_id, file_data (base64), and filename required", {
+    
+    task_id = bodyTaskId;
+
+    // Check if this is MODE 3 (pre-signed URL upload)
+    if (storage_path) {
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Pre-signed URL - file already uploaded to: ${storage_path}`);
+      
+      if (!task_id) {
+        return new Response("task_id required", { status: 400 });
+      }
+      
+      // SECURITY: Validate that storage_path contains the correct task_id
+      // Expected format: userId/tasks/{task_id}/filename or userId/tasks/{task_id}/thumbnails/filename
+      const pathParts = storage_path.split('/');
+      if (pathParts.length < 4 || pathParts[1] !== 'tasks') {
+        return new Response("Invalid storage_path format. Must be generated from generate-upload-url endpoint.", { status: 400 });
+      }
+      
+      const pathTaskId = pathParts[2];
+      if (pathTaskId !== task_id) {
+        console.error(`[COMPLETE-TASK-DEBUG] Security violation: storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id})`);
+        return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
+      }
+      
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
+      
+      // Validate thumbnail path if provided
+      if (thumbnail_storage_path) {
+        const thumbParts = thumbnail_storage_path.split('/');
+        if (thumbParts.length < 4 || thumbParts[1] !== 'tasks') {
+          return new Response("Invalid thumbnail_storage_path format.", { status: 400 });
+        }
+        const thumbTaskId = thumbParts[2];
+        if (thumbTaskId !== task_id) {
+          console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
+          return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
+        }
+      }
+      
+      storagePathProvided = storage_path;
+      thumbnailPathProvided = thumbnail_storage_path;
+      
+      // Extract filename from storage path
+      filename = pathParts[pathParts.length - 1];
+      
+      // Skip to authorization - no file upload needed
+    } else {
+      // MODE 1: Legacy base64 upload
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 1: Processing JSON request with base64 data`);
+      
+      if (!bodyTaskId || !file_data || !bodyFilename) {
+        return new Response("task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)", {
       status: 400
     });
   }
+
   // Validate thumbnail parameters if provided
-  if (first_frame_data && !first_frame_filename) {
+      if (first_frame_data && !bodyFirstFrameFilename) {
     return new Response("first_frame_filename required when first_frame_data is provided", {
       status: 400
     });
   }
-  if (first_frame_filename && !first_frame_data) {
+      if (bodyFirstFrameFilename && !first_frame_data) {
     return new Response("first_frame_data required when first_frame_filename is provided", {
       status: 400
     });
   }
+
+      task_id = bodyTaskId;
+      filename = bodyFilename;
+
+      // Decode base64 file data
+      try {
+        console.log(`[COMPLETE-TASK-DEBUG] Decoding base64 file data (length: ${file_data.length} chars)`);
+        const fileBuffer = Uint8Array.from(atob(file_data), (c)=>c.charCodeAt(0));
+        fileUploadBody = fileBuffer;
+        fileContentType = getContentType(filename);
+        console.log(`[COMPLETE-TASK-DEBUG] Decoded file buffer size: ${fileBuffer.length} bytes`);
+      } catch (e) {
+        console.error("[COMPLETE-TASK-DEBUG] Base64 decode error:", e);
+        return new Response("Invalid base64 file_data", { status: 400 });
+      }
+
+      // Decode thumbnail if provided
+      if (first_frame_data && bodyFirstFrameFilename) {
+        try {
+          console.log(`[COMPLETE-TASK-DEBUG] Decoding base64 thumbnail data`);
+          const thumbBuffer = Uint8Array.from(atob(first_frame_data), (c)=>c.charCodeAt(0));
+          first_frame_filename = bodyFirstFrameFilename;
+          firstFrameUploadBody = thumbBuffer;
+          firstFrameContentType = getContentType(first_frame_filename);
+          console.log(`[COMPLETE-TASK-DEBUG] Decoded thumbnail buffer size: ${thumbBuffer.length} bytes`);
+        } catch (e) {
+          console.error("[COMPLETE-TASK-DEBUG] Thumbnail base64 decode error:", e);
+          // Continue without thumbnail
+        }
+      }
+    }
+  }
+
   // Convert task_id to string early to avoid UUID casting issues
   const taskIdString = String(task_id);
   console.log(`[COMPLETE-TASK-DEBUG] Converted task_id to string: ${taskIdString}`);
-  // Extract authorization header
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return new Response("Missing or invalid Authorization header", {
-      status: 401
-    });
-  }
-  const token = authHeader.slice(7); // Remove "Bearer " prefix
+  
+  // Get environment variables
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   if (!serviceKey || !supabaseUrl) {
@@ -83,123 +265,80 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
       status: 500
     });
   }
+  
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-  let callerId = null;
-  let isServiceRole = false;
-  // 1) Check if token matches service-role key directly
-  if (token === serviceKey) {
-    isServiceRole = true;
-    console.log("Direct service-role key match");
+  
+  // Authenticate request using shared utility
+  const auth = await authenticateRequest(req, supabaseAdmin, "[COMPLETE-TASK-DEBUG]");
+  
+  if (!auth.success) {
+    return new Response(auth.error || "Authentication failed", { 
+      status: auth.statusCode || 403 
+    });
   }
-  // 2) If not service key, try to decode as JWT and check role
-  if (!isServiceRole) {
-    try {
-      const parts = token.split(".");
-      if (parts.length === 3) {
-        // It's a JWT - decode and check role
-        const payloadB64 = parts[1];
-        const padded = payloadB64 + "=".repeat((4 - payloadB64.length % 4) % 4);
-        const payload = JSON.parse(atob(padded));
-        // Check for service role in various claim locations
-        const role = payload.role || payload.app_metadata?.role;
-        if ([
-          "service_role",
-          "supabase_admin"
-        ].includes(role)) {
-          isServiceRole = true;
-          console.log("JWT has service-role/admin role");
-        }
-      // Don't extract user ID from JWT - always look it up in user_api_token table
-      }
-    } catch (e) {
-      // Not a valid JWT - will be treated as PAT
-      console.log("Token is not a valid JWT, treating as PAT");
-    }
-  }
-  // 3) USER TOKEN PATH - ALWAYS resolve callerId via user_api_token table
-  if (!isServiceRole) {
-    console.log("Looking up token in user_api_token table...");
-    try {
-      // Query user_api_tokens table to find user
-      const { data, error } = await supabaseAdmin.from("user_api_tokens").select("user_id").eq("token", token).single();
-      if (error || !data) {
-        console.error("Token lookup failed:", error);
-        return new Response("Invalid or expired token", {
-          status: 403
-        });
-      }
-      callerId = data.user_id;
-      console.log(`Token resolved to user ID: ${callerId}`);
-    } catch (e) {
-      console.error("Error querying user_api_token:", e);
-      return new Response("Token validation failed", {
-        status: 403
-      });
-    }
-  }
+
+  const isServiceRole = auth.isServiceRole;
+  const callerId = auth.userId;
+
   try {
-    // 4) If user token, verify task ownership
+    // Verify task ownership if user token
     if (!isServiceRole && callerId) {
-      console.log(`[COMPLETE-TASK-DEBUG] Verifying task ${taskIdString} belongs to user ${callerId}...`);
-      console.log(`[COMPLETE-TASK-DEBUG] taskIdString type: ${typeof taskIdString}, value: ${taskIdString}`);
-      const { data: taskData, error: taskError } = await supabaseAdmin.from("tasks").select("project_id").eq("id", taskIdString).single();
-      if (taskError) {
-        console.error("Task lookup error:", taskError);
-        return new Response("Task not found", {
-          status: 404
+      const ownershipResult = await verifyTaskOwnership(
+        supabaseAdmin, 
+        taskIdString, 
+        callerId, 
+        "[COMPLETE-TASK-DEBUG]"
+      );
+      
+      if (!ownershipResult.success) {
+        return new Response(ownershipResult.error || "Forbidden", { 
+          status: ownershipResult.statusCode || 403 
         });
       }
-      // Check if user owns the project that this task belongs to
-      const { data: projectData, error: projectError } = await supabaseAdmin.from("projects").select("user_id").eq("id", taskData.project_id).single();
-      if (projectError) {
-        console.error("Project lookup error:", projectError);
-        return new Response("Project not found", {
-          status: 404
-        });
-      }
-      if (projectData.user_id !== callerId) {
-        console.error(`Task ${taskIdString} belongs to project ${taskData.project_id} owned by ${projectData.user_id}, not user ${callerId}`);
-        return new Response("Forbidden: Task does not belong to user", {
-          status: 403
-        });
-      }
-      console.log(`Task ${taskIdString} ownership verified: user ${callerId} owns project ${taskData.project_id}`);
     }
-    // 5) Decode the base64 file data
-    const fileBuffer = Uint8Array.from(atob(file_data), (c)=>c.charCodeAt(0));
+    // 5) Prepare for storage operations
+    let publicUrl: string;
+    let objectPath: string;
+    
+    // MODE 3: File already uploaded via pre-signed URL
+    if (storagePathProvided) {
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Using pre-uploaded file at ${storagePathProvided}`);
+      objectPath = storagePathProvided;
+      
+      // Just get the public URL - file is already in storage
+      const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
+      publicUrl = urlData.publicUrl;
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Retrieved public URL: ${publicUrl}`);
+    } else {
+      // MODE 1 & 2: Need to upload file
+      const effectiveContentType = fileContentType || getContentType(filename);
+      console.log(`[COMPLETE-TASK-DEBUG] Upload body ready. filename=${filename}, contentType=${effectiveContentType}`);
+      
     // 6) Determine the storage path
     let userId;
     if (isServiceRole) {
-      // For service role, we need to determine the appropriate user folder
-      // Get the task to find which project (and user) it belongs to
-      console.log(`[COMPLETE-TASK-DEBUG] Service role - looking up task ${taskIdString} for storage path determination`);
-      console.log(`[COMPLETE-TASK-DEBUG] taskIdString type: ${typeof taskIdString}, value: ${taskIdString}`);
-      const { data: taskData, error: taskError } = await supabaseAdmin.from("tasks").select("project_id").eq("id", taskIdString).single();
-      if (taskError) {
-        console.error("Task lookup error for storage path:", taskError);
-        return new Response("Task not found", {
-          status: 404
-        });
-      }
-      // Get the project owner
-      const { data: projectData, error: projectError } = await supabaseAdmin.from("projects").select("user_id").eq("id", taskData.project_id).single();
-      if (projectError) {
-        console.error("Project lookup error for storage path:", projectError);
-        // Fallback to system folder if we can't determine owner
-        userId = 'system';
-      } else {
-        userId = projectData.user_id;
-      }
-      console.log(`Service role storing file for task ${taskIdString} in user ${userId}'s folder`);
+        // For service role, look up task owner using shared utility
+        const taskUserResult = await getTaskUserId(supabaseAdmin, taskIdString, "[COMPLETE-TASK-DEBUG]");
+        
+        if (taskUserResult.error) {
+          return new Response(taskUserResult.error, { 
+            status: taskUserResult.statusCode || 404 
+          });
+        }
+        
+        userId = taskUserResult.userId;
+        console.log(`[COMPLETE-TASK-DEBUG] Service role storing file for task ${taskIdString} in user ${userId}'s folder`);
     } else {
       // For user tokens, use the authenticated user's ID
       userId = callerId;
     }
-    const objectPath = `${userId}/${filename}`;
+      objectPath = `${userId}/${filename}`;
+      
     // 7) Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage.from('image_uploads').upload(objectPath, fileBuffer, {
-      contentType: getContentType(filename),
+      console.log(`[COMPLETE-TASK-DEBUG] Uploading to storage: ${objectPath}`);
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage.from('image_uploads').upload(objectPath, fileUploadBody as any, {
+        contentType: effectiveContentType,
       upsert: true
     });
     if (uploadError) {
@@ -208,21 +347,41 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
         status: 500
       });
     }
+      
     // 8) Get the public URL
     const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
-    const publicUrl = urlData.publicUrl;
-    // 8.1) Upload thumbnail if provided
-    let thumbnailUrl = null;
-    if (first_frame_data && first_frame_filename) {
+      publicUrl = urlData.publicUrl;
+      console.log(`[COMPLETE-TASK-DEBUG] Upload successful: ${publicUrl}`);
+    }
+    // 8.1) Handle thumbnail
+    let thumbnailUrl: string | null = null;
+    
+    // MODE 3: Thumbnail already uploaded
+    if (thumbnailPathProvided) {
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Using pre-uploaded thumbnail at ${thumbnailPathProvided}`);
+      const { data: thumbnailUrlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(thumbnailPathProvided);
+      thumbnailUrl = thumbnailUrlData.publicUrl;
+      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Retrieved thumbnail URL: ${thumbnailUrl}`);
+    } else if (firstFrameUploadBody && first_frame_filename) {
+      // MODE 1 & 2: Upload thumbnail
       console.log(`[COMPLETE-TASK-DEBUG] Uploading thumbnail for task ${taskIdString}`);
       try {
-        // Decode the base64 thumbnail data
-        const thumbnailBuffer = Uint8Array.from(atob(first_frame_data), (c)=>c.charCodeAt(0));
+        // Need userId - get it from objectPath if MODE 3, otherwise it's already set
+        let userId;
+        if (storagePathProvided) {
+          // Extract userId from the objectPath (format: userId/filename)
+          userId = objectPath.split('/')[0];
+        } else {
+          // userId is already set from earlier
+          const pathParts = objectPath.split('/');
+          userId = pathParts[0];
+        }
+        
         // Create thumbnail path
         const thumbnailPath = `${userId}/thumbnails/${first_frame_filename}`;
-        // Upload thumbnail to storage
-        const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabaseAdmin.storage.from('image_uploads').upload(thumbnailPath, thumbnailBuffer, {
-          contentType: getContentType(first_frame_filename),
+        // Upload thumbnail to storage (buffer already prepared earlier)
+        const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabaseAdmin.storage.from('image_uploads').upload(thumbnailPath, firstFrameUploadBody as any, {
+          contentType: firstFrameContentType || getContentType(first_frame_filename),
           upsert: true
         });
         if (thumbnailUploadError) {
@@ -240,7 +399,8 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
       }
     }
     // 8.2) If no thumbnail provided and this is an image, auto-generate a thumbnail (1/3 size)
-    if (!thumbnailUrl) {
+    // Skip for MODE 3 since we don't have the file in memory
+    if (!thumbnailUrl && !storagePathProvided) {
       try {
         const contentType = getContentType(filename);
         console.log(`[ThumbnailGenDebug] Starting thumbnail generation for task ${taskIdString}, filename: ${filename}, contentType: ${contentType}`);
@@ -249,8 +409,19 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
           console.log(`[ThumbnailGenDebug] Processing image for thumbnail generation with ImageScript`);
 
           // Decode with ImageScript (Deno-native, no DOM/canvas APIs)
-          console.log(`[ThumbnailGenDebug] Original file buffer size: ${fileBuffer.length} bytes`);
-          const image = await ImageScript.decode(fileBuffer);
+          let sourceBytes: Uint8Array;
+          if (fileUploadBody instanceof Uint8Array) {
+            sourceBytes = fileUploadBody;
+            console.log(`[ThumbnailGenDebug] Using Uint8Array source, size: ${sourceBytes.length} bytes`);
+          } else if (typeof (fileUploadBody as any).arrayBuffer === 'function') {
+            const ab = await (fileUploadBody as Blob).arrayBuffer();
+            sourceBytes = new Uint8Array(ab);
+            console.log(`[ThumbnailGenDebug] Converted Blob to Uint8Array, size: ${sourceBytes.length} bytes`);
+          } else {
+            throw new Error('Unsupported upload body type for thumbnail generation');
+          }
+
+          const image = await ImageScript.decode(sourceBytes);
           const originalWidth = image.width;
           const originalHeight = image.height;
           console.log(`[ThumbnailGenDebug] Original image dimensions: ${originalWidth}x${originalHeight}`);
@@ -263,9 +434,11 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
           const jpegQuality = 80;
           const thumbBytes = await image.encodeJPEG(jpegQuality);
           console.log(`[ThumbnailGenDebug] Encoded JPEG thumbnail bytes: ${thumbBytes.length} (quality ${jpegQuality})`);
-          console.log(`[ThumbnailGenDebug] Size reduction: ${fileBuffer.length} → ${thumbBytes.length} bytes (${((thumbBytes.length / fileBuffer.length) * 100).toFixed(1)}% of original)`);
+          console.log(`[ThumbnailGenDebug] Size reduction: ${sourceBytes.length} → ${thumbBytes.length} bytes (${((thumbBytes.length / sourceBytes.length) * 100).toFixed(1)}% of original)`);
 
           // Upload thumbnail to storage
+          // Extract userId from objectPath (format: userId/filename)
+          const userId = objectPath.split('/')[0];
           const ts = Date.now();
           const rand = Math.random().toString(36).substring(2, 8);
           const thumbFilename = `thumb_${ts}_${rand}.jpg`;
@@ -283,7 +456,7 @@ import { Image as ImageScript } from "https://deno.land/x/imagescript@1.3.0/mod.
             thumbnailUrl = autoThumbUrlData.publicUrl;
             console.log(`[ThumbnailGenDebug] ✅ Auto-generated thumbnail uploaded successfully!`);
             console.log(`[ThumbnailGenDebug] Thumbnail URL: ${thumbnailUrl}`);
-            console.log(`[ThumbnailGenDebug] Final summary - Original: ${originalWidth}x${originalHeight} (${fileBuffer.length} bytes) → Thumbnail: ${thumbWidth}x${thumbHeight} (${thumbBytes.length} bytes)`);
+            console.log(`[ThumbnailGenDebug] Final summary - Original: ${originalWidth}x${originalHeight} (${sourceBytes.length} bytes) → Thumbnail: ${thumbWidth}x${thumbHeight} (${thumbBytes.length} bytes)`);
           }
         } else {
           console.log(`[ThumbnailGenDebug] Skipping auto-thumbnail, content type is not image: ${contentType}`);

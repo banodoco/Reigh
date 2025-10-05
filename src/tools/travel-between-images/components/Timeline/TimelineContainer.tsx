@@ -66,6 +66,8 @@ interface TimelineContainerProps {
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => void;
+  // Auto-create individual prompts flag
+  autoCreateIndividualPrompts?: boolean;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -97,7 +99,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   structureVideoTreatment = 'adjust',
   structureVideoMotionStrength = 1.0,
   structureVideoType = 'flow',
-  onStructureVideoChange
+  onStructureVideoChange,
+  autoCreateIndividualPrompts
 }) => {
   // Local state for reset gap and pending context
   const [resetGap, setResetGap] = useState<number>(10);
@@ -665,7 +668,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 numPairs={numPairs}
                 startFrame={pair.startFrame}
                 endFrame={pair.endFrame}
-                onPairClick={onPairClick ? (pairIndex, pairData) => {
+                onPairClick={onPairClick && !autoCreateIndividualPrompts ? (pairIndex, pairData) => {
                   // Get the images for this pair
                   const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
                   const endImage = images.find(img => img.shotImageEntryId === endEntry?.[0]);
@@ -698,6 +701,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
+                autoCreateIndividualPrompts={autoCreateIndividualPrompts || false}
               />
             );
           })}
