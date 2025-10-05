@@ -12,11 +12,13 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import FileInput from '@/shared/components/FileInput';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { toast } from 'sonner';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
+import { useProject } from '@/shared/contexts/ProjectContext';
 
 interface CreateShotModalProps {
   isOpen: boolean;
@@ -26,6 +28,7 @@ interface CreateShotModalProps {
   defaultShotName?: string;
   projectAspectRatio?: string;
   initialAspectRatio?: string | null;
+  projectId?: string;
 }
 
 const CreateShotModal: React.FC<CreateShotModalProps> = ({ 
@@ -35,12 +38,15 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
   isLoading, 
   defaultShotName,
   projectAspectRatio,
-  initialAspectRatio
+  initialAspectRatio,
+  projectId
 }) => {
   const [shotName, setShotName] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [aspectRatio, setAspectRatio] = useState<string>('');
+  const [updateProjectAspectRatio, setUpdateProjectAspectRatio] = useState(false);
   const isMobile = useIsMobile();
+  const { updateProject } = useProject();
   
   // Modal styling
   const modal = useMediumModal();
@@ -50,8 +56,16 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
     if (isOpen) {
       // Use initialAspectRatio if provided, otherwise fall back to projectAspectRatio, otherwise default to '3:2'
       setAspectRatio(initialAspectRatio || projectAspectRatio || '3:2');
+      setUpdateProjectAspectRatio(false);
     }
   }, [isOpen, initialAspectRatio, projectAspectRatio]);
+
+  // Reset checkbox when aspect ratio changes back to project aspect ratio
+  useEffect(() => {
+    if (aspectRatio === projectAspectRatio) {
+      setUpdateProjectAspectRatio(false);
+    }
+  }, [aspectRatio, projectAspectRatio]);
 
   const handleSubmit = async () => {
     let finalShotName = shotName.trim();
@@ -85,11 +99,17 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
         }
       }
       
+      // Update project aspect ratio if checkbox is checked
+      if (updateProjectAspectRatio && projectId && aspectRatio && aspectRatio !== projectAspectRatio) {
+        await updateProject(projectId, { aspectRatio });
+      }
+      
       await onSubmit(finalShotName, processedFiles, aspectRatio || null);
       // Only clear the form and close if submission was successful
       setShotName('');
       setFiles([]);
       setAspectRatio(projectAspectRatio || '3:2');
+      setUpdateProjectAspectRatio(false);
       onClose();
     } catch (error) {
       // Let the parent component handle the error display
@@ -101,6 +121,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
     setShotName('');
     setFiles([]);
     setAspectRatio(projectAspectRatio || '3:2');
+    setUpdateProjectAspectRatio(false);
     onClose();
   };
 
@@ -149,6 +170,24 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
                 id="shot-aspect-ratio"
                 showVisualizer={true}
               />
+              
+              {/* Show checkbox when selected aspect ratio differs from project aspect ratio */}
+              {aspectRatio && projectAspectRatio && aspectRatio !== projectAspectRatio && (
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="update-project-aspect-ratio"
+                    checked={updateProjectAspectRatio}
+                    onCheckedChange={(checked) => setUpdateProjectAspectRatio(checked === true)}
+                    disabled={isLoading}
+                  />
+                  <Label
+                    htmlFor="update-project-aspect-ratio"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Update project aspect ratio to {aspectRatio}
+                  </Label>
+                </div>
+              )}
             </div>
           </div>
         </div>

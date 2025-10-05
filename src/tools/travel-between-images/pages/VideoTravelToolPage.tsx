@@ -1792,6 +1792,7 @@ const VideoTravelToolPage: React.FC = () => {
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
         projectAspectRatio={projectAspectRatio}
         initialAspectRatio={null}
+        projectId={selectedProjectId}
       />
     </div>
   );

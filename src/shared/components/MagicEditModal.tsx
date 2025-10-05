@@ -426,6 +426,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleCreateShotForMagicEdit}
         isLoading={createShotMutation.isPending}
+        projectId={selectedProjectId}
       />
     </>
   );

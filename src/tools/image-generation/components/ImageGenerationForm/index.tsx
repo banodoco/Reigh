@@ -1588,6 +1588,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleCreateShot}
         isLoading={createShotMutation.isPending}
+        projectId={selectedProjectId}
       />
     </>
   );

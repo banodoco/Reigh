@@ -1619,6 +1619,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           onClose={() => setIsCreateShotModalOpen(false)}
           onSubmit={handleCreateShot}
           isLoading={isCreatingShot}
+          projectId={selectedProjectId}
         />
       )}
     </React.Fragment>
@@ -1631,6 +1632,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           onClose={() => setIsCreateShotModalOpen(false)}
           onSubmit={handleCreateShot}
           isLoading={isCreatingShot}
+          projectId={selectedProjectId}
         />
       )}
     </DraggableImage>
