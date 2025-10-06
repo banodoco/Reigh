@@ -24,12 +24,21 @@ if (DATASET_SUPABASE_ANON_KEY === 'PLACEHOLDER_API_KEY_REPLACE_ME') {
 /**
  * Supabase client specifically for the dataset database
  * This client should ONLY be used for accessing dataset_contents table
+ * 
+ * Note: Multiple GoTrueClient warning is expected and safe - we use a separate
+ * storage key and auth is disabled for this read-only dataset client
  */
 export const datasetSupabase = createClient(DATASET_SUPABASE_URL, DATASET_SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: false, // Don't persist auth sessions for dataset browsing
-    storageKey: 'sb-dataset-auth', // Use unique storage key to avoid GoTrueClient conflicts
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+    storageKey: 'sb-dataset-auth',
+    debug: false, // Suppress GoTrueClient warnings
   },
+  db: {
+    schema: 'public'
+  }
 });
 
 /**
