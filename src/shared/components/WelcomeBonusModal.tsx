@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { Gift, Sparkles, Smartphone, Download, ChevronRight, X, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart } from 'lucide-react';
+import { Gift, Sparkles, Smartphone, Download, ChevronRight, ChevronLeft, Palette, Users, Monitor, Coins, Settings, Check, Loader2, MoreHorizontal, PartyPopper, Heart } from 'lucide-react';
 
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -719,6 +719,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   const [userChoice, setUserChoice] = useState<'music-video' | 'something-else' | 'no-thanks' | null>(null);
   const [isProcessingCredits, setIsProcessingCredits] = useState(false);
   const [shouldShowConfetti, setShouldShowConfetti] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
   const queryClient = useQueryClient();
   const modal = useMediumModal();
   const { showFade, scrollRef } = useScrollFade({ 
@@ -832,6 +833,11 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
     onClose();
   };
 
+  const handleShake = () => {
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 500);
+  };
+
   // Render current step component conditionally to avoid calling hooks for unused steps
   const renderCurrentStep = () => {
     // Show loading step if processing credits
@@ -862,27 +868,36 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   const stepTitles = ["Welcome", "Community", "Install App", "Generation", "Promise", "Credits", "Complete"];
   
   return (
-    <Dialog open={isOpen} onOpenChange={() => {
-      // Prevent closing by clicking outside - users must complete the onboarding flow
-    }}>
+    <Dialog open={isOpen} onOpenChange={handleShake}>
       <DialogContent 
         className={modal.className}
         style={modal.style}
         {...modal.props}
       >
-        <div className={modal.headerClass}>
-          {/* Close button */}
-          <button
-            onClick={handleClose}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-        </div>
+        <style>
+          {`
+            @keyframes shake {
+              0%, 100% { transform: translateX(0); }
+              10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+              20%, 40%, 60%, 80% { transform: translateX(8px); }
+            }
+            .shake-wrapper {
+              animation: shake 0.5s ease-in-out;
+            }
+          `}
+        </style>
+        <style>{`
+          /* Hide the built-in close button from Dialog component */
+          button[data-radix-dialog-close] {
+            display: none !important;
+          }
+        `}</style>
+        <div className={isShaking ? 'shake-wrapper' : ''}>
+          <div className={modal.headerClass}></div>
 
         <div ref={scrollRef} className={modal.scrollClass}>
           {renderCurrentStep()}
+          <div className="h-6"></div>
         </div>
         
         <div className={`${modal.footerClass} relative`}>
@@ -919,6 +934,7 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
                   }`}
                 />
               ))}
+            </div>
             </div>
           </div>
         </div>

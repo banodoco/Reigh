@@ -28,7 +28,8 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { Button } from './ui/button';
-import { ArrowDown, Trash2, Check, Sparkles } from 'lucide-react';
+import { ArrowDown, Trash2, Check, Sparkles, Image } from 'lucide-react';
+import { Label } from './ui/label';
 import { ProgressiveLoadingManager } from '@/shared/components/ProgressiveLoadingManager';
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel, AlertDialogOverlay } from "@/shared/components/ui/alert-dialog";
@@ -942,12 +943,55 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   if (!images || images.length === 0) {
     console.log(`[DEBUG] EARLY RETURN - No images`);
     return (
-      <p className="text-sm text-muted-foreground">
-        No images to display - <span 
-          onPointerUp={() => navigate("/tools/image-generation")}
-          className="text-primary hover:underline cursor-pointer"
-        >generate images</span>
-      </p>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          No images to display - <span 
+            onPointerUp={() => navigate("/tools/image-generation")}
+            className="text-primary hover:underline cursor-pointer"
+          >generate images</span>
+        </p>
+        
+        {/* Show upload UI when available */}
+        {onImageUpload && (
+          <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <Image className="h-8 w-8 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                Add images to start building your animation
+              </p>
+              
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
+                    onImageUpload(files);
+                    e.target.value = ''; // Reset input
+                  }
+                }}
+                className="hidden"
+                id="empty-shot-image-upload"
+                disabled={isUploadingImage}
+              />
+              <Label htmlFor="empty-shot-image-upload" className="m-0 cursor-pointer w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploadingImage}
+                  className="w-full"
+                  asChild
+                >
+                  <span>
+                    {isUploadingImage ? 'Uploading...' : 'Upload Images'}
+                  </span>
+                </Button>
+              </Label>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
