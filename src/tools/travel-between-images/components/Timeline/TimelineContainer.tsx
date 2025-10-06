@@ -68,6 +68,8 @@ interface TimelineContainerProps {
   ) => void;
   // Auto-create individual prompts flag
   autoCreateIndividualPrompts?: boolean;
+  // Empty state flag for blur effect
+  hasNoImages?: boolean;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -100,7 +102,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   structureVideoMotionStrength = 1.0,
   structureVideoType = 'flow',
   onStructureVideoChange,
-  autoCreateIndividualPrompts
+  autoCreateIndividualPrompts,
+  hasNoImages = false
 }) => {
   // Local state for reset gap and pending context
   const [resetGap, setResetGap] = useState<number>(10);
@@ -352,7 +355,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Fixed corner controls - positioned relative to visible viewport */}
       {/* Top-left: Zoom controls */}
-      <div className="absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto">
+      <div className={`absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
         <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
         <Button
           variant={zoomLevel > 1.5 ? "default" : "outline"}
@@ -398,7 +401,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
       {/* Bottom-left: Gap and Context controls */}
       <div 
-        className="absolute left-8 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto"
+        className={`absolute left-8 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
         style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
       >
         {/* Gap to reset */}
@@ -440,7 +443,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
       {/* Top-right: Video upload and structure controls */}
       {shotId && projectId && onStructureVideoChange && (
-        <div className="absolute right-8 top-4 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 pointer-events-auto">
+        <div className={`absolute right-8 top-4 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
           {structureVideoPath && structureVideoMetadata ? (
             // Structure controls (when video is present)
             <>
@@ -512,7 +515,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       {/* Bottom-right: Add Images button */}
       {onImageDrop && (
         <div 
-          className="absolute right-8 z-20 pointer-events-auto"
+          className={`absolute right-8 z-20 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
           style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
         >
           <input

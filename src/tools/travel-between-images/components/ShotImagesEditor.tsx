@@ -448,6 +448,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
                 autoCreateIndividualPrompts={autoCreateIndividualPrompts}
+                // Image upload for empty state
+                onImageUpload={onImageUpload}
+                isUploadingImage={isUploadingImage}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}

@@ -45,6 +45,9 @@ import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { Button } from "@/shared/components/ui/button";
+import { Label } from "@/shared/components/ui/label";
+import { Image, Upload } from "lucide-react";
 
 // Clear legacy timeline cache on import
 import "@/utils/clearTimelineCache";
@@ -128,6 +131,9 @@ export interface TimelineProps {
   ) => void;
   // Auto-create individual prompts flag
   autoCreateIndividualPrompts?: boolean;
+  // Image upload handler for empty state
+  onImageUpload?: (files: File[]) => Promise<void>;
+  isUploadingImage?: boolean;
 }
 
 /**
@@ -167,7 +173,9 @@ const Timeline: React.FC<TimelineProps> = ({
   structureVideoMotionStrength,
   structureVideoType,
   onStructureVideoChange,
-  autoCreateIndividualPrompts
+  autoCreateIndividualPrompts,
+  onImageUpload,
+  isUploadingImage
 }) => {
   
   // Core state
@@ -299,8 +307,157 @@ const Timeline: React.FC<TimelineProps> = ({
     await setFramePositions(newPositions);
   }, [images, setFramePositions, onContextFramesChange]);
 
+  // Check if timeline is empty
+  const hasNoImages = images.length === 0;
+
+  // Drag and drop state for empty state upload container
+  const [isFileOver, setIsFileOver] = useState(false);
+
+  // Drag and drop handlers for empty state
+  const handleEmptyStateDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files') && onImageUpload) {
+      setIsFileOver(true);
+    }
+  }, [onImageUpload]);
+
+  const handleEmptyStateDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files') && onImageUpload) {
+      setIsFileOver(true);
+      e.dataTransfer.dropEffect = 'copy';
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  }, [onImageUpload]);
+
+  const handleEmptyStateDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide if we're leaving the container entirely
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      setIsFileOver(false);
+    }
+  }, []);
+
+  const handleEmptyStateDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsFileOver(false);
+
+    if (!onImageUpload) return;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    // Validate image types
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const validFiles = files.filter(file => {
+      if (validImageTypes.includes(file.type)) {
+        return true;
+      }
+      toast.error(`Invalid file type for ${file.name}. Only JPEG, PNG, and WebP are supported.`);
+      return false;
+    });
+
+    if (validFiles.length === 0) return;
+
+    try {
+      await onImageUpload(validFiles);
+    } catch (error) {
+      console.error('Error handling image drop:', error);
+      toast.error(`Failed to add images: ${(error as Error).message}`);
+    }
+  }, [onImageUpload]);
+
   return (
-    <div className="w-full overflow-x-hidden">
+    <div className="w-full overflow-x-hidden relative">
+      {/* Blur and overlay when no images */}
+      {hasNoImages && (
+        <>
+          {/* Very light blur overlay */}
+          <div className="absolute inset-0 backdrop-blur-[0.5px] bg-background/5 z-10" />
+          
+          {/* Upload container */}
+          {onImageUpload && (
+            <div 
+              className="absolute inset-0 z-20 flex items-center justify-center p-4"
+              onDragEnter={handleEmptyStateDragEnter}
+              onDragOver={handleEmptyStateDragOver}
+              onDragLeave={handleEmptyStateDragLeave}
+              onDrop={handleEmptyStateDrop}
+            >
+              <div className={`w-full max-w-md p-6 border-2 rounded-lg bg-background shadow-lg transition-all duration-200 ${
+                isFileOver 
+                  ? 'border-primary bg-primary/5 ring-2 ring-primary scale-105' 
+                  : 'border-border'
+              }`}>
+                <div className="flex flex-col items-center gap-3 text-center">
+                  {isFileOver ? (
+                    <>
+                      <Upload className="h-12 w-12 text-primary animate-bounce" />
+                      <div>
+                        <h3 className="font-medium mb-2 text-primary">Drop images here</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Release to add images to timeline
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Image className="h-10 w-10 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-medium mb-2">No images on timeline</h3>
+                      </div>
+                      
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          if (files.length > 0) {
+                            onImageUpload(files);
+                            e.target.value = ''; // Reset input
+                          }
+                        }}
+                        className="hidden"
+                        id="timeline-empty-image-upload"
+                        disabled={isUploadingImage}
+                      />
+                      <Label htmlFor="timeline-empty-image-upload" className="m-0 cursor-pointer w-full">
+                        <Button
+                          variant="default"
+                          size="default"
+                          disabled={isUploadingImage}
+                          className="w-full"
+                          asChild
+                        >
+                          <span>
+                            {isUploadingImage ? 'Uploading...' : 'Upload Images'}
+                          </span>
+                        </Button>
+                      </Label>
+                      
+                      {/* Subtle drag and drop hint */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
+                        <Upload className="h-3 w-3" />
+                        <span>or drag and drop</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      
       {/* Timeline Container - includes both controls and timeline */}
       <TimelineContainer
         shotId={shotId}
@@ -333,6 +490,7 @@ const Timeline: React.FC<TimelineProps> = ({
         structureVideoType={structureVideoType}
         onStructureVideoChange={onStructureVideoChange}
         autoCreateIndividualPrompts={autoCreateIndividualPrompts}
+        hasNoImages={hasNoImages}
       />
 
       {/* Lightbox */}
