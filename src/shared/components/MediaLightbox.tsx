@@ -121,6 +121,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  // Log flip state changes
+  useEffect(() => {
+    console.log('[ImageFlipDebug] Flip state changed', {
+      mediaId: media.id,
+      isFlippedHorizontally,
+      hasChanges,
+      isSaving,
+      timestamp: Date.now()
+    });
+  }, [isFlippedHorizontally, hasChanges, isSaving, media.id]);
   const [replaceImages, setReplaceImages] = useState(true);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   
@@ -418,12 +429,38 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }, [onNext, onPrevious, onClose]);
 
   const handleFlip = () => {
-    setIsFlippedHorizontally(!isFlippedHorizontally);
+    const newFlipState = !isFlippedHorizontally;
+    console.log('[ImageFlipDebug] handleFlip called', {
+      mediaId: media.id,
+      oldState: isFlippedHorizontally,
+      newState: newFlipState,
+      hasChanges: hasChanges,
+      timestamp: Date.now()
+    });
+    setIsFlippedHorizontally(newFlipState);
     setHasChanges(true);
   };
 
   const handleSave = async () => {
-    if (!hasChanges || !canvasRef.current || isSaving) return;
+    console.log('[ImageFlipDebug] handleSave called', {
+      mediaId: media.id,
+      hasChanges,
+      hasCanvasRef: !!canvasRef.current,
+      isSaving,
+      isFlippedHorizontally,
+      displayUrl,
+      timestamp: Date.now()
+    });
+
+    if (!hasChanges || !canvasRef.current || isSaving) {
+      console.log('[ImageFlipDebug] handleSave early return', {
+        reason: !hasChanges ? 'no changes' : !canvasRef.current ? 'no canvas' : 'already saving',
+        hasChanges,
+        hasCanvasRef: !!canvasRef.current,
+        isSaving
+      });
+      return;
+    }
 
     setIsSaving(true);
 
@@ -434,34 +471,54 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         throw new Error('Failed to get canvas context');
       }
 
+      console.log('[ImageFlipDebug] Canvas context obtained', {
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height
+      });
+
       // Create a promise that resolves with the blob
       const blob = await new Promise<Blob>((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
         img.onload = () => {
+          console.log('[ImageFlipDebug] Image loaded for canvas', {
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+            isFlippedHorizontally
+          });
+
           canvas.width = img.naturalWidth;
           canvas.height = img.naturalHeight;
           ctx.save();
           if (isFlippedHorizontally) {
+            console.log('[ImageFlipDebug] Applying flip transform to canvas');
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
           }
           ctx.drawImage(img, 0, 0);
           ctx.restore();
+          
           canvas.toBlob(blob => {
             if (blob) {
+              console.log('[ImageFlipDebug] Canvas to blob conversion successful', {
+                blobSize: blob.size,
+                blobType: blob.type
+              });
               resolve(blob);
             } else {
+              console.error('[ImageFlipDebug] Canvas to blob conversion failed');
               reject(new Error('Canvas to Blob conversion failed'));
             }
           }, 'image/png');
         };
 
         img.onerror = (err) => {
+          console.error('[ImageFlipDebug] Image load error', err);
           reject(err);
         };
 
+        console.log('[ImageFlipDebug] Loading image for canvas', { src: displayUrl });
         img.src = displayUrl;
       });
 

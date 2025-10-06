@@ -827,28 +827,40 @@ const VideoTravelToolPage: React.FC = () => {
   // Update state when settings are loaded from database (or confirmed absent)
   // OPTIMIZATION: Use React.startTransition to batch state updates and reduce renders
   useEffect(() => {
-    // CRITICAL FIX: Allow settings initialization even if query was cancelled
+    // CRITICAL FIX: Allow settings initialization even if query was cancelled or failed
     // We need to mark as loaded to enable user input, using whatever settings we have
     const isQueryCancelled = settingsError?.message?.includes('Request was cancelled');
+    const isAuthError = settingsError?.message?.includes('Authentication') || settingsError?.message?.includes('Auth timeout');
+    const isNetworkError = settingsError?.message?.includes('Failed to fetch') || settingsError?.message?.includes('Network');
     
     console.log('[BatchVideoSteps] Settings effect triggered:', {
       isLoadingSettings,
       hasLoadedInitialSettings: hasLoadedInitialSettings.current,
       isQueryCancelled,
+      isAuthError,
+      isNetworkError,
+      settingsError: settingsError?.message,
       shotId: selectedShot?.id?.substring(0, 8),
       willRun: !isLoadingSettings && !hasLoadedInitialSettings.current
     });
     
-    // Always mark as loaded when not loading, even if query was cancelled
+    // Always mark as loaded when not loading, even if query was cancelled or had errors
     // This ensures UI remains editable instead of being permanently locked
+    // Network/auth errors should fall back to defaults (handled by useToolSettings)
     if (!isLoadingSettings && !hasLoadedInitialSettings.current) {
       hasLoadedInitialSettings.current = true;
       // Reset user interaction flag when loading new settings
       userHasInteracted.current = false;
 
-      // Warn if we're initializing with potentially incomplete data due to cancellation
+      // Warn if we're initializing with potentially incomplete data due to cancellation or errors
       if (isQueryCancelled) {
         console.warn('[BatchVideoSteps] Initializing with available settings after query cancellation - UI will be editable');
+      }
+      if (isAuthError || isNetworkError) {
+        console.error('[BatchVideoSteps] ⚠️ Network/auth error loading settings - using defaults. Settings may not save!', {
+          error: settingsError?.message,
+          shotId: selectedShot?.id?.substring(0, 8)
+        });
       }
 
       // Start from existing settings if present, otherwise empty defaults
