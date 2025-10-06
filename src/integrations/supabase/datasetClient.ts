@@ -19,37 +19,7 @@ if (DATASET_SUPABASE_ANON_KEY === 'PLACEHOLDER_API_KEY_REPLACE_ME') {
   console.error('[DatasetClient] ❌ API key not configured! Please set VITE_DATASET_SUPABASE_ANON_KEY environment variable or update the hardcoded value.');
 }
 
-// Safe logging with JWT validation
-const logCredentials = () => {
-  try {
-    const logData: any = {
-      url: DATASET_SUPABASE_URL,
-      keyLength: DATASET_SUPABASE_ANON_KEY?.length,
-      keyConfigured: DATASET_SUPABASE_ANON_KEY !== 'PLACEHOLDER_API_KEY_REPLACE_ME'
-    };
-
-    // Only decode JWT if it's a valid JWT format
-    if (DATASET_SUPABASE_ANON_KEY && 
-        DATASET_SUPABASE_ANON_KEY !== 'PLACEHOLDER_API_KEY_REPLACE_ME' &&
-        DATASET_SUPABASE_ANON_KEY.includes('.')) {
-      try {
-        const payload = JSON.parse(atob(DATASET_SUPABASE_ANON_KEY.split('.')[1]));
-        logData.keyRef = payload.ref;
-        logData.keyPrefix = DATASET_SUPABASE_ANON_KEY.substring(0, 20) + '...';
-      } catch (jwtError) {
-        logData.keyError = 'Invalid JWT format';
-      }
-    } else {
-      logData.keyStatus = 'Not configured or invalid format';
-    }
-
-    console.log('[DatasetClient] Using dataset credentials:', logData);
-  } catch (error) {
-    console.error('[DatasetClient] Error logging credentials:', error);
-  }
-};
-
-logCredentials();
+// Dataset credentials validation removed - not needed in production
 
 /**
  * Supabase client specifically for the dataset database

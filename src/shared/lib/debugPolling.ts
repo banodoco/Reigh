@@ -146,5 +146,4 @@ export const debugPolling = {
 // Make available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).debugPolling = debugPolling;
-  console.log('[PollingDebug] Debug utilities available at window.debugPolling');
 }

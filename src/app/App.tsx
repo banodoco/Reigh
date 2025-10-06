@@ -1,6 +1,3 @@
-// CRITICAL: Log at VERY TOP of App.tsx
-console.info('[ReconnectionIssue] 🔥 APP.TSX FILE LOADED AT:', new Date().toISOString());
-
 import React, { useContext } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";

@@ -145,17 +145,6 @@ window.getProjectDebugHistory = () => {
   }
 };
 
-console.log(`
-🔧 Mobile Project Debug Tools Loaded
-=================================
-
-Available console commands:
-• enableProjectDebug()  - Enable detailed logging
-• checkProjectState()   - Check current state
-• forceProjectRecovery() - Attempt recovery
-• getProjectDebugHistory() - View debug log
-
-Run any of these commands when experiencing stalling issues.
-`);
+// Debug tools available at: window.enableProjectDebug(), checkProjectState(), forceProjectRecovery(), getProjectDebugHistory()
 
 export {}; // Make this a module 
