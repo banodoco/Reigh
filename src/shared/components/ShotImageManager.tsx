@@ -1045,13 +1045,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     console.log(`[DEBUG] EARLY RETURN - No images`);
     return (
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          No images to display - <span 
-            onPointerUp={() => navigate("/tools/image-generation")}
-            className="text-primary hover:underline cursor-pointer"
-          >generate images</span>
-        </p>
-        
         {/* Show upload UI when available */}
         {onImageUpload && (
           <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
@@ -1076,28 +1069,31 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 id="empty-shot-image-upload"
                 disabled={isUploadingImage}
               />
-              <Label htmlFor="empty-shot-image-upload" className="m-0 cursor-pointer w-full">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploadingImage}
-                  className="w-full"
-                  asChild
-                >
-                  <span>
-                    {isUploadingImage ? 'Uploading...' : 'Upload Images'}
-                  </span>
-                </Button>
-              </Label>
               
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => navigate("/tools/image-generation")}
-                className="w-full"
-              >
-                Start generating
-              </Button>
+              <div className="flex gap-2 w-full">
+                <Label htmlFor="empty-shot-image-upload" className="m-0 cursor-pointer flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isUploadingImage}
+                    className="w-full"
+                    asChild
+                  >
+                    <span>
+                      {isUploadingImage ? 'Uploading...' : 'Upload Images'}
+                    </span>
+                  </Button>
+                </Label>
+                
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => navigate("/tools/image-generation")}
+                  className="flex-1"
+                >
+                  Start generating
+                </Button>
+              </div>
             </div>
           </div>
         )}
