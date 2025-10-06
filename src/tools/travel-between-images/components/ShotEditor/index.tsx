@@ -503,6 +503,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [showCtaElement, setShowCtaElement] = useState(true); // Start as true to show on initial load
   const ctaHideTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMountRef = useRef(true); // Track if this is the first render
+  const [refsReady, setRefsReady] = useState(0); // Increment to trigger effect re-run when refs are ready
 
   useEffect(() => {
     const containerEl = headerContainerRef.current;
@@ -628,11 +629,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
   }, [isCtaFloating, showCtaElement]);
 
+  // Check when refs become available and trigger IntersectionObserver setup
+  // useLayoutEffect runs synchronously after DOM mutations, ensuring refs are populated
+  useEffect(() => {
+    // Check refs are ready and notify
+    const checkRefs = () => {
+      if (videoGalleryRef.current && ctaContainerRef.current && refsReady === 0) {
+        console.log('[ShotEditor] Refs are now ready, triggering observer setup');
+        setRefsReady(1);
+      }
+    };
+    
+    // Check immediately
+    checkRefs();
+    
+    // Also check after a short delay in case of async rendering
+    const timer = setTimeout(checkRefs, 100);
+    
+    return () => clearTimeout(timer);
+  }, []); // Run once on mount
+
   // Floating CTA: Track when user scrolls past video gallery and before reaching original CTA
   useEffect(() => {
     const galleryEl = videoGalleryRef.current;
     const ctaEl = ctaContainerRef.current;
-    if (!galleryEl || !ctaEl) return;
+    if (!galleryEl || !ctaEl) {
+      console.log('[ShotEditor] Refs not ready yet, waiting...', { galleryEl: !!galleryEl, ctaEl: !!ctaEl });
+      return;
+    }
+    
+    console.log('[ShotEditor] Setting up IntersectionObservers for floating CTA');
     
     let hasScrolledPastGallery = false;
     let isOriginalCtaVisible = false;
@@ -678,11 +704,34 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     galleryObserver.observe(galleryEl);
     ctaObserver.observe(ctaEl);
     
+    // Immediately check initial state since IntersectionObserver callbacks don't fire synchronously
+    const galleryRect = galleryEl.getBoundingClientRect();
+    const ctaRect = ctaEl.getBoundingClientRect();
+    
+    // Check if gallery is above viewport (scrolled past)
+    hasScrolledPastGallery = galleryRect.top < -200; // Match the rootMargin threshold
+    
+    // Check if original CTA is visible in viewport
+    const ctaTop = ctaRect.top;
+    const ctaBottom = ctaRect.bottom;
+    const viewportHeight = window.innerHeight;
+    isOriginalCtaVisible = ctaTop < viewportHeight && ctaBottom > 0;
+    
+    // Update state immediately with initial values
+    updateFloatingState();
+    
+    console.log('[ShotEditor] Initial floating state:', { 
+      hasScrolledPastGallery, 
+      isOriginalCtaVisible, 
+      hasActiveSelection,
+      shouldFloat: hasScrolledPastGallery && !isOriginalCtaVisible && !hasActiveSelection
+    });
+    
     return () => {
       galleryObserver.disconnect();
       ctaObserver.disconnect();
     };
-  }, [isMobile, hasActiveSelection]);
+  }, [isMobile, hasActiveSelection, refsReady]);
 
   const handleStickyNameClick = useCallback(() => {
     const containerEl = headerContainerRef.current;
