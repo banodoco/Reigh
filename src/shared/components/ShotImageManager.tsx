@@ -939,63 +939,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
   const activeImage = activeId ? currentImages.find((img) => img.shotImageEntryId === activeId) : null;
 
-  console.log(`[DEBUG] Checking images condition - images.length=${images?.length} selectedIds.length=${selectedIds.length}`);
-  if (!images || images.length === 0) {
-    console.log(`[DEBUG] EARLY RETURN - No images`);
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          No images to display - <span 
-            onPointerUp={() => navigate("/tools/image-generation")}
-            className="text-primary hover:underline cursor-pointer"
-          >generate images</span>
-        </p>
-        
-        {/* Show upload UI when available */}
-        {onImageUpload && (
-          <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <Image className="h-8 w-8 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">
-                Add images to start building your animation
-              </p>
-              
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    onImageUpload(files);
-                    e.target.value = ''; // Reset input
-                  }
-                }}
-                className="hidden"
-                id="empty-shot-image-upload"
-                disabled={isUploadingImage}
-              />
-              <Label htmlFor="empty-shot-image-upload" className="m-0 cursor-pointer w-full">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isUploadingImage}
-                  className="w-full"
-                  asChild
-                >
-                  <span>
-                    {isUploadingImage ? 'Uploading...' : 'Upload Images'}
-                  </span>
-                </Button>
-              </Label>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   // Mobile reordering function - integrates with unified position system
+  // MUST be defined before any early returns to satisfy Rules of Hooks
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
     if (mobileSelectedIds.length === 0) {
       console.log('[MobileReorder] No items selected for reordering');
@@ -1094,6 +1039,62 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       // Don't clear selection on error so user can retry
     }
   }, [mobileSelectedIds, currentImages, onImageReorder]);
+
+  console.log(`[DEBUG] Checking images condition - images.length=${images?.length} selectedIds.length=${selectedIds.length}`);
+  if (!images || images.length === 0) {
+    console.log(`[DEBUG] EARLY RETURN - No images`);
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          No images to display - <span 
+            onPointerUp={() => navigate("/tools/image-generation")}
+            className="text-primary hover:underline cursor-pointer"
+          >generate images</span>
+        </p>
+        
+        {/* Show upload UI when available */}
+        {onImageUpload && (
+          <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <Image className="h-8 w-8 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                Add images to start building your animation
+              </p>
+              
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
+                    onImageUpload(files);
+                    e.target.value = ''; // Reset input
+                  }
+                }}
+                className="hidden"
+                id="empty-shot-image-upload"
+                disabled={isUploadingImage}
+              />
+              <Label htmlFor="empty-shot-image-upload" className="m-0 cursor-pointer w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploadingImage}
+                  className="w-full"
+                  asChild
+                >
+                  <span>
+                    {isUploadingImage ? 'Uploading...' : 'Upload Images'}
+                  </span>
+                </Button>
+              </Label>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
   // Mobile batch mode with selection - delegate to specialized component

@@ -379,12 +379,18 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     onGenerationModeChange(value);
                   }
                 }}
-                className="h-8"
+                className="h-9 border rounded-md bg-muted/50"
               >
-                <ToggleGroupItem value="timeline" className="text-xs px-2 h-8">
+                <ToggleGroupItem 
+                  value="timeline" 
+                  className="text-sm px-3 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+                >
                   Timeline
                 </ToggleGroupItem>
-                <ToggleGroupItem value="batch" className="text-xs px-2 h-8">
+                <ToggleGroupItem 
+                  value="batch" 
+                  className="text-sm px-3 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+                >
                   Batch
                 </ToggleGroupItem>
               </ToggleGroup>
