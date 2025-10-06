@@ -73,8 +73,15 @@ export function usePositionManagement({
     }
   }, [shotId]);
 
-  // Detect unexpected position changes
+  // Detect unexpected position changes (but ignore legitimate drag/persist operations)
   useEffect(() => {
+    // Skip monitoring during drag or persist operations - these are expected changes
+    if (isDragInProgress || isPersistingPositions) {
+      // Update reference but don't check for changes
+      prevStablePositionsRef.current = new Map(stablePositions);
+      return;
+    }
+
     const prevPositions = prevStablePositionsRef.current;
     const currentPositions = Array.from(stablePositions.entries());
 
@@ -111,7 +118,7 @@ export function usePositionManagement({
 
     // Update previous positions
     prevStablePositionsRef.current = new Map(stablePositions);
-  }, [stablePositions, shotId]);
+  }, [stablePositions, shotId, isDragInProgress, isPersistingPositions]);
 
   // Calculate frame positions from database
   const imagesByShotGenId = useMemo(() => {

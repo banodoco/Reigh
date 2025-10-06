@@ -132,12 +132,16 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   
   const { data: taskData } = useGetTask(taskId);
   
-  const taskType = taskData?.taskType || (image.metadata as any)?.tool_type;
+  // Only use the actual task type name (like 'wan_2_2_t2i'), not tool_type (like 'image-generation')
+  // tool_type and task type name are different concepts - tool_type is a broader category
+  const taskType = taskData?.taskType;
   const { data: taskTypeInfo } = useTaskType(taskType || null);
   
   // Determine if this should show video task details (SharedTaskDetails)
   // Check if content_type is 'video' from task_types table
-  const isVideoTask = taskTypeInfo?.content_type === 'video';
+  // Fallback: if no taskTypeInfo, check metadata.tool_type for legacy support
+  const isVideoTask = taskTypeInfo?.content_type === 'video' || 
+    (!taskTypeInfo && (image.metadata as any)?.tool_type === 'travel-between-images');
   
   // [VideoThumbnailRender] Debug if this component is rendering for videos
   React.useEffect(() => {
