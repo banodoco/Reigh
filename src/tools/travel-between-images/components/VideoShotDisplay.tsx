@@ -434,7 +434,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             </div>
           ) : (
             <h3 
-              className="text-xl font-light group-hover:text-primary/80 transition-colors duration-300 flex-grow mr-2"
+              className="text-xl font-light group-hover:text-primary/80 transition-colors duration-300 flex-grow mr-2 truncate"
             >
               {shot.name}
             </h3>
