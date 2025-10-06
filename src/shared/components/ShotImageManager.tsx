@@ -1089,6 +1089,15 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                   </span>
                 </Button>
               </Label>
+              
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => navigate("/tools/image-generation")}
+                className="w-full"
+              >
+                Start generating
+              </Button>
             </div>
           </div>
         )}

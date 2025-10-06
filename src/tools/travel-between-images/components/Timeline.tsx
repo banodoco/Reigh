@@ -41,6 +41,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
@@ -177,6 +178,9 @@ const Timeline: React.FC<TimelineProps> = ({
   onImageUpload,
   isUploadingImage
 }) => {
+  
+  // Navigation
+  const navigate = useNavigate();
   
   // Core state
   const [isPersistingPositions, setIsPersistingPositions] = useState<boolean>(false);
@@ -430,19 +434,30 @@ const Timeline: React.FC<TimelineProps> = ({
                         id="timeline-empty-image-upload"
                         disabled={isUploadingImage}
                       />
-                      <Label htmlFor="timeline-empty-image-upload" className="m-0 cursor-pointer w-full">
+                      <div className="flex gap-2 w-full">
+                        <Label htmlFor="timeline-empty-image-upload" className="m-0 cursor-pointer flex-1">
+                          <Button
+                            variant="outline"
+                            size="default"
+                            disabled={isUploadingImage}
+                            className="w-full"
+                            asChild
+                          >
+                            <span>
+                              {isUploadingImage ? 'Uploading...' : 'Upload Images'}
+                            </span>
+                          </Button>
+                        </Label>
+                        
                         <Button
                           variant="default"
                           size="default"
-                          disabled={isUploadingImage}
-                          className="w-full"
-                          asChild
+                          onClick={() => navigate('/tools/image-generation')}
+                          className="flex-1"
                         >
-                          <span>
-                            {isUploadingImage ? 'Uploading...' : 'Upload Images'}
-                          </span>
+                          Start generating
                         </Button>
-                      </Label>
+                      </div>
                       
                       {/* Subtle drag and drop hint */}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
