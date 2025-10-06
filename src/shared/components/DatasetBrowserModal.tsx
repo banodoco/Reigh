@@ -331,17 +331,18 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
           <DialogFooter className="border-t relative z-20 pt-4">
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center gap-2 mr-auto">
+              <div className="flex items-center gap-2 w-full md:w-auto md:mr-auto">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
+                  className="flex-1 md:flex-initial"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </Button>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button
@@ -349,6 +350,7 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
                   size="sm"
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
+                  className="flex-1 md:flex-initial"
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
@@ -356,7 +358,7 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
               </div>
             )}
             
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="hidden md:inline-flex">
               Cancel
             </Button>
           </DialogFooter>
