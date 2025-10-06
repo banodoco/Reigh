@@ -68,12 +68,16 @@ serve(async (req)=>{
       }
     });
     const { task_id } = await req.json();
+    console.log(`[CALC-COST-DEBUG] Request received for task_id: ${task_id}`);
+    
     if (!task_id) {
+      console.error('[CALC-COST-DEBUG] Missing task_id in request');
       return jsonResponse({
         error: 'task_id is required'
       }, 400);
     }
     // Get task details
+    console.log(`[CALC-COST-DEBUG] Fetching task details from database...`);
     const { data: task, error: taskError } = await supabaseAdmin.from('tasks').select(`
         id,
         task_type,
@@ -84,21 +88,25 @@ serve(async (req)=>{
         project_id,
         projects(user_id)
       `).eq('id', task_id).single();
+    
     if (taskError || !task) {
-      console.error('Error fetching task:', taskError);
+      console.error('[CALC-COST-DEBUG] Error fetching task:', taskError);
       return jsonResponse({
         error: 'Task not found'
       }, 404);
     }
+    
+    console.log(`[CALC-COST-DEBUG] Task found: type=${task.task_type}, status=${task.status}, started=${task.generation_started_at}, processed=${task.generation_processed_at}`);
     // Check if task has both start and end times
     if (!task.generation_started_at || !task.generation_processed_at) {
+      console.error('[CALC-COST-DEBUG] Missing timestamps - started:', task.generation_started_at, 'processed:', task.generation_processed_at);
       return jsonResponse({
         error: 'Task must have both generation_started_at and generation_processed_at timestamps'
       }, 400);
     }
     // Check if task has orchestrator_task_id_ref - skip billing if present (sub-task of parent)
     if (task.params?.orchestrator_task_id_ref) {
-      console.log(`Task ${task_id} has orchestrator_task_id_ref ${task.params.orchestrator_task_id_ref}, skipping credit ledger entry (sub-task)`);
+      console.log(`[CALC-COST-DEBUG] Task ${task_id} has orchestrator_task_id_ref ${task.params.orchestrator_task_id_ref}, skipping credit ledger entry (sub-task)`);
       return jsonResponse({
         success: true,
         skipped: true,
@@ -145,9 +153,11 @@ serve(async (req)=>{
       durationSeconds = Math.max(1, Math.ceil((endTime.getTime() - startTime.getTime()) / 1000));
     }
     // Get task type configuration
+    console.log(`[CALC-COST-DEBUG] Fetching task type configuration for: ${task.task_type}`);
     const { data: taskType, error: taskTypeError } = await supabaseAdmin.from('task_types').select('*').eq('name', task.task_type).eq('is_active', true).single();
     if (taskTypeError || !taskType) {
-      console.error('Error fetching task type config:', taskTypeError);
+      console.error('[CALC-COST-DEBUG] Error fetching task type config:', taskTypeError);
+      console.log('[CALC-COST-DEBUG] Using default cost configuration');
       // Use default cost if no config found
       const defaultCostPerSecond = 0.01; // 1 cent per second (in dollars)
       const startTime = new Date(task.generation_started_at);
@@ -185,10 +195,13 @@ serve(async (req)=>{
       });
     }
     // Calculate cost based on task type configuration
+    console.log(`[CALC-COST-DEBUG] Calculating cost with: billing_type=${taskType.billing_type}, base_cost=${taskType.base_cost_per_second}, unit_cost=${taskType.unit_cost}, duration=${durationSeconds}s`);
     const cost = calculateTaskCost(taskType.billing_type, taskType.base_cost_per_second, taskType.unit_cost, durationSeconds, taskType.cost_factors, task.params);
+    console.log(`[CALC-COST-DEBUG] Calculated cost: $${cost}`);
+    
     // Validate cost calculation
     if (isNaN(cost) || cost < 0) {
-      console.error('Invalid cost calculated:', {
+      console.error('[CALC-COST-DEBUG] Invalid cost calculated:', {
         cost,
         billing_type: taskType.billing_type,
         base_cost_per_second: taskType.base_cost_per_second,
@@ -211,6 +224,7 @@ serve(async (req)=>{
       }, 400);
     }
     // Insert cost into credit ledger
+    console.log(`[CALC-COST-DEBUG] Inserting into credit ledger: user_id=${task.projects.user_id}, amount=-${cost}`);
     const { error: ledgerError } = await supabaseAdmin.from('credits_ledger').insert({
       user_id: task.projects.user_id,
       task_id: task.id,
@@ -229,7 +243,7 @@ serve(async (req)=>{
       }
     });
     if (ledgerError) {
-      console.error('Error inserting into credit ledger:', {
+      console.error('[CALC-COST-DEBUG] Error inserting into credit ledger:', {
         error: ledgerError,
         user_id: task.projects.user_id,
         task_id: task.id,
@@ -246,6 +260,7 @@ serve(async (req)=>{
         error: `Failed to record cost in ledger: ${ledgerError.message}`
       }, 500);
     }
+    console.log(`[CALC-COST-DEBUG] Successfully recorded cost: $${cost} for task ${task.id}`);
     return jsonResponse({
       success: true,
       cost: cost,
@@ -258,9 +273,10 @@ serve(async (req)=>{
       task_id: task.id
     });
   } catch (error) {
-    console.error('Error in calculate-task-cost function:', error.message);
+    console.error('[CALC-COST-DEBUG] Unhandled error in calculate-task-cost function:', error);
+    console.error('[CALC-COST-DEBUG] Error stack:', error.stack);
     return jsonResponse({
-      error: error.message
+      error: error.message || 'Unknown error occurred'
     }, 500);
   }
 });

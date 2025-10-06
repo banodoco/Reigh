@@ -776,7 +776,11 @@ serve(async (req)=>{
         });
         if (costCalcResp.ok) {
           const costData = await costCalcResp.json();
-          console.log(`[COMPLETE-TASK-DEBUG] Cost calculation successful: $${costData.cost.toFixed(3)} for ${costData.duration_seconds}s (task_type: ${costData.task_type}, billing_type: ${costData.billing_type})`);
+          if (costData && typeof costData.cost === 'number') {
+            console.log(`[COMPLETE-TASK-DEBUG] Cost calculation successful: $${costData.cost.toFixed(3)} for ${costData.duration_seconds}s (task_type: ${costData.task_type}, billing_type: ${costData.billing_type})`);
+          } else {
+            console.log(`[COMPLETE-TASK-DEBUG] Cost calculation returned unexpected data:`, costData);
+          }
         } else {
           const errTxt = await costCalcResp.text();
           console.error(`[COMPLETE-TASK-DEBUG] Cost calculation failed: ${errTxt}`);

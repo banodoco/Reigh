@@ -500,8 +500,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const videoGalleryRef = useRef<HTMLDivElement>(null);
   const [isCtaFloating, setIsCtaFloating] = useState(false);
   const [hasActiveSelection, setHasActiveSelection] = useState(false);
-  const [showCtaElement, setShowCtaElement] = useState(false);
+  const [showCtaElement, setShowCtaElement] = useState(true); // Start as true to show on initial load
   const ctaHideTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMountRef = useRef(true); // Track if this is the first render
 
   useEffect(() => {
     const containerEl = headerContainerRef.current;
@@ -594,6 +595,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Manage CTA element visibility with animation delay
   useEffect(() => {
+    // After first render, mark that initial mount is complete
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+    }
+    
     if (isCtaFloating) {
       // Clear any pending hide timer
       if (ctaHideTimerRef.current) {
@@ -602,8 +608,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
       // Show immediately when it should float
       setShowCtaElement(true);
-    } else if (showCtaElement) {
+    } else if (showCtaElement && !isInitialMountRef.current) {
       // When it should hide, wait for animation to complete before removing from DOM
+      // Skip this on initial mount to avoid unwanted animation
       // Clear any existing timer first
       if (ctaHideTimerRef.current) {
         clearTimeout(ctaHideTimerRef.current);
@@ -2186,9 +2193,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {showCtaElement && (
         <div 
           className={`fixed z-[80] flex justify-center duration-300 ${
-            isCtaFloating 
-              ? 'animate-in slide-in-from-bottom-4 fade-in' 
-              : 'animate-out slide-out-to-bottom-4 fade-out'
+            isInitialMountRef.current 
+              ? '' // No animation on initial mount
+              : isCtaFloating 
+                ? 'animate-in slide-in-from-bottom-4 fade-in' 
+                : 'animate-out slide-out-to-bottom-4 fade-out'
           }`}
           style={{
             bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
