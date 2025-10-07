@@ -2288,7 +2288,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {/* Floating CTA - appears when original position is not visible */}
       {showCtaElement && (
         <div 
-          className={`fixed z-[80] flex justify-center duration-300 ${
+          className={`fixed z-[80] flex justify-center duration-300 pointer-events-none ${
             isInitialMountRef.current 
               ? '' // No animation on initial mount
               : isCtaFloating 
@@ -2301,7 +2301,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             right: isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px',
           }}
         >
-          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-lg">
+          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-lg pointer-events-auto">
             <div className="flex flex-col items-center gap-2">
               {/* Variant Name Input */}
               <div className="w-full">
