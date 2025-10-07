@@ -4,34 +4,33 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
-import { authenticateRequest, verifyTaskOwnership } from "../_shared/auth.ts";
+import { authenticateRequest } from "../_shared/auth.ts";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
 
 /**
  * Edge function: update-shot-pair-prompts
  * 
- * Takes an orchestrator task ID and updates the shot_generations.metadata fields
- * for all images in the associated shot with prompts from the task.
- * 
- * Updates:
- * - pair_prompt: Individual prompt for each pair (from base_prompts array)
- * - pair_negative_prompt: Individual negative prompt for each pair (from negative_prompts array)
- * - enhanced_prompt: Enhanced/AI-generated prompt for each pair (from enhanced_prompts array)
- * - base_prompt: The default/base prompt used across all pairs (singular)
+ * Updates the shot_generations.metadata.enhanced_prompt field for all positioned
+ * images in a shot with the provided enhanced prompts array.
  * 
  * POST /functions/v1/update-shot-pair-prompts
  * Headers: Authorization: Bearer <Service Role Key or PAT>
  * Body: {
- *   "task_id": "uuid-string"  // Orchestrator task ID
+ *   "shot_id": "uuid-string",           // Shot ID to update
+ *   "enhanced_prompts": [               // Array of enhanced prompts (one per image)
+ *     "Detailed VLM description...",
+ *     "",                               // Empty strings are skipped
+ *     "Another description..."
+ *   ]
  * }
  * 
  * Returns:
- * - 200 OK with updated shot_generations
+ * - 200 OK with updated shot_generations count
  * - 400 Bad Request if missing required fields
  * - 401 Unauthorized if no valid token
- * - 403 Forbidden if user doesn't own the task
- * - 404 Not Found if task doesn't exist or has no shot_id
+ * - 403 Forbidden if user doesn't own the shot
+ * - 404 Not Found if shot doesn't exist
  * - 500 Internal Server Error
  */
 
@@ -83,112 +82,54 @@ serve(async (req) => {
   }
 
   // Validate required fields
-  const { task_id } = requestBody;
-  if (!task_id) {
-    return new Response("Missing required field: task_id", { status: 400 });
+  const { shot_id, enhanced_prompts } = requestBody;
+  if (!shot_id) {
+    return new Response("Missing required field: shot_id", { status: 400 });
+  }
+  if (!enhanced_prompts || !Array.isArray(enhanced_prompts)) {
+    return new Response("Missing or invalid required field: enhanced_prompts (must be array)", { status: 400 });
   }
 
   try {
-    // Verify task ownership if user token
+    // Verify shot ownership if user token
     if (!isServiceRole && callerId) {
-      const ownershipResult = await verifyTaskOwnership(
-        supabaseAdmin, 
-        task_id, 
-        callerId, 
-        LOG_PREFIX
-      );
+      // Get shot's project to verify ownership
+      const { data: shotData, error: shotError } = await supabaseAdmin
+        .from("shots")
+        .select("project_id")
+        .eq("id", shot_id)
+        .single();
 
-      if (!ownershipResult.success) {
-        return new Response(ownershipResult.error || "Forbidden", { 
-          status: ownershipResult.statusCode || 403 
-        });
+      if (shotError || !shotData) {
+        console.error(`${LOG_PREFIX} Shot not found:`, shotError);
+        return new Response("Shot not found", { status: 404 });
       }
 
-      console.log(`${LOG_PREFIX} Task ownership verified for user ${callerId}`);
+      // Check if user owns the project
+      const { data: projectData, error: projectError } = await supabaseAdmin
+        .from("projects")
+        .select("user_id")
+        .eq("id", shotData.project_id)
+        .single();
+
+      if (projectError || !projectData) {
+        console.error(`${LOG_PREFIX} Project not found:`, projectError);
+        return new Response("Project not found", { status: 404 });
+      }
+
+      if (projectData.user_id !== callerId) {
+        console.error(`${LOG_PREFIX} User ${callerId} does not own shot ${shot_id}`);
+        return new Response("Forbidden: You do not own this shot", { status: 403 });
+      }
+
+      console.log(`${LOG_PREFIX} Shot ownership verified for user ${callerId}`);
     }
 
-    console.log(`${LOG_PREFIX} Fetching task ${task_id}`);
-    
-    // 1. Get the task and extract shot_id and base_prompts
-    const { data: task, error: taskError } = await supabaseAdmin
-      .from("tasks")
-      .select("id, params, project_id")
-      .eq("id", task_id)
-      .single();
-
-    if (taskError || !task) {
-      console.error(`${LOG_PREFIX} Task not found:`, taskError);
-      return new Response("Task not found", { status: 404 });
-    }
-
-    console.log(`${LOG_PREFIX} Task found:`, {
-      taskId: task.id,
-      projectId: task.project_id,
+    console.log(`${LOG_PREFIX} Processing shot ${shot_id}:`, {
+      enhancedPromptsCount: enhanced_prompts.length,
     });
 
-    // Extract shot_id and prompts from params
-    const params = typeof task.params === 'string' ? JSON.parse(task.params) : task.params;
-    
-    // Try multiple paths to find shot_id (matching complete_task logic)
-    let shotId: string | null = null;
-    
-    // Priority 1: orchestrator_details.shot_id
-    if (params.orchestrator_details?.shot_id) {
-      shotId = params.orchestrator_details.shot_id;
-    }
-    // Priority 2: shot_id at top level
-    else if (params.shot_id) {
-      shotId = params.shot_id;
-    }
-    // Priority 3: full_orchestrator_payload.shot_id (legacy)
-    else if (params.full_orchestrator_payload?.shot_id) {
-      shotId = params.full_orchestrator_payload.shot_id;
-    }
-
-    if (!shotId) {
-      console.error(`${LOG_PREFIX} No shot_id found in task params`);
-      return new Response("Task does not have a shot_id in params", { status: 404 });
-    }
-
-    // Extract base_prompts (can be in multiple places)
-    let basePrompts: string[] = [];
-    if (params.base_prompts) {
-      basePrompts = params.base_prompts;
-    } else if (params.base_prompts_expanded) {
-      basePrompts = params.base_prompts_expanded;
-    } else if (params.orchestrator_details?.base_prompts) {
-      basePrompts = params.orchestrator_details.base_prompts;
-    }
-
-    // Extract negative_prompts (optional)
-    let negativePrompts: string[] = [];
-    if (params.negative_prompts) {
-      negativePrompts = params.negative_prompts;
-    } else if (params.negative_prompts_expanded) {
-      negativePrompts = params.negative_prompts_expanded;
-    } else if (params.orchestrator_details?.negative_prompts) {
-      negativePrompts = params.orchestrator_details.negative_prompts;
-    }
-
-    // Extract enhanced_prompts (optional) - only from orchestrator_details
-    const enhancedPrompts: string[] = params.orchestrator_details?.enhanced_prompts || [];
-
-    // Extract base_prompt (singular - the default/base prompt)
-    const basePrompt: string | undefined = params.base_prompt || params.orchestrator_details?.base_prompt;
-
-    console.log(`${LOG_PREFIX} Extracted from task:`, {
-      shotId,
-      basePromptsCount: basePrompts.length,
-      basePrompt: basePrompt ? basePrompt.substring(0, 50) + '...' : '(none)',
-      negativePromptsCount: negativePrompts.length,
-      enhancedPromptsCount: enhancedPrompts.length,
-    });
-
-    if (basePrompts.length === 0) {
-      console.warn(`${LOG_PREFIX} No base_prompts found in task params`);
-    }
-
-    // 2. Get all shot_generations for this shot, filtering for images with timeline_frame
+    // Get all shot_generations for this shot, filtering for images with timeline_frame
     const { data: shotGenerations, error: sgError } = await supabaseAdmin
       .from("shot_generations")
       .select(`
@@ -202,7 +143,7 @@ serve(async (req) => {
           location
         )
       `)
-      .eq("shot_id", shotId)
+      .eq("shot_id", shot_id)
       .not("timeline_frame", "is", null)
       .order("timeline_frame", { ascending: true });
 
@@ -212,7 +153,7 @@ serve(async (req) => {
     }
 
     if (!shotGenerations || shotGenerations.length === 0) {
-      console.warn(`${LOG_PREFIX} No shot_generations found for shot ${shotId}`);
+      console.warn(`${LOG_PREFIX} No shot_generations found for shot ${shot_id}`);
       return new Response(JSON.stringify({
         success: true,
         message: "No positioned images found for this shot",
@@ -241,14 +182,12 @@ serve(async (req) => {
       })),
     });
 
-    // Verify prompt count matches expected (N images = N-1 pairs)
-    const expectedPromptCount = imageGenerations.length - 1;
-    if (basePrompts.length !== expectedPromptCount) {
-      console.warn(`${LOG_PREFIX} ⚠️ Prompt count mismatch:`, {
+    // Verify enhanced_prompts count matches image count
+    if (enhanced_prompts.length !== imageGenerations.length) {
+      console.warn(`${LOG_PREFIX} ⚠️ Enhanced prompts count mismatch:`, {
         imageCount: imageGenerations.length,
-        expectedPrompts: expectedPromptCount,
-        actualPrompts: basePrompts.length,
-        warning: 'The number of prompts should equal (imageCount - 1) for proper pair mapping'
+        enhancedPromptsCount: enhanced_prompts.length,
+        warning: 'The number of enhanced_prompts should equal imageCount for proper mapping'
       });
     }
 
@@ -263,56 +202,31 @@ serve(async (req) => {
       });
     }
 
-    // 3. Update each shot_generation's metadata with the corresponding pair_prompt
-    // The first image gets base_prompts[0], second gets base_prompts[1], etc.
+    // Update each shot_generation's metadata with the corresponding enhanced_prompt
+    // Image at index i gets enhanced_prompts[i]
     const updatePromises = imageGenerations.map(async (sg, index) => {
       // Get existing metadata or create new object
       const existingMetadata = sg.metadata || {};
       
-      // Build updated metadata - only add fields that have non-empty values
-      const updatedMetadata = {
-        ...existingMetadata,
-      };
-
-      let hasChanges = false;
-
-      // Assign pair_prompt if available and not empty
-      if (index < basePrompts.length && basePrompts[index]) {
-        updatedMetadata.pair_prompt = basePrompts[index];
-        hasChanges = true;
-      }
-
-      // Assign pair_negative_prompt if available and not empty
-      if (index < negativePrompts.length && negativePrompts[index]) {
-        updatedMetadata.pair_negative_prompt = negativePrompts[index];
-        hasChanges = true;
-      }
-
-      // Assign enhanced_prompt if available and not empty
-      if (index < enhancedPrompts.length && enhancedPrompts[index]) {
-        updatedMetadata.enhanced_prompt = enhancedPrompts[index];
-        hasChanges = true;
-      }
-
-      // Assign base_prompt (singular - the default/base prompt used for all pairs)
-      if (basePrompt) {
-        updatedMetadata.base_prompt = basePrompt;
-        hasChanges = true;
-      }
-
-      // Skip update if no changes
-      if (!hasChanges) {
-        console.log(`${LOG_PREFIX} Skipping shot_generation ${sg.id.substring(0, 8)} (no non-empty values to update)`);
+      // Check if we have an enhanced_prompt for this index
+      const enhancedPrompt = index < enhanced_prompts.length ? enhanced_prompts[index] : undefined;
+      
+      // Skip if enhanced_prompt is empty/falsy
+      if (!enhancedPrompt) {
+        console.log(`${LOG_PREFIX} Skipping shot_generation ${sg.id.substring(0, 8)} at index ${index} (empty enhanced_prompt)`);
         return { id: sg.id, success: true, skipped: true };
       }
+
+      // Build updated metadata with enhanced_prompt
+      const updatedMetadata = {
+        ...existingMetadata,
+        enhanced_prompt: enhancedPrompt,
+      };
 
       console.log(`${LOG_PREFIX} Updating shot_generation ${sg.id.substring(0, 8)}:`, {
         index,
         timeline_frame: sg.timeline_frame,
-        pair_prompt: updatedMetadata.pair_prompt?.substring(0, 50) || '(none)',
-        pair_negative_prompt: updatedMetadata.pair_negative_prompt?.substring(0, 50) || '(none)',
-        enhanced_prompt: updatedMetadata.enhanced_prompt?.substring(0, 50) || '(none)',
-        base_prompt: updatedMetadata.base_prompt?.substring(0, 50) || '(none)',
+        enhanced_prompt: enhancedPrompt.substring(0, 100) + (enhancedPrompt.length > 100 ? '...' : ''),
       });
 
       // Update the shot_generation
@@ -341,11 +255,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Updated ${successCount} shot_generation(s) with pair prompts`,
+      message: `Updated ${successCount} shot_generation(s) with enhanced prompts`,
       updated_count: successCount,
       failed_count: failedCount,
-      shot_id: shotId,
-      task_id: task_id,
+      shot_id: shot_id,
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" }
