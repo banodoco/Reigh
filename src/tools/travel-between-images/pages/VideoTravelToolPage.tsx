@@ -341,9 +341,13 @@ const VideoTravelToolPage: React.FC = () => {
   }, []);
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
-    if (!hasLoadedInitialSettings.current) return;
+    // Always allow toggle to work - don't wait for settings to load
+    // This prevents the toggle from getting stuck if settings load slowly or fail
     userHasInteracted.current = true;
     setGenerationMode(mode);
+    
+    // If settings haven't loaded yet, we'll still save when they do load
+    // The user's selection will be preserved in the state
   }, []);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -973,7 +977,11 @@ const VideoTravelToolPage: React.FC = () => {
         setAdvancedMode(advancedModeValue);
         setPhaseConfig(phaseConfigValue);
         setVideoPairConfigs(settingsToApply.pairConfigs || []);
-        setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
+        // Don't overwrite generationMode if user has already interacted with it
+        // This prevents race condition where settings load after user clicks toggle
+        if (!userHasInteracted.current) {
+          setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
+        }
         setPairConfigs(settingsToApply.pairConfigs || []);
         // selectedMode removed - now hardcoded to use specific model
         setSteerableMotionSettings({

@@ -7,7 +7,7 @@ export class SimpleRealtimeManager {
   private projectId: string | null = null;
   private isSubscribed = false;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 3;
+  private maxReconnectAttempts = 5; // Increased from 3 to handle transient issues
   private reconnectTimeout: NodeJS.Timeout | null = null;
 
   private boundAuthHealHandler: (event: CustomEvent) => void;
