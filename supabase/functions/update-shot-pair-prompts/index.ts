@@ -4,7 +4,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 // @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
-import { authenticateRequest } from "../_shared/auth.ts";
+import { authenticateRequest, verifyShotOwnership } from "../_shared/auth.ts";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
 
@@ -93,33 +93,17 @@ serve(async (req) => {
   try {
     // Verify shot ownership if user token
     if (!isServiceRole && callerId) {
-      // Get shot's project to verify ownership
-      const { data: shotData, error: shotError } = await supabaseAdmin
-        .from("shots")
-        .select("project_id")
-        .eq("id", shot_id)
-        .single();
+      const ownershipResult = await verifyShotOwnership(
+        supabaseAdmin, 
+        shot_id, 
+        callerId, 
+        LOG_PREFIX
+      );
 
-      if (shotError || !shotData) {
-        console.error(`${LOG_PREFIX} Shot not found:`, shotError);
-        return new Response("Shot not found", { status: 404 });
-      }
-
-      // Check if user owns the project
-      const { data: projectData, error: projectError } = await supabaseAdmin
-        .from("projects")
-        .select("user_id")
-        .eq("id", shotData.project_id)
-        .single();
-
-      if (projectError || !projectData) {
-        console.error(`${LOG_PREFIX} Project not found:`, projectError);
-        return new Response("Project not found", { status: 404 });
-      }
-
-      if (projectData.user_id !== callerId) {
-        console.error(`${LOG_PREFIX} User ${callerId} does not own shot ${shot_id}`);
-        return new Response("Forbidden: You do not own this shot", { status: 403 });
+      if (!ownershipResult.success) {
+        return new Response(ownershipResult.error || "Forbidden", { 
+          status: ownershipResult.statusCode || 403 
+        });
       }
 
       console.log(`${LOG_PREFIX} Shot ownership verified for user ${callerId}`);

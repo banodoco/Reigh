@@ -167,6 +167,71 @@ export async function verifyTaskOwnership(
 }
 
 /**
+ * Verifies that a user owns a specific shot (via its project)
+ * 
+ * @param supabaseAdmin - Supabase admin client
+ * @param shotId - Shot ID to verify
+ * @param userId - User ID to check ownership
+ * @param logPrefix - Optional prefix for log messages
+ * @returns Object with success status and optional error details
+ */
+export async function verifyShotOwnership(
+  supabaseAdmin: any,
+  shotId: string,
+  userId: string,
+  logPrefix: string = "[AUTH]"
+): Promise<{ success: boolean; error?: string; statusCode?: number; projectId?: string }> {
+  console.log(`${logPrefix} Verifying shot ${shotId} belongs to user ${userId}...`);
+
+  // Get shot and its project
+  const { data: shotData, error: shotError } = await supabaseAdmin
+    .from("shots")
+    .select("project_id")
+    .eq("id", shotId)
+    .single();
+
+  if (shotError || !shotData) {
+    console.error(`${logPrefix} Shot lookup error:`, shotError);
+    return {
+      success: false,
+      error: "Shot not found",
+      statusCode: 404
+    };
+  }
+
+  // Check if user owns the project that this shot belongs to
+  const { data: projectData, error: projectError } = await supabaseAdmin
+    .from("projects")
+    .select("user_id")
+    .eq("id", shotData.project_id)
+    .single();
+
+  if (projectError || !projectData) {
+    console.error(`${logPrefix} Project lookup error:`, projectError);
+    return {
+      success: false,
+      error: "Project not found",
+      statusCode: 404
+    };
+  }
+
+  if (projectData.user_id !== userId) {
+    console.error(`${logPrefix} Shot ${shotId} belongs to project ${shotData.project_id} owned by ${projectData.user_id}, not user ${userId}`);
+    return {
+      success: false,
+      error: "Forbidden: Shot does not belong to user",
+      statusCode: 403
+    };
+  }
+
+  console.log(`${logPrefix} Shot ${shotId} ownership verified: user ${userId} owns project ${shotData.project_id}`);
+  return {
+    success: true,
+    projectId: shotData.project_id
+  };
+}
+
+/**
  * Gets the user ID for a task (for service role requests)
  * 
  * @param supabaseAdmin - Supabase admin client
