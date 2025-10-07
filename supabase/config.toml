@@ -110,5 +110,8 @@ verify_jwt = false
 [functions.trigger-auto-topup]
 verify_jwt = false
 
+[functions.update-shot-pair-prompts]
+verify_jwt = false
+
 [functions.update-task-status]
 verify_jwt = false
