@@ -1159,13 +1159,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
   const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);
-  
-  // Auto-set context frames to 8 when hidden (<=2 images)
-  useEffect(() => {
-    if (simpleFilteredImages.length <= 2 && batchVideoContext !== 8) {
-      onBatchVideoContextChange(8);
-    }
-  }, [simpleFilteredImages.length, batchVideoContext, onBatchVideoContextChange]);
 
   // Auto-disable turbo mode when there are more than 2 images
   useEffect(() => {
@@ -1761,6 +1754,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Use model based on turbo mode for task creation
     const actualModelName = getModelName();
     
+    // Debug log phase config before sending
+    if (advancedMode && phaseConfig) {
+      console.log('[PhaseConfigDebug] Preparing to send phase_config:', {
+        num_phases: phaseConfig.num_phases,
+        model_switch_phase: phaseConfig.model_switch_phase,
+        phases_array_length: phaseConfig.phases?.length,
+        steps_array_length: phaseConfig.steps_per_phase?.length,
+        phases_data: phaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+        steps_per_phase: phaseConfig.steps_per_phase
+      });
+    }
+    
     const requestBody: any = {
       project_id: projectId,
       shot_id: selectedShot.id,
@@ -2145,15 +2150,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   <div className="flex flex-col items-center">
                     {/* Variant Name Input */}
                     <div className="w-full max-w-md mb-4">
-                      <label htmlFor="variant-name" className="block text-xs font-medium text-muted-foreground mb-2">
-                        Variant Name (optional)
-                      </label>
                       <input
                         id="variant-name"
                         type="text"
                         value={variantName}
                         onChange={(e) => setVariantName(e.target.value)}
-                        placeholder="e.g., high-contrast, bright-colors"
+                        placeholder="Variant name"
                         className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                       />
                     </div>
@@ -2303,15 +2305,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             <div className="flex flex-col items-center gap-2">
               {/* Variant Name Input */}
               <div className="w-full">
-                <label htmlFor="variant-name-floating" className="block text-xs font-medium text-muted-foreground mb-2">
-                  Variant Name (optional)
-                </label>
                 <input
                   id="variant-name-floating"
                   type="text"
                   value={variantName}
                   onChange={(e) => setVariantName(e.target.value)}
-                  placeholder="e.g., high-contrast, bright-colors"
+                  placeholder="Variant name"
                   className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                 />
               </div>

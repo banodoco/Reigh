@@ -328,6 +328,14 @@ const VideoTravelToolPage: React.FC = () => {
 
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
     if (!hasLoadedInitialSettings.current) return;
+    console.log('[PhaseConfigDebug] Phase config changed by user:', {
+      num_phases: config.num_phases,
+      model_switch_phase: config.model_switch_phase,
+      phases_array_length: config.phases?.length,
+      steps_array_length: config.steps_per_phase?.length,
+      phases_data: config.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+      steps_per_phase: config.steps_per_phase
+    });
     userHasInteracted.current = true;
     setPhaseConfig(config);
   }, []);
@@ -930,7 +938,16 @@ const VideoTravelToolPage: React.FC = () => {
       });
       
       const advancedModeValue = settingsToApply.advancedMode ?? false;
-      const phaseConfigValue = settingsToApply.phaseConfig;
+      let phaseConfigValue = settingsToApply.phaseConfig;
+      
+      // TEMPORARY FIX: Force num_phases to 3 if it's set to something else
+      if (phaseConfigValue && phaseConfigValue.num_phases !== 3) {
+        console.warn('[PhaseConfig] Forcing num_phases to 3 (was:', phaseConfigValue.num_phases, ')');
+        phaseConfigValue = {
+          ...phaseConfigValue,
+          num_phases: 3
+        };
+      }
       
       console.log('[AdvancedMode] Setting advancedMode from loaded settings:', {
         shotId: selectedShot?.id?.substring(0, 8),
@@ -1522,6 +1539,10 @@ const VideoTravelToolPage: React.FC = () => {
           console.log('[BatchVideoSteps] Saving settings to DB (shot level only):', {
             batchVideoSteps: currentSettings.batchVideoSteps,
             advancedMode: currentSettings.advancedMode,
+            phaseConfig_num_phases: currentSettings.phaseConfig?.num_phases,
+            phaseConfig_model_switch_phase: currentSettings.phaseConfig?.model_switch_phase,
+            phaseConfig_phases_length: currentSettings.phaseConfig?.phases?.length,
+            phaseConfig_steps_length: currentSettings.phaseConfig?.steps_per_phase?.length,
             shotId: selectedShot?.id?.substring(0, 8)
           });
           lastSavedSettingsRef.current = currentSettings;

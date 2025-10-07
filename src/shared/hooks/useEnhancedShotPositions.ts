@@ -265,6 +265,99 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     }
   }, [shotGenerations]);
 
+  // Helper function to clear enhanced prompts for specific generation IDs
+  const clearEnhancedPromptsForGenerations = useCallback(async (shotGenerationIds: string[]) => {
+    if (!shotId || shotGenerationIds.length === 0) return;
+
+    try {
+      console.log('[EnhancedPrompts-Position] 🧹 Clearing enhanced prompts for generations:', shotGenerationIds.map(id => id.substring(0, 8)));
+
+      // Get the generations and their metadata
+      const { data: generations, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('id, metadata')
+        .eq('shot_id', shotId)
+        .in('id', shotGenerationIds);
+
+      if (fetchError) {
+        console.error('[EnhancedPrompts-Position] Error fetching shot generations:', fetchError);
+        throw fetchError;
+      }
+
+      if (!generations || generations.length === 0) {
+        console.log('[EnhancedPrompts-Position] No generations found to clear');
+        return;
+      }
+
+      // Update each generation to clear enhanced_prompt
+      const updates = generations.map(async (gen) => {
+        const existingMetadata = gen.metadata as Record<string, any> | null;
+        const updatedMetadata = {
+          ...(existingMetadata || {}),
+          enhanced_prompt: ''
+        };
+
+        const { error: updateError } = await supabase
+          .from('shot_generations')
+          .update({ metadata: updatedMetadata })
+          .eq('id', gen.id);
+
+        if (updateError) {
+          console.error(`[EnhancedPrompts-Position] Error updating generation ${gen.id}:`, updateError);
+        }
+
+        return { id: gen.id, success: !updateError };
+      });
+
+      const results = await Promise.all(updates);
+      const successCount = results.filter(r => r.success).length;
+      
+      console.log(`[EnhancedPrompts-Position] ✅ Cleared ${successCount}/${generations.length} enhanced prompts`);
+
+      // Invalidate cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+    } catch (err) {
+      console.error('[clearEnhancedPromptsForGenerations] Error:', err);
+      // Don't throw - position changes should still succeed even if prompt clearing fails
+    }
+  }, [shotId, queryClient]);
+
+  // Get generation IDs that are adjacent to a given timeline_frame
+  const getAdjacentGenerationIds = useCallback((timelineFrame: number): string[] => {
+    if (!timelineFrame) return [];
+    
+    // Sort all generations by timeline_frame, filtering out videos
+    const sorted = [...shotGenerations]
+      .filter(sg => {
+        if (sg.timeline_frame == null) return false;
+        // Filter out videos - check generation type
+        const isVideo = sg.generation.type === 'video' ||
+                       sg.generation.type === 'video_travel_output' ||
+                       (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+        return !isVideo;
+      })
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+    
+    // Find the index of the item with this timeline_frame
+    const index = sorted.findIndex(sg => sg.timeline_frame === timelineFrame);
+    if (index === -1) return [];
+    
+    const adjacentIds: string[] = [];
+    
+    // Add the item before (if exists)
+    if (index > 0) {
+      adjacentIds.push(sorted[index - 1].id);
+    }
+    
+    // Add the item after (if exists)
+    if (index < sorted.length - 1) {
+      adjacentIds.push(sorted[index + 1].id);
+    }
+    
+    return adjacentIds;
+  }, [shotGenerations]);
+
   // Exchange positions between two items
   const exchangePositions = useCallback(async (generationIdA: string, generationIdB: string) => {
     if (!shotId) {
@@ -314,6 +407,33 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         itemB: updatedGenerations.data?.find(sg => sg.generation_id === generationIdB)
       };
 
+      // Clear enhanced prompts for both swapped items AND their neighbors
+      if (itemA && itemB) {
+        // Get neighbors of both items BEFORE they swapped
+        const itemANeighbors = itemA.timeline_frame ? getAdjacentGenerationIds(itemA.timeline_frame) : [];
+        const itemBNeighbors = itemB.timeline_frame ? getAdjacentGenerationIds(itemB.timeline_frame) : [];
+        
+        // Combine all affected IDs (deduped via Set)
+        const allAffectedIds = new Set([
+          itemA.id, 
+          itemB.id,
+          ...itemANeighbors.filter(id => id !== itemB.id), // Exclude if A and B were adjacent
+          ...itemBNeighbors.filter(id => id !== itemA.id)
+        ]);
+        const itemsToClear = Array.from(allAffectedIds);
+        
+        console.log(`[ExchangePositions] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for swapped items and neighbors:`, {
+          itemA: itemA.id.substring(0, 8),
+          itemB: itemB.id.substring(0, 8),
+          itemANeighbors: itemANeighbors.map(id => id.substring(0, 8)),
+          itemBNeighbors: itemBNeighbors.map(id => id.substring(0, 8)),
+          totalToClear: itemsToClear.length
+        });
+        
+        clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
+          console.error('[exchangePositions] Error clearing enhanced prompts:', err);
+        });
+      }
       
       // Position exchange completed successfully - no toast needed for smooth UX
       
@@ -322,7 +442,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       toast.error(`Failed to exchange positions: ${errorMessage}`);
       throw err;
     }
-  }, [shotId, shotGenerations, loadPositions]);
+  }, [shotId, shotGenerations, loadPositions, clearEnhancedPromptsForGenerations]);
 
   // Exchange positions without reloading (for batch operations)
   const exchangePositionsNoReload = useCallback(async (shotGenerationIdA: string, shotGenerationIdB: string) => {
@@ -370,6 +490,32 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       console.log('[BatchModeReorderFlow] [SQL_SUCCESS] ✅ exchange_timeline_frames completed');
+      
+      // Clear enhanced prompts for both swapped items AND their neighbors
+      const itemANeighbors = frameA ? getAdjacentGenerationIds(frameA) : [];
+      const itemBNeighbors = frameB ? getAdjacentGenerationIds(frameB) : [];
+      
+      // Combine all affected IDs (deduped via Set)
+      const allAffectedIds = new Set([
+        shotGenerationIdA,
+        shotGenerationIdB,
+        ...itemANeighbors.filter(id => id !== shotGenerationIdB), // Exclude if A and B were adjacent
+        ...itemBNeighbors.filter(id => id !== shotGenerationIdA)
+      ]);
+      const itemsToClear = Array.from(allAffectedIds);
+      
+      console.log(`[BatchModeReorderFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for swapped items and neighbors:`, {
+        itemA: shotGenerationIdA.substring(0, 8),
+        itemB: shotGenerationIdB.substring(0, 8),
+        itemANeighbors: itemANeighbors.map(id => id.substring(0, 8)),
+        itemBNeighbors: itemBNeighbors.map(id => id.substring(0, 8)),
+        totalToClear: itemsToClear.length
+      });
+      
+      clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
+        console.error('[exchangePositionsNoReload] Error clearing enhanced prompts:', err);
+      });
+      
       // No position reload - caller will handle this
       
     } catch (err) {
@@ -377,7 +523,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       console.error('[BatchModeReorderFlow] [EXCHANGE_ERROR] ❌ Exchange failed:', errorMessage);
       throw err;
     }
-  }, [shotId, shotGenerations]);
+  }, [shotId, shotGenerations, clearEnhancedPromptsForGenerations]);
 
   // Batch exchange positions - performs multiple exchanges then reloads once
   const batchExchangePositions = useCallback(async (exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }>) => {
@@ -539,6 +685,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     const dragSessionId = metadata?.drag_session_id || 'no-session';
     console.log(`[TimelineDragFlow] [DB_UPDATE] 🎯 Session: ${dragSessionId} | Updating timeline frame for shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
 
+    // Get the item's current timeline_frame BEFORE the move
+    const movedItem = shotGenerations.find(sg => sg.id === shotGenerationId);
+    const oldTimelineFrame = movedItem?.timeline_frame;
+
+    // Get IDs of items that were adjacent to the old position (before move)
+    const oldAdjacentIds = oldTimelineFrame ? getAdjacentGenerationIds(oldTimelineFrame) : [];
+
     setIsPersistingPositions(true);
 
     try {
@@ -557,6 +710,51 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
       console.log(`[TimelineDragFlow] [DB_SUCCESS] ✅ Session: ${dragSessionId} | Successfully updated shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
       
+      // AFTER the database update, fetch the updated state to get new neighbors
+      const { data: updatedGenerations, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('id, generation_id, timeline_frame, generation(type, location)')
+        .eq('shot_id', shotId)
+        .not('timeline_frame', 'is', null)
+        .order('timeline_frame', { ascending: true });
+
+      if (fetchError) {
+        console.error('[updateTimelineFrame] Error fetching updated positions:', fetchError);
+      }
+
+      // Find new adjacent neighbors from the fresh data
+      let newAdjacentIds: string[] = [];
+      if (updatedGenerations) {
+        // Filter out videos and find the moved item's new position
+        const nonVideoGens = updatedGenerations.filter(sg => {
+          const gen = (sg as any).generation;
+          const isVideo = gen.type === 'video' || 
+                         gen.type === 'video_travel_output' ||
+                         (gen.location && gen.location.endsWith('.mp4'));
+          return !isVideo;
+        });
+        
+        const newIndex = nonVideoGens.findIndex(sg => sg.id === shotGenerationId);
+        if (newIndex !== -1) {
+          if (newIndex > 0) newAdjacentIds.push(nonVideoGens[newIndex - 1].id);
+          if (newIndex < nonVideoGens.length - 1) newAdjacentIds.push(nonVideoGens[newIndex + 1].id);
+        }
+      }
+      
+      // Clear enhanced prompts for: moved item + old neighbors + new neighbors (deduped)
+      const allAffectedIds = new Set([shotGenerationId, ...oldAdjacentIds, ...newAdjacentIds]);
+      const itemsToClear = Array.from(allAffectedIds);
+      
+      console.log(`[TimelineDragFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for all affected items:`, {
+        movedItem: shotGenerationId.substring(0, 8),
+        oldNeighbors: oldAdjacentIds.map(id => id.substring(0, 8)),
+        newNeighbors: newAdjacentIds.map(id => id.substring(0, 8)),
+        totalToClear: itemsToClear.length
+      });
+      
+      // Clear prompts and AWAIT it to ensure consistency before UI updates
+      await clearEnhancedPromptsForGenerations(itemsToClear);
+      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update timeline frame';
       console.error('[updateTimelineFrame] Error:', errorMessage);
@@ -565,7 +763,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     } finally {
       setIsPersistingPositions(false);
     }
-  }, [shotId]);
+  }, [shotId, shotGenerations, getAdjacentGenerationIds, clearEnhancedPromptsForGenerations]);
 
   // REMOVED: Automatic timeline frame initialization
   // This was causing magic edit items (with add_in_position: false) to be automatically
@@ -628,6 +826,29 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         });
       }
 
+      // Clear enhanced prompts for all changed items AND their neighbors
+      const generationIdsChanged = changes.map(c => c.generationId);
+      const changedItems = shotGenerations.filter(sg => generationIdsChanged.includes(sg.generation_id));
+      
+      // Collect all affected IDs: changed items + their old neighbors
+      const allAffectedIds = new Set<string>();
+      changedItems.forEach(item => {
+        allAffectedIds.add(item.id);
+        // Add old neighbors (before the change)
+        if (item.timeline_frame) {
+          const neighbors = getAdjacentGenerationIds(item.timeline_frame);
+          neighbors.forEach(neighborId => allAffectedIds.add(neighborId));
+        }
+      });
+      
+      const itemsToClear = Array.from(allAffectedIds);
+      
+      if (itemsToClear.length > 0) {
+        console.log(`[ApplyTimelineFrames] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for ${itemsToClear.length} affected items (${changedItems.length} changed + neighbors)`);
+        clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
+          console.error('[applyTimelineFrames] Error clearing enhanced prompts:', err);
+        });
+      }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to apply timeline frames';
@@ -637,7 +858,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     } finally {
       setIsPersistingPositions(false);
     }
-  }, [shotId]);
+  }, [shotId, shotGenerations, clearEnhancedPromptsForGenerations]);
 
   // Update pair prompts for a specific generation (first item in pair)
   const updatePairPrompts = useCallback(async (generationId: string, pairPrompt?: string, pairNegativePrompt?: string) => {
@@ -652,10 +873,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       // Update metadata with pair prompts
+      // CRITICAL: Clear enhanced_prompt when user manually edits pair_prompt
       const updatedMetadata: PositionMetadata = {
         ...generation.metadata,
         pair_prompt: pairPrompt?.trim() || undefined,
         pair_negative_prompt: pairNegativePrompt?.trim() || undefined,
+        enhanced_prompt: '', // Clear enhanced prompt when manually editing
       };
 
       // Update in database
@@ -823,6 +1046,63 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     console.log(`[PairPrompts-SAVE] ✅ COMPLETED updatePairPromptsByIndex for pair ${pairIndex}`);
   }, [shotGenerations, updatePairPrompts]);
 
+  // Clear all enhanced prompts for the shot (used when base prompt changes)
+  const clearAllEnhancedPrompts = useCallback(async () => {
+    if (!shotId) return;
+
+    try {
+      console.log('[EnhancedPrompts] 🧹 Clearing all enhanced prompts for shot:', shotId.substring(0, 8));
+
+      // Get all shot_generations for this shot
+      const { data: generations, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('id, metadata')
+        .eq('shot_id', shotId);
+
+      if (fetchError) {
+        console.error('[EnhancedPrompts] Error fetching shot generations:', fetchError);
+        throw fetchError;
+      }
+
+      if (!generations || generations.length === 0) {
+        console.log('[EnhancedPrompts] No generations found for shot');
+        return;
+      }
+
+      // Update all generations to clear enhanced_prompt
+      const updates = generations.map(async (gen) => {
+        const existingMetadata = gen.metadata as Record<string, any> | null;
+        const updatedMetadata = {
+          ...(existingMetadata || {}),
+          enhanced_prompt: ''
+        };
+
+        const { error: updateError } = await supabase
+          .from('shot_generations')
+          .update({ metadata: updatedMetadata })
+          .eq('id', gen.id);
+
+        if (updateError) {
+          console.error(`[EnhancedPrompts] Error updating generation ${gen.id}:`, updateError);
+        }
+
+        return { id: gen.id, success: !updateError };
+      });
+
+      const results = await Promise.all(updates);
+      const successCount = results.filter(r => r.success).length;
+      
+      console.log(`[EnhancedPrompts] ✅ Cleared ${successCount}/${generations.length} enhanced prompts`);
+
+      // Invalidate cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+    } catch (err) {
+      console.error('[clearAllEnhancedPrompts] Error:', err);
+      throw err;
+    }
+  }, [shotId, queryClient]);
+
   return {
     shotGenerations,
     isLoading,
@@ -843,7 +1123,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     updatePairPrompts,
     getPairPrompts,
     pairPrompts, // Export reactive pairPrompts value
-    updatePairPromptsByIndex
+    updatePairPromptsByIndex,
+    clearAllEnhancedPrompts
   };
 };
 

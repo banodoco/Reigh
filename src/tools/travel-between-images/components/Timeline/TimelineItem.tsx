@@ -3,7 +3,6 @@ import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl, cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
 import { Trash2, Copy, Sparkles, Check } from "lucide-react";
-import { MagicEditModal } from "@/shared/components/MagicEditModal";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
 // import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
@@ -33,6 +32,7 @@ interface TimelineItemProps {
   // Action handlers
   onDelete: (imageId: string) => void;
   onDuplicate: (imageId: string, timeline_frame: number) => void;
+  onMagicEdit?: (imageUrl: string, shotGenerationId: string) => void;
   duplicatingImageId?: string;
   duplicateSuccessImageId?: string;
   projectAspectRatio?: string;
@@ -59,6 +59,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   shouldLoad = true,
   onDelete,
   onDuplicate,
+  onMagicEdit,
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio = undefined,
@@ -68,9 +69,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
   // Track hover state
   const [isHovered, setIsHovered] = useState(false);
-  
-  // Track magic edit modal state
-  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   
   // Track if we just clicked a button to prevent drag from starting
   const buttonClickedRef = useRef(false);
@@ -181,14 +179,17 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   const handleMagicEditClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-    console.log('[MagicEditClickIssue] ⭐ BUTTON CLICKED - opening modal:', {
+    console.log('[MagicEditClickIssue] ⭐ BUTTON CLICKED - calling magic edit callback:', {
       imageId: image.id.substring(0, 8),
       shotImageEntryId: image.shotImageEntryId.substring(0, 8),
       framePosition,
       imageUrl: image.imageUrl?.substring(0, 50) + '...'
     });
-    setIsMagicEditOpen(true);
+    
+    // Call the lifted callback to handle magic edit at a higher level
+    if (onMagicEdit) {
+      onMagicEdit(getDisplayUrl(image.imageUrl), image.shotImageEntryId);
+    }
   };
   // Calculate position as pixel offset with padding adjustment
   const imageHalfWidth = 48; // Half of 96px image width for centering
@@ -384,7 +385,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - blocking modal overlay listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -398,8 +399,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  // Reset flag after a short delay (same as mousedown)
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - blocking modal overlay listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -412,7 +412,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   });
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - blocking modal overlay listeners
                 }}
               />
               {/* Magic Edit Button */}
@@ -430,8 +430,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  // Reset flag after a short delay
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - blocking modal overlay listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -445,8 +444,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  // Reset flag after a short delay
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - blocking modal overlay listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -466,7 +464,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -475,8 +473,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  // Reset flag after a short delay
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -503,7 +500,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -512,8 +509,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  // Reset flag after a short delay
+                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -529,20 +525,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             <span className="inline-block">{displayFrame}</span>
           </div>
         </div>
-        
-        {/* Magic Edit Modal */}
-        <MagicEditModal
-          isOpen={isMagicEditOpen}
-          imageUrl={getDisplayUrl(image.imageUrl)}
-          onClose={() => {
-            console.log('[MagicEditPromptDebug] TimelineItem Magic Edit modal closed for:', {
-              imageId: image.id.substring(0, 8),
-              shotImageEntryId: image.shotImageEntryId.substring(0, 8)
-            });
-            setIsMagicEditOpen(false);
-          }}
-          shotGenerationId={image.shotImageEntryId}
-        />
       </div>
     </div>
   );

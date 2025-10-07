@@ -33,6 +33,8 @@ interface MagicEditModalProps {
   shotGenerationId?: string;
   // Optional tool type override - when provided, forces the generation to use this tool type
   toolTypeOverride?: string;
+  // Optional z-index override for when opened from high z-index contexts (e.g., MediaLightbox)
+  zIndexOverride?: number;
 }
 
 const MagicEditModal: React.FC<MagicEditModalProps> = ({
@@ -42,6 +44,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   onClose,
   shotGenerationId,
   toolTypeOverride,
+  zIndexOverride,
 }) => {
   const isMobile = useIsMobile();
   
@@ -327,9 +330,22 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
+        {/* Custom overlay with higher z-index when needed */}
+        {zIndexOverride && (
+          <style>
+            {`
+              [data-radix-dialog-overlay][data-state="open"] {
+                z-index: ${zIndexOverride - 10} !important;
+              }
+            `}
+          </style>
+        )}
         <DialogContent
           className={modal.className}
-          style={modal.style}
+          style={{
+            ...modal.style,
+            ...(zIndexOverride ? { zIndex: zIndexOverride } : {})
+          }}
           {...modal.props}
         >
           <div className={modal.headerClass}>

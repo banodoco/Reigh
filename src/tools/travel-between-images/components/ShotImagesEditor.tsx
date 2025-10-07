@@ -200,7 +200,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     loadPositions,
     pairPrompts, // Use reactive pairPrompts value directly
     updatePairPrompts, // Direct update by shot_generation.id
-    updatePairPromptsByIndex
+    updatePairPromptsByIndex,
+    clearAllEnhancedPrompts
   } = hookData;
   
   // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
@@ -328,6 +329,20 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     positionsLoading,
     isModeReady
   });
+
+  // Wrap onDefaultPromptChange to also clear all enhanced prompts when base prompt changes
+  const handleDefaultPromptChange = React.useCallback(async (newPrompt: string) => {
+    // First update the default prompt
+    onDefaultPromptChange(newPrompt);
+    
+    // Then clear all enhanced prompts for the shot
+    try {
+      await clearAllEnhancedPrompts();
+      console.log('[ShotImagesEditor] 🧹 Cleared all enhanced prompts after base prompt change');
+    } catch (error) {
+      console.error('[ShotImagesEditor] Error clearing enhanced prompts:', error);
+    }
+  }, [onDefaultPromptChange, clearAllEnhancedPrompts]);
 
   return (
     <Card className="w-full">

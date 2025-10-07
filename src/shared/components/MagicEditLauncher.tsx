@@ -9,6 +9,7 @@ interface MagicEditLauncherProps {
   imageUrl: string;
   imageDimensions?: { width: number; height: number } | null;
   toolTypeOverride?: string;
+  zIndexOverride?: number;
 }
 
 /**
@@ -16,7 +17,7 @@ interface MagicEditLauncherProps {
  * 1. A sparkles button shown in the lightbox controls
  * 2. The MagicEditModal component handles its own dialog
  */
-const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDimensions, toolTypeOverride }) => {
+const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDimensions, toolTypeOverride, zIndexOverride }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -33,7 +34,7 @@ const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDi
             <Sparkles className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent className="z-[100001]">Magic Edit</TooltipContent>
+        <TooltipContent className={zIndexOverride ? `z-[${zIndexOverride + 1}]` : "z-[100001]"}>Magic Edit</TooltipContent>
       </Tooltip>
 
       {/* Modal */}
@@ -43,6 +44,7 @@ const MagicEditLauncher: React.FC<MagicEditLauncherProps> = ({ imageUrl, imageDi
         imageDimensions={imageDimensions ?? undefined}
         onClose={() => setIsOpen(false)}
         toolTypeOverride={toolTypeOverride}
+        zIndexOverride={zIndexOverride}
       />
     </>
   );

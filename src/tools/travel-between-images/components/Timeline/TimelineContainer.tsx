@@ -12,6 +12,8 @@ import PairRegion from './PairRegion';
 import TimelineItem from './TimelineItem';
 import { GuidanceVideoStrip } from './GuidanceVideoStrip';
 import { GuidanceVideoUploader } from './GuidanceVideoUploader';
+import { MagicEditModal } from '@/shared/components/MagicEditModal';
+import { getDisplayUrl } from '@/shared/lib/utils';
 import { TIMELINE_HORIZONTAL_PADDING } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
@@ -107,29 +109,39 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   autoCreateIndividualPrompts,
   hasNoImages = false
 }) => {
-  // Local state for reset gap and pending context
+  // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(10);
-  const [pendingContext, setPendingContext] = useState<number>(contextFrames);
-  const maxGap = Math.max(1, 81 - pendingContext);
+  const maxGap = Math.max(1, 81 - contextFrames);
+  
+  // Magic Edit Modal state - lifted from TimelineItem to avoid z-index and event handling issues
+  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
+  const [magicEditImageUrl, setMagicEditImageUrl] = useState<string>('');
+  const [magicEditShotGenerationId, setMagicEditShotGenerationId] = useState<string>('');
   
   // File input ref for Add Images button
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Sync pending context when actual context changes externally
-  useEffect(() => {
-    setPendingContext(contextFrames);
-  }, [contextFrames]);
-  
-  // Adjust resetGap when pendingContext changes to keep it within valid range
+  // Adjust resetGap when contextFrames changes to keep it within valid range
   useEffect(() => {
     if (resetGap > maxGap) {
       setResetGap(maxGap);
     }
-  }, [pendingContext, maxGap, resetGap]);
+  }, [contextFrames, maxGap, resetGap]);
   
   // Handle reset button click
   const handleReset = () => {
-    onResetFrames(resetGap, pendingContext);
+    onResetFrames(resetGap, contextFrames);
+  };
+  
+  // Handle opening magic edit modal - called from TimelineItem
+  const handleOpenMagicEdit = (imageUrl: string, shotGenerationId: string) => {
+    console.log('[MagicEditModal] Opening modal at TimelineContainer level:', {
+      imageUrl: imageUrl.substring(0, 50),
+      shotGenerationId: shotGenerationId.substring(0, 8)
+    });
+    setMagicEditImageUrl(imageUrl);
+    setMagicEditShotGenerationId(shotGenerationId);
+    setIsMagicEditOpen(true);
   };
   
   // Refs
@@ -401,7 +413,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         </Button>
       </div>
 
-      {/* Bottom-left: Gap and Context controls */}
+      {/* Bottom-left: Gap control and Reset button */}
       <div 
         className={`absolute left-8 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
         style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
@@ -414,19 +426,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             onValueChange={([value]) => setResetGap(value)}
             min={1}
             max={maxGap}
-            step={1}
-            className="w-16 h-4"
-          />
-        </div>
-
-        {/* Context frames */}
-        <div className="flex items-center gap-1.5">
-          <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Context: {pendingContext}</Label>
-          <Slider
-            value={[pendingContext]}
-            onValueChange={([value]) => setPendingContext(value)}
-            min={1}
-            max={24}
             step={1}
             className="w-16 h-4"
           />
@@ -714,7 +713,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 numPairs={numPairs}
                 startFrame={pair.startFrame}
                 endFrame={pair.endFrame}
-                onPairClick={onPairClick && !autoCreateIndividualPrompts ? (pairIndex, pairData) => {
+                onPairClick={onPairClick ? (pairIndex, pairData) => {
                   // Get the images for this pair
                   const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
                   const endImage = images.find(img => img.shotImageEntryId === endEntry?.[0]);
@@ -804,6 +803,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
                 onDelete={onImageDelete}
                 onDuplicate={onImageDuplicate}
+                onMagicEdit={handleOpenMagicEdit}
                 duplicatingImageId={duplicatingImageId}
                 duplicateSuccessImageId={duplicateSuccessImageId}
                 projectAspectRatio={projectAspectRatio}
@@ -812,6 +812,19 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           })}
         </div>
       </div>
+      
+      {/* Magic Edit Modal - rendered at TimelineContainer level to avoid event handling conflicts */}
+      <MagicEditModal
+        isOpen={isMagicEditOpen}
+        imageUrl={magicEditImageUrl}
+        onClose={() => {
+          console.log('[MagicEditModal] Closing modal at TimelineContainer level');
+          setIsMagicEditOpen(false);
+          setMagicEditImageUrl('');
+          setMagicEditShotGenerationId('');
+        }}
+        shotGenerationId={magicEditShotGenerationId}
+      />
     </div>
   );
 };

@@ -1254,6 +1254,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           imageUrl={displayUrl}
                           imageDimensions={imageDimensions}
                           toolTypeOverride={toolTypeOverride}
+                          zIndexOverride={100100}
                         />
                       )}
 
@@ -1739,6 +1740,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       imageUrl={displayUrl}
                       imageDimensions={imageDimensions}
                       toolTypeOverride={toolTypeOverride}
+                      zIndexOverride={100100}
                     />
                   )}
 
