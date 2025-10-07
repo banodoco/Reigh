@@ -182,9 +182,17 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       try {
         // Extract frames based on treatment mode
         // In adjust mode: video is stretched/compressed to fit timeline
-        // Extract reasonable number of thumbnails (max 60 to avoid density issues)
         // In clip mode: video plays as-is, so extract totalVideoFrames thumbnails (all video frames)
-        const maxThumbnails = 60; // Limit thumbnails to prevent density issues
+        
+        // DYNAMIC: Calculate ideal number of thumbnails based on container width
+        // Target ~50px per thumbnail for comfortable viewing
+        const targetThumbnailWidth = 50;
+        const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+        const idealThumbnailCount = Math.floor(effectiveWidth / targetThumbnailWidth);
+        
+        // Clamp between 20 and 100 thumbnails for performance and visual quality
+        const maxThumbnails = Math.max(20, Math.min(idealThumbnailCount, 100));
+        
         const numFrames = treatment === 'adjust' 
           ? Math.min(timelineFrames, maxThumbnails)
           : Math.min(totalVideoFrames, maxThumbnails);
@@ -510,18 +518,10 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             video.removeEventListener('seeked', handleSeeked);
           video.removeEventListener('error', handleError);
           
-          console.warn('[GuidanceVideoStrip] Seek timeout for frame', frame, {
-            readyState: video.readyState,
-            currentTime: video.currentTime,
-            targetTime: timeInSeconds
-          });
-          
+          // Seek timeout - this is normal when scrubbing quickly
           // Try to draw anyway - video might have seeked without firing event
-          const success = drawVideoFrame(video, frame, true); // Force retry flag
-          if (!success) {
-            console.error('[GuidanceVideoStrip] Failed to draw on timeout for frame', frame);
-          }
-            resolve();
+          drawVideoFrame(video, frame, true); // Force retry flag (failures are expected and silent)
+          resolve();
           }, 500);
         });
     } catch (error) {
