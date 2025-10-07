@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import { VideoTravelSettings } from '../settings';
+import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -308,6 +308,30 @@ const VideoTravelToolPage: React.FC = () => {
     setAmountOfMotion(motion);
   }, []);
 
+  const handleAdvancedModeChange = useCallback((advanced: boolean) => {
+    if (!hasLoadedInitialSettings.current) return;
+    console.log('[AdvancedMode] User toggling advancedMode to:', advanced);
+    userHasInteracted.current = true;
+    setAdvancedMode(advanced);
+    
+    // Initialize phaseConfig if turning on Advanced Mode and it's not set
+    if (advanced) {
+      setPhaseConfig((currentPhaseConfig) => {
+        if (!currentPhaseConfig) {
+          console.log('[AdvancedMode] Initializing phaseConfig to DEFAULT_PHASE_CONFIG');
+          return DEFAULT_PHASE_CONFIG;
+        }
+        return currentPhaseConfig;
+      });
+    }
+  }, []);
+
+  const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
+    if (!hasLoadedInitialSettings.current) return;
+    userHasInteracted.current = true;
+    setPhaseConfig(config);
+  }, []);
+
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     if (!hasLoadedInitialSettings.current) return;
     userHasInteracted.current = true;
@@ -455,6 +479,8 @@ const VideoTravelToolPage: React.FC = () => {
   const [autoCreateIndividualPrompts, setAutoCreateIndividualPrompts] = useState<boolean>(true);
   const [turboMode, setTurboMode] = useState<boolean>(false);
   const [amountOfMotion, setAmountOfMotion] = useState<number>(50); // 0-100 range for UI, defaults to 50
+  const [advancedMode, setAdvancedMode] = useState<boolean>(false);
+  const [phaseConfig, setPhaseConfig] = useState<PhaseConfig | undefined>(undefined);
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
   const [pairConfigs, setPairConfigs] = useState<any[]>([]);
   // Mode selection removed - now hardcoded to use specific model
@@ -898,7 +924,20 @@ const VideoTravelToolPage: React.FC = () => {
         willSetTo: settingsToApply.batchVideoSteps || 4,
         shotId: selectedShot?.id?.substring(0, 8),
         hasLoadedBefore: hasLoadedInitialSettings.current,
+        advancedMode: settingsToApply.advancedMode,
+        hasAdvancedModeField: 'advancedMode' in settingsToApply,
         fullSettings: settingsToApply
+      });
+      
+      const advancedModeValue = settingsToApply.advancedMode ?? false;
+      const phaseConfigValue = settingsToApply.phaseConfig;
+      
+      console.log('[AdvancedMode] Setting advancedMode from loaded settings:', {
+        shotId: selectedShot?.id?.substring(0, 8),
+        rawValue: settingsToApply.advancedMode,
+        willSetTo: advancedModeValue,
+        hasPhaseConfig: !!phaseConfigValue,
+        phaseConfigNumPhases: phaseConfigValue?.num_phases
       });
       
       startTransition(() => {
@@ -914,6 +953,8 @@ const VideoTravelToolPage: React.FC = () => {
         setAutoCreateIndividualPrompts(settingsToApply.autoCreateIndividualPrompts ?? true);
         setTurboMode(settingsToApply.turboMode || false);
         setAmountOfMotion(settingsToApply.amountOfMotion ?? 50); // Default to 50 if not present
+        setAdvancedMode(advancedModeValue);
+        setPhaseConfig(phaseConfigValue);
         setVideoPairConfigs(settingsToApply.pairConfigs || []);
         setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
         setPairConfigs(settingsToApply.pairConfigs || []);
@@ -1386,6 +1427,8 @@ const VideoTravelToolPage: React.FC = () => {
     autoCreateIndividualPrompts,
     turboMode,
     amountOfMotion,
+    advancedMode,
+    phaseConfig,
     generationMode,
     pairConfigs,
     // selectedMode removed - now hardcoded to use specific model
@@ -1403,6 +1446,8 @@ const VideoTravelToolPage: React.FC = () => {
           enhancePrompt,
           autoCreateIndividualPrompts,
           turboMode,
+          advancedMode,
+          phaseConfig,
           amountOfMotion,
           generationMode,
           pairConfigs,
@@ -1418,6 +1463,9 @@ const VideoTravelToolPage: React.FC = () => {
   const updateProjectSettingsRef = useRef(updateProjectSettings);
   
   // Keep refs updated
+  // Track previous shot ID to prevent cross-contamination
+  const previousShotIdRef = useRef<string | undefined>(undefined);
+  
   useEffect(() => {
     currentSettingsRef.current = currentSettings;
     settingsRef.current = settings;
@@ -1426,32 +1474,32 @@ const VideoTravelToolPage: React.FC = () => {
   });
   
   useEffect(() => {
-    // Flush any pending saves before resetting
-    if (saveTimeoutRef.current) {
-      console.log('[BatchVideoSteps] Flushing pending save before shot switch');
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-      
-      // Immediately save if there are pending changes
-      if (hasLoadedInitialSettings.current && userHasInteracted.current && currentSettingsRef.current) {
-        if (!deepEqual(sanitizeSettings(currentSettingsRef.current), sanitizeSettings(settingsRef.current))) {
-          console.log('[BatchVideoSteps] Immediately saving before shot switch:', {
-            batchVideoSteps: currentSettingsRef.current.batchVideoSteps,
-            shotId: selectedShot?.id?.substring(0, 8)
-          });
-          lastSavedSettingsRef.current = currentSettingsRef.current;
-          updateSettingsRef.current('shot', currentSettingsRef.current);
-          if (selectedProjectId && updateProjectSettingsRef.current) {
-            updateProjectSettingsRef.current('project', currentSettingsRef.current);
-          }
-        }
+    const currentShotId = selectedShot?.id;
+    const previousShotId = previousShotIdRef.current;
+    
+    // Only flush if we're actually switching to a different shot
+    if (previousShotId && previousShotId !== currentShotId) {
+      // Flush any pending saves before resetting
+      if (saveTimeoutRef.current) {
+        console.log('[BatchVideoSteps] Flushing pending save before shot switch from', previousShotId.substring(0, 8), 'to', currentShotId?.substring(0, 8));
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+        
+        // DON'T SAVE HERE - the settings have already been auto-saved for the previous shot
+        // Saving here would write the old shot's settings to the new shot (bug!)
       }
     }
     
-    console.log('[BatchVideoSteps] Resetting flags for shot:', selectedShot?.id?.substring(0, 8));
-    hasLoadedInitialSettings.current = false;
-    userHasInteracted.current = false;
-    lastSavedSettingsRef.current = null;
+    // Reset flags when shot changes
+    if (previousShotId !== currentShotId) {
+      console.log('[BatchVideoSteps] Resetting flags for shot:', currentShotId?.substring(0, 8));
+      hasLoadedInitialSettings.current = false;
+      userHasInteracted.current = false;
+      lastSavedSettingsRef.current = null;
+    }
+    
+    // Update previous shot ID for next comparison
+    previousShotIdRef.current = currentShotId;
   }, [selectedShot?.id, selectedProjectId]); // ONLY trigger on shot/project changes
 
   // Save settings to database whenever they change (optimized)
@@ -1471,16 +1519,14 @@ const VideoTravelToolPage: React.FC = () => {
         }
 
         if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
-          console.log('[BatchVideoSteps] Saving settings to DB:', {
+          console.log('[BatchVideoSteps] Saving settings to DB (shot level only):', {
             batchVideoSteps: currentSettings.batchVideoSteps,
+            advancedMode: currentSettings.advancedMode,
             shotId: selectedShot?.id?.substring(0, 8)
           });
           lastSavedSettingsRef.current = currentSettings;
-          // Save to both shot and project levels
+          // Only save to shot level - project settings should only be updated via explicit "Save Project Settings" button
           updateSettings('shot', currentSettings);
-          if (selectedProjectId && updateProjectSettings) {
-            updateProjectSettings('project', currentSettings);
-          }
         } else {
           console.log('[BatchVideoSteps] Skipping save - already updating or no changes');
         }
@@ -1778,6 +1824,10 @@ const VideoTravelToolPage: React.FC = () => {
               onTurboModeChange={handleTurboModeChange}
               amountOfMotion={amountOfMotion}
               onAmountOfMotionChange={handleAmountOfMotionChange}
+              advancedMode={advancedMode}
+              onAdvancedModeChange={handleAdvancedModeChange}
+              phaseConfig={phaseConfig}
+              onPhaseConfigChange={handlePhaseConfigChange}
               generationMode={generationMode}
               onGenerationModeChange={handleGenerationModeChange}
 

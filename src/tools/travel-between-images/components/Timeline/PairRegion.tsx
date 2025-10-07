@@ -23,6 +23,7 @@ interface PairRegionProps {
   }) => void;
   pairPrompt?: string;
   pairNegativePrompt?: string;
+  enhancedPrompt?: string;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   showLabel: boolean;
@@ -45,6 +46,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
   onPairClick,
   pairPrompt,
   pairNegativePrompt,
+  enhancedPrompt,
   defaultPrompt,
   defaultNegativePrompt,
   showLabel,
@@ -174,6 +176,14 @@ const PairRegion: React.FC<PairRegionProps> = ({
                         {pairNegativePrompt && pairNegativePrompt.trim() ? pairNegativePrompt.trim() : '[default]'}
                       </p>
                     </div>
+                    {enhancedPrompt && enhancedPrompt.trim() && (
+                      <div className="pt-1 border-t border-border/50">
+                        <span className="font-medium">Enhanced Prompt:</span>
+                        <p className="text-sm">
+                          {enhancedPrompt.trim()}
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

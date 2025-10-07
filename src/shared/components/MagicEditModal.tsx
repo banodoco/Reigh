@@ -51,6 +51,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
+  const [isNextSceneBoostEnabled, setIsNextSceneBoostEnabled] = useState(false);
   
   // Log when modal is opened/closed
   useEffect(() => {
@@ -121,6 +122,15 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       // Determine shot_id: prioritize currentShotId (when ON a shot), then magicEditShotId (when selected from dropdown)
       const shotId = currentShotId || magicEditShotId || undefined;
       
+      // Build loras array if any boosts are enabled
+      const loras = [];
+      if (isNextSceneBoostEnabled) {
+        loras.push({
+          url: 'https://huggingface.co/lovis93/next-scene-qwen-image-lora-2509/resolve/main/next-scene_lora_v1-3000.safetensors',
+          strength: 1.0
+        });
+      }
+      
       // Create batch magic edit tasks using the unified system
       const batchParams = {
         project_id: selectedProjectId,
@@ -132,6 +142,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         seed: 11111, // Base seed, will be incremented for each image
         shot_id: shotId, // Associate with shot if available (currentShotId takes priority over magicEditShotId)
         tool_type: toolTypeOverride, // Override tool type if provided (e.g., 'image-generation' when used in ImageGenerationToolPage)
+        loras: loras.length > 0 ? loras : undefined, // Array of lora configurations
       };
       
       console.log(`[MagicEditModal] Creating tasks with shot_id: ${shotId} (currentShotId: ${currentShotId}, magicEditShotId: ${magicEditShotId}), tool_type override: ${toolTypeOverride}`);
@@ -192,6 +203,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         setMagicEditPrompt('');
         setMagicEditNumImages(4);
         setMagicEditShotId(null);
+        setIsNextSceneBoostEnabled(false);
         setTasksCreated(false);
       }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
@@ -393,6 +405,24 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
             max={16}
             step={1}
           />
+        </div>
+
+        {/* Boosts Section */}
+        <div className="space-y-2">
+          <Label>Boosts</Label>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="next-scene-boost"
+              checked={isNextSceneBoostEnabled}
+              onCheckedChange={(checked) => setIsNextSceneBoostEnabled(checked === true)}
+            />
+            <label
+              htmlFor="next-scene-boost"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Next Scene
+            </label>
+          </div>
         </div>
 
 

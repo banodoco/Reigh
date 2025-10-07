@@ -18,7 +18,9 @@ export interface TravelBetweenImagesTaskParams {
   shot_id?: string;
   image_urls: string[];
   base_prompts: string[];
+  base_prompt?: string; // Singular - the default/base prompt used when autoCreateIndividualPrompts is enabled
   negative_prompts?: string[];
+  enhanced_prompts?: string[];
   segment_frames: number[];
   frame_overlap: number[];
   resolution?: string;
@@ -48,6 +50,7 @@ export interface TravelBetweenImagesTaskParams {
   random_seed?: boolean;
   turbo_mode?: boolean;
   amount_of_motion?: number;
+  advanced_mode?: boolean;                           // Whether Advanced Mode is enabled
   // Structure video parameters (matches backend naming)
   structure_video_path?: string | null;              // Path to structure video (S3/Storage URL)
   structure_video_treatment?: 'adjust' | 'clip';     // How to handle frame mismatches
@@ -55,6 +58,22 @@ export interface TravelBetweenImagesTaskParams {
   structure_video_type?: 'flow' | 'canny' | 'depth'; // Type of structure extraction: optical flow, canny edges, or depth map
   // Variant naming
   generation_name?: string;                          // Optional variant name for the generation
+  // Advanced phase configuration
+  phase_config?: {
+    num_phases: number;
+    steps_per_phase: number[];
+    flow_shift: number;
+    sample_solver: string;
+    model_switch_phase: number;
+    phases: Array<{
+      phase: number;
+      guidance_scale: number;
+      loras: Array<{
+        url: string;
+        multiplier: string;
+      }>;
+    }>;
+  };
 }
 
 /**
@@ -136,19 +155,23 @@ function buildTravelBetweenImagesPayload(
   // Expand arrays if they have a single element and numSegments > 1
   const basePromptsExpanded = expandArrayToCount(params.base_prompts, numSegments);
   const negativePromptsExpanded = expandArrayToCount(params.negative_prompts, numSegments) || Array(numSegments).fill("");
+  const enhancedPromptsExpanded = expandArrayToCount(params.enhanced_prompts || [], numSegments) || Array(numSegments).fill("");
   const segmentFramesExpanded = expandArrayToCount(params.segment_frames, numSegments);
   const frameOverlapExpanded = expandArrayToCount(params.frame_overlap, numSegments);
 
-  // Extract steps parameter - prioritize top-level, then from JSON string, then default
+  // Extract steps parameter - only needed if NOT in Advanced Mode
+  // In Advanced Mode, steps come from steps_per_phase in phase_config
   let stepsValue = params.steps;
-  if (stepsValue === undefined && params.params_json_str) {
-    const parsedParams = safeParseJson(params.params_json_str, {} as any);
-    if (typeof (parsedParams as any).steps === 'number') {
-      stepsValue = (parsedParams as any).steps;
+  if (!params.advanced_mode) {
+    if (stepsValue === undefined && params.params_json_str) {
+      const parsedParams = safeParseJson(params.params_json_str, {} as any);
+      if (typeof (parsedParams as any).steps === 'number') {
+        stepsValue = (parsedParams as any).steps;
+      }
     }
-  }
-  if (stepsValue === undefined) {
-    stepsValue = DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.steps;
+    if (stepsValue === undefined) {
+      stepsValue = DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.steps;
+    }
   }
 
   // Handle fade duration parameters (matching original logic)
@@ -176,13 +199,16 @@ function buildTravelBetweenImagesPayload(
     input_image_paths_resolved: params.image_urls,
     num_new_segments_to_generate: numSegments,
     base_prompts_expanded: basePromptsExpanded,
+    base_prompt: params.base_prompt, // Singular - the default/base prompt
     negative_prompts_expanded: negativePromptsExpanded,
+    enhanced_prompts_expanded: enhancedPromptsExpanded,
     segment_frames_expanded: segmentFramesExpanded,
     frame_overlap_expanded: frameOverlapExpanded,
     parsed_resolution_wh: finalResolution,
     model_name: params.model_name ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.model_name,
     seed_base: finalSeed,
-    steps: stepsValue,
+    // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase)
+    ...(params.advanced_mode ? {} : { steps: stepsValue }),
     apply_reward_lora: params.apply_reward_lora ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.apply_reward_lora,
     colour_match_videos: params.colour_match_videos ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.colour_match_videos,
     apply_causvid: params.apply_causvid ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.apply_causvid,
@@ -201,7 +227,9 @@ function buildTravelBetweenImagesPayload(
     accelerated_mode: params.accelerated_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.accelerated_mode,
     generation_mode: params.generation_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.generation_mode,
     dimension_source: params.dimension_source ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.dimension_source,
-    amount_of_motion: params.amount_of_motion ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.amount_of_motion,
+    // Only include amount_of_motion if NOT in Advanced Mode
+    ...(params.advanced_mode ? {} : { amount_of_motion: params.amount_of_motion ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.amount_of_motion }),
+    advanced_mode: params.advanced_mode ?? false,
     // Include generation_name in orchestrator payload so it flows to child tasks
     generation_name: params.generation_name ?? undefined,
   };
@@ -227,6 +255,12 @@ function buildTravelBetweenImagesPayload(
       return acc;
     }, {});
     orchestratorPayload.additional_loras = additionalLoras;
+  }
+
+  // Add phase_config if provided (for advanced mode)
+  if (params.phase_config) {
+    orchestratorPayload.phase_config = params.phase_config;
+    console.log("[createTravelBetweenImagesTask] Including phase_config in orchestrator payload:", params.phase_config);
   }
 
   return orchestratorPayload;

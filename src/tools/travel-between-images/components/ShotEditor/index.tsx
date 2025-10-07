@@ -73,6 +73,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onTurboModeChange,
   amountOfMotion,
   onAmountOfMotionChange,
+  advancedMode,
+  onAdvancedModeChange,
+  phaseConfig,
+  onPhaseConfigChange,
   autoCreateIndividualPrompts,
   onAutoCreateIndividualPromptsChange,
   generationMode,
@@ -951,20 +955,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [accelerated, steerableMotionSettings.model_name, updateStepsForCurrentSettings]);
   
   const setAccelerated = useCallback((value: boolean) => {
+    // Only save to shot level - project settings inherit automatically via useToolSettings merge
     updateShotUISettings('shot', { acceleratedMode: value });
-    // Also save to project level for new shot defaults
-    if (updateProjectUISettings) {
-      updateProjectUISettings('project', { acceleratedMode: value });
-    }
-  }, [updateShotUISettings, updateProjectUISettings]);
+  }, [updateShotUISettings]);
   
   const setRandomSeed = useCallback((value: boolean) => {
+    // Only save to shot level - project settings inherit automatically via useToolSettings merge
     updateShotUISettings('shot', { randomSeed: value });
-    // Also save to project level for new shot defaults
-    if (updateProjectUISettings) {
-      updateProjectUISettings('project', { randomSeed: value });
-    }
-  }, [updateShotUISettings, updateProjectUISettings]);
+  }, [updateShotUISettings]);
 
   // Handle random seed changes
   const handleRandomSeedChange = useCallback((value: boolean) => {
@@ -1558,6 +1556,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     let segmentFrames: number[];
     let frameOverlap: number[];
     let negativePrompts: string[];
+    let enhancedPromptsArray: string[] = [];
 
     if (generationMode === 'timeline') {
       // Timeline positions are now managed by useEnhancedShotPositions
@@ -1565,6 +1564,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // Fetch shot generations with timeline positions from database for timeline generation
       let pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
+      let enhancedPrompts: Record<number, string> = {};
       let sortedPositions: Array<{id: string, pos: number}> = [];
       
       try {
@@ -1630,7 +1630,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               shotGenId: firstItem.id.substring(0, 8),
               timeline_frame: firstItem.timeline_frame,
               has_pair_prompt: !!metadata?.pair_prompt,
-              has_pair_negative_prompt: !!metadata?.pair_negative_prompt
+              has_pair_negative_prompt: !!metadata?.pair_negative_prompt,
+              has_enhanced_prompt: !!metadata?.enhanced_prompt
             });
             
             if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
@@ -1645,13 +1646,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 timeline_frame: firstItem.timeline_frame
               });
             }
+            
+            // Extract enhanced prompt if present
+            if (metadata?.enhanced_prompt) {
+              enhancedPrompts[i] = metadata.enhanced_prompt;
+              console.log(`[PairPrompts-LOAD] ✅ Loaded enhanced prompt ${i} from metadata:`, {
+                enhancedPrompt: metadata.enhanced_prompt,
+                shotGenId: firstItem.id.substring(0, 8),
+                timeline_frame: firstItem.timeline_frame
+              });
+            }
           }
           
           console.log('[PairPrompts-LOAD] 📊 Pair prompts loaded from database:', {
             totalPairs: filteredShotGenerations.length - 1,
             customPairs: Object.keys(pairPrompts).length,
             pairPromptIndexes: Object.keys(pairPrompts).map(Number),
-            allPairPrompts: pairPrompts
+            allPairPrompts: pairPrompts,
+            enhancedPromptsCount: Object.keys(enhancedPrompts).length,
+            enhancedPromptIndexes: Object.keys(enhancedPrompts).map(Number),
+            allEnhancedPrompts: enhancedPrompts
           });
         }
       } catch (err) {
@@ -1711,18 +1725,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         return finalNegativePrompt;
       }) : [steerableMotionSettings.negative_prompt];
 
+      // Build enhanced prompts array (empty strings for pairs without enhanced prompts)
+      enhancedPromptsArray = frameGaps.length > 0 ? frameGaps.map((_, index) => {
+        const enhancedPrompt = enhancedPrompts[index] || '';
+        console.log(`[PairPrompts-GENERATION] 🌟 Pair ${index} enhanced:`, {
+          hasEnhancedPrompt: !!enhancedPrompt,
+          enhancedPromptRaw: enhancedPrompt || '(none)',
+          promptPreview: enhancedPrompt ? enhancedPrompt.substring(0, 50) + (enhancedPrompt.length > 50 ? '...' : '') : '(none)'
+        });
+        return enhancedPrompt;
+      }) : [];
+
       console.log(`[PairPrompts-GENERATION] ✅ Final prompts array:`, {
         basePrompts,
         negativePrompts,
+        enhancedPrompts: enhancedPromptsArray,
         pairPromptsObject: pairPrompts,
         summary: basePrompts.map((prompt, idx) => ({
           pairIndex: idx,
           promptPreview: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''),
-          isCustom: prompt !== batchVideoPrompt
+          isCustom: prompt !== batchVideoPrompt,
+          hasEnhancedPrompt: !!enhancedPromptsArray[idx]
         }))
       });
 
-      console.log(`[Generation] Timeline mode - Final prompts:`, { basePrompts, negativePrompts, pairPrompts });
+      console.log(`[Generation] Timeline mode - Final prompts:`, { basePrompts, negativePrompts, pairPrompts, enhancedPrompts, enhancedPromptsArray });
     } else {
       // batch mode
       basePrompts = [batchVideoPrompt];
@@ -1739,12 +1766,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       shot_id: selectedShot.id,
       image_urls: absoluteImageUrls,
       base_prompts: basePrompts,
+      base_prompt: batchVideoPrompt, // Singular - the default/base prompt that gets appended when autoCreateIndividualPrompts is enabled
       segment_frames: segmentFrames,
       frame_overlap: frameOverlap,
       negative_prompts: negativePrompts,
+      enhanced_prompts: enhancedPromptsArray,
       model_name: actualModelName,
       seed: steerableMotionSettings.seed,
-      steps: batchVideoSteps,
+      // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)
+      ...(advancedMode ? {} : { steps: batchVideoSteps }),
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
       // Force these settings to consistent defaults, except use_lighti2x_lora which follows accelerated mode (unless Wan 2.2)
       apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
@@ -1765,14 +1795,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       accelerated_mode: accelerated,
       random_seed: randomSeed,
       turbo_mode: turboMode,
-      // Convert UI amount of motion (0-100) to task value (0.0-1.0)
-      amount_of_motion: amountOfMotion / 100.0,
+      // Only include amount_of_motion if NOT in Advanced Mode
+      ...(advancedMode ? {} : { amount_of_motion: amountOfMotion / 100.0 }),
+      // Advanced mode flag and phase config
+      advanced_mode: advancedMode,
+      phase_config: advancedMode && phaseConfig ? phaseConfig : undefined,
       // selected_mode removed - now hardcoded to use specific model
       // Add generation name if provided
       generation_name: variantName.trim() || undefined,
     };
 
-    if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
+    // Only add regular LoRAs if Advanced Mode is OFF
+    // In Advanced Mode, LoRAs are defined per-phase in phase_config
+    if (!advancedMode && loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
       requestBody.loras = loraManager.selectedLoras.map(l => ({ 
         path: l.path, 
         strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
@@ -1852,6 +1887,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     randomSeed,
     turboMode,
     amountOfMotion,
+    advancedMode,
+    phaseConfig,
     variantName,
     // selectedMode removed - now hardcoded to use specific model
     loraManager.selectedLoras,
@@ -2001,8 +2038,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Left Column: Main Settings */}
-                    <div className="lg:w-1/2 order-2 lg:order-1">
+                    {/* Left Column: Main Settings - Full width when Advanced Mode is enabled */}
+                    <div className={advancedMode ? "w-full" : "lg:w-1/2 order-2 lg:order-1"}>
                         <div className="mb-4">
                             <SectionHeader title="Settings" theme="orange" />
                         </div>
@@ -2040,59 +2077,67 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             imageCount={simpleFilteredImages.length}
                             autoCreateIndividualPrompts={autoCreateIndividualPrompts}
                             onAutoCreateIndividualPromptsChange={onAutoCreateIndividualPromptsChange}
+                            advancedMode={advancedMode}
+                            onAdvancedModeChange={onAdvancedModeChange}
+                            phaseConfig={phaseConfig}
+                            onPhaseConfigChange={onPhaseConfigChange}
                         />
                         
                         
-                        {/* LoRA Settings (Mobile) */}
-                        <div className="block lg:hidden mt-6">
-                            <div className="mb-4">
-                                <SectionHeader title="LoRAs" theme="purple" />
-                            </div>
-                            <div className="space-y-4">
-                                
-                                <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
-                                    Add or Manage LoRAs
-                                </Button>
-                                
-                                <ActiveLoRAsDisplay
-                                    selectedLoras={loraManager.selectedLoras}
-                                    onRemoveLora={loraManager.handleRemoveLora}
-                                    onLoraStrengthChange={loraManager.handleLoraStrengthChange}
-                                    availableLoras={availableLoras}
-                                    className="mt-4"
-                                    onAddTriggerWord={loraManager.handleAddTriggerWord}
-                                    renderHeaderActions={loraManager.renderHeaderActions}
-                                />
-                            </div>
-                        </div>
+                        {/* LoRA Settings (Mobile) - Hidden when Advanced Mode is enabled */}
+                        {!advancedMode && (
+                          <div className="block lg:hidden mt-6">
+                              <div className="mb-4">
+                                  <SectionHeader title="LoRAs" theme="purple" />
+                              </div>
+                              <div className="space-y-4">
+                                  
+                                  <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
+                                      Add or Manage LoRAs
+                                  </Button>
+                                  
+                                  <ActiveLoRAsDisplay
+                                      selectedLoras={loraManager.selectedLoras}
+                                      onRemoveLora={loraManager.handleRemoveLora}
+                                      onLoraStrengthChange={loraManager.handleLoraStrengthChange}
+                                      availableLoras={availableLoras}
+                                      className="mt-4"
+                                      onAddTriggerWord={loraManager.handleAddTriggerWord}
+                                      renderHeaderActions={loraManager.renderHeaderActions}
+                                  />
+                              </div>
+                          </div>
+                        )}
                         
                         
                     </div>
 
-                    {/* Right Column: Model & LoRA Settings (Desktop) */}
-                    <div className="hidden lg:block lg:w-1/2 order-1 lg:order-2">
-                        
-                        {/* LoRA Settings */}
-                        <div className="mb-4">
-                            <SectionHeader title="LoRAs" theme="purple" />
-                        </div>
-                        <div className="space-y-4">
-                            
-                            <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
-                                Add or Manage LoRAs
-                            </Button>
-                            
-                            <ActiveLoRAsDisplay
-                                selectedLoras={loraManager.selectedLoras}
-                                onRemoveLora={loraManager.handleRemoveLora}
-                                onLoraStrengthChange={loraManager.handleLoraStrengthChange}
-                                availableLoras={availableLoras}
-                                className="mt-4"
-                                onAddTriggerWord={loraManager.handleAddTriggerWord}
-                                renderHeaderActions={loraManager.renderHeaderActions}
-                            />
-                        </div>
-                    </div>
+                    {/* Right Column: Model & LoRA Settings (Desktop) - Hidden when Advanced Mode is enabled */}
+                    {!advancedMode && (
+                      <div className="hidden lg:block lg:w-1/2 order-1 lg:order-2">
+                          
+                          {/* LoRA Settings */}
+                          <div className="mb-4">
+                              <SectionHeader title="LoRAs" theme="purple" />
+                          </div>
+                          <div className="space-y-4">
+                              
+                              <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
+                                  Add or Manage LoRAs
+                              </Button>
+                              
+                              <ActiveLoRAsDisplay
+                                  selectedLoras={loraManager.selectedLoras}
+                                  onRemoveLora={loraManager.handleRemoveLora}
+                                  onLoraStrengthChange={loraManager.handleLoraStrengthChange}
+                                  availableLoras={availableLoras}
+                                  className="mt-4"
+                                  onAddTriggerWord={loraManager.handleAddTriggerWord}
+                                  renderHeaderActions={loraManager.renderHeaderActions}
+                              />
+                          </div>
+                      </div>
+                    )}
                 </div>
 
                 {/* Full-width divider and generate button - Original position with ref */}

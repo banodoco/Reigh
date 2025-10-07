@@ -33,6 +33,7 @@ export interface PositionMetadata {
   // Pair prompts (stored on the first item of each pair)
   pair_prompt?: string;
   pair_negative_prompt?: string;
+  enhanced_prompt?: string;
 }
 
 const DEFAULT_FRAME_SPACING = 60;

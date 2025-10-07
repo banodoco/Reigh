@@ -11,6 +11,11 @@ import {
  * Parameters for creating a magic edit task
  * Maps to the parameters expected by the image_edit task type
  */
+export interface LoraConfig {
+  url: string;
+  strength: number;
+}
+
 export interface MagicEditTaskParams {
   project_id: string;
   prompt: string;
@@ -25,6 +30,7 @@ export interface MagicEditTaskParams {
   max_wait_seconds?: number; // Default to 300
   enable_base64_output?: boolean; // Default to false
   tool_type?: string; // Optional: override tool type for generation association
+  loras?: LoraConfig[]; // Optional: array of lora configurations for model enhancement
 }
 
 /**
@@ -45,6 +51,7 @@ export interface BatchMagicEditTaskParams {
   max_wait_seconds?: number;
   enable_base64_output?: boolean;
   tool_type?: string; // Optional: override tool type for generation association
+  loras?: LoraConfig[]; // Optional: array of lora configurations for model enhancement
 }
 
 /**
@@ -164,6 +171,11 @@ function buildMagicEditTaskParams(
     taskParams.tool_type = params.tool_type;
   }
 
+  // Add loras if provided
+  if (params.loras && params.loras.length > 0) {
+    taskParams.loras = params.loras;
+  }
+
   return taskParams;
 }
 
@@ -245,6 +257,7 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
         max_wait_seconds: params.max_wait_seconds,
         enable_base64_output: params.enable_base64_output,
         tool_type: params.tool_type, // Pass through tool type override
+        loras: params.loras, // Pass through lora configurations
       } as MagicEditTaskParams;
     });
 
@@ -295,3 +308,4 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
  * Re-export the interface and error class for convenience
  */
 export { TaskValidationError } from "../taskCreation";
+export type { LoraConfig };

@@ -22,6 +22,7 @@
 | **`create_task`** | Task creation | Validates credits, creates queued task |
 | **`claim_next_task`** | Worker polling | Returns next available task for processing |
 | **`update-task-status`** | Status updates | Real-time task status broadcasting |
+| **`update-shot-pair-prompts`** | Metadata updates | Updates shot_generations metadata (pair_prompt, enhanced_prompt, etc.) from orchestrator task |
 
 ### Payment Processing
 

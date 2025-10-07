@@ -1,6 +1,67 @@
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './components/ShotEditor/state/types';
 // import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay'; // Removed - LoRAs now managed in ShotEditor
 
+// PhaseConfig types for advanced video generation settings
+export interface PhaseLoraConfig {
+  url: string;
+  multiplier: string; // Can be a single value "1.0" or comma-separated ramp "0.1,0.3,0.5"
+}
+
+export interface PhaseSettings {
+  phase: number;
+  guidance_scale: number;
+  loras: PhaseLoraConfig[];
+}
+
+export interface PhaseConfig {
+  num_phases: number;
+  steps_per_phase: number[];
+  flow_shift: number;
+  sample_solver: string;
+  model_switch_phase: number;
+  phases: PhaseSettings[];
+}
+
+export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
+  num_phases: 3,
+  steps_per_phase: [2, 2, 2],
+  flow_shift: 5.0,
+  sample_solver: "euler",
+  model_switch_phase: 2,
+  phases: [
+    {
+      phase: 1,
+      guidance_scale: 3.0,
+      loras: [
+        {
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
+          multiplier: "0.75"
+        }
+      ]
+    },
+    {
+      phase: 2,
+      guidance_scale: 1.0,
+      loras: [
+        {
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
+          multiplier: "1.0"
+        }
+      ]
+    },
+    {
+      phase: 3,
+      guidance_scale: 1.0,
+      loras: [
+        {
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors",
+          multiplier: "1.0"
+        }
+      ]
+    }
+  ]
+};
+
 export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;
@@ -17,6 +78,8 @@ export interface VideoTravelSettings {
   selectedModel?: 'wan-2.1' | 'wan-2.2';
   turboMode: boolean;
   amountOfMotion: number; // 0-100 range for UI
+  advancedMode: boolean; // Toggle for showing phase_config settings
+  phaseConfig?: PhaseConfig; // Advanced phase configuration
   // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;
@@ -60,6 +123,7 @@ export const videoTravelSettings = {
     selectedModel: 'wan-2.1' as const,
     turboMode: false,
     amountOfMotion: 50,
+    advancedMode: false,
     selectedMode: 'Zippy Supreme' as const,
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   },

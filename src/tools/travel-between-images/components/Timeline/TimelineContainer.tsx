@@ -42,6 +42,7 @@ interface TimelineContainerProps {
   // Pair-specific props
   onPairClick?: (pairIndex: number, pairData: any) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   // Action handlers
@@ -87,6 +88,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   onResetFrames,
   onPairClick,
   pairPrompts,
+  enhancedPrompts,
   defaultPrompt,
   defaultNegativePrompt,
   onImageDelete,
@@ -687,10 +689,15 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             // CRITICAL: Get the first image in this pair to read its metadata
             const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
             
-            // Read pair prompts directly from the image metadata instead of index-based lookup
-            // This ensures we're reading from the exact shot_generation being displayed
+            // Read pair prompts from props first, then fallback to metadata
+            // Props take precedence when passed (used during batch generation setup)
             const pairPromptFromMetadata = (startImage as any)?.metadata?.pair_prompt || '';
             const pairNegativePromptFromMetadata = (startImage as any)?.metadata?.pair_negative_prompt || '';
+            
+            // Enhanced prompt: use prop if provided, otherwise fallback to metadata
+            const enhancedPromptFromProps = enhancedPrompts?.[index] || '';
+            const enhancedPromptFromMetadata = (startImage as any)?.metadata?.enhanced_prompt || '';
+            const actualEnhancedPrompt = enhancedPromptFromProps || enhancedPromptFromMetadata;
 
             return (
               <PairRegion
@@ -737,6 +744,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 } : undefined}
                 pairPrompt={pairPromptFromMetadata}
                 pairNegativePrompt={pairNegativePromptFromMetadata}
+                enhancedPrompt={actualEnhancedPrompt}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}

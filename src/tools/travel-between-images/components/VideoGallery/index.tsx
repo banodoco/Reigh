@@ -555,17 +555,23 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   }, []);
 
-  // Mobile double-tap handler with preloading
-  const handleMobileTap = createMobileTapHandler(lastTouchTimeRef, doubleTapTimeoutRef, setLightboxIndex, handleMobilePreload);
+  // Mobile double-tap handler with preloading - memoized for stable reference
+  const handleMobileTap = useCallback(
+    createMobileTapHandler(lastTouchTimeRef, doubleTapTimeoutRef, setLightboxIndex, handleMobilePreload),
+    [handleMobilePreload]
+  );
 
-  // Handle opening details from hover
-  const handleOpenDetailsFromHover = createHoverDetailsHandler(
-    hoveredVideo,
-    displaySortedVideoOutputs,
-    isMobile,
-    setSelectedVideoForDetails,
-    setLightboxIndex,
-    handleHoverEnd
+  // Handle opening details from hover - memoized for stable reference
+  const handleOpenDetailsFromHover = useCallback(
+    createHoverDetailsHandler(
+      hoveredVideo,
+      displaySortedVideoOutputs,
+      isMobile,
+      setSelectedVideoForDetails,
+      setLightboxIndex,
+      handleHoverEnd
+    ),
+    [hoveredVideo, displaySortedVideoOutputs, isMobile, handleHoverEnd]
   );
 
   // Stable callback for showing task details
@@ -578,18 +584,18 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       setLightboxIndex
     )(), [lightboxIndex, displaySortedVideoOutputs]);
 
-  // Lightbox navigation
-  const handleNext = () => {
+  // Lightbox navigation - memoized for stable reference
+  const handleNext = useCallback(() => {
     if (lightboxIndex !== null) {
       setLightboxIndex((lightboxIndex + 1) % displaySortedVideoOutputs.length);
     }
-  };
+  }, [lightboxIndex, displaySortedVideoOutputs.length]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (lightboxIndex !== null) {
       setLightboxIndex((lightboxIndex - 1 + displaySortedVideoOutputs.length) % displaySortedVideoOutputs.length);
     }
-  };
+  }, [lightboxIndex, displaySortedVideoOutputs.length]);
 
   // Optimistic delete handler: hide immediately, then delegate to parent
   const handleDeleteOptimistic = useCallback((generationId: string) => {
@@ -619,6 +625,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       });
     }
   }, [onDelete]);
+
+  // Stable handler for opening mobile modal - prevents VideoItem re-renders
+  const handleMobileModalOpen = useCallback((video: GenerationRow) => {
+    setSelectedVideoForDetails(video);
+    setShowTaskDetailsModal(true);
+  }, []);
 
   // ===============================================================================
   // EFFECT HANDLERS
@@ -789,10 +801,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   deletingVideoId={deletingVideoId}
                   onHoverStart={handleHoverStart}
                   onHoverEnd={handleHoverEnd}
-                  onMobileModalOpen={(video: GenerationRow) => {
-                    setSelectedVideoForDetails(video);
-                    setShowTaskDetailsModal(true);
-                  }}
+                  onMobileModalOpen={handleMobileModalOpen}
                   selectedVideoForDetails={selectedVideoForDetails}
                   showTaskDetailsModal={showTaskDetailsModal}
                 />

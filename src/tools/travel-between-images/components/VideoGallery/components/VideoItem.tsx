@@ -54,6 +54,14 @@ export const VideoItem = React.memo<VideoItemProps>(({
   selectedVideoForDetails,
   showTaskDetailsModal
 }) => {
+  // DEBUG: Track re-renders to verify memo is working
+  if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+    console.log('[HoverIssue] 🔄 VideoItem re-render (first item):', {
+      videoId: video.id?.substring(0, 8),
+      timestamp: Date.now()
+    });
+  }
+  
   // ===============================================================================
   // HOOKS - Use extracted hooks for cleaner separation of concerns
   // ===============================================================================
@@ -540,8 +548,24 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 onLightboxOpen(originalIndex);
               }
             }}
-            onMouseEnter={(e) => onHoverStart(video, e)}
-            onMouseLeave={onHoverEnd}
+            onMouseEnter={(e) => {
+              if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+                console.log('[HoverIssue] 👆 Hover START on first item Info button:', {
+                  videoId: video.id?.substring(0, 8),
+                  timestamp: Date.now()
+                });
+              }
+              onHoverStart(video, e);
+            }}
+            onMouseLeave={() => {
+              if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+                console.log('[HoverIssue] 👇 Hover END on first item Info button:', {
+                  videoId: video.id?.substring(0, 8),
+                  timestamp: Date.now()
+                });
+              }
+              onHoverEnd();
+            }}
             className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
           >
             <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -584,5 +608,49 @@ export const VideoItem = React.memo<VideoItemProps>(({
         </div>
       )}
     </div>
+  );
+}, (prevProps, nextProps) => {
+  // ============================================================================
+  // CUSTOM MEMO COMPARISON - FIX FOR HOVER STATE ISSUE
+  // ============================================================================
+  // 
+  // ROOT CAUSE: The useUnifiedGenerations hook constantly refetches data (every 5s),
+  // causing VideoOutputsGallery to re-render. Without a custom comparison function,
+  // React.memo would allow VideoItem to re-render on every parent render, which:
+  // 1. Recreates event handlers (breaking reference equality)
+  // 2. Potentially disrupts hover state, especially on the first item
+  // 3. Causes unnecessary work and DOM updates
+  //
+  // FIX: This custom comparison function prevents re-renders unless meaningful
+  // props have actually changed. Combined with memoized event handlers in the
+  // parent, this ensures the hover state remains stable even during frequent
+  // query refetches.
+  //
+  // TESTING: Watch for "[HoverIssue] 🔄 VideoItem re-render" logs - with this fix,
+  // the first item should NOT re-render on every query refetch.
+  // ============================================================================
+  
+  // Only re-render if meaningful props have changed
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.video.location === nextProps.video.location &&
+    prevProps.video.thumbUrl === nextProps.video.thumbUrl &&
+    prevProps.index === nextProps.index &&
+    prevProps.originalIndex === nextProps.originalIndex &&
+    prevProps.isFirstVideo === nextProps.isFirstVideo &&
+    prevProps.shouldPreload === nextProps.shouldPreload &&
+    prevProps.isMobile === nextProps.isMobile &&
+    prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
+    prevProps.deletingVideoId === nextProps.deletingVideoId &&
+    prevProps.selectedVideoForDetails?.id === nextProps.selectedVideoForDetails?.id &&
+    prevProps.showTaskDetailsModal === nextProps.showTaskDetailsModal &&
+    // Handler functions should be stable via useCallback, so reference equality is fine
+    prevProps.onLightboxOpen === nextProps.onLightboxOpen &&
+    prevProps.onMobileTap === nextProps.onMobileTap &&
+    prevProps.onMobilePreload === nextProps.onMobilePreload &&
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onHoverStart === nextProps.onHoverStart &&
+    prevProps.onHoverEnd === nextProps.onHoverEnd &&
+    prevProps.onMobileModalOpen === nextProps.onMobileModalOpen
   );
 });

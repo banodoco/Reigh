@@ -109,6 +109,7 @@ export interface TimelineProps {
   }) => void;
   // Pair prompt data for display (optional - will use database if not provided)
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   // Action handlers
@@ -160,6 +161,7 @@ const Timeline: React.FC<TimelineProps> = ({
   hookData: propHookData,
   onPairClick,
   pairPrompts,
+  enhancedPrompts,
   defaultPrompt,
   defaultNegativePrompt,
   onImageDelete,
@@ -489,6 +491,7 @@ const Timeline: React.FC<TimelineProps> = ({
         setIsDragInProgress={setIsDragInProgress}
         onPairClick={onPairClick}
         pairPrompts={actualPairPrompts}
+        enhancedPrompts={enhancedPrompts || {}}
         defaultPrompt={defaultPrompt}
         defaultNegativePrompt={defaultNegativePrompt}
         onImageDelete={onImageDelete}

@@ -60,7 +60,7 @@ export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   negative_prompt: '',
   model_name: 'lightning_baseline_2_2_2',
   seed: 789,
-  debug: true,
+  debug: false,
   apply_reward_lora: false,
   colour_match_videos: false,
   apply_causvid: false,
@@ -129,6 +129,11 @@ export interface ShotEditorProps {
   // Auto-create individual prompts
   autoCreateIndividualPrompts: boolean;
   onAutoCreateIndividualPromptsChange: (autoCreate: boolean) => void;
+  // Advanced mode
+  advancedMode: boolean;
+  onAdvancedModeChange: (advanced: boolean) => void;
+  phaseConfig?: any; // PhaseConfig type from settings
+  onPhaseConfigChange: (config: any) => void;
   // Mode selection removed - now hardcoded to use specific model
   // Navigation props
   onPreviousShot?: () => void;
