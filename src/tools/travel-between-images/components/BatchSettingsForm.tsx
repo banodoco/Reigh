@@ -480,7 +480,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       <div className="w-44">
                         <Label htmlFor="num_phases" className="text-sm font-light block mb-2">
                           Number of Phases
-                          <span className="ml-2 text-xs text-muted-foreground">(Locked to 3)</span>
                         </Label>
                         <Input
                           id="num_phases"
