@@ -416,7 +416,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     setAdvancedSectionExpanded(false);
                   }
                 }}
-                className={advancedMode ? 'data-[state=checked]:bg-orange-500' : ''}
               />
               <div className="flex-1">
                 <Label htmlFor="advanced-mode-toggle" className="font-medium">
