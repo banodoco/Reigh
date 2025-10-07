@@ -7,7 +7,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Slider } from '@/shared/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { GeneratePromptsParams, AIPromptItem } from '@/types/ai';
-import { Wand2, ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import { Wand2, ChevronDown, ChevronRight, Settings, Zap } from 'lucide-react';
 
 export interface GenerationControlValues {
   overallPromptText: string;
@@ -22,11 +22,13 @@ export interface GenerationControlValues {
 
 interface PromptGenerationControlsProps {
   onGenerate: (params: GeneratePromptsParams) => Promise<void>; 
+  onGenerateAndQueue?: (params: GeneratePromptsParams) => Promise<void>;
   isGenerating: boolean;
   hasApiKey?: boolean;
   existingPromptsForContext?: AIPromptItem[];
   initialValues?: Partial<GenerationControlValues>;
   onValuesChange?: (values: GenerationControlValues) => void;
+  remixMode?: boolean;
 }
 
 const temperatureOptions = [
@@ -39,11 +41,13 @@ const temperatureOptions = [
 
 export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> = ({
   onGenerate,
+  onGenerateAndQueue,
   isGenerating,
   hasApiKey,
   existingPromptsForContext = [],
   initialValues,
   onValuesChange,
+  remixMode = false,
 }) => {
   const [overallPromptText, setOverallPromptText] = useState(initialValues?.overallPromptText || '');
   const [rulesToRememberText, setRulesToRememberText] = useState(initialValues?.rulesToRememberText || '');
@@ -107,9 +111,29 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       overallPromptText,
       rulesToRememberText,
       numberToGenerate,
-      existingPrompts: includeExistingContext ? existingPromptsForContext : undefined,
+      existingPrompts: (remixMode || includeExistingContext) ? existingPromptsForContext : undefined,
       addSummaryForNewPrompts: addSummary,
-      replaceCurrentPrompts,
+      replaceCurrentPrompts: remixMode || replaceCurrentPrompts,
+      temperature,
+    });
+  };
+
+  const handleGenerateAndQueueClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!hasApiKey) {
+        alert('API Key is required to generate prompts.');
+        return;
+    }
+    if (!onGenerateAndQueue) {
+      return;
+    }
+    await onGenerateAndQueue({
+      overallPromptText,
+      rulesToRememberText,
+      numberToGenerate,
+      existingPrompts: (remixMode || includeExistingContext) ? existingPromptsForContext : undefined,
+      addSummaryForNewPrompts: addSummary,
+      replaceCurrentPrompts: remixMode || replaceCurrentPrompts,
       temperature,
     });
   };
@@ -135,7 +159,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         <div className="flex-1 space-y-2">
           {/* Main prompt input - always visible */}
           <div>
-          <Label htmlFor="gen_overallPromptText" className="mb-2 block">What prompts would you like to generate?</Label>
+          <Label htmlFor="gen_overallPromptText" className="mb-2 block">
+            {remixMode ? 'How would you like to remix the prompts?' : 'What prompts would you like to generate?'}
+          </Label>
           <Textarea
             id="gen_overallPromptText"
             value={overallPromptText}
@@ -144,7 +170,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               setOverallPromptText(next);
               emitChange({ overallPromptText: next });
             }}
-            placeholder="e.g., A medieval fantasy adventure with dragons and magic..."
+            placeholder={remixMode ? "e.g., Make them more cinematic, Add vibrant colors, Focus on close-up details..." : "e.g., A medieval fantasy adventure with dragons and magic..."}
               rows={2}
             disabled={!hasApiKey || isGenerating}
               className="min-h-[60px] max-h-[60px]"
@@ -373,43 +399,45 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   </div>
                 </div>
 
-                {/* Checkboxes - moved into advanced */}
-                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="gen_includeExistingContext" 
-                      checked={includeExistingContext} 
-                      onCheckedChange={(checked) => {
-                        const next = Boolean(checked);
-                        setIncludeExistingContext(next);
-                        emitChange({ includeExistingContext: next });
-                      }} 
-                      disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
-                    />
-                    <Label htmlFor="gen_includeExistingContext" className="font-normal">
-                      Include current prompts
-                    </Label>
+                {/* Checkboxes - moved into advanced, hidden in remix mode */}
+                {!remixMode && (
+                  <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="gen_includeExistingContext" 
+                        checked={includeExistingContext} 
+                        onCheckedChange={(checked) => {
+                          const next = Boolean(checked);
+                          setIncludeExistingContext(next);
+                          emitChange({ includeExistingContext: next });
+                        }} 
+                        disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
+                      />
+                      <Label htmlFor="gen_includeExistingContext" className="font-normal">
+                        Include current prompts
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="gen_replaceCurrentPrompts" 
+                        checked={replaceCurrentPrompts} 
+                        onCheckedChange={(checked) => {
+                          const next = Boolean(checked);
+                          setReplaceCurrentPrompts(next);
+                          emitChange({ replaceCurrentPrompts: next });
+                        }} 
+                        disabled={!hasApiKey || isGenerating}
+                      />
+                      <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal">Replace current prompts</Label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="gen_replaceCurrentPrompts" 
-                      checked={replaceCurrentPrompts} 
-                      onCheckedChange={(checked) => {
-                        const next = Boolean(checked);
-                        setReplaceCurrentPrompts(next);
-                        emitChange({ replaceCurrentPrompts: next });
-                      }} 
-                      disabled={!hasApiKey || isGenerating}
-                    />
-                    <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal">Replace current prompts</Label>
-                  </div>
-                </div>
+                )}
               </div>
             </CollapsibleContent>
           </Collapsible>
 
           {/* Generate button */}
-          <div className="w-full sm:w-[300px]">
+          <div className="w-full sm:w-[300px] space-y-2">
             <Button 
               type="button"
               onClick={handleGenerateClick}
@@ -418,6 +446,17 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
             >
               {isGenerating ? 'Generating...' : 'Generate Prompts'}
             </Button>
+            {onGenerateAndQueue && (
+              <button 
+                type="button"
+                onClick={handleGenerateAndQueueClick}
+                disabled={!hasApiKey || isGenerating} 
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 py-1"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                {isGenerating ? 'Generating...' : 'Generate Prompts & Queue Images'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -542,9 +581,9 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               </div>
 
               {/* Creativity slider and checkboxes side-by-side */}
-              <div className="flex gap-4">
-                {/* Creativity slider on left - 50% width */}
-                <div className="flex-1">
+              <div className={remixMode ? "" : "flex gap-4"}>
+                {/* Creativity slider on left - 50% width (or full width in remix mode) */}
+                <div className={remixMode ? "" : "flex-1"}>
                   <div className="text-center mb-3">
                     <span className="font-light text-sm">Level of creativity</span>
                   </div>
@@ -571,37 +610,39 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                   </div>
                 </div>
 
-                {/* Checkboxes stacked on right - 50% width */}
-                <div className="flex-1 flex flex-col gap-3 justify-center">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="gen_includeExistingContext" 
-                      checked={includeExistingContext} 
-                      onCheckedChange={(checked) => {
-                        const next = Boolean(checked);
-                        setIncludeExistingContext(next);
-                        emitChange({ includeExistingContext: next });
-                      }} 
-                      disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
-                    />
-                    <Label htmlFor="gen_includeExistingContext" className="font-normal text-sm">
-                      Include current prompts
-                    </Label>
+                {/* Checkboxes stacked on right - 50% width, hidden in remix mode */}
+                {!remixMode && (
+                  <div className="flex-1 flex flex-col gap-3 justify-center">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="gen_includeExistingContext" 
+                        checked={includeExistingContext} 
+                        onCheckedChange={(checked) => {
+                          const next = Boolean(checked);
+                          setIncludeExistingContext(next);
+                          emitChange({ includeExistingContext: next });
+                        }} 
+                        disabled={!hasApiKey || isGenerating || existingPromptsForContext.length === 0}
+                      />
+                      <Label htmlFor="gen_includeExistingContext" className="font-normal text-sm">
+                        Include current prompts
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="gen_replaceCurrentPrompts" 
+                        checked={replaceCurrentPrompts} 
+                        onCheckedChange={(checked) => {
+                          const next = Boolean(checked);
+                          setReplaceCurrentPrompts(next);
+                          emitChange({ replaceCurrentPrompts: next });
+                        }} 
+                        disabled={!hasApiKey || isGenerating}
+                      />
+                      <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal text-sm">Replace current prompts</Label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="gen_replaceCurrentPrompts" 
-                      checked={replaceCurrentPrompts} 
-                      onCheckedChange={(checked) => {
-                        const next = Boolean(checked);
-                        setReplaceCurrentPrompts(next);
-                        emitChange({ replaceCurrentPrompts: next });
-                      }} 
-                      disabled={!hasApiKey || isGenerating}
-                    />
-                    <Label htmlFor="gen_replaceCurrentPrompts" className="font-normal text-sm">Replace current prompts</Label>
-                  </div>
-                </div>
+                )}
               </div>
       </div>
         )}

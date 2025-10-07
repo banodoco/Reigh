@@ -3,13 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { PromptEntry, PromptInputRow, PromptInputRowProps } from '@/tools/image-generation/components/ImageGenerationForm';
-import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronLeft, ChevronRight, Sparkles, X, Loader2 } from 'lucide-react';
+import { PlusCircle, AlertTriangle, Wand2Icon, Edit, PackagePlus, ArrowUp, Trash2, ChevronDown, ChevronLeft, ChevronRight, Sparkles, X, Loader2, Shuffle } from 'lucide-react';
 import { PromptGenerationControls, GenerationControlValues as PGC_GenerationControlValues } from '@/tools/image-generation/components/PromptGenerationControls';
 import { BulkEditControls, BulkEditParams as BEC_BulkEditParams, BulkEditControlValues as BEC_BulkEditControlValues } from '@/tools/image-generation/components/BulkEditControls';
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 import { AIPromptItem, GeneratePromptsParams, EditPromptParams, AIModelType } from '@/types/ai';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -42,15 +43,17 @@ export interface PromptEditorModalProps {
   generatePromptId: () => string;
   apiKey?: string;
   openWithAIExpanded?: boolean;
+  onGenerateAndQueue?: (prompts: PromptEntry[]) => void;
 }
 
-type EditorMode = 'generate' | 'bulk-edit';
+type EditorMode = 'generate' | 'remix' | 'bulk-edit';
 
 const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   isOpen, onClose, prompts: initialPrompts, onSave,
   generatePromptId,
   apiKey,
   openWithAIExpanded = false,
+  onGenerateAndQueue,
 }) => {
   // Debug: Log when component is called with detailed prop info
   console.log(`[EDIT_DEBUG:RENDER] PromptEditorModal rendered.`, {
@@ -461,6 +464,22 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     }
   };
   
+  const handleGenerateAndQueue = async (params: GeneratePromptsParams) => {
+    console.log("[PromptEditorModal] Generate & Queue: Starting generation");
+    await handleGenerateAndAddPrompts(params);
+    
+    // Wait a moment for state to update
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Get the updated prompts from the ref (which has the latest state)
+    const updatedPrompts = internalPromptsRef.current;
+    console.log("[PromptEditorModal] Generate & Queue: Prompts generated, queuing images with", updatedPrompts.length, "prompts");
+    
+    if (onGenerateAndQueue) {
+      onGenerateAndQueue(updatedPrompts);
+    }
+  };
+  
 
   const handleBulkEditPrompts = async (params: BEC_BulkEditParams) => {
     if (internalPrompts.length === 0) { toast.info("No prompts to edit."); return; }
@@ -806,35 +825,69 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
             <CollapsibleContent>
               <div className="bg-accent/30 border border-accent-foreground/10 rounded-lg p-4">
                 <Tabs value={activeTab} onValueChange={(value) => { markAsInteracted(); setActiveTab(value as EditorMode); }}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="generate"><Wand2Icon className="mr-2 h-4 w-4" />Generate New</TabsTrigger>
-                    <TabsTrigger value="bulk-edit"><Edit className="mr-2 h-4 w-4" />Bulk Edit</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger 
+                      value="generate" 
+                      className="w-full hover:bg-accent/50 data-[state=active]:hover:bg-background"
+                      title="Generate new prompts"
+                    >
+                      <Wand2Icon className="mr-2 h-4 w-4" />Generate
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="remix" 
+                      className="w-full hover:bg-accent/50 data-[state=active]:hover:bg-background"
+                      title="Remix existing prompts"
+                    >
+                      <Shuffle className="mr-2 h-4 w-4" />Remix
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="bulk-edit" 
+                      className="w-full hover:bg-accent/50 data-[state=active]:hover:bg-background"
+                      title="Edit existing prompts"
+                    >
+                      <Edit className="mr-2 h-4 w-4" />Edit
+                    </TabsTrigger>
                   </TabsList>
-                  <TabsContent value="generate">
-                    {activeTab === 'generate' && (
-                      <PromptGenerationControls 
-                        onGenerate={handleGenerateAndAddPrompts} 
-                        isGenerating={isAIGenerating}
-                        initialValues={generationControlValues}
-                        onValuesChange={handleGenerationValuesChange}
-                        hasApiKey={true}
-                        existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
-                      />
-                    )}
-                  </TabsContent>
-                  <TabsContent value="bulk-edit">
-                    {activeTab === 'bulk-edit' && (
-                      <BulkEditControls 
-                        onBulkEdit={handleBulkEditPrompts} 
-                        isEditing={isAIEditing}
-                        initialValues={bulkEditControlValues}
-                        onValuesChange={handleBulkEditValuesChange}
-                        hasApiKey={true}
-                        numberOfPromptsToEdit={internalPrompts.length}
-                      />
-                    )}
-                  </TabsContent>
-                </Tabs>
+                    <TabsContent value="generate">
+                      {activeTab === 'generate' && (
+                        <PromptGenerationControls 
+                          onGenerate={handleGenerateAndAddPrompts} 
+                          onGenerateAndQueue={onGenerateAndQueue ? handleGenerateAndQueue : undefined}
+                          isGenerating={isAIGenerating}
+                          initialValues={generationControlValues}
+                          onValuesChange={handleGenerationValuesChange}
+                          hasApiKey={true}
+                          existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
+                        />
+                      )}
+                    </TabsContent>
+                    <TabsContent value="remix">
+                      {activeTab === 'remix' && (
+                        <PromptGenerationControls 
+                          onGenerate={handleGenerateAndAddPrompts} 
+                          onGenerateAndQueue={onGenerateAndQueue ? handleGenerateAndQueue : undefined}
+                          isGenerating={isAIGenerating}
+                          initialValues={generationControlValues}
+                          onValuesChange={handleGenerationValuesChange}
+                          hasApiKey={true}
+                          existingPromptsForContext={internalPrompts.map(p => ({ id: p.id, text: p.fullPrompt, shortText: p.shortPrompt, hidden: false}))}
+                          remixMode={true}
+                        />
+                      )}
+                    </TabsContent>
+                    <TabsContent value="bulk-edit">
+                      {activeTab === 'bulk-edit' && (
+                        <BulkEditControls 
+                          onBulkEdit={handleBulkEditPrompts} 
+                          isEditing={isAIEditing}
+                          initialValues={bulkEditControlValues}
+                          onValuesChange={handleBulkEditValuesChange}
+                          hasApiKey={true}
+                          numberOfPromptsToEdit={internalPrompts.length}
+                        />
+                      )}
+                    </TabsContent>
+                  </Tabs>
               </div>
             </CollapsibleContent>
           </Collapsible>

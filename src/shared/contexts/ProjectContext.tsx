@@ -481,7 +481,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
             
             Object.entries(currentProjectData.settings).forEach(([toolId, toolSettings]) => {
               if (typeof toolSettings === 'object' && toolSettings !== null) {
-                // Create a copy of tool settings excluding prompts and AI generation details
+                // Create a copy of tool settings excluding prompts, references, and AI generation details
                 const filteredToolSettings = { ...toolSettings } as any;
                 
                 // Remove prompt-related keys
@@ -492,14 +492,26 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
                 delete filteredToolSettings.afterEachPromptText;
                 delete filteredToolSettings.pairConfigs; // These often contain prompts
                 
+                // Remove reference-related keys (shouldn't carry over between projects)
+                delete filteredToolSettings.references;
+                delete filteredToolSettings.selectedReferenceId;
+                delete filteredToolSettings.selectedReferenceIdByShot;
+                delete filteredToolSettings.styleReferenceImage;
+                delete filteredToolSettings.styleReferenceImageOriginal;
+                delete filteredToolSettings.styleReferenceStrength;
+                delete filteredToolSettings.subjectStrength;
+                delete filteredToolSettings.subjectDescription;
+                delete filteredToolSettings.inThisScene;
+                
                 // Remove prompt-editor specific AI settings that should not be inherited
                 delete filteredToolSettings.generationSettings;
                 delete filteredToolSettings.bulkEditSettings;
                 delete filteredToolSettings.activeTab;
                 
-                // Also filter out any keys that contain "prompt" in their name (case-insensitive)
+                // Also filter out any keys that contain "prompt" or "reference" in their name (case-insensitive)
                 Object.keys(filteredToolSettings).forEach(key => {
-                  if (key.toLowerCase().includes('prompt')) {
+                  const lowerKey = key.toLowerCase();
+                  if (lowerKey.includes('prompt') || lowerKey.includes('reference')) {
                     delete filteredToolSettings[key];
                   }
                 });
@@ -511,7 +523,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
               }
             });
             
-            console.log('[ProjectContext] Copying settings from current project to new project (excluding prompts):', {
+            console.log('[ProjectContext] Copying settings from current project to new project (excluding prompts and references):', {
               sourceProjectId: selectedProjectId,
               originalToolCount: Object.keys(currentProjectData.settings).length,
               filteredToolCount: Object.keys(settingsToInherit).length,
@@ -548,7 +560,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
 
       if (Object.keys(settingsToInherit).length > 0) {
-        toast.success(`Project "${projectData.name}" created with inherited settings!`);
+        toast.success(`Project "${projectData.name}" created!`);
+      } else {
+        toast.success(`Project "${projectData.name}" created!`);
       }
             
       return mappedProject;

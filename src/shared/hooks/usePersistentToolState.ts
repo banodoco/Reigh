@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useToolSettings, SettingsScope } from './useToolSettings';
 import { deepEqual, sanitizeSettings } from '../lib/deepEqual';
+import { toolsManifest } from '@/tools';
 
 export interface StateMapping<T> {
   [key: string]: [T[keyof T], React.Dispatch<React.SetStateAction<T[keyof T]>>];
@@ -108,14 +109,23 @@ export function usePersistentToolState<T extends Record<string, any>>(
       // Use an empty object if settings could not be fetched (e.g. first time or API failure)
       const effectiveSettings: Partial<T> = (settings as Partial<T>) || {};
       
+      // Get defaults for this tool to reset undefined values
+      const toolDefaults = toolsManifest.find(t => t.id === toolId)?.defaults || {};
+      
       hasHydratedRef.current = true;
       userHasInteractedRef.current = false;
       
       // Apply each setting to its corresponding setter
+      // CRITICAL FIX: Reset to defaults if undefined in database (prevents stale state from previous project)
       Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
         if (effectiveSettings[key as keyof T] !== undefined) {
+          // Value exists in DB - use it
           setter(effectiveSettings[key as keyof T] as any);
+        } else if (toolDefaults[key as keyof typeof toolDefaults] !== undefined) {
+          // Value missing in DB but has a default - reset to default
+          setter(toolDefaults[key as keyof typeof toolDefaults] as any);
         }
+        // If no default exists, leave the state value as-is (allows for optional fields)
       });
 
       // Mark as ready after hydration

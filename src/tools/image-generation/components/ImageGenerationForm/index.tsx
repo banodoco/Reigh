@@ -1243,6 +1243,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     setPrompts(sanitizedPrompts);
   };
+  
+  const handleGenerateAndQueue = useCallback((updatedPrompts: PromptEntry[]) => {
+    console.log('[ImageGenerationForm] Generate & Queue: Received', updatedPrompts.length, 'prompts, saving and queuing');
+    
+    // Save the prompts first
+    handleSavePromptsFromModal(updatedPrompts);
+    
+    // Close the modal
+    setIsPromptModalOpen(false);
+    setOpenPromptModalWithAIExpanded(false);
+    
+    // Trigger form submission after a short delay to allow state to update
+    setTimeout(() => {
+      console.log('[ImageGenerationForm] Generate & Queue: Triggering form submission');
+      // Create a synthetic form event
+      const form = document.querySelector('form');
+      if (form) {
+        const event = new Event('submit', { cancelable: true, bubbles: true });
+        form.dispatchEvent(event);
+      } else {
+        console.error('[ImageGenerationForm] Generate & Queue: Could not find form element');
+      }
+    }, 200);
+  }, [handleSavePromptsFromModal]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();    
@@ -1579,6 +1603,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             generatePromptId={generatePromptId}
             apiKey={openaiApiKey}
             openWithAIExpanded={openPromptModalWithAIExpanded}
+            onGenerateAndQueue={handleGenerateAndQueue}
           />
         </DynamicImportErrorBoundary>
       </Suspense>
