@@ -28,6 +28,16 @@ if (DATASET_SUPABASE_ANON_KEY === 'PLACEHOLDER_API_KEY_REPLACE_ME') {
  * Note: Multiple GoTrueClient warning is expected and safe - we use a separate
  * storage key and auth is disabled for this read-only dataset client
  */
+
+// Suppress the multiple GoTrueClient warning since this is intentional
+const originalWarn = console.warn;
+console.warn = (...args: any[]) => {
+  if (typeof args[0] === 'string' && args[0].includes('Multiple GoTrueClient instances')) {
+    return; // Suppress this specific warning
+  }
+  originalWarn.apply(console, args);
+};
+
 export const datasetSupabase = createClient(DATASET_SUPABASE_URL, DATASET_SUPABASE_ANON_KEY, {
   auth: {
     persistSession: false,
@@ -40,6 +50,9 @@ export const datasetSupabase = createClient(DATASET_SUPABASE_URL, DATASET_SUPABA
     schema: 'public'
   }
 });
+
+// Restore console.warn after client creation
+console.warn = originalWarn;
 
 /**
  * Verify dataset client connection

@@ -181,15 +181,17 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       
       try {
         // Extract frames based on treatment mode
-        // In adjust mode: video is stretched/compressed to fit timeline, so extract timelineFrames thumbnails
+        // In adjust mode: video is stretched/compressed to fit timeline
+        // Extract reasonable number of thumbnails (max 60 to avoid density issues)
         // In clip mode: video plays as-is, so extract totalVideoFrames thumbnails (all video frames)
+        const maxThumbnails = 60; // Limit thumbnails to prevent density issues
         const numFrames = treatment === 'adjust' 
-          ? timelineFrames 
-          : totalVideoFrames;
+          ? Math.min(timelineFrames, maxThumbnails)
+          : Math.min(totalVideoFrames, maxThumbnails);
         
         const extractedFrames: string[] = [];
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
         if (!ctx) {
           console.error('[GuidanceVideoStrip] Failed to get canvas context');
@@ -331,7 +333,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     }
     
     const previewCanvas = previewCanvasRef.current;
-    const previewCtx = previewCanvas.getContext('2d');
+    const previewCtx = previewCanvas.getContext('2d', { willReadFrequently: true });
     
     if (!previewCtx) {
       console.warn('[GuidanceVideoStrip] No canvas context for frame', frame);
@@ -678,7 +680,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
               <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                 <SelectValue>
                   {treatment === 'adjust' 
-                    ? (videoMetadata.total_frames > timelineFrameCount ? 'Compress' : videoMetadata.total_frames < timelineFrameCount ? 'Stretch' : 'Match') + ' to timeline'
+                    ? (videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
                     : 'Use video as is'}
                 </SelectValue>
               </SelectTrigger>
@@ -686,7 +688,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
                 <SelectItem value="adjust">
                   <div className="flex flex-col gap-0.5 py-1">
                     <span className="text-xs font-medium">
-                      {videoMetadata.total_frames > timelineFrameCount ? 'Compress' : videoMetadata.total_frames < timelineFrameCount ? 'Stretch' : 'Match'} to timeline
+                      {videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match'} to timeline
                     </span>
                     <span className="text-[10px] text-muted-foreground leading-tight">
                       {(() => {

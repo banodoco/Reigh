@@ -155,7 +155,9 @@ function buildTravelBetweenImagesPayload(
   // Expand arrays if they have a single element and numSegments > 1
   const basePromptsExpanded = expandArrayToCount(params.base_prompts, numSegments);
   const negativePromptsExpanded = expandArrayToCount(params.negative_prompts, numSegments) || Array(numSegments).fill("");
-  const enhancedPromptsExpanded = expandArrayToCount(params.enhanced_prompts || [], numSegments) || Array(numSegments).fill("");
+  // CRITICAL FIX: Only expand enhanced_prompts if they were actually provided
+  // Don't fill with empty strings - let the backend orchestrator handle missing enhanced prompts
+  const enhancedPromptsExpanded = params.enhanced_prompts ? expandArrayToCount(params.enhanced_prompts, numSegments) : undefined;
   const segmentFramesExpanded = expandArrayToCount(params.segment_frames, numSegments);
   const frameOverlapExpanded = expandArrayToCount(params.frame_overlap, numSegments);
 
@@ -201,7 +203,9 @@ function buildTravelBetweenImagesPayload(
     base_prompts_expanded: basePromptsExpanded,
     base_prompt: params.base_prompt, // Singular - the default/base prompt
     negative_prompts_expanded: negativePromptsExpanded,
-    enhanced_prompts_expanded: enhancedPromptsExpanded,
+    // CRITICAL FIX: Only include enhanced_prompts_expanded if actually provided
+    // This prevents the backend from misinterpreting empty arrays
+    ...(enhancedPromptsExpanded !== undefined ? { enhanced_prompts_expanded: enhancedPromptsExpanded } : {}),
     segment_frames_expanded: segmentFramesExpanded,
     frame_overlap_expanded: frameOverlapExpanded,
     parsed_resolution_wh: finalResolution,

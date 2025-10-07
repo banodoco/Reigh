@@ -1690,17 +1690,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
 
       basePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
-        // Use pair-specific prompt if available, otherwise fall back to default
+        // CRITICAL: Only use pair-specific prompt if it exists
+        // Send EMPTY STRING if no custom prompt - backend will use base_prompt (singular)
         const pairPrompt = pairPrompts[index]?.prompt;
-        const finalPrompt = (pairPrompt && pairPrompt.trim()) ? pairPrompt.trim() : batchVideoPrompt;
+        const finalPrompt = (pairPrompt && pairPrompt.trim()) ? pairPrompt.trim() : '';
         console.log(`[PairPrompts-GENERATION] 📝 Pair ${index}:`, {
           hasPairPrompt: !!pairPrompt,
           pairPromptRaw: pairPrompt || '(none)',
-          finalPromptUsed: finalPrompt,
+          finalPromptUsed: finalPrompt || '(empty - will use base_prompt)',
           isCustom: pairPrompt && pairPrompt.trim() ? true : false
         });
         return finalPrompt;
-      }) : [batchVideoPrompt];
+      }) : [''];
       
       segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
       frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
@@ -1744,8 +1745,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       console.log(`[Generation] Timeline mode - Final prompts:`, { basePrompts, negativePrompts, pairPrompts, enhancedPrompts, enhancedPromptsArray });
     } else {
-      // batch mode
-      basePrompts = [batchVideoPrompt];
+      // batch mode - send empty string, backend will use base_prompt
+      basePrompts = [''];
       segmentFrames = [batchVideoFrames];
       frameOverlap = [batchVideoContext];
       negativePrompts = [steerableMotionSettings.negative_prompt];
@@ -1766,6 +1767,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
     }
     
+    // CRITICAL: Filter out empty enhanced prompts to prevent backend from duplicating base_prompt
+    // Only send enhanced_prompts if we have actual non-empty enhanced prompts from metadata
+    const hasValidEnhancedPrompts = enhancedPromptsArray.some(prompt => prompt && prompt.trim().length > 0);
+    
+    console.log('[EnhancedPrompts-Safety] Checking enhanced prompts:', {
+      enhancedPromptsArrayLength: enhancedPromptsArray.length,
+      hasValidEnhancedPrompts,
+      enhancedPromptsPreview: enhancedPromptsArray.map((p, i) => ({ 
+        index: i, 
+        hasContent: !!p && p.trim().length > 0,
+        preview: p ? p.substring(0, 30) + '...' : '(empty)'
+      })),
+      enhancePromptFlag: enhancePrompt,
+      autoCreateIndividualPromptsFlag: autoCreateIndividualPrompts,
+      // Show what we're sending for prompt appending
+      base_prompt_singular: batchVideoPrompt,
+      base_prompts_array: basePrompts,
+      willAppendBasePrompt: enhancePrompt || autoCreateIndividualPrompts
+    });
+    
     const requestBody: any = {
       project_id: projectId,
       shot_id: selectedShot.id,
@@ -1775,7 +1796,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       segment_frames: segmentFrames,
       frame_overlap: frameOverlap,
       negative_prompts: negativePrompts,
-      enhanced_prompts: enhancedPromptsArray,
+      // CRITICAL: Only include enhanced_prompts if we have actual enhanced prompts to send
+      // This prevents the backend from duplicating base_prompt into enhanced_prompts_expanded
+      ...(hasValidEnhancedPrompts ? { enhanced_prompts: enhancedPromptsArray } : {}),
       model_name: actualModelName,
       seed: steerableMotionSettings.seed,
       // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)
@@ -1845,13 +1868,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       requestBody.structure_video_type = structureVideoType;
     }
     
-    // Debug logging for enhance_prompt parameter
+    // Debug logging for enhance_prompt parameter and enhanced_prompts array
     console.log("[ShotEditor] enhance_prompt debugging:", {
       enhancePrompt,
       autoCreateIndividualPrompts, 
       enhance_prompt_value: enhancePrompt || autoCreateIndividualPrompts,
       openai_api_key_provided: !!((enhancePrompt || autoCreateIndividualPrompts) ? openaiApiKey : ''),
-      requestBody_enhance_prompt: requestBody.enhance_prompt
+      requestBody_enhance_prompt: requestBody.enhance_prompt,
+      // CRITICAL: Verify enhanced_prompts is NOT being sent when empty
+      enhanced_prompts_included_in_request: 'enhanced_prompts' in requestBody,
+      enhanced_prompts_array_length: requestBody.enhanced_prompts?.length || 0,
+      enhanced_prompts_preview: requestBody.enhanced_prompts?.map((p: string, i: number) => ({
+        index: i,
+        preview: p ? p.substring(0, 30) + '...' : '(empty)',
+        length: p?.length || 0
+      })) || 'NOT_INCLUDED'
     });
     
     try {
