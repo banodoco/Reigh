@@ -269,7 +269,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     onChange={(e) => onBatchVideoPromptChange(e.target.value)}
                     placeholder={
                       autoCreateIndividualPrompts && isTimelineMode
-                        ? "Text to append after AI-generated prompts... (e.g., cinematic style, high quality)"
+                        ? "e.g., cinematic style, high quality"
                         : "Enter a global prompt for all video segments... (e.g., cinematic transition)"
                     }
                     className="min-h-[70px]"
