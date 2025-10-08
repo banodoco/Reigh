@@ -358,6 +358,28 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     return adjacentIds;
   }, [shotGenerations]);
 
+  // Get only the item BEFORE a given timeline_frame (for pair prompt clearing)
+  // Since pair prompts are stored on the first item, we only need to clear
+  // items whose NEXT neighbor changed
+  const getPreviousGenerationId = useCallback((timelineFrame: number): string | null => {
+    if (!timelineFrame) return null;
+    
+    const sorted = [...shotGenerations]
+      .filter(sg => {
+        if (sg.timeline_frame == null) return false;
+        const isVideo = sg.generation.type === 'video' ||
+                       sg.generation.type === 'video_travel_output' ||
+                       (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+        return !isVideo;
+      })
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+    
+    const index = sorted.findIndex(sg => sg.timeline_frame === timelineFrame);
+    if (index === -1 || index === 0) return null;
+    
+    return sorted[index - 1].id;
+  }, [shotGenerations]);
+
   // Exchange positions between two items
   const exchangePositions = useCallback(async (generationIdA: string, generationIdB: string) => {
     if (!shotId) {
@@ -407,30 +429,35 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         itemB: updatedGenerations.data?.find(sg => sg.generation_id === generationIdB)
       };
 
-      // Clear enhanced prompts for both swapped items AND their neighbors
+      // Clear enhanced prompts for both swapped items AND items whose next changed
       if (itemA && itemB) {
-        // Get neighbors of both items BEFORE they swapped
-        const itemANeighbors = itemA.timeline_frame ? getAdjacentGenerationIds(itemA.timeline_frame) : [];
-        const itemBNeighbors = itemB.timeline_frame ? getAdjacentGenerationIds(itemB.timeline_frame) : [];
+        // Since pair prompts are stored on first item, clear items whose NEXT changed
+        // When A and B swap, their neighbors' next values change too
+        const itemsToClear = new Set<string>([itemA.id, itemB.id]);
         
-        // Combine all affected IDs (deduped via Set)
-        const allAffectedIds = new Set([
-          itemA.id, 
-          itemB.id,
-          ...itemANeighbors.filter(id => id !== itemB.id), // Exclude if A and B were adjacent
-          ...itemBNeighbors.filter(id => id !== itemA.id)
-        ]);
-        const itemsToClear = Array.from(allAffectedIds);
+        // Get items BEFORE A and B at their original positions
+        // These items' next changed (from A/B to B/A)
+        const itemBeforeA = itemA.timeline_frame ? getPreviousGenerationId(itemA.timeline_frame) : null;
+        const itemBeforeB = itemB.timeline_frame ? getPreviousGenerationId(itemB.timeline_frame) : null;
         
-        console.log(`[ExchangePositions] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for swapped items and neighbors:`, {
+        // Only add if it's not the other swapped item (handles adjacent swaps)
+        if (itemBeforeA && itemBeforeA !== itemB.id) {
+          itemsToClear.add(itemBeforeA);
+        }
+        if (itemBeforeB && itemBeforeB !== itemA.id) {
+          itemsToClear.add(itemBeforeB);
+        }
+        
+        console.log(`[ExchangePositions] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (next neighbor changed):`, {
           itemA: itemA.id.substring(0, 8),
           itemB: itemB.id.substring(0, 8),
-          itemANeighbors: itemANeighbors.map(id => id.substring(0, 8)),
-          itemBNeighbors: itemBNeighbors.map(id => id.substring(0, 8)),
-          totalToClear: itemsToClear.length
+          itemBeforeA: itemBeforeA?.substring(0, 8) || 'none',
+          itemBeforeB: itemBeforeB?.substring(0, 8) || 'none',
+          totalToClear: itemsToClear.size,
+          note: 'Exchange swaps positions, so both items and their predecessors affected'
         });
         
-        clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
+        clearEnhancedPromptsForGenerations(Array.from(itemsToClear)).catch(err => {
           console.error('[exchangePositions] Error clearing enhanced prompts:', err);
         });
       }
@@ -442,7 +469,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       toast.error(`Failed to exchange positions: ${errorMessage}`);
       throw err;
     }
-  }, [shotId, shotGenerations, loadPositions, clearEnhancedPromptsForGenerations]);
+  }, [shotId, shotGenerations, loadPositions, getPreviousGenerationId, clearEnhancedPromptsForGenerations]);
 
   // Exchange positions without reloading (for batch operations)
   const exchangePositionsNoReload = useCallback(async (shotGenerationIdA: string, shotGenerationIdB: string) => {
@@ -491,28 +518,34 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
       console.log('[BatchModeReorderFlow] [SQL_SUCCESS] ✅ exchange_timeline_frames completed');
       
-      // Clear enhanced prompts for both swapped items AND their neighbors
-      const itemANeighbors = frameA ? getAdjacentGenerationIds(frameA) : [];
-      const itemBNeighbors = frameB ? getAdjacentGenerationIds(frameB) : [];
+      // Clear enhanced prompts for both swapped items AND items whose next changed
+      // Since pair prompts are stored on first item, clear items whose NEXT changed
+      // When A and B swap, their neighbors' next values change too
+      const itemsToClear = new Set<string>([shotGenerationIdA, shotGenerationIdB]);
       
-      // Combine all affected IDs (deduped via Set)
-      const allAffectedIds = new Set([
-        shotGenerationIdA,
-        shotGenerationIdB,
-        ...itemANeighbors.filter(id => id !== shotGenerationIdB), // Exclude if A and B were adjacent
-        ...itemBNeighbors.filter(id => id !== shotGenerationIdA)
-      ]);
-      const itemsToClear = Array.from(allAffectedIds);
+      // Get items BEFORE A and B at their original positions
+      // These items' next changed (from A/B to B/A)
+      const itemBeforeA = frameA ? getPreviousGenerationId(frameA) : null;
+      const itemBeforeB = frameB ? getPreviousGenerationId(frameB) : null;
       
-      console.log(`[BatchModeReorderFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for swapped items and neighbors:`, {
+      // Only add if it's not the other swapped item (handles adjacent swaps)
+      if (itemBeforeA && itemBeforeA !== shotGenerationIdB) {
+        itemsToClear.add(itemBeforeA);
+      }
+      if (itemBeforeB && itemBeforeB !== shotGenerationIdA) {
+        itemsToClear.add(itemBeforeB);
+      }
+      
+      console.log(`[BatchModeReorderFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (next neighbor changed):`, {
         itemA: shotGenerationIdA.substring(0, 8),
         itemB: shotGenerationIdB.substring(0, 8),
-        itemANeighbors: itemANeighbors.map(id => id.substring(0, 8)),
-        itemBNeighbors: itemBNeighbors.map(id => id.substring(0, 8)),
-        totalToClear: itemsToClear.length
+        itemBeforeA: itemBeforeA?.substring(0, 8) || 'none',
+        itemBeforeB: itemBeforeB?.substring(0, 8) || 'none',
+        totalToClear: itemsToClear.size,
+        note: 'Exchange swaps positions, so both items and their predecessors affected'
       });
       
-      clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
+      clearEnhancedPromptsForGenerations(Array.from(itemsToClear)).catch(err => {
         console.error('[exchangePositionsNoReload] Error clearing enhanced prompts:', err);
       });
       
@@ -523,7 +556,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       console.error('[BatchModeReorderFlow] [EXCHANGE_ERROR] ❌ Exchange failed:', errorMessage);
       throw err;
     }
-  }, [shotId, shotGenerations, clearEnhancedPromptsForGenerations]);
+  }, [shotId, shotGenerations, getPreviousGenerationId, clearEnhancedPromptsForGenerations]);
 
   // Batch exchange positions - performs multiple exchanges then reloads once
   const batchExchangePositions = useCallback(async (exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }>) => {
@@ -763,18 +796,41 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       
       // ONLY clear enhanced prompts if the relative order actually changed
       if (orderChanged) {
-        // Get old neighbors
-        const oldAdjacentIds = oldTimelineFrame ? getAdjacentGenerationIds(oldTimelineFrame) : [];
+        // Since pair prompts are stored on the first item of each pair,
+        // we need to clear items whose NEXT neighbor changed:
+        // 1. The moved item (its next changed)
+        // 2. The item BEFORE the moved item at its OLD position (its next changed from movedItem to something else)
+        // 3. The item BEFORE the moved item at its NEW position (its next changed from something to movedItem)
+        const itemsToClear: string[] = [shotGenerationId];
         
-        // Clear enhanced prompts for: moved item + old neighbors + new neighbors (deduped)
-        const allAffectedIds = new Set([shotGenerationId, ...oldAdjacentIds, ...newAdjacentIds]);
-        const itemsToClear = Array.from(allAffectedIds);
+        // Get the item before the moved item at OLD position
+        const oldPrevious = oldTimelineFrame ? getPreviousGenerationId(oldTimelineFrame) : null;
+        if (oldPrevious) {
+          itemsToClear.push(oldPrevious);
+        }
+        
+        // Get the item before the moved item at NEW position
+        let newPrevious: string | null = null;
+        if (updatedGenerations && newIndex > 0) {
+          const nonVideoGens = updatedGenerations.filter(sg => {
+            const gen = (sg as any).generation;
+            const isVideo = gen.type === 'video' || 
+                           gen.type === 'video_travel_output' ||
+                           (gen.location && gen.location.endsWith('.mp4'));
+            return !isVideo;
+          });
+          newPrevious = nonVideoGens[newIndex - 1]?.id || null;
+          if (newPrevious && newPrevious !== oldPrevious) {
+            itemsToClear.push(newPrevious);
+          }
+        }
         
         console.log(`[TimelineDragFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (order changed):`, {
           movedItem: shotGenerationId.substring(0, 8),
-          oldNeighbors: oldAdjacentIds.map(id => id.substring(0, 8)),
-          newNeighbors: newAdjacentIds.map(id => id.substring(0, 8)),
-          totalToClear: itemsToClear.length
+          oldPrevious: oldPrevious?.substring(0, 8) || 'none',
+          newPrevious: newPrevious?.substring(0, 8) || 'none',
+          totalToClear: itemsToClear.length,
+          reason: 'Clearing items whose next neighbor changed'
         });
         
         // Clear prompts and AWAIT it to ensure consistency before UI updates
@@ -791,7 +847,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     } finally {
       setIsPersistingPositions(false);
     }
-  }, [shotId, shotGenerations, getAdjacentGenerationIds, clearEnhancedPromptsForGenerations]);
+  }, [shotId, shotGenerations, getPreviousGenerationId, clearEnhancedPromptsForGenerations]);
 
   // REMOVED: Automatic timeline frame initialization
   // This was causing magic edit items (with add_in_position: false) to be automatically

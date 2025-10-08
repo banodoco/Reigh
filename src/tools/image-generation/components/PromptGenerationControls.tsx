@@ -170,7 +170,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
               setOverallPromptText(next);
               emitChange({ overallPromptText: next });
             }}
-            placeholder={remixMode ? "e.g., Make them more cinematic, Add vibrant colors, Focus on close-up details..." : "e.g., A medieval fantasy adventure with dragons and magic..."}
+            placeholder={remixMode ? "e.g., Transform into fever dreams..." : "e.g., A medieval fantasy adventure with dragons and magic..."}
               rows={2}
             disabled={!hasApiKey || isGenerating}
               className="min-h-[60px] max-h-[60px]"
