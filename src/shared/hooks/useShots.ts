@@ -1672,6 +1672,7 @@ export const useCreateShotWithImage = () => {
 export const useHandleExternalImageDrop = () => {
   const createShotMutation = useCreateShot();
   const addImageToShotMutation = useAddImageToShot();
+  const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   // IMPORTANT: This hook needs access to the current project_id.
   // This should ideally come from a context, e.g., useProject().
   // For now, I'll assume it's passed as an argument or a higher-level component handles it.
@@ -1682,9 +1683,10 @@ export const useHandleExternalImageDrop = () => {
         imageFiles: File[], 
         targetShotId: string | null, 
         currentProjectQueryKey: string | null,
-        currentShotCount: number
+        currentShotCount: number,
+        skipAutoPosition?: boolean // NEW: Flag to skip auto-positioning for timeline uploads
     }) => {
-    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount } = variables;
+    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition } = variables;
     
     if (!currentProjectQueryKey) { // Should be actual projectId
         toast.error("Cannot add image(s): current project is not identified.");
@@ -1771,13 +1773,26 @@ export const useHandleExternalImageDrop = () => {
           }
 
           // 2c. Add the generation to the shot (either new or existing)
-          await addImageToShotMutation.mutateAsync({
-            shot_id: shotId,
-            generation_id: newGeneration.id as string,
-            project_id: projectIdForOperation,
-            imageUrl: newGeneration.location || undefined,
-            thumbUrl: thumbnailUrl || newGeneration.location || undefined,
-          });
+          // Use different mutation based on skipAutoPosition flag
+          if (skipAutoPosition) {
+            // For timeline uploads: create without auto-positioning so caller can set position
+            await addImageToShotWithoutPositionMutation.mutateAsync({
+              shot_id: shotId,
+              generation_id: newGeneration.id as string,
+              project_id: projectIdForOperation,
+              imageUrl: newGeneration.location || undefined,
+              thumbUrl: thumbnailUrl || newGeneration.location || undefined,
+            });
+          } else {
+            // For normal uploads: use default auto-positioning behavior
+            await addImageToShotMutation.mutateAsync({
+              shot_id: shotId,
+              generation_id: newGeneration.id as string,
+              project_id: projectIdForOperation,
+              imageUrl: newGeneration.location || undefined,
+              thumbUrl: thumbnailUrl || newGeneration.location || undefined,
+            });
+          }
           generationIds.push(newGeneration.id as string);
   
 

@@ -224,6 +224,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         onClose={() => setIsMagicEditOpen(false)}
         imageUrl={displayImageUrl}
         shotGenerationId={(image as any).shotImageEntryId}
+        zIndexOverride={100100}
       />
     </>
   );

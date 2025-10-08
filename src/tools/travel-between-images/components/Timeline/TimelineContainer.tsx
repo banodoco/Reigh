@@ -211,33 +211,15 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     isZooming,
   } = useZoom({ fullMin, fullMax, fullRange });
 
-  // Custom zoom handlers to zoom to center of viewport
+  // Custom zoom handlers to zoom anchored to the leftmost part of timeline
   const handleZoomInToCenter = () => {
-    if (!timelineRef.current || !containerRef.current) return;
-    const scrollContainer = timelineRef.current;
-    const timelineContent = containerRef.current;
-    
-    const scrollCenterPx = scrollContainer.scrollLeft + (scrollContainer.clientWidth / 2);
-    const contentWidth = timelineContent.getBoundingClientRect().width;
-    
-    // Convert the center pixel of the viewport to a frame number
-    const centerFrame = pixelToFrame(scrollCenterPx, contentWidth, fullMin, fullRange);
-    
-    handleZoomIn(centerFrame);
+    // Zoom anchored to the leftmost frame
+    handleZoomIn(fullMin);
   };
 
   const handleZoomOutFromCenter = () => {
-    if (!timelineRef.current || !containerRef.current) return;
-    const scrollContainer = timelineRef.current;
-    const timelineContent = containerRef.current;
-    
-    const scrollCenterPx = scrollContainer.scrollLeft + (scrollContainer.clientWidth / 2);
-    const contentWidth = timelineContent.getBoundingClientRect().width;
-    
-    // Convert the center pixel of the viewport to a frame number
-    const centerFrame = pixelToFrame(scrollCenterPx, contentWidth, fullMin, fullRange);
-    
-    handleZoomOut(centerFrame);
+    // Zoom anchored to the leftmost frame
+    handleZoomOut(fullMin);
   };
 
   // Force re-render when zoom changes to update containerWidth measurement
@@ -367,56 +349,57 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
   return (
     <div className="w-full overflow-x-hidden relative">
-      {/* Fixed corner controls - positioned relative to visible viewport */}
-      {/* Top-left: Zoom controls */}
-      <div className={`absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-        <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
-        <Button
-          variant={zoomLevel > 1.5 ? "default" : "outline"}
-          size="sm"
-          onClick={handleZoomReset}
-          disabled={zoomLevel <= 1}
-          className={`h-7 text-xs px-2 transition-all ${
-            zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
-            zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
-          }`}
-          style={{
-            transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
-          }}
-        >
-          Reset
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleZoomOutFromCenter}
-          disabled={zoomLevel <= 1}
-          className="h-7 w-7 p-0"
-        >
-          −
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleZoomInToCenter}
-          className="h-7 w-7 p-0"
-        >
-          +
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleZoomToStart}
-          className="h-7 text-xs px-2"
-        >
-          ← Start
-        </Button>
-      </div>
+      {/* Top-left: Zoom controls - show when video is present (otherwise in uploader strip) */}
+      {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+        <div className={`absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+          <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomToStart}
+            className="h-7 text-xs px-2"
+          >
+            ← Start
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomOutFromCenter}
+            disabled={zoomLevel <= 1}
+            className="h-7 w-7 p-0"
+          >
+            −
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZoomInToCenter}
+            className="h-7 w-7 p-0"
+          >
+            +
+          </Button>
+          <Button
+            variant={zoomLevel > 1.5 ? "default" : "outline"}
+            size="sm"
+            onClick={handleZoomReset}
+            disabled={zoomLevel <= 1}
+            className={`h-7 text-xs px-2 transition-all ${
+              zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
+              zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
+            }`}
+            style={{
+              transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
+            }}
+          >
+            Reset
+          </Button>
+        </div>
+      )}
 
       {/* Bottom-left: Gap control and Reset button */}
       <div 
         className={`absolute left-8 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-        style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
+        style={{ bottom: zoomLevel <= 1 ? 'calc(1rem + 30px)' : 'calc(2rem + 30px)' }}
       >
         {/* Gap to reset */}
         <div className="flex items-center gap-1.5">
@@ -442,74 +425,56 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         </Button>
       </div>
 
-      {/* Top-right: Video upload and structure controls */}
-      {shotId && projectId && onStructureVideoChange && (
+      {/* Top-right: Structure controls (only when video is present) */}
+      {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
         <div className={`absolute right-8 top-4 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-          {structureVideoPath && structureVideoMetadata ? (
-            // Structure controls (when video is present)
-            <>
-              {/* Structure type selector */}
-              <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
-                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
-              }}>
-                <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                  <SelectValue>
-                    {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="flow">
-                    <span className="text-xs">Optical flow</span>
-                  </SelectItem>
-                  <SelectItem value="canny">
-                    <span className="text-xs">Canny</span>
-                  </SelectItem>
-                  <SelectItem value="depth">
-                    <span className="text-xs">Depth</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Structure type selector */}
+          <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+            onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
+          }}>
+            <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+              <SelectValue>
+                {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="flow">
+                <span className="text-xs">Optical flow</span>
+              </SelectItem>
+              <SelectItem value="canny">
+                <span className="text-xs">Canny</span>
+              </SelectItem>
+              <SelectItem value="depth">
+                <span className="text-xs">Depth</span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
 
-              {/* Strength compact display */}
-              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
-                <span className="text-muted-foreground">Strength:</span>
-                <span className={`font-medium ${
-                  structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
-                  structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
-                  'text-foreground'
-                }`}>
-                  {structureVideoMotionStrength.toFixed(1)}x
-                </span>
-              </div>
+          {/* Strength compact display */}
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
+            <span className="text-muted-foreground">Strength:</span>
+            <span className={`font-medium ${
+              structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
+              structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
+              'text-foreground'
+            }`}>
+              {structureVideoMotionStrength.toFixed(1)}x
+            </span>
+          </div>
 
-              {/* Strength slider (compact) */}
-              <div className="w-16">
-                <Slider
-                  value={[structureVideoMotionStrength]}
-                  onValueChange={([value]) => {
-                    onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
-                  }}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  className="h-4"
-                />
-              </div>
-            </>
-          ) : (
-            // Upload button (when no video is present)
-            <GuidanceVideoUploader
-              shotId={shotId}
-              projectId={projectId}
-              onVideoUploaded={(videoUrl, metadata) => {
-                if (videoUrl && metadata) {
-                  onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
-                }
+          {/* Strength slider (compact) */}
+          <div className="w-16">
+            <Slider
+              value={[structureVideoMotionStrength]}
+              onValueChange={([value]) => {
+                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
               }}
-              currentVideoUrl={structureVideoPath}
-              compact={true}
+              min={0}
+              max={2}
+              step={0.1}
+              className="h-4"
             />
-          )}
+          </div>
         </div>
       )}
 
@@ -517,7 +482,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       {onImageDrop && (
         <div 
           className={`absolute right-8 z-20 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-          style={{ bottom: zoomLevel <= 1 ? '2.75rem' : '3.5rem' }}
+          style={{ bottom: zoomLevel <= 1 ? 'calc(1rem + 30px)' : 'calc(2rem + 30px)' }}
         >
           <input
             ref={fileInputRef}
@@ -558,8 +523,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         }`}
         style={{ 
           minHeight: "200px", 
-          paddingTop: structureVideoPath && structureVideoMetadata ? "3rem" : "4.5rem", 
-          paddingBottom: "5.5rem" 
+          paddingTop: structureVideoPath && structureVideoMetadata ? "3rem" : "1.5rem", 
+          paddingBottom: "4.5rem" 
         }}
         onWheel={handleWheel}
         onDragEnter={handleDragEnter}
@@ -576,30 +541,49 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           containerWidth={containerWidth}
         />
 
-        {/* Structure video strip */}
-        {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
-          <GuidanceVideoStrip
-            videoUrl={structureVideoPath}
-            videoMetadata={structureVideoMetadata}
-            treatment={structureVideoTreatment}
-            motionStrength={structureVideoMotionStrength}
-            onTreatmentChange={(treatment) => {
-              onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength, structureVideoType);
-            }}
-            onMotionStrengthChange={(strength) => {
-              onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength, structureVideoType);
-            }}
-            onRemove={() => {
-              onStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
-            }}
-            fullMin={fullMin}
-            fullMax={fullMax}
-            fullRange={fullRange}
-            containerWidth={containerWidth}
-            zoomLevel={zoomLevel}
-            timelineFrameCount={images.length}
-            frameSpacing={contextFrames}
-          />
+        {/* Structure video strip or uploader */}
+        {shotId && projectId && onStructureVideoChange && (
+          structureVideoPath && structureVideoMetadata ? (
+            <GuidanceVideoStrip
+              videoUrl={structureVideoPath}
+              videoMetadata={structureVideoMetadata}
+              treatment={structureVideoTreatment}
+              motionStrength={structureVideoMotionStrength}
+              onTreatmentChange={(treatment) => {
+                onStructureVideoChange(structureVideoPath, structureVideoMetadata, treatment, structureVideoMotionStrength, structureVideoType);
+              }}
+              onMotionStrengthChange={(strength) => {
+                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, strength, structureVideoType);
+              }}
+              onRemove={() => {
+                onStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+              }}
+              fullMin={fullMin}
+              fullMax={fullMax}
+              fullRange={fullRange}
+              containerWidth={containerWidth}
+              zoomLevel={zoomLevel}
+              timelineFrameCount={images.length}
+              frameSpacing={contextFrames}
+            />
+          ) : (
+            <GuidanceVideoUploader
+              shotId={shotId}
+              projectId={projectId}
+              onVideoUploaded={(videoUrl, metadata) => {
+                if (videoUrl && metadata) {
+                  onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
+                }
+              }}
+              currentVideoUrl={structureVideoPath}
+              compact={false}
+              zoomLevel={zoomLevel}
+              onZoomIn={handleZoomInToCenter}
+              onZoomOut={handleZoomOutFromCenter}
+              onZoomReset={handleZoomReset}
+              onZoomToStart={handleZoomToStart}
+            />
+          )
         )}
 
         {/* Ruler */}

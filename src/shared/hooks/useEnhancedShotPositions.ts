@@ -768,18 +768,20 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // Check if the relative order actually changed
       let orderChanged = false;
       let newAdjacentIds: string[] = [];
+      let newIndex = -1; // Declare outside for use later
       
       if (updatedGenerations) {
         // Filter out videos
         const nonVideoGens = updatedGenerations.filter(sg => {
           const gen = (sg as any).generation;
+          if (!gen) return false; // Skip if no generation data
           const isVideo = gen.type === 'video' || 
                          gen.type === 'video_travel_output' ||
                          (gen.location && gen.location.endsWith('.mp4'));
           return !isVideo;
         });
         
-        const newIndex = nonVideoGens.findIndex(sg => sg.id === shotGenerationId);
+        newIndex = nonVideoGens.findIndex(sg => sg.id === shotGenerationId);
         
         // Order changed if the item's position in the sequence changed
         if (newIndex !== -1 && oldIndex !== -1 && newIndex !== oldIndex) {
@@ -814,6 +816,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         if (updatedGenerations && newIndex > 0) {
           const nonVideoGens = updatedGenerations.filter(sg => {
             const gen = (sg as any).generation;
+            if (!gen) return false; // Skip if no generation data
             const isVideo = gen.type === 'video' || 
                            gen.type === 'video_travel_output' ||
                            (gen.location && gen.location.endsWith('.mp4'));

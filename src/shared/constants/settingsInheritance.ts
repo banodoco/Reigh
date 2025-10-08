@@ -172,3 +172,5 @@ export type ContentField = typeof NEVER_INHERIT_FIELDS[number] |
 export type ConfigurationField = 
   typeof TOOL_FIELD_CATEGORIES[keyof typeof TOOL_FIELD_CATEGORIES]['configuration'][number];
 
+
+

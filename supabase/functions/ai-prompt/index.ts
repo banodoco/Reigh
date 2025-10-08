@@ -59,9 +59,10 @@ IMPORTANT GUIDELINES:
 - Each prompt should be specifically designed for AI image generation
 - Add detail that expands or adds to the user's instruction (unless they request otherwise)
 - Focus on visual elements like composition, lighting, colors, and atmosphere
-- CHARACTER GUIDANCE: Only mention specific character details iv requested - if the user asks for them. If they provide a character description use it consistently across prompts. If they ask you to generate characters, give them unique character names and descriptions for each prompt.
-- STYLE GUIDANCE: Only mention specific artistic styles (photography, anime, oil painting, digital art) if specifically requested.
-- SCENE GUIDANCE: ALWAYS specifically describe the scene and environment - if the user doesn't specify, you should always describe the scene and environment in detail.
+- SUBJECT GUIDANCE: If the user asks for simple subjects like "a man", "a woman", or "a train" without requesting additional details or variety, mention them simply without embellishment. Only add descriptive details when specifically requested.
+- CHARACTER GUIDANCE: Only mention specific character details if requested - if the user asks for them. If they provide a character description use it consistently across prompts. If they ask you to generate characters, give them unique character names and descriptions for each prompt.
+- STYLE GUIDANCE: Only mention specific artistic styles (photography, anime, oil painting, digital art) if specifically requested. Keep styles simple unless the user asks for detailed styling.
+- SCENE GUIDANCE: Only provide detailed scene and environment descriptions when specifically requested. If the user mentions a simple scene, keep it simple.
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Output EXACTLY ${numberToGenerate} prompts
@@ -87,6 +88,8 @@ FORMAT EXAMPLE (${numberToGenerate} prompts):
 YOUR OUTPUT (${numberToGenerate} prompts):
 
 Reminder: here's the user request: "${overallPromptText || "Please generate general image prompts based on the overall goal and rules."}" - make sure to respect that precisely.
+
+CRITICAL REMINDER: If the user asks for simple subjects (like "a man", "a woman", "a train"), styles, or scenes without asking for details or variety, keep them simple in the prompt. Only add descriptive details when specifically requested.
 
 IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do not include any commentary, explanations, or additional text.`;
 
