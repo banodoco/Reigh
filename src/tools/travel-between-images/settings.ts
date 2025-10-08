@@ -111,8 +111,15 @@ export const videoTravelSettings = {
   id: 'travel-between-images',
   scope: ['shot'], // Video travel settings are per-shot
   defaults: {
-    videoControlMode: 'batch' as const,
+    // Content fields (don't inherit to new projects) - explicit empty defaults
     batchVideoPrompt: '',
+    pairConfigs: [],
+    shotImageIds: [],
+    phaseConfig: undefined,
+    structureVideo: undefined,
+    
+    // Configuration fields (can inherit to new projects)
+    videoControlMode: 'batch' as const,
     batchVideoFrames: 60,
     batchVideoContext: 10,
     batchVideoSteps: 6,
@@ -126,5 +133,7 @@ export const videoTravelSettings = {
     advancedMode: false,
     selectedMode: 'Zippy Supreme' as const,
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
+    customWidth: undefined,
+    customHeight: undefined,
   },
 }; 

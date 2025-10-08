@@ -685,12 +685,22 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     const dragSessionId = metadata?.drag_session_id || 'no-session';
     console.log(`[TimelineDragFlow] [DB_UPDATE] 🎯 Session: ${dragSessionId} | Updating timeline frame for shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
 
-    // Get the item's current timeline_frame BEFORE the move
+    // Get the item's current state BEFORE the move
     const movedItem = shotGenerations.find(sg => sg.id === shotGenerationId);
     const oldTimelineFrame = movedItem?.timeline_frame;
 
-    // Get IDs of items that were adjacent to the old position (before move)
-    const oldAdjacentIds = oldTimelineFrame ? getAdjacentGenerationIds(oldTimelineFrame) : [];
+    // Get the current order of items (excluding videos)
+    const oldOrderedItems = shotGenerations
+      .filter(sg => {
+        if (!sg.generation) return false;
+        const isVideo = sg.generation.type === 'video' ||
+                       sg.generation.type === 'video_travel_output' ||
+                       (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+        return !isVideo && sg.timeline_frame !== null && sg.timeline_frame !== undefined;
+      })
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+    
+    const oldIndex = oldOrderedItems.findIndex(sg => sg.id === shotGenerationId);
 
     setIsPersistingPositions(true);
 
@@ -710,10 +720,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
       console.log(`[TimelineDragFlow] [DB_SUCCESS] ✅ Session: ${dragSessionId} | Successfully updated shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
       
-      // AFTER the database update, fetch the updated state to get new neighbors
+      // AFTER the database update, fetch the updated state to check if order changed
       const { data: updatedGenerations, error: fetchError } = await supabase
         .from('shot_generations')
-        .select('id, generation_id, timeline_frame, generation(type, location)')
+        .select('id, generation_id, timeline_frame, generations:generations(type, location)')
         .eq('shot_id', shotId)
         .not('timeline_frame', 'is', null)
         .order('timeline_frame', { ascending: true });
@@ -722,10 +732,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         console.error('[updateTimelineFrame] Error fetching updated positions:', fetchError);
       }
 
-      // Find new adjacent neighbors from the fresh data
+      // Check if the relative order actually changed
+      let orderChanged = false;
       let newAdjacentIds: string[] = [];
+      
       if (updatedGenerations) {
-        // Filter out videos and find the moved item's new position
+        // Filter out videos
         const nonVideoGens = updatedGenerations.filter(sg => {
           const gen = (sg as any).generation;
           const isVideo = gen.type === 'video' || 
@@ -735,25 +747,41 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         });
         
         const newIndex = nonVideoGens.findIndex(sg => sg.id === shotGenerationId);
-        if (newIndex !== -1) {
+        
+        // Order changed if the item's position in the sequence changed
+        if (newIndex !== -1 && oldIndex !== -1 && newIndex !== oldIndex) {
+          orderChanged = true;
+          console.log(`[TimelineDragFlow] [ORDER_CHANGE] 📊 Order changed: ${oldIndex} → ${newIndex}`);
+          
+          // Get new neighbors
           if (newIndex > 0) newAdjacentIds.push(nonVideoGens[newIndex - 1].id);
           if (newIndex < nonVideoGens.length - 1) newAdjacentIds.push(nonVideoGens[newIndex + 1].id);
+        } else {
+          console.log(`[TimelineDragFlow] [ORDER_SAME] ✓ Order unchanged (frame spacing adjusted): ${oldIndex} → ${newIndex}`);
         }
       }
       
-      // Clear enhanced prompts for: moved item + old neighbors + new neighbors (deduped)
-      const allAffectedIds = new Set([shotGenerationId, ...oldAdjacentIds, ...newAdjacentIds]);
-      const itemsToClear = Array.from(allAffectedIds);
-      
-      console.log(`[TimelineDragFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for all affected items:`, {
-        movedItem: shotGenerationId.substring(0, 8),
-        oldNeighbors: oldAdjacentIds.map(id => id.substring(0, 8)),
-        newNeighbors: newAdjacentIds.map(id => id.substring(0, 8)),
-        totalToClear: itemsToClear.length
-      });
-      
-      // Clear prompts and AWAIT it to ensure consistency before UI updates
-      await clearEnhancedPromptsForGenerations(itemsToClear);
+      // ONLY clear enhanced prompts if the relative order actually changed
+      if (orderChanged) {
+        // Get old neighbors
+        const oldAdjacentIds = oldTimelineFrame ? getAdjacentGenerationIds(oldTimelineFrame) : [];
+        
+        // Clear enhanced prompts for: moved item + old neighbors + new neighbors (deduped)
+        const allAffectedIds = new Set([shotGenerationId, ...oldAdjacentIds, ...newAdjacentIds]);
+        const itemsToClear = Array.from(allAffectedIds);
+        
+        console.log(`[TimelineDragFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (order changed):`, {
+          movedItem: shotGenerationId.substring(0, 8),
+          oldNeighbors: oldAdjacentIds.map(id => id.substring(0, 8)),
+          newNeighbors: newAdjacentIds.map(id => id.substring(0, 8)),
+          totalToClear: itemsToClear.length
+        });
+        
+        // Clear prompts and AWAIT it to ensure consistency before UI updates
+        await clearEnhancedPromptsForGenerations(itemsToClear);
+      } else {
+        console.log(`[TimelineDragFlow] [SKIP_CLEAR] ⏭️ Skipping prompt clear (order unchanged, only spacing adjusted)`);
+      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update timeline frame';

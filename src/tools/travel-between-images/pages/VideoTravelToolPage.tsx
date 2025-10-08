@@ -862,6 +862,22 @@ const VideoTravelToolPage: React.FC = () => {
     return () => clearHeader();
   }, []);
 
+  // FAILSAFE: Force enable inputs after 2 seconds if settings haven't loaded
+  // This prevents the UI from being permanently locked due to query failures
+  useEffect(() => {
+    if (!selectedShot?.id) return;
+    
+    const timeoutId = setTimeout(() => {
+      if (!hasLoadedInitialSettings.current) {
+        console.warn('[SettingsLoadingFailsafe] ⚠️ Settings failed to load within 2s, force-enabling UI with defaults');
+        hasLoadedInitialSettings.current = true;
+        userHasInteracted.current = false;
+      }
+    }, 2000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [selectedShot?.id]);
+
   // Update state when settings are loaded from database (or confirmed absent)
   // OPTIMIZATION: Use React.startTransition to batch state updates and reduce renders
   useEffect(() => {

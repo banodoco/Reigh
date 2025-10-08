@@ -11,7 +11,10 @@ export const editTravelSettings = {
   id: 'edit-travel',
   scope: ['project'] as const, // persist at project level by default
   defaults: {
+    // Content fields (don't inherit to new projects) - explicit empty defaults
     prompts: [],
+    
+    // Configuration fields (can inherit to new projects)
     imagesPerPrompt: 1,
     generationMode: 'kontext' as const,
     fluxSoftEdgeStrength: 0.2,

@@ -466,6 +466,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Get settings from the current project to copy to the new project
+      // See src/shared/constants/settingsInheritance.ts for full documentation of what inherits
       let settingsToInherit = {};
       if (selectedProjectId) {
         try {
@@ -476,7 +477,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
             .single();
           
           if (currentProjectData?.settings) {
-            // Filter out prompt-related settings while keeping everything else
+            // Filter out content fields (prompts, references) while keeping configuration
+            // INHERITANCE POLICY: Content data doesn't inherit, but configuration settings do
             settingsToInherit = {};
             
             Object.entries(currentProjectData.settings).forEach(([toolId, toolSettings]) => {

@@ -16,13 +16,16 @@ export interface ActiveLora {
 
 export interface ImageGenerationSettings {
   prompts?: PromptEntry[];
+  promptsByShot?: Record<string, PromptEntry[]>; // Prompts organized by shot ID
   imagesPerPrompt?: number;
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
+  selectedLoras?: ActiveLora[]; // Currently selected LoRAs
   depthStrength?: number;
   softEdgeStrength?: number;
   generationMode?: GenerationMode;
   beforeEachPromptText?: string;
   afterEachPromptText?: string;
+  associatedShotId?: string | null; // Last associated shot
 }
 
 export const defaultImageGenerationSettings: ImageGenerationSettings = {
@@ -33,16 +36,22 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
       shortPrompt: 'Cat Astronaut',
     },
   ],
+  // Content fields (don't inherit to new projects) - explicit empty defaults
+  promptsByShot: {},
+  beforeEachPromptText: '',
+  afterEachPromptText: '',
+  associatedShotId: null,
+  
+  // Configuration fields (can inherit to new projects)
   imagesPerPrompt: 1,
   selectedLorasByMode: {
     'wan-local': [],
     'qwen-image': [],
   },
+  selectedLoras: [],
   depthStrength: 50,
   softEdgeStrength: 20,
   generationMode: 'wan-local',
-  beforeEachPromptText: '',
-  afterEachPromptText: '',
 };
 
 export const imageGenerationSettings = {

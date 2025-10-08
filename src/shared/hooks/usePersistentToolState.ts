@@ -3,6 +3,29 @@ import { useToolSettings, SettingsScope } from './useToolSettings';
 import { deepEqual, sanitizeSettings } from '../lib/deepEqual';
 import { toolsManifest } from '@/tools';
 
+/**
+ * Infer an appropriate "empty" value for a given value based on its type.
+ * 
+ * IMPORTANT: This is a SAFETY NET for fields that are persisted but don't have
+ * explicit defaults defined in their tool's settings.ts file. This prevents stale
+ * state from previous projects from persisting when switching projects.
+ * 
+ * BEST PRACTICE: All persisted fields should have explicit defaults in settings.ts,
+ * even if those defaults are empty (e.g., promptsByShot: {}, batchVideoPrompt: '').
+ * This makes the "contract" of what gets persisted clear and self-documenting.
+ * 
+ * @param value - The current state value to infer an empty value from
+ * @returns An appropriate empty value based on the type of the input
+ */
+function inferEmptyValue(value: any): any {
+  if (Array.isArray(value)) return [];
+  if (typeof value === 'object' && value !== null) return {};
+  if (typeof value === 'string') return '';
+  if (typeof value === 'number') return 0;
+  if (typeof value === 'boolean') return false;
+  return undefined;
+}
+
 export interface StateMapping<T> {
   [key: string]: [T[keyof T], React.Dispatch<React.SetStateAction<T[keyof T]>>];
 }
@@ -116,16 +139,30 @@ export function usePersistentToolState<T extends Record<string, any>>(
       userHasInteractedRef.current = false;
       
       // Apply each setting to its corresponding setter
-      // CRITICAL FIX: Reset to defaults if undefined in database (prevents stale state from previous project)
-      Object.entries(stateMapping).forEach(([key, [_, setter]]) => {
+      // CRITICAL FIX: Always reset values when switching projects to prevent stale state
+      Object.entries(stateMapping).forEach(([key, [currentValue, setter]]) => {
         if (effectiveSettings[key as keyof T] !== undefined) {
           // Value exists in DB - use it
           setter(effectiveSettings[key as keyof T] as any);
         } else if (toolDefaults[key as keyof typeof toolDefaults] !== undefined) {
           // Value missing in DB but has a default - reset to default
           setter(toolDefaults[key as keyof typeof toolDefaults] as any);
+        } else {
+          // SAFETY NET: No value in DB and no default - infer empty value from current type
+          // This prevents stale state but ideally all fields should have explicit defaults
+          const emptyValue = inferEmptyValue(currentValue);
+          
+          // Warn in development if we're using inference (indicates missing default)
+          if (process.env.NODE_ENV === 'development') {
+            console.warn(
+              `[usePersistentToolState] Field "${key}" in tool "${toolId}" has no default value. ` +
+              `Inferring empty value (${JSON.stringify(emptyValue)}). ` +
+              `Consider adding explicit default in settings.ts`
+            );
+          }
+          
+          setter(emptyValue as any);
         }
-        // If no default exists, leave the state value as-is (allows for optional fields)
       });
 
       // Mark as ready after hydration
