@@ -592,18 +592,20 @@ const JoinClipsPage: React.FC = () => {
           const hasValidData = videosData?.items && videosData.items.length > 0;
           const isLoadingOrFetching = videosLoading || videosFetching;
           
-          // Show skeleton only if we're loading AND we already have data (refetching)
-          // This prevents showing "Previous Results" when there might not be any data yet
-          const shouldShowSkeleton = (isLoadingOrFetching || videosViewJustEnabled) && hasValidData;
+          // Show skeleton when loading for the first time (no data yet) or when just enabled
+          // Don't show skeleton during refetches when we already have data (prevents flicker)
+          const shouldShowSkeleton = (isLoadingOrFetching && !hasValidData) || videosViewJustEnabled;
           
           if (shouldShowSkeleton) {
+            // Use actual count if available, otherwise default to 6 for initial load
+            const skeletonCount = videosData?.items?.length || 6;
             return (
               <div className="space-y-4 pt-4 border-t">
                 <h2 className="text-xl font-medium">
-                  Previous Results ({videosData.items.length})
+                  {hasValidData ? `Previous Results (${videosData.items.length})` : 'Loading Results...'}
                 </h2>
                 <SkeletonGallery
-                  count={videosData.items.length}
+                  count={skeletonCount}
                   columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
                   showControls={true}
                   projectAspectRatio={projectAspectRatio}
