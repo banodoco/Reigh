@@ -46,6 +46,10 @@ const JoinClipsPage: React.FC = () => {
   // Track success state for button feedback
   const [showSuccessState, setShowSuccessState] = useState(false);
   
+  // Track drag state for visual feedback
+  const [isDraggingOverStarting, setIsDraggingOverStarting] = useState(false);
+  const [isDraggingOverEnding, setIsDraggingOverEnding] = useState(false);
+  
   // Load settings
   const { settings, update: updateSettings } = useToolSettings<JoinClipsSettings>(
     'join-clips',
@@ -136,25 +140,22 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [settings?.startingVideoUrl, settings?.endingVideoUrl]);
   
-  // Handle starting video upload
-  const handleStartingVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
+  // Helper function to upload a video file
+  const uploadVideoFile = async (file: File, type: 'starting' | 'ending') => {
     if (!file.type.startsWith('video/')) {
       toast({
         title: 'Invalid file type',
         description: 'Please upload a video file',
         variant: 'destructive',
       });
-      return;
+      return null;
     }
     
     setIsUploading(true);
     try {
       // Upload video to Supabase storage
       const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `join-clips/${selectedProjectId}/${Date.now()}-starting-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileName = `join-clips/${selectedProjectId}/${Date.now()}-${type}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       
       const { data, error } = await supabase.storage
         .from('image_uploads')
@@ -170,17 +171,12 @@ const JoinClipsPage: React.FC = () => {
         .from('image_uploads')
         .getPublicUrl(fileName);
       
-      setStartingVideo({ url: publicUrl, file });
-      
-      // Save URL to project settings for persistence
-      if (selectedProjectId) {
-        updateSettings('project', { ...settings, startingVideoUrl: publicUrl });
-      }
-      
       toast({
         title: 'Video uploaded',
-        description: 'Your starting video has been saved',
+        description: `Your ${type} video has been saved`,
       });
+      
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading video:', error);
       toast({
@@ -188,8 +184,25 @@ const JoinClipsPage: React.FC = () => {
         description: 'Failed to upload video',
         variant: 'destructive',
       });
+      return null;
     } finally {
       setIsUploading(false);
+    }
+  };
+  
+  // Handle starting video upload
+  const handleStartingVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const publicUrl = await uploadVideoFile(file, 'starting');
+    if (!publicUrl) return;
+    
+    setStartingVideo({ url: publicUrl, file });
+    
+    // Save URL to project settings for persistence
+    if (selectedProjectId) {
+      updateSettings('project', { ...settings, startingVideoUrl: publicUrl });
     }
   };
   
@@ -198,55 +211,94 @@ const JoinClipsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (!file.type.startsWith('video/')) {
-      toast({
-        title: 'Invalid file type',
-        description: 'Please upload a video file',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const publicUrl = await uploadVideoFile(file, 'ending');
+    if (!publicUrl) return;
     
-    setIsUploading(true);
-    try {
-      // Upload video to Supabase storage
-      const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `join-clips/${selectedProjectId}/${Date.now()}-ending-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('image_uploads')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      if (error) throw error;
-      
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('image_uploads')
-        .getPublicUrl(fileName);
-      
-      setEndingVideo({ url: publicUrl, file });
-      
-      // Save URL to project settings for persistence
-      if (selectedProjectId) {
-        updateSettings('project', { ...settings, endingVideoUrl: publicUrl });
-      }
-      
-      toast({
-        title: 'Video uploaded',
-        description: 'Your ending video has been saved',
-      });
-    } catch (error) {
-      console.error('Error uploading video:', error);
-      toast({
-        title: 'Upload failed',
-        description: 'Failed to upload video',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUploading(false);
+    setEndingVideo({ url: publicUrl, file });
+    
+    // Save URL to project settings for persistence
+    if (selectedProjectId) {
+      updateSettings('project', { ...settings, endingVideoUrl: publicUrl });
+    }
+  };
+  
+  // Drag and drop handlers for starting video
+  const handleStartingDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleStartingDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverStarting(true);
+  };
+  
+  const handleStartingDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if we're leaving the drop zone itself
+    if (e.currentTarget === e.target) {
+      setIsDraggingOverStarting(false);
+    }
+  };
+  
+  const handleStartingDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverStarting(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    
+    const publicUrl = await uploadVideoFile(file, 'starting');
+    if (!publicUrl) return;
+    
+    setStartingVideo({ url: publicUrl, file });
+    
+    // Save URL to project settings for persistence
+    if (selectedProjectId) {
+      updateSettings('project', { ...settings, startingVideoUrl: publicUrl });
+    }
+  };
+  
+  // Drag and drop handlers for ending video
+  const handleEndingDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleEndingDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverEnding(true);
+  };
+  
+  const handleEndingDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set to false if we're leaving the drop zone itself
+    if (e.currentTarget === e.target) {
+      setIsDraggingOverEnding(false);
+    }
+  };
+  
+  const handleEndingDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverEnding(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    
+    const publicUrl = await uploadVideoFile(file, 'ending');
+    if (!publicUrl) return;
+    
+    setEndingVideo({ url: publicUrl, file });
+    
+    // Save URL to project settings for persistence
+    if (selectedProjectId) {
+      updateSettings('project', { ...settings, endingVideoUrl: publicUrl });
     }
   };
   
@@ -349,25 +401,40 @@ const JoinClipsPage: React.FC = () => {
             <Label className="text-lg font-medium">
               🎬 Starting Video
             </Label>
-            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+            <div 
+              className={`aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative ${
+                isDraggingOverStarting 
+                  ? 'border-primary bg-primary/10' 
+                  : 'border-border hover:border-primary/50'
+              } ${!startingVideo ? 'cursor-pointer' : ''}`}
+              onDragOver={handleStartingDragOver}
+              onDragEnter={handleStartingDragEnter}
+              onDragLeave={handleStartingDragLeave}
+              onDrop={handleStartingDrop}
+              onClick={() => !startingVideo && startingVideoInputRef.current?.click()}
+            >
               {startingVideo ? (
-                <video
-                  src={startingVideo.url}
-                  controls
-                  className="w-full h-full object-contain"
-                />
+                <>
+                  <video
+                    src={startingVideo.url}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                  {isDraggingOverStarting && (
+                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                      <p className="text-lg font-medium text-foreground">Drop to replace</p>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="text-center p-6">
+                <div className="text-center p-6 pointer-events-none">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-4">No starting video</p>
-                  <Button
-                    onClick={() => startingVideoInputRef.current?.click()}
-                    disabled={isUploading}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Video
-                  </Button>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {isDraggingOverStarting ? 'Drop video here' : 'Drag & drop or click to upload'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isDraggingOverStarting ? '' : 'MP4, WebM, MOV supported'}
+                  </p>
                 </div>
               )}
             </div>
@@ -456,25 +523,40 @@ const JoinClipsPage: React.FC = () => {
             <Label className="text-lg font-medium">
               🎬 Ending Video
             </Label>
-            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+            <div 
+              className={`aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative ${
+                isDraggingOverEnding 
+                  ? 'border-primary bg-primary/10' 
+                  : 'border-border hover:border-primary/50'
+              } ${!endingVideo ? 'cursor-pointer' : ''}`}
+              onDragOver={handleEndingDragOver}
+              onDragEnter={handleEndingDragEnter}
+              onDragLeave={handleEndingDragLeave}
+              onDrop={handleEndingDrop}
+              onClick={() => !endingVideo && endingVideoInputRef.current?.click()}
+            >
               {endingVideo ? (
-                <video
-                  src={endingVideo.url}
-                  controls
-                  className="w-full h-full object-contain"
-                />
+                <>
+                  <video
+                    src={endingVideo.url}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                  {isDraggingOverEnding && (
+                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                      <p className="text-lg font-medium text-foreground">Drop to replace</p>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="text-center p-6">
+                <div className="text-center p-6 pointer-events-none">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-4">No ending video</p>
-                  <Button
-                    onClick={() => endingVideoInputRef.current?.click()}
-                    disabled={isUploading}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Video
-                  </Button>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {isDraggingOverEnding ? 'Drop video here' : 'Drag & drop or click to upload'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isDraggingOverEnding ? '' : 'MP4, WebM, MOV supported'}
+                  </p>
                 </div>
               )}
             </div>

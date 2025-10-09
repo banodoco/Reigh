@@ -14,7 +14,7 @@ export interface PhaseSettings {
 }
 
 export interface PhaseConfig {
-  num_phases: number;
+  num_phases: number; // Fixed to 3 - this is the optimal configuration
   steps_per_phase: number[];
   flow_shift: number;
   sample_solver: string;

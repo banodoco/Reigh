@@ -506,47 +506,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         <Label htmlFor="num_phases" className="text-sm font-light block mb-2">
                           Number of Phases
                         </Label>
+                        {/* Fixed to 3 phases - this is the optimal configuration */}
                         <Input
                           id="num_phases"
                           type="number"
                           className="h-10"
-                          min={2}
-                          max={3}
-                          value={phaseConfig.num_phases}
-                          onChange={(e) => {
-                            const newNumPhases = Math.max(2, Math.min(3, parseInt(e.target.value) || 2));
-                            const currentPhases = phaseConfig.phases;
-                            let newPhases = [...currentPhases];
-                            let newStepsPerPhase = [...phaseConfig.steps_per_phase];
-                            
-                            // Adjust phases array when changing num_phases
-                            if (newNumPhases < currentPhases.length) {
-                              // Remove excess phases
-                              newPhases = currentPhases.slice(0, newNumPhases);
-                              newStepsPerPhase = phaseConfig.steps_per_phase.slice(0, newNumPhases);
-                            } else if (newNumPhases > currentPhases.length) {
-                              // Add new phases with default values from DEFAULT_PHASE_CONFIG
-                              const defaultSteps = phaseConfig.steps_per_phase[phaseConfig.steps_per_phase.length - 1] || 2;
-                              for (let i = currentPhases.length; i < newNumPhases; i++) {
-                                // Use the corresponding phase from DEFAULT_PHASE_CONFIG if available
-                                const defaultPhase = DEFAULT_PHASE_CONFIG.phases[i];
-                                newPhases.push({
-                                  phase: i + 1,
-                                  guidance_scale: defaultPhase?.guidance_scale || 1.0,
-                                  // Deep copy the loras array to avoid mutation
-                                  loras: defaultPhase?.loras ? JSON.parse(JSON.stringify(defaultPhase.loras)) : []
-                                });
-                                newStepsPerPhase.push(defaultSteps);
-                              }
-                            }
-                            
-                            onPhaseConfigChange({
-                              ...phaseConfig,
-                              num_phases: newNumPhases,
-                              steps_per_phase: newStepsPerPhase,
-                              phases: newPhases
-                            });
-                          }}
+                          value={3}
+                          disabled
+                          readOnly
                         />
                       </div>
                       
@@ -622,10 +589,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   {/* Per-Phase Settings - 3 side by side when space available */}
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {phaseConfig.phases.map((phase, phaseIdx) => {
-                    // Dynamic labels based on number of phases
-                    const phaseLabels = phaseConfig.num_phases === 2 
-                      ? ["High Noise Sampler", "Low Noise Sampler"]
-                      : ["High Noise Sampler 1", "High Noise Sampler 2", "Low Noise Sampler"];
+                    // Fixed 3-phase labels
+                    const phaseLabels = ["High Noise Sampler 1", "High Noise Sampler 2", "Low Noise Sampler"];
                     return (
                     <Card key={phaseIdx} className="bg-muted/30">
                       <CardHeader className="pb-3">
