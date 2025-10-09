@@ -262,9 +262,6 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           {/* Video Clips Side by Side */}
           {(startingVideoPath || endingVideoPath) && (
             <div className="space-y-2">
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>
-                🎬 Video Clips
-              </p>
               <div className="grid grid-cols-2 gap-3">
                 {/* Starting Video */}
                 {startingVideoPath && (
