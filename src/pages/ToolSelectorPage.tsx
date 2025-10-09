@@ -389,7 +389,7 @@ const ToolSelectorPage: React.FC = () => {
 
             {/* Assistant Tools Column */}
             <div className="w-full c-lg:w-1/3">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-4`}>
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-1`}>
                 {assistantTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
                   
