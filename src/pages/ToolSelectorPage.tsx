@@ -211,7 +211,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className={`${isSm ? 'p-2' : 'p-1'} ${isLg ? 'p-3' : ''} h-full flex flex-col justify-center`}>
+        <div className={`${isSm ? 'px-2 py-1' : 'px-1 py-0.5'} ${isLg ? 'px-3 py-1' : ''} h-full flex flex-col justify-center`}>
           {/* Tool Header without icon */}
           <div className={`wes-symmetry ${isSm ? 'mb-1' : 'mb-0.5'} relative`}>
             <div className="px-2">
