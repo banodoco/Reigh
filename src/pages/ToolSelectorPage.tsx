@@ -168,7 +168,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
   const content = (
     <div 
-      className={`wes-tool-card click-ripple relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
+      className={`wes-tool-card click-ripple relative overflow-hidden ${isSquare ? 'min-h-32' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
       style={rippleStyles}
     >
       {/* Disabled/Coming Soon Badge */}
