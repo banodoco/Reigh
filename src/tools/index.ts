@@ -3,6 +3,7 @@ export { videoTravelSettings } from './travel-between-images/settings';
 export { imageGenerationSettings } from './image-generation/settings';
 export { editTravelSettings } from './edit-travel/settings';
 export { characterAnimateSettings } from './character-animate/settings';
+export { joinClipsSettings } from './join-clips/settings';
 export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
@@ -10,15 +11,17 @@ import { videoTravelSettings } from './travel-between-images/settings';
 import { imageGenerationSettings } from './image-generation/settings';
 import { editTravelSettings } from './edit-travel/settings';
 import { characterAnimateSettings } from './character-animate/settings';
+import { joinClipsSettings } from './join-clips/settings';
 import { userPreferencesSettings } from '../shared/settings/userPreferences';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
-import { Paintbrush, Video, Edit, Users } from 'lucide-react';
+import { Paintbrush, Video, Edit, Users, Link2 } from 'lucide-react';
 
 export const toolsManifest = [
   videoTravelSettings,
   imageGenerationSettings,
   editTravelSettings,
   characterAnimateSettings,
+  joinClipsSettings,
   userPreferencesSettings,
 ] as const;
 
@@ -83,6 +86,18 @@ export const toolsUIManifest: ToolUIDefinition[] = [
     gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
     accent: 'wes-sage',
     ornament: '◉',
+    badge: 'New',
+  },
+  {
+    id: joinClipsSettings.id,
+    name: 'Join Clips',
+    path: '/tools/join-clips',
+    description: 'Seamlessly join two video clips with AI-generated transitions, creating smooth connections between scenes.',
+    environments: [AppEnv.LOCAL, AppEnv.WEB],
+    icon: Link2,
+    gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',
+    accent: 'wes-dusty-blue',
+    ornament: '◆',
     badge: 'New',
   },
 ]; 

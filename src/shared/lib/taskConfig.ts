@@ -74,6 +74,24 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
     description: 'Edit travel using Flux model'
   },
 
+  // Character animation tasks
+  animate_character: {
+    isVisible: true,
+    displayName: 'Animate Character',
+    canCancel: true,
+    category: 'generation',
+    description: 'Animate or replace characters in videos'
+  },
+
+  // Video joining tasks
+  join_clips: {
+    isVisible: true,
+    displayName: 'Join Clips',
+    canCancel: true,
+    category: 'generation',
+    description: 'Join two video clips with AI-generated transitions'
+  },
+
   // Add more task types as needed...
 };
 

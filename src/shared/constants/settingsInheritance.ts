@@ -134,6 +134,25 @@ export const TOOL_FIELD_CATEGORIES = {
     ],
   },
   
+  'join-clips': {
+    content: [
+      'defaultPrompt',      // Default transition prompt
+      'startingVideoUrl',   // Last used starting video
+      'endingVideoUrl',     // Last used ending video
+    ],
+    configuration: [
+      'contextFrameCount',  // Frames to extract from each clip
+      'gapFrameCount',      // Frames to generate between clips
+      'model',              // Generation model
+      'numInferenceSteps',  // Inference steps
+      'guidanceScale',      // Guidance scale
+      'seed',               // Seed value
+      'negativePrompt',     // Negative prompt
+      'priority',           // Queue priority
+      'randomSeed',         // Random seed toggle
+    ],
+  },
+  
   'project-image-settings': {
     content: [
       'references',         // All reference images

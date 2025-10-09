@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { Info, Plus, Trash2, Search, Download, ChevronDown, ChevronLeft, Sparkles } from 'lucide-react';
+import { Info, Plus, Trash2, Search, Download, ChevronDown, ChevronLeft, Sparkles, RotateCcw } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Checkbox } from "@/shared/components/ui/checkbox";
@@ -238,6 +238,30 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
       imageCount
     });
 
+    // Validation: Check for phaseConfig inconsistencies and warn
+    React.useEffect(() => {
+      if (phaseConfig && advancedMode) {
+        const phasesLength = phaseConfig.phases?.length || 0;
+        const stepsLength = phaseConfig.steps_per_phase?.length || 0;
+        const numPhases = phaseConfig.num_phases;
+        
+        if (numPhases !== phasesLength || numPhases !== stepsLength) {
+          console.error('[BatchSettingsForm] INCONSISTENT PHASE CONFIG:', {
+            num_phases: numPhases,
+            phases_array_length: phasesLength,
+            steps_array_length: stepsLength,
+            phases_data: phaseConfig.phases?.map(p => ({ 
+              phase: p.phase, 
+              guidance_scale: p.guidance_scale, 
+              loras_count: p.loras?.length 
+            })),
+            steps_per_phase: phaseConfig.steps_per_phase,
+            WARNING: 'num_phases does not match array lengths! This will cause backend errors.'
+          });
+        }
+      }
+    }, [phaseConfig, advancedMode]);
+
     return (
         <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -461,15 +485,16 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-lg">Phase Configuration</CardTitle>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="text-xs hover:bg-accent/50"
+                      className="gap-2"
                       onClick={(e) => {
                         e.stopPropagation();
                         onPhaseConfigChange(DEFAULT_PHASE_CONFIG);
                       }}
                       type="button"
                     >
+                      <RotateCcw className="h-3.5 w-3.5" />
                       Restore Defaults
                     </Button>
                   </CardHeader>
@@ -484,10 +509,44 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         <Input
                           id="num_phases"
                           type="number"
-                          className="h-10 cursor-not-allowed opacity-60"
-                          value={3}
-                          disabled
-                          readOnly
+                          className="h-10"
+                          min={2}
+                          max={3}
+                          value={phaseConfig.num_phases}
+                          onChange={(e) => {
+                            const newNumPhases = Math.max(2, Math.min(3, parseInt(e.target.value) || 2));
+                            const currentPhases = phaseConfig.phases;
+                            let newPhases = [...currentPhases];
+                            let newStepsPerPhase = [...phaseConfig.steps_per_phase];
+                            
+                            // Adjust phases array when changing num_phases
+                            if (newNumPhases < currentPhases.length) {
+                              // Remove excess phases
+                              newPhases = currentPhases.slice(0, newNumPhases);
+                              newStepsPerPhase = phaseConfig.steps_per_phase.slice(0, newNumPhases);
+                            } else if (newNumPhases > currentPhases.length) {
+                              // Add new phases with default values from DEFAULT_PHASE_CONFIG
+                              const defaultSteps = phaseConfig.steps_per_phase[phaseConfig.steps_per_phase.length - 1] || 2;
+                              for (let i = currentPhases.length; i < newNumPhases; i++) {
+                                // Use the corresponding phase from DEFAULT_PHASE_CONFIG if available
+                                const defaultPhase = DEFAULT_PHASE_CONFIG.phases[i];
+                                newPhases.push({
+                                  phase: i + 1,
+                                  guidance_scale: defaultPhase?.guidance_scale || 1.0,
+                                  // Deep copy the loras array to avoid mutation
+                                  loras: defaultPhase?.loras ? JSON.parse(JSON.stringify(defaultPhase.loras)) : []
+                                });
+                                newStepsPerPhase.push(defaultSteps);
+                              }
+                            }
+                            
+                            onPhaseConfigChange({
+                              ...phaseConfig,
+                              num_phases: newNumPhases,
+                              steps_per_phase: newStepsPerPhase,
+                              phases: newPhases
+                            });
+                          }}
                         />
                       </div>
                       

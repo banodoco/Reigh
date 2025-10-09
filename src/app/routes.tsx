@@ -12,6 +12,8 @@ import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerat
 import VideoTravelToolPage from '@/tools/travel-between-images/pages/VideoTravelToolPage';
 // Import CharacterAnimatePage eagerly for consistency with other main tools
 import CharacterAnimatePage from '@/tools/character-animate/pages/CharacterAnimatePage';
+// Import JoinClipsPage eagerly for consistency with other main tools
+import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditTravelToolPage = lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
 const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
@@ -93,6 +95,10 @@ const router = createBrowserRouter([
       {
         path: '/tools/character-animate',
         element: <CharacterAnimatePage />, // No Suspense wrapper needed – component is loaded synchronously
+      },
+      {
+        path: '/tools/join-clips',
+        element: <JoinClipsPage />, // No Suspense wrapper needed – component is loaded synchronously
       },
       {
         path: '/tools/edit-travel',

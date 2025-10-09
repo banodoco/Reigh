@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AppEnv, type AppEnvValue } from '../types/env';
-import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye, Users } from 'lucide-react';
+import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye, Users, Link2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
@@ -31,79 +31,88 @@ const processTools = [
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
     accent: 'wes-mint',
   },
-  {
-    id: 'character-animate',
-    name: 'Animate Characters',
-    description: 'Bring characters to life by mapping motion from reference videos onto static images.',
-    tool: toolsUIManifest.find(t => t.id === 'character-animate'),
-    icon: Users,
-    gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
-    accent: 'wes-sage',
-  },
-  {
-    id: 'reinvent-videos',
-    name: 'Reinvent Videos',
-    description: 'Transform existing videos with AI-powered style transfer and creative effects.',
-    tool: null, // Coming soon
-    icon: Film,
-    gradient: 'from-wes-coral via-wes-salmon to-wes-pink',
-    accent: 'wes-coral',
-    comingSoon: true,
-  },
-  {
-    id: 'upscale-videos',
-    name: 'Upscale Videos',
-    description: 'Enhance video quality and resolution using advanced AI upscaling techniques.',
-    tool: null, // Coming soon
-    icon: Maximize2,
-    gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
-    accent: 'wes-vintage-gold',
-    comingSoon: true,
-  },
+  // {
+  //   id: 'reinvent-videos',
+  //   name: 'Reinvent Videos',
+  //   description: 'Transform existing videos with AI-powered style transfer and creative effects.',
+  //   tool: null, // Coming soon
+  //   icon: Film,
+  //   gradient: 'from-wes-coral via-wes-salmon to-wes-pink',
+  //   accent: 'wes-coral',
+  //   comingSoon: true,
+  // },
+  // {
+  //   id: 'upscale-videos',
+  //   name: 'Upscale Videos',
+  //   description: 'Enhance video quality and resolution using advanced AI upscaling techniques.',
+  //   tool: null, // Coming soon
+  //   icon: Maximize2,
+  //   gradient: 'from-wes-pink via-wes-lavender to-wes-dusty-blue',
+  //   accent: 'wes-vintage-gold',
+  //   comingSoon: true,
+  // },
 ];
 
 // Define assistant tools
 const assistantTools = [
   {
-    id: 'edit-videos',
-    name: 'Edit\nVideos',
-    description: 'AI-assisted cuts, transitions, and effects.',
-    tool: null, // Coming soon
-    icon: Wand2,
-    gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
+    id: 'join-clips',
+    name: 'Join Clips',
+    description: 'Seamlessly connect video clips with AI.',
+    tool: toolsUIManifest.find(t => t.id === 'join-clips'),
+    icon: Link2,
+    gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',
     accent: 'wes-dusty-blue',
-    comingSoon: true,
   },
   {
-    id: 'edit-images',
-    name: 'Edit\nImages',
-    description: 'Transform, reimagine, and enhance images.',
-    tool: null, // Marked as coming soon
-    icon: Edit,
-    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
-    accent: 'wes-yellow',
-    comingSoon: true,
-  },
-  {
-    id: 'generate-perspectives',
-    name: 'Different\nPerspectives',
-    description: 'Create images from different perspectives.',
-    tool: null, // Coming soon
-    icon: Eye,
-    gradient: 'from-wes-lavender via-wes-pink to-wes-coral',
-    accent: 'wes-lavender',
-    comingSoon: true,
-  },
-  {
-    id: 'train-lora',
-    name: 'Train\nLoRA',
-    description: 'Fine-tune LoRAs for unique styles & motion.',
-    tool: null, // Coming soon
-    icon: Layers,
-    gradient: 'from-wes-sage via-wes-mint to-wes-dusty-blue',
+    id: 'character-animate',
+    name: 'Animate Characters',
+    description: 'Bring characters to life with motion.',
+    tool: toolsUIManifest.find(t => t.id === 'character-animate'),
+    icon: Users,
+    gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
     accent: 'wes-sage',
-    comingSoon: true,
   },
+  // {
+  //   id: 'edit-videos',
+  //   name: 'Edit\nVideos',
+  //   description: 'AI-assisted cuts, transitions, and effects.',
+  //   tool: null, // Coming soon
+  //   icon: Wand2,
+  //   gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
+  //   accent: 'wes-dusty-blue',
+  //   comingSoon: true,
+  // },
+  // {
+  //   id: 'edit-images',
+  //   name: 'Edit\nImages',
+  //   description: 'Transform, reimagine, and enhance images.',
+  //   tool: null, // Marked as coming soon
+  //   icon: Edit,
+  //   gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
+  //   accent: 'wes-yellow',
+  //   comingSoon: true,
+  // },
+  // {
+  //   id: 'generate-perspectives',
+  //   name: 'Different\nPerspectives',
+  //   description: 'Create images from different perspectives.',
+  //   tool: null, // Coming soon
+  //   icon: Eye,
+  //   gradient: 'from-wes-lavender via-wes-pink to-wes-coral',
+  //   accent: 'wes-lavender',
+  //   comingSoon: true,
+  // },
+  // {
+  //   id: 'train-lora',
+  //   name: 'Train\nLoRA',
+  //   description: 'Fine-tune LoRAs for unique styles & motion.',
+  //   tool: null, // Coming soon
+  //   icon: Layers,
+  //   gradient: 'from-wes-sage via-wes-mint to-wes-dusty-blue',
+  //   accent: 'wes-sage',
+  //   comingSoon: true,
+  // },
 ];
 
 const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any, isSquare?: boolean, index?: number, isVisible: boolean }) => {
@@ -114,16 +123,15 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
 
-  // Debug logging for character-animate
+  // Debug logging for tools
   useEffect(() => {
-    if (item.id === 'character-animate') {
-      const isComingSoon = item.comingSoon || (!item.tool);
-      const shouldShow = isComingSoon || isVisible;
-      console.log('[CharacterAnimateVisibility] ToolCard:',
-        `isVisible=${isVisible}, isComingSoon=${isComingSoon}, ` +
-        `hasTool=${!!item.tool}, shouldShow=${shouldShow}, WILL_RENDER=${shouldShow}`);
+    if (item.id === 'character-animate' || item.id === 'join-clips') {
+      const isDisabled = !isVisible;
+      console.log(`[${item.id}Visibility] ToolCard:`,
+        `isVisible=${isVisible}, isDisabled=${isDisabled}, ` +
+        `hasTool=${!!item.tool}`);
     }
-  }, [item.id, isVisible, item.comingSoon, item.tool]);
+  }, [item.id, isVisible, item.tool]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     triggerRipple(e);
@@ -140,8 +148,15 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
     }, 600); // Match animation duration
   };
 
-  const isComingSoon = item.comingSoon || (!item.tool);
-  const shouldShow = isComingSoon || isVisible;
+  // Special handling for character-animate: show as disabled when not in cloud mode
+  // For other tools, use comingSoon flag or missing tool to determine disabled state
+  const isDisabled = item.id === 'character-animate' 
+    ? !isVisible  // Disabled when cloud mode is off
+    : (item.comingSoon || !item.tool);
+  
+  // Character-animate always shows (disabled if not visible)
+  // Other tools show if coming soon or visible
+  const shouldShow = item.id === 'character-animate' ? true : (isDisabled || isVisible);
 
   if (!shouldShow) return null;
 
@@ -153,14 +168,14 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
   const content = (
     <div 
-      className={`wes-tool-card click-ripple relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isComingSoon ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
+      className={`wes-tool-card click-ripple relative overflow-hidden ${isSquare ? 'min-h-48' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
       style={rippleStyles}
     >
-      {/* Coming Soon Badge */}
-      {isComingSoon && isSm && (
+      {/* Disabled/Coming Soon Badge */}
+      {isDisabled && isSm && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
           <div className="bg-gradient-to-r from-wes-vintage-gold to-wes-mustard text-primary text-xs font-bold px-2 py-0.5 rounded-md border border-primary/20 shadow-sm">
-            COMING SOON
+            {item.id === 'character-animate' ? 'CLOUD MODE' : 'COMING SOON'}
           </div>
         </div>
       )}
@@ -179,14 +194,14 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           
           {/* Icon */}
           <div className={`flex-shrink-0 ${isSm ? 'mr-4' : 'mr-3'} ${isLg ? 'mr-6' : ''} relative z-10`}>
-            <div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isComingSoon ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
+            <div className={`${iconContainerSize} bg-gradient-to-br ${item.gradient} rounded-xl sm:rounded-2xl flex items-center justify-center shadow-wes-deep ${!isDisabled ? 'group-hover:shadow-wes-hover group-hover:scale-110' : ''} transition-all duration-700`}>
               <item.icon className={`${iconSize} text-white drop-shadow-lg`} />
             </div>
           </div>
           
           {/* Text content */}
           <div className="flex-1 relative z-10 min-w-0">
-            <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
+            <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 leading-tight`}>
               {item.name}
             </h3>
             <p className={`font-theme ${descriptionSize} font-theme-body text-muted-foreground leading-relaxed pr-2`}>
@@ -199,16 +214,16 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         <div className={`${isSm ? 'p-2' : 'p-1'} ${isLg ? 'p-3' : ''} h-full flex flex-col justify-center`}>
           {/* Tool Header without icon */}
           <div className={`wes-symmetry ${isSm ? 'mb-1' : 'mb-0.5'} relative`}>
-            <div className="">
-              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-2 ${!isComingSoon ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-pre-line`}>
+            <div className="px-2">
+              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-2 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-nowrap`}>
                 {item.name}
               </h3>
-              <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isComingSoon ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
+              <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
           </div>
 
           {/* Description - always show on mobile with adjusted styling */}
-          <div className={`${isSm ? 'mt-1' : 'mt-0.5'}`}>
+          <div className={`${isSm ? 'mt-1' : 'mt-0.5'} px-2`}>
             <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
               {item.description}
             </p>
@@ -225,7 +240,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
     </div>
   );
 
-  if (isComingSoon) {
+  if (isDisabled) {
     return (
       <div className="relative w-full h-full">
         <button
@@ -318,6 +333,14 @@ const ToolSelectorPage: React.FC = () => {
       return shouldShow;
     }
     
+    // Join Clips always shows (no cloud requirement)
+    if (toolId === 'join-clips') {
+      // For DEV mode, always show
+      if (currentEnv === AppEnv.DEV) return true;
+      // For other environments, check if tool is in environments list
+      return tool.environments.includes(currentEnv);
+    }
+    
     // For all other tools, show in DEV mode
     if (currentEnv === AppEnv.DEV) return true;
     
@@ -350,10 +373,6 @@ const ToolSelectorPage: React.FC = () => {
               <div className={`flex flex-col ${itemGap} ${topMargin} px-4 py-4`}>
                 {processTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
-                  const isComingSoon = tool.comingSoon || (!tool.tool);
-                  const shouldShow = isComingSoon || isVisible;
-                  
-                  if (!shouldShow) return null;
                   
                   return (
                     <FadeInSection key={tool.id}>
@@ -373,10 +392,6 @@ const ToolSelectorPage: React.FC = () => {
               <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-4`}>
                 {assistantTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
-                  const isComingSoon = tool.comingSoon || (!tool.tool);
-                  const shouldShow = isComingSoon || isVisible;
-                  
-                  if (!shouldShow) return null;
                   
                   return (
                     <FadeInSection key={tool.id}>

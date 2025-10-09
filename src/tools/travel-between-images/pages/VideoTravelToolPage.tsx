@@ -328,16 +328,23 @@ const VideoTravelToolPage: React.FC = () => {
 
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
     if (!hasLoadedInitialSettings.current) return;
+    
+    // Auto-set model_switch_phase to 1 when num_phases is 2
+    const adjustedConfig = config.num_phases === 2 
+      ? { ...config, model_switch_phase: 1 }
+      : config;
+    
     console.log('[PhaseConfigDebug] Phase config changed by user:', {
-      num_phases: config.num_phases,
-      model_switch_phase: config.model_switch_phase,
-      phases_array_length: config.phases?.length,
-      steps_array_length: config.steps_per_phase?.length,
-      phases_data: config.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
-      steps_per_phase: config.steps_per_phase
+      num_phases: adjustedConfig.num_phases,
+      model_switch_phase: adjustedConfig.model_switch_phase,
+      phases_array_length: adjustedConfig.phases?.length,
+      steps_array_length: adjustedConfig.steps_per_phase?.length,
+      phases_data: adjustedConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+      steps_per_phase: adjustedConfig.steps_per_phase,
+      auto_adjusted: config.num_phases === 2 && config.model_switch_phase !== 1
     });
     userHasInteracted.current = true;
-    setPhaseConfig(config);
+    setPhaseConfig(adjustedConfig);
   }, []);
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
@@ -960,13 +967,31 @@ const VideoTravelToolPage: React.FC = () => {
       const advancedModeValue = settingsToApply.advancedMode ?? false;
       let phaseConfigValue = settingsToApply.phaseConfig;
       
-      // TEMPORARY FIX: Force num_phases to 3 if it's set to something else
-      if (phaseConfigValue && phaseConfigValue.num_phases !== 3) {
-        console.warn('[PhaseConfig] Forcing num_phases to 3 (was:', phaseConfigValue.num_phases, ')');
-        phaseConfigValue = {
-          ...phaseConfigValue,
-          num_phases: 3
-        };
+      // Validate phaseConfig consistency: ensure num_phases matches array lengths
+      if (phaseConfigValue) {
+        const phasesLength = phaseConfigValue.phases?.length || 0;
+        const stepsLength = phaseConfigValue.steps_per_phase?.length || 0;
+        const numPhases = phaseConfigValue.num_phases;
+        
+        // If there's a mismatch, fix it by using the actual array length as source of truth
+        if (numPhases !== phasesLength || numPhases !== stepsLength) {
+          console.warn('[PhaseConfig] Inconsistent phase config detected:', {
+            num_phases: numPhases,
+            phases_length: phasesLength,
+            steps_length: stepsLength
+          });
+          
+          // Use the actual phases array length as the source of truth
+          const correctNumPhases = phasesLength;
+          console.log('[PhaseConfig] Correcting num_phases to match arrays:', correctNumPhases);
+          
+          phaseConfigValue = {
+            ...phaseConfigValue,
+            num_phases: correctNumPhases,
+            // Ensure steps_per_phase matches phases array length
+            steps_per_phase: phaseConfigValue.steps_per_phase?.slice(0, correctNumPhases) || []
+          };
+        }
       }
       
       console.log('[AdvancedMode] Setting advancedMode from loaded settings:', {

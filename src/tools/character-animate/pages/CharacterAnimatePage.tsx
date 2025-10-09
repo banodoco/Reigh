@@ -37,6 +37,9 @@ const CharacterAnimatePage: React.FC = () => {
   // Track when we've just triggered a generation to prevent empty state flash
   const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
   
+  // Track success state for button feedback
+  const [showSuccessState, setShowSuccessState] = useState(false);
+  
   // Load settings
   const { settings, update: updateSettings } = useToolSettings<CharacterAnimateSettings>(
     'character-animate',
@@ -255,11 +258,18 @@ const CharacterAnimatePage: React.FC = () => {
         description: 'Your character animation task has been queued',
       });
       
+      // Show success state on button
+      setShowSuccessState(true);
+      setTimeout(() => setShowSuccessState(false), 3000);
+      
       // Set flag to indicate we just created a task
       setVideosViewJustEnabled(true);
       
-      // Invalidate tasks query to show the new task
+      // Invalidate both tasks and generations queries
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['unified-generations', 'project', selectedProjectId]
+      });
     },
     onError: (error) => {
       console.error('[CharacterAnimate] Task creation failed:', error);
@@ -457,11 +467,16 @@ const CharacterAnimatePage: React.FC = () => {
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
-          disabled={!characterImage || !motionVideo || generateAnimationMutation.isPending}
+          disabled={!characterImage || !motionVideo || generateAnimationMutation.isPending || showSuccessState}
           className="w-full"
           size="lg"
+          variant={showSuccessState ? 'default' : 'default'}
         >
-          {generateAnimationMutation.isPending ? 'Creating Task...' : 'Generate'}
+          {generateAnimationMutation.isPending 
+            ? 'Creating Task...' 
+            : showSuccessState 
+            ? '✓ Task Created!' 
+            : 'Generate'}
         </Button>
 
         {/* Results Gallery */}

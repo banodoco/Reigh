@@ -1755,15 +1755,34 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Use model based on turbo mode for task creation
     const actualModelName = getModelName();
     
-    // Debug log phase config before sending
+    // Validate and debug log phase config before sending
     if (advancedMode && phaseConfig) {
+      const phasesLength = phaseConfig.phases?.length || 0;
+      const stepsLength = phaseConfig.steps_per_phase?.length || 0;
+      const numPhases = phaseConfig.num_phases;
+      
+      // Final validation check before sending to backend
+      if (numPhases !== phasesLength || numPhases !== stepsLength) {
+        console.error('[PhaseConfigDebug] CRITICAL: Inconsistent phase config about to be sent!', {
+          num_phases: numPhases,
+          phases_array_length: phasesLength,
+          steps_array_length: stepsLength,
+          ERROR: 'This WILL cause backend validation errors!',
+          phases_data: phaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+          steps_per_phase: phaseConfig.steps_per_phase
+        });
+        toast.error(`Invalid phase configuration: num_phases (${numPhases}) doesn't match arrays (phases: ${phasesLength}, steps: ${stepsLength}). Please reset to defaults.`);
+        return; // Don't submit invalid config
+      }
+      
       console.log('[PhaseConfigDebug] Preparing to send phase_config:', {
         num_phases: phaseConfig.num_phases,
         model_switch_phase: phaseConfig.model_switch_phase,
-        phases_array_length: phaseConfig.phases?.length,
-        steps_array_length: phaseConfig.steps_per_phase?.length,
+        phases_array_length: phasesLength,
+        steps_array_length: stepsLength,
         phases_data: phaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
-        steps_per_phase: phaseConfig.steps_per_phase
+        steps_per_phase: phaseConfig.steps_per_phase,
+        VALIDATION: 'PASSED'
       });
     }
     

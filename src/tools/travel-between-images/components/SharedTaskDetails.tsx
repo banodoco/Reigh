@@ -36,6 +36,9 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   // Check if this is a character animate task
   const isCharacterAnimateTask = task?.taskType === 'animate_character';
   
+  // Check if this is a join clips task
+  const isJoinClipsTask = task?.taskType === 'join_clips';
+  
   // Get LoRAs from the correct location (try all possible paths)
   const additionalLoras = (
     orchestratorPayload?.additional_loras || 
@@ -116,6 +119,40 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     orchestratorDetails?.resolution || 
     orchestratorPayload?.resolution
   ) : null;
+
+  // Join Clips specific data
+  const startingVideoPath = isJoinClipsTask ? (
+    task?.params?.starting_video_path || 
+    orchestratorDetails?.starting_video_path || 
+    orchestratorPayload?.starting_video_path
+  ) : null;
+  
+  const endingVideoPath = isJoinClipsTask ? (
+    task?.params?.ending_video_path || 
+    orchestratorDetails?.ending_video_path || 
+    orchestratorPayload?.ending_video_path
+  ) : null;
+  
+  const joinClipsPrompt = isJoinClipsTask ? (
+    task?.params?.prompt || 
+    orchestratorDetails?.prompt || 
+    orchestratorPayload?.prompt
+  ) : null;
+  
+  const contextFrameCount = isJoinClipsTask ? (
+    task?.params?.context_frame_count || 
+    orchestratorDetails?.context_frame_count || 
+    orchestratorPayload?.context_frame_count
+  ) : null;
+  
+  const gapFrameCount = isJoinClipsTask ? (
+    task?.params?.gap_frame_count || 
+    orchestratorDetails?.gap_frame_count || 
+    orchestratorPayload?.gap_frame_count
+  ) : null;
+  
+  const [startingVideoLoaded, setStartingVideoLoaded] = useState(false);
+  const [endingVideoLoaded, setEndingVideoLoaded] = useState(false);
 
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'}`}>
@@ -219,8 +256,146 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </>
       )}
 
-      {/* Guidance Images Section (for non-character-animate tasks) */}
-      {!isCharacterAnimateTask && inputImages.length > 0 && (
+      {/* Join Clips Task Details */}
+      {isJoinClipsTask && (
+        <>
+          {/* Starting Video */}
+          {startingVideoPath && (
+            <div className="space-y-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>
+                🎬 Starting Clip
+              </p>
+              <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: '160px' }}>
+                {!startingVideoLoaded ? (
+                  <div 
+                    className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
+                    onClick={() => setStartingVideoLoaded(true)}
+                  >
+                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <video 
+                      src={startingVideoPath}
+                      className="w-full object-cover rounded border shadow-sm"
+                      loop
+                      muted
+                      playsInline
+                      autoPlay
+                      onClick={(e) => {
+                        const video = e.currentTarget;
+                        if (video.paused) {
+                          video.play();
+                        } else {
+                          video.pause();
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 rounded-full p-2">
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Ending Video */}
+          {endingVideoPath && (
+            <div className="space-y-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>
+                🎬 Ending Clip
+              </p>
+              <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: '160px' }}>
+                {!endingVideoLoaded ? (
+                  <div 
+                    className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
+                    onClick={() => setEndingVideoLoaded(true)}
+                  >
+                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <video 
+                      src={endingVideoPath}
+                      className="w-full object-cover rounded border shadow-sm"
+                      loop
+                      muted
+                      playsInline
+                      autoPlay
+                      onClick={(e) => {
+                        const video = e.currentTarget;
+                        if (video.paused) {
+                          video.play();
+                        } else {
+                          video.pause();
+                        }
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 rounded-full p-2">
+                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Frame Configuration */}
+          {(contextFrameCount !== null || gapFrameCount !== null) && (
+            <div className="space-y-2 pt-2 border-t border-muted-foreground/20">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Frame Configuration</p>
+              <div className="grid grid-cols-2 gap-3">
+                {contextFrameCount !== null && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} text-muted-foreground`}>Context Frames</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                      {contextFrameCount}
+                    </p>
+                  </div>
+                )}
+                {gapFrameCount !== null && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} text-muted-foreground`}>Gap Frames</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                      {gapFrameCount}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Join Clips Prompt */}
+          {joinClipsPrompt && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Transition Prompt</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                {joinClipsPrompt}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Guidance Images Section (for non-character-animate and non-join-clips tasks) */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && inputImages.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center">
             <div className="flex items-center space-x-2">
@@ -261,8 +436,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </div>
       )}
 
-      {/* Video Guidance Section (for non-character-animate tasks) */}
-      {!isCharacterAnimateTask && (() => {
+      {/* Video Guidance Section (for non-character-animate and non-join-clips tasks) */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
         // Check for video guidance data in multiple locations
         // Priority: orchestratorDetails > orchestratorPayload > task.params
         const videoPath = orchestratorDetails?.structure_video_path || 
@@ -367,8 +542,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         );
       })()}
 
-      {/* Style Reference Image Section (for non-character-animate tasks) */}
-      {!isCharacterAnimateTask && (() => {
+      {/* Style Reference Image Section (for non-character-animate and non-join-clips tasks) */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
         // Check multiple possible locations for style reference data
         const styleImage = task?.params?.style_reference_image || 
                           orchestratorDetails?.style_reference_image;
@@ -423,8 +598,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         );
       })()}
       
-      {/* Prompts and Technical Settings (for non-character-animate tasks) */}
-      {!isCharacterAnimateTask && (
+      {/* Prompts and Technical Settings (for non-character-animate and non-join-clips tasks) */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && (
       <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
         {/* Prompts Section */}
         <div className="space-y-3">
@@ -532,8 +707,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       </div>
       )}
 
-      {/* LoRAs Section (for non-character-animate tasks) */}
-      {!isCharacterAnimateTask && additionalLoras && Object.keys(additionalLoras).length > 0 && (
+      {/* LoRAs Section (for non-character-animate and non-join-clips tasks) */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && additionalLoras && Object.keys(additionalLoras).length > 0 && (
         <div className="pt-2 border-t border-muted-foreground/20">
           <div className="space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs Used</p>
