@@ -259,99 +259,105 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       {/* Join Clips Task Details */}
       {isJoinClipsTask && (
         <>
-          {/* Starting Video */}
-          {startingVideoPath && (
+          {/* Video Clips Side by Side */}
+          {(startingVideoPath || endingVideoPath) && (
             <div className="space-y-2">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>
-                🎬 Starting Clip
+                🎬 Video Clips
               </p>
-              <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: '160px' }}>
-                {!startingVideoLoaded ? (
-                  <div 
-                    className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
-                    onClick={() => setStartingVideoLoaded(true)}
-                  >
-                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
-                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Starting Video */}
+                {startingVideoPath && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} text-muted-foreground text-center`}>Starting Clip</p>
+                    <div className="relative group cursor-pointer">
+                      {!startingVideoLoaded ? (
+                        <div 
+                          className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
+                          onClick={() => setStartingVideoLoaded(true)}
+                        >
+                          <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
+                            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <video 
+                            src={startingVideoPath}
+                            className="w-full object-cover rounded border shadow-sm"
+                            loop
+                            muted
+                            playsInline
+                            autoPlay
+                            onClick={(e) => {
+                              const video = e.currentTarget;
+                              if (video.paused) {
+                                video.play();
+                              } else {
+                                video.pause();
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="bg-black/50 rounded-full p-2">
+                              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <video 
-                      src={startingVideoPath}
-                      className="w-full object-cover rounded border shadow-sm"
-                      loop
-                      muted
-                      playsInline
-                      autoPlay
-                      onClick={(e) => {
-                        const video = e.currentTarget;
-                        if (video.paused) {
-                          video.play();
-                        } else {
-                          video.pause();
-                        }
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-black/50 rounded-full p-2">
-                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                      </div>
-                    </div>
-                  </>
                 )}
-              </div>
-            </div>
-          )}
 
-          {/* Ending Video */}
-          {endingVideoPath && (
-            <div className="space-y-2">
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>
-                🎬 Ending Clip
-              </p>
-              <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: '160px' }}>
-                {!endingVideoLoaded ? (
-                  <div 
-                    className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
-                    onClick={() => setEndingVideoLoaded(true)}
-                  >
-                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
-                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
+                {/* Ending Video */}
+                {endingVideoPath && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} text-muted-foreground text-center`}>Ending Clip</p>
+                    <div className="relative group cursor-pointer">
+                      {!endingVideoLoaded ? (
+                        <div 
+                          className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"
+                          onClick={() => setEndingVideoLoaded(true)}
+                        >
+                          <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
+                            <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <video 
+                            src={endingVideoPath}
+                            className="w-full object-cover rounded border shadow-sm"
+                            loop
+                            muted
+                            playsInline
+                            autoPlay
+                            onClick={(e) => {
+                              const video = e.currentTarget;
+                              if (video.paused) {
+                                video.play();
+                              } else {
+                                video.pause();
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="bg-black/50 rounded-full p-2">
+                              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <>
-                    <video 
-                      src={endingVideoPath}
-                      className="w-full object-cover rounded border shadow-sm"
-                      loop
-                      muted
-                      playsInline
-                      autoPlay
-                      onClick={(e) => {
-                        const video = e.currentTarget;
-                        if (video.paused) {
-                          video.play();
-                        } else {
-                          video.pause();
-                        }
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-black/50 rounded-full p-2">
-                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                      </div>
-                    </div>
-                  </>
                 )}
               </div>
             </div>
