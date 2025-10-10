@@ -29,11 +29,20 @@ export interface ImageGalleryLightboxProps {
   selectedShotIdLocal: string;
   onShotChange: (shotId: string) => void;
   onAddToShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // UI state
   showTickForImageId: string | null;
   setShowTickForImageId: (id: string | null) => void;
+  showTickForSecondaryImageId?: string | null;
+  setShowTickForSecondaryImageId?: (id: string | null) => void;
   
+  // Optimistic updates
+  optimisticPositionedIds?: Set<string>;
+  optimisticUnpositionedIds?: Set<string>;
+  onOptimisticPositioned?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string) => void;
+
   // Task details
   isMobile: boolean;
   showTaskDetailsModal: boolean;
@@ -74,8 +83,16 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   selectedShotIdLocal,
   onShotChange,
   onAddToShot,
+  onAddToShotWithoutPosition,
   showTickForImageId,
   setShowTickForImageId,
+  showTickForSecondaryImageId,
+  setShowTickForSecondaryImageId,
+  // Optimistic updates
+  optimisticPositionedIds,
+  optimisticUnpositionedIds,
+  onOptimisticPositioned,
+  onOptimisticUnpositioned,
   isMobile,
   showTaskDetailsModal,
   setShowTaskDetailsModal,
@@ -91,6 +108,22 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   onNavigateToShot,
   toolTypeOverride,
 }) => {
+  
+  // [ShotNavDebug] confirm plumbing into Lightbox
+  React.useEffect(() => {
+    console.log('[ShotNavDebug] [ImageGalleryLightbox] props snapshot', {
+      activeLightboxMediaId: activeLightboxMedia?.id,
+      selectedShotIdLocal,
+      hasOnAddToShot: !!onAddToShot,
+      hasOnAddToShotWithoutPosition: !!onAddToShotWithoutPosition,
+      showTickForImageId,
+      showTickForSecondaryImageId,
+      hasOptimisticPositioned: !!optimisticPositionedIds,
+      hasOptimisticUnpositioned: !!optimisticUnpositionedIds,
+      hasOnNavigateToShot: !!onNavigateToShot,
+      timestamp: Date.now()
+    });
+  }, [activeLightboxMedia?.id, selectedShotIdLocal, onAddToShot, onAddToShotWithoutPosition, showTickForImageId, showTickForSecondaryImageId, optimisticPositionedIds, optimisticUnpositionedIds, onNavigateToShot]);
   
   // Log the callback we received
   React.useEffect(() => {
@@ -181,11 +214,18 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           selectedShotId={selectedShotIdLocal}
           onShotChange={onShotChange}
           onAddToShot={onAddToShot}
+          onAddToShotWithoutPosition={onAddToShotWithoutPosition}
           onDelete={onDelete}
           isDeleting={isDeleting}
           onApplySettings={onApplySettings}
           showTickForImageId={showTickForImageId}
           onShowTick={setShowTickForImageId}
+          showTickForSecondaryImageId={showTickForSecondaryImageId}
+          onShowSecondaryTick={setShowTickForSecondaryImageId}
+          optimisticPositionedIds={optimisticPositionedIds}
+          optimisticUnpositionedIds={optimisticUnpositionedIds}
+          onOptimisticPositioned={onOptimisticPositioned}
+          onOptimisticUnpositioned={onOptimisticUnpositioned}
           starred={starredValue}
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation

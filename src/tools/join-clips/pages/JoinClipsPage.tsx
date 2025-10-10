@@ -1,11 +1,11 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Slider } from '@/shared/components/ui/slider';
-import { Upload, Film } from 'lucide-react';
+import { Upload, Film, X } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,10 @@ import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hook
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { LoraManager } from '@/shared/components/LoraManager';
+import { useLoraManager } from '@/shared/hooks/useLoraManager';
+import { useListPublicResources } from '@/shared/hooks/useResources';
+import type { LoraModel } from '@/shared/hooks/useLoraManager';
 
 const JoinClipsPage: React.FC = () => {
   const { toast } = useToast();
@@ -60,6 +64,18 @@ const JoinClipsPage: React.FC = () => {
   const { projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
+  
+  // Fetch available LoRAs
+  const publicLorasResult = useListPublicResources('lora');
+  const availableLoras = (publicLorasResult.data || []) as LoraModel[];
+  
+  // Initialize LoRA manager with project persistence
+  const loraManager = useLoraManager(availableLoras, {
+    projectId: selectedProjectId || undefined,
+    persistenceScope: 'project',
+    enableProjectPersistence: true,
+    persistenceKey: 'join-clips',
+  });
   
   // Fetch all videos generated with join-clips tool type
   // Disable polling to prevent gallery flicker (join-clips tasks are long-running)
@@ -309,6 +325,12 @@ const JoinClipsPage: React.FC = () => {
       if (!endingVideo) throw new Error('No ending video');
       if (!selectedProjectId) throw new Error('No project selected');
       
+      // Convert selected LoRAs to the format expected by the task
+      const lorasForTask = loraManager.selectedLoras.map(lora => ({
+        path: lora.path,
+        strength: lora.strength,
+      }));
+      
       // Create task using the join clips task creation utility
       const taskParams: import('@/shared/lib/tasks/joinClips').JoinClipsTaskParams = {
         project_id: selectedProjectId,
@@ -323,6 +345,7 @@ const JoinClipsPage: React.FC = () => {
         seed: settings?.seed || -1,
         negative_prompt: settings?.negativePrompt || '',
         priority: settings?.priority || 0,
+        ...(lorasForTask.length > 0 && { loras: lorasForTask }),
       };
       
       console.log('[JoinClips] Creating task with params:', taskParams);
@@ -395,7 +418,7 @@ const JoinClipsPage: React.FC = () => {
         <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
         
         {/* Input Videos with Frame Controls in Center */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 items-start">
           {/* Starting Video */}
           <div className="space-y-3">
             <Label className="text-lg font-medium">
@@ -420,6 +443,22 @@ const JoinClipsPage: React.FC = () => {
                     controls
                     className="w-full h-full object-contain"
                   />
+                  {/* Remove button */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStartingVideo(null);
+                      if (selectedProjectId) {
+                        updateSettings('project', { ...settings, startingVideoUrl: undefined });
+                      }
+                    }}
+                    disabled={isUploading}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                   {isDraggingOverStarting && (
                     <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
                       <p className="text-lg font-medium text-foreground">Drop to replace</p>
@@ -445,22 +484,10 @@ const JoinClipsPage: React.FC = () => {
               className="hidden"
               onChange={handleStartingVideoUpload}
             />
-            {startingVideo && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => startingVideoInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Replace Video
-              </Button>
-            )}
           </div>
 
           {/* Frame Controls - Centered Between Videos */}
-          <div className="hidden md:flex flex-col space-y-4 px-4 min-w-[200px]">
+          <div className="hidden md:flex flex-col space-y-4 px-4 min-w-[200px] justify-center self-center mt-16">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label htmlFor="gapFrameCount" className="text-sm">
@@ -542,6 +569,22 @@ const JoinClipsPage: React.FC = () => {
                     controls
                     className="w-full h-full object-contain"
                   />
+                  {/* Remove button */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEndingVideo(null);
+                      if (selectedProjectId) {
+                        updateSettings('project', { ...settings, endingVideoUrl: undefined });
+                      }
+                    }}
+                    disabled={isUploading}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                   {isDraggingOverEnding && (
                     <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
                       <p className="text-lg font-medium text-foreground">Drop to replace</p>
@@ -567,18 +610,6 @@ const JoinClipsPage: React.FC = () => {
               className="hidden"
               onChange={handleEndingVideoUpload}
             />
-            {endingVideo && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => endingVideoInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Replace Video
-              </Button>
-            )}
           </div>
         </div>
 
@@ -641,37 +672,55 @@ const JoinClipsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Prompt Section */}
-        <div className="space-y-2">
-          <Label htmlFor="prompt">Transition Prompt (Optional)</Label>
-          <Textarea
-            id="prompt"
-            value={prompt}
-            onChange={(e) => {
-              const newPrompt = e.target.value;
-              setPrompt(newPrompt);
-              updateSettings('project', { ...settings, prompt: newPrompt });
-            }}
-            placeholder="Describe the transition between clips (optional)"
-            rows={2}
-            className="resize-none"
-          />
+        {/* Prompt and LoRA Section - Side by Side */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Prompt Section */}
+          <div className="space-y-2">
+            <Label htmlFor="prompt">Transition Prompt (Optional)</Label>
+            <Textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => {
+                const newPrompt = e.target.value;
+                setPrompt(newPrompt);
+                updateSettings('project', { ...settings, prompt: newPrompt });
+              }}
+              placeholder="Describe the transition between clips (optional)"
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+
+          {/* LoRA Section */}
+          <div className="space-y-2">
+            <LoraManager
+              availableLoras={availableLoras}
+              projectId={selectedProjectId || undefined}
+              persistenceScope="project"
+              enableProjectPersistence={true}
+              persistenceKey="join-clips"
+              title="LoRA Models (Optional)"
+              addButtonText="Add or Manage LoRAs"
+            />
+          </div>
         </div>
 
         {/* Generate Button */}
-        <Button
-          onClick={handleGenerate}
-          disabled={!startingVideo || !endingVideo || generateJoinClipsMutation.isPending || showSuccessState}
-          className="w-full"
-          size="lg"
-          variant={showSuccessState ? 'default' : 'default'}
-        >
-          {generateJoinClipsMutation.isPending 
-            ? 'Creating Task...' 
-            : showSuccessState 
-            ? '✓ Task Created!' 
-            : 'Generate'}
-        </Button>
+        <div className="flex justify-center">
+          <Button
+            onClick={handleGenerate}
+            disabled={!startingVideo || !endingVideo || generateJoinClipsMutation.isPending || showSuccessState}
+            className="w-full max-w-[33.333%]"
+            size="lg"
+            variant={showSuccessState ? 'default' : 'default'}
+          >
+            {generateJoinClipsMutation.isPending 
+              ? 'Creating Task...' 
+              : showSuccessState 
+              ? '✓ Task Created!' 
+              : 'Generate'}
+          </Button>
+        </div>
 
         {/* Results Gallery */}
         {(() => {

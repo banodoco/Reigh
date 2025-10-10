@@ -690,8 +690,15 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
         selectedShotIdLocal={stateHook.state.selectedShotIdLocal}
         onShotChange={actionsHook.handleShotChange}
         onAddToShot={onAddToLastShot}
+        onAddToShotWithoutPosition={onAddToLastShotWithoutPosition}
         showTickForImageId={stateHook.state.showTickForImageId}
         setShowTickForImageId={stateHook.setShowTickForImageId}
+        showTickForSecondaryImageId={stateHook.state.showTickForSecondaryImageId}
+        setShowTickForSecondaryImageId={stateHook.setShowTickForSecondaryImageId}
+        optimisticPositionedIds={stateHook.state.optimisticPositionedIds}
+        optimisticUnpositionedIds={stateHook.state.optimisticUnpositionedIds}
+        onOptimisticPositioned={stateHook.markOptimisticPositioned}
+        onOptimisticUnpositioned={stateHook.markOptimisticUnpositioned}
         isMobile={isMobile}
         showTaskDetailsModal={stateHook.state.showTaskDetailsModal}
         setShowTaskDetailsModal={stateHook.setShowTaskDetailsModal}

@@ -22,6 +22,7 @@ import { nanoid } from 'nanoid';
 import { processStyleReferenceForAspectRatioString } from '@/shared/lib/styleReferenceProcessor';
 import { resolveProjectResolution } from '@/shared/lib/taskCreation';
 import { dataURLtoFile } from '@/shared/lib/utils';
+import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 interface ShotOption {
   id: string;
@@ -47,11 +48,14 @@ interface MediaLightboxProps {
   selectedShotId?: string;
   onShotChange?: (shotId: string) => void;
   onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onDelete?: (id: string) => void;
   isDeleting?: string | null;
   onApplySettings?: (metadata: any) => void;
   showTickForImageId?: string | null;
   onShowTick?: (imageId: string) => void;
+  showTickForSecondaryImageId?: string | null;
+  onShowSecondaryTick?: (imageId: string) => void;
   onMagicEdit?: (imageUrl: string, prompt: string, numImages: number) => void;
   // Star functionality
   starred?: boolean;
@@ -76,6 +80,11 @@ interface MediaLightboxProps {
   onNavigateToShot?: (shot: Shot) => void;
   // Tool type override for magic edit
   toolTypeOverride?: string;
+  // Optimistic updates
+  optimisticPositionedIds?: Set<string>;
+  optimisticUnpositionedIds?: Set<string>;
+  onOptimisticPositioned?: (mediaId: string) => void;
+  onOptimisticUnpositioned?: (mediaId: string) => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -96,11 +105,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   selectedShotId,
   onShotChange,
   onAddToShot,
+  onAddToShotWithoutPosition,
   onDelete,
   isDeleting,
   onApplySettings,
   showTickForImageId,
   onShowTick,
+  showTickForSecondaryImageId,
+  onShowSecondaryTick,
   onMagicEdit,
   // Star functionality
   starred = false,
@@ -116,6 +128,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onNavigateToShot,
   // Tool type override for magic edit
   toolTypeOverride,
+  // Optimistic updates
+  optimisticPositionedIds,
+  optimisticUnpositionedIds,
+  onOptimisticPositioned,
+  onOptimisticUnpositioned,
 }) => {
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -157,6 +174,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Hooks for atomic shot creation with image
   const { selectedProjectId } = useProject();
   const createShotWithImageMutation = useCreateShotWithImage();
+  const { navigateToShot } = useShotNavigation();
   
   // Hook for managing project image settings (references)
   const {
@@ -749,12 +767,189 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  const isAlreadyPositionedInSelectedShot = useMemo(() => {
+    if (!selectedShotId || !media.id) return false;
+    
+    // Check optimistic state first
+    if (optimisticPositionedIds?.has(media.id)) return true;
+    
+    // Check if this media is positioned in the selected shot
+    // First check single shot association
+    if ((media as any).shot_id === selectedShotId) {
+      return (media as any).position !== null && (media as any).position !== undefined;
+    }
+    
+    // Check multiple shot associations
+    const allShotAssociations = (media as any).all_shot_associations;
+    if (allShotAssociations && Array.isArray(allShotAssociations)) {
+      const matchingAssociation = allShotAssociations.find(
+        (assoc: any) => assoc.shot_id === selectedShotId
+      );
+      return matchingAssociation && 
+             matchingAssociation.position !== null && 
+             matchingAssociation.position !== undefined;
+    }
+    
+    return false;
+  }, [selectedShotId, media, optimisticPositionedIds]);
+
+  // [ShotNavDebug] Log computed positioned state
+  useEffect(() => {
+    console.log('[ShotNavDebug] [MediaLightbox] isAlreadyPositionedInSelectedShot computed', {
+      mediaId: media?.id,
+      selectedShotId,
+      value: isAlreadyPositionedInSelectedShot,
+      mediaShotId: (media as any)?.shot_id,
+      mediaPosition: (media as any)?.position,
+      optimisticHas: optimisticPositionedIds?.has(media?.id || ''),
+      timestamp: Date.now()
+    });
+  }, [isAlreadyPositionedInSelectedShot, media?.id, selectedShotId, optimisticPositionedIds]);
+
   const handleAddToShot = async () => {
     if (!onAddToShot || !selectedShotId) return;
     
+    console.log('[ShotNavDebug] [MediaLightbox] handleAddToShot click', {
+      mediaId: media?.id,
+      selectedShotId,
+      isAlreadyPositionedInSelectedShot,
+      hasOnNavigateToShot: !!onNavigateToShot,
+      allShotsCount: allShots?.length,
+      timestamp: Date.now()
+    });
+
+    // If already positioned in shot, navigate to the shot
+    if (isAlreadyPositionedInSelectedShot) {
+      const targetShotOption = allShots.find(s => s.id === selectedShotId);
+      const minimalShot: Shot = {
+        id: targetShotOption?.id || selectedShotId,
+        name: targetShotOption?.name || 'Shot',
+        images: [],
+        position: 0,
+      };
+      console.log('[ShotNavDebug] [MediaLightbox] Navigating to shot (with position)', {
+        minimalShot,
+        usedFrom: targetShotOption ? 'fromList' : 'fallback',
+        via: onNavigateToShot ? 'onNavigateToShot' : 'navigateToShot+onClose',
+        timestamp: Date.now()
+      });
+      if (onNavigateToShot) {
+        onNavigateToShot(minimalShot);
+      } else {
+        onClose();
+        navigateToShot(minimalShot);
+      }
+      return;
+    }
+    
+    console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShot', {
+      mediaId: media?.id,
+      imageUrl: (media?.imageUrl || '').slice(0, 120),
+      thumbUrl: (media?.thumbUrl || '').slice(0, 120),
+      timestamp: Date.now()
+    });
     const success = await onAddToShot(media.id, media.imageUrl, media.thumbUrl);
-    if (success && onShowTick) {
-      onShowTick(media.id);
+    console.log('[ShotNavDebug] [MediaLightbox] onAddToShot result', { success, timestamp: Date.now() });
+    if (success) {
+      onShowTick?.(media.id);
+      onOptimisticPositioned?.(media.id);
+      console.log('[ShotNavDebug] [MediaLightbox] Positioned optimistic + tick applied', {
+        mediaId: media?.id,
+        timestamp: Date.now()
+      });
+    }
+  };
+
+  // Check if image is already associated with the selected shot WITHOUT position
+  const isAlreadyAssociatedWithoutPosition = useMemo(() => {
+    if (!selectedShotId || !media.id) return false;
+    
+    // Check optimistic state first
+    if (optimisticUnpositionedIds?.has(media.id)) return true;
+    
+    // Check if this media is associated with the selected shot without position
+    // First check single shot association
+    if ((media as any).shot_id === selectedShotId) {
+      return (media as any).position === null || (media as any).position === undefined;
+    }
+    
+    // Check multiple shot associations
+    const allShotAssociations = (media as any).all_shot_associations;
+    if (allShotAssociations && Array.isArray(allShotAssociations)) {
+      const matchingAssociation = allShotAssociations.find(
+        (assoc: any) => assoc.shot_id === selectedShotId
+      );
+      return matchingAssociation && 
+             (matchingAssociation.position === null || matchingAssociation.position === undefined);
+    }
+    
+    return false;
+  }, [selectedShotId, media, optimisticUnpositionedIds]);
+
+  // [ShotNavDebug] Log computed unpositioned state
+  useEffect(() => {
+    console.log('[ShotNavDebug] [MediaLightbox] isAlreadyAssociatedWithoutPosition computed', {
+      mediaId: media?.id,
+      selectedShotId,
+      value: isAlreadyAssociatedWithoutPosition,
+      mediaShotId: (media as any)?.shot_id,
+      mediaPosition: (media as any)?.position,
+      optimisticHas: optimisticUnpositionedIds?.has(media?.id || ''),
+      timestamp: Date.now()
+    });
+  }, [isAlreadyAssociatedWithoutPosition, media?.id, selectedShotId, optimisticUnpositionedIds]);
+
+  const handleAddToShotWithoutPosition = async () => {
+    if (!onAddToShotWithoutPosition || !selectedShotId) return;
+
+    console.log('[ShotNavDebug] [MediaLightbox] handleAddToShotWithoutPosition click', {
+      mediaId: media?.id,
+      selectedShotId,
+      isAlreadyAssociatedWithoutPosition,
+      hasOnNavigateToShot: !!onNavigateToShot,
+      allShotsCount: allShots?.length,
+      timestamp: Date.now()
+    });
+    
+    // If already associated without position, navigate to the shot
+    if (isAlreadyAssociatedWithoutPosition) {
+      const targetShotOption = allShots.find(s => s.id === selectedShotId);
+      const minimalShot: Shot = {
+        id: targetShotOption?.id || selectedShotId,
+        name: targetShotOption?.name || 'Shot',
+        images: [],
+        position: 0,
+      };
+      console.log('[ShotNavDebug] [MediaLightbox] Navigating to shot (without position)', {
+        minimalShot,
+        usedFrom: targetShotOption ? 'fromList' : 'fallback',
+        via: onNavigateToShot ? 'onNavigateToShot' : 'navigateToShot+onClose',
+        timestamp: Date.now()
+      });
+      if (onNavigateToShot) {
+        onNavigateToShot(minimalShot);
+      } else {
+        onClose();
+        navigateToShot(minimalShot);
+      }
+      return;
+    }
+    
+    console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShotWithoutPosition', {
+      mediaId: media?.id,
+      imageUrl: (media?.imageUrl || '').slice(0, 120),
+      thumbUrl: (media?.thumbUrl || '').slice(0, 120),
+      timestamp: Date.now()
+    });
+    const success = await onAddToShotWithoutPosition(media.id, media.imageUrl, media.thumbUrl);
+    console.log('[ShotNavDebug] [MediaLightbox] onAddToShotWithoutPosition result', { success, timestamp: Date.now() });
+    if (success) {
+      onShowSecondaryTick?.(media.id);
+      onOptimisticUnpositioned?.(media.id);
+      console.log('[ShotNavDebug] [MediaLightbox] Unpositioned optimistic + secondary tick applied', {
+        mediaId: media?.id,
+        timestamp: Date.now()
+      });
     }
   };
 

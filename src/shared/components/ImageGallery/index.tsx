@@ -837,8 +837,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
         selectedShotIdLocal={stateHook.selectedShotIdLocal}
         onShotChange={actionsHook.handleShotChange}
         onAddToShot={onAddToLastShot}
+        onAddToShotWithoutPosition={onAddToLastShotWithoutPosition}
         showTickForImageId={stateHook.showTickForImageId}
         setShowTickForImageId={stateHook.setShowTickForImageId}
+        showTickForSecondaryImageId={stateHook.showTickForSecondaryImageId}
+        setShowTickForSecondaryImageId={stateHook.setShowTickForSecondaryImageId}
+        optimisticPositionedIds={stateHook.optimisticPositionedIds}
+        optimisticUnpositionedIds={stateHook.optimisticUnpositionedIds}
+        onOptimisticPositioned={stateHook.markOptimisticPositioned}
+        onOptimisticUnpositioned={stateHook.markOptimisticUnpositioned}
         isMobile={isMobile}
         showTaskDetailsModal={stateHook.showTaskDetailsModal}
         setShowTaskDetailsModal={stateHook.setShowTaskDetailsModal}

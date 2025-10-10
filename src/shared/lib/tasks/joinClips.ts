@@ -26,6 +26,7 @@ export interface JoinClipsTaskParams {
   fps?: number;
   negative_prompt?: string;
   priority?: number;
+  loras?: Array<{ path: string; strength: number }>; // LoRA models to apply
 }
 
 /**
@@ -103,6 +104,14 @@ function buildJoinClipsPayload(
   }
   if (params.fps) {
     orchestratorPayload.fps = params.fps;
+  }
+
+  // Add LoRAs if provided
+  if (params.loras && params.loras.length > 0) {
+    orchestratorPayload.additional_loras = params.loras.reduce<Record<string, number>>((acc, lora) => {
+      acc[lora.path] = lora.strength;
+      return acc;
+    }, {});
   }
 
   return orchestratorPayload;
