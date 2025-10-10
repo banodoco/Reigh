@@ -11,6 +11,7 @@ import { Wand2, ChevronDown, ChevronRight, Settings, Zap } from 'lucide-react';
 
 export interface GenerationControlValues {
   overallPromptText: string;
+  remixPromptText: string;
   rulesToRememberText: string;
   numberToGenerate: number;
   includeExistingContext: boolean;
@@ -52,6 +53,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   console.log(`[RemixContextDebug] Component render - remixMode: ${remixMode}, existingPromptsForContext.length: ${existingPromptsForContext.length}`);
   
   const [overallPromptText, setOverallPromptText] = useState(initialValues?.overallPromptText || '');
+  const [remixPromptText, setRemixPromptText] = useState(initialValues?.remixPromptText || 'More like this');
   const [rulesToRememberText, setRulesToRememberText] = useState(initialValues?.rulesToRememberText || '');
   const [numberToGenerate, setNumberToGenerate] = useState<number>(initialValues?.numberToGenerate || 16);
   const [includeExistingContext, setIncludeExistingContext] = useState(initialValues?.includeExistingContext ?? true);
@@ -67,6 +69,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   useEffect(() => {
     if (!hasHydratedRef.current && initialValues) {
       setOverallPromptText(initialValues.overallPromptText || '');
+      setRemixPromptText(initialValues.remixPromptText || 'More like this');
       setRulesToRememberText(initialValues.rulesToRememberText || '');
       setNumberToGenerate(initialValues.numberToGenerate || 3);
       setIncludeExistingContext(initialValues.includeExistingContext ?? true);
@@ -78,6 +81,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       // Emit once after hydration so parent has a consistent snapshot
       onValuesChange?.({
         overallPromptText: initialValues.overallPromptText || '',
+        remixPromptText: initialValues.remixPromptText || 'More like this',
         rulesToRememberText: initialValues.rulesToRememberText || '',
         numberToGenerate: initialValues.numberToGenerate || 3,
         includeExistingContext: initialValues.includeExistingContext ?? true,
@@ -94,6 +98,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     if (!onValuesChange) return;
     onValuesChange({
       overallPromptText,
+      remixPromptText,
       rulesToRememberText,
       numberToGenerate,
       includeExistingContext,
@@ -103,7 +108,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       showAdvanced,
       ...overrides,
     });
-  }, [overallPromptText, rulesToRememberText, numberToGenerate, includeExistingContext, addSummary, replaceCurrentPrompts, temperature, showAdvanced, onValuesChange]);
+  }, [overallPromptText, remixPromptText, rulesToRememberText, numberToGenerate, includeExistingContext, addSummary, replaceCurrentPrompts, temperature, showAdvanced, onValuesChange]);
 
   // When remixMode is enabled, automatically set includeExistingContext and replaceCurrentPrompts to true
   useEffect(() => {
@@ -113,14 +118,10 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       setIncludeExistingContext(true);
       setReplaceCurrentPrompts(true);
       
-      // Set default prompt text for remix mode if empty
-      if (!overallPromptText.trim()) {
-        setOverallPromptText('More like this');
-      }
-      
       // Notify parent of the change
       onValuesChange?.({
-        overallPromptText: overallPromptText.trim() ? overallPromptText : 'More like this',
+        overallPromptText,
+        remixPromptText,
         rulesToRememberText,
         numberToGenerate,
         includeExistingContext: true,
@@ -131,7 +132,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       });
       console.log(`[RemixContextDebug] State updated for remix mode - includeExistingContext: true, replaceCurrentPrompts: true`);
     }
-  }, [remixMode, onValuesChange, overallPromptText, rulesToRememberText, numberToGenerate, temperature, showAdvanced]);
+  }, [remixMode, onValuesChange, overallPromptText, remixPromptText, rulesToRememberText, numberToGenerate, temperature, showAdvanced]);
 
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -143,6 +144,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     const shouldIncludeExisting = remixMode || includeExistingContext;
     const shouldReplace = remixMode || replaceCurrentPrompts;
     const existingPromptsToUse = shouldIncludeExisting ? existingPromptsForContext : undefined;
+    const promptTextToUse = remixMode ? remixPromptText : overallPromptText;
     
     console.log(`[RemixContextDebug] handleGenerateClick - Building params:`, {
       remixMode,
@@ -152,10 +154,11 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       shouldReplace,
       existingPromptsCount: existingPromptsToUse?.length ?? 0,
       existingPromptsPresent: !!existingPromptsToUse,
+      promptTextToUse,
     });
     
     const params = {
-      overallPromptText,
+      overallPromptText: promptTextToUse,
       rulesToRememberText,
       numberToGenerate,
       existingPrompts: existingPromptsToUse,
@@ -185,6 +188,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     const shouldIncludeExisting = remixMode || includeExistingContext;
     const shouldReplace = remixMode || replaceCurrentPrompts;
     const existingPromptsToUse = shouldIncludeExisting ? existingPromptsForContext : undefined;
+    const promptTextToUse = remixMode ? remixPromptText : overallPromptText;
     
     console.log(`[RemixContextDebug] handleGenerateAndQueueClick - Building params:`, {
       remixMode,
@@ -194,10 +198,11 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       shouldReplace,
       existingPromptsCount: existingPromptsToUse?.length ?? 0,
       existingPromptsPresent: !!existingPromptsToUse,
+      promptTextToUse,
     });
     
     const params = {
-      overallPromptText,
+      overallPromptText: promptTextToUse,
       rulesToRememberText,
       numberToGenerate,
       existingPrompts: existingPromptsToUse,
@@ -240,11 +245,16 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
           </Label>
           <Textarea
             id="gen_overallPromptText"
-            value={overallPromptText}
+            value={remixMode ? remixPromptText : overallPromptText}
             onChange={(e) => {
               const next = e.target.value;
-              setOverallPromptText(next);
-              emitChange({ overallPromptText: next });
+              if (remixMode) {
+                setRemixPromptText(next);
+                emitChange({ remixPromptText: next });
+              } else {
+                setOverallPromptText(next);
+                emitChange({ overallPromptText: next });
+              }
             }}
             placeholder={remixMode ? "e.g., Transform into fever dreams..." : "e.g., A medieval fantasy adventure with dragons and magic..."}
               rows={2}

@@ -221,7 +221,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     console.log(`[PromptEditorModal:PROJECT_CHANGE] Project changed to: ${selectedProjectId}`);
     // Reset generation settings to defaults when project changes
     setGenerationControlValues({
-      overallPromptText: '', 
+      overallPromptText: '',
+      remixPromptText: 'More like this',
       rulesToRememberText: '',
       numberToGenerate: 16, 
       includeExistingContext: true, 
@@ -240,8 +241,12 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   }, [selectedProjectId]);
 
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
-    overallPromptText: '', rulesToRememberText: '',
-    numberToGenerate: 16, includeExistingContext: true, addSummary: true,
+    overallPromptText: '',
+    remixPromptText: 'More like this',
+    rulesToRememberText: '',
+    numberToGenerate: 16,
+    includeExistingContext: true,
+    addSummary: true,
     replaceCurrentPrompts: false,
     temperature: 0.8,
     showAdvanced: false,
