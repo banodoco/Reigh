@@ -112,9 +112,15 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       console.log(`[RemixContextDebug] Setting includeExistingContext=true and replaceCurrentPrompts=true due to remix mode`);
       setIncludeExistingContext(true);
       setReplaceCurrentPrompts(true);
+      
+      // Set default prompt text for remix mode if empty
+      if (!overallPromptText.trim()) {
+        setOverallPromptText('More like this');
+      }
+      
       // Notify parent of the change
       onValuesChange?.({
-        overallPromptText,
+        overallPromptText: overallPromptText.trim() ? overallPromptText : 'More like this',
         rulesToRememberText,
         numberToGenerate,
         includeExistingContext: true,
