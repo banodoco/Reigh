@@ -36,6 +36,7 @@ import { getDimensions, DEFAULT_RESOLUTION } from './utils/dimension-utils';
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import { supabase } from '@/integrations/supabase/client';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
+import { useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
@@ -97,6 +98,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
   const { getApiKey } = useApiKeys();
+  const updateGenerationLocationMutation = useUpdateGenerationLocation();
   
   // Load complete shot data and images
   const { shots } = useShots(); // Get shots from context for shot metadata
@@ -2040,7 +2042,65 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             batchVideoFrames={batchVideoFrames}
             batchVideoContext={batchVideoContext}
             onImageReorder={handleReorderImagesInShot}
-            onImageSaved={async () => {}} // TODO: implement
+            onImageSaved={async (imageId: string, newImageUrl: string, createNew?: boolean) => {
+              console.log('[ImageFlipDebug] [ShotEditor] onImageSaved called', {
+                imageId,
+                newImageUrl,
+                createNew,
+                timestamp: Date.now()
+              });
+              
+              try {
+                if (createNew) {
+                  // TODO: Create new generation if needed
+                  console.log('[ImageFlipDebug] [ShotEditor] Create new not implemented yet');
+                  return;
+                }
+                
+                console.log('[ImageFlipDebug] [ShotEditor] Updating generation location and thumbnail', {
+                  imageId,
+                  newImageUrl,
+                  timestamp: Date.now()
+                });
+                
+                // Update both location and thumbnail_url in the database
+                await updateGenerationLocationMutation.mutateAsync({
+                  id: imageId,
+                  location: newImageUrl,
+                  thumbUrl: newImageUrl, // Also update thumbnail
+                  projectId: projectId
+                });
+                
+                console.log('[ImageFlipDebug] [ShotEditor] Generation location updated successfully', {
+                  timestamp: Date.now()
+                });
+                
+                // Invalidate queries to refresh the UI
+                await queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShotId] });
+                await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShotId] });
+                
+                console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {
+                  timestamp: Date.now()
+                });
+                
+                // Call parent callback to update other related data
+                onShotImagesUpdate();
+                
+                console.log('[ImageFlipDebug] [ShotEditor] onImageSaved completed successfully', {
+                  timestamp: Date.now()
+                });
+              } catch (error) {
+                console.error('[ImageFlipDebug] [ShotEditor] Error in onImageSaved:', {
+                  error,
+                  errorMessage: error instanceof Error ? error.message : String(error),
+                  errorStack: error instanceof Error ? error.stack : undefined,
+                  imageId,
+                  newImageUrl,
+                  timestamp: Date.now()
+                });
+                toast.error('Failed to save flipped image.');
+              }
+            }}
             onContextFramesChange={onBatchVideoContextChange}
             onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}

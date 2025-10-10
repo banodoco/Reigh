@@ -92,6 +92,35 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   toolTypeOverride,
 }) => {
   
+  // Log the callback we received
+  React.useEffect(() => {
+    console.log('[ImageFlipDebug] [ImageGalleryLightbox] onImageSaved prop', {
+      hasCallback: !!onImageSaved,
+      callbackType: typeof onImageSaved,
+      callbackName: onImageSaved?.name,
+      timestamp: Date.now()
+    });
+  }, [onImageSaved]);
+  
+  // Wrap onImageSaved to add logging
+  const wrappedOnImageSaved = React.useCallback(async (newImageUrl: string, createNew?: boolean) => {
+    console.log('[ImageFlipDebug] [ImageGalleryLightbox] wrappedOnImageSaved called', {
+      newImageUrl,
+      createNew,
+      hasOriginalCallback: !!onImageSaved,
+      timestamp: Date.now()
+    });
+    
+    const result = await onImageSaved(newImageUrl, createNew);
+    
+    console.log('[ImageFlipDebug] [ImageGalleryLightbox] wrappedOnImageSaved completed', {
+      result,
+      timestamp: Date.now()
+    });
+    
+    return result;
+  }, [onImageSaved]);
+  
   // Calculate navigation availability for MediaLightbox
   const { hasNext, hasPrevious } = useMemo(() => {
     if (!activeLightboxMedia) return { hasNext: false, hasPrevious: false };
@@ -141,7 +170,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           onClose={onClose}
           onNext={onNext}
           onPrevious={onPrevious}
-          onImageSaved={onImageSaved}
+          onImageSaved={wrappedOnImageSaved}
           showNavigation={true}
           showImageEditTools={!activeLightboxMedia.type.includes('video')}
           showDownload={true}

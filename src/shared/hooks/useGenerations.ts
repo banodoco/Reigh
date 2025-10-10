@@ -361,10 +361,17 @@ export async function fetchGenerations(
 /**
  * Update generation location using direct Supabase call
  */
-async function updateGenerationLocation(id: string, location: string): Promise<void> {
+async function updateGenerationLocation(id: string, location: string, thumbUrl?: string): Promise<void> {
+  const updateData: { location: string; thumbnail_url?: string } = { location };
+  
+  // If thumbUrl is provided, update it as well (important for flipped images)
+  if (thumbUrl) {
+    updateData.thumbnail_url = thumbUrl;
+  }
+  
   const { error } = await supabase
     .from('generations')
-    .update({ location })
+    .update(updateData)
     .eq('id', id);
 
   if (error) {
@@ -521,8 +528,8 @@ export function useUpdateGenerationLocation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, location, projectId }: { id: string; location: string; projectId?: string }) => {
-      return updateGenerationLocation(id, location);
+    mutationFn: ({ id, location, thumbUrl, projectId }: { id: string; location: string; thumbUrl?: string; projectId?: string }) => {
+      return updateGenerationLocation(id, location, thumbUrl);
     },
     onSuccess: (data, variables) => {
       // Generation location update events are now handled by DataFreshnessManager via realtime events

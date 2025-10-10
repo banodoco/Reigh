@@ -54,16 +54,21 @@ export const extractVideoMetadata = async (file: File): Promise<VideoMetadata> =
 export const uploadVideoToStorage = async (
   file: File,
   projectId: string,
+  shotId: string,
+  onProgress?: (progress: number) => void,
   maxRetries: number = 3
 ): Promise<string> => {
   const fileExt = file.name.split('.').pop() || 'mp4';
-  const fileName = `guidance-videos/${projectId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+  const fileName = `guidance-videos/${projectId}/${shotId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
   
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       console.log(`[videoUploader] Upload attempt ${attempt + 1}/${maxRetries}:`, fileName);
+      
+      // Report initial progress
+      onProgress?.(10);
       
       const { data, error } = await supabase.storage
         .from('image_uploads')
@@ -76,10 +81,16 @@ export const uploadVideoToStorage = async (
         throw error;
       }
       
+      // Report upload complete
+      onProgress?.(90);
+      
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('image_uploads')
         .getPublicUrl(fileName);
+      
+      // Report final progress
+      onProgress?.(100);
       
       console.log('[videoUploader] Upload successful:', publicUrl);
       return publicUrl;

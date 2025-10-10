@@ -116,6 +116,10 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     const handleTaskUpdate = (event: CustomEvent) => {
       console.log('[SimpleRealtimeProvider] 📨 Task update received:', event.detail);
       
+      const payload = event.detail;
+      const isComplete = payload?.new?.status === 'Complete';
+      const shotId = payload?.new?.metadata?.shot_id || payload?.new?.metadata?.shotId;
+      
       setState(prev => ({
         ...prev,
         lastTaskUpdate: { payload: event.detail, timestamp: Date.now() }
@@ -125,20 +129,43 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       console.log('[TasksPaneRealtimeDebug] 🔄 Invalidating React Query caches for task update', {
         context: 'realtime-invalidation-task-update',
         eventDetail: event.detail,
-        queryKeysInvalidated: ['tasks', 'task-status-counts', 'unified-generations (all variants)', 'shots', 'unpositioned-count', 'project-video-counts'],
+        isComplete,
+        shotId: shotId ? shotId.substring(0, 8) : null,
+        queryKeysInvalidated: isComplete 
+          ? ['tasks', 'task-status-counts', 'unified-generations (selective)', 'shots', 'unpositioned-count', 'project-video-counts']
+          : ['tasks', 'task-status-counts'],
         timestamp: Date.now()
       });
       
-      // Task updates are less frequent, so invalidate immediately
+      // Always invalidate task-related queries
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
-      // Use predicate to invalidate all unified-generations queries (including shot-specific ones)
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === 'unified-generations'
-      });
-      queryClient.invalidateQueries({ queryKey: ['shots'] });
-      queryClient.invalidateQueries({ queryKey: ['unpositioned-count'] });
-      queryClient.invalidateQueries({ queryKey: ['project-video-counts'] });
+      
+      // Only invalidate generation data when task actually completes (creates new generations)
+      if (isComplete) {
+        // Invalidate project-level generation queries (for galleries, unpositioned pane)
+        queryClient.invalidateQueries({ 
+          predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'
+        });
+        
+        // Only invalidate shot-specific query if we know which shot it's for
+        if (shotId) {
+          console.log('[TasksPaneRealtimeDebug] 🎯 Targeted shot invalidation:', { shotId: shotId.substring(0, 8) });
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+          queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shotId] });
+        } else {
+          // Fallback: invalidate all shot queries if we don't know the specific shot
+          // This is less ideal but ensures data consistency
+          console.log('[TasksPaneRealtimeDebug] ⚠️ Fallback: invalidating all shot queries (no shotId in metadata)');
+          queryClient.invalidateQueries({ 
+            predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'shot'
+          });
+          queryClient.invalidateQueries({ queryKey: ['unpositioned-count'] });
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ['shots'] });
+        queryClient.invalidateQueries({ queryKey: ['project-video-counts'] });
+      }
     };
 
     const handleNewTask = (event: CustomEvent) => {
@@ -221,12 +248,34 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       }, timeoutMs);
     };
 
+    const handleShotGenerationChange = (event: CustomEvent) => {
+      const { shotId, isPositioned, eventType } = event.detail;
+      
+      console.log('[SimpleRealtimeProvider] 🎯 Shot generation change received:', {
+        shotId: shotId?.substring(0, 8),
+        isPositioned,
+        eventType,
+        timestamp: Date.now()
+      });
+      
+      // Only invalidate the specific shot's queries - timeline will reload efficiently
+      // This is NOT debounced because positioned image changes are rare and precise
+      if (shotId) {
+        console.log('[SimpleRealtimeProvider] 🎯 Targeted shot invalidation for positioned image:', { shotId: shotId.substring(0, 8) });
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shotId] });
+      }
+    };
+
     window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
     window.addEventListener('realtime:task-new', handleNewTask as EventListener);
+    window.addEventListener('realtime:shot-generation-change', handleShotGenerationChange as EventListener);
 
     return () => {
       window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);
       window.removeEventListener('realtime:task-new', handleNewTask as EventListener);
+      window.removeEventListener('realtime:shot-generation-change', handleShotGenerationChange as EventListener);
       
       // Clean up any pending invalidation timeout
       if (invalidationTimeoutRef.current) {

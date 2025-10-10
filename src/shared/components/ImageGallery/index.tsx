@@ -427,23 +427,40 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   //   timestamp: new Date().toISOString()
   // });
 
-  // Sync selection when lastShotId changes
+  // Sync external initialShotFilter prop to internal selectedShotIdLocal state
+  // This allows external components (like GenerationsPane) to control the filter
+  const prevInitialShotFilterRef = useRef(initialShotFilter);
+  useEffect(() => {
+    // Only sync when initialShotFilter actually changes (not on every render)
+    if (initialShotFilter && initialShotFilter !== prevInitialShotFilterRef.current) {
+      console.log('[ShotSelectionDebug] External initialShotFilter changed, syncing to internal state:', {
+        previousExternal: prevInitialShotFilterRef.current,
+        newExternal: initialShotFilter,
+        currentInternal: stateHook.selectedShotIdLocal,
+        timestamp: Date.now()
+      });
+      stateHook.setSelectedShotIdLocal(initialShotFilter);
+      prevInitialShotFilterRef.current = initialShotFilter;
+    }
+  }, [initialShotFilter, stateHook.selectedShotIdLocal, stateHook.setSelectedShotIdLocal]);
+
+  // Sync selection when lastShotId changes (only for fixing invalid selections)
+  // NOTE: Do NOT auto-sync to currentShotId to allow external filter control (e.g., GenerationsPane)
   useEffect(() => {
     if (!lastShotId) return;
     
-    // If we're viewing a specific shot, don't override with lastShotId
-    if (currentShotId && simplifiedShotOptions.find(shot => shot.id === currentShotId)) {
-      console.log('[ShotSelectionDebug] Not syncing to lastShotId because currentShotId takes priority:', {
-        currentShotId,
-        lastShotId,
-        selectedShotIdLocal: stateHook.selectedShotIdLocal
-      });
+    // Only sync if the current selection is invalid and lastShotId exists in shots
+    const isCurrentSelectionValid = stateHook.selectedShotIdLocal && 
+      simplifiedShotOptions.some(s => s.id === stateHook.selectedShotIdLocal);
+    
+    if (isCurrentSelectionValid) {
+      // Current selection is valid, don't override it
       return;
     }
 
     const existsInShots = simplifiedShotOptions.some(s => s.id === lastShotId);
     if (existsInShots && lastShotId !== stateHook.selectedShotIdLocal) {
-      console.log('[ShotSelectionDebug] Syncing selection to lastShotId change:', {
+      console.log('[ShotSelectionDebug] Syncing to lastShotId due to invalid selection:', {
         previousSelection: stateHook.selectedShotIdLocal,
         nextSelection: lastShotId,
         shotsCount: simplifiedShotOptions.length,
@@ -451,7 +468,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
       });
       stateHook.setSelectedShotIdLocal(lastShotId);
     }
-  }, [lastShotId, simplifiedShotOptions, stateHook.selectedShotIdLocal, currentShotId, stateHook.setSelectedShotIdLocal]);
+  }, [lastShotId, simplifiedShotOptions, stateHook.selectedShotIdLocal, stateHook.setSelectedShotIdLocal]);
 
   // Handle opening lightbox after page navigation
   useEffect(() => {

@@ -200,38 +200,30 @@ export const useImageGalleryState = ({
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fix race condition: Update selectedShotIdLocal when shots data loads or context changes
+  // NOTE: Do NOT auto-sync when external filter control is enabled (e.g., GenerationsPane manages its own filter)
   useEffect(() => {
-    // When viewing a specific shot (currentShotId exists), always prioritize that shot for the selector
-    if (currentShotId && simplifiedShotOptions.find(shot => shot.id === currentShotId)) {
-      if (selectedShotIdLocal !== currentShotId) {
-        console.log('[ShotSelectionDebug] Setting shot selector to current shot (GenerationsPane context):', {
-          oldSelection: selectedShotIdLocal,
-          newSelection: currentShotId,
-          context: 'viewing specific shot'
-        });
-        setSelectedShotIdLocal(currentShotId);
-      }
-      return;
-    }
+    // SKIP auto-sync entirely - let the external filter control (ShotFilter component) manage the state
+    // The external filter can set selectedShotIdLocal directly via setSelectedShotIdLocal
+    // This prevents fighting between the dropdown and the auto-sync logic
     
-    // Only update if current selection is empty/invalid and we're not viewing a specific shot
+    // Only fix invalid selections (empty or shot no longer exists)
     const isCurrentSelectionValid = selectedShotIdLocal && simplifiedShotOptions.find(shot => shot.id === selectedShotIdLocal);
     
     if (!isCurrentSelectionValid) {
       const newSelection = lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
       if (newSelection && newSelection !== selectedShotIdLocal) {
-        console.log('[ShotSelectionDebug] Fixing selectedShotIdLocal race condition:', {
+        console.log('[ShotSelectionDebug] Fixing invalid selectedShotIdLocal:', {
           oldSelection: selectedShotIdLocal,
           newSelection,
           lastShotId,
           availableShots: simplifiedShotOptions.length,
           firstShotId: simplifiedShotOptions[0]?.id,
-          context: 'no specific shot context'
+          context: 'invalid selection'
         });
         setSelectedShotIdLocal(newSelection);
       }
     }
-  }, [currentShotId, lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
+  }, [lastShotId, simplifiedShotOptions, selectedShotIdLocal]);
 
   // 🚀 PERFORMANCE FIX: Memoize image IDs to prevent unnecessary effect triggers
   const currentImageIds = useMemo(() => 

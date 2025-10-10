@@ -730,10 +730,29 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return false;
   }, [selectedShotIdLocal, image.id, image.shot_id, image.position, image.all_shot_associations, optimisticUnpositionedIds]);
 
-  // Check if we're currently viewing the selected shot (hide buttons if so)
+  // Check if we're currently viewing the selected shot specifically
+  // Only hide "add without position" button when actively filtering to view the current shot's items
   const isCurrentlyViewingSelectedShot = useMemo(() => {
-    return currentViewingShotId && selectedShotIdLocal && currentViewingShotId === selectedShotIdLocal;
-  }, [currentViewingShotId, selectedShotIdLocal]);
+    // Must have both IDs and they must match
+    if (!currentViewingShotId || !selectedShotIdLocal) {
+      console.log('[AddWithoutPosition] isCurrentlyViewingSelectedShot = false (missing IDs):', {
+        currentViewingShotId,
+        selectedShotIdLocal,
+        imageId: image.id?.substring(0, 8)
+      });
+      return false;
+    }
+    
+    // Only hide when viewing items specifically filtered to the current shot
+    const result = currentViewingShotId === selectedShotIdLocal;
+    console.log('[AddWithoutPosition] isCurrentlyViewingSelectedShot check:', {
+      result,
+      currentViewingShotId: currentViewingShotId?.substring(0, 8),
+      selectedShotIdLocal: selectedShotIdLocal?.substring(0, 8),
+      imageId: image.id?.substring(0, 8)
+    });
+    return result;
+  }, [currentViewingShotId, selectedShotIdLocal, image.id]);
   
   // Handle quick create success navigation
   const handleQuickCreateSuccess = useCallback(() => {
@@ -1340,7 +1359,21 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     </Tooltip>
                     
                     {/* Add without position button - hide when positioned, during main button success, while main button is processing, or when currently viewing this shot */}
-                    {onAddToLastShotWithoutPosition && !isAlreadyPositionedInSelectedShot && showTickForImageId !== image.id && addingToShotImageId !== image.id && !isCurrentlyViewingSelectedShot && (
+                    {(() => {
+                      const shouldShow = onAddToLastShotWithoutPosition && !isAlreadyPositionedInSelectedShot && showTickForImageId !== image.id && addingToShotImageId !== image.id && !isCurrentlyViewingSelectedShot;
+                      console.log('[AddWithoutPosition] Button visibility check for image:', {
+                        imageId: image.id?.substring(0, 8),
+                        shouldShow,
+                        conditions: {
+                          hasCallback: !!onAddToLastShotWithoutPosition,
+                          notAlreadyPositioned: !isAlreadyPositionedInSelectedShot,
+                          noTickShowing: showTickForImageId !== image.id,
+                          notAdding: addingToShotImageId !== image.id,
+                          notViewingCurrentShot: !isCurrentlyViewingSelectedShot
+                        }
+                      });
+                      return shouldShow;
+                    })() && (
                         <Tooltip delayDuration={0} disableHoverableContent>
                             <TooltipTrigger asChild>
                                 <Button

@@ -91,6 +91,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const {
     addMagicEditPrompt,
     getLastMagicEditPrompt,
+    getLastSettings,
     isLoading: isLoadingMetadata
   } = useShotGenerationMetadata({
     shotId: currentShotId || '',
@@ -176,7 +177,12 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       if (shotGenerationId && currentShotId) {
         try {
           console.log('[MagicEditPromptPersist] 💾 CALLING addMagicEditPrompt...');
-          await addMagicEditPrompt(magicEditPrompt.trim(), magicEditNumImages);
+          await addMagicEditPrompt(
+            magicEditPrompt.trim(), 
+            magicEditNumImages,
+            isNextSceneBoostEnabled,
+            isInSceneBoostEnabled
+          );
           console.log('[MagicEditPromptPersist] ✅ SAVE SUCCESS:', {
             shotGenerationId: shotGenerationId.substring(0, 8),
             currentShotId: currentShotId.substring(0, 8),
@@ -259,7 +265,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
     }
   }, [selectedProjectId, createShotMutation, queryClient]);
 
-  // Load last saved prompt when modal opens (for shot generation context)
+  // Load last saved prompt and settings when modal opens (for shot generation context)
   useEffect(() => {
     console.log('[MagicEditPromptPersist] 📥 LOAD EFFECT triggered:', {
       isOpen,
@@ -273,13 +279,15 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
     });
     
     if (isOpen && shotGenerationId && !isLoadingMetadata) {
-      console.log('[MagicEditPromptPersist] 📥 CALLING getLastMagicEditPrompt...');
+      console.log('[MagicEditPromptPersist] 📥 CALLING getLastMagicEditPrompt and getLastSettings...');
       const lastPrompt = getLastMagicEditPrompt();
+      const lastSettings = getLastSettings();
       
       console.log('[MagicEditPromptPersist] 📥 LOAD RESULT:', {
         hasLastPrompt: !!lastPrompt,
         lastPromptLength: lastPrompt?.length || 0,
         lastPromptPreview: lastPrompt ? lastPrompt.substring(0, 50) + '...' : 'none',
+        lastSettings,
         hasCurrentPrompt: !!magicEditPrompt,
         currentPromptLength: magicEditPrompt?.length || 0,
         willSetPrompt: !!(lastPrompt && !magicEditPrompt),
@@ -288,13 +296,17 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       });
       
       if (lastPrompt && !magicEditPrompt) {
-        console.log('[MagicEditPromptPersist] ✅ SETTING PROMPT from saved data:', {
+        console.log('[MagicEditPromptPersist] ✅ SETTING PROMPT and SETTINGS from saved data:', {
           shotGenerationId: shotGenerationId.substring(0, 8),
           promptLength: lastPrompt.length,
           promptPreview: lastPrompt.substring(0, 50) + '...',
+          settings: lastSettings,
           timestamp: Date.now()
         });
         setMagicEditPrompt(lastPrompt);
+        setMagicEditNumImages(lastSettings.numImages);
+        setIsNextSceneBoostEnabled(lastSettings.isNextSceneBoostEnabled);
+        setIsInSceneBoostEnabled(lastSettings.isInSceneBoostEnabled);
       } else if (lastPrompt && magicEditPrompt) {
         console.log('[MagicEditPromptPersist] ⏭️  SKIPPING LOAD - current prompt exists:', {
           currentPromptLength: magicEditPrompt.length,
@@ -322,7 +334,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         timestamp: Date.now()
       });
     }
-  }, [isOpen, shotGenerationId, isLoadingMetadata, getLastMagicEditPrompt, magicEditPrompt]);
+  }, [isOpen, shotGenerationId, isLoadingMetadata, getLastMagicEditPrompt, getLastSettings, magicEditPrompt]);
 
   // Reset magicEditShotId if the selected shot no longer exists (e.g., was deleted)
   useEffect(() => {

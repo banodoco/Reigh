@@ -351,7 +351,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Top-left: Zoom controls - show when video is present (otherwise in uploader strip) */}
       {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
-        <div className={`absolute left-8 top-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+        <div className={`absolute left-8 top-4 z-20 flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
           <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
           <Button
             variant="outline"
@@ -398,8 +398,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
       {/* Bottom-left: Gap control and Reset button */}
       <div 
-        className={`absolute left-8 z-20 flex items-center gap-2 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-        style={{ bottom: zoomLevel <= 1 ? 'calc(1rem + 30px)' : 'calc(2rem + 30px)' }}
+        className={`absolute left-8 z-20 flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
+        style={{ bottom: zoomLevel <= 1 ? '1.5rem' : '2.5rem' }}
       >
         {/* Gap to reset */}
         <div className="flex items-center gap-1.5">
@@ -410,7 +410,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             min={1}
             max={maxGap}
             step={1}
-            className="w-16 h-4"
+            className="w-24 h-4"
           />
         </div>
 
@@ -427,7 +427,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
       {/* Top-right: Structure controls (only when video is present) */}
       {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
-        <div className={`absolute right-8 top-4 z-20 flex items-center gap-1.5 bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+        <div className={`absolute right-8 top-4 z-20 flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
           {/* Structure type selector */}
           <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
             onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
@@ -482,7 +482,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       {onImageDrop && (
         <div 
           className={`absolute right-8 z-20 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-          style={{ bottom: zoomLevel <= 1 ? 'calc(1rem + 30px)' : 'calc(2rem + 30px)' }}
+          style={{ bottom: zoomLevel <= 1 ? '1.5rem' : '2.5rem' }}
         >
           <input
             ref={fileInputRef}
@@ -503,7 +503,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs px-3 sm:px-2 lg:px-3 bg-background/95 backdrop-blur-sm shadow-md border-border/50"
+              className="h-8 text-xs px-3 sm:px-2 lg:px-3"
               asChild
             >
               <span className="flex items-center gap-1.5">
@@ -582,6 +582,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               onZoomOut={handleZoomOutFromCenter}
               onZoomReset={handleZoomReset}
               onZoomToStart={handleZoomToStart}
+              hasNoImages={hasNoImages}
             />
           )
         )}
@@ -599,15 +600,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         <div
           ref={containerRef}
           id="timeline-container"
-          className={`relative h-32 mb-8 ${shotId && projectId && onStructureVideoChange ? 'border-l border-r border-b rounded-b bg-gradient-to-b from-muted/5 to-transparent' : ''}`}
+          className={`relative h-36 mb-4`}
           onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
           style={{
             width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
             minWidth: "100%",
             userSelect: 'none',
             paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
-            paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
-            marginTop: (shotId && projectId && onStructureVideoChange) ? '-1px' : '0', // Overlap border for seamless connection
+            paddingRight: `${TIMELINE_HORIZONTAL_PADDING + 60}px`,
           }}
         >
           {/* Pair visualizations */}

@@ -142,6 +142,22 @@ export class SimpleRealtimeManager {
             console.log('[SimpleRealtime] 📨 Task updated:', payload);
             this.handleTaskUpdate(payload);
           }
+        )
+        // Listen to shot_generations table for positioned image changes
+        // This allows timeline to reload ONLY when relevant positioned images are added/updated
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'shot_generations' }, 
+          (payload: any) => {
+            console.log('[SimpleRealtime] 📨 Shot generation inserted:', payload);
+            this.handleShotGenerationChange(payload, 'INSERT');
+          }
+        )
+        .on('postgres_changes', 
+          { event: 'UPDATE', schema: 'public', table: 'shot_generations' }, 
+          (payload: any) => {
+            console.log('[SimpleRealtime] 📨 Shot generation updated:', payload);
+            this.handleShotGenerationChange(payload, 'UPDATE');
+          }
         );
 
       // Subscribe with status callback
@@ -263,6 +279,61 @@ export class SimpleRealtimeManager {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('realtime:task-new', { 
         detail: payload 
+      }));
+    }
+  }
+
+  private handleShotGenerationChange(payload: any, eventType: 'INSERT' | 'UPDATE') {
+    // Update global snapshot with latest event time
+    this.updateGlobalSnapshot('joined', Date.now());
+    
+    const newRecord = payload?.new;
+    const oldRecord = payload?.old;
+    const shotId = newRecord?.shot_id;
+    const timelineFrame = newRecord?.timeline_frame;
+    const oldTimelineFrame = oldRecord?.timeline_frame;
+    
+    // Only invalidate if this involves a positioned image (timeline_frame is NOT NULL)
+    const isNowPositioned = timelineFrame !== null && timelineFrame !== undefined;
+    const wasPositioned = oldTimelineFrame !== null && oldTimelineFrame !== undefined;
+    const positionChanged = eventType === 'UPDATE' && timelineFrame !== oldTimelineFrame;
+    
+    // For INSERT: only care if it's positioned
+    // For UPDATE: care if position changed (added, removed, or moved)
+    const shouldInvalidate = eventType === 'INSERT' ? isNowPositioned : (isNowPositioned || wasPositioned || positionChanged);
+    
+    console.log('[SimpleRealtime] 🎯 Shot generation change analysis:', {
+      eventType,
+      shotId: shotId?.substring(0, 8),
+      timelineFrame,
+      oldTimelineFrame,
+      isNowPositioned,
+      wasPositioned,
+      positionChanged,
+      shouldInvalidate
+    });
+    
+    if (!shouldInvalidate) {
+      console.log('[SimpleRealtime] ⏭️  Skipping invalidation - no positioned image changes');
+      return;
+    }
+    
+    if (!shotId) {
+      console.warn('[SimpleRealtime] ⚠️  Shot generation change missing shot_id, cannot target invalidation');
+      return;
+    }
+    
+    // Report event to freshness manager - ONLY for the specific shot
+    dataFreshnessManager.onRealtimeEvent('shot-generation-positioned', [
+      ['unified-generations', 'shot', shotId],
+      ['shot-generations', shotId],
+      ['unpositioned-count', shotId]
+    ]);
+    
+    // Emit event for React components to listen to
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('realtime:shot-generation-change', { 
+        detail: { ...payload, eventType, shotId, isPositioned: isNowPositioned }
       }));
     }
   }

@@ -122,6 +122,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
+  // Log what callback we received
+  useEffect(() => {
+    console.log('[ImageFlipDebug] MediaLightbox mounted/updated', {
+      mediaId: media.id,
+      hasOnImageSaved: !!onImageSaved,
+      onImageSavedType: typeof onImageSaved,
+      onImageSavedName: onImageSaved?.name,
+      timestamp: Date.now()
+    });
+  }, [media.id, onImageSaved]);
+
   // Log flip state changes
   useEffect(() => {
     console.log('[ImageFlipDebug] Flip state changed', {
@@ -470,13 +481,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   };
 
   const handleSave = async () => {
+    // Capture the current image URL at save time to prevent it from changing during the async operation
+    const sourceImageUrl = displayUrl;
+    const flipStateAtSave = isFlippedHorizontally;
+    
     console.log('[ImageFlipDebug] handleSave called', {
       mediaId: media.id,
       hasChanges,
       hasCanvasRef: !!canvasRef.current,
       isSaving,
-      isFlippedHorizontally,
-      displayUrl,
+      isFlippedHorizontally: flipStateAtSave,
+      sourceImageUrl,
+      mediaLocation: media.location,
+      mediaImageUrl: media.imageUrl,
       timestamp: Date.now()
     });
 
@@ -513,14 +530,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           console.log('[ImageFlipDebug] Image loaded for canvas', {
             naturalWidth: img.naturalWidth,
             naturalHeight: img.naturalHeight,
-            isFlippedHorizontally
+            flipStateAtSave,
+            currentFlipState: isFlippedHorizontally
           });
 
           canvas.width = img.naturalWidth;
           canvas.height = img.naturalHeight;
           ctx.save();
-          if (isFlippedHorizontally) {
-            console.log('[ImageFlipDebug] Applying flip transform to canvas');
+          if (flipStateAtSave) {
+            console.log('[ImageFlipDebug] Applying flip transform to canvas', {
+              canvasWidth: canvas.width,
+              flipStateAtSave
+            });
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
           }
@@ -546,8 +567,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           reject(err);
         };
 
-        console.log('[ImageFlipDebug] Loading image for canvas', { src: displayUrl });
-        img.src = displayUrl;
+        console.log('[ImageFlipDebug] Loading image for canvas', { 
+          src: sourceImageUrl,
+          willApplyFlip: flipStateAtSave
+        });
+        img.src = sourceImageUrl;
       });
 
       if (onImageSaved) {
@@ -555,21 +579,57 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         const fileName = `flipped_${media.id || 'image'}_${Date.now()}.png`;
         const file = new File([blob], fileName, { type: 'image/png' });
 
+        console.log('[ImageFlipDebug] Starting upload to storage', {
+          fileName,
+          fileSize: file.size,
+          timestamp: Date.now()
+        });
+
         // Upload to storage and get a public URL
         const uploadedUrl = await uploadImageToStorage(file);
 
-        // Reset state
-        setIsFlippedHorizontally(false);
-        setHasChanges(false);
+        console.log('[ImageFlipDebug] Upload completed', {
+          uploadedUrl,
+          timestamp: Date.now()
+        });
+
+        // Don't reset flip state yet - keep showing flipped version during save
+        // This will be reset when the lightbox closes
+
+        console.log('[ImageFlipDebug] Calling onImageSaved callback', {
+          uploadedUrl,
+          createNew: false,
+          hasCallback: !!onImageSaved,
+          callbackType: typeof onImageSaved,
+          callbackName: onImageSaved?.name,
+          timestamp: Date.now()
+        });
 
         // Await parent handler with the persistent URL - always replace original
-        await onImageSaved(uploadedUrl, false);
+        const result = await onImageSaved(uploadedUrl, false);
+        
+        console.log('[ImageFlipDebug] onImageSaved callback returned', {
+          result,
+          resultType: typeof result,
+          timestamp: Date.now()
+        });
+
+        console.log('[ImageFlipDebug] onImageSaved callback completed, closing lightbox', {
+          timestamp: Date.now()
+        });
 
         // Close the lightbox on successful save
         onClose();
+      } else {
+        console.warn('[ImageFlipDebug] No onImageSaved callback provided');
       }
     } catch (error) {
-      console.error('Error saving image:', error);
+      console.error('[ImageFlipDebug] Error during save process:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        timestamp: Date.now()
+      });
       toast.error('Failed to save image.');
     } finally {
       // This will now run after onImageSaved has completed
@@ -1276,10 +1336,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           }}
                         />
                         {isSaving && (
-                          <div className="absolute inset-0 flex items-center justify-center z-10">
-                            <div className="text-center text-white bg-black/60 rounded-lg p-4 backdrop-blur-sm">
-                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                              <p className="text-sm">Saving...</p>
+                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm">
+                            <div className="text-center text-white bg-black/80 rounded-lg p-6 backdrop-blur-sm border border-white/20">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-3"></div>
+                              <p className="text-lg font-medium">Saving flipped image...</p>
+                              <p className="text-sm text-white/70 mt-1">Please wait</p>
                             </div>
                           </div>
                         )}
@@ -1360,6 +1421,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           imageDimensions={imageDimensions}
                           toolTypeOverride={toolTypeOverride}
                           zIndexOverride={100100}
+                          shotGenerationId={media.shotImageEntryId}
                         />
                       )}
 
@@ -1587,10 +1649,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           }}
                         />
                         {isSaving && (
-                          <div className="absolute inset-0 flex items-center justify-center z-10">
-                            <div className="text-center text-white bg-black/60 rounded-lg p-3 backdrop-blur-sm">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
-                              <p className="text-xs">Saving...</p>
+                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm">
+                            <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
+                              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
+                              <p className="text-base font-medium">Saving flipped image...</p>
+                              <p className="text-xs text-white/70 mt-1">Please wait</p>
                             </div>
                           </div>
                         )}
@@ -1763,10 +1826,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       }}
                     />
                     {isSaving && (
-                      <div className="absolute inset-0 flex items-center justify-center z-10">
-                        <div className="text-center text-white bg-black/60 rounded-lg p-4 backdrop-blur-sm">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                          <p className="text-sm">Saving...</p>
+                      <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm">
+                        <div className="text-center text-white bg-black/80 rounded-lg p-6 backdrop-blur-sm border border-white/20">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-3"></div>
+                          <p className="text-lg font-medium">Saving flipped image...</p>
+                          <p className="text-sm text-white/70 mt-1">Please wait</p>
                         </div>
                       </div>
                     )}
@@ -1846,6 +1910,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       imageDimensions={imageDimensions}
                       toolTypeOverride={toolTypeOverride}
                       zIndexOverride={100100}
+                      shotGenerationId={media.shotImageEntryId}
                     />
                   )}
 

@@ -938,5 +938,7 @@ export const useGenerationActions = ({
     isEnqueuing,
     justQueued,
     enqueueTasks,
+    // Expose mutation for direct use (e.g., for image flipping)
+    updateGenerationLocationMutation,
   };
 }; 

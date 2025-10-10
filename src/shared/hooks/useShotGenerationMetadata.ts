@@ -7,8 +7,13 @@ export interface ShotGenerationMetadata {
     prompt: string;
     timestamp: string;
     numImages?: number;
+    isNextSceneBoostEnabled?: boolean;
+    isInSceneBoostEnabled?: boolean;
   }>;
   lastMagicEditPrompt?: string;
+  lastMagicEditNumImages?: number;
+  lastMagicEditNextSceneBoost?: boolean;
+  lastMagicEditInSceneBoost?: boolean;
   userPositioned?: boolean;
   frameSpacing?: number;
   autoInitialized?: boolean;
@@ -213,12 +218,19 @@ export function useShotGenerationMetadata({
   }, [shotId, shotGenerationId, metadata, isUpdating, queryClient]);
 
   // Convenience method to add a magic edit prompt
-  const addMagicEditPrompt = useCallback(async (prompt: string, numImages?: number) => {
+  const addMagicEditPrompt = useCallback(async (
+    prompt: string, 
+    numImages?: number,
+    isNextSceneBoostEnabled?: boolean,
+    isInSceneBoostEnabled?: boolean
+  ) => {
     console.log('[MagicEditPromptPersist] 💾 ADD PROMPT called:', {
       shotGenerationId: shotGenerationId ? shotGenerationId.substring(0, 8) : 'N/A',
       promptLength: prompt.length,
       promptPreview: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''),
       numImages,
+      isNextSceneBoostEnabled,
+      isInSceneBoostEnabled,
       existingPromptsCount: metadata.magicEditPrompts?.length || 0,
       currentLastPrompt: metadata.lastMagicEditPrompt 
         ? metadata.lastMagicEditPrompt.substring(0, 30) + '...'
@@ -229,7 +241,9 @@ export function useShotGenerationMetadata({
     const newPromptEntry = {
       prompt,
       timestamp: new Date().toISOString(),
-      numImages
+      numImages,
+      isNextSceneBoostEnabled,
+      isInSceneBoostEnabled
     };
 
     const existingPrompts = metadata.magicEditPrompts || [];
@@ -247,7 +261,10 @@ export function useShotGenerationMetadata({
 
     await updateMetadata({
       magicEditPrompts: trimmedPrompts,
-      lastMagicEditPrompt: prompt
+      lastMagicEditPrompt: prompt,
+      lastMagicEditNumImages: numImages,
+      lastMagicEditNextSceneBoost: isNextSceneBoostEnabled,
+      lastMagicEditInSceneBoost: isInSceneBoostEnabled
     });
     
     console.log('[MagicEditPromptPersist] ✅ ADD PROMPT completed:', {
@@ -278,6 +295,15 @@ export function useShotGenerationMetadata({
     return metadata.magicEditPrompts || [];
   }, [metadata]);
 
+  // Get last settings
+  const getLastSettings = useCallback(() => {
+    return {
+      numImages: metadata.lastMagicEditNumImages || 4,
+      isNextSceneBoostEnabled: metadata.lastMagicEditNextSceneBoost || false,
+      isInSceneBoostEnabled: metadata.lastMagicEditInSceneBoost || false
+    };
+  }, [metadata]);
+
   return {
     metadata,
     isLoading,
@@ -285,6 +311,7 @@ export function useShotGenerationMetadata({
     updateMetadata,
     addMagicEditPrompt,
     getLastMagicEditPrompt,
-    getMagicEditPrompts
+    getMagicEditPrompts,
+    getLastSettings
   };
 }

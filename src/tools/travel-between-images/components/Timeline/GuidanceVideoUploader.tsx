@@ -4,6 +4,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Upload, Video, ZoomIn, ZoomOut, RotateCcw, AlignStartHorizontal } from 'lucide-react';
 import { uploadVideoToStorage, extractVideoMetadata, type VideoMetadata } from '@/shared/lib/videoUploader';
 import { toast } from 'sonner';
+import { TIMELINE_HORIZONTAL_PADDING } from './constants';
 
 interface GuidanceVideoUploaderProps {
   shotId: string;
@@ -16,6 +17,7 @@ interface GuidanceVideoUploaderProps {
   onZoomOut: () => void;
   onZoomReset: () => void;
   onZoomToStart: () => void;
+  hasNoImages?: boolean;
 }
 
 export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
@@ -29,6 +31,7 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
   onZoomOut,
   onZoomReset,
   onZoomToStart,
+  hasNoImages = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -71,94 +74,110 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
   };
 
   return (
-    <div className="relative flex items-center justify-between p-2 bg-muted/20 rounded-lg border border-dashed border-border">
-      <div className="flex items-center gap-3 flex-1">
-        <Video className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-muted-foreground">
-            {currentVideoUrl ? 'Replace guidance video' : 'Add guidance video to control motion'}
-          </p>
+    <div className="relative w-full">
+      {/* Placeholder strip with controls overlaid */}
+      <div 
+        className="relative h-28 mb-0"
+        style={{
+          width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
+          minWidth: '100%',
+          paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
+          paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
+          overflow: 'visible',
+        }}
+      >
+        {/* Controls bar at top - zoom on left, upload on right */}
+        <div className="absolute top-2 left-2 right-2 z-20 flex items-center justify-between gap-2">
+          {/* Left: Zoom controls */}
+          <div className={`flex items-center gap-2 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+            <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onZoomToStart}
+              disabled={isUploading}
+              className="h-7 text-xs px-2"
+            >
+              ← Start
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onZoomOut}
+              disabled={zoomLevel <= 1 || isUploading}
+              className="h-7 w-7 p-0"
+            >
+              −
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onZoomIn}
+              disabled={isUploading}
+              className="h-7 w-7 p-0"
+            >
+              +
+            </Button>
+            <Button
+              variant={zoomLevel > 1.5 ? "default" : "outline"}
+              size="sm"
+              onClick={onZoomReset}
+              disabled={zoomLevel <= 1 || isUploading}
+              className={`h-7 text-xs px-2 transition-all ${
+                zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
+                zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
+              }`}
+              style={{
+                transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
+              }}
+            >
+              Reset
+            </Button>
+          </div>
+
+          {/* Right: Upload button - styled to match Add Images button */}
+          <div className={hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              onChange={handleFileSelect}
+              disabled={isUploading}
+              className="hidden"
+              id={`guidance-video-upload-${shotId}`}
+            />
+            <Label htmlFor={`guidance-video-upload-${shotId}`} className="m-0 cursor-pointer">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isUploading}
+                className="h-8 text-xs px-3 sm:px-2 lg:px-3"
+                asChild
+              >
+                <span className="flex items-center gap-1.5">
+                  <Upload className="h-3.5 w-3.5" />
+                  <span className="sm:hidden lg:inline">Upload Guidance Video</span>
+                </span>
+              </Button>
+            </Label>
+          </div>
+        </div>
+
+        {/* Center message */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+          <Video className="h-10 w-10 text-muted-foreground/30" />
+          <span className="text-xs text-muted-foreground">
+            {isUploading ? `Uploading... ${uploadProgress}%` : 'Add guidance video to control motion'}
+          </span>
           {isUploading && (
-            <div className="mt-2">
-              <div className="w-full bg-muted rounded-full h-1.5">
-                <div
-                  className="bg-primary h-1.5 rounded-full transition-all"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{uploadProgress}%</p>
+            <div className="w-48 bg-muted rounded-full h-1.5">
+              <div 
+                className="bg-primary h-1.5 rounded-full transition-all"
+                style={{ width: `${uploadProgress}%` }}
+              />
             </div>
           )}
         </div>
-      </div>
-      
-      <div className="flex items-center gap-2">
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onZoomOut}
-            disabled={isUploading}
-            className="h-8 w-8 p-0"
-            title="Zoom out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onZoomIn}
-            disabled={isUploading}
-            className="h-8 w-8 p-0"
-            title="Zoom in"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onZoomReset}
-            disabled={isUploading}
-            className="h-8 w-8 p-0"
-            title="Reset zoom"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onZoomToStart}
-            disabled={isUploading}
-            className="h-8 w-8 p-0"
-            title="Zoom to start"
-          >
-            <AlignStartHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="video/mp4,video/webm,video/quicktime"
-          onChange={handleFileSelect}
-          disabled={isUploading}
-          className="hidden"
-          id={`guidance-video-upload-${shotId}`}
-        />
-        <Label htmlFor={`guidance-video-upload-${shotId}`} className="m-0 cursor-pointer">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isUploading}
-            asChild
-          >
-            <span className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              {isUploading ? 'Uploading...' : currentVideoUrl ? 'Replace' : 'Upload'}
-            </span>
-          </Button>
-        </Label>
       </div>
     </div>
   );

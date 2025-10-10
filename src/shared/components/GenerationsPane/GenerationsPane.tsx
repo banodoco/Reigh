@@ -6,7 +6,7 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { usePanes } from '@/shared/contexts/PanesContext';
@@ -411,6 +411,7 @@ const GenerationsPaneComponent: React.FC = () => {
             <div className="mt-2 mx-2 flex items-start justify-between">
                 <div 
                   className={cn(
+                    "flex items-center gap-2",
                     "transition-all duration-200",
                     isInteractionDisabled && "pointer-events-none opacity-70"
                   )}
@@ -438,6 +439,31 @@ const GenerationsPaneComponent: React.FC = () => {
                       setShotFilterOpen(open);
                     }}
                   />
+                  
+                  {/* Show CTA to toggle between current shot and all images */}
+                  {currentShotId && (
+                    selectedShotFilter === currentShotId ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedShotFilter('all')}
+                        className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        <span className="hidden sm:inline">See all images</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedShotFilter(currentShotId)}
+                        className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        <span className="hidden sm:inline">View my shot</span>
+                      </Button>
+                    )
+                  )}
                 </div>
 
                 {totalCount > GENERATIONS_PER_PAGE && (
@@ -475,12 +501,21 @@ const GenerationsPaneComponent: React.FC = () => {
             )}
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
             {paginatedData.items.length > 0 && (
-                <ImageGallery
+                <>
+                  {console.log('[GenerationsPane] Rendering ImageGallery with:', {
+                    selectedShotFilter,
+                    currentShotId,
+                    itemsCount: paginatedData.items.length,
+                    timestamp: Date.now()
+                  })}
+                  <ImageGallery
                     images={paginatedData.items}
                     onDelete={handleDeleteGeneration}
                     isDeleting={isDeleting}
                     allShots={shotsData || []}
                     lastShotId={lastAffectedShotId || undefined}
+                    initialShotFilter={selectedShotFilter}
+                    onShotFilterChange={setSelectedShotFilter}
                     onAddToLastShot={(generationId, imageUrl, thumbUrl) => {
                       console.log('[GenerationsPane] ImageGallery onAddToLastShot called', {
                         generationId,
@@ -523,6 +558,7 @@ const GenerationsPaneComponent: React.FC = () => {
                 onPrefetchAdjacentPages={handlePrefetchAdjacentPages}
                 currentViewingShotId={currentShotId || undefined}
                 />
+                </>
             )}
             {paginatedData.items.length === 0 && !isLoading && (
                 <div className="flex-1 flex items-center justify-center text-zinc-500">
@@ -538,4 +574,4 @@ const GenerationsPaneComponent: React.FC = () => {
 // Memoize GenerationsPane - it has no props so a simple memo is sufficient
 export const GenerationsPane = React.memo(GenerationsPaneComponent);
 
-export default GenerationsPane; 
+export default GenerationsPane;

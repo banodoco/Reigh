@@ -662,9 +662,28 @@ const Timeline: React.FC<TimelineProps> = ({
           onClose={closeLightbox}
           onNext={images.length > 1 ? goNext : undefined}
           onPrevious={images.length > 1 ? goPrev : undefined}
-          onImageSaved={async (newUrl: string, createNew?: boolean) => 
-            await onImageSaved(currentLightboxImage.id, newUrl, createNew)
-          }
+          onImageSaved={async (newUrl: string, createNew?: boolean) => {
+            console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
+              imageId: currentLightboxImage.id,
+              newUrl,
+              createNew,
+              timestamp: Date.now()
+            });
+            
+            await onImageSaved(currentLightboxImage.id, newUrl, createNew);
+            
+            console.log('[ImageFlipDebug] [Timeline] Parent onImageSaved completed, triggering onTimelineChange', {
+              timestamp: Date.now()
+            });
+            
+            // Trigger reload of timeline data after flip
+            if (onTimelineChange) {
+              await onTimelineChange();
+              console.log('[ImageFlipDebug] [Timeline] onTimelineChange completed', {
+                timestamp: Date.now()
+              });
+            }
+          }}
           showNavigation={showNavigation}
           showMagicEdit={true}
           hasNext={hasNext}
