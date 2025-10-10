@@ -28,17 +28,25 @@ export const useAIInteractionService = ({
 
       try {
         // Invoke the new edge function. We pass the full params object so the server can replicate previous behaviour.
+        console.log(`[RemixContextDebug] useAIInteractionService preparing request:`, {
+          hasExistingPrompts: !!params.existingPrompts,
+          existingPromptsLength: params.existingPrompts?.length ?? 0,
+          includeExistingContext: params.includeExistingContext,
+        });
+        
         const data = await invokeWithTimeout<any>('ai-prompt', {
           body: {
             task: 'generate_prompts',
             overallPromptText: params.overallPromptText,
             rulesToRememberText: params.rulesToRememberText,
             numberToGenerate: params.numberToGenerate,
-            existingPrompts: params.includeExistingContext ? params.existingPrompts ?? [] : [],
+            existingPrompts: params.existingPrompts ?? [],
             temperature: params.temperature || 0.8,
           },
           timeoutMs: 20000,
         });
+        
+        console.log(`[RemixContextDebug] Request sent to edge function with ${params.existingPrompts?.length ?? 0} existing prompts`);
 
         const generatedTexts: string[] = (data as any)?.prompts ?? [];
 

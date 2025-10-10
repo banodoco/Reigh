@@ -47,6 +47,14 @@ serve(async (req) => {
           temperature = 0.8,
         } = body;
 
+        console.log(`[RemixContextDebug] Edge function received generate_prompts request:`, {
+          overallPromptText: overallPromptText.substring(0, 50),
+          numberToGenerate,
+          existingPromptsCount: existingPrompts.length,
+          hasExistingPrompts: existingPrompts.length > 0,
+          temperature
+        });
+
         const systemMsg = `You are a helpful assistant that generates detailed image prompts optimized for AI image generation. Focus on visual elements like composition, lighting, colors, and atmosphere while following the user's specific instructions and formatting requirements.`;
         
         let detailedInstructions = `Generate exactly ${numberToGenerate} distinct image generation prompts based on the following:
@@ -71,8 +79,15 @@ CRITICAL FORMATTING REQUIREMENTS:
 
         if (existingPrompts.length) {
           const ctx = existingPrompts.map((p: any) => `- ${typeof p === "string" ? p : p.text ?? ""}`).join("\n");
+          console.log(`[RemixContextDebug] Including ${existingPrompts.length} existing prompts as context for AI generation`);
+          console.log(`[RemixContextDebug] First 3 existing prompts:`, existingPrompts.slice(0, 3).map((p: any) => {
+            const text = typeof p === "string" ? p : p.text ?? "";
+            return text.substring(0, 60) + "...";
+          }));
           detailedInstructions += `\n\nExisting Prompts for Context (do NOT repeat or return these, but use them as inspiration for new, distinct image generation ideas):\n${ctx}`;
+          console.log(`[RemixContextDebug] Added existing prompts context to AI instructions`);
         } else {
+          console.log(`[RemixContextDebug] No existing prompts provided - generating from scratch`);
           detailedInstructions += `
 
 FORMAT EXAMPLE (${numberToGenerate} prompts):
@@ -95,6 +110,7 @@ IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do n
 
         const userMsg = detailedInstructions;
 
+        console.log(`[RemixContextDebug] Calling Groq API with temperature: ${temperature}`);
         const resp = await groq.chat.completions.create({
           model: "moonshotai/kimi-k2-instruct",
           messages: [
@@ -108,6 +124,11 @@ IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do n
         const outputText = resp.choices[0]?.message?.content?.trim() || "";
         const prompts = outputText.split("\n").map((s) => s.trim()).filter(Boolean);
         
+        console.log(`[RemixContextDebug] AI generated ${prompts.length} prompts (expected ${numberToGenerate})`);
+        if (prompts.length > 0) {
+          console.log(`[RemixContextDebug] First generated prompt: "${prompts[0].substring(0, 80)}..."`);
+        }
+        
         // Validate we got the expected number of prompts
         if (prompts.length !== numberToGenerate) {
           console.warn(`[ai-prompt] Expected ${numberToGenerate} prompts but got ${prompts.length}. Adjusting...`);
@@ -118,6 +139,7 @@ IMPORTANT: Only respond with the ${numberToGenerate} prompts, nothing else. Do n
           // If we got too few, we'll just return what we have rather than failing
         }
         
+        console.log(`[RemixContextDebug] Returning ${prompts.length} prompts to client`);
         return jsonResponse({ prompts, usage: resp.usage });
       }
       case "edit_prompt": {
