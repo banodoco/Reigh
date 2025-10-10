@@ -1247,26 +1247,105 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const handleGenerateAndQueue = useCallback((updatedPrompts: PromptEntry[]) => {
     console.log('[ImageGenerationForm] Generate & Queue: Received', updatedPrompts.length, 'prompts, saving and queuing');
     
-    // Save the prompts first
+    // Save the prompts to state for future use
     handleSavePromptsFromModal(updatedPrompts);
     
     // Close the modal
     setIsPromptModalOpen(false);
     setOpenPromptModalWithAIExpanded(false);
     
-    // Trigger form submission after a short delay to allow state to update
-    setTimeout(() => {
-      console.log('[ImageGenerationForm] Generate & Queue: Triggering form submission');
-      // Create a synthetic form event
-      const form = document.querySelector('form');
-      if (form) {
-        const event = new Event('submit', { cancelable: true, bubbles: true });
-        form.dispatchEvent(event);
-      } else {
-        console.error('[ImageGenerationForm] Generate & Queue: Could not find form element');
-      }
-    }, 200);
-  }, [handleSavePromptsFromModal]);
+    // Generate immediately with the updated prompts (don't wait for state)
+    // This ensures we use the exact prompts the user just created
+    const activePrompts = updatedPrompts.filter(p => p.fullPrompt.trim() !== "");
+    
+    if (activePrompts.length === 0) {
+      console.warn("[ImageGenerationForm] Generate & Queue: No active prompts. Generation aborted.");
+      toast.error("Please enter at least one valid prompt.");
+      return;
+    }
+
+    // Validate model-specific requirements
+    if (selectedModel === 'qwen-image' && !styleReferenceImageGeneration) {
+      toast.error("Please upload a style reference image for Qwen.Image model.");
+      return;
+    }
+
+    // Map selected LoRAs (disabled for qwen-image)
+    const lorasForApi: any[] = [];
+
+    // Debug: Log what style reference we're about to send
+    if (styleReferenceImageGeneration) {
+      console.log('[ImageGenerationForm] Generate & Queue - Style reference being sent to task:', {
+        isUrl: styleReferenceImageGeneration.startsWith('http'),
+        isBase64: styleReferenceImageGeneration.startsWith('data:'),
+        length: styleReferenceImageGeneration.length,
+        preview: styleReferenceImageGeneration.substring(0, 100) + '...'
+      });
+    }
+    
+    // Build the unified task creation parameters
+    const batchTaskParams: BatchImageGenerationTaskParams = {
+      project_id: selectedProjectId!,
+      prompts: activePrompts.map(p => {
+        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${afterEachPromptText ? `, ${afterEachPromptText.trim()}` : ''}`.trim();
+        return {
+          id: p.id,
+          fullPrompt: combinedFull,
+          shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
+        };
+      }), 
+      imagesPerPrompt, 
+      loras: lorasForApi,
+      shot_id: associatedShotId || undefined,
+      model_name: 'qwen-image',
+      steps: isLocalGenerationEnabled ? steps : undefined,
+      ...(styleReferenceImageGeneration && {
+        style_reference_image: styleReferenceImageGeneration,
+        style_reference_strength: currentStyleStrength,
+        subject_reference_image: styleReferenceImageGeneration,
+        subject_strength: currentSubjectStrength,
+        subject_description: currentSubjectDescription,
+        in_this_scene: currentInThisScene
+      }),
+    };
+
+    console.log('[ImageGenerationForm] Generate & Queue: Calling onGenerate with', activePrompts.length, 'prompts');
+
+    // Legacy data structure for backward compatibility
+    const legacyGenerationData = {
+      prompts: batchTaskParams.prompts,
+      imagesPerPrompt, 
+      loras: lorasForApi, 
+      fullSelectedLoras: loraManager.selectedLoras,
+      generationMode: selectedModel,
+      associatedShotId,
+      styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImageGeneration : null,
+      styleReferenceStrength: selectedModel === 'qwen-image' ? currentStyleStrength : undefined,
+      subjectStrength: selectedModel === 'qwen-image' ? currentSubjectStrength : undefined,
+      subjectDescription: selectedModel === 'qwen-image' ? currentSubjectDescription : undefined,
+      selectedModel,
+      batchTaskParams
+    };
+    
+    onGenerate(legacyGenerationData);
+  }, [
+    handleSavePromptsFromModal, 
+    selectedModel, 
+    styleReferenceImageGeneration,
+    selectedProjectId,
+    beforeEachPromptText,
+    afterEachPromptText,
+    imagesPerPrompt,
+    associatedShotId,
+    isLocalGenerationEnabled,
+    steps,
+    currentStyleStrength,
+    currentSubjectStrength,
+    currentSubjectDescription,
+    currentInThisScene,
+    loraManager.selectedLoras,
+    onGenerate
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();    
