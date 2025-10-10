@@ -55,6 +55,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const [isNextSceneBoostEnabled, setIsNextSceneBoostEnabled] = useState(false);
+  const [isInSceneBoostEnabled, setIsInSceneBoostEnabled] = useState(false);
   
   // Log when modal is opened/closed
   useEffect(() => {
@@ -133,6 +134,12 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
           strength: 1.0
         });
       }
+      if (isInSceneBoostEnabled) {
+        loras.push({
+          url: 'https://huggingface.co/peteromallet/mystery_models/resolve/main/in_scene_qwen_edit_2_000006750.safetensors',
+          strength: 1.0
+        });
+      }
       
       // Create batch magic edit tasks using the unified system
       const batchParams = {
@@ -207,6 +214,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         setMagicEditNumImages(4);
         setMagicEditShotId(null);
         setIsNextSceneBoostEnabled(false);
+        setIsInSceneBoostEnabled(false);
         setTasksCreated(false);
       }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
@@ -411,33 +419,49 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
           />
         </div>
 
-        {/* Number of Images Slider */}
-        <div className="space-y-2">
-          <SliderWithValue
-            label="Number to Generate"
-            value={magicEditNumImages}
-            onChange={setMagicEditNumImages}
-            min={1}
-            max={16}
-            step={1}
-          />
-        </div>
+        {/* Boosts and Number of Images - Side by Side */}
+        <div className="flex gap-6">
+          {/* Boosts Section */}
+          <div className="space-y-2 flex-shrink-0">
+            <Label>Boosts</Label>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="in-scene-boost"
+                checked={isInSceneBoostEnabled}
+                onCheckedChange={(checked) => setIsInSceneBoostEnabled(checked === true)}
+              />
+              <label
+                htmlFor="in-scene-boost"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                In-Scene
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="next-scene-boost"
+                checked={isNextSceneBoostEnabled}
+                onCheckedChange={(checked) => setIsNextSceneBoostEnabled(checked === true)}
+              />
+              <label
+                htmlFor="next-scene-boost"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Next Scene
+              </label>
+            </div>
+          </div>
 
-        {/* Boosts Section */}
-        <div className="space-y-2">
-          <Label>Boosts</Label>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="next-scene-boost"
-              checked={isNextSceneBoostEnabled}
-              onCheckedChange={(checked) => setIsNextSceneBoostEnabled(checked === true)}
+          {/* Number of Images Slider */}
+          <div className="space-y-2 flex-1">
+            <SliderWithValue
+              label="Number to Generate"
+              value={magicEditNumImages}
+              onChange={setMagicEditNumImages}
+              min={1}
+              max={16}
+              step={1}
             />
-            <label
-              htmlFor="next-scene-boost"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-            >
-              Next Scene
-            </label>
           </div>
         </div>
 

@@ -115,7 +115,9 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                                metadata.userProvidedImageUrl;
 
   // Check if this is a qwen_image_edit task with source image
+  // Check both top-level (for ImageGalleryItem) and originalParams (for TasksPane)
   const isQwenImageEdit = (metadata as any).tool_type === 'qwen_image_edit' || 
+                          (metadata as any).qwen_endpoint === 'qwen-image-edit' ||
                           (metadata as any).originalParams?.qwen_endpoint === 'qwen-image-edit';
   const qwenSourceImage = (metadata as any).image || 
                           (metadata as any).originalParams?.image;
