@@ -48,9 +48,9 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
     <div
       className="absolute h-8 border-t"
       style={{
-        bottom: "4rem",
+        bottom: "4.5rem",
         left: `${TIMELINE_HORIZONTAL_PADDING}px`,
-        width: zoomLevel > 1 ? `calc(${zoomLevel * 100}% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)` : `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)`,
+        width: zoomLevel > 1 ? `calc(${zoomLevel * 100}% - ${TIMELINE_HORIZONTAL_PADDING * 1.5}px)` : `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 1.5}px)`,
         minWidth: `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)`,
       }}
     >

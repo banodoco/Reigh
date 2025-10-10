@@ -394,7 +394,7 @@ pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
 python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA devices: {torch.cuda.device_count()}'); print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
-python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
+python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
     } else {
       // Linux command (existing)
       return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
@@ -405,8 +405,7 @@ source venv/bin/activate && \\
 pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124 && \\
 pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
-python worker.py --db-type supabase \\
-  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
+python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}${debugFlag}`;
     }
@@ -420,13 +419,12 @@ python worker.py --db-type supabase \\
     if (computerType === "windows") {
       return `git pull
 venv\\Scripts\\activate.bat
-python worker.py --db-type supabase --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
+python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
     } else {
       // Linux / Mac command
       return `git pull && \\
 source venv/bin/activate && \\
-python worker.py --db-type supabase \\
-  --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
+python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
   --supabase-access-token ${token}${debugFlag}`;
     }

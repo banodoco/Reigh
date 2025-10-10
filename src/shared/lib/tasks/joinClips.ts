@@ -52,8 +52,7 @@ function validateJoinClipsParams(params: JoinClipsTaskParams): void {
   validateRequiredFields(params, [
     'project_id',
     'starting_video_path',
-    'ending_video_path',
-    'prompt'
+    'ending_video_path'
   ]);
 
   // Additional validations
@@ -64,10 +63,8 @@ function validateJoinClipsParams(params: JoinClipsTaskParams): void {
   if (!params.ending_video_path) {
     throw new TaskValidationError("ending_video_path is required", 'ending_video_path');
   }
-
-  if (!params.prompt) {
-    throw new TaskValidationError("prompt is required", 'prompt');
-  }
+  
+  // Note: prompt is optional and can be empty
 }
 
 /**

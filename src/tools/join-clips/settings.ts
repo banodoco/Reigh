@@ -11,7 +11,7 @@ export const joinClipsSettings = {
     seed: -1,
     negativePrompt: '',
     priority: 0,
-    defaultPrompt: 'smooth camera glide between scenes',
+    prompt: '', // User's current prompt (persisted per project)
     randomSeed: true,
     startingVideoUrl: undefined as string | undefined,
     endingVideoUrl: undefined as string | undefined,

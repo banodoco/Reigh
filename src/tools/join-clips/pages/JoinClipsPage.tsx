@@ -117,16 +117,16 @@ const JoinClipsPage: React.FC = () => {
     };
   }, []);
   
-  // Initialize prompt and parameters from settings
+  // Initialize parameters from settings
   useEffect(() => {
-    if (settings?.defaultPrompt) {
-      setPrompt(settings.defaultPrompt);
-    }
     if (settings?.contextFrameCount !== undefined) {
       setContextFrameCount(settings.contextFrameCount);
     }
     if (settings?.gapFrameCount !== undefined) {
       setGapFrameCount(settings.gapFrameCount);
+    }
+    if (settings?.prompt !== undefined) {
+      setPrompt(settings.prompt);
     }
   }, [settings]);
   
@@ -314,7 +314,7 @@ const JoinClipsPage: React.FC = () => {
         project_id: selectedProjectId,
         starting_video_path: startingVideo.url,
         ending_video_path: endingVideo.url,
-        prompt: prompt || settings?.defaultPrompt || 'smooth camera glide between scenes',
+        prompt: prompt,
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
         model: settings?.model || 'lightning_baseline_2_2_2',
@@ -643,12 +643,16 @@ const JoinClipsPage: React.FC = () => {
 
         {/* Prompt Section */}
         <div className="space-y-2">
-          <Label htmlFor="prompt">Transition Prompt</Label>
+          <Label htmlFor="prompt">Transition Prompt (Optional)</Label>
           <Textarea
             id="prompt"
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the transition between clips, e.g., smooth camera glide between scenes"
+            onChange={(e) => {
+              const newPrompt = e.target.value;
+              setPrompt(newPrompt);
+              updateSettings('project', { ...settings, prompt: newPrompt });
+            }}
+            placeholder="Describe the transition between clips (optional)"
             rows={2}
             className="resize-none"
           />
