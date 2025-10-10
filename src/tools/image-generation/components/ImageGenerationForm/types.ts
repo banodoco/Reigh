@@ -47,7 +47,7 @@ export interface PersistedFormSettings {
 }
 
 // Reference mode type
-export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'custom';
+export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene-imprecise' | 'custom';
 
 // Individual reference image with its own settings
 export interface ReferenceImage {

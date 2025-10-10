@@ -2,7 +2,6 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
-import { Checkbox } from "@/shared/components/ui/checkbox";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Trash2, Images, Plus, X, Upload, Search } from "lucide-react";
@@ -113,82 +112,86 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
           );
         })}
         
-        {/* Add reference button */}
-        <label 
-          className={cn(
-            "aspect-square flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200",
-            isGenerating || isUploadingStyleReference
-              ? "border-gray-200 cursor-not-allowed opacity-50"
-              : isDraggingOverAdd
-                ? "border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg"
-                : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
-          )}
-          title="Add new reference"
-          onDragEnter={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isGenerating && !isUploadingStyleReference) {
-              setIsDraggingOverAdd(true);
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setIsDraggingOverAdd(false);
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setIsDraggingOverAdd(false);
-            if (!isGenerating && !isUploadingStyleReference) {
-              const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-              if (files.length > 0) {
-                onAddReference(files);
+        {/* Add reference button with search button in top right */}
+        <div className="relative aspect-square">
+          <label 
+            className={cn(
+              "w-full h-full flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200",
+              isGenerating || isUploadingStyleReference
+                ? "border-gray-200 cursor-not-allowed opacity-50"
+                : isDraggingOverAdd
+                  ? "border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg"
+                  : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
+            )}
+            title="Add new reference"
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isGenerating && !isUploadingStyleReference) {
+                setIsDraggingOverAdd(true);
               }
-            }
-          }}
-        >
-          {isDraggingOverAdd ? (
-            <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400 animate-bounce" />
-          ) : (
-            <Plus className="h-6 w-6 text-gray-400" />
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              if (files.length > 0) onAddReference(files);
-              e.target.value = ''; // Reset input
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingOverAdd(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingOverAdd(false);
+              if (!isGenerating && !isUploadingStyleReference) {
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                if (files.length > 0) {
+                  onAddReference(files);
+                }
+              }
+            }}
+          >
+            {isDraggingOverAdd ? (
+              <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400 animate-bounce" />
+            ) : (
+              <Plus className="h-6 w-6 text-gray-400" />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) onAddReference(files);
+                e.target.value = ''; // Reset input
+              }}
+              disabled={isGenerating || isUploadingStyleReference}
+            />
+          </label>
+          
+          {/* Search reference button - positioned in top right corner */}
+          <button
+            type="button"
+            className={cn(
+              "absolute top-1.5 right-1.5 p-1 rounded-full shadow-sm transition-all duration-200",
+              isGenerating || isUploadingStyleReference
+                ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-40"
+                : "bg-white dark:bg-gray-900 hover:bg-purple-50 dark:hover:bg-purple-950 hover:shadow-md hover:scale-105 active:scale-95"
+            )}
+            title="Search reference images"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isGenerating && !isUploadingStyleReference) {
+                onOpenDatasetBrowser();
+              }
             }}
             disabled={isGenerating || isUploadingStyleReference}
-          />
-        </label>
-        
-        {/* Search reference button */}
-        <button
-          type="button"
-          className={cn(
-            "aspect-square flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200",
-            isGenerating || isUploadingStyleReference
-              ? "border-gray-200 cursor-not-allowed opacity-50"
-              : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
-          )}
-          title="Search reference images"
-          onClick={() => {
-            if (!isGenerating && !isUploadingStyleReference) {
-              onOpenDatasetBrowser();
-            }
-          }}
-          disabled={isGenerating || isUploadingStyleReference}
-        >
-          <Search className="h-6 w-6 text-gray-400" />
-        </button>
+          >
+            <Search className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -274,148 +277,142 @@ const StyleReferenceSection: React.FC<{
 
     {/* New Multiple References UI - Two column layout when reference exists */}
     {showMultiReference && references.length > 0 && styleReferenceImage && (
-      <div className={`flex gap-4 ${isMobile ? 'flex-col' : 'flex-row'}`}>
-        {/* Left side - Thumbnails and Settings */}
-        <div className="flex-1 space-y-4">
-          <ReferenceSelector
-            references={references}
-            selectedReferenceId={selectedReferenceId}
-            onSelectReference={onSelectReference}
-            onAddReference={onStyleUpload}
-            onDeleteReference={onDeleteReference}
-            isGenerating={isGenerating}
-            isUploadingStyleReference={isUploadingStyleReference}
-            onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
-          />
+      <div className="space-y-4">
+        {/* First Row: Thumbnails and Preview */}
+        <div className={`flex gap-4 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+          {/* Left side - Thumbnails */}
+          <div className="flex-[2]">
+            <ReferenceSelector
+              references={references}
+              selectedReferenceId={selectedReferenceId}
+              onSelectReference={onSelectReference}
+              onAddReference={onStyleUpload}
+              onDeleteReference={onDeleteReference}
+              isGenerating={isGenerating}
+              isUploadingStyleReference={isUploadingStyleReference}
+              onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
+            />
+          </div>
           
-          {/* Settings below thumbnails */}
-          <div className="space-y-4">
-            {/* Reference Mode Selector */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">How would you like to use this reference?</Label>
-              <RadioGroup 
-                value={referenceMode} 
-                onValueChange={(value) => {
-                  if (!onReferenceModeChange) return;
-                  const mode = value as ReferenceMode;
-                  // onReferenceModeChange now handles mode + auto-setting strength values in one batch
-                  onReferenceModeChange(mode);
-                }}
-                className="flex flex-wrap gap-3"
-                disabled={isGenerating || isUploadingStyleReference}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="style" id="mode-style" />
-                  <Label htmlFor="mode-style" className="cursor-pointer font-normal">Style</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="subject" id="mode-subject" />
-                  <Label htmlFor="mode-subject" className="cursor-pointer font-normal">Subject</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="style-character" id="mode-style-character" />
-                  <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + subject</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="custom" id="mode-custom" />
-                  <Label htmlFor="mode-custom" className="cursor-pointer font-normal">Custom</Label>
-                </div>
-              </RadioGroup>
+          {/* Right side - Large preview (hidden on mobile) */}
+          {!isMobile && (
+            <div className="flex-1">
+              <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
+                <img
+                  src={styleReferenceImage}
+                  alt="Selected reference"
+                  className="w-full h-full object-contain"
+                  style={{ objectFit: 'contain' }}
+                />
+              </div>
             </div>
+          )}
+        </div>
 
+        {/* Second Row: Settings in Two Columns */}
+        <div className={`flex gap-4 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+          {/* Left column - Reference Mode Selector */}
+          <div className="flex-1 space-y-2">
+            <Label className="text-sm font-medium">How would you like to use this reference?</Label>
+            <RadioGroup 
+              value={referenceMode} 
+              onValueChange={(value) => {
+                if (!onReferenceModeChange) return;
+                const mode = value as ReferenceMode;
+                // onReferenceModeChange now handles mode + auto-setting strength values in one batch
+                onReferenceModeChange(mode);
+              }}
+              className="flex flex-wrap gap-3"
+              disabled={isGenerating || isUploadingStyleReference}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="style" id="mode-style" />
+                <Label htmlFor="mode-style" className="cursor-pointer font-normal">Style</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="subject" id="mode-subject" />
+                <Label htmlFor="mode-subject" className="cursor-pointer font-normal">Subject</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="style-character" id="mode-style-character" />
+                <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + subject</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="scene-imprecise" id="mode-scene-imprecise" />
+                <Label htmlFor="mode-scene-imprecise" className="cursor-pointer font-normal">Scene (imprecise)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="custom" id="mode-custom" />
+                <Label htmlFor="mode-custom" className="cursor-pointer font-normal">Custom</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Right column - Strength sliders and subject description */}
+          <div className="flex-1 space-y-4">
             {/* Style and Subject strength sliders - only show in custom mode */}
             {referenceMode === 'custom' && (
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <SliderWithValue
-                  label="Style strength"
-                  value={styleReferenceStrength}
-                  onChange={(value) => {
-                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                    const newTotal = value + subjectStrength;
-                    if (newTotal < 0.5) {
-                      return;
-                    }
-                    onStyleStrengthChange(value);
-                  }}
-                  min={0.0}
-                  max={2.0}
-                  step={0.1}
-                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                  numberInputClassName="w-10"
-                />
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <SliderWithValue
+                    label="Style strength"
+                    value={styleReferenceStrength}
+                    onChange={(value) => {
+                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                      const newTotal = value + subjectStrength;
+                      if (newTotal < 0.5) {
+                        return;
+                      }
+                      onStyleStrengthChange(value);
+                    }}
+                    min={0.0}
+                    max={2.0}
+                    step={0.1}
+                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                    numberInputClassName="w-10"
+                  />
+                </div>
+                <div className="flex-1">
+                  <SliderWithValue
+                    label="Subject strength"
+                    value={subjectStrength}
+                    onChange={(value) => {
+                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                      const newTotal = styleReferenceStrength + value;
+                      if (newTotal < 0.5) {
+                        return;
+                      }
+                      onSubjectStrengthChange(value);
+                    }}
+                    min={0.0}
+                    max={2.0}
+                    step={0.1}
+                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                    numberInputClassName="w-10"
+                  />
+                </div>
               </div>
-              <div className="flex-1">
-                <SliderWithValue
-                  label="Subject strength"
-                  value={subjectStrength}
-                  onChange={(value) => {
-                    // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                    const newTotal = styleReferenceStrength + value;
-                    if (newTotal < 0.5) {
-                      return;
-                    }
-                    onSubjectStrengthChange(value);
-                  }}
-                  min={0.0}
-                  max={2.0}
-                  step={0.1}
-                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                  numberInputClassName="w-10"
-                />
-              </div>
-            </div>
             )}
             
-            {/* Show subject description only when subject strength > 0 */}
-            {subjectStrength > 0 && styleReferenceImage && (
-            <div className="space-y-2">
-              <Label htmlFor="subject-description" className="text-sm font-medium">
-                Which character from this image?
-              </Label>
-              <div className="flex items-center space-x-3">
+            {/* Show subject description when subject strength > 0 OR in scene-imprecise mode */}
+            {(subjectStrength > 0 || referenceMode === 'scene-imprecise') && styleReferenceImage && (
+              <div className="space-y-2">
+                <Label htmlFor="subject-description" className="text-sm font-medium">
+                  Which subject from this image?
+                </Label>
                 <Input
                   id="subject-description"
                   type="text"
                   value={subjectDescription}
                   onChange={(e) => onSubjectDescriptionChange(e.target.value)}
-                  placeholder="girl, monster, teapot..."
+                  placeholder="man, woman, cactus"
                   disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
                   className="flex-1"
                 />
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="in-this-scene"
-                    checked={inThisScene}
-                    onCheckedChange={onInThisSceneChange}
-                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                  />
-                  <Label 
-                    htmlFor="in-this-scene" 
-                    className="text-sm font-medium cursor-pointer whitespace-nowrap"
-                  >
-                    In this scene
-                  </Label>
-                </div>
               </div>
-            </div>
             )}
           </div>
         </div>
-        
-        {/* Right side - Large preview (hidden on mobile) */}
-        {!isMobile && (
-          <div className="flex-1">
-            <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
-              <img
-                src={styleReferenceImage}
-                alt="Selected reference"
-                className="w-full h-full object-contain"
-                style={{ objectFit: 'contain' }}
-              />
-            </div>
-          </div>
-        )}
       </div>
     )}
     

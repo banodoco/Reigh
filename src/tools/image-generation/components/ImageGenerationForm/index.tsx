@@ -248,6 +248,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const currentStyleStrength = selectedReference?.styleReferenceStrength ?? projectImageSettings?.styleReferenceStrength ?? 1.0;
   const currentSubjectStrength = selectedReference?.subjectStrength ?? projectImageSettings?.subjectStrength ?? 0.0;
   const currentSubjectDescription = selectedReference?.subjectDescription ?? projectImageSettings?.subjectDescription ?? '';
+  // Default to 'this character' when subject description is empty but subject strength is active
+  const effectiveSubjectDescription = currentSubjectDescription.trim() || 'this character';
   const currentInThisScene = selectedReference?.inThisScene ?? projectImageSettings?.inThisScene ?? false;
   const currentReferenceMode = (selectedReference?.referenceMode ?? 'custom') as ReferenceMode;
   
@@ -1163,14 +1165,21 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (mode === 'style') {
       updates.styleReferenceStrength = 1.1;
       updates.subjectStrength = 0;
+      updates.inThisScene = false;
     } else if (mode === 'subject') {
       updates.styleReferenceStrength = 0;
       updates.subjectStrength = 1.1;
+      updates.inThisScene = false;
     } else if (mode === 'style-character') {
       updates.styleReferenceStrength = 0.5;
       updates.subjectStrength = 1.0;
+      updates.inThisScene = false;
+    } else if (mode === 'scene-imprecise') {
+      updates.styleReferenceStrength = 0.5;
+      updates.subjectStrength = 1.0;
+      updates.inThisScene = true;
     }
-    // For 'custom', don't auto-change strength values
+    // For 'custom', don't auto-change strength values or inThisScene
     
     console.log('[RefSettings] 🎯 Batched update for mode change:', updates);
     
@@ -1182,6 +1191,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     if (updates.subjectStrength !== undefined) {
       setSubjectStrength(updates.subjectStrength);
+    }
+    if (updates.inThisScene !== undefined) {
+      setInThisScene(updates.inThisScene);
     }
     
     // Single batched update to avoid race conditions
@@ -1304,7 +1316,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         style_reference_strength: currentStyleStrength,
         subject_reference_image: styleReferenceImageGeneration,
         subject_strength: currentSubjectStrength,
-        subject_description: currentSubjectDescription,
+        subject_description: effectiveSubjectDescription,
         in_this_scene: currentInThisScene
       }),
     };
@@ -1322,7 +1334,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImageGeneration : null,
       styleReferenceStrength: selectedModel === 'qwen-image' ? currentStyleStrength : undefined,
       subjectStrength: selectedModel === 'qwen-image' ? currentSubjectStrength : undefined,
-      subjectDescription: selectedModel === 'qwen-image' ? currentSubjectDescription : undefined,
+      subjectDescription: selectedModel === 'qwen-image' ? effectiveSubjectDescription : undefined,
       selectedModel,
       batchTaskParams
     };
@@ -1341,7 +1353,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     steps,
     currentStyleStrength,
     currentSubjectStrength,
-    currentSubjectDescription,
+    effectiveSubjectDescription,
     currentInThisScene,
     loraManager.selectedLoras,
     onGenerate
@@ -1400,7 +1412,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         style_reference_strength: currentStyleStrength,
         subject_reference_image: styleReferenceImageGeneration, // Same image for now
         subject_strength: currentSubjectStrength,
-        subject_description: currentSubjectDescription,
+        subject_description: effectiveSubjectDescription,
         in_this_scene: currentInThisScene
       }),
       // resolution will be resolved by the helper
@@ -1427,7 +1439,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       styleReferenceImage: selectedModel === 'qwen-image' ? styleReferenceImageGeneration : null,
       styleReferenceStrength: selectedModel === 'qwen-image' ? currentStyleStrength : undefined,
       subjectStrength: selectedModel === 'qwen-image' ? currentSubjectStrength : undefined,
-      subjectDescription: selectedModel === 'qwen-image' ? currentSubjectDescription : undefined,
+      subjectDescription: selectedModel === 'qwen-image' ? effectiveSubjectDescription : undefined,
       selectedModel,
       // Add the new unified params for the updated handler
       batchTaskParams

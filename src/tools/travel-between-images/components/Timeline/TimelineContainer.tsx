@@ -427,7 +427,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               </Select>
 
               {/* Strength compact display */}
-              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-[10px]">
+              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-xs">
                 <span className="text-muted-foreground">Strength:</span>
                 <span className={`font-medium ${
                   structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
@@ -748,7 +748,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           >
             {/* Gap to reset */}
             <div className="flex items-center gap-1.5">
-              <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
               <Slider
                 value={[resetGap]}
                 onValueChange={([value]) => setResetGap(value)}
