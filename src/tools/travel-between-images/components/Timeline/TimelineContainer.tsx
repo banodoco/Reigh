@@ -396,35 +396,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         </div>
       )}
 
-      {/* Bottom-left: Gap control and Reset button */}
-      <div 
-        className={`absolute left-8 z-20 flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-        style={{ bottom: zoomLevel <= 1 ? '1.5rem' : '2.5rem' }}
-      >
-        {/* Gap to reset */}
-        <div className="flex items-center gap-1.5">
-          <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
-          <Slider
-            value={[resetGap]}
-            onValueChange={([value]) => setResetGap(value)}
-            min={1}
-            max={maxGap}
-            step={1}
-            className="w-24 h-4"
-          />
-        </div>
-
-        {/* Reset button */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleReset}
-          className="h-6 text-[10px] px-2"
-        >
-          Reset
-        </Button>
-      </div>
-
       {/* Top-right: Structure controls (only when video is present) */}
       {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
         <div className={`absolute right-8 top-4 z-20 flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
@@ -478,51 +449,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         </div>
       )}
 
-      {/* Bottom-right: Add Images button */}
-      {onImageDrop && (
-        <div 
-          className={`absolute right-8 z-20 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-          style={{ bottom: zoomLevel <= 1 ? '1.5rem' : '2.5rem' }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              if (files.length > 0) {
-                onImageDrop(files);
-                e.target.value = ''; // Reset input
-              }
-            }}
-            className="hidden"
-            id="timeline-image-upload"
-          />
-          <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs px-3 sm:px-2 lg:px-3"
-              asChild
-            >
-              <span className="flex items-center gap-1.5">
-                <Plus className="h-3.5 w-3.5" />
-                <span className="sm:hidden lg:inline">Add Images</span>
-              </span>
-            </Button>
-          </Label>
-        </div>
-      )}
-
       {/* Timeline */}
       <div
         ref={timelineRef}
-        className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-6 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+        className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-10 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
           isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
         }`}
         style={{ 
-          minHeight: "200px", 
+          minHeight: "240px", 
           paddingTop: structureVideoPath && structureVideoMetadata ? "3rem" : "1.5rem", 
           paddingBottom: "4.5rem" 
         }}
@@ -600,7 +534,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         <div
           ref={containerRef}
           id="timeline-container"
-          className={`relative h-36 mb-4`}
+          className={`relative h-36 mb-10`}
           onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
           style={{
             width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
@@ -795,6 +729,72 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             );
           })}
         </div>
+
+        {/* Bottom-left: Gap control and Reset button */}
+        <div 
+          className={`absolute left-8 z-20 flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
+          style={{ bottom: zoomLevel <= 1 ? '1.5rem' : '2.5rem' }}
+        >
+          {/* Gap to reset */}
+          <div className="flex items-center gap-1.5">
+            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
+            <Slider
+              value={[resetGap]}
+              onValueChange={([value]) => setResetGap(value)}
+              min={1}
+              max={maxGap}
+              step={1}
+              className="w-24 h-4"
+            />
+          </div>
+
+          {/* Reset button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            className="h-6 text-[10px] px-2"
+          >
+            Reset
+          </Button>
+        </div>
+
+        {/* Bottom-right: Add Images button */}
+        {onImageDrop && (
+          <div 
+            className={`absolute right-8 z-20 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
+            style={{ bottom: zoomLevel <= 1 ? '1.5rem' : '2.5rem' }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  onImageDrop(files);
+                  e.target.value = ''; // Reset input
+                }
+              }}
+              className="hidden"
+              id="timeline-image-upload"
+            />
+            <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs px-3 sm:px-2 lg:px-3"
+                asChild
+              >
+                <span className="flex items-center gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="sm:hidden lg:inline">Add Images</span>
+                </span>
+              </Button>
+            </Label>
+          </div>
+        )}
       </div>
       
       {/* Magic Edit Modal - rendered at TimelineContainer level to avoid event handling conflicts */}

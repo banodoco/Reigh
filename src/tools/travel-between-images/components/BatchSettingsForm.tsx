@@ -28,6 +28,7 @@ import { SectionHeader } from '@/tools/image-generation/components/ImageGenerati
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
+import { toast } from 'sonner';
 
 // Pre-defined LoRA options for quick selection
 const PREDEFINED_LORAS = [
@@ -142,6 +143,9 @@ interface BatchSettingsFormProps {
   onAdvancedModeChange: (value: boolean) => void;
   phaseConfig?: PhaseConfig;
   onPhaseConfigChange: (config: PhaseConfig) => void;
+  
+  // Clear enhanced prompts handler
+  onClearEnhancedPrompts?: () => Promise<void>;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -182,6 +186,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onAdvancedModeChange,
   phaseConfig = DEFAULT_PHASE_CONFIG,
   onPhaseConfigChange,
+  onClearEnhancedPrompts,
 }) => {
     // Get project context for persistent state
     const { selectedProjectId: contextProjectId } = useProject();
@@ -342,6 +347,25 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     Enhance/Create Prompts
                   </Label>
                 </div>
+                {onClearEnhancedPrompts && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await onClearEnhancedPrompts();
+                        toast.success('Enhanced prompts cleared');
+                      } catch (error) {
+                        console.error('Error clearing enhanced prompts:', error);
+                        toast.error('Failed to clear enhanced prompts');
+                      }
+                    }}
+                    className="text-xs"
+                  >
+                    Clear current enhanced prompts
+                  </Button>
+                )}
               </div>
             )}
             

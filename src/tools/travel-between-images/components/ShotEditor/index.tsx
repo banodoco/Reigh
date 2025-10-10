@@ -339,7 +339,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // No local caching or debouncing needed
   
   // Get pair prompts data for checking if all pairs have prompts
-  const { pairPrompts, shotGenerations } = useEnhancedShotPositions(selectedShotId);
+  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts } = useEnhancedShotPositions(selectedShotId);
   
   // Check if all pairs (except the last one) have custom prompts
   const allPairsHavePrompts = React.useMemo(() => {
@@ -2196,6 +2196,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onAdvancedModeChange={onAdvancedModeChange}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={onPhaseConfigChange}
+                            onClearEnhancedPrompts={clearAllEnhancedPrompts}
                         />
                         
                         

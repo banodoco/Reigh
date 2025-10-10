@@ -101,6 +101,25 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     });
   }, [overallPromptText, rulesToRememberText, numberToGenerate, includeExistingContext, addSummary, replaceCurrentPrompts, temperature, showAdvanced, onValuesChange]);
 
+  // When remixMode is enabled, automatically set includeExistingContext and replaceCurrentPrompts to true
+  useEffect(() => {
+    if (remixMode) {
+      setIncludeExistingContext(true);
+      setReplaceCurrentPrompts(true);
+      // Notify parent of the change
+      onValuesChange?.({
+        overallPromptText,
+        rulesToRememberText,
+        numberToGenerate,
+        includeExistingContext: true,
+        addSummary: true,
+        replaceCurrentPrompts: true,
+        temperature,
+        showAdvanced,
+      });
+    }
+  }, [remixMode, onValuesChange, overallPromptText, rulesToRememberText, numberToGenerate, temperature, showAdvanced]);
+
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (!hasApiKey) {
