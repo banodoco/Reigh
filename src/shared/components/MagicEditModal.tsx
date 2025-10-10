@@ -355,6 +355,14 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
             ...(zIndexOverride ? { zIndex: zIndexOverride } : {})
           }}
           {...modal.props}
+          onPointerDownOutside={(e) => {
+            // Allow closing when clicking outside
+            console.log('[MagicEditModal] onPointerDownOutside triggered');
+          }}
+          onInteractOutside={(e) => {
+            // Allow closing when clicking outside
+            console.log('[MagicEditModal] onInteractOutside triggered');
+          }}
         >
           <div className={modal.headerClass}>
             <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-1' : 'px-6 pt-2 pb-1'} flex-shrink-0`}>

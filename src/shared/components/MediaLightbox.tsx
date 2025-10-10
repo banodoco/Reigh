@@ -231,6 +231,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         return;
       }
 
+      // Check if a higher z-index dialog is open (e.g., MagicEditModal on top of MediaLightbox)
+      // If so, don't handle this click - let the higher dialog handle it
+      const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+      const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+        const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+        // MediaLightbox uses z-[100000], MagicEditModal uses z-[100100]
+        return zIndex > 100000;
+      });
+
+      if (hasHigherZIndexDialog) {
+        return; // Let the higher dialog handle the click
+      }
+
       const contentEl = contentRef.current;
       const target = e.target as Node | null;
       const path = (e as any).composedPath ? (e as any).composedPath() as any[] : undefined;
@@ -321,7 +334,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       document.removeEventListener('touchstart', intercept, options as any);
       document.removeEventListener('click', intercept, options as any);
     };
-  }, [safeClose]);
+  }, [safeClose, isSelectOpen]);
 
 
   
@@ -409,9 +422,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
    * is consumed by the browser, the second finally
    * reaches our onKeyDown handler. Capturing the event at
    * the window level avoids that issue entirely.
+   * 
+   * IMPORTANT: Don't handle keys if another dialog is open on top (e.g., MagicEditModal)
    */
   useEffect(() => {
     const handleWindowKeyDown = (e: KeyboardEvent) => {
+      // Check if another dialog/modal is open on top by looking for higher z-index dialog overlays
+      const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+      const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+        const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+        // MediaLightbox uses z-[100000], MagicEditModal uses z-[100100]
+        return zIndex > 100000;
+      });
+
+      // Don't handle keys if a higher z-index dialog is open
+      if (hasHigherZIndexDialog) {
+        return;
+      }
+
       if (e.key === 'ArrowLeft' && onPrevious) {
         e.preventDefault();
         onPrevious();
@@ -921,6 +949,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           <DialogPrimitive.Overlay 
             className="fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             onPointerDown={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Completely block all pointer events from reaching underlying elements
               e.preventDefault();
               e.stopPropagation();
@@ -929,12 +968,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onClick={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't handle the click
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Only close if clicking directly on the overlay (background)
               if (e.target === e.currentTarget) {
                 onClose();
               }
             }}
             onPointerUp={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Also block pointer up events to prevent accidental interactions
               e.preventDefault();
               e.stopPropagation();
@@ -943,6 +1004,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onTouchStart={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Block touch events on mobile
               e.preventDefault();
               e.stopPropagation();
@@ -951,6 +1023,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onTouchMove={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Block touch move events on mobile
               e.preventDefault();
               e.stopPropagation();
@@ -959,6 +1042,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onTouchEnd={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Block touch end events on mobile and close lightbox
               e.preventDefault();
               e.stopPropagation();
@@ -968,6 +1062,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               onClose();
             }}
             onTouchCancel={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
               // Block touch cancel events on mobile
               e.preventDefault();
               e.stopPropagation();
