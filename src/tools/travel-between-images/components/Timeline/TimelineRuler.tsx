@@ -1,5 +1,6 @@
 import React from "react";
 import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
+import { framesToSeconds } from "./utils/time-utils";
 
 interface TimelineRulerProps {
   fullMin: number;
@@ -70,7 +71,7 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
               style={{ left: `${leftPercent}%` }}
             >
               <div className="w-px h-4 bg-border"></div>
-              <span className="text-xs text-muted-foreground mt-1">{frame}</span>
+              <span className="text-xs text-muted-foreground mt-1">{framesToSeconds(frame)}</span>
             </div>
           );
         })}

@@ -29,6 +29,7 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { toast } from 'sonner';
+import { framesToSeconds } from './Timeline/utils/time-utils';
 
 // Pre-defined LoRA options for quick selection
 const PREDEFINED_LORAS = [
@@ -389,7 +390,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     Turbo Mode
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Using fast WAN 2.2 model for quick results (81 frames)
+                    Using fast WAN 2.2 model for quick results ({framesToSeconds(81)})
                   </p>
                 </div>
               </div>
@@ -399,8 +400,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             <div className={`grid grid-cols-1 gap-4 ${(isTimelineMode || imageCount >= 2) ? 'md:grid-cols-2' : ''}`}>
               <div className="relative">
                 <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
-                  {isTimelineMode ? 'Frames per pair' : (imageCount === 1 ? 'Frames to generate' : 'Frames per pair')}: {batchVideoFrames}
-                  {turboMode && <span className="text-sm text-muted-foreground ml-2">(Fixed at 81 in Turbo Mode)</span>}
+                  {isTimelineMode ? 'Duration per pair' : (imageCount === 1 ? 'Duration to generate' : 'Duration per pair')}: {framesToSeconds(batchVideoFrames)} ({batchVideoFrames} frames)
+                  {turboMode && <span className="text-sm text-muted-foreground ml-2">(Fixed at {framesToSeconds(81)} in Turbo Mode)</span>}
                 </Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -425,7 +426,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
               {(isTimelineMode || imageCount >= 2) && (
                 <div className="relative">
-                  <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Context frames: {batchVideoContext}</Label>
+                  <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Context: {framesToSeconds(batchVideoContext)} ({batchVideoContext} frames)</Label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">

@@ -1,6 +1,7 @@
 import React from "react";
 import { Pencil } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { framesToSeconds } from "./utils/time-utils";
 
 interface PairRegionProps {
   index: number;
@@ -138,7 +139,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
               }}
             >
               <div className="flex items-center gap-1.5">
-                <span>Pair {index + 1} • {actualFrames}f</span>
+                <span className="whitespace-nowrap">Pair {index + 1} • {framesToSeconds(actualFrames)}</span>
                 <Pencil 
                   className={`h-3 w-3 ${hasCustomPrompt ? colorScheme.text : 'text-gray-400'} ${hasCustomPrompt ? 'opacity-100' : 'opacity-60'}`}
                 />

@@ -6,6 +6,7 @@ import { Label } from "@/shared/components/ui/label";
 import { X, Save } from "lucide-react";
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal } from '@/shared/hooks/useModal';
+import { framesToSeconds } from "./utils/time-utils";
 
 interface PairPromptModalProps {
   isOpen: boolean;
@@ -137,7 +138,7 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                   Pair {pairData.index + 1} Prompts
                 </DialogTitle>
                 <span className="text-sm font-normal text-muted-foreground">
-                  {pairData.frames} frames • {pairData.startFrame} → {pairData.endFrame}
+                  {framesToSeconds(pairData.frames)} ({pairData.frames} frames) • {framesToSeconds(pairData.startFrame)} → {framesToSeconds(pairData.endFrame)}
                 </span>
               </div>
             </div>

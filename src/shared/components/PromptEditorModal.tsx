@@ -216,29 +216,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   });
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
-  // Reset generation and bulk edit settings to defaults when project changes
-  useEffect(() => {
-    console.log(`[PromptEditorModal:PROJECT_CHANGE] Project changed to: ${selectedProjectId}`);
-    // Reset generation settings to defaults when project changes
-    setGenerationControlValues({
-      overallPromptText: '',
-      remixPromptText: 'More like this',
-      rulesToRememberText: '',
-      numberToGenerate: 16, 
-      includeExistingContext: true, 
-      addSummary: true,
-      replaceCurrentPrompts: false,
-      temperature: 0.8,
-      showAdvanced: false,
-    });
-    // Reset bulk edit settings to defaults when project changes
-    setBulkEditControlValues({
-      editInstructions: '', 
-      modelType: 'smart' as AIModelType,
-    });
-    // Reset active tab to generate when project changes
-    setActiveTab('generate');
-  }, [selectedProjectId]);
+  // Note: Project change resets are now handled by usePersistentToolState hook
+  // which properly hydrates saved values per-project or uses defaults if none exist
 
   const [generationControlValues, setGenerationControlValues] = useState<GenerationControlValues>({
     overallPromptText: '',
@@ -272,21 +251,19 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
   }, []);
 
   // -------------------------------------------------------------
-  // Persistent settings wiring - DISABLED for AI generation settings
-  // These settings should NOT persist across projects or sessions
+  // Persistent settings wiring - saves AI generation settings per-project
   // -------------------------------------------------------------
   // Persist settings to the currently-selected project so they are shared across sessions
   // (selectedProjectId is now declared earlier to prevent TDZ errors)
 
-  // Disable persistence for prompt editor AI settings since they should be session-specific
+  // Enable persistence for prompt editor AI settings - these are now properly scoped per-project
   const { markAsInteracted } = usePersistentToolState<PersistedEditorControlsSettings>(
     'prompt-editor-controls',
     { projectId: selectedProjectId ?? undefined },
     {
-      // Temporarily disable all persistence to prevent AI settings from leaking across projects
-      // generationSettings: [generationControlValues, setGenerationControlValues],
-      // bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
-      // activeTab: [activeTab, setActiveTab],
+      generationSettings: [generationControlValues, setGenerationControlValues],
+      bulkEditSettings: [bulkEditControlValues, setBulkEditControlValues],
+      activeTab: [activeTab, setActiveTab],
     }
   );
 

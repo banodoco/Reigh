@@ -65,7 +65,7 @@ ADDITIONAL RULES TO REMEMBER: ${rulesToRememberText}
 
 IMPORTANT GUIDELINES:
 - Each prompt should be specifically designed for AI image generation
-- Add detail that expands or adds to the user's instruction (unless they request otherwise)
+- Keep the user's descriptions as stated - only add detail when they specifically request it
 - Focus on visual elements like composition, lighting, colors, and atmosphere
 - SUBJECT GUIDANCE: If the user asks for simple subjects like "a man", "a woman", or "a train" without requesting additional details or variety, mention them simply without embellishment. Only add descriptive details when specifically requested.
 - CHARACTER GUIDANCE: Only mention specific character details if requested - if the user asks for them. If they provide a character description use it consistently across prompts. If they ask you to generate characters, give them unique character names and descriptions for each prompt.

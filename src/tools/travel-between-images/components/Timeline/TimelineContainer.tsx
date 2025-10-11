@@ -3,6 +3,7 @@ import { GenerationRow } from '@/types/shots';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { calculateMaxGap, getPairInfo, getTimelineDimensions, pixelToFrame } from './utils/timeline-utils';
 import { timelineDebugger } from './utils/timeline-debug';
+import { framesToSeconds } from './utils/time-utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 // Import components
@@ -463,7 +464,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           }`}
           style={{ 
             minHeight: "240px", 
-            paddingTop: structureVideoPath && structureVideoMetadata ? "4rem" : "2.5rem", 
+            paddingTop: structureVideoPath && structureVideoMetadata ? "4rem" : "1rem", 
             paddingBottom: "4.5rem" 
           }}
           onWheel={handleWheel}
@@ -748,7 +749,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           >
             {/* Gap to reset */}
             <div className="flex items-center gap-1.5">
-              <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap: {resetGap}</Label>
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap: {framesToSeconds(resetGap)}</Label>
               <Slider
                 value={[resetGap]}
                 onValueChange={([value]) => setResetGap(value)}

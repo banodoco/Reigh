@@ -4,6 +4,7 @@ import { Slider } from "@/shared/components/ui/slider";
 import { Label } from "@/shared/components/ui/label";
 import { Info, ZoomOut, ZoomIn, RotateCcw, MoveLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { framesToSeconds } from './utils/time-utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 interface TimelineControlsProps {
@@ -111,7 +112,7 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              <p>This will reset to a {resetGap} frames gap with {pendingContextFrames} context frames</p>
+              <p>This will reset to a {framesToSeconds(resetGap)} gap with {framesToSeconds(pendingContextFrames)} context</p>
             </TooltipContent>
           </Tooltip>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { framesToSeconds } from './Timeline/utils/time-utils';
 
 interface SharedTaskDetailsProps {
   task: any;
@@ -367,17 +368,17 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 {contextFrameCount !== null && (
                   <div className="space-y-1">
-                    <p className={`${config.textSize} text-muted-foreground`}>Context Frames</p>
+                    <p className={`${config.textSize} text-muted-foreground`}>Context Duration</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                      {contextFrameCount}
+                      {framesToSeconds(contextFrameCount)} ({contextFrameCount} frames)
                     </p>
                   </div>
                 )}
                 {gapFrameCount !== null && (
                   <div className="space-y-1">
-                    <p className={`${config.textSize} text-muted-foreground`}>Gap Frames</p>
+                    <p className={`${config.textSize} text-muted-foreground`}>Gap Duration</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                      {gapFrameCount}
+                      {framesToSeconds(gapFrameCount)} ({gapFrameCount} frames)
                     </p>
                   </div>
                 )}

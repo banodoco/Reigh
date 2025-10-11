@@ -22,6 +22,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import MagicEditModal from '@/shared/components/MagicEditModal';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
+import { framesToSeconds } from './Timeline/utils/time-utils';
 
 interface SortableImageItemProps {
   image: GenerationRow;
@@ -314,7 +315,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       {/* Frame number overlay - bottom (matching timeline style) */}
       {timeline_frame !== undefined && (
         <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
-          <span className="inline-block">{timeline_frame}</span>
+          <span className="inline-block">{framesToSeconds(timeline_frame)}</span>
         </div>
       )}
       

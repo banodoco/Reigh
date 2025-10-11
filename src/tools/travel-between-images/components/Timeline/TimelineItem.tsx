@@ -5,6 +5,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Trash2, Copy, Sparkles, Check } from "lucide-react";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
+import { framesToSeconds } from "./utils/time-utils";
 // import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
 const TIMELINE_HORIZONTAL_PADDING = 20; // Fallback constant
 
@@ -325,7 +326,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     : 'bg-primary/90 text-primary-foreground'
                 }`}
     >
-                {dragDistances.distanceToPrev}f
+                {framesToSeconds(dragDistances.distanceToPrev)}
               </div>
             )}
             {dragDistances.distanceToNext !== undefined && (
@@ -336,7 +337,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     : 'bg-primary/90 text-primary-foreground'
                 }`}
               >
-                {dragDistances.distanceToNext}f
+                {framesToSeconds(dragDistances.distanceToNext)}
               </div>
             )}
           </>
@@ -356,7 +357,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           <img
             ref={progressiveRef}
             src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
-            alt={`Frame ${displayFrame}`}
+            alt={`Time ${framesToSeconds(displayFrame)}`}
             className={cn(
               "w-full h-full object-cover transition-all duration-200",
               // Progressive loading visual states
@@ -522,7 +523,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           )}
 
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] leading-none text-center py-0.5 pointer-events-none whitespace-nowrap overflow-hidden">
-            <span className="inline-block">{displayFrame}</span>
+            <span className="inline-block">{framesToSeconds(displayFrame)}</span>
           </div>
         </div>
       </div>
