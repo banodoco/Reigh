@@ -514,7 +514,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     buttonClickedRef.current = false;
                   }, 100);
                 }}
-                title="Remove image from shot"
+                title="Remove from timeline"
               >
                 <Trash2 className="h-3 w-3" />
               </Button>

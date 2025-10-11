@@ -88,10 +88,10 @@ const ShotsPage: React.FC = () => {
     }, {
       onSuccess: () => {
         // The query invalidation will trigger a refetch and update the view.
-        // No need for refreshSelectedShotImages();
+        // NOTE: This removes timeline_frame, not deleting the generation
       },
       onError: (error) => {
-        toast.error(`Failed to remove image: ${error.message}`);
+        toast.error(`Failed to remove image from timeline: ${error.message}`);
         setManagedImages(originalImages); // Revert optimistic update
       },
     });

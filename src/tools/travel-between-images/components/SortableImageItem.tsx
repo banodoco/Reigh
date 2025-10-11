@@ -388,7 +388,7 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
               e.stopPropagation();
               e.nativeEvent.stopImmediatePropagation();
             }}
-            title="Remove image from shot"
+            title="Remove from timeline"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>

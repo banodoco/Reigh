@@ -307,16 +307,17 @@ export const useGenerationActions = ({
 
   const handleDeleteImageFromShot = useCallback(async (shotImageEntryId: string) => {
     if (!selectedShot || !projectId) {
-      toast.error("Cannot delete image: No shot or project selected.");
+      toast.error("Cannot remove image: No shot or project selected.");
       return;
     }
 
-    console.log('[OPTIMISTIC_DELETE] Parent handling optimistic delete', {
+    console.log('[OPTIMISTIC_DELETE] Parent handling optimistic removal from timeline', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
       currentCount: state.localOrderedShotImages.length
     });
 
     // Optimistically remove the image from the local state
+    // NOTE: This removes timeline_frame (not deleting the record), so generation is preserved
     const optimisticImages = state.localOrderedShotImages.filter(img => img.shotImageEntryId !== shotImageEntryId);
     actions.setLocalOrderedShotImages(optimisticImages);
     skipNextSyncRef.current = true; // Skip next prop sync to prevent flicker
@@ -328,7 +329,7 @@ export const useGenerationActions = ({
     }, {
       onError: () => {
         // Rollback on error
-        console.log('[OPTIMISTIC_DELETE] Rolling back optimistic delete');
+        console.log('[OPTIMISTIC_DELETE] Rolling back optimistic removal');
         actions.setLocalOrderedShotImages(orderedShotImages);
         skipNextSyncRef.current = false;
       }
@@ -340,19 +341,20 @@ export const useGenerationActions = ({
       return;
     }
 
-    console.log('[OPTIMISTIC_DELETE] Parent handling batch optimistic delete', {
-      idsToDelete: shotImageEntryIds.map(id => id.substring(0, 8)),
+    console.log('[OPTIMISTIC_DELETE] Parent handling batch optimistic removal from timeline', {
+      idsToRemove: shotImageEntryIds.map(id => id.substring(0, 8)),
       totalCount: shotImageEntryIds.length,
       currentCount: state.localOrderedShotImages.length
     });
 
     // Optimistically remove all images from the local state
+    // NOTE: This removes timeline_frame (not deleting the records), so generations are preserved
     const optimisticImages = state.localOrderedShotImages.filter(img => !shotImageEntryIds.includes(img.shotImageEntryId));
     actions.setLocalOrderedShotImages(optimisticImages);
     skipNextSyncRef.current = true; // Skip next prop sync to prevent flicker
     
-    // Execute all deletions
-    const deletePromises = shotImageEntryIds.map(id => 
+    // Execute all timeline removals
+    const removePromises = shotImageEntryIds.map(id => 
       removeImageFromShotMutation.mutateAsync({
         shot_id: selectedShot.id,
         shotImageEntryId: id,
@@ -361,14 +363,14 @@ export const useGenerationActions = ({
     );
 
     try {
-      await Promise.all(deletePromises);
-      console.log('[OPTIMISTIC_DELETE] Batch delete completed successfully');
+      await Promise.all(removePromises);
+      console.log('[OPTIMISTIC_DELETE] Batch removal completed successfully');
     } catch (error) {
       // Rollback on error
-      console.log('[OPTIMISTIC_DELETE] Rolling back batch optimistic delete');
+      console.log('[OPTIMISTIC_DELETE] Rolling back batch optimistic removal');
       actions.setLocalOrderedShotImages(orderedShotImages);
       skipNextSyncRef.current = false;
-      toast.error('Failed to delete some images');
+      toast.error('Failed to remove some images from timeline');
     }
   }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages, state.localOrderedShotImages, skipNextSyncRef]);
 
@@ -449,8 +451,8 @@ export const useGenerationActions = ({
         const updatedImages = state.localOrderedShotImages.map(img => 
           img.shotImageEntryId === tempDuplicateId ? {
             ...img,
-            shotImageEntryId: result.shotImageEntryId || result.id,
-            id: result.generationId || result.id,
+            shotImageEntryId: result.id,
+            id: result.generation_id,
             isOptimistic: false
           } : img
         );
@@ -793,7 +795,7 @@ export const useGenerationActions = ({
                 shotGenId: r.shotGenId?.substring(0, 8),
                 framePosition: r.framePosition,
                 success: r.success,
-                error: r.error?.message || r.error
+                error: typeof r.error === 'object' && r.error && 'message' in r.error ? r.error.message : r.error
               }))
             });
             
@@ -878,7 +880,7 @@ export const useGenerationActions = ({
               shotGenId: r.shotGenId?.substring(0, 8),
               framePosition: r.framePosition,
               success: r.success,
-              error: r.error?.message || r.error
+              error: typeof r.error === 'object' && r.error && 'message' in r.error ? r.error.message : r.error
             }))
           });
           

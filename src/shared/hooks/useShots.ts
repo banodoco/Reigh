@@ -1382,15 +1382,18 @@ interface RemoveImageFromShotArgs {
   project_id?: string | null;
 }
 
-// Remove an image from a shot VIA API
+// Remove an image from a shot's timeline VIA API
+// NOTE: This sets timeline_frame to null rather than deleting the shot_generations record,
+// effectively removing it from the timeline while preserving the generation association
 export const useRemoveImageFromShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async ({ shot_id, shotImageEntryId, project_id }: { shot_id: string; shotImageEntryId: string; project_id?: string | null }) => {
+      // Instead of deleting, just remove the timeline_frame to unlink from timeline
       const { error } = await supabase
         .from('shot_generations')
-        .delete()
+        .update({ timeline_frame: null })
         .eq('id', shotImageEntryId)
         .eq('shot_id', shot_id);
       
