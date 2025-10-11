@@ -85,6 +85,9 @@ interface MediaLightboxProps {
   optimisticUnpositionedIds?: Set<string>;
   onOptimisticPositioned?: (mediaId: string) => void;
   onOptimisticUnpositioned?: (mediaId: string) => void;
+  // Precomputed overrides from gallery source record
+  positionedInSelectedShot?: boolean;
+  associatedWithoutPositionInSelectedShot?: boolean;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -133,7 +136,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   optimisticUnpositionedIds,
   onOptimisticPositioned,
   onOptimisticUnpositioned,
+  // Overrides
+  positionedInSelectedShot,
+  associatedWithoutPositionInSelectedShot,
 }) => {
+  // [ShotNavDebug] Log received override props
+  useEffect(() => {
+    console.log('[ShotNavDebug] [MediaLightbox] Received props', {
+      mediaId: media?.id,
+      selectedShotId,
+      positionedInSelectedShot,
+      associatedWithoutPositionInSelectedShot,
+      optimisticPositionedCount: optimisticPositionedIds?.size || 0,
+      optimisticUnpositionedCount: optimisticUnpositionedIds?.size || 0,
+      timestamp: Date.now()
+    });
+  }, [media?.id, selectedShotId, positionedInSelectedShot, associatedWithoutPositionInSelectedShot, optimisticPositionedIds, optimisticUnpositionedIds]);
+
   const [isFlippedHorizontally, setIsFlippedHorizontally] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -769,6 +788,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotId || !media.id) return false;
+
+    // Prefer override from gallery source
+    if (typeof positionedInSelectedShot === 'boolean') {
+      return positionedInSelectedShot || !!optimisticPositionedIds?.has(media.id);
+    }
     
     // Check optimistic state first
     if (optimisticPositionedIds?.has(media.id)) return true;
@@ -791,7 +815,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
     
     return false;
-  }, [selectedShotId, media, optimisticPositionedIds]);
+  }, [selectedShotId, media, optimisticPositionedIds, positionedInSelectedShot]);
 
   // [ShotNavDebug] Log computed positioned state
   useEffect(() => {
@@ -802,9 +826,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       mediaShotId: (media as any)?.shot_id,
       mediaPosition: (media as any)?.position,
       optimisticHas: optimisticPositionedIds?.has(media?.id || ''),
+      override: positionedInSelectedShot,
       timestamp: Date.now()
     });
-  }, [isAlreadyPositionedInSelectedShot, media?.id, selectedShotId, optimisticPositionedIds]);
+  }, [isAlreadyPositionedInSelectedShot, media?.id, selectedShotId, optimisticPositionedIds, positionedInSelectedShot]);
 
   const handleAddToShot = async () => {
     if (!onAddToShot || !selectedShotId) return;
@@ -863,6 +888,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Check if image is already associated with the selected shot WITHOUT position
   const isAlreadyAssociatedWithoutPosition = useMemo(() => {
     if (!selectedShotId || !media.id) return false;
+
+    // Prefer override from gallery source
+    if (typeof associatedWithoutPositionInSelectedShot === 'boolean') {
+      return associatedWithoutPositionInSelectedShot || !!optimisticUnpositionedIds?.has(media.id);
+    }
     
     // Check optimistic state first
     if (optimisticUnpositionedIds?.has(media.id)) return true;
@@ -884,7 +914,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
     
     return false;
-  }, [selectedShotId, media, optimisticUnpositionedIds]);
+  }, [selectedShotId, media, optimisticUnpositionedIds, associatedWithoutPositionInSelectedShot]);
 
   // [ShotNavDebug] Log computed unpositioned state
   useEffect(() => {
@@ -895,9 +925,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       mediaShotId: (media as any)?.shot_id,
       mediaPosition: (media as any)?.position,
       optimisticHas: optimisticUnpositionedIds?.has(media?.id || ''),
+      override: associatedWithoutPositionInSelectedShot,
       timestamp: Date.now()
     });
-  }, [isAlreadyAssociatedWithoutPosition, media?.id, selectedShotId, optimisticUnpositionedIds]);
+  }, [isAlreadyAssociatedWithoutPosition, media?.id, selectedShotId, optimisticUnpositionedIds, associatedWithoutPositionInSelectedShot]);
 
   const handleAddToShotWithoutPosition = async () => {
     if (!onAddToShotWithoutPosition || !selectedShotId) return;
@@ -1704,17 +1735,54 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                     size="sm"
                                     onClick={handleAddToShot}
                                     disabled={!selectedShotId}
-                                    className="bg-blue-600/80 hover:bg-blue-600 text-white h-8 px-3"
+                                    className={`h-8 px-3 text-white ${
+                                      isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                                        ? 'bg-green-600/80 hover:bg-green-600'
+                                        : 'bg-blue-600/80 hover:bg-blue-600'
+                                    }`}
                                   >
-                                    {showTickForImageId === media.id ? (
+                                    {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
                                       <CheckCircle className="h-4 w-4" />
                                     ) : (
                                       <PlusCircle className="h-4 w-4" />
                                     )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">Add to shot</TooltipContent>
+                            <TooltipContent className="z-[100001]">
+                              {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                                ? 'Added with position. Jump to shot.'
+                                : 'Add to shot with position'}
+                            </TooltipContent>
                           </Tooltip>
+
+                              {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={handleAddToShotWithoutPosition}
+                                      disabled={!selectedShotId}
+                                      className={`h-8 px-3 text-white ${
+                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                          ? 'bg-green-600/80 hover:bg-green-600'
+                                          : 'bg-purple-600/80 hover:bg-purple-600'
+                                      }`}
+                                    >
+                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
+                                        <CheckCircle className="h-4 w-4" />
+                                      ) : (
+                                        <PlusCircle className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="z-[100001]">
+                                    {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                      ? 'Added without position. Jump to shot.'
+                                      : 'Add to shot without position'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                         </>
                       )}
 
@@ -2209,54 +2277,91 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 size="sm"
                                 onClick={handleAddToShot}
                                 disabled={!selectedShotId}
-                                className="bg-blue-600/80 hover:bg-blue-600 text-white h-7 sm:h-8 px-2 sm:px-3"
+                                className={`h-7 sm:h-8 px-2 sm:px-3 text-white ${
+                                  isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                                    ? 'bg-green-600/80 hover:bg-green-600'
+                                    : 'bg-blue-600/80 hover:bg-blue-600'
+                                }`}
                               >
-                                {showTickForImageId === media.id ? (
+                                {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
                                   <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                 ) : (
                                   <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                 )}
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Add to shot</TooltipContent>
+                          <TooltipContent className="z-[100001]">
+                            {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                              ? 'Added with position. Jump to shot.'
+                              : 'Add to shot'}
+                          </TooltipContent>
                         </Tooltip>
-                      </>
-                    )}
 
-                    {/* Apply Settings */}
-                    {onApplySettings && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleApplySettings}
-                            className="bg-purple-600/80 hover:bg-purple-600 text-white h-7 sm:h-8 px-2 sm:px-3"
-                          >
-                            <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
-                      </Tooltip>
-                    )}
+                              {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={handleAddToShotWithoutPosition}
+                                      disabled={!selectedShotId}
+                                      className={`h-8 px-3 text-white ${
+                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                          ? 'bg-green-600/80 hover:bg-green-600'
+                                          : 'bg-purple-600/80 hover:bg-purple-600'
+                                      }`}
+                                    >
+                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
+                                        <CheckCircle className="h-4 w-4" />
+                                      ) : (
+                                        <PlusCircle className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="z-[100001]">
+                                    {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                      ? 'Added without position. Jump to shot.'
+                                      : 'Add to shot without position'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                        </>
+                      )}
 
-                    {/* Delete */}
-                    {onDelete && !isVideo && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleDelete}
-                            disabled={isDeleting === media.id}
-                            className="bg-red-600/80 hover:bg-red-600 text-white h-7 sm:h-8 px-2 sm:px-3"
-                          >
-                            <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="z-[100001]">Delete image</TooltipContent>
-                      </Tooltip>
-                    )}
+                      {/* Apply Settings */}
+                      {onApplySettings && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleApplySettings}
+                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-7 sm:h-8 px-2 sm:px-3"
+                            >
+                              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {/* Delete */}
+                      {onDelete && !isVideo && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleDelete}
+                              disabled={isDeleting === media.id}
+                              className="bg-red-600/80 hover:bg-red-600 text-white h-7 sm:h-8 px-2 sm:px-3"
+                            >
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Delete image</TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </div>
                 )}

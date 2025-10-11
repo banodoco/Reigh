@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { GenerationRow, Shot } from "@/types/shots";
@@ -194,6 +194,120 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return starred;
   }, [filteredImages, activeLightboxMedia?.id]);
 
+  // Compute positioned/associated state from gallery source record (mirrors ImageGalleryItem logic)
+  const sourceRecord = useMemo(() => {
+    const found = filteredImages.find(img => img.id === activeLightboxMedia?.id);
+    console.log('[ShotNavDebug] [ImageGalleryLightbox] sourceRecord lookup', {
+      mediaId: activeLightboxMedia?.id,
+      foundRecord: !!found,
+      shot_id: found?.shot_id,
+      position: found?.position,
+      all_shot_associations: found?.all_shot_associations,
+      filteredImagesCount: filteredImages.length,
+      timestamp: Date.now()
+    });
+    return found;
+  }, [filteredImages, activeLightboxMedia?.id]);
+  
+  const positionedInSelectedShot = useMemo(() => {
+    if (!sourceRecord || !selectedShotIdLocal) {
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: early return undefined', {
+        hasSourceRecord: !!sourceRecord,
+        selectedShotIdLocal,
+        timestamp: Date.now()
+      });
+      return undefined;
+    }
+    
+    let result: boolean;
+    if (sourceRecord.shot_id === selectedShotIdLocal) {
+      result = sourceRecord.position !== null && sourceRecord.position !== undefined;
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: direct shot_id match', {
+        shot_id: sourceRecord.shot_id,
+        position: sourceRecord.position,
+        result,
+        timestamp: Date.now()
+      });
+      return result;
+    }
+    
+    const a = sourceRecord.all_shot_associations;
+    if (Array.isArray(a)) {
+      const m = a.find(x => x.shot_id === selectedShotIdLocal);
+      result = !!(m && m.position !== null && m.position !== undefined);
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: all_shot_associations check', {
+        associationsCount: a.length,
+        foundMatch: !!m,
+        matchPosition: m?.position,
+        result,
+        timestamp: Date.now()
+      });
+      return result;
+    }
+    
+    console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: fallback false', {
+      timestamp: Date.now()
+    });
+    return false;
+  }, [sourceRecord, selectedShotIdLocal]);
+  
+  const associatedWithoutPositionInSelectedShot = useMemo(() => {
+    if (!sourceRecord || !selectedShotIdLocal) {
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: early return undefined', {
+        hasSourceRecord: !!sourceRecord,
+        selectedShotIdLocal,
+        timestamp: Date.now()
+      });
+      return undefined;
+    }
+    
+    let result: boolean;
+    if (sourceRecord.shot_id === selectedShotIdLocal) {
+      result = sourceRecord.position === null || sourceRecord.position === undefined;
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: direct shot_id match', {
+        shot_id: sourceRecord.shot_id,
+        position: sourceRecord.position,
+        result,
+        timestamp: Date.now()
+      });
+      return result;
+    }
+    
+    const a = sourceRecord.all_shot_associations;
+    if (Array.isArray(a)) {
+      const m = a.find(x => x.shot_id === selectedShotIdLocal);
+      result = !!(m && (m.position === null || m.position === undefined));
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: all_shot_associations check', {
+        associationsCount: a.length,
+        foundMatch: !!m,
+        matchPosition: m?.position,
+        result,
+        timestamp: Date.now()
+      });
+      return result;
+    }
+    
+    console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: fallback false', {
+      timestamp: Date.now()
+    });
+    return false;
+  }, [sourceRecord, selectedShotIdLocal]);
+
+  // Log what's being passed to MediaLightbox
+  useEffect(() => {
+    if (activeLightboxMedia) {
+      console.log('[ShotNavDebug] [ImageGalleryLightbox] Passing to MediaLightbox', {
+        mediaId: activeLightboxMedia.id,
+        selectedShotIdLocal,
+        positionedInSelectedShot,
+        associatedWithoutPositionInSelectedShot,
+        optimisticPositionedCount: optimisticPositionedIds?.size || 0,
+        optimisticUnpositionedCount: optimisticUnpositionedIds?.size || 0,
+        timestamp: Date.now()
+      });
+    }
+  }, [activeLightboxMedia?.id, selectedShotIdLocal, positionedInSelectedShot, associatedWithoutPositionInSelectedShot, optimisticPositionedIds, optimisticUnpositionedIds]);
+
   return (
     <>
       {/* Main Lightbox Modal */}
@@ -246,6 +360,8 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           onCreateShot={onCreateShot}
           onNavigateToShot={onNavigateToShot}
           toolTypeOverride={toolTypeOverride}
+          positionedInSelectedShot={positionedInSelectedShot}
+          associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
         />
       )}
 
