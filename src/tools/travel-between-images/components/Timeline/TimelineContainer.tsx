@@ -279,15 +279,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         const newScrollWidth = timelineContainer.scrollWidth;
         const restoredScrollLeft = prev.scrollFraction * newScrollWidth;
 
-        console.log('[ScrollPreservation] Restoring scroll after dimension change:', {
-          prevScrollFraction: prev.scrollFraction.toFixed(3),
-          prevFullRange: prev.fullRange,
-          newFullRange: fullRange,
-          prevScrollLeft: prev.scrollLeft,
-          restoredScrollLeft: Math.round(restoredScrollLeft),
-          newScrollWidth
-        });
-
         scrollContainer.scrollTo({
           left: Math.max(0, restoredScrollLeft),
           behavior: 'instant'
