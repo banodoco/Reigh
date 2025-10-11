@@ -60,12 +60,15 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
           const frame = startFrame + (i * interval);
           if (frame < fullMin || frame > fullMax) return null;
           
-          // Match TimelineItem positioning calculation exactly
-          const imageHalfWidth = 48; // Half of 96px image width for centering
-          const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth;
-          const effectiveWidth = containerWidth - (paddingOffset * 2);
-          const pixelPosition = paddingOffset + ((frame - fullMin) / fullRange) * effectiveWidth;
-          const leftPercent = (pixelPosition / containerWidth) * 100;
+          // Use the same positioning logic as TimelineItem but account for image centering
+          // The ruler container is already positioned at TIMELINE_HORIZONTAL_PADDING
+          // Items add imageHalfWidth (48px) to center the image on the marker
+          const imageHalfWidth = 48;
+          const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2) - (imageHalfWidth * 2);
+          const normalizedPosition = (frame - fullMin) / fullRange;
+          const pixelOffset = imageHalfWidth + (normalizedPosition * effectiveWidth);
+          const rulerContainerWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+          const leftPercent = (pixelOffset / rulerContainerWidth) * 100;
           
           return (
             <div
