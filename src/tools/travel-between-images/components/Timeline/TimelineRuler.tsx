@@ -42,47 +42,58 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
   };
   
   const interval = calculateMarkerInterval();
-  const startFrame = Math.floor(fullMin / interval) * interval;
-  const numMarkers = Math.floor((fullMax - startFrame) / interval) + 1;
   
+  // Precompute shared geometry based on TimelineItem's positioning
+  const imageHalfWidth = 48;
+  const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth;
+  const itemEffectiveWidth = containerWidth - (paddingOffset * 2);
+  const rulerWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+
+  // Generate evenly spaced markers, including both endpoints without duplicates
+  const markers: number[] = [];
+  if (fullRange > 0) {
+    const epsilon = 1e-6;
+    // Always include start
+    markers.push(fullMin);
+    // Interior markers spaced by interval
+    const firstStep = Math.ceil((fullMin + epsilon) / interval) * interval;
+    for (let frame = firstStep; frame <= fullMax - epsilon; frame += interval) {
+      // Avoid pushing endpoints again
+      if (frame > fullMin + epsilon && frame < fullMax - epsilon) {
+        markers.push(frame);
+      }
+    }
+    // Always include end
+    if (fullMax - fullMin > epsilon) {
+      markers.push(fullMax);
+    }
+  }
+
   return (
     <div
       className="absolute h-8 border-t"
       style={{
         bottom: "4.5rem",
         left: `${TIMELINE_HORIZONTAL_PADDING}px`,
-        width: zoomLevel > 1 ? `calc(${zoomLevel * 100}% - ${TIMELINE_HORIZONTAL_PADDING * 1.5}px)` : `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 1.5}px)`,
+        width: zoomLevel > 1 ? `calc(${zoomLevel * 100}% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)` : `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)`,
         minWidth: `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)`,
       }}
     >
       <div className="relative h-full">
-        {Array.from({ length: numMarkers }, (_, i) => {
-          const frame = startFrame + (i * interval);
-          if (frame < fullMin || frame > fullMax) return null;
-          
-          // Match TimelineItem positioning exactly
-          // Items use: paddingOffset + ((frame - fullMin) / fullRange) * effectiveWidth
-          // where paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth
-          // and effectiveWidth = timelineWidth - (paddingOffset * 2)
-          const imageHalfWidth = 48;
-          const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth;
-          const effectiveWidth = containerWidth - (paddingOffset * 2);
-          const pixelPosition = paddingOffset + ((frame - fullMin) / fullRange) * effectiveWidth;
-          
-          // Ruler container is offset by TIMELINE_HORIZONTAL_PADDING and has width (containerWidth - TIMELINE_HORIZONTAL_PADDING * 2)
-          // Convert absolute pixel position to percentage within ruler container
-          const pixelInRuler = pixelPosition - TIMELINE_HORIZONTAL_PADDING;
-          const rulerWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
-          const leftPercent = (pixelInRuler / rulerWidth) * 100;
-          
+        {markers.map((frame) => {
+          // Project frame → pixel at item center, then into ruler space
+          const itemPixelPosition = paddingOffset + ((frame - fullMin) / fullRange) * itemEffectiveWidth;
+          const rulerPixelPosition = itemPixelPosition - TIMELINE_HORIZONTAL_PADDING;
+          const leftPercent = (rulerPixelPosition / rulerWidth) * 100;
+
           return (
             <div
               key={frame}
               className="absolute flex flex-col items-center"
-              style={{ left: `${leftPercent}%` }}
+              style={{ left: `${leftPercent}%`, transform: 'translateX(-50%)' }}
             >
               <div className="w-px h-4 bg-border"></div>
-              <span className="text-xs text-muted-foreground mt-1">{framesToSeconds(frame)}</span>
+              <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{framesToSeconds(frame)}</span>
             </div>
           );
         })}

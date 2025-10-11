@@ -233,8 +233,82 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     return () => clearTimeout(timer);
   }, [zoomLevel]);
 
+  // Preserve scroll position when timeline dimensions change (e.g., when tasks complete)
+  // Track previous scroll position and timeline dimensions
+  const prevScrollStateRef = useRef<{
+    scrollLeft: number;
+    scrollFraction: number;
+    fullRange: number;
+    fullMin: number;
+  } | null>(null);
+
+  useEffect(() => {
+    // Skip during active zooming or dragging - those have their own scroll management
+    if (isZooming || dragState.isDragging) {
+      return;
+    }
+
+    const scrollContainer = timelineRef.current;
+    const timelineContainer = containerRef.current;
+    
+    if (!scrollContainer || !timelineContainer) return;
+
+    // Only preserve scroll when zoomed in
+    if (zoomLevel <= 1) {
+      prevScrollStateRef.current = null;
+      return;
+    }
+
+    // Get current state
+    const currentScrollLeft = scrollContainer.scrollLeft;
+    const currentScrollWidth = timelineContainer.scrollWidth;
+    const currentScrollFraction = currentScrollWidth > 0 ? currentScrollLeft / currentScrollWidth : 0;
+
+    // Check if timeline dimensions changed
+    const prev = prevScrollStateRef.current;
+    const dimensionsChanged = prev && (prev.fullRange !== fullRange || prev.fullMin !== fullMin);
+
+    if (dimensionsChanged && prev) {
+      // Timeline dimensions changed - restore scroll position proportionally
+      const timer = setTimeout(() => {
+        const scrollContainer = timelineRef.current;
+        const timelineContainer = containerRef.current;
+        
+        if (!scrollContainer || !timelineContainer) return;
+
+        const newScrollWidth = timelineContainer.scrollWidth;
+        const restoredScrollLeft = prev.scrollFraction * newScrollWidth;
+
+        console.log('[ScrollPreservation] Restoring scroll after dimension change:', {
+          prevScrollFraction: prev.scrollFraction.toFixed(3),
+          prevFullRange: prev.fullRange,
+          newFullRange: fullRange,
+          prevScrollLeft: prev.scrollLeft,
+          restoredScrollLeft: Math.round(restoredScrollLeft),
+          newScrollWidth
+        });
+
+        scrollContainer.scrollTo({
+          left: Math.max(0, restoredScrollLeft),
+          behavior: 'instant'
+        });
+      }, 10);
+
+      return () => clearTimeout(timer);
+    }
+
+    // Save current state for next comparison
+    prevScrollStateRef.current = {
+      scrollLeft: currentScrollLeft,
+      scrollFraction: currentScrollFraction,
+      fullRange,
+      fullMin
+    };
+  }, [fullRange, fullMin, zoomLevel, isZooming, dragState.isDragging]);
+
   // Scroll timeline to center on zoom center when zooming
   // IMPORTANT: Don't adjust scroll during drag operations to prevent view jumping
+  // CRITICAL: Only adjust scroll when actively zooming, NOT when timeline dimensions change
   useEffect(() => {
     // Skip scroll adjustment if a drag is in progress or if the change is not from zooming
     if (dragState.isDragging || !isZooming) {
@@ -269,7 +343,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [zoomLevel, zoomCenter, fullMin, fullRange, dragState.isDragging, isZooming]);
+  }, [zoomLevel, zoomCenter, dragState.isDragging, isZooming]);
 
   // File drop hook
   const {
@@ -459,7 +533,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         {/* Timeline scrolling container */}
         <div
           ref={timelineRef}
-          className={`timeline-scroll relative bg-muted/20 border rounded-lg p-4 overflow-x-auto mb-10 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto mb-10 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
           style={{ 
