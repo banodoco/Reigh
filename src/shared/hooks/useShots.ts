@@ -224,18 +224,20 @@ export const useDuplicateShot = () => {
       // Create an optimistic shot for immediate UI feedback
       const originalShot = previousShots?.find(s => s.id === shotId);
       if (originalShot) {
-        // Filter out video outputs for optimistic update
-        const nonVideoImages = originalShot.images.filter(img => 
-          img.type !== 'video_travel_output' && 
-          !(img.location && img.location.endsWith('.mp4')) &&
-          !(img.imageUrl && img.imageUrl.endsWith('.mp4'))
-        );
+        // Filter to only include positioned non-video images (matching the actual duplication logic)
+        const positionedNonVideoImages = originalShot.images.filter(img => {
+          const isVideo = img.type === 'video_travel_output' || 
+                         (img.location && img.location.endsWith('.mp4')) ||
+                         (img.imageUrl && img.imageUrl.endsWith('.mp4'));
+          const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+          return !isVideo && hasTimelineFrame;
+        });
         
         const optimisticDuplicatedShot: Shot = {
           id: `optimistic-duplicate-${Date.now()}`,
           name: newName || `${originalShot.name} (Copy)`,
           created_at: new Date().toISOString(),
-          images: nonVideoImages, // Only copy non-video images for optimistic update
+          images: positionedNonVideoImages, // Only copy positioned non-video images for optimistic update
           project_id: projectId,
           position: ((originalShot as any).position || 0) + 1, // Position after the original shot
         };
@@ -278,11 +280,29 @@ export const useDuplicateShot = () => {
             !shot.id.startsWith('optimistic-duplicate-') && 
             !shot.id.startsWith('optimistic-')
           );
-          return [newShot, ...shotsWithoutOptimistic];
+          
+          // Insert the new shot at the correct position based on its position value
+          const newShotPosition = (newShot as any).position || 0;
+          const insertionIndex = shotsWithoutOptimistic.findIndex(shot => 
+            (shot.position || 0) > newShotPosition
+          );
+          
+          if (insertionIndex === -1) {
+            // No shots with higher position found, append at end
+            return [...shotsWithoutOptimistic, newShot];
+          } else {
+            // Insert at the correct position
+            const updatedShots = [...shotsWithoutOptimistic];
+            updatedShots.splice(insertionIndex, 0, newShot);
+            return updatedShots;
+          }
         });
         
         // Also ensure the shot is properly cached individually
         queryClient.setQueryData(['shot', newShot.id], newShot);
+        
+        // Invalidate to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
       }
     },
     onError: (err, { projectId }, context) => {
