@@ -96,9 +96,11 @@ export type Database = {
       }
       generations: {
         Row: {
+          based_on: string | null
           created_at: string
           id: string
           location: string | null
+          name: string | null
           params: Json | null
           project_id: string
           starred: boolean
@@ -108,9 +110,11 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          based_on?: string | null
           created_at?: string
           id?: string
           location?: string | null
+          name?: string | null
           params?: Json | null
           project_id: string
           starred?: boolean
@@ -120,9 +124,11 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          based_on?: string | null
           created_at?: string
           id?: string
           location?: string | null
+          name?: string | null
           params?: Json | null
           project_id?: string
           starred?: boolean
@@ -132,6 +138,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "generations_based_on_fkey"
+            columns: ["based_on"]
+            isOneToOne: false
+            referencedRelation: "generations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "generations_project_id_projects_id_fk"
             columns: ["project_id"]
@@ -401,6 +414,21 @@ export type Database = {
           },
         ]
       }
+      settings: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       shot_generations: {
         Row: {
           created_at: string | null
@@ -455,28 +483,31 @@ export type Database = {
       }
       shots: {
         Row: {
+          aspect_ratio: string | null
           created_at: string
           id: string
           name: string
-          timeline_frame: number
+          position: number
           project_id: string
           settings: Json | null
           updated_at: string | null
         }
         Insert: {
+          aspect_ratio?: string | null
           created_at?: string
           id?: string
           name: string
-          timeline_frame?: number
+          position?: number
           project_id: string
           settings?: Json | null
           updated_at?: string | null
         }
         Update: {
+          aspect_ratio?: string | null
           created_at?: string
           id?: string
           name?: string
-          timeline_frame?: number
+          position?: number
           project_id?: string
           settings?: Json | null
           updated_at?: string | null
@@ -630,6 +661,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      timeline_update_log: {
+        Row: {
+          call_source: string | null
+          created_at: string | null
+          generation_id: string
+          id: string
+          metadata: Json | null
+          new_timeline_frame: number | null
+          old_timeline_frame: number | null
+          operation_type: string
+          shot_id: string | null
+        }
+        Insert: {
+          call_source?: string | null
+          created_at?: string | null
+          generation_id: string
+          id?: string
+          metadata?: Json | null
+          new_timeline_frame?: number | null
+          old_timeline_frame?: number | null
+          operation_type: string
+          shot_id?: string | null
+        }
+        Update: {
+          call_source?: string | null
+          created_at?: string | null
+          generation_id?: string
+          id?: string
+          metadata?: Json | null
+          new_timeline_frame?: number | null
+          old_timeline_frame?: number | null
+          operation_type?: string
+          shot_id?: string | null
+        }
+        Relationships: []
       }
       training_data: {
         Row: {
@@ -1083,8 +1150,8 @@ export type Database = {
         Returns: {
           generation_id: string
           id: string
-          timeline_frame: number
           shot_id: string
+          timeline_frame: number
         }[]
       }
       analyze_task_availability_service_role: {
@@ -1126,21 +1193,7 @@ export type Database = {
         Returns: {
           generation_id: string
           id: string
-          timeline_frame: number
-          timeline_frame: number
-          updated_at: string
-        }[]
-      }
-      atomic_timeline_update: {
-        Args: {
-          p_changes: Json
-          p_shot_id: string
-          p_update_positions?: boolean
-        }
-        Returns: {
-          generation_id: string
-          id: string
-          timeline_frame: number
+          position: number
           timeline_frame: number
           updated_at: string
         }[]
@@ -1149,9 +1202,35 @@ export type Database = {
         Args: { p_instance_type?: string; p_worker_id: string }
         Returns: undefined
       }
+      batch_update_timeline_positions: {
+        Args: { updates: Json }
+        Returns: {
+          error_message: string
+          generation_id: string
+          id: string
+          success: boolean
+          timeline_frame: number
+        }[]
+      }
       bytea_to_text: {
         Args: { data: string }
         Returns: string
+      }
+      check_shot_generations_functions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          function_definition: string
+          function_name: string
+        }[]
+      }
+      check_shot_generations_triggers: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          trigger_definition: string
+          trigger_enabled: boolean
+          trigger_name: string
+          trigger_type: string
+        }[]
       }
       check_welcome_bonus_eligibility: {
         Args: Record<PropertyKey, never>
@@ -1244,14 +1323,23 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      debug_timeline_update: {
+        Args: {
+          p_generation_id: string
+          p_metadata?: Json
+          p_new_timeline_frame: number
+          p_shot_id: string
+        }
+        Returns: Json
+      }
       ensure_shot_association_from_params: {
         Args: { p_generation_id: string; p_params: Json }
         Returns: boolean
       }
-      exchange_shot_positions: {
+      exchange_timeline_frames: {
         Args: {
-          p_generation_id_a: string
-          p_generation_id_b: string
+          p_shot_generation_id_a: string
+          p_shot_generation_id_b: string
           p_shot_id: string
         }
         Returns: undefined
@@ -1259,6 +1347,18 @@ export type Database = {
       extract_discord_username: {
         Args: { jwt_claims: Json; user_metadata: Json }
         Returns: string
+      }
+      fix_timeline_spacing: {
+        Args: { p_shot_id: string }
+        Returns: {
+          details: string
+          generation_id: string
+          id: string
+          new_timeline_frame: number
+          old_timeline_frame: number
+          updated: boolean
+          violation_type: string
+        }[]
       }
       func_claim_available_task: {
         Args: { worker_id_param: string }
@@ -1324,6 +1424,19 @@ export type Database = {
           worker_id_param: string
         }
         Returns: undefined
+      }
+      get_recent_timeline_updates: {
+        Args: { p_generation_id?: string; p_minutes?: number }
+        Returns: {
+          call_source: string
+          created_at: string
+          generation_id: string
+          log_id: string
+          new_frame: number
+          old_frame: number
+          operation_type: string
+          shot_id: string
+        }[]
       }
       get_task_cost: {
         Args: {
@@ -1439,15 +1552,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      position_existing_generation_in_shot: {
-        Args: { p_generation_id: string; p_shot_id: string }
-        Returns: {
-          generation_id: string
-          id: string
-          timeline_frame: number
-          shot_id: string
-        }[]
-      }
       safe_insert_task: {
         Args: {
           p_dependant_on?: string
@@ -1488,6 +1592,19 @@ export type Database = {
         Args: { data: string }
         Returns: string
       }
+      timeline_sync_bulletproof: {
+        Args: {
+          frame_changes: Json
+          shot_uuid: string
+          should_update_positions?: boolean
+        }
+        Returns: {
+          frame_value: number
+          gen_uuid: string
+          last_updated: string
+          record_id: string
+        }[]
+      }
       track_referral_visit: {
         Args: {
           p_referrer_username: string
@@ -1496,6 +1613,39 @@ export type Database = {
           p_visitor_ip?: unknown
         }
         Returns: string
+      }
+      update_shot_image_order_disabled: {
+        Args: {
+          p_ordered_shot_generation_ids: string[]
+          p_project_id: string
+          p_shot_id: string
+        }
+        Returns: Json
+      }
+      update_single_timeline_frame: {
+        Args: {
+          p_generation_id: string
+          p_metadata: Json
+          p_new_timeline_frame: number
+        }
+        Returns: {
+          created_at: string | null
+          generation_id: string
+          id: string
+          metadata: Json | null
+          shot_id: string
+          timeline_frame: number | null
+          updated_at: string
+        }[]
+      }
+      update_timeline_frame_debug: {
+        Args: {
+          p_generation_id: string
+          p_metadata?: Json
+          p_new_timeline_frame: number
+          p_shot_id: string
+        }
+        Returns: Json
       }
       urlencode: {
         Args: { data: Json } | { string: string } | { string: string }

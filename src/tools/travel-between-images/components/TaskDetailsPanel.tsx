@@ -25,6 +25,8 @@ interface TaskDetailsPanelProps {
   taskId: string | null;
   className?: string;
   onClose?: () => void;
+  basedOnSection?: ReactNode;
+  derivedSection?: ReactNode;
 }
 
 const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ 
@@ -38,7 +40,9 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   onApplySettingsFromTask, 
   taskId,
   className = "",
-  onClose
+  onClose,
+  basedOnSection,
+  derivedSection
 }) => {
   const isMobile = useIsMobile();
   const [showDetailedParams, setShowDetailedParams] = useState(false);
@@ -164,6 +168,12 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
               }
             })()}
           </div>
+          
+          {/* Based On Section */}
+          {basedOnSection}
+          
+          {/* Derived Generations Section */}
+          {derivedSection}
           
           <div className="space-y-3">
             <div className="flex items-center justify-between">

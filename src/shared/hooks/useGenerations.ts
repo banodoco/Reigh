@@ -124,6 +124,7 @@ export async function fetchGenerations(
       params,
       starred,
       tasks,
+      based_on,
       shot_generations(shot_id, timeline_frame)
     `)
     .eq('project_id', projectId);
@@ -293,11 +294,13 @@ export async function fetchGenerations(
               'No prompt',
       metadata: {
         ...(item.params || {}),
-        taskId // Include task ID in metadata for ImageGalleryItem to access
+        taskId, // Include task ID in metadata for ImageGalleryItem to access
+        based_on: item.based_on // Include based_on for lineage tracking
       },
       createdAt: item.created_at,
       isVideo: item.type?.includes('video'),
       starred: item.starred || false,
+      based_on: item.based_on, // Include at top level for easy access
       position: null,
       timeline_frame: null,
     };
@@ -566,7 +569,10 @@ export function useCreateGeneration() {
 export async function fetchDerivedGenerations(
   sourceGenerationId: string | null
 ): Promise<GeneratedImageWithMetadata[]> {
+  console.log('[BasedOnDebug] fetchDerivedGenerations called', { sourceGenerationId });
+  
   if (!sourceGenerationId) {
+    console.log('[BasedOnDebug] fetchDerivedGenerations returning empty - no sourceGenerationId');
     return [];
   }
   
@@ -581,14 +587,22 @@ export async function fetchDerivedGenerations(
       params,
       starred,
       tasks,
+      based_on,
       shot_generations(shot_id, timeline_frame)
     `)
     .eq('based_on', sourceGenerationId)
     .order('created_at', { ascending: false });
   
   if (error) {
+    console.error('[BasedOnDebug] fetchDerivedGenerations error', error);
     throw error;
   }
+  
+  console.log('[BasedOnDebug] fetchDerivedGenerations result', {
+    sourceGenerationId,
+    count: data?.length || 0,
+    data: data?.map(d => ({ id: d.id, based_on: (d as any).based_on }))
+  });
   
   const items = data?.map((item: any) => {
     const mainUrl = item.location;
@@ -675,7 +689,10 @@ export function useDerivedGenerations(
 export async function fetchSourceGeneration(
   sourceGenerationId: string | null
 ): Promise<GeneratedImageWithMetadata | null> {
+  console.log('[BasedOnDebug] fetchSourceGeneration called', { sourceGenerationId });
+  
   if (!sourceGenerationId) {
+    console.log('[BasedOnDebug] fetchSourceGeneration returning null - no sourceGenerationId');
     return null;
   }
   
@@ -690,15 +707,22 @@ export async function fetchSourceGeneration(
       params,
       starred,
       tasks,
+      based_on,
       shot_generations(shot_id, timeline_frame)
     `)
     .eq('id', sourceGenerationId)
     .single();
   
   if (error || !data) {
-    console.error('[SourceGeneration] Error fetching source generation:', error);
+    console.error('[BasedOnDebug] fetchSourceGeneration error or no data', { error, hasData: !!data });
     return null;
   }
+  
+  console.log('[BasedOnDebug] fetchSourceGeneration found generation', {
+    id: data.id,
+    hasLocation: !!data.location,
+    hasThumbnail: !!data.thumbnail_url
+  });
   
   const item = data;
   const mainUrl = item.location;

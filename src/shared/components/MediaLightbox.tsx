@@ -218,15 +218,59 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const derivedPerPage = 6;
   const derivedTotalPages = derivedGenerations ? Math.ceil(derivedGenerations.length / derivedPerPage) : 0;
   const paginatedDerived = useMemo(() => {
-    if (!derivedGenerations) return [];
+    if (!derivedGenerations) {
+      console.log('[BasedOnDebug] paginatedDerived: no derivedGenerations');
+      return [];
+    }
     const start = (derivedPage - 1) * derivedPerPage;
-    return derivedGenerations.slice(start, start + derivedPerPage);
+    const paginated = derivedGenerations.slice(start, start + derivedPerPage);
+    console.log('[BasedOnDebug] paginatedDerived calculated', {
+      derivedGenerationsCount: derivedGenerations.length,
+      derivedPage,
+      start,
+      end: start + derivedPerPage,
+      paginatedCount: paginated.length,
+      paginatedItems: paginated.map(d => ({ id: d.id, hasThumbUrl: !!d.thumbUrl }))
+    });
+    return paginated;
   }, [derivedGenerations, derivedPage, derivedPerPage]);
 
   // Fetch source generation if this is based on another generation
   // Check if media.metadata contains based_on field (from generation params)
   const basedOnId = (media as any).based_on || (media.metadata as any)?.based_on;
   const { data: sourceGeneration, isLoading: isSourceLoading } = useSourceGeneration(basedOnId);
+
+  // [BasedOnDebug] Log what we're fetching and what we got
+  useEffect(() => {
+    console.log('[BasedOnDebug] MediaLightbox lineage data check', {
+      mediaId: media.id,
+      mediaKeys: Object.keys(media),
+      mediaObject: media,
+      'media.based_on': (media as any).based_on,
+      'media.metadata': media.metadata,
+      'media.metadata?.based_on': (media.metadata as any)?.based_on,
+      basedOnId,
+      hasSourceGeneration: !!sourceGeneration,
+      sourceGenerationId: sourceGeneration?.id,
+      isSourceLoading,
+      hasDerivedGenerations: !!derivedGenerations,
+      derivedCount: derivedGenerations?.length || 0,
+      isDerivedLoading,
+      showTaskDetails,
+      taskDetailsData: !!taskDetailsData,
+      timestamp: Date.now()
+    });
+    
+    // Extra check for derived generations
+    if (derivedGenerations && derivedGenerations.length > 0) {
+      console.log('[BasedOnDebug] DERIVED GENERATIONS ARE PRESENT!', {
+        count: derivedGenerations.length,
+        showTaskDetails,
+        willSectionRender: showTaskDetails && derivedGenerations.length > 0,
+        firstItem: derivedGenerations[0]
+      });
+    }
+  }, [media.id, basedOnId, sourceGeneration, isSourceLoading, derivedGenerations, isDerivedLoading, showTaskDetails, media, taskDetailsData]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Ref for the dialog content so we can programmatically focus it, enabling keyboard shortcuts immediately
@@ -1864,50 +1908,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   className="bg-background border-l border-border overflow-y-auto"
                   style={{ width: '40%' }}
                 >
-                  {/* Based On Section - Show source generation */}
-                  {sourceGeneration && (
-                    <div className="border-b border-border p-4 space-y-2 bg-muted/20">
-                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Based on
-                      </h3>
-                      <button
-                        onClick={() => {
-                          if (onNavigateToGeneration) {
-                            onNavigateToGeneration(sourceGeneration.id);
-                          } else {
-                            toast.info('Navigation requires parent support');
-                          }
-                        }}
-                        className="relative w-full group overflow-hidden rounded border border-border hover:border-primary transition-colors"
-                      >
-                        <div className="flex items-center gap-3 p-2">
-                          <div className="relative w-16 h-16 flex-shrink-0">
-                            <img
-                              src={sourceGeneration.thumbUrl}
-                              alt="Source generation"
-                              className="w-full h-full object-cover rounded"
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
-                            {sourceGeneration.starred && (
-                              <div className="absolute top-0.5 right-0.5">
-                                <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <p className="text-sm font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                              {sourceGeneration.prompt}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(sourceGeneration.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-                        </div>
-                      </button>
-                    </div>
-                  )}
-
                   {taskDetailsData && (
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
@@ -1927,72 +1927,133 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       } : undefined}
                       onClose={taskDetailsData.onClose || onClose}
                       className=""
-                    />
-                  )}
-                  
-                  {/* Derived Generations Section */}
-                  {derivedGenerations && derivedGenerations.length > 0 && (
-                    <div className="border-t border-border p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium text-foreground">
-                          Based on this ({derivedGenerations.length})
-                        </h3>
-                        {derivedTotalPages > 1 && (
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
-                              disabled={derivedPage === 1}
-                              className="h-7 w-7 p-0"
-                            >
-                              <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              {derivedPage} / {derivedTotalPages}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
-                              disabled={derivedPage === derivedTotalPages}
-                              className="h-7 w-7 p-0"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
+                      basedOnSection={(() => {
+                        console.log('[BasedOnDebug] Desktop render check - Based On section', {
+                          hasSourceGeneration: !!sourceGeneration,
+                          sourceGeneration: sourceGeneration ? {
+                            id: sourceGeneration.id,
+                            prompt: sourceGeneration.prompt?.slice(0, 50)
+                          } : null
+                        });
+                        
+                        if (!sourceGeneration) return null;
+                        
+                        return (
+                          <div className="space-y-3 mb-6">
+                            <div className="border-t border-border p-4 space-y-2 bg-muted/20">
+                              <h3 className="text-lg font-light">
+                                Based on
+                              </h3>
+                              <button
+                                onClick={() => {
+                                  if (onNavigateToGeneration) {
+                                    onNavigateToGeneration(sourceGeneration.id);
+                                  } else {
+                                    toast.info('Navigation requires parent support');
+                                  }
+                                }}
+                                className="relative w-1/3 group overflow-hidden rounded border border-border hover:border-primary transition-colors aspect-square"
+                              >
+                                <img
+                                  src={sourceGeneration.thumbUrl}
+                                  alt="Source generation"
+                                  className="w-full h-full object-cover rounded"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
+                                {sourceGeneration.starred && (
+                                  <div className="absolute top-1 right-1">
+                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                  </div>
+                                )}
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-2">
-                        {paginatedDerived.map((derived) => (
-                          <button
-                            key={derived.id}
-                            onClick={() => {
-                              if (onNavigateToGeneration) {
-                                onNavigateToGeneration(derived.id);
-                              } else {
-                                console.log('[DerivedGeneration] Clicked:', derived.id);
-                                toast.info('Navigation requires parent support');
-                              }
-                            }}
-                            className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
-                          >
-                            <img
-                              src={derived.thumbUrl}
-                              alt="Derived generation"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                            {derived.starred && (
-                              <div className="absolute top-1 right-1">
-                                <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                        );
+                      })()}
+                      derivedSection={(() => {
+                        console.log('[BasedOnDebug] Desktop render check - Derived Generations section', {
+                          hasDerivedGenerations: !!derivedGenerations,
+                          derivedCount: derivedGenerations?.length || 0,
+                          paginatedDerivedCount: paginatedDerived.length,
+                          willRender: !!derivedGenerations && derivedGenerations.length > 0
+                        });
+                        
+                        if (!derivedGenerations || derivedGenerations.length === 0) return null;
+                        
+                        console.log('[BasedOnDebug] Inside Derived Generations section render', {
+                          derivedGenerationsLength: derivedGenerations.length,
+                          paginatedDerivedLength: paginatedDerived.length,
+                          derivedTotalPages,
+                          derivedPage
+                        });
+                        
+                        return (
+                          <div className="space-y-3 mb-6">
+                            <div className="border-t border-border p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-light">
+                                  Based on this ({derivedGenerations.length})
+                                </h3>
+                                {derivedTotalPages > 1 && (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
+                                      disabled={derivedPage === 1}
+                                      className="h-7 w-7 p-0"
+                                    >
+                                      <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground">
+                                      {derivedPage} / {derivedTotalPages}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
+                                      disabled={derivedPage === derivedTotalPages}
+                                      className="h-7 w-7 p-0"
+                                    >
+                                      <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                              
+                              <div className="grid grid-cols-3 gap-2">
+                                {paginatedDerived.map((derived) => (
+                                  <button
+                                    key={derived.id}
+                                    onClick={() => {
+                                      if (onNavigateToGeneration) {
+                                        onNavigateToGeneration(derived.id);
+                                      } else {
+                                        console.log('[DerivedGeneration] Clicked:', derived.id);
+                                        toast.info('Navigation requires parent support');
+                                      }
+                                    }}
+                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
+                                  >
+                                    <img
+                                      src={derived.thumbUrl}
+                                      alt="Derived generation"
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                    {derived.starred && (
+                                      <div className="absolute top-1 right-1">
+                                        <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                      </div>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    />
                   )}
                 </div>
               </div>
@@ -2132,50 +2193,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   className="bg-background border-t border-border overflow-y-auto"
                   style={{ height: '40%' }}
                 >
-                  {/* Based On Section - Mobile */}
-                  {sourceGeneration && (
-                    <div className="border-b border-border p-3 space-y-2 bg-muted/20">
-                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Based on
-                      </h3>
-                      <button
-                        onClick={() => {
-                          if (onNavigateToGeneration) {
-                            onNavigateToGeneration(sourceGeneration.id);
-                          } else {
-                            toast.info('Navigation requires parent support');
-                          }
-                        }}
-                        className="relative w-full group overflow-hidden rounded border border-border hover:border-primary transition-colors"
-                      >
-                        <div className="flex items-center gap-2 p-2">
-                          <div className="relative w-12 h-12 flex-shrink-0">
-                            <img
-                              src={sourceGeneration.thumbUrl}
-                              alt="Source generation"
-                              className="w-full h-full object-cover rounded"
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
-                            {sourceGeneration.starred && (
-                              <div className="absolute top-0.5 right-0.5">
-                                <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <p className="text-xs font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                              {sourceGeneration.prompt}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {new Date(sourceGeneration.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-                        </div>
-                      </button>
-                    </div>
-                  )}
-
                   {taskDetailsData && (
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
@@ -2195,72 +2212,133 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       } : undefined}
                       onClose={taskDetailsData.onClose || onClose}
                       className=""
-                    />
-                  )}
-                  
-                  {/* Derived Generations Section - Mobile */}
-                  {derivedGenerations && derivedGenerations.length > 0 && (
-                    <div className="border-t border-border p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-medium text-foreground">
-                          Based on this ({derivedGenerations.length})
-                        </h3>
-                        {derivedTotalPages > 1 && (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
-                              disabled={derivedPage === 1}
-                              className="h-6 w-6 p-0"
-                            >
-                              <ChevronLeft className="h-3 w-3" />
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              {derivedPage} / {derivedTotalPages}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
-                              disabled={derivedPage === derivedTotalPages}
-                              className="h-6 w-6 p-0"
-                            >
-                              <ChevronRight className="h-3 w-3" />
-                            </Button>
+                      basedOnSection={(() => {
+                        console.log('[BasedOnDebug] Mobile render check - Based On section', {
+                          hasSourceGeneration: !!sourceGeneration,
+                          sourceGeneration: sourceGeneration ? {
+                            id: sourceGeneration.id,
+                            prompt: sourceGeneration.prompt?.slice(0, 50)
+                          } : null
+                        });
+                        
+                        if (!sourceGeneration) return null;
+                        
+                        return (
+                          <div className="space-y-3 mb-6">
+                            <div className="border-t border-border p-3 space-y-2 bg-muted/20">
+                              <h3 className="text-lg font-light">
+                                Based on
+                              </h3>
+                              <button
+                                onClick={() => {
+                                  if (onNavigateToGeneration) {
+                                    onNavigateToGeneration(sourceGeneration.id);
+                                  } else {
+                                    toast.info('Navigation requires parent support');
+                                  }
+                                }}
+                                className="relative w-1/3 group overflow-hidden rounded border border-border hover:border-primary transition-colors aspect-square"
+                              >
+                                <img
+                                  src={sourceGeneration.thumbUrl}
+                                  alt="Source generation"
+                                  className="w-full h-full object-cover rounded"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
+                                {sourceGeneration.starred && (
+                                  <div className="absolute top-0.5 right-0.5">
+                                    <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
+                                  </div>
+                                )}
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {paginatedDerived.map((derived) => (
-                          <button
-                            key={derived.id}
-                            onClick={() => {
-                              if (onNavigateToGeneration) {
-                                onNavigateToGeneration(derived.id);
-                              } else {
-                                console.log('[DerivedGeneration] Clicked:', derived.id);
-                                toast.info('Navigation requires parent support');
-                              }
-                            }}
-                            className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
-                          >
-                            <img
-                              src={derived.thumbUrl}
-                              alt="Derived generation"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                            {derived.starred && (
-                              <div className="absolute top-0.5 right-0.5">
-                                <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
+                        );
+                      })()}
+                      derivedSection={(() => {
+                        console.log('[BasedOnDebug] Mobile render check - Derived Generations section', {
+                          hasDerivedGenerations: !!derivedGenerations,
+                          derivedCount: derivedGenerations?.length || 0,
+                          paginatedDerivedCount: paginatedDerived.length,
+                          willRender: !!derivedGenerations && derivedGenerations.length > 0
+                        });
+                        
+                        if (!derivedGenerations || derivedGenerations.length === 0) return null;
+                        
+                        console.log('[BasedOnDebug] Inside Mobile Derived Generations section render', {
+                          derivedGenerationsLength: derivedGenerations.length,
+                          paginatedDerivedLength: paginatedDerived.length,
+                          derivedTotalPages,
+                          derivedPage
+                        });
+                        
+                        return (
+                          <div className="space-y-3 mb-6">
+                            <div className="border-t border-border p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-light">
+                                  Based on this ({derivedGenerations.length})
+                                </h3>
+                                {derivedTotalPages > 1 && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
+                                      disabled={derivedPage === 1}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <ChevronLeft className="h-3 w-3" />
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground">
+                                      {derivedPage} / {derivedTotalPages}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
+                                      disabled={derivedPage === derivedTotalPages}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <ChevronRight className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                              
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {paginatedDerived.map((derived) => (
+                                  <button
+                                    key={derived.id}
+                                    onClick={() => {
+                                      if (onNavigateToGeneration) {
+                                        onNavigateToGeneration(derived.id);
+                                      } else {
+                                        console.log('[DerivedGeneration] Clicked:', derived.id);
+                                        toast.info('Navigation requires parent support');
+                                      }
+                                    }}
+                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
+                                  >
+                                    <img
+                                      src={derived.thumbUrl}
+                                      alt="Derived generation"
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                    {derived.starred && (
+                                      <div className="absolute top-0.5 right-0.5">
+                                        <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
+                                      </div>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    />
                   )}
                 </div>
               </div>

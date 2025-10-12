@@ -63,6 +63,9 @@ export interface ImageGalleryLightboxProps {
   
   // Tool type override for magic edit
   toolTypeOverride?: string;
+  
+  // Generation lineage navigation
+  setActiveLightboxIndex?: (index: number) => void;
 }
 
 export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
@@ -107,6 +110,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   onCreateShot,
   onNavigateToShot,
   toolTypeOverride,
+  setActiveLightboxIndex,
 }) => {
   
   // [ShotNavDebug] confirm plumbing into Lightbox
@@ -308,6 +312,38 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     }
   }, [activeLightboxMedia?.id, selectedShotIdLocal, positionedInSelectedShot, associatedWithoutPositionInSelectedShot, optimisticPositionedIds, optimisticUnpositionedIds]);
 
+  // Handle navigation to a specific generation by ID
+  const handleNavigateToGeneration = React.useCallback((generationId: string) => {
+    console.log('[BasedOnDebug] handleNavigateToGeneration called', { 
+      generationId,
+      hasSetActiveLightboxIndex: !!setActiveLightboxIndex,
+      filteredImagesCount: filteredImages.length
+    });
+    
+    // Find the generation in the filtered images
+    const index = filteredImages.findIndex(img => img.id === generationId);
+    
+    if (index !== -1) {
+      console.log('[BasedOnDebug] Found generation in filtered images', { index, generationId });
+      
+      if (setActiveLightboxIndex) {
+        console.log('[BasedOnDebug] Calling setActiveLightboxIndex', { index });
+        setActiveLightboxIndex(index);
+        console.log('[BasedOnDebug] setActiveLightboxIndex called successfully');
+      } else {
+        console.error('[BasedOnDebug] setActiveLightboxIndex is not defined!');
+      }
+    } else {
+      console.log('[BasedOnDebug] Generation not found in current filtered set', {
+        generationId,
+        filteredImagesCount: filteredImages.length,
+        filteredImageIds: filteredImages.map(img => img.id).slice(0, 5)
+      });
+      // TODO: Could potentially fetch the generation and add it to the view
+      // For now, just log that it's not available
+    }
+  }, [filteredImages, setActiveLightboxIndex]);
+
   return (
     <>
       {/* Main Lightbox Modal */}
@@ -362,6 +398,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           toolTypeOverride={toolTypeOverride}
           positionedInSelectedShot={positionedInSelectedShot}
           associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
+          onNavigateToGeneration={handleNavigateToGeneration}
         />
       )}
 

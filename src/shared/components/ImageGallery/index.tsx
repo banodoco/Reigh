@@ -83,8 +83,10 @@ export interface GeneratedImageWithMetadata {
   starred?: boolean;
   shot_id?: string;
   position?: number | null;
+  timeline_frame?: number | null;
   name?: string; // Variant name for the generation
-  all_shot_associations?: Array<{ shot_id: string; position: number | null }>;
+  all_shot_associations?: Array<{ shot_id: string; position: number | null; timeline_frame?: number | null }>;
+  based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
 }
 
 export interface ImageGalleryProps {
@@ -559,6 +561,28 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     }
   }, [actionsHook.handleOpenLightbox, stateHook.setActiveLightboxMedia, stateHook.setPendingLightboxTarget, onServerPageChange]);
 
+  // Navigate to a specific image by index (for generation lineage navigation)
+  const handleSetActiveLightboxIndex = useCallback((index: number) => {
+    const { filteredImages } = navigationDataRef.current;
+    
+    console.log('[BasedOnDebug] handleSetActiveLightboxIndex called', { 
+      index, 
+      filteredImagesLength: filteredImages.length,
+      targetImageId: filteredImages[index]?.id 
+    });
+    
+    if (index >= 0 && index < filteredImages.length) {
+      console.log('[BasedOnDebug] Opening lightbox for image at index', { 
+        index, 
+        imageId: filteredImages[index].id 
+      });
+      actionsHook.handleOpenLightbox(filteredImages[index]);
+      console.log('[BasedOnDebug] handleOpenLightbox called');
+    } else {
+      console.warn('[BasedOnDebug] Invalid index for navigation', { index, filteredImagesLength: filteredImages.length });
+    }
+  }, [actionsHook.handleOpenLightbox]);
+
   // Additional action handlers
   const handleSwitchToAssociatedShot = useCallback(() => {
     if (formAssociatedShotId && onSwitchToAssociatedShot) {
@@ -860,6 +884,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
         onCreateShot={onCreateShot}
         onNavigateToShot={handleNavigateToShot}
         toolTypeOverride={currentToolType}
+        setActiveLightboxIndex={handleSetActiveLightboxIndex}
       />
     </TooltipProvider>
   );
