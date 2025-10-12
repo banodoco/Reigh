@@ -18,6 +18,8 @@ interface DragState {
   currentY: number;
   originalFramePos: number;
   dragSessionId?: string;
+  // Track if we've crossed the drag threshold
+  hasMovedPastThreshold: boolean;
 }
 
 interface DragRefs {
@@ -53,6 +55,9 @@ export const useTimelineDrag = ({
   
   // Debug: Log if setIsDragInProgress is available
   console.log('[TimelineMovementDebug] 🔧 useTimelineDrag initialized with setIsDragInProgress:', !!setIsDragInProgress);
+  // Drag threshold in pixels - must move this far before drag starts
+  const DRAG_THRESHOLD = 5;
+
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     activeId: null,
@@ -61,6 +66,7 @@ export const useTimelineDrag = ({
     currentX: 0,
     currentY: 0,
     originalFramePos: 0,
+    hasMovedPastThreshold: false,
   });
 
   const dragRefsRef = useRef<DragRefs>({
@@ -144,7 +150,7 @@ export const useTimelineDrag = ({
 
   // Calculate positions during drag for preview
   const calculateDragPreview = useCallback((): Map<string, number> => {
-    if (!dragState.isDragging || !dragState.activeId || !currentMousePosRef.current) {
+    if (!dragState.isDragging || !dragState.activeId || !currentMousePosRef.current || !dragState.hasMovedPastThreshold) {
       return framePositions;
     }
 
@@ -235,6 +241,7 @@ export const useTimelineDrag = ({
     dragState.isDragging,
     dragState.activeId,
     dragState.currentX,
+    dragState.hasMovedPastThreshold,
     framePositions,
     contextFrames,
     calculateTargetFrame,
@@ -243,7 +250,7 @@ export const useTimelineDrag = ({
 
   // Calculate positions with a specific mouse position (for final drop calculation)
   const calculateDragPreviewWithPosition = useCallback((clientX: number): Map<string, number> => {
-    if (!dragState.isDragging || !dragState.activeId) {
+    if (!dragState.isDragging || !dragState.activeId || !dragState.hasMovedPastThreshold) {
       return framePositions;
     }
 
@@ -338,6 +345,7 @@ export const useTimelineDrag = ({
   }, [
     dragState.isDragging,
     dragState.activeId,
+    dragState.hasMovedPastThreshold,
     framePositions,
     contextFrames,
     calculateTargetFrame,
@@ -527,6 +535,7 @@ export const useTimelineDrag = ({
       currentY: e.clientY,
       originalFramePos: framePos,
       dragSessionId: dragSessionId,
+      hasMovedPastThreshold: false, // Not yet moved past threshold
     });
 
     log('TimelineDragDebug', 'start', {
@@ -538,15 +547,48 @@ export const useTimelineDrag = ({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragState.isDragging) return;
 
+    // Calculate distance from start position
+    const deltaX = Math.abs(e.clientX - dragState.startX);
+    const deltaY = Math.abs(e.clientY - dragState.startY);
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    // If we haven't crossed the threshold yet, check if we should
+    if (!dragState.hasMovedPastThreshold) {
+      if (distance < DRAG_THRESHOLD) {
+        // Haven't moved far enough yet, don't process this as a drag
+        console.log('[DragThreshold] 🚫 Mouse moved but below threshold:', {
+          distance: distance.toFixed(2),
+          threshold: DRAG_THRESHOLD,
+          deltaX: deltaX.toFixed(2),
+          deltaY: deltaY.toFixed(2)
+        });
+        return;
+      }
+      
+      // Crossed the threshold! Now we can start the actual drag
+      console.log('[DragThreshold] ✅ Drag threshold crossed:', {
+        distance: distance.toFixed(2),
+        threshold: DRAG_THRESHOLD,
+        itemId: dragState.activeId?.substring(0, 8)
+      });
+      
+      setDragState(prev => ({
+        ...prev,
+        hasMovedPastThreshold: true,
+        currentX: e.clientX,
+        currentY: e.clientY,
+      }));
+    } else {
+      // Already past threshold, update normally
+      setDragState(prev => ({
+        ...prev,
+        currentX: e.clientX,
+        currentY: e.clientY,
+      }));
+    }
+
     // Update the ref with the most current mouse position (instantly available)
     currentMousePosRef.current = { x: e.clientX, y: e.clientY };
-
-    // Only update currentX and currentY, don't modify startX or originalFramePos
-    setDragState(prev => ({
-      ...prev,
-      currentX: e.clientX,
-      currentY: e.clientY,
-    }));
 
     console.log('[TimelineDragFix] 🖱️ MOUSE MOVE DURING DRAG:', {
       itemId: dragState.activeId?.substring(0, 8),
@@ -638,6 +680,7 @@ export const useTimelineDrag = ({
     console.log('[TimelineDragFix] 🎯 MOUSE UP CALLED:', {
       isDragging: dragState.isDragging,
       activeId: dragState.activeId,
+      hasMovedPastThreshold: dragState.hasMovedPastThreshold,
       timestamp: e.timeStamp,
       clientX: e.clientX,
       clientY: e.clientY,
@@ -651,6 +694,42 @@ export const useTimelineDrag = ({
         activeId: dragState.activeId,
         timestamp: e.timeStamp
       });
+      return;
+    }
+
+    // If we never crossed the drag threshold, this was just a click (or double-click)
+    // Cancel the drag without applying any changes
+    if (!dragState.hasMovedPastThreshold) {
+      console.log('[DragThreshold] 🎯 Mouse up before crossing threshold - treating as click, not drag:', {
+        itemId: dragState.activeId.substring(0, 8),
+        startX: dragState.startX,
+        startY: dragState.startY,
+        endX: e.clientX,
+        endY: e.clientY,
+        distance: Math.sqrt(Math.pow(e.clientX - dragState.startX, 2) + Math.pow(e.clientY - dragState.startY, 2)).toFixed(2)
+      });
+
+      // Reset drag state without applying any changes
+      setDragState({
+        isDragging: false,
+        activeId: null,
+        startX: 0,
+        startY: 0,
+        currentX: 0,
+        currentY: 0,
+        originalFramePos: 0,
+        hasMovedPastThreshold: false,
+      });
+
+      // Clear the mouse position ref
+      currentMousePosRef.current = null;
+
+      // Reset drag in progress flag
+      if (setIsDragInProgress) {
+        console.log('[TimelineMovementDebug] 🏁 DRAG CANCELLED (below threshold) - Setting isDragInProgress = false');
+        setIsDragInProgress(false);
+      }
+
       return;
     }
 
@@ -1041,6 +1120,7 @@ export const useTimelineDrag = ({
       currentX: 0,
       currentY: 0,
       originalFramePos: 0,
+      hasMovedPastThreshold: false,
     });
 
     // Clear the mouse position ref at the end of a drag to avoid stale values on next drag
@@ -1058,11 +1138,12 @@ export const useTimelineDrag = ({
   ]);
 
   // Calculate current values for rendering
-  const dragOffset = dragState.isDragging
+  // Only show drag offset if we've crossed the threshold
+  const dragOffset = dragState.isDragging && dragState.hasMovedPastThreshold
     ? { x: dragState.currentX - dragState.startX, y: 0 }
     : null;
 
-  const currentDragFrame = dragState.isDragging && dragState.activeId
+  const currentDragFrame = dragState.isDragging && dragState.activeId && dragState.hasMovedPastThreshold
     ? calculateFinalPosition(calculateTargetFrame(dragState.currentX, containerRect))
     : null;
 

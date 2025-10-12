@@ -467,7 +467,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
                 htmlFor="next-scene-boost"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
-                Next Scene
+                Next Shot
               </label>
             </div>
           </div>
