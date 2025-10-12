@@ -314,6 +314,8 @@ export class SimpleRealtimeManager {
         this.dispatchBatchedTaskUpdates(payloads);
       } else if (eventType === 'task-new') {
         this.dispatchBatchedNewTasks(payloads);
+      } else if (eventType === 'shot-generation-change') {
+        this.dispatchBatchedShotGenerationChanges(payloads);
       }
     });
 
@@ -386,6 +388,53 @@ export class SimpleRealtimeManager {
     }
   }
 
+  /**
+   * Dispatch batched shot generation change events as a single consolidated event
+   */
+  private dispatchBatchedShotGenerationChanges(payloads: any[]) {
+    // Update global snapshot with latest event time
+    this.updateGlobalSnapshot('joined', Date.now());
+
+    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched shot generation changes:', {
+      count: payloads.length,
+      timestamp: Date.now()
+    });
+
+    // Collect unique shot IDs affected by this batch
+    const affectedShotIds = new Set<string>();
+    payloads.forEach((p: any) => {
+      if (p.shotId) {
+        affectedShotIds.add(p.shotId);
+      }
+    });
+
+    console.log('[SimpleRealtime:Batching] 🎯 Affected shots in batch:', {
+      count: affectedShotIds.size,
+      shotIds: Array.from(affectedShotIds).map(id => id.substring(0, 8))
+    });
+
+    // Report consolidated event to freshness manager for all affected shots
+    const queryKeys = Array.from(affectedShotIds).flatMap(shotId => [
+      ['unified-generations', 'shot', shotId],
+      ['shot-generations', shotId],
+      ['unpositioned-count', shotId]
+    ]);
+    
+    dataFreshnessManager.onRealtimeEvent('shot-generation-positioned', queryKeys);
+
+    // Emit single consolidated event with all payloads
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('realtime:shot-generation-change-batch', {
+        detail: {
+          payloads,
+          count: payloads.length,
+          affectedShotIds: Array.from(affectedShotIds),
+          timestamp: Date.now()
+        }
+      }));
+    }
+  }
+
   private handleTaskUpdate(payload: any) {
     // Batch this event instead of dispatching immediately
     this.batchEvent('task-update', payload);
@@ -397,9 +446,6 @@ export class SimpleRealtimeManager {
   }
 
   private handleShotGenerationChange(payload: any, eventType: 'INSERT' | 'UPDATE') {
-    // Update global snapshot with latest event time
-    this.updateGlobalSnapshot('joined', Date.now());
-    
     const newRecord = payload?.new;
     const oldRecord = payload?.old;
     const shotId = newRecord?.shot_id;
@@ -436,19 +482,9 @@ export class SimpleRealtimeManager {
       return;
     }
     
-    // Report event to freshness manager - ONLY for the specific shot
-    dataFreshnessManager.onRealtimeEvent('shot-generation-positioned', [
-      ['unified-generations', 'shot', shotId],
-      ['shot-generations', shotId],
-      ['unpositioned-count', shotId]
-    ]);
-    
-    // Emit event for React components to listen to
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('realtime:shot-generation-change', { 
-        detail: { ...payload, eventType, shotId, isPositioned: isNowPositioned }
-      }));
-    }
+    // Batch this event to prevent conflicts with optimistic updates during drag operations
+    console.log('[SimpleRealtime:Batching] 📦 Batching shot generation change for shot:', shotId.substring(0, 8));
+    this.batchEvent('shot-generation-change', { ...payload, eventType, shotId, isPositioned: isNowPositioned });
   }
 
   private updateGlobalSnapshot(channelState: string, lastEventAt?: number) {
