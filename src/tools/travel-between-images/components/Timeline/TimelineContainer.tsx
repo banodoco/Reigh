@@ -15,7 +15,7 @@ import { GuidanceVideoStrip } from './GuidanceVideoStrip';
 import { GuidanceVideoUploader } from './GuidanceVideoUploader';
 import { MagicEditModal } from '@/shared/components/MagicEditModal';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { TIMELINE_HORIZONTAL_PADDING } from './constants';
+import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
@@ -397,8 +397,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       const [, endFrame] = sortedPositions[i + 1];
       const frameWidth = endFrame - startFrame;
       
-      // Convert to pixels
-      const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+      // Convert to pixels using consistent coordinate system
+      const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
       const pixelWidth = (frameWidth / fullRange) * effectiveWidth * zoomLevel;
       
       totalPairWidth += pixelWidth;
@@ -420,8 +420,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         {/* Fixed top controls overlay - zoom and structure controls */}
         {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
           <div
-            className="absolute left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
-            style={{ top: '1rem' }}
+            className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
+            style={{ top: '55px' }}
           >
             {/* Top-left: Zoom controls */}
             <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
@@ -593,15 +593,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           )
         )}
 
-        {/* Ruler */}
-        <TimelineRuler
-          fullMin={fullMin}
-          fullMax={fullMax}
-          fullRange={fullRange}
-          zoomLevel={zoomLevel}
-          containerWidth={containerWidth}
-        />
-
         {/* Timeline container - visually connected to structure video above */}
         <div
           ref={containerRef}
@@ -616,6 +607,15 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             paddingRight: `${TIMELINE_HORIZONTAL_PADDING + 60}px`,
           }}
         >
+          {/* Ruler - positioned inside timeline container to match image coordinate space */}
+          <TimelineRuler
+            fullMin={fullMin}
+            fullMax={fullMax}
+            fullRange={fullRange}
+            zoomLevel={zoomLevel}
+            containerWidth={containerWidth}
+          />
+
           {/* Pair visualizations */}
           {pairInfo.map((pair, index) => {
             // Build sorted positions array with id for pixel calculations
@@ -645,10 +645,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 return 0; // Return 0 since this won't be used anyway
               }
 
-              // Use actual container dimensions minus padding
-              const paddingOffset = TIMELINE_HORIZONTAL_PADDING; // Left padding
-              const effectiveWidth = containerWidth - (paddingOffset * 2); // Subtract both left and right padding
-              const basePixel = paddingOffset + ((framePos - fullMin) / fullRange) * effectiveWidth;
+              // Use the same coordinate system as TimelineItem and TimelineRuler
+              // This ensures pair regions align perfectly with images
+              const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+              const basePixel = TIMELINE_PADDING_OFFSET + ((framePos - fullMin) / fullRange) * effectiveWidth;
               return basePixel;
             };
 
@@ -667,12 +667,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             const visibleContextFrames = Math.max(0, actualEndFrame - contextStartFrame);
             
             // Use same padding calculation as getPixel function
-            const paddingOffset = TIMELINE_HORIZONTAL_PADDING;
-            const effectiveWidth = containerWidth - (paddingOffset * 2);
-            const contextStartPixel = paddingOffset + ((contextStartFrame - fullMin) / fullRange) * effectiveWidth;
+            const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+            const contextStartPixel = TIMELINE_PADDING_OFFSET + ((contextStartFrame - fullMin) / fullRange) * effectiveWidth;
             const contextStartPercent = (contextStartPixel / containerWidth) * 100;
 
-            const generationStartPixel = paddingOffset + ((pair.generationStart - fullMin) / fullRange) * effectiveWidth;
+            const generationStartPixel = TIMELINE_PADDING_OFFSET + ((pair.generationStart - fullMin) / fullRange) * effectiveWidth;
             const generationStartPercent = (generationStartPixel / containerWidth) * 100;
 
             // CRITICAL: Get the first image in this pair to read its metadata
@@ -805,8 +804,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
         {/* Fixed bottom controls overlay - gap and add images */}
         <div
-          className="absolute left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
-          style={{ bottom: zoomLevel <= 1 ? '1rem' : '1.75rem' }}
+          className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
+          style={{ bottom: '90px' }}
         >
           {/* Bottom-left: Gap control and Reset button */}
           <div 

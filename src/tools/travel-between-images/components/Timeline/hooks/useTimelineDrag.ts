@@ -7,6 +7,7 @@ import {
   applyFluidTimeline,
 } from "../utils/timeline-utils";
 import { log } from "@/shared/lib/logger";
+import { TIMELINE_PADDING_OFFSET } from "../constants";
 
 interface DragState {
   isDragging: boolean;
@@ -77,11 +78,11 @@ export const useTimelineDrag = ({
     // GROUND TRUTH: Use actual container dimensions
     const containerWidth = containerRect.width;
     const containerLeft = containerRect.left;
-    const paddingOffset = 60; // Account for container padding
-    const effectiveWidth = containerWidth - (paddingOffset * 2);
+    // Use the same padding offset as other timeline components for consistency
+    const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
 
     // Calculate where mouse is relative to container (accounting for padding)
-    const relativeMouseX = clientX - containerLeft - paddingOffset; // Subtract left padding
+    const relativeMouseX = clientX - containerLeft - TIMELINE_PADDING_OFFSET; // Subtract left padding
     const dragOffsetX = clientX - dragState.startX;
 
     // Find the actual position of the dragged item in the container
@@ -107,7 +108,7 @@ export const useTimelineDrag = ({
       fullRange,
       containerWidth,
       effectiveWidth,
-      paddingOffset,
+      paddingOffset: TIMELINE_PADDING_OFFSET,
       originalRelativePos,
       targetRelativePos,
       baseCalculatedFrame,

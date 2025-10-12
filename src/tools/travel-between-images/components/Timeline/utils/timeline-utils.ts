@@ -631,6 +631,8 @@ export const applyFluidTimeline = (
 };
 
 // Convert pixel position to frame number
+// Note: This function expects pixelX to be relative to the container edge (not accounting for padding)
+// The padding offset is applied in the calling code (e.g., useTimelineDrag, useFileDrop)
 export const pixelToFrame = (pixelX: number, containerWidth: number, fullMin: number, fullRange: number): number => {
   const fraction = pixelX / containerWidth;
   return Math.round(fullMin + fraction * fullRange);

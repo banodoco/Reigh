@@ -1,5 +1,5 @@
 import React from "react";
-import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
+import { TIMELINE_PADDING_OFFSET } from "./constants";
 
 interface DropIndicatorProps {
   isVisible: boolean;
@@ -21,10 +21,8 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
   }
 
   // Use same positioning calculation as TimelineItem (with image centering)
-  const imageHalfWidth = 48; // Half of 96px image width for centering
-  const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth;
-  const effectiveWidth = containerWidth - (paddingOffset * 2);
-  const pixelPosition = paddingOffset + ((dropTargetFrame - fullMin) / fullRange) * effectiveWidth;
+  const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+  const pixelPosition = TIMELINE_PADDING_OFFSET + ((dropTargetFrame - fullMin) / fullRange) * effectiveWidth;
   const leftPercent = (pixelPosition / containerWidth) * 100;
 
   return (

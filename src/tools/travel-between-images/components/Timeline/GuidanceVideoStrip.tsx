@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { VideoMetadata } from '@/shared/lib/videoUploader';
-import { TIMELINE_HORIZONTAL_PADDING } from './constants';
+import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
@@ -38,9 +38,9 @@ const calculateAdjustModeFrame = (
   videoMetadata: VideoMetadata
 ): number => {
   // 1. Calculate cursor position in timeline coordinate space
-  const paddingOffset = TIMELINE_HORIZONTAL_PADDING;
-  const effectiveWidth = containerWidth - (paddingOffset * 2);
-  const normalizedX = Math.max(0, Math.min(1, (cursorPixelX - paddingOffset) / effectiveWidth));
+  // Use the same coordinate system as images/ruler to ensure alignment
+  const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+  const normalizedX = Math.max(0, Math.min(1, (cursorPixelX - TIMELINE_PADDING_OFFSET) / effectiveWidth));
   
   // 2. Map normalized position to video frame
   const videoFrame = Math.floor(normalizedX * videoMetadata.total_frames);
@@ -57,9 +57,9 @@ const calculateClipModeFrame = (
   videoMetadata: VideoMetadata
 ): number => {
   // Direct 1:1 mapping - timeline frame = video frame
-  const paddingOffset = TIMELINE_HORIZONTAL_PADDING;
-  const effectiveWidth = containerWidth - (paddingOffset * 2);
-  const normalizedX = Math.max(0, Math.min(1, (cursorPixelX - paddingOffset) / effectiveWidth));
+  // Use the same coordinate system as images/ruler to ensure alignment
+  const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+  const normalizedX = Math.max(0, Math.min(1, (cursorPixelX - TIMELINE_PADDING_OFFSET) / effectiveWidth));
   const timelineFrame = fullMin + (normalizedX * (fullMax - fullMin));
   
   // Direct mapping (assuming timeline and video have same frame rate)
@@ -153,6 +153,8 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   })();
 
   // Extract frames from video when it loads or treatment changes
+  // NOTE: Only re-extract when video URL, metadata, or treatment changes
+  // Do NOT re-extract on zoom (containerWidth) or timeline expansion (fullMin/fullMax)
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -184,18 +186,13 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         // In adjust mode: video is stretched/compressed to fit timeline
         // In clip mode: video plays as-is, so extract totalVideoFrames thumbnails (all video frames)
         
-        // DYNAMIC: Calculate ideal number of thumbnails based on container width
-        // Target ~50px per thumbnail for comfortable viewing
-        const targetThumbnailWidth = 50;
-        const effectiveWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
-        const idealThumbnailCount = Math.floor(effectiveWidth / targetThumbnailWidth);
+        // Use a FIXED number of thumbnails based on video duration, not container width
+        // This prevents re-extraction on zoom
+        const maxThumbnails = treatment === 'adjust' 
+          ? Math.min(timelineFrames, 80) // Fixed max for adjust mode
+          : Math.min(totalVideoFrames, 80); // Fixed max for clip mode
         
-        // Clamp between 20 and 100 thumbnails for performance and visual quality
-        const maxThumbnails = Math.max(20, Math.min(idealThumbnailCount, 100));
-        
-        const numFrames = treatment === 'adjust' 
-          ? Math.min(timelineFrames, maxThumbnails)
-          : Math.min(totalVideoFrames, maxThumbnails);
+        const numFrames = maxThumbnails;
         
         const extractedFrames: string[] = [];
         const canvas = document.createElement('canvas');
@@ -247,10 +244,9 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           
           // Draw frame to canvas and convert to data URL
           ctx.drawImage(video, 0, 0);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          // Use lower quality (0.6 instead of 0.8) for faster processing
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
           extractedFrames.push(dataUrl);
-          
-          console.log(`[GuidanceVideoStrip] Extracted frame ${i + 1}/${numFrames} (frame ${frameIndex}) [${treatment} mode]`);
         }
         
         // Only update if we successfully extracted frames
@@ -292,7 +288,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('error', handleError);
     };
-  }, [videoUrl, videoMetadata, containerWidth, treatment, fullMin, fullMax]);
+  }, [videoUrl, videoMetadata, treatment]); // REMOVED: containerWidth, fullMin, fullMax
   
   const isCanvasBlank = useCallback((canvas: HTMLCanvasElement): boolean => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -567,9 +563,9 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     setHoverPosition({ x: e.clientX, y: e.clientY });
     
     // Calculate timeline frame from cursor position
-    const paddingOffset = TIMELINE_HORIZONTAL_PADDING;
-    const effectiveWidth = containerWidth - (paddingOffset * 2);
-    const normalizedX = Math.max(0, Math.min(1, (cursorX - paddingOffset) / effectiveWidth));
+    // Use the same coordinate system as images/ruler to ensure alignment
+    const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+    const normalizedX = Math.max(0, Math.min(1, (cursorX - TIMELINE_PADDING_OFFSET) / effectiveWidth));
     const timelineFrame = Math.round(fullMin + (normalizedX * (fullMax - fullMin)));
     setCurrentTimelineFrame(timelineFrame);
     

@@ -1,5 +1,5 @@
 import React from "react";
-import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
+import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_IMAGE_HALF_WIDTH, TIMELINE_PADDING_OFFSET } from "./constants";
 import { framesToSeconds } from "./utils/time-utils";
 
 interface TimelineRulerProps {
@@ -17,54 +17,41 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
   zoomLevel,
   containerWidth,
 }) => {
-  // Calculate appropriate marker interval based on range and zoom
-  // Goal: Keep markers at least ~60px apart (enough space for 4-digit numbers)
-  const calculateMarkerInterval = () => {
-    const effectiveWidth = containerWidth - TIMELINE_HORIZONTAL_PADDING * 2;
-    const effectiveZoomedWidth = effectiveWidth * zoomLevel;
-    
-    // Minimum pixels between markers (adjust for comfortable spacing)
-    const minPixelSpacing = 60;
-    
-    // How many markers can we fit?
-    const maxMarkers = effectiveZoomedWidth / minPixelSpacing;
-    
-    // What interval do we need?
-    const rawInterval = fullRange / maxMarkers;
-    
-    // Round to nice intervals: 10, 20, 30, 50, 100, 150, 200, 300, 500, 1000, etc.
-    const niceIntervals = [10, 20, 30, 50, 100, 150, 200, 300, 500, 1000, 1500, 2000, 3000, 5000, 10000];
-    
-    // Find the smallest nice interval that's larger than our raw interval
-    const interval = niceIntervals.find(i => i >= rawInterval) || Math.ceil(rawInterval / 100) * 100;
-    
-    return interval;
-  };
-  
-  const interval = calculateMarkerInterval();
-  
-  // Precompute shared geometry based on TimelineItem's positioning
-  const imageHalfWidth = 48;
-  const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth;
-  const itemEffectiveWidth = containerWidth - (paddingOffset * 2);
-  const rulerWidth = containerWidth - (TIMELINE_HORIZONTAL_PADDING * 2);
+  // Match TimelineItem's exact positioning logic
+  // Items use: effectiveWidth = timelineWidth - (TIMELINE_PADDING_OFFSET * 2)
+  // And position at: TIMELINE_PADDING_OFFSET + ((frame - fullMin) / fullRange) * effectiveWidth
+  const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+  const rulerWidth = effectiveWidth; // Ruler matches item coordinate space
 
-  // Generate evenly spaced markers, including both endpoints without duplicates
+  // Calculate how many markers we can fit based on pixel spacing
+  const calculateMarkerCount = () => {
+    const effectiveZoomedWidth = effectiveWidth * zoomLevel;
+    const minPixelSpacing = 60; // Minimum pixels between markers (enough space for labels)
+    const maxMarkers = Math.floor(effectiveZoomedWidth / minPixelSpacing);
+    
+    // At least 2 markers (start and end), at most what fits comfortably
+    return Math.max(2, Math.min(maxMarkers, 20));
+  };
+
+  // Generate evenly spaced markers from fullMin to fullMax
   const markers: number[] = [];
   if (fullRange > 0) {
-    const epsilon = 1e-6;
-    // Always include start
+    const markerCount = calculateMarkerCount();
+    
+    // Always include start and end
     markers.push(fullMin);
-    // Interior markers spaced by interval
-    const firstStep = Math.ceil((fullMin + epsilon) / interval) * interval;
-    for (let frame = firstStep; frame <= fullMax - epsilon; frame += interval) {
-      // Avoid pushing endpoints again
-      if (frame > fullMin + epsilon && frame < fullMax - epsilon) {
-        markers.push(frame);
+    
+    // Add evenly spaced markers in between
+    if (markerCount > 2) {
+      for (let i = 1; i < markerCount - 1; i++) {
+        const fraction = i / (markerCount - 1);
+        const markerFrame = fullMin + (fraction * fullRange);
+        markers.push(markerFrame);
       }
     }
+    
     // Always include end
-    if (fullMax - fullMin > epsilon) {
+    if (markerCount > 1) {
       markers.push(fullMax);
     }
   }
@@ -73,17 +60,19 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
     <div
       className="absolute h-8 border-t"
       style={{
-        bottom: "4.5rem",
-        left: `${TIMELINE_HORIZONTAL_PADDING}px`,
-        width: zoomLevel > 1 ? `calc(${zoomLevel * 100}% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)` : `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)`,
-        minWidth: `calc(100% - ${TIMELINE_HORIZONTAL_PADDING * 2}px)`,
+        bottom: "-3rem", // Position below the timeline items
+        // Position at TIMELINE_PADDING_OFFSET from container's edge (0,0)
+        // containerWidth includes padding, and items position from this same origin
+        left: `${TIMELINE_PADDING_OFFSET}px`,
+        width: `${rulerWidth}px`,
       }}
     >
       <div className="relative h-full">
         {markers.map((frame) => {
-          // Project frame → pixel at item center, then into ruler space
-          const itemPixelPosition = paddingOffset + ((frame - fullMin) / fullRange) * itemEffectiveWidth;
-          const rulerPixelPosition = itemPixelPosition - TIMELINE_HORIZONTAL_PADDING;
+          // Use exact same calculation as TimelineItem
+          const pixelPosition = TIMELINE_PADDING_OFFSET + ((frame - fullMin) / fullRange) * effectiveWidth;
+          // Convert to position within ruler (which starts at TIMELINE_PADDING_OFFSET)
+          const rulerPixelPosition = pixelPosition - TIMELINE_PADDING_OFFSET;
           const leftPercent = (rulerPixelPosition / rulerWidth) * 100;
 
           return (

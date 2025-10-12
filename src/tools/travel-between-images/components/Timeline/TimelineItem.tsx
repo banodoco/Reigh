@@ -6,8 +6,7 @@ import { Trash2, Copy, Sparkles, Check } from "lucide-react";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
 import { framesToSeconds } from "./utils/time-utils";
-// import { TIMELINE_HORIZONTAL_PADDING } from "./constants";
-const TIMELINE_HORIZONTAL_PADDING = 20; // Fallback constant
+import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_IMAGE_HALF_WIDTH, TIMELINE_PADDING_OFFSET } from "./constants";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -193,10 +192,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     }
   };
   // Calculate position as pixel offset with padding adjustment
-  const imageHalfWidth = 48; // Half of 96px image width for centering
-  const paddingOffset = TIMELINE_HORIZONTAL_PADDING + imageHalfWidth; // Left padding from container + half image width
-  const effectiveWidth = timelineWidth - (paddingOffset * 2); // Subtract both left and right padding
-  const pixelPosition = paddingOffset + ((framePosition - fullMinFrames) / fullRange) * effectiveWidth;
+  // Use constants to ensure consistency across all timeline components
+  const effectiveWidth = timelineWidth - (TIMELINE_PADDING_OFFSET * 2); // Subtract both left and right padding
+  const pixelPosition = TIMELINE_PADDING_OFFSET + ((framePosition - fullMinFrames) / fullRange) * effectiveWidth;
 
   // [Position0Debug] Only log position 0 items to reduce noise
   if (framePosition === 0) {
@@ -215,7 +213,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   // and the shift already implied by the updated framePosition.
   let finalX = pixelPosition;
   if (isDragging && dragOffset) {
-    const originalPixel = paddingOffset + ((originalFramePos - fullMinFrames) / fullRange) * effectiveWidth;
+    const originalPixel = TIMELINE_PADDING_OFFSET + ((originalFramePos - fullMinFrames) / fullRange) * effectiveWidth;
     const desiredPixel = originalPixel + dragOffset.x;
     finalX = desiredPixel; // cursor-aligned
   }
