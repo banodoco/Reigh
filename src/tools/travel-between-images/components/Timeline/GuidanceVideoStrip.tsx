@@ -648,7 +648,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           className="absolute left-0 top-0 bottom-0"
           style={{
             width: treatment === 'clip' 
-              ? `${videoCoverageRatio * zoomLevel * 100}%`
+              ? `${videoCoverageRatio * 100}%` // Parent already handles zoom scaling
               : '100%',
             paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
             paddingRight: `${TIMELINE_HORIZONTAL_PADDING}px`,
