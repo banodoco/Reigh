@@ -216,7 +216,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           <div className={`wes-symmetry ${isSm ? 'mb-1' : 'mb-0.5'} relative`}>
             <div className="px-2">
               <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-2 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-nowrap`}>
-                {item.name}
+                {item.id === 'character-animate' && !isSm ? 'Characters' : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
