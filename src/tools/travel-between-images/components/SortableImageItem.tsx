@@ -45,7 +45,7 @@ interface SortableImageItemProps {
   projectAspectRatio?: string;
 }
 
-export const SortableImageItem: React.FC<SortableImageItemProps> = ({
+const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   image,
   onDelete,
   onDuplicate,
@@ -446,4 +446,51 @@ export const SortableImageItem: React.FC<SortableImageItemProps> = ({
       </AlertDialog>
     </div>
   );
-}; 
+};
+
+// 🎯 PERFORMANCE: Memoize component to prevent unnecessary re-renders
+// Only re-render when these specific props change
+export const SortableImageItem = React.memo(
+  SortableImageItemComponent,
+  (prevProps, nextProps) => {
+    // Log deep render trace for debugging (can be removed once optimized)
+    const shouldSkipRender = 
+      prevProps.image.shotImageEntryId === nextProps.image.shotImageEntryId &&
+      prevProps.isSelected === nextProps.isSelected &&
+      prevProps.isDragDisabled === nextProps.isDragDisabled &&
+      prevProps.timeline_frame === nextProps.timeline_frame &&
+      prevProps.skipConfirmation === nextProps.skipConfirmation &&
+      prevProps.duplicatingImageId === nextProps.duplicatingImageId &&
+      prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
+      prevProps.shouldLoad === nextProps.shouldLoad &&
+      prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
+      // Image URL changes (e.g., thumbnail loaded)
+      prevProps.image.thumbUrl === nextProps.image.thumbUrl &&
+      prevProps.image.imageUrl === nextProps.imageUrl;
+
+    console.warn('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
+      imageId: nextProps.image.shotImageEntryId?.substring(0, 8),
+      isSelected: nextProps.isSelected,
+      isDragDisabled: nextProps.isDragDisabled,
+      isMobile: false,
+      hasOnClick: !!nextProps.onClick,
+      hasOnDoubleClick: !!nextProps.onDoubleClick,
+      shouldSkipRender,
+      propsChanged: {
+        id: prevProps.image.shotImageEntryId !== nextProps.image.shotImageEntryId,
+        isSelected: prevProps.isSelected !== nextProps.isSelected,
+        isDragDisabled: prevProps.isDragDisabled !== nextProps.isDragDisabled,
+        timeline_frame: prevProps.timeline_frame !== nextProps.timeline_frame,
+        skipConfirmation: prevProps.skipConfirmation !== nextProps.skipConfirmation,
+        duplicating: prevProps.duplicatingImageId !== nextProps.duplicatingImageId,
+        success: prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId,
+        shouldLoad: prevProps.shouldLoad !== nextProps.shouldLoad,
+        aspectRatio: prevProps.projectAspectRatio !== nextProps.projectAspectRatio,
+        thumbUrl: prevProps.image.thumbUrl !== nextProps.image.thumbUrl,
+        imageUrl: prevProps.image.imageUrl !== nextProps.image.imageUrl,
+      }
+    });
+
+    return shouldSkipRender; // Return true to SKIP render, false to render
+  }
+); 

@@ -10,6 +10,11 @@ export class SimpleRealtimeManager {
   private maxReconnectAttempts = 5; // Increased from 3 to handle transient issues
   private reconnectTimeout: NodeJS.Timeout | null = null;
 
+  // Event batching to prevent cascading invalidations
+  private eventBatchQueue: Map<string, any[]> = new Map();
+  private batchTimeoutId: NodeJS.Timeout | null = null;
+  private readonly BATCH_WINDOW_MS = 100; // Batch events within 100ms
+
   private boundAuthHealHandler: (event: CustomEvent) => void;
 
   constructor() {
@@ -228,6 +233,19 @@ export class SimpleRealtimeManager {
       this.reconnectTimeout = null;
     }
     
+    // Clear any pending batch timeout
+    if (this.batchTimeoutId) {
+      console.log('[SimpleRealtime:Batching] 🧹 Clearing pending batch timeout on leave');
+      clearTimeout(this.batchTimeoutId);
+      this.batchTimeoutId = null;
+    }
+    
+    // Clear the event queue
+    if (this.eventBatchQueue.size > 0) {
+      console.log('[SimpleRealtime:Batching] 🧹 Clearing', this.eventBatchQueue.size, 'pending batched events');
+      this.eventBatchQueue.clear();
+    }
+    
     if (this.channel) {
       await this.channel.unsubscribe();
       this.channel = null;
@@ -243,44 +261,139 @@ export class SimpleRealtimeManager {
     this.reconnectAttempts = 0;
   }
 
-  private handleTaskUpdate(payload: any) {
+  /**
+   * Batch an event for processing. Events are grouped by type and processed together
+   * within BATCH_WINDOW_MS to reduce invalidation cascades.
+   */
+  private batchEvent(eventType: string, payload: any) {
+    const existing = this.eventBatchQueue.get(eventType) || [];
+    existing.push(payload);
+    this.eventBatchQueue.set(eventType, existing);
+
+    console.log('[SimpleRealtime:Batching] 📦 Event queued:', {
+      eventType,
+      queueSize: existing.length,
+      totalQueues: this.eventBatchQueue.size,
+      timestamp: Date.now()
+    });
+
+    // Clear existing timeout if any
+    if (this.batchTimeoutId) {
+      clearTimeout(this.batchTimeoutId);
+    }
+
+    // Set new timeout to process batch
+    this.batchTimeoutId = setTimeout(() => {
+      this.processBatchedEvents();
+    }, this.BATCH_WINDOW_MS);
+  }
+
+  /**
+   * Process all batched events together, dispatching a single consolidated event
+   * for each event type.
+   */
+  private processBatchedEvents() {
+    if (this.eventBatchQueue.size === 0) {
+      console.log('[SimpleRealtime:Batching] ✅ No events to process');
+      return;
+    }
+
+    console.log('[SimpleRealtime:Batching] 🚀 Processing batched events:', {
+      eventTypes: Array.from(this.eventBatchQueue.keys()),
+      totalEvents: Array.from(this.eventBatchQueue.values()).reduce((sum, arr) => sum + arr.length, 0),
+      breakdown: Array.from(this.eventBatchQueue.entries()).map(([type, events]) => ({
+        type,
+        count: events.length
+      })),
+      timestamp: Date.now()
+    });
+
+    // Process each event type
+    this.eventBatchQueue.forEach((payloads, eventType) => {
+      if (eventType === 'task-update') {
+        this.dispatchBatchedTaskUpdates(payloads);
+      } else if (eventType === 'task-new') {
+        this.dispatchBatchedNewTasks(payloads);
+      }
+    });
+
+    // Clear the queue
+    this.eventBatchQueue.clear();
+    this.batchTimeoutId = null;
+  }
+
+  /**
+   * Dispatch batched task update events as a single consolidated event
+   */
+  private dispatchBatchedTaskUpdates(payloads: any[]) {
     // Update global snapshot with latest event time
     this.updateGlobalSnapshot('joined', Date.now());
-    
-    // Report event to freshness manager - this is the key integration!
+
+    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched task updates:', {
+      count: payloads.length,
+      timestamp: Date.now()
+    });
+
+    // Report consolidated event to freshness manager
     dataFreshnessManager.onRealtimeEvent('task-update', [
       ['tasks'],
-      ['task-status-counts'], 
+      ['task-status-counts'],
       ['unified-generations'],
       ['tasks', 'paginated', this.projectId].filter(Boolean)
     ]);
-    
-    // Emit event for React components to listen to
+
+    // Emit single consolidated event with all payloads
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('realtime:task-update', { 
-        detail: payload 
+      window.dispatchEvent(new CustomEvent('realtime:task-update-batch', {
+        detail: {
+          payloads,
+          count: payloads.length,
+          timestamp: Date.now()
+        }
       }));
     }
   }
 
-  private handleNewTask(payload: any) {
+  /**
+   * Dispatch batched new task events as a single consolidated event
+   */
+  private dispatchBatchedNewTasks(payloads: any[]) {
     // Update global snapshot with latest event time
     this.updateGlobalSnapshot('joined', Date.now());
-    
-    // Report event to freshness manager
+
+    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched new tasks:', {
+      count: payloads.length,
+      timestamp: Date.now()
+    });
+
+    // Report consolidated event to freshness manager
     dataFreshnessManager.onRealtimeEvent('task-new', [
       ['tasks'],
-      ['task-status-counts'], 
+      ['task-status-counts'],
       ['unified-generations'],
       ['tasks', 'paginated', this.projectId].filter(Boolean)
     ]);
-    
-    // Emit event for React components to listen to
+
+    // Emit single consolidated event with all payloads
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('realtime:task-new', { 
-        detail: payload 
+      window.dispatchEvent(new CustomEvent('realtime:task-new-batch', {
+        detail: {
+          payloads,
+          count: payloads.length,
+          timestamp: Date.now()
+        }
       }));
     }
+  }
+
+  private handleTaskUpdate(payload: any) {
+    // Batch this event instead of dispatching immediately
+    this.batchEvent('task-update', payload);
+  }
+
+  private handleNewTask(payload: any) {
+    // Batch this event instead of dispatching immediately
+    this.batchEvent('task-new', payload);
   }
 
   private handleShotGenerationChange(payload: any, eventType: 'INSERT' | 'UPDATE') {
@@ -368,6 +481,15 @@ export class SimpleRealtimeManager {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
+    
+    // Clear any pending batch timeout
+    if (this.batchTimeoutId) {
+      clearTimeout(this.batchTimeoutId);
+      this.batchTimeoutId = null;
+    }
+    
+    // Clear the event queue
+    this.eventBatchQueue.clear();
   }
 
   destroy() {
@@ -381,6 +503,15 @@ export class SimpleRealtimeManager {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
+    
+    // Clear any pending batch timeout
+    if (this.batchTimeoutId) {
+      clearTimeout(this.batchTimeoutId);
+      this.batchTimeoutId = null;
+    }
+    
+    // Clear the event queue
+    this.eventBatchQueue.clear();
     
     // Leave any active channel
     this.leave();

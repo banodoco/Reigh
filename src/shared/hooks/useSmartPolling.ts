@@ -101,8 +101,14 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
   let pollingReason: string;
 
   if (pollingInterval === false) {
-    finalInterval = minInterval;
-    pollingReason = 'Freshness manager disabled polling, using minInterval';
+    // 🎯 NEW: Respect when freshness manager disables polling completely
+    if (minInterval === false) {
+      finalInterval = false;
+      pollingReason = 'Polling DISABLED - realtime is healthy and working';
+    } else {
+      finalInterval = minInterval;
+      pollingReason = 'Freshness manager disabled polling, using minInterval fallback';
+    }
   } else if (minInterval !== false && pollingInterval > minInterval && isDataFresh) {
     finalInterval = minInterval;
     pollingReason = 'Data is fresh, using minInterval';
@@ -152,9 +158,17 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
 /**
  * Simplified version for common use cases
  * Just returns the config object to spread into useQuery
+ * 
+ * By default, minInterval is set to false to allow polling to be completely disabled
+ * when realtime is working. Pass minInterval: number if you want a fallback interval.
  */
 export function useSmartPollingConfig(queryKey: string[], debug = false) {
-  const { refetchInterval, staleTime } = useSmartPolling({ queryKey, debug });
+  // 🎯 NEW: Default to minInterval: false to allow full polling disable
+  const { refetchInterval, staleTime } = useSmartPolling({ 
+    queryKey, 
+    debug,
+    minInterval: false // Allow polling to be disabled when realtime is healthy
+  });
   
   return {
     refetchInterval,
