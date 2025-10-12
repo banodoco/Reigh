@@ -152,7 +152,7 @@ export const useDuplicateShot = () => {
         position: ((originalShot as any).position || 0) + 1
       }) as { shot: Shot };
       
-      // Copy only non-video images to the new shot
+      // Copy only non-video images that have a timeline_frame to the new shot
       if (originalShot.shot_generations && originalShot.shot_generations.length > 0) {
         for (const sg of originalShot.shot_generations) {
           // Skip video outputs
@@ -164,11 +164,24 @@ export const useDuplicateShot = () => {
             continue; // Skip this video output
           }
           
-          await addImageToShot.mutateAsync({
-            shot_id: newShot.id,
-            generation_id: sg.generation_id,
-            project_id: projectId
-          });
+          // Skip shot_generations without a timeline_frame
+          if (sg.timeline_frame === null || sg.timeline_frame === undefined) {
+            continue;
+          }
+          
+          // Directly insert shot_generation with the preserved timeline_frame
+          const { error: insertError } = await supabase
+            .from('shot_generations')
+            .insert({
+              shot_id: newShot.id,
+              generation_id: sg.generation_id,
+              timeline_frame: sg.timeline_frame
+            });
+          
+          if (insertError) {
+            console.error('Error inserting shot_generation during duplication:', insertError);
+            throw insertError;
+          }
         }
       }
       
