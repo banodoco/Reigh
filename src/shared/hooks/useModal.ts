@@ -20,8 +20,8 @@ interface ModalStyling {
 export const useModal = (size: ModalSize = 'medium'): ModalStyling => {
   const isMobile = useIsMobile();
   
-  // Base classes that all modals need - use higher z-index than dialog default
-  const baseClasses = 'bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg flex flex-col z-[11100]';
+  // Base classes that all modals need - removed z-index from classes since we apply it via inline style
+  const baseClasses = 'bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg flex flex-col';
   
   // Size-specific max widths
   const sizeClasses = {
@@ -36,8 +36,15 @@ export const useModal = (size: ModalSize = 'medium'): ModalStyling => {
     width: 'calc(100vw - 2rem)', // 16px edges
     maxHeight: (size === 'large' || size === 'extra-large')
       ? 'min(80vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 80px))'
-      : 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))'
-  } : {};
+      : 'min(90vh, calc(100vh - env(safe-area-inset-top, 20px) - env(safe-area-inset-bottom, 20px) - 64px))',
+    // Apply z-index via inline style to ensure it takes precedence
+    // 50001 puts it above the DialogOverlay (50000) and other normal UI elements
+    // but below MediaLightbox (100000) and GuidanceVideoStrip preview (999999)
+    zIndex: 50001
+  } : {
+    // Apply same z-index on desktop for consistency
+    zIndex: 50001
+  };
 
   // Mobile props to prevent auto-focus (prevents keyboard popup)
   const mobileProps = isMobile ? { 
