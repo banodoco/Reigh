@@ -448,6 +448,9 @@ export function useToolSettings<T>(
       clearTimeout(debounceTimeoutRef.current);
     }
 
+    // Snapshot the target entity id NOW to prevent cross-project/shot overwrites when debounce fires
+    const entityId = scope === 'project' ? projectId : (scope === 'shot' ? shotId : undefined);
+
     // Debounce updates to prevent cascading requests
     debounceTimeoutRef.current = setTimeout(() => {
       // Create an AbortController for this update and track it
@@ -461,9 +464,6 @@ export function useToolSettings<T>(
       
       // Set up cleanup handlers
       controller.signal.addEventListener('abort', cleanup);
-      
-      // Snapshot the target entity id at scheduling time to prevent cross-project/shot overwrites
-      const entityId = scope === 'project' ? projectId : (scope === 'shot' ? shotId : undefined);
 
       updateMutation.mutate(
         { scope, settings, signal: controller.signal, entityId },
