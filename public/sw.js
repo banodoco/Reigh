@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reigh-v1';
+const CACHE_NAME = 'reigh-v2';
 
 // Only cache essential static assets, not dynamic content
 const urlsToCache = [

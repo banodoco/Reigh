@@ -362,9 +362,13 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         toast.error('Failed to clear enhanced prompts');
                       }
                     }}
-                    className="text-xs"
+                    className="text-[11px] leading-tight"
                   >
-                    Clear current enhanced prompts
+                    <span className="text-center">
+                      Clear current
+                      <br />
+                      enhanced prompts
+                    </span>
                   </Button>
                 )}
               </div>
