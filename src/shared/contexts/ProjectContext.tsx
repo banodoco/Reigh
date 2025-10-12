@@ -73,7 +73,19 @@ const mapDbProjectToProject = (row: any): Project => ({
   name: row.name,
   user_id: row.user_id,
   aspectRatio: row.aspect_ratio ?? undefined,
+  createdAt: row.created_at ?? undefined,
 });
+
+// Helper to sort projects by creation date (newest first)
+const sortProjectsByCreatedAt = (projects: Project[]): Project[] => {
+  return [...projects].sort((a, b) => {
+    // Handle missing createdAt by treating them as oldest
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    // Sort descending (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+};
 
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   // CRITICAL: Log component mount/unmount to detect tab suspension issues
@@ -367,7 +379,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         .from('projects')
         .select('*')
         .eq('user_id', user.id)
-        .order('name', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -555,7 +567,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       await createDefaultShot(newProject.id);
 
       const mappedProject = mapDbProjectToProject(newProject);
-      setProjects(prevProjects => [...prevProjects, mappedProject].sort((a, b) => a.name.localeCompare(b.name)));
+      setProjects(prevProjects => sortProjectsByCreatedAt([...prevProjects, mappedProject]));
       setSelectedProjectIdState(mappedProject.id);
       
       // Save the new project as last opened in user settings
@@ -605,8 +617,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       const mappedProject = mapDbProjectToProject(updatedProject);
 
       setProjects(prevProjects => 
-        prevProjects.map(p => p.id === projectId ? mappedProject : p)
-                     .sort((a, b) => a.name.localeCompare(b.name))
+        sortProjectsByCreatedAt(
+          prevProjects.map(p => p.id === projectId ? mappedProject : p)
+        )
       );      
       return true;
     } catch (err: any) {

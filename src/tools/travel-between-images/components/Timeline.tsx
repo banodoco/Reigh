@@ -536,7 +536,7 @@ const Timeline: React.FC<TimelineProps> = ({
           {/* Upload container */}
           {onImageUpload && (
             <div 
-              className="absolute inset-0 z-20 flex items-center justify-center p-4"
+              className="absolute inset-0 z-20 flex items-start justify-center pt-20 p-4"
               onDragEnter={handleEmptyStateDragEnter}
               onDragOver={handleEmptyStateDragOver}
               onDragLeave={handleEmptyStateDragLeave}

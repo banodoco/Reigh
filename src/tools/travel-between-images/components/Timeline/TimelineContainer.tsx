@@ -614,6 +614,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             fullRange={fullRange}
             zoomLevel={zoomLevel}
             containerWidth={containerWidth}
+            hasNoImages={hasNoImages}
           />
 
           {/* Pair visualizations */}

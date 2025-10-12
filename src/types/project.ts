@@ -3,4 +3,5 @@ export interface Project {
   name: string;
   user_id: string;
   aspectRatio?: string;
+  createdAt?: string;
 } 

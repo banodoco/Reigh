@@ -8,6 +8,7 @@ interface TimelineRulerProps {
   fullRange: number;
   zoomLevel: number;
   containerWidth: number;
+  hasNoImages?: boolean;
 }
 
 const TimelineRuler: React.FC<TimelineRulerProps> = ({
@@ -16,6 +17,7 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
   fullRange,
   zoomLevel,
   containerWidth,
+  hasNoImages = false,
 }) => {
   // Match TimelineItem's exact positioning logic
   // Items use: effectiveWidth = timelineWidth - (TIMELINE_PADDING_OFFSET * 2)
@@ -58,7 +60,7 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
   return (
     <div
-      className="absolute h-8 border-t"
+      className={`absolute h-8 border-t transition-all duration-200 ${hasNoImages ? 'blur-[0.5px] opacity-50' : ''}`}
       style={{
         bottom: "-3rem", // Position below the timeline items
         // Position at TIMELINE_PADDING_OFFSET from container's edge (0,0)
