@@ -388,27 +388,31 @@ export function useToolSettings<T>(
 
   // Update settings mutation
   const updateMutation = useMutation({
-    mutationFn: async ({ scope, settings: newSettings, signal }: { 
+    mutationFn: async ({ scope, settings: newSettings, signal, entityId }: { 
       scope: SettingsScope; 
       settings: Partial<T>; 
       signal?: AbortSignal;
+      entityId?: string;
     }) => {
-      let idForScope: string | undefined;
+      // Prefer explicitly provided entityId (snapshotted at schedule time) to avoid drift
+      let idForScope: string | undefined = entityId;
       
-      if (scope === 'user') {
-        // Get userId from auth for user scope with timeout protection (aligned with global timeout)
-        const { data: { user } } = await getUserWithTimeout(7000);
-        idForScope = user?.id;
-      } else if (scope === 'project') {
-        idForScope = projectId;
-      } else if (scope === 'shot') {
-        idForScope = shotId;
+      if (!idForScope) {
+        if (scope === 'user') {
+          // Get userId from auth for user scope with timeout protection (aligned with global timeout)
+          const { data: { user } } = await getUserWithTimeout(7000);
+          idForScope = user?.id;
+        } else if (scope === 'project') {
+          idForScope = projectId;
+        } else if (scope === 'shot') {
+          idForScope = shotId;
+        }
       }
       
       if (!idForScope) {
         throw new Error(`Missing identifier for ${scope} tool settings update`);
       }
-
+  
       await updateToolSettingsSupabase({
           scope,
           id: idForScope,
@@ -458,8 +462,11 @@ export function useToolSettings<T>(
       // Set up cleanup handlers
       controller.signal.addEventListener('abort', cleanup);
       
+      // Snapshot the target entity id at scheduling time to prevent cross-project/shot overwrites
+      const entityId = scope === 'project' ? projectId : (scope === 'shot' ? shotId : undefined);
+
       updateMutation.mutate(
-        { scope, settings, signal: controller.signal },
+        { scope, settings, signal: controller.signal, entityId },
         {
           onSettled: cleanup, // Clean up on both success and error
         }

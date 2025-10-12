@@ -1050,6 +1050,45 @@ async function insertGeneration(supabase: any, record: any): Promise<any> {
 }
 
 /**
+ * Find source generation by image URL (for magic edit tracking)
+ * Returns the generation ID if found, null otherwise
+ */
+async function findSourceGenerationByImageUrl(supabase: any, imageUrl: string): Promise<string | null> {
+  if (!imageUrl) {
+    return null;
+  }
+  
+  try {
+    console.log(`[BasedOn] Looking for source generation with image URL: ${imageUrl}`);
+    
+    // Query generations by location (main image URL)
+    const { data, error } = await supabase
+      .from('generations')
+      .select('id')
+      .eq('location', imageUrl)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (error) {
+      console.error(`[BasedOn] Error finding source generation:`, error);
+      return null;
+    }
+    
+    if (data) {
+      console.log(`[BasedOn] Found source generation: ${data.id}`);
+      return data.id;
+    }
+    
+    console.log(`[BasedOn] No source generation found for image URL`);
+    return null;
+  } catch (error) {
+    console.error(`[BasedOn] Exception finding source generation:`, error);
+    return null;
+  }
+}
+
+/**
  * Link generation to shot using the existing RPC
  */
 async function linkGenerationToShot(supabase: any, shotId: string, generationId: string, addInPosition: boolean): Promise<void> {
@@ -1153,6 +1192,21 @@ async function createGenerationFromTask(
     
     console.log(`[GenMigration] Extracted generation_name: ${generationName}`);
     
+    // Find source generation for magic edit tasks (based_on tracking)
+    let basedOnGenerationId: string | null = null;
+    const sourceImageUrl = taskData.params?.image; // Magic edit tasks have source image in params.image
+    
+    if (sourceImageUrl) {
+      console.log(`[BasedOn] Task has source image, looking for source generation: ${sourceImageUrl}`);
+      basedOnGenerationId = await findSourceGenerationByImageUrl(supabase, sourceImageUrl);
+      
+      if (basedOnGenerationId) {
+        console.log(`[BasedOn] Will link new generation to source: ${basedOnGenerationId}`);
+      } else {
+        console.log(`[BasedOn] No source generation found, new generation will not have based_on`);
+      }
+    }
+    
     // Insert generation record
     const generationRecord = {
       id: newGenerationId,
@@ -1163,6 +1217,7 @@ async function createGenerationFromTask(
       project_id: taskData.project_id,
       thumbnail_url: thumbnailUrl,
       name: generationName, // Add generation name to the record
+      based_on: basedOnGenerationId, // Link to source generation if found
       created_at: new Date().toISOString()
     };
     

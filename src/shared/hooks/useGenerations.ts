@@ -560,6 +560,222 @@ export function useCreateGeneration() {
             });
         }
 
+/**
+ * Fetch generations that are derived from a specific source generation (based_on tracking)
+ */
+export async function fetchDerivedGenerations(
+  sourceGenerationId: string | null
+): Promise<GeneratedImageWithMetadata[]> {
+  if (!sourceGenerationId) {
+    return [];
+  }
+  
+  const { data, error } = await supabase
+    .from('generations')
+    .select(`
+      id,
+      location,
+      thumbnail_url,
+      type,
+      created_at,
+      params,
+      starred,
+      tasks,
+      shot_generations(shot_id, timeline_frame)
+    `)
+    .eq('based_on', sourceGenerationId)
+    .order('created_at', { ascending: false });
+  
+  if (error) {
+    throw error;
+  }
+  
+  const items = data?.map((item: any) => {
+    const mainUrl = item.location;
+    const thumbnailUrl = item.thumbnail_url || mainUrl;
+    const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
+    
+    const baseItem: GeneratedImageWithMetadata = {
+      id: item.id,
+      url: mainUrl,
+      thumbUrl: thumbnailUrl,
+      prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
+              item.params?.prompt || 
+              'No prompt',
+      metadata: {
+        ...(item.params || {}),
+        taskId
+      },
+      createdAt: item.created_at,
+      isVideo: item.type?.includes('video'),
+      starred: item.starred || false,
+      position: null,
+      timeline_frame: null,
+    };
+    
+    // Include shot association data
+    const shotGenerations = item.shot_generations || [];
+    const normalizePosition = (timelineFrame: number | null | undefined) => {
+      if (timelineFrame === null || timelineFrame === undefined) return null;
+      return Math.floor(timelineFrame / 50);
+    };
+    
+    if (shotGenerations.length > 0) {
+      if (shotGenerations.length === 1) {
+        const singleShot = shotGenerations[0];
+        return {
+          ...baseItem,
+          shot_id: singleShot.shot_id,
+          position: normalizePosition(singleShot.timeline_frame),
+          timeline_frame: singleShot.timeline_frame,
+        };
+      }
+      
+      const allAssociations = shotGenerations.map((sg: any) => ({
+        shot_id: sg.shot_id,
+        timeline_frame: sg.timeline_frame,
+        position: normalizePosition(sg.timeline_frame),
+      }));
+      
+      const primaryShot = shotGenerations[0];
+      return {
+        ...baseItem,
+        shot_id: primaryShot.shot_id,
+        position: normalizePosition(primaryShot.timeline_frame),
+        timeline_frame: primaryShot.timeline_frame,
+        all_shot_associations: allAssociations,
+      };
+    }
+    
+    return baseItem;
+  }) || [];
+  
+  return items;
+}
+
+/**
+ * Hook to fetch derived generations (generations based on a source generation)
+ */
+export function useDerivedGenerations(
+  sourceGenerationId: string | null,
+  enabled: boolean = true
+) {
+  return useQuery<GeneratedImageWithMetadata[], Error>({
+    queryKey: ['derived-generations', sourceGenerationId],
+    queryFn: () => fetchDerivedGenerations(sourceGenerationId),
+    enabled: !!sourceGenerationId && enabled,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Fetch a single source generation by ID (for "based on" display)
+ */
+export async function fetchSourceGeneration(
+  sourceGenerationId: string | null
+): Promise<GeneratedImageWithMetadata | null> {
+  if (!sourceGenerationId) {
+    return null;
+  }
+  
+  const { data, error } = await supabase
+    .from('generations')
+    .select(`
+      id,
+      location,
+      thumbnail_url,
+      type,
+      created_at,
+      params,
+      starred,
+      tasks,
+      shot_generations(shot_id, timeline_frame)
+    `)
+    .eq('id', sourceGenerationId)
+    .single();
+  
+  if (error || !data) {
+    console.error('[SourceGeneration] Error fetching source generation:', error);
+    return null;
+  }
+  
+  const item = data;
+  const mainUrl = item.location;
+  const thumbnailUrl = item.thumbnail_url || mainUrl;
+  const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
+  
+  const baseItem: GeneratedImageWithMetadata = {
+    id: item.id,
+    url: mainUrl,
+    thumbUrl: thumbnailUrl,
+    prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
+            item.params?.prompt || 
+            'No prompt',
+    metadata: {
+      ...(item.params || {}),
+      taskId
+    },
+    createdAt: item.created_at,
+    isVideo: item.type?.includes('video'),
+    starred: item.starred || false,
+    position: null,
+    timeline_frame: null,
+  };
+  
+  // Include shot association data
+  const shotGenerations = item.shot_generations || [];
+  const normalizePosition = (timelineFrame: number | null | undefined) => {
+    if (timelineFrame === null || timelineFrame === undefined) return null;
+    return Math.floor(timelineFrame / 50);
+  };
+  
+  if (shotGenerations.length > 0) {
+    if (shotGenerations.length === 1) {
+      const singleShot = shotGenerations[0];
+      return {
+        ...baseItem,
+        shot_id: singleShot.shot_id,
+        position: normalizePosition(singleShot.timeline_frame),
+        timeline_frame: singleShot.timeline_frame,
+      };
+    }
+    
+    const allAssociations = shotGenerations.map((sg: any) => ({
+      shot_id: sg.shot_id,
+      timeline_frame: sg.timeline_frame,
+      position: normalizePosition(sg.timeline_frame),
+    }));
+    
+    const primaryShot = shotGenerations[0];
+    return {
+      ...baseItem,
+      shot_id: primaryShot.shot_id,
+      position: normalizePosition(primaryShot.timeline_frame),
+      timeline_frame: primaryShot.timeline_frame,
+      all_shot_associations: allAssociations,
+    };
+  }
+  
+  return baseItem;
+}
+
+/**
+ * Hook to fetch the source generation (for "based on" display)
+ */
+export function useSourceGeneration(
+  sourceGenerationId: string | null,
+  enabled: boolean = true
+) {
+  return useQuery<GeneratedImageWithMetadata | null, Error>({
+    queryKey: ['source-generation', sourceGenerationId],
+    queryFn: () => fetchSourceGeneration(sourceGenerationId),
+    enabled: !!sourceGenerationId && enabled,
+    staleTime: 60 * 1000, // 1 minute (source doesn't change often)
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
 export function useToggleGenerationStar() {
   const queryClient = useQueryClient();
 
