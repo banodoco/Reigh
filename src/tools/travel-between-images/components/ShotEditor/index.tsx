@@ -1288,8 +1288,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         if (newSelectedPhasePresetId && onPhasePresetSelect && newPhaseConfig) {
           // If we have a preset ID and the phase config, restore the preset selection
           onPhasePresetSelect(newSelectedPhasePresetId, newPhaseConfig);
-        } else if (newSelectedPhasePresetId === null && onPhasePresetRemove) {
-          // If preset ID is explicitly null, clear the preset
+        } else if (!newSelectedPhasePresetId && onPhasePresetRemove) {
+          // If preset ID is null/undefined/falsy, clear the preset
+          console.log('[ApplySettings] Clearing preset (task had no preset selected)');
           onPhasePresetRemove();
         }
       }
