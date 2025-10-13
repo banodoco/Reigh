@@ -620,12 +620,13 @@ export const useAddImageToShot = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id }: { 
+    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id, timelineFrame }: { 
       shot_id: string; 
       generation_id: string; 
       imageUrl?: string;
       thumbUrl?: string;
       project_id: string;
+      timelineFrame?: number;
     }) => {
       log('MobileNetworkDebug', `Starting add image to shot - ShotID: ${shot_id}, GenerationID: ${generation_id}, ImageURL: ${imageUrl?.substring(0, 100)}...`);
       console.log('[PositionFix] useAddImageToShot starting (regular path):', {
@@ -712,6 +713,25 @@ export const useAddImageToShot = () => {
         newTimelineFrame: (shotGeneration as any)?.timeline_frame,
         timestamp: Date.now()
       });
+
+      // If explicit timeline_frame was provided, update it
+      if (timelineFrame !== undefined && shotGeneration) {
+        console.log('[ApplySettings] Setting explicit timeline_frame:', {
+          shotGenerationId: (shotGeneration as any).id,
+          timelineFrame
+        });
+        
+        const { error: updateError } = await supabase
+          .from('shot_generations')
+          .update({ timeline_frame: timelineFrame })
+          .eq('id', (shotGeneration as any).id);
+        
+        if (updateError) {
+          console.error('[ApplySettings] Error setting timeline_frame:', updateError);
+        } else {
+          console.log('[ApplySettings] Successfully set timeline_frame to:', timelineFrame);
+        }
+      }
 
       // Verify the final state
       const { data: finalRecords, error: verifyError } = await supabase

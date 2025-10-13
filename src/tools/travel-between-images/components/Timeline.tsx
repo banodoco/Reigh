@@ -112,6 +112,7 @@ export interface TimelineProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
   // Action handlers
   onImageDelete: (imageId: string) => void;
   onImageDuplicate: (imageId: string, timeline_frame: number) => void;
@@ -164,6 +165,7 @@ const Timeline: React.FC<TimelineProps> = ({
   enhancedPrompts,
   defaultPrompt,
   defaultNegativePrompt,
+  onClearEnhancedPrompt,
   onImageDelete,
   onImageDuplicate,
   duplicatingImageId,
@@ -638,6 +640,7 @@ const Timeline: React.FC<TimelineProps> = ({
         enhancedPrompts={enhancedPrompts || {}}
         defaultPrompt={defaultPrompt}
         defaultNegativePrompt={defaultNegativePrompt}
+        onClearEnhancedPrompt={onClearEnhancedPrompt}
         onImageDelete={onImageDelete}
         onImageDuplicate={onImageDuplicate}
         duplicatingImageId={duplicatingImageId}

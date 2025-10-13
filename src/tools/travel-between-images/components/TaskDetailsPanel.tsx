@@ -27,6 +27,11 @@ interface TaskDetailsPanelProps {
   onClose?: () => void;
   basedOnSection?: ReactNode;
   derivedSection?: ReactNode;
+  // Variant name editing
+  generationName?: string;
+  onGenerationNameChange?: (name: string) => void;
+  isEditingGenerationName?: boolean;
+  onEditingGenerationNameChange?: (editing: boolean) => void;
 }
 
 const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ 
@@ -42,7 +47,11 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   className = "",
   onClose,
   basedOnSection,
-  derivedSection
+  derivedSection,
+  generationName,
+  onGenerationNameChange,
+  isEditingGenerationName,
+  onEditingGenerationNameChange
 }) => {
   const isMobile = useIsMobile();
   const [showDetailedParams, setShowDetailedParams] = useState(false);
@@ -142,6 +151,10 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
                     onShowAllImagesChange={setShowAllImages}
                     showFullPrompt={showFullPrompt}
                     onShowFullPromptChange={setShowFullPrompt}
+                    generationName={generationName}
+                    onGenerationNameChange={onGenerationNameChange}
+                    isEditingGenerationName={isEditingGenerationName}
+                    onEditingGenerationNameChange={onEditingGenerationNameChange}
                     showFullNegativePrompt={showFullNegativePrompt}
                     onShowFullNegativePromptChange={setShowFullNegativePrompt}
                   />

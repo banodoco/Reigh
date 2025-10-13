@@ -350,8 +350,8 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        {/* Custom overlay with higher z-index when needed */}
-        {zIndexOverride && (
+        {/* Custom overlay with higher z-index when needed (only when this modal is open) */}
+        {zIndexOverride && isOpen && (
           <style>
             {`
               [data-radix-dialog-overlay][data-state="open"] {

@@ -23,6 +23,8 @@ import { processStyleReferenceForAspectRatioString } from '@/shared/lib/styleRef
 import { resolveProjectResolution } from '@/shared/lib/taskCreation';
 import { dataURLtoFile } from '@/shared/lib/utils';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ShotOption {
   id: string;
@@ -198,6 +200,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { selectedProjectId } = useProject();
   const createShotWithImageMutation = useCreateShotWithImage();
   const { navigateToShot } = useShotNavigation();
+  const queryClient = useQueryClient();
   
   // Hook for managing project image settings (references)
   const {
@@ -211,6 +214,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // State for adding to references
   const [isAddingToReferences, setIsAddingToReferences] = useState(false);
   const [addToReferencesSuccess, setAddToReferencesSuccess] = useState(false);
+  
+  // State for editing generation name (variant name)
+  const [generationName, setGenerationName] = useState<string>((media as any).name || '');
+  const [isEditingGenerationName, setIsEditingGenerationName] = useState(false);
+  const [isUpdatingGenerationName, setIsUpdatingGenerationName] = useState(false);
 
   // Fetch derived generations (generations based on this one)
   const { data: derivedGenerations, isLoading: isDerivedLoading } = useDerivedGenerations(media.id);
@@ -1180,6 +1188,43 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  // Handle updating generation name
+  const handleGenerationNameChange = async (newName: string) => {
+    setGenerationName(newName);
+    
+    // Debounce the actual save
+    if (isUpdatingGenerationName) return;
+    
+    setIsUpdatingGenerationName(true);
+    try {
+      const { error } = await supabase
+        .from('generations')
+        .update({ name: newName || null })
+        .eq('id', media.id);
+
+      if (error) {
+        console.error('[VariantName] Error updating generation name:', error);
+        toast.error('Failed to update variant name');
+        throw error;
+      }
+
+      console.log('[VariantName] Successfully updated generation name:', {
+        generationId: media.id.substring(0, 8),
+        newName: newName || '(cleared)'
+      });
+
+      // Invalidate relevant queries to update UI
+      if (selectedProjectId) {
+        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+      }
+      
+    } catch (error) {
+      console.error('[VariantName] Failed to update generation name:', error);
+    } finally {
+      setIsUpdatingGenerationName(false);
+    }
+  };
+
   // Handle adding to references
   const handleAddToReferences = async () => {
     if (!selectedProjectId || isVideo) {
@@ -1927,6 +1972,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       } : undefined}
                       onClose={taskDetailsData.onClose || onClose}
                       className=""
+                      generationName={generationName}
+                      onGenerationNameChange={handleGenerationNameChange}
+                      isEditingGenerationName={isEditingGenerationName}
+                      onEditingGenerationNameChange={setIsEditingGenerationName}
                       basedOnSection={(() => {
                         console.log('[BasedOnDebug] Desktop render check - Based On section', {
                           hasSourceGeneration: !!sourceGeneration,
@@ -2212,6 +2261,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       } : undefined}
                       onClose={taskDetailsData.onClose || onClose}
                       className=""
+                      generationName={generationName}
+                      onGenerationNameChange={handleGenerationNameChange}
+                      isEditingGenerationName={isEditingGenerationName}
+                      onEditingGenerationNameChange={setIsEditingGenerationName}
                       basedOnSection={(() => {
                         console.log('[BasedOnDebug] Mobile render check - Based On section', {
                           hasSourceGeneration: !!sourceGeneration,

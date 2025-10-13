@@ -73,18 +73,52 @@ export const Header: React.FC<HeaderProps> = ({
     }
     
     // Debounce database update to avoid race conditions with rapid changes
-    updateTimeoutRef.current = setTimeout(() => {
-      supabase
-        .from('shots')
-        .update({ aspect_ratio: newAspectRatio } as any)
-        .eq('id', selectedShot.id)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Failed to update aspect ratio:', error);
-            // Revert on error by invalidating all shots caches
-            queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-          }
-        });
+    updateTimeoutRef.current = setTimeout(async () => {
+      try {
+        // First, get current settings to preserve other settings while clearing custom dimensions
+        const { data: currentShot } = await supabase
+          .from('shots')
+          .select('settings')
+          .eq('id', selectedShot.id)
+          .single();
+        
+        const currentSettings = (currentShot?.settings as any) || {};
+        const travelSettings = currentSettings['travel-between-images'] || {};
+        
+        // Clear custom dimension settings when aspect ratio changes
+        // This ensures the new aspect ratio takes precedence
+        const updatedTravelSettings = {
+          ...travelSettings,
+          dimensionSource: 'firstImage', // Reset to default
+          customWidth: undefined,
+          customHeight: undefined,
+        };
+        
+        // Update both aspect_ratio and settings
+        const { error } = await supabase
+          .from('shots')
+          .update({ 
+            aspect_ratio: newAspectRatio,
+            settings: {
+              ...currentSettings,
+              'travel-between-images': updatedTravelSettings
+            }
+          } as any)
+          .eq('id', selectedShot.id);
+        
+        if (error) {
+          console.error('Failed to update aspect ratio:', error);
+          // Revert on error by invalidating all shots caches
+          queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        } else {
+          console.log('[AspectRatioChange] Cleared custom dimensions, reset to dimensionSource: firstImage');
+          // Invalidate tool settings to refresh UI with cleared custom dimensions
+          queryClient.invalidateQueries({ queryKey: ['toolSettings', 'travel-between-images', 'shot', selectedShot.id] });
+        }
+      } catch (error) {
+        console.error('Failed to update aspect ratio and settings:', error);
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      }
     }, 300); // Wait 300ms after last change before updating database
   };
   

@@ -339,7 +339,12 @@ const VideoTravelToolPage: React.FC = () => {
       model_switch_phase: adjustedConfig.model_switch_phase,
       phases_array_length: adjustedConfig.phases?.length,
       steps_array_length: adjustedConfig.steps_per_phase?.length,
-      phases_data: adjustedConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+      phases_data: adjustedConfig.phases?.map(p => ({ 
+        phase: p.phase, 
+        guidance_scale: p.guidance_scale, 
+        loras_count: p.loras?.length,
+        lora_urls: p.loras?.map(l => l.url.split('/').pop()) // Show filenames for easier debugging
+      })),
       steps_per_phase: adjustedConfig.steps_per_phase,
       auto_adjusted: config.num_phases === 2 && config.model_switch_phase !== 1
     });
@@ -935,8 +940,35 @@ const VideoTravelToolPage: React.FC = () => {
         if (storedProjectDefaults) {
           try {
             const projectDefaults = JSON.parse(storedProjectDefaults);
+            
+            // CRITICAL FIX: Deep clone phaseConfig to prevent reference sharing
+            // Shallow spread doesn't work for nested objects/arrays
+            const projectDefaultsWithClonedPhaseConfig = {
+              ...projectDefaults,
+              // Deep clone phaseConfig if it exists
+              phaseConfig: projectDefaults.phaseConfig 
+                ? JSON.parse(JSON.stringify(projectDefaults.phaseConfig))
+                : undefined
+            };
+            
             // Merge project defaults with any existing shot settings, with shot settings taking precedence
-            settingsToApply = { ...(projectDefaults || {}), ...(settings || {}) } as VideoTravelSettings;
+            // For phaseConfig, if shot has one, use it entirely; otherwise use project default
+            settingsToApply = {
+              ...projectDefaultsWithClonedPhaseConfig,
+              ...(settings || {}),
+              // Explicitly handle phaseConfig to avoid partial merges
+              phaseConfig: (settings as VideoTravelSettings)?.phaseConfig 
+                ? JSON.parse(JSON.stringify((settings as VideoTravelSettings).phaseConfig))
+                : projectDefaultsWithClonedPhaseConfig.phaseConfig
+            } as VideoTravelSettings;
+            
+            console.log('[PhaseConfigMerge] Applied project defaults to new shot:', {
+              shotId: selectedShot.id.substring(0, 8),
+              hasProjectPhaseConfig: !!projectDefaults.phaseConfig,
+              hasShotPhaseConfig: !!(settings as VideoTravelSettings)?.phaseConfig,
+              usingPhaseConfigFrom: (settings as VideoTravelSettings)?.phaseConfig ? 'shot' : 'project',
+              finalPhaseConfig: settingsToApply.phaseConfig
+            });
             
             // Apply the merged settings to the database
             setTimeout(() => {
@@ -968,29 +1000,41 @@ const VideoTravelToolPage: React.FC = () => {
       let phaseConfigValue = settingsToApply.phaseConfig;
       
       // Validate phaseConfig consistency: ensure num_phases matches array lengths
+      // IMPORTANT: Only log warnings, don't auto-correct to prevent data loss
       if (phaseConfigValue) {
         const phasesLength = phaseConfigValue.phases?.length || 0;
         const stepsLength = phaseConfigValue.steps_per_phase?.length || 0;
         const numPhases = phaseConfigValue.num_phases;
         
-        // If there's a mismatch, fix it by using the actual array length as source of truth
+        // Log detailed phase config for debugging
+        console.log('[PhaseConfigLoad] Loading phase config:', {
+          shotId: selectedShot?.id?.substring(0, 8),
+          num_phases: numPhases,
+          phases_length: phasesLength,
+          steps_length: stepsLength,
+          phases_with_loras: phaseConfigValue.phases?.map(p => ({
+            phase: p.phase,
+            guidance_scale: p.guidance_scale,
+            loras_count: p.loras?.length,
+            lora_urls: p.loras?.map(l => l.url.split('/').pop())
+          }))
+        });
+        
+        // Only warn if there's a mismatch - DON'T auto-correct
+        // Auto-correction was causing LoRAs to be randomly removed
         if (numPhases !== phasesLength || numPhases !== stepsLength) {
-          console.warn('[PhaseConfig] Inconsistent phase config detected:', {
+          console.error('[PhaseConfig] ⚠️ INCONSISTENT PHASE CONFIG DETECTED:', {
+            shotId: selectedShot?.id?.substring(0, 8),
             num_phases: numPhases,
-            phases_length: phasesLength,
-            steps_length: stepsLength
+            phases_array_length: phasesLength,
+            steps_array_length: stepsLength,
+            WARNING: 'Inconsistency detected but NOT auto-correcting to prevent data loss',
+            RECOMMENDATION: 'User should manually verify phase configuration'
           });
           
-          // Use the actual phases array length as the source of truth
-          const correctNumPhases = phasesLength;
-          console.log('[PhaseConfig] Correcting num_phases to match arrays:', correctNumPhases);
-          
-          phaseConfigValue = {
-            ...phaseConfigValue,
-            num_phases: correctNumPhases,
-            // Ensure steps_per_phase matches phases array length
-            steps_per_phase: phaseConfigValue.steps_per_phase?.slice(0, correctNumPhases) || []
-          };
+          // DO NOT MODIFY phaseConfigValue here - this was causing the random changes
+          // The user's saved data should be preserved even if inconsistent
+          // The UI should handle this gracefully
         }
       }
       
@@ -1018,11 +1062,9 @@ const VideoTravelToolPage: React.FC = () => {
         setAdvancedMode(advancedModeValue);
         setPhaseConfig(phaseConfigValue);
         setVideoPairConfigs(settingsToApply.pairConfigs || []);
-        // Don't overwrite generationMode if user has already interacted with it
-        // This prevents race condition where settings load after user clicks toggle
-        if (!userHasInteracted.current) {
-          setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
-        }
+        // Always load generationMode from settings when switching shots
+        // The hasLoadedInitialSettings flag prevents this from running after initial load
+        setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
         setPairConfigs(settingsToApply.pairConfigs || []);
         // selectedMode removed - now hardcoded to use specific model
         setSteerableMotionSettings({
@@ -1592,6 +1634,11 @@ const VideoTravelToolPage: React.FC = () => {
             phaseConfig_model_switch_phase: currentSettings.phaseConfig?.model_switch_phase,
             phaseConfig_phases_length: currentSettings.phaseConfig?.phases?.length,
             phaseConfig_steps_length: currentSettings.phaseConfig?.steps_per_phase?.length,
+            phaseConfig_loras: currentSettings.phaseConfig?.phases?.map(p => ({
+              phase: p.phase,
+              loras_count: p.loras?.length,
+              lora_urls: p.loras?.map(l => l.url.split('/').pop())
+            })),
             shotId: selectedShot?.id?.substring(0, 8)
           });
           lastSavedSettingsRef.current = currentSettings;

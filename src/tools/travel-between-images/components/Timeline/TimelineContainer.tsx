@@ -48,6 +48,7 @@ interface TimelineContainerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
   // Action handlers
   onImageDelete: (imageId: string) => void;
   onImageDuplicate: (imageId: string, timeline_frame: number) => void;
@@ -94,6 +95,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   enhancedPrompts,
   defaultPrompt,
   defaultNegativePrompt,
+  onClearEnhancedPrompt,
   onImageDelete,
   onImageDuplicate,
   duplicatingImageId,
@@ -738,6 +740,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
                 autoCreateIndividualPrompts={autoCreateIndividualPrompts || false}
+                onClearEnhancedPrompt={onClearEnhancedPrompt}
               />
             );
           })}

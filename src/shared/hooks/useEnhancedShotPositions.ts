@@ -1019,6 +1019,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       return !isVideo;
     });
 
+    // 🎯 PERFORMANCE: Early return if no generations to process
+    // Prevents wasteful iteration and logging when there's nothing to pair
+    if (filteredGenerations.length === 0) {
+      console.log('[PairPrompts-GETTER] ⏭️ SKIPPING - no generations to process');
+      return {};
+    }
+
     console.log('[PairPrompts-GETTER] 📖 Reading pair prompts from shotGenerations:', {
       totalGenerations: shotGenerations.length,
       afterVideoFilter: filteredGenerations.length,
@@ -1133,6 +1140,59 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     console.log(`[PairPrompts-SAVE] ✅ COMPLETED updatePairPromptsByIndex for pair ${pairIndex}`);
   }, [shotGenerations, updatePairPrompts]);
 
+  // Clear enhanced prompt for a specific pair/generation
+  const clearEnhancedPrompt = useCallback(async (generationId: string) => {
+    if (!shotId) return;
+
+    try {
+      console.log('[EnhancedPrompts] 🧹 Clearing enhanced prompt for generation:', generationId.substring(0, 8));
+
+      // Find the current generation
+      const generation = shotGenerations.find(sg => sg.id === generationId);
+      if (!generation) {
+        throw new Error(`Generation ${generationId} not found`);
+      }
+
+      // Update metadata to clear enhanced_prompt
+      const updatedMetadata: PositionMetadata = {
+        ...generation.metadata,
+        enhanced_prompt: '', // Clear enhanced prompt
+      };
+
+      // Update in database
+      const { data, error } = await supabase
+        .from('shot_generations')
+        .update({ 
+          metadata: updatedMetadata as any, // Cast to any for JSON compatibility
+        })
+        .eq('id', generationId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[clearEnhancedPrompt] Database error:', error);
+        throw error;
+      }
+
+      console.log('[clearEnhancedPrompt] Successfully cleared enhanced prompt');
+
+      // Update local state optimistically
+      setShotGenerations(prev => prev.map(sg => 
+        sg.id === generationId 
+          ? { ...sg, metadata: updatedMetadata }
+          : sg
+      ));
+
+      // Invalidate queries to refresh data
+      await queryClient.invalidateQueries({ queryKey: ['shot_generations', shotId] });
+      await queryClient.invalidateQueries({ queryKey: ['shots'] });
+
+    } catch (err) {
+      console.error('[clearEnhancedPrompt] Error:', err);
+      throw err;
+    }
+  }, [shotId, shotGenerations, queryClient]);
+
   // Clear all enhanced prompts for the shot (used when base prompt changes)
   const clearAllEnhancedPrompts = useCallback(async () => {
     if (!shotId) return;
@@ -1211,6 +1271,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     getPairPrompts,
     pairPrompts, // Export reactive pairPrompts value
     updatePairPromptsByIndex,
+    clearEnhancedPrompt,
     clearAllEnhancedPrompts
   };
 };

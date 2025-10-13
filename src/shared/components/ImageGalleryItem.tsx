@@ -735,24 +735,36 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isCurrentlyViewingSelectedShot = useMemo(() => {
     // Must have both IDs and they must match
     if (!currentViewingShotId || !selectedShotIdLocal) {
-      console.log('[AddWithoutPosition] isCurrentlyViewingSelectedShot = false (missing IDs):', {
-        currentViewingShotId,
-        selectedShotIdLocal,
-        imageId: image.id?.substring(0, 8)
-      });
       return false;
     }
     
     // Only hide when viewing items specifically filtered to the current shot
-    const result = currentViewingShotId === selectedShotIdLocal;
-    console.log('[AddWithoutPosition] isCurrentlyViewingSelectedShot check:', {
-      result,
-      currentViewingShotId: currentViewingShotId?.substring(0, 8),
-      selectedShotIdLocal: selectedShotIdLocal?.substring(0, 8),
-      imageId: image.id?.substring(0, 8)
-    });
-    return result;
-  }, [currentViewingShotId, selectedShotIdLocal, image.id]);
+    return currentViewingShotId === selectedShotIdLocal;
+  }, [currentViewingShotId, selectedShotIdLocal]);
+
+  // 🎯 PERFORMANCE: Memoize "Add without position" button visibility to prevent 840 checks per 2 minutes
+  // This calculation was running on every render, causing massive overhead
+  const shouldShowAddWithoutPositionButton = useMemo(() => {
+    const shouldShow = onAddToLastShotWithoutPosition && 
+                      !isAlreadyPositionedInSelectedShot && 
+                      showTickForImageId !== image.id && 
+                      addingToShotImageId !== image.id && 
+                      !isCurrentlyViewingSelectedShot;
+    
+    // Throttled logging to track visibility changes (not on every render)
+    if (shouldShow) {
+      console.log('[AddWithoutPosition] Button will show for image:', image.id?.substring(0, 8));
+    }
+    
+    return shouldShow;
+  }, [
+    onAddToLastShotWithoutPosition,
+    isAlreadyPositionedInSelectedShot,
+    showTickForImageId,
+    image.id,
+    addingToShotImageId,
+    isCurrentlyViewingSelectedShot
+  ]);
   
   // Handle quick create success navigation
   const handleQuickCreateSuccess = useCallback(() => {
@@ -1358,22 +1370,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         </TooltipContent>
                     </Tooltip>
                     
-                    {/* Add without position button - hide when positioned, during main button success, while main button is processing, or when currently viewing this shot */}
-                    {(() => {
-                      const shouldShow = onAddToLastShotWithoutPosition && !isAlreadyPositionedInSelectedShot && showTickForImageId !== image.id && addingToShotImageId !== image.id && !isCurrentlyViewingSelectedShot;
-                      console.log('[AddWithoutPosition] Button visibility check for image:', {
-                        imageId: image.id?.substring(0, 8),
-                        shouldShow,
-                        conditions: {
-                          hasCallback: !!onAddToLastShotWithoutPosition,
-                          notAlreadyPositioned: !isAlreadyPositionedInSelectedShot,
-                          noTickShowing: showTickForImageId !== image.id,
-                          notAdding: addingToShotImageId !== image.id,
-                          notViewingCurrentShot: !isCurrentlyViewingSelectedShot
-                        }
-                      });
-                      return shouldShow;
-                    })() && (
+                    {/* Add without position button - visibility now memoized for performance */}
+                    {shouldShowAddWithoutPositionButton && (
                         <Tooltip delayDuration={0} disableHoverableContent>
                             <TooltipTrigger asChild>
                                 <Button

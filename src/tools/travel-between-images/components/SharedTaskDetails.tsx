@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { framesToSeconds } from './Timeline/utils/time-utils';
 
@@ -13,6 +13,11 @@ interface SharedTaskDetailsProps {
   onShowFullPromptChange?: (show: boolean) => void;
   showFullNegativePrompt?: boolean;
   onShowFullNegativePromptChange?: (show: boolean) => void;
+  // Variant name editing (only for modal variant)
+  generationName?: string;
+  onGenerationNameChange?: (name: string) => void;
+  isEditingGenerationName?: boolean;
+  onEditingGenerationNameChange?: (editing: boolean) => void;
 }
 
 export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
@@ -26,13 +31,17 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   onShowFullPromptChange,
   showFullNegativePrompt = false,
   onShowFullNegativePromptChange,
+  generationName,
+  onGenerationNameChange,
+  isEditingGenerationName = false,
+  onEditingGenerationNameChange,
 }) => {
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [characterVideoLoaded, setCharacterVideoLoaded] = useState(false);
   
-  // Helper to safely access orchestrator payload from multiple possible locations
-  const orchestratorPayload = task?.params?.full_orchestrator_payload as any;
-  const orchestratorDetails = task?.params?.orchestrator_details as any;
+  // Helper to safely access orchestrator payload from multiple possible locations (memoized)
+  const orchestratorPayload = useMemo(() => task?.params?.full_orchestrator_payload as any, [task?.params?.full_orchestrator_payload]);
+  const orchestratorDetails = useMemo(() => task?.params?.orchestrator_details as any, [task?.params?.orchestrator_details]);
   
   // Check if this is a character animate task
   const isCharacterAnimateTask = task?.taskType === 'animate_character';
@@ -46,6 +55,29 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
     orchestratorDetails?.additional_loras || 
     task?.params?.additional_loras
   ) as Record<string, any> | undefined;
+
+  // Get phase_config for phase-by-phase LoRA display (memoized to prevent random changes)
+  const phaseConfig = useMemo(() => {
+    return (
+      orchestratorPayload?.phase_config || 
+      orchestratorDetails?.phase_config || 
+      task?.params?.phase_config
+    ) as any;
+  }, [orchestratorPayload?.phase_config, orchestratorDetails?.phase_config, task?.params?.phase_config]);
+
+  // Memoize computed phase values to prevent flickering
+  const phaseStepsDisplay = useMemo(() => {
+    if (!phaseConfig?.steps_per_phase || !Array.isArray(phaseConfig.steps_per_phase)) return null;
+    const stepsArray = phaseConfig.steps_per_phase;
+    const total = stepsArray.reduce((a: number, b: number) => a + b, 0);
+    return `${stepsArray.join(' → ')} (${total} total)`;
+  }, [phaseConfig?.steps_per_phase]);
+
+  // Memoize phases with LoRAs to prevent array recreation
+  const phasesWithLoras = useMemo(() => {
+    if (!phaseConfig?.phases || !Array.isArray(phaseConfig.phases)) return [];
+    return phaseConfig.phases.filter((phase: any) => phase.loras && phase.loras.length > 0);
+  }, [phaseConfig?.phases]);
 
   // Size configuration based on variant
   const config = {
@@ -155,8 +187,50 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   const [startingVideoLoaded, setStartingVideoLoaded] = useState(false);
   const [endingVideoLoaded, setEndingVideoLoaded] = useState(false);
 
+  // Check if this is a video travel task (not character animate or join clips)
+  const isVideoTravelTask = !isCharacterAnimateTask && !isJoinClipsTask;
+
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'}`}>
+      {/* Variant Name Section - Only for Video Travel tasks in modal or panel variant */}
+      {isVideoTravelTask && (variant === 'modal' || variant === 'panel') && (generationName !== undefined || onGenerationNameChange) && (
+        <div className="space-y-1 pb-3 border-b border-muted-foreground/20">
+          <p className={`${config.textSize} font-medium text-muted-foreground`}>Variant Name</p>
+          {isEditingGenerationName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={generationName || ''}
+                onChange={(e) => onGenerationNameChange?.(e.target.value)}
+                onBlur={() => onEditingGenerationNameChange?.(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onEditingGenerationNameChange?.(false);
+                  } else if (e.key === 'Escape') {
+                    onEditingGenerationNameChange?.(false);
+                  }
+                }}
+                autoFocus
+                placeholder="Enter variant name..."
+                className="flex-1 px-2 py-1 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          ) : (
+            <div 
+              className="flex items-center justify-between group cursor-pointer hover:bg-muted/50 px-2 py-1 rounded transition-colors"
+              onClick={() => onEditingGenerationNameChange?.(true)}
+            >
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground ${!generationName && 'text-muted-foreground italic'}`}>
+                {generationName || 'Click to add variant name...'}
+              </p>
+              <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                Edit
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Character Animate Task Details */}
       {isCharacterAnimateTask && (
         <>
@@ -440,6 +514,55 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </div>
       )}
 
+      {/* Advanced Phase Settings - Show after images when phase_config is present */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && phaseConfig?.phases && (
+        <div className="pt-3 border-t border-muted-foreground/20">
+          <div className="space-y-2">
+            <p className={`${config.textSize} font-medium text-muted-foreground mb-2`}>Advanced Phase Settings</p>
+            <div className={`grid gap-2 ${config.gridCols}`}>
+              <div className="space-y-1">
+                <p className={`${config.textSize} font-medium text-muted-foreground`}>Phases</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                  {phaseConfig.num_phases || phaseConfig.phases.length}
+                </p>
+              </div>
+              {phaseConfig.flow_shift !== undefined && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Flow Shift</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {phaseConfig.flow_shift}
+                  </p>
+                </div>
+              )}
+              {phaseConfig.sample_solver && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Solver</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground capitalize`}>
+                    {phaseConfig.sample_solver}
+                  </p>
+                </div>
+              )}
+              {phaseConfig.model_switch_phase !== undefined && (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Model Switch</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Phase {phaseConfig.model_switch_phase}
+                  </p>
+                </div>
+              )}
+            </div>
+            {phaseStepsDisplay && (
+              <div className="space-y-1 pt-1">
+                <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps per Phase</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                  {phaseStepsDisplay}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Video Guidance Section (for non-character-animate and non-join-clips tasks) */}
       {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
         // Check for video guidance data in multiple locations
@@ -603,7 +726,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       })()}
       
       {/* Prompts and Technical Settings (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && (
+      {!isCharacterAnimateTask && !isJoinClipsTask && !phaseConfig?.phases && (
       <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
         {/* Prompts Section */}
         <div className="space-y-3">
@@ -682,12 +805,15 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         
         {/* Technical Settings */}
         <div className={`grid gap-2 ${config.gridCols}`}>
-          <div className="space-y-1">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps</p>
-            <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-              {orchestratorDetails?.steps || orchestratorPayload?.steps || task?.params?.num_inference_steps || 'N/A'}
-            </p>
-          </div>
+          {/* Hide basic Steps when phase_config is present (shown in detail above) */}
+          {!phaseConfig?.phases && (
+            <div className="space-y-1">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps</p>
+              <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                {orchestratorDetails?.steps || orchestratorPayload?.steps || task?.params?.num_inference_steps || 'N/A'}
+              </p>
+            </div>
+          )}
           <div className="space-y-1">
             <p className={`${config.textSize} font-medium text-muted-foreground`}>Resolution</p>
             <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh || 'N/A'}</p>
@@ -712,36 +838,100 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       )}
 
       {/* LoRAs Section (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && additionalLoras && Object.keys(additionalLoras).length > 0 && (
-        <div className="pt-2 border-t border-muted-foreground/20">
-          <div className="space-y-2">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs Used</p>
-            <div className="space-y-1">
-              {Object.entries(additionalLoras).slice(0, config.maxLoras).map(([url, strength]) => {
-                const fileName = url.split('/').pop() || 'Unknown';
-                const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
-                return (
-                  <div key={url} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
-                    <div className="flex-1 min-w-0">
-                      <p className={`${config.fontWeight} truncate`} title={displayName}>
-                        {displayName.length > config.loraNameLength ? displayName.slice(0, config.loraNameLength) + '...' : displayName}
-                      </p>
+      {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
+        // Check if we have phase_config with phases
+        const hasPhaseConfig = phasesWithLoras.length > 0;
+        
+        if (hasPhaseConfig) {
+          // Display phase-by-phase LoRAs using memoized phasesWithLoras
+          return (
+            <div className="pt-2 border-t border-muted-foreground/20">
+              <div className="space-y-3">
+                <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs by Phase</p>
+                {phasesWithLoras.map((phase: any) => {
+                  const stepsPerPhase = phaseConfig.steps_per_phase?.[phase.phase - 1];
+                  return (
+                    <div key={phase.phase} className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <p className={`${config.textSize} font-medium text-foreground`}>
+                          Phase {phase.phase}
+                        </p>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          {stepsPerPhase && (
+                            <span className={`${config.textSize} ${config.fontWeight}`}>
+                              {stepsPerPhase} step{stepsPerPhase !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {phase.guidance_scale !== undefined && (
+                            <>
+                              <span className={`${config.textSize}`}>•</span>
+                              <span className={`${config.textSize} ${config.fontWeight}`}>
+                                CFG: {phase.guidance_scale}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1 ml-2">
+                        {phase.loras.map((lora: any, idx: number) => {
+                          const fileName = lora.url.split('/').pop() || 'Unknown';
+                          const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
+                          return (
+                            <div key={idx} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
+                              <div className="flex-1 min-w-0">
+                                <p className={`${config.fontWeight} truncate`} title={displayName}>
+                                  {displayName.length > config.loraNameLength ? displayName.slice(0, config.loraNameLength) + '...' : displayName}
+                                </p>
+                              </div>
+                              <div className={`${config.fontWeight} text-muted-foreground ml-1`}>
+                                {lora.multiplier}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className={`${config.fontWeight} text-muted-foreground ml-1`}>
-                      {strength}
-                    </div>
-                  </div>
-                );
-              })}
-              {Object.keys(additionalLoras).length > config.maxLoras && (
-                <p className={`${config.textSize} text-muted-foreground`}>
-                  +{Object.keys(additionalLoras).length - config.maxLoras} more
-                </p>
-              )}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        } else if (additionalLoras && Object.keys(additionalLoras).length > 0) {
+          // Fall back to non-phase LoRA display
+          return (
+            <div className="pt-2 border-t border-muted-foreground/20">
+              <div className="space-y-2">
+                <p className={`${config.textSize} font-medium text-muted-foreground`}>LoRAs Used</p>
+                <div className="space-y-1">
+                  {Object.entries(additionalLoras).slice(0, config.maxLoras).map(([url, strength]) => {
+                    const fileName = url.split('/').pop() || 'Unknown';
+                    const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
+                    return (
+                      <div key={url} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className={`${config.fontWeight} truncate`} title={displayName}>
+                            {displayName.length > config.loraNameLength ? displayName.slice(0, config.loraNameLength) + '...' : displayName}
+                          </p>
+                        </div>
+                        <div className={`${config.fontWeight} text-muted-foreground ml-1`}>
+                          {strength}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {Object.keys(additionalLoras).length > config.maxLoras && (
+                    <p className={`${config.textSize} text-muted-foreground`}>
+                      +{Object.keys(additionalLoras).length - config.maxLoras} more
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        
+        return null;
+      })()}
     </div>
   );
 };

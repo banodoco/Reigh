@@ -201,6 +201,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     pairPrompts, // Use reactive pairPrompts value directly
     updatePairPrompts, // Direct update by shot_generation.id
     updatePairPromptsByIndex,
+    clearEnhancedPrompt,
     clearAllEnhancedPrompts
   } = hookData;
   
@@ -461,6 +462,34 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 }}
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
+                onClearEnhancedPrompt={async (pairIndex) => {
+                  try {
+                    // Convert pairIndex to generation ID using the same logic as pair prompts
+                    // Filter out videos to match the timeline display
+                    const filteredGenerations = shotGenerations.filter(sg => {
+                      if (!sg.generation) return false;
+                      const isVideo = sg.generation.type === 'video' ||
+                                     sg.generation.type === 'video_travel_output' ||
+                                     (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+                      return !isVideo;
+                    });
+
+                    const sortedGenerations = [...filteredGenerations]
+                      .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+
+                    // Get the first item of the pair
+                    const firstItem = sortedGenerations[pairIndex];
+                    if (!firstItem) {
+                      console.error('[ClearEnhancedPrompt] No generation found for pair index:', pairIndex);
+                      return;
+                    }
+
+                    console.log('[ClearEnhancedPrompt] Clearing enhanced prompt for pair:', pairIndex, 'generation:', firstItem.id.substring(0, 8));
+                    await clearEnhancedPrompt(firstItem.id);
+                  } catch (error) {
+                    console.error('[ClearEnhancedPrompt] Error:', error);
+                  }
+                }}
                 // Structure video props
                 structureVideoPath={propStructureVideoPath}
                 structureVideoMetadata={propStructureVideoMetadata}

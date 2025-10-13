@@ -356,10 +356,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     onClick={async () => {
                       try {
                         await onClearEnhancedPrompts();
-                        toast.success('Enhanced prompts cleared');
                       } catch (error) {
                         console.error('Error clearing enhanced prompts:', error);
-                        toast.error('Failed to clear enhanced prompts');
                       }
                     }}
                     className="text-[11px] leading-tight"
@@ -453,6 +451,55 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               )}
             </div>
 
+            
+            {/* Steps and Amount of Motion sliders - shown when NOT in turbo mode and NOT in advanced mode */}
+            {!turboMode && !advancedMode && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                <div className="relative">
+                  <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation steps: {batchVideoSteps}</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                        <Info className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Slider
+                    id="batchVideoSteps"
+                    min={3}
+                    max={12}
+                    step={3}
+                    value={[batchVideoSteps]}
+                    onValueChange={(value) => onBatchVideoStepsChange(value[0])}
+                  />
+                </div>
+                
+                <div className="relative">
+                  <Label htmlFor="amountOfMotion" className="text-sm font-light block mb-1">Amount of motion: {amountOfMotion}</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                        <Info className="h-4 w-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Controls the amount of motion in the generated video. <br /> 0 = minimal motion, 100 = maximum motion.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Slider
+                    id="amountOfMotion"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[amountOfMotion]}
+                    onValueChange={(value) => onAmountOfMotionChange(value[0])}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Advanced Mode Toggle */}
             <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
@@ -823,55 +870,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </Card>
               </CollapsibleContent>
             </Collapsible>
-            
-            {/* Steps and Amount of Motion sliders - shown when NOT in turbo mode and NOT in advanced mode */}
-            {!turboMode && !advancedMode && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <div className="relative">
-                  <Label htmlFor="batchVideoSteps" className="text-sm font-light block mb-1">Generation steps: {batchVideoSteps}</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Number of processing steps for each frame. <br /> Higher values can improve quality but increase generation time.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Slider
-                    id="batchVideoSteps"
-                    min={3}
-                    max={12}
-                    step={3}
-                    value={[batchVideoSteps]}
-                    onValueChange={(value) => onBatchVideoStepsChange(value[0])}
-                  />
-                </div>
-                
-                <div className="relative">
-                  <Label htmlFor="amountOfMotion" className="text-sm font-light block mb-1">Amount of motion: {amountOfMotion}</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Controls the amount of motion in the generated video. <br /> 0 = minimal motion, 100 = maximum motion.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Slider
-                    id="amountOfMotion"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={[amountOfMotion]}
-                    onValueChange={(value) => onAmountOfMotionChange(value[0])}
-                  />
-                </div>
-              </div>
-            )}
             
             {/* LoRA Selector Modal for Phase Config */}
             <LoraSelectorModal

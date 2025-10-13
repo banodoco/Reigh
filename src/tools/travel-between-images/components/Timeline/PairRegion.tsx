@@ -1,6 +1,7 @@
 import React from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
+import { Button } from "@/shared/components/ui/button";
 import { framesToSeconds } from "./utils/time-utils";
 
 interface PairRegionProps {
@@ -29,6 +30,7 @@ interface PairRegionProps {
   defaultNegativePrompt?: string;
   showLabel: boolean;
   autoCreateIndividualPrompts?: boolean;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
 }
 
 const PairRegion: React.FC<PairRegionProps> = ({
@@ -52,6 +54,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
   defaultNegativePrompt,
   showLabel,
   autoCreateIndividualPrompts,
+  onClearEnhancedPrompt,
 }) => {
   const pairColorSchemes = [
     { bg: 'bg-blue-50', border: 'border-blue-300', context: 'bg-blue-200/60', text: 'text-blue-700', line: 'bg-blue-400' },
@@ -163,7 +166,23 @@ const PairRegion: React.FC<PairRegionProps> = ({
                 </div>
                 {enhancedPrompt && enhancedPrompt.trim() && (
                   <div className="pt-1 border-t border-border/50">
-                    <span className="font-medium">Enhanced Prompt:</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium">Enhanced Prompt:</span>
+                      {onClearEnhancedPrompt && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onClearEnhancedPrompt(index);
+                          }}
+                          className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          title="Clear enhanced prompt"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm">
                       {enhancedPrompt.trim()}
                     </p>

@@ -22,11 +22,15 @@ export function deepMerge(target: any, source: any): any {
   Object.keys(source).forEach(key => {
     if (source[key] === undefined) return;
     
-    if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
-      // If it's an object (but not an array), merge recursively
+    // Special handling for arrays - always deep clone to prevent reference sharing
+    if (Array.isArray(source[key])) {
+      // For arrays, we replace entirely but deep clone to prevent mutations
+      output[key] = JSON.parse(JSON.stringify(source[key]));
+    } else if (typeof source[key] === 'object' && source[key] !== null) {
+      // For objects (but not arrays), merge recursively
       output[key] = deepMerge(target[key], source[key]);
     } else {
-      // Otherwise, just assign the value
+      // For primitives, just assign the value
       output[key] = source[key];
     }
   });

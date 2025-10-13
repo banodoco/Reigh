@@ -1210,6 +1210,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const newContext: number | undefined = (params.frame_overlap_settings_expanded?.[0]) ?? orchestrator.frame_overlap_expanded?.[0] ?? params.frame_overlap_expanded;
       const newModel: string | undefined = params.model_name || orchestrator.model_name;
       const parsedResolution: string | undefined = params.parsed_resolution_wh;
+      const newGenerationMode: 'batch' | 'timeline' | undefined = orchestrator.generation_mode ?? params.generation_mode;
+      const newAdvancedMode: boolean | undefined = orchestrator.advanced_mode ?? params.advanced_mode;
+      const newPhaseConfig: any = orchestrator.phase_config ?? params.phase_config;
 
       if (newModel && newModel !== steerableMotionSettings.model_name) {
         // Apply model directly to settings
@@ -1236,14 +1239,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onBatchVideoStepsChange(newSteps);
       }
 
-      if (typeof parsedResolution === 'string' && /^(\d+)x(\d+)$/.test(parsedResolution)) {
-        const match = parsedResolution.match(/^(\d+)x(\d+)$/);
-        if (match) {
-          const [, w, h] = match;
-          onDimensionSourceChange('custom');
-          onCustomWidthChange(parseInt(w, 10));
-          onCustomHeightChange(parseInt(h, 10));
-        }
+      // NOTE: We intentionally DON'T apply parsedResolution here.
+      // The dimension source (project/firstImage/custom) should be controlled
+      // by the shot's aspect ratio settings, not overridden by task history.
+
+      // Apply generation mode (batch vs timeline)
+      if (newGenerationMode && (newGenerationMode === 'batch' || newGenerationMode === 'timeline')) {
+        console.log('[ApplySettings] Setting generation mode:', {
+          newGenerationMode,
+          currentMode: generationMode,
+          source: orchestrator.generation_mode ? 'orchestrator' : 'params'
+        });
+        onGenerationModeChange(newGenerationMode);
+      }
+
+      // Apply advanced mode and phase configuration
+      if (newAdvancedMode !== undefined) {
+        console.log('[ApplySettings] Setting advanced mode:', {
+          newAdvancedMode,
+          currentAdvancedMode: advancedMode,
+          hasPhaseConfig: !!newPhaseConfig,
+          source: orchestrator.advanced_mode !== undefined ? 'orchestrator' : 'params'
+        });
+        onAdvancedModeChange(newAdvancedMode);
+      }
+
+      if (newPhaseConfig) {
+        console.log('[ApplySettings] Setting phase configuration:', {
+          num_phases: newPhaseConfig.num_phases,
+          phases_count: newPhaseConfig.phases?.length,
+          steps_per_phase: newPhaseConfig.steps_per_phase,
+          flow_shift: newPhaseConfig.flow_shift,
+          model_switch_phase: newPhaseConfig.model_switch_phase,
+          sample_solver: newPhaseConfig.sample_solver,
+          source: orchestrator.phase_config ? 'orchestrator' : 'params'
+        });
+        onPhaseConfigChange(newPhaseConfig);
       }
 
       // Replace images if requested
@@ -1261,14 +1292,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             await Promise.allSettled(deletions);
           }
 
-          // Add input images in order
-          const additions = (inputImages || []).map(url => addImageToShotMutation.mutateAsync({
-            shot_id: selectedShot.id,
-            generation_id: '',
-            project_id: projectId,
-            imageUrl: url,
-            thumbUrl: url,
-          }));
+          // Calculate timeline positions based on segment_frames
+          // Extract segment_frames from orchestrator payload (frames per segment between images)
+          const segmentFrames = newFrames || 60; // Use the extracted frames value, fallback to 60
+          
+          console.log('[ApplySettings] Calculating timeline positions:', {
+            segmentFrames,
+            imageCount: inputImages.length,
+            extractedFrom: newFrames ? 'task params' : 'default'
+          });
+
+          // Add input images in order with calculated timeline_frame positions
+          const additions = (inputImages || []).map((url, index) => {
+            const timelineFrame = index * segmentFrames;
+            console.log('[ApplySettings] Adding image with timeline position:', {
+              index,
+              url: url.substring(url.lastIndexOf('/') + 1),
+              timelineFrame,
+              calculation: `${index} × ${segmentFrames}`
+            });
+            
+            return addImageToShotMutation.mutateAsync({
+              shot_id: selectedShot.id,
+              generation_id: '',
+              project_id: projectId,
+              imageUrl: url,
+              thumbUrl: url,
+              timelineFrame: timelineFrame, // Set the calculated timeline position
+            } as any); // Type assertion needed for new parameter
+          });
+          
           if (additions.length > 0) {
             await Promise.allSettled(additions);
           }
@@ -1291,8 +1344,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     onDimensionSourceChange,
     onCustomWidthChange,
     onCustomHeightChange,
+    onGenerationModeChange,
+    generationMode,
+    onAdvancedModeChange,
+    advancedMode,
+    onPhaseConfigChange,
     addImageToShotMutation,
     removeImageFromShotMutation,
+    steerableMotionSettings.model_name,
   ]);
 
   const applySettingsDirect = useCallback((settings: any) => {
@@ -1327,15 +1386,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (typeof newSteps === 'number' && !Number.isNaN(newSteps)) {
         onBatchVideoStepsChange(newSteps);
       }
-      if (typeof parsedResolution === 'string' && /^(\d+)x(\d+)$/.test(parsedResolution)) {
-        const match = parsedResolution.match(/^(\d+)x(\d+)$/);
-        if (match) {
-          const [, w, h] = match;
-          onDimensionSourceChange('custom');
-          onCustomWidthChange(parseInt(w, 10));
-          onCustomHeightChange(parseInt(h, 10));
-        }
-      }
+      
+      // NOTE: We intentionally DON'T apply parsedResolution here.
+      // The dimension source (project/firstImage/custom) should be controlled
+      // by the shot's aspect ratio settings, not overridden by task history.
 
     } catch (e) {
       console.error('Failed to apply settings:', e);

@@ -416,13 +416,15 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         video.removeEventListener('canplay', handleCanPlay);
         video.removeEventListener('loadeddata', handleCanPlay);
         video.removeEventListener('canplaythrough', handleCanPlay);
-        console.error('[GuidanceVideoStrip] Video ready timeout after 1s, readyState:', video.readyState);
-        // Try once more before giving up
-        if (video.readyState >= 1) {
-          resolve(true); // Has metadata, try anyway
-        } else {
+        
+        // Only log as warning if truly problematic (no metadata)
+        if (video.readyState < 1) {
+          console.warn('[GuidanceVideoStrip] Video timeout with no metadata (readyState:', video.readyState, '), retrying...');
           video.load(); // Force reload
           resolve(false);
+        } else {
+          // Has metadata (readyState >= 1), proceed - this is acceptable for slow networks
+          resolve(true);
         }
       }, 1000);
       
