@@ -1,6 +1,6 @@
 /* eslint-disable no-sequences */
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Infinity, Github, MessageCircle, Plus } from 'lucide-react';
+import { ArrowRight, Video, Users, FileText, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, GitBranch, X, HandHeart, Brain, Github, MessageCircle, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -718,74 +718,56 @@ export default function HomePage() {
               )}
             </FadeInSection>
 
-            {/* See Examples Trigger */}
+            {/* Social Icons */}
             <FadeInSection delayMs={350}>
-              <div className="mt-8 mb-6 flex justify-center">
-                {/* Placeholder icon to balance the design */}
-                <Infinity className="w-9 h-9 text-wes-vintage-gold/80" />
-                {/*
-                // Temporarily removed interactive "See examples" button
-                // <button
-                //   onClick={() => {
-                //     setIsExamplesButtonAnimating(true);
-                //     setIsExamplesPaneOpening(true);
-                //     setShowExamples(true);
-                //     // Reset animation state after pane is fully open
-                //     setTimeout(() => setIsExamplesButtonAnimating(false), 350);
-                //     setTimeout(() => setIsExamplesPaneOpening(false), 300);
-                //   }}
-                //   className={`group text-sm font-light text-muted-foreground hover:text-primary underline underline-offset-2 transition-colors duration-200 ${
-                //     isExamplesButtonAnimating ? 'animate-pulse' : ''
-                //   } ${
-                //     showExamples || isExamplesButtonAnimating
-                //       ? 'opacity-0 pointer-events-none'
-                //       : showCreativePartner || isCreativePartnerButtonAnimating || showPhilosophy || isPhilosophyButtonAnimating
-                //         ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100'
-                //         : 'opacity-100 pointer-events-auto transition-all duration-300'
-                //   }`}
-                // >
-                //   See examples
-                // </button>
-                */}
+              <div className="mt-12 flex justify-center">
+                <div className="flex flex-col items-center space-y-3">
+                  {/* GitHub and Discord icons side by side */}
+                  <div className="flex items-center space-x-3">
+                    <a
+                      href="https://github.com/your-repo"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
+                    >
+                      <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                    </a>
+                    <a
+                      href="https://discord.gg/D5K2c6kfhy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
+                    >
+                      <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                    </a>
+                  </div>
+                  
+                  {/* Placeholder icon beneath them */}
+                  <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
+                    <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
+                  </div>
+
+                  {/* Banodoco Logo */}
+                  <div className="mt-2">
+                    <a
+                      href="http://banodoco.ai/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block transition-all duration-700 ease-in-out hover:scale-110"
+                    >
+                      <img 
+                        src="/banodoco-gold.png" 
+                        alt="Banodoco" 
+                        className="w-9 h-9 object-contain opacity-80 hover:opacity-100 transition-all duration-700 ease-in-out hover:brightness-110 hover:saturate-150 hover:hue-rotate-[-15deg]" 
+                      />
+                    </a>
+                  </div>
+                </div>
               </div>
             </FadeInSection>
 
-
-
           </div>
         </div>
-
-        {/* Social Icons */}
-        <FadeInSection delayMs={400}>
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-30">
-            <div className="flex flex-col items-center space-y-2">
-              {/* GitHub and Discord icons side by side */}
-              <div className="flex items-center space-x-3">
-                <a
-                  href="https://github.com/your-repo"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
-                >
-                  <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
-                </a>
-                <a
-                  href="https://discord.gg/D5K2c6kfhy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
-                >
-                  <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
-                </a>
-              </div>
-              
-              {/* Placeholder icon beneath them */}
-              <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
-                <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
-              </div>
-            </div>
-          </div>
-        </FadeInSection>
 
         {/*
           Additional landing content (examples, community art, philosophy/FAQ, and decorative film strips)

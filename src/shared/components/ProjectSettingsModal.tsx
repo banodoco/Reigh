@@ -16,11 +16,28 @@ import { Project } from '@/types/project';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronDown, AlertTriangle } from 'lucide-react';
+import { ChevronDown, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
+import { recropAllReferences, ReferenceImage } from '@/shared/lib/recropReferences';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 
+
+interface ProjectImageSettings {
+  references?: ReferenceImage[];
+  selectedReferenceIdByShot?: Record<string, string | null>;
+  [key: string]: any;
+}
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -35,11 +52,19 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   const [aspectRatio, setAspectRatio] = useState<string>('');
   // Persistent project-level upload settings
   const { settings: uploadSettings, update: updateUploadSettings, isLoading: isLoadingUploadSettings } = useToolSettings<{ cropToProjectSize?: boolean }>('upload', { projectId: project?.id });
+  
+  // Project image settings for reference recropping
+  const { settings: imageSettings, update: updateImageSettings } = useToolSettings<ProjectImageSettings>('project-image-settings', { projectId: project?.id });
 
   const [cropToProjectSize, setCropToProjectSize] = useState<boolean>(true);
   const { updateProject, isUpdatingProject, deleteProject, isDeletingProject } = useProject();
   const [deleteConfirmText, setDeleteConfirmText] = useState<string>('');
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+  
+  // Recrop dialog state
+  const [showRecropDialog, setShowRecropDialog] = useState(false);
+  const [pendingUpdates, setPendingUpdates] = useState<{ name?: string; aspectRatio?: string } | null>(null);
+  const [isReprocessing, setIsReprocessing] = useState(false);
 
   useEffect(() => {
     if (project && isOpen) { // Also check isOpen to re-init when modal re-opens with same project
@@ -91,12 +116,95 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
         return;
     }
     
+    // Check if aspect ratio changed and we have references to recrop
+    const aspectRatioChanged = updates.aspectRatio && updates.aspectRatio !== project.aspectRatio;
+    const references = imageSettings?.references || [];
+    const hasReferencesToRecrop = references.some(ref => ref.styleReferenceImageOriginal);
+    
+    if (aspectRatioChanged && hasReferencesToRecrop) {
+      // Show confirmation dialog and store pending updates
+      setPendingUpdates(updates);
+      setShowRecropDialog(true);
+      return;
+    }
+    
+    // No recrop needed, proceed with normal update
+    await performProjectUpdate(updates);
+  };
+  
+  const performProjectUpdate = async (updates: { name?: string; aspectRatio?: string }, skipRecrop: boolean = false) => {
+    if (!project) return;
+    
     const success = await updateProject(project.id, updates);
     if (success) {
-      // Name in toast will be the new name if it was changed, or old name if only aspect ratio changed      
+      // If aspect ratio changed and we didn't skip recrop, perform recropping
+      if (!skipRecrop && updates.aspectRatio && updates.aspectRatio !== project.aspectRatio) {
+        await performRecrop(updates.aspectRatio);
+      }
       onOpenChange(false);
-    } 
+    }
     // Errors are handled within updateProject with toasts
+  };
+  
+  const performRecrop = async (newAspectRatio: string) => {
+    if (!project?.id) return;
+    
+    console.log('[ProjectSettings] 🎬 Starting recrop process for aspect ratio:', newAspectRatio);
+    setIsReprocessing(true);
+    
+    const references = imageSettings?.references || [];
+    const referencesWithOriginals = references.filter(ref => ref.styleReferenceImageOriginal);
+    
+    if (referencesWithOriginals.length === 0) {
+      console.log('[ProjectSettings] No references with originals to recrop');
+      setIsReprocessing(false);
+      return;
+    }
+    
+    const toastId = toast.loading(`Re-cropping ${referencesWithOriginals.length} reference image${referencesWithOriginals.length > 1 ? 's' : ''}...`);
+    
+    try {
+      console.log('[ProjectSettings] Reprocessing', referencesWithOriginals.length, 'references');
+      
+      // Reprocess all references
+      const updatedReferences = await recropAllReferences(
+        references,
+        newAspectRatio,
+        (current, total) => {
+          toast.loading(`Re-cropping references... ${current}/${total}`, { id: toastId });
+        }
+      );
+      
+      console.log('[ProjectSettings] Recrop complete, updating settings...');
+      
+      // Save updated references
+      await updateImageSettings('project', {
+        references: updatedReferences
+      });
+      
+      toast.success(`Successfully re-cropped ${referencesWithOriginals.length} reference image${referencesWithOriginals.length > 1 ? 's' : ''}`, { id: toastId });
+    } catch (error) {
+      console.error('[ProjectSettings] Failed to recrop references:', error);
+      toast.error("Failed to re-crop some references. You may need to re-upload them.", { id: toastId });
+    } finally {
+      setIsReprocessing(false);
+    }
+  };
+  
+  const handleRecropConfirm = async () => {
+    setShowRecropDialog(false);
+    if (pendingUpdates) {
+      await performProjectUpdate(pendingUpdates, false); // Perform with recrop
+      setPendingUpdates(null);
+    }
+  };
+  
+  const handleRecropSkip = async () => {
+    setShowRecropDialog(false);
+    if (pendingUpdates) {
+      await performProjectUpdate(pendingUpdates, true); // Skip recrop
+      setPendingUpdates(null);
+    }
   };
 
   const handleDeleteProject = async () => {
@@ -219,18 +327,55 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
           </div>
         </div>
         <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-0 flex-row justify-between' : 'px-6 pt-5 pb-0'} border-t`}>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject} className={modal.isMobile ? '' : 'mr-auto'}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdatingProject || isReprocessing} className={modal.isMobile ? '' : 'mr-auto'}>
             Cancel
           </Button>
           <Button 
             type="submit" 
             onClick={handleSaveChanges} 
-            disabled={isUpdatingProject || !projectName.trim() || !aspectRatio}
+            disabled={isUpdatingProject || isReprocessing || !projectName.trim() || !aspectRatio}
           >
-            {isUpdatingProject ? "Saving..." : "Save Changes"}
+            {isUpdatingProject || isReprocessing ? "Processing..." : "Save Changes"}
           </Button>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Recrop Confirmation Dialog */}
+      <AlertDialog open={showRecropDialog} onOpenChange={setShowRecropDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-purple-500" />
+              Re-crop Reference Images?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p>
+                You've changed the project's aspect ratio. Would you like to automatically re-crop 
+                all reference images to match the new dimensions?
+              </p>
+              <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-md p-3">
+                <p className="text-sm text-purple-900 dark:text-purple-100">
+                  <strong>✓ Recommended:</strong> This will preserve your original images and regenerate 
+                  the cropped versions. Your originals are never modified.
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {imageSettings?.references?.filter(ref => ref.styleReferenceImageOriginal).length || 0} reference 
+                image{imageSettings?.references?.filter(ref => ref.styleReferenceImageOriginal).length !== 1 ? 's' : ''} will be reprocessed.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleRecropSkip}>
+              Skip Re-crop
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleRecropConfirm} className="bg-purple-600 hover:bg-purple-700">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Re-crop Images
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }; 
