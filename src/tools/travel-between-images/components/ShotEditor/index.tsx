@@ -1227,8 +1227,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (typeof newPrompt === 'string') {
         onBatchVideoPromptChange(newPrompt);
       }
-      if (typeof newNegativePrompt === 'string') {
-        onSteerableMotionSettingsChange({ negative_prompt: newNegativePrompt });
+      // Apply negative prompt - clear it if task didn't have one
+      if (newNegativePrompt !== undefined) {
+        console.log('[ApplySettings] Setting negative prompt:', {
+          hasNegativePrompt: !!newNegativePrompt,
+          willClear: !newNegativePrompt
+        });
+        onSteerableMotionSettingsChange({ negative_prompt: newNegativePrompt || '' });
       }
       if (typeof newFrames === 'number' && !Number.isNaN(newFrames)) {
         onBatchVideoFramesChange(newFrames);
