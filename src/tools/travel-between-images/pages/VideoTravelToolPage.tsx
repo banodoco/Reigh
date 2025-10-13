@@ -1307,11 +1307,14 @@ const VideoTravelToolPage: React.FC = () => {
   // };
 
   const handleSteerableMotionSettingsChange = useCallback((settings: Partial<typeof steerableMotionSettings>) => {
-    shotSettings.updateField('steerableMotionSettings', {
-      ...steerableMotionSettings,
-      ...settings
+    // FIX: Use functional update to get current value, not stale closure
+    shotSettings.updateFields({
+      steerableMotionSettings: {
+        ...shotSettings.settings.steerableMotionSettings,
+        ...settings
+      }
     });
-  }, [shotSettings, steerableMotionSettings]);
+  }, [shotSettings]);
 
   // Mode change handler removed - now hardcoded to use specific model
 
