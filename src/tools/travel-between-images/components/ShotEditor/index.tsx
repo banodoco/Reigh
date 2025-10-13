@@ -1560,10 +1560,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Note: Pair prompts are now managed through the database via ShotImagesEditor
   // The generation logic will need to be updated to fetch pair prompts from the database
 
-  // Check if generation should be disabled due to missing OpenAI API key for enhance prompt
-  const openaiApiKey = getApiKey('openai_api_key');
-  const isGenerationDisabledDueToApiKey = enhancePrompt && (!openaiApiKey || openaiApiKey.trim() === '');
-  const isGenerationDisabled = isSteerableMotionEnqueuing || isGenerationDisabledDueToApiKey;
+  const isGenerationDisabled = isSteerableMotionEnqueuing;
 
   // Handle video generation
   const handleGenerateBatch = useCallback(async () => {
@@ -1969,7 +1966,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
       enhance_prompt: enhancePrompt || autoCreateIndividualPrompts,
-      openai_api_key: enhancePrompt ? openaiApiKey : '',
       // Save UI state settings (dimension_source removed - now using aspect ratios only)
       generation_mode: generationMode,
       random_seed: randomSeed,
@@ -2025,7 +2021,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       enhancePrompt,
       autoCreateIndividualPrompts, 
       enhance_prompt_value: enhancePrompt || autoCreateIndividualPrompts,
-      openai_api_key_provided: !!((enhancePrompt || autoCreateIndividualPrompts) ? openaiApiKey : ''),
       requestBody_enhance_prompt: requestBody.enhance_prompt,
       // CRITICAL: Verify enhanced_prompts is NOT being sent when empty
       enhanced_prompts_included_in_request: 'enhanced_prompts' in requestBody,
@@ -2071,7 +2066,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     accelerated,
     selectedShot,
     enhancePrompt,
-    openaiApiKey,
     randomSeed,
     turboMode,
     amountOfMotion,
@@ -2420,17 +2414,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                           ? 'Creating Tasks...' 
                           : 'Generate Video'}
                     </Button>
-                    {isGenerationDisabledDueToApiKey && (
-                      <p className="text-xs text-center text-muted-foreground mt-2">
-                        If Enhance Prompt is enabled, you must add an{' '}
-                        <button 
-                          onClick={() => actions.setSettingsModalOpen(true)}
-                          className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
-                        >
-                          OpenAI API key
-                        </button>
-                      </p>
-                    )}
                   </div>
                 </div>
             </CardContent>
@@ -2575,17 +2558,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                     ? 'Creating Tasks...' 
                     : 'Generate Video'}
               </Button>
-              {isGenerationDisabledDueToApiKey && (
-                <p className="text-xs text-center text-muted-foreground mt-2">
-                  If Enhance Prompt is enabled, you must add an{' '}
-                  <button 
-                    onClick={() => actions.setSettingsModalOpen(true)}
-                    className="underline text-blue-600 hover:text-blue-800 cursor-pointer"
-                  >
-                    OpenAI API key
-                  </button>
-                </p>
-              )}
             </div>
           </div>
         </div>
