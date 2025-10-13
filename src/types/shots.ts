@@ -11,6 +11,7 @@ export interface GenerationRow {
   isOptimistic?: boolean;
   shotImageEntryId?: string; // ID from the shot_images table linking shot to generation
   name?: string; // Optional variant name
+  timeline_frame?: number; // Position in timeline (from shot_generations table)
 }
 
 export interface Shot {

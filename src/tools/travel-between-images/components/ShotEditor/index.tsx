@@ -1001,8 +1001,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     if (steerableMotionSettings.model_name !== targetModel) {
       console.log(`[ShotEditor] Setting model based on turbo mode: ${targetModel} (turbo: ${turboMode})`);
       onSteerableMotionSettingsChange({ 
-        model_name: targetModel,
-        apply_causvid: false
+        model_name: targetModel
       });
     }
   }, [turboMode, steerableMotionSettings.model_name, onSteerableMotionSettingsChange]);
@@ -1219,8 +1218,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (newModel && newModel !== steerableMotionSettings.model_name) {
         // Apply model directly to settings
         onSteerableMotionSettingsChange({ 
-          model_name: newModel,
-          apply_causvid: false
+          model_name: newModel
         });
       }
 
@@ -1502,8 +1500,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       if (newModel && newModel !== steerableMotionSettings.model_name) {
         onSteerableMotionSettingsChange({ 
-          model_name: newModel,
-          apply_causvid: false
+          model_name: newModel
         });
       }
       if (typeof newPrompt === 'string') {
