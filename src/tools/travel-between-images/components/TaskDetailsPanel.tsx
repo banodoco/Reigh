@@ -20,7 +20,6 @@ interface TaskDetailsPanelProps {
   inputImages: string[];
   replaceImages: boolean;
   onReplaceImagesChange: (checked: boolean) => void;
-  onApplySettings?: (settings: any) => void;
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   taskId: string | null;
   className?: string;
@@ -41,7 +40,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   inputImages, 
   replaceImages, 
   onReplaceImagesChange, 
-  onApplySettings, 
   onApplySettingsFromTask, 
   taskId,
   className = "",
@@ -61,14 +59,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   
   // Get task type info from database to check content_type
   const { data: taskTypeInfo } = useTaskType(task?.taskType || null);
-
-
-
-  const handleApplySettings = () => {
-    if (task && onApplySettings) {
-      onApplySettings(task.params);
-    }
-  };
 
   const handleApplySettingsFromTask = () => {
     if (taskId && onApplySettingsFromTask && task) {

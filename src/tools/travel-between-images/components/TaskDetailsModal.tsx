@@ -29,7 +29,6 @@ import { SharedTaskDetails } from './SharedTaskDetails';
 interface TaskDetailsModalProps {
   generationId: string;
   children?: ReactNode;
-  onApplySettings?: (settings: any) => void;
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   onClose?: () => void;
   onShowVideo?: () => void;
@@ -38,7 +37,7 @@ interface TaskDetailsModalProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettings, onApplySettingsFromTask, onClose, onShowVideo, isVideoContext, open, onOpenChange }) => {
+const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, children, onApplySettingsFromTask, onClose, onShowVideo, isVideoContext, open, onOpenChange }) => {
   const isMobile = useIsMobile();
   const modal = useLargeModal();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -122,15 +121,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     };
   }, [isOpen, generationId]); // Removed getTaskIdMutation to avoid infinite loop
 
-  const handleApplySettings = () => {
-    if (task && onApplySettings) {
-      onApplySettings(task.params);
-    }
-    setIsOpen(false);
-    onClose?.();
-  };
-
-    const handleApplySettingsFromTask = () => {
+  const handleApplySettingsFromTask = () => {
     if (taskId && onApplySettingsFromTask && task) {
       // Pass the correctly ordered inputImages array (derived from task JSON sources)
       onApplySettingsFromTask(taskId, replaceImages, inputImages);

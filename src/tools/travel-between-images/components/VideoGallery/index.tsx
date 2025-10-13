@@ -89,25 +89,7 @@ interface VideoOutputsGalleryProps {
   onDelete: (generationId: string) => void;
   deletingVideoId: string | null;
   /**
-   * Apply settings extracted from a task/generation directly.
-   */
-  onApplySettings: (settings: {
-    prompt?: string;
-    prompts?: string[];
-    negativePrompt?: string;
-    negativePrompts?: string[];
-    steps?: number;
-    frame?: number;
-    frames?: number[];
-    context?: number;
-    contexts?: number[];
-    width?: number;
-    height?: number;
-    replaceImages?: boolean;
-    inputImages?: string[];
-  }) => void;
-  /**
-   * Alternative apply handler that operates using the original task id (server-side extraction).
+   * Apply handler that operates using the original task id (server-side extraction).
    */
   onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
@@ -143,7 +125,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   shotId,
   onDelete,
   deletingVideoId,
-  onApplySettings,
   onApplySettingsFromTask,
   onImageSaved,
   shotKey,
@@ -850,7 +831,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
               error: taskError,
               inputImages,
               taskId: lightboxTaskMapping?.taskId || null,
-              onApplyTaskSettings: onApplySettings,
               onApplySettingsFromTask,
               onClose: () => setLightboxIndex(null)
             }}
@@ -869,11 +849,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                 setShowTaskDetailsModal(false);
                 setSelectedVideoForDetails(null);
               }
-            }}
-            onApplySettings={(settings) => {
-              onApplySettings(settings);
-              setSelectedVideoForDetails(null);
-              setShowTaskDetailsModal(false);
             }}
             onApplySettingsFromTask={(taskId, replaceImages, inputImages) => {
               onApplySettingsFromTask(taskId, replaceImages, inputImages);

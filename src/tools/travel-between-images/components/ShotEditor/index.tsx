@@ -1487,56 +1487,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     loraManager,
   ]);
 
-  const applySettingsDirect = useCallback((settings: any) => {
-    try {
-      const orchestrator: any = settings?.full_orchestrator_payload || {};
-      const newPrompt: string | undefined = orchestrator.base_prompts_expanded?.[0] ?? settings?.prompt;
-      const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? settings?.negative_prompt;
-      const newSteps: number | undefined = orchestrator.steps ?? settings?.num_inference_steps;
-      const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? settings?.segment_frames_expanded;
-      const newContext: number | undefined = (settings?.frame_overlap_settings_expanded?.[0]) ?? orchestrator.frame_overlap_expanded?.[0] ?? settings?.frame_overlap_expanded;
-      const newModel: string | undefined = settings?.model_name || orchestrator.model_name;
-      const parsedResolution: string | undefined = settings?.parsed_resolution_wh;
-
-      if (newModel && newModel !== steerableMotionSettings.model_name) {
-        onSteerableMotionSettingsChange({ 
-          model_name: newModel
-        });
-      }
-      if (typeof newPrompt === 'string') {
-        onBatchVideoPromptChange(newPrompt);
-      }
-      if (typeof newNegativePrompt === 'string') {
-        onSteerableMotionSettingsChange({ negative_prompt: newNegativePrompt });
-      }
-      if (typeof newFrames === 'number' && !Number.isNaN(newFrames)) {
-        onBatchVideoFramesChange(newFrames);
-      }
-      if (typeof newContext === 'number' && !Number.isNaN(newContext)) {
-        onBatchVideoContextChange(newContext);
-      }
-      if (typeof newSteps === 'number' && !Number.isNaN(newSteps)) {
-        onBatchVideoStepsChange(newSteps);
-      }
-      
-      // NOTE: We intentionally DON'T apply parsedResolution here.
-      // The dimension source (project/firstImage/custom) should be controlled
-      // by the shot's aspect ratio settings, not overridden by task history.
-
-    } catch (e) {
-      console.error('Failed to apply settings:', e);
-    }
-  }, [
-    onBatchVideoPromptChange,
-    onSteerableMotionSettingsChange,
-    onBatchVideoFramesChange,
-    onBatchVideoContextChange,
-    onBatchVideoStepsChange,
-    onDimensionSourceChange,
-    onCustomWidthChange,
-    onCustomHeightChange,
-    steerableMotionSettings.model_name,
-  ]);
 
   // Early return check after all hooks are called (Rules of Hooks)
   if (!selectedShot) {
@@ -2173,7 +2123,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           shotId={selectedShotId}
           onDelete={generationActions.handleDeleteVideoOutput}
           deletingVideoId={state.deletingVideoId}
-          onApplySettings={applySettingsDirect}
           onApplySettingsFromTask={applySettingsFromTask}
           shotKey={selectedShotId}
           getShotVideoCount={getShotVideoCount}

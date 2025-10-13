@@ -70,7 +70,6 @@ interface MediaLightboxProps {
     error: any;
     inputImages: string[];
     taskId: string | null;
-    onApplyTaskSettings?: (settings: any) => void;
     onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
     onClose?: () => void;
   };
@@ -1962,10 +1961,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       taskId={taskDetailsData.taskId}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onApplySettings={taskDetailsData.onApplyTaskSettings ? (settings) => {
-                        taskDetailsData.onApplyTaskSettings?.(settings);
-                        onClose(); // Close lightbox after applying settings
-                      } : undefined}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
@@ -2251,10 +2246,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       taskId={taskDetailsData.taskId}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onApplySettings={taskDetailsData.onApplyTaskSettings ? (settings) => {
-                        taskDetailsData.onApplyTaskSettings?.(settings);
-                        onClose(); // Close lightbox after applying settings
-                      } : undefined}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
