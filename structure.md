@@ -178,7 +178,7 @@ Serverless functions handle AI processing, payments, and task management. For co
 | Page | Route | Description |
 |------|-------|-------------|
 | **ToolSelectorPage** | `/tools` | Grid of available tools (or `/` in non-web envs) |
-| **HomePage** | `/` | Landing page (web env only) |
+| **HomePage** | `/` | Landing page (web env only) with hero section, social icons (GitHub/Discord), and Banodoco logo linking to banodoco.ai |
 | **ShotsPage** | `/shots` | Project shots management |
 | **GenerationsPage** | `/generations` | Media gallery with filtering (type/shot/search) & pagination |
 | **PaymentSuccessPage** | `/payments/success` | Stripe payment confirmation |
@@ -244,7 +244,7 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 |---------|----------|---------|
 | **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments |
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
-| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns |
+| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`) |
 
 ---
 
