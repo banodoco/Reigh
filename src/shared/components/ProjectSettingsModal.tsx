@@ -21,16 +21,6 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { AspectRatioSelector } from '@/shared/components/AspectRatioSelector';
 import { recropAllReferences, ReferenceImage } from '@/shared/lib/recropReferences';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/shared/components/ui/alert-dialog";
 
 
 interface ProjectImageSettings {
@@ -61,9 +51,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   const [deleteConfirmText, setDeleteConfirmText] = useState<string>('');
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
   
-  // Recrop dialog state
-  const [showRecropDialog, setShowRecropDialog] = useState(false);
-  const [pendingUpdates, setPendingUpdates] = useState<{ name?: string; aspectRatio?: string } | null>(null);
+  // Recrop state
   const [isReprocessing, setIsReprocessing] = useState(false);
 
   useEffect(() => {
@@ -121,28 +109,22 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
     const references = imageSettings?.references || [];
     const hasReferencesToRecrop = references.some(ref => ref.styleReferenceImageOriginal);
     
+    // If aspect ratio changed and we have references, show processing state
     if (aspectRatioChanged && hasReferencesToRecrop) {
-      // Show confirmation dialog and store pending updates
-      setPendingUpdates(updates);
-      setShowRecropDialog(true);
-      return;
+      setIsReprocessing(true);
     }
     
-    // No recrop needed, proceed with normal update
-    await performProjectUpdate(updates);
-  };
-  
-  const performProjectUpdate = async (updates: { name?: string; aspectRatio?: string }, skipRecrop: boolean = false) => {
-    if (!project) return;
-    
+    // Save project updates
     const success = await updateProject(project.id, updates);
     if (success) {
-      // If aspect ratio changed and we didn't skip recrop, perform recropping
-      if (!skipRecrop && updates.aspectRatio && updates.aspectRatio !== project.aspectRatio) {
-        await performRecrop(updates.aspectRatio);
+      // If aspect ratio changed, perform recropping
+      if (aspectRatioChanged && hasReferencesToRecrop) {
+        await performRecrop(updates.aspectRatio!);
       }
       onOpenChange(false);
     }
+    
+    setIsReprocessing(false);
     // Errors are handled within updateProject with toasts
   };
   
@@ -150,29 +132,22 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
     if (!project?.id) return;
     
     console.log('[ProjectSettings] 🎬 Starting recrop process for aspect ratio:', newAspectRatio);
-    setIsReprocessing(true);
     
     const references = imageSettings?.references || [];
     const referencesWithOriginals = references.filter(ref => ref.styleReferenceImageOriginal);
     
     if (referencesWithOriginals.length === 0) {
       console.log('[ProjectSettings] No references with originals to recrop');
-      setIsReprocessing(false);
       return;
     }
     
-    const toastId = toast.loading(`Re-cropping ${referencesWithOriginals.length} reference image${referencesWithOriginals.length > 1 ? 's' : ''}...`);
-    
     try {
-      console.log('[ProjectSettings] Reprocessing', referencesWithOriginals.length, 'references');
+      console.log('[ProjectSettings] Reprocessing', referencesWithOriginals.length, 'references with originals out of', references.length, 'total');
       
-      // Reprocess all references
+      // Reprocess all references (no toast, button shows wait state)
       const updatedReferences = await recropAllReferences(
         references,
-        newAspectRatio,
-        (current, total) => {
-          toast.loading(`Re-cropping references... ${current}/${total}`, { id: toastId });
-        }
+        newAspectRatio
       );
       
       console.log('[ProjectSettings] Recrop complete, updating settings...');
@@ -182,28 +157,10 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
         references: updatedReferences
       });
       
-      toast.success(`Successfully re-cropped ${referencesWithOriginals.length} reference image${referencesWithOriginals.length > 1 ? 's' : ''}`, { id: toastId });
+      console.log('[ProjectSettings] ✅ Successfully updated', references.length, 'reference images');
     } catch (error) {
       console.error('[ProjectSettings] Failed to recrop references:', error);
-      toast.error("Failed to re-crop some references. You may need to re-upload them.", { id: toastId });
-    } finally {
-      setIsReprocessing(false);
-    }
-  };
-  
-  const handleRecropConfirm = async () => {
-    setShowRecropDialog(false);
-    if (pendingUpdates) {
-      await performProjectUpdate(pendingUpdates, false); // Perform with recrop
-      setPendingUpdates(null);
-    }
-  };
-  
-  const handleRecropSkip = async () => {
-    setShowRecropDialog(false);
-    if (pendingUpdates) {
-      await performProjectUpdate(pendingUpdates, true); // Skip recrop
-      setPendingUpdates(null);
+      toast.error("Failed to update some reference images. You may need to re-upload them.");
     }
   };
 
@@ -334,48 +291,21 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
             type="submit" 
             onClick={handleSaveChanges} 
             disabled={isUpdatingProject || isReprocessing || !projectName.trim() || !aspectRatio}
+            className={isReprocessing ? 'min-w-[280px]' : ''}
           >
-            {isUpdatingProject || isReprocessing ? "Processing..." : "Save Changes"}
+            {isReprocessing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Updating for new dimensions...
+              </>
+            ) : isUpdatingProject ? (
+              "Saving..."
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
-      
-      {/* Recrop Confirmation Dialog */}
-      <AlertDialog open={showRecropDialog} onOpenChange={setShowRecropDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5 text-purple-500" />
-              Re-crop Reference Images?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3 pt-2">
-              <p>
-                You've changed the project's aspect ratio. Would you like to automatically re-crop 
-                all reference images to match the new dimensions?
-              </p>
-              <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-md p-3">
-                <p className="text-sm text-purple-900 dark:text-purple-100">
-                  <strong>✓ Recommended:</strong> This will preserve your original images and regenerate 
-                  the cropped versions. Your originals are never modified.
-                </p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {imageSettings?.references?.filter(ref => ref.styleReferenceImageOriginal).length || 0} reference 
-                image{imageSettings?.references?.filter(ref => ref.styleReferenceImageOriginal).length !== 1 ? 's' : ''} will be reprocessed.
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleRecropSkip}>
-              Skip Re-crop
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleRecropConfirm} className="bg-purple-600 hover:bg-purple-700">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Re-crop Images
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Dialog>
   );
 }; 
