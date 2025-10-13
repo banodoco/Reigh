@@ -78,6 +78,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onAdvancedModeChange,
   phaseConfig,
   onPhaseConfigChange,
+  selectedPhasePresetId,
+  onPhasePresetSelect,
+  onPhasePresetRemove,
+  onBlurSave,
   autoCreateIndividualPrompts,
   onAutoCreateIndividualPromptsChange,
   generationMode,
@@ -539,29 +543,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const preTriggerOffset = isMobile ? 16 : 24; // Save/close just before sticky shows
       const shouldBeSticky = currentScroll > stickyThresholdY.current;
 
-      // Save/close slightly before sticky activates to avoid visual jump
-      if (state.isEditingName && !savedOnApproachRef.current && currentScroll > (stickyThresholdY.current - preTriggerOffset)) {
-        if (onUpdateShotName && state.editingName.trim() && state.editingName.trim() !== selectedShot?.name) {
-          onUpdateShotName(state.editingName.trim());
-        }
-        actions.setEditingName(false);
-        actions.setEditingNameValue(selectedShot?.name || '');
-        savedOnApproachRef.current = true;
+      // Do not auto-save/close while actively editing; user controls save/cancel
+      if (!state.isEditingName && !savedOnApproachRef.current && currentScroll > (stickyThresholdY.current - preTriggerOffset)) {
+        // no-op: previously auto-saved here; now disabled during edit to prevent blur
       }
 
       if (shouldBeSticky !== isStickyRef.current) {
         isStickyRef.current = shouldBeSticky;
         setIsSticky(shouldBeSticky);
-        
-        // Failsafe: if we somehow missed the pre-trigger, save/close when sticky activates
-        if (shouldBeSticky && state.isEditingName && !savedOnApproachRef.current) {
-          if (onUpdateShotName && state.editingName.trim() && state.editingName.trim() !== selectedShot?.name) {
-            onUpdateShotName(state.editingName.trim());
-          }
-          actions.setEditingName(false);
-          actions.setEditingNameValue(selectedShot?.name || '');
-          savedOnApproachRef.current = true;
-        }
+        // Do not force-close when sticky toggles while editing
       }
     };
 
@@ -577,7 +567,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
 
     computeThreshold();
-    checkSticky();
+    // Avoid immediate sticky check while editing to prevent instant blur
+    if (!state.isEditingName) {
+      checkSticky();
+    }
 
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onResize);
@@ -1020,20 +1013,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     actions.setEditingName(false);
   }, [selectedShot?.id, selectedShot?.name, actions]);
 
-  const handleNameClick = () => {
+  const handleNameClick = useCallback(() => {
     if (onUpdateShotName) {
       actions.setEditingName(true);
     }
-  };
+  }, [onUpdateShotName, actions]);
 
-  const handleNameSave = () => {
+  const handleNameSave = useCallback(() => {
     if (onUpdateShotName && state.editingName.trim() && state.editingName.trim() !== selectedShot?.name) {
       onUpdateShotName(state.editingName.trim());
     }
     actions.setEditingName(false);
-  };
+  }, [onUpdateShotName, state.editingName, selectedShot?.name, actions]);
 
-  const handleNameCancel = (e?: React.MouseEvent) => {
+  const handleNameCancel = useCallback((e?: React.MouseEvent) => {
     // Prevent event propagation to avoid clicking elements that appear after layout change
     if (e) {
       e.preventDefault();
@@ -1054,15 +1047,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         actions.setTransitioningFromNameEdit(false);
       }, 200);
     }, 100);
-  };
+  }, [selectedShot?.name, actions]);
 
-  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleNameSave();
     } else if (e.key === 'Escape') {
       handleNameCancel();
     }
-  };
+  }, [handleNameSave, handleNameCancel]);
 
   // Use state from the hook for optimistic updates on image list
   const localOrderedShotImages = state.localOrderedShotImages;
@@ -1213,6 +1206,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const newGenerationMode: 'batch' | 'timeline' | undefined = orchestrator.generation_mode ?? params.generation_mode;
       const newAdvancedMode: boolean | undefined = orchestrator.advanced_mode ?? params.advanced_mode;
       const newPhaseConfig: any = orchestrator.phase_config ?? params.phase_config;
+      const newSelectedPhasePresetId: string | null | undefined = orchestrator.selected_phase_preset_id ?? params.selected_phase_preset_id;
+      const newTurboMode: boolean | undefined = orchestrator.turbo_mode ?? params.turbo_mode;
+      const newEnhancePrompt: boolean | undefined = orchestrator.enhance_prompt ?? params.enhance_prompt;
+      const newAmountOfMotion: number | undefined = orchestrator.amount_of_motion ?? params.amount_of_motion;
+      const newLoras: Array<{ path: string; strength: number }> | undefined = orchestrator.loras ?? params.loras;
+      const newStructureVideoPath: string | null | undefined = orchestrator.structure_video_path ?? params.structure_video_path;
+      const newStructureVideoTreatment: 'adjust' | 'clip' | undefined = orchestrator.structure_video_treatment ?? params.structure_video_treatment;
+      const newStructureVideoMotionStrength: number | undefined = orchestrator.structure_video_motion_strength ?? params.structure_video_motion_strength;
+      const newStructureVideoType: 'flow' | 'canny' | 'depth' | undefined = orchestrator.structure_video_type ?? params.structure_video_type;
 
       if (newModel && newModel !== steerableMotionSettings.model_name) {
         // Apply model directly to settings
@@ -1275,6 +1277,89 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           source: orchestrator.phase_config ? 'orchestrator' : 'params'
         });
         onPhaseConfigChange(newPhaseConfig);
+      }
+
+      // Apply selected phase preset ID if provided (for UI state restoration)
+      if (newSelectedPhasePresetId !== undefined) {
+        console.log('[ApplySettings] Restoring phase preset ID:', {
+          selectedPhasePresetId: newSelectedPhasePresetId,
+          source: orchestrator.selected_phase_preset_id !== undefined ? 'orchestrator' : 'params'
+        });
+        if (newSelectedPhasePresetId && onPhasePresetSelect && newPhaseConfig) {
+          // If we have a preset ID and the phase config, restore the preset selection
+          onPhasePresetSelect(newSelectedPhasePresetId, newPhaseConfig);
+        } else if (newSelectedPhasePresetId === null && onPhasePresetRemove) {
+          // If preset ID is explicitly null, clear the preset
+          onPhasePresetRemove();
+        }
+      }
+
+      // Apply turbo mode
+      if (newTurboMode !== undefined && onTurboModeChange) {
+        console.log('[ApplySettings] Setting turbo mode:', {
+          newTurboMode,
+          currentTurboMode: turboMode,
+          source: orchestrator.turbo_mode !== undefined ? 'orchestrator' : 'params'
+        });
+        onTurboModeChange(newTurboMode);
+      }
+
+      // Apply enhance prompt
+      if (newEnhancePrompt !== undefined && onEnhancePromptChange) {
+        console.log('[ApplySettings] Setting enhance prompt:', {
+          newEnhancePrompt,
+          currentEnhancePrompt: enhancePrompt,
+          source: orchestrator.enhance_prompt !== undefined ? 'orchestrator' : 'params'
+        });
+        onEnhancePromptChange(newEnhancePrompt);
+      }
+
+      // Apply amount of motion (only if NOT in Advanced Mode)
+      if (newAmountOfMotion !== undefined && !newAdvancedMode && onAmountOfMotionChange) {
+        console.log('[ApplySettings] Setting amount of motion:', {
+          newAmountOfMotion,
+          currentAmountOfMotion: amountOfMotion,
+          convertedValue: newAmountOfMotion * 100, // Convert 0.0-1.0 to 0-100
+          source: orchestrator.amount_of_motion !== undefined ? 'orchestrator' : 'params'
+        });
+        onAmountOfMotionChange(newAmountOfMotion * 100); // Convert 0.0-1.0 to 0-100 for UI
+      }
+
+      // Apply LoRAs (only if NOT in Advanced Mode)
+      // Note: LoRAs are managed internally by the LoRA manager hook, so we need to trigger a reload
+      // The LoRA manager will sync with the saved LoRAs from the shot settings
+      if (newLoras && newLoras.length > 0 && !newAdvancedMode) {
+        console.log('[ApplySettings] LoRAs found in task params:', {
+          lorasCount: newLoras.length,
+          loras: newLoras.map(l => ({ path: l.path, strength: l.strength })),
+          source: orchestrator.loras !== undefined ? 'orchestrator' : 'params',
+          note: 'LoRA restoration requires page refresh or manual re-selection'
+        });
+        // TODO: LoRAs need to be restored via the LoRA manager
+        // For now, just log them - user can manually re-add them
+      }
+
+      // Apply structure video settings
+      if (newStructureVideoPath) {
+        console.log('[ApplySettings] Setting structure video:', {
+          path: newStructureVideoPath,
+          treatment: newStructureVideoTreatment,
+          motionStrength: newStructureVideoMotionStrength,
+          type: newStructureVideoType,
+          source: orchestrator.structure_video_path !== undefined ? 'orchestrator' : 'params'
+        });
+        // Use the local handler which has the correct signature
+        handleStructureVideoChange(
+          newStructureVideoPath,
+          null, // metadata will be fetched from the video path
+          newStructureVideoTreatment || 'adjust',
+          newStructureVideoMotionStrength ?? 1.0,
+          newStructureVideoType || 'flow'
+        );
+      } else if (newStructureVideoPath === null) {
+        // Explicitly clear structure video if it was null in the task
+        console.log('[ApplySettings] Clearing structure video (was null in task)');
+        handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
       }
 
       // Replace images if requested
@@ -1349,6 +1434,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     onAdvancedModeChange,
     advancedMode,
     onPhaseConfigChange,
+    onPhasePresetSelect,
+    onPhasePresetRemove,
+    onTurboModeChange,
+    turboMode,
+    onEnhancePromptChange,
+    enhancePrompt,
+    onAmountOfMotionChange,
+    amountOfMotion,
+    handleStructureVideoChange,
     addImageToShotMutation,
     removeImageFromShotMutation,
     steerableMotionSettings.model_name,
@@ -1502,41 +1596,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     let resolution: string | undefined = undefined;
 
+    // SIMPLIFIED RESOLUTION LOGIC - Only use aspect ratios (no more custom dimensions)
     // Priority 1: Check if shot has an aspect ratio set
     if (selectedShot?.aspect_ratio) {
       resolution = ASPECT_RATIO_TO_RESOLUTION[selectedShot.aspect_ratio];
-      if (!resolution) {
-        console.warn(`Shot aspect ratio "${selectedShot.aspect_ratio}" not found in ASPECT_RATIO_TO_RESOLUTION, falling back to dimension source`);
-      }
+      console.log('[Resolution] Using shot aspect ratio:', {
+        aspectRatio: selectedShot.aspect_ratio,
+        resolution
+      });
     }
 
-    // Priority 2: If no shot aspect ratio, use dimension source settings
-    if (!resolution && (dimensionSource || 'project') === 'firstImage' && simpleFilteredImages.length > 0) {
-      try {
-        const firstImage = simpleFilteredImages[0];
-        const imageUrl = getDisplayUrl(firstImage.imageUrl);
-        if (imageUrl) {          
-          const { width, height } = await getDimensions(imageUrl);
-          const imageAspectRatio = width / height;
-          const closestRatioKey = findClosestAspectRatio(imageAspectRatio);
-          resolution = ASPECT_RATIO_TO_RESOLUTION[closestRatioKey] || DEFAULT_RESOLUTION;
-        } else {
-          toast.warning("Could not get URL for the first image. Using project default resolution.");
-        }
-      } catch (error) {
-        console.error("Error getting first image dimensions:", error);
-        toast.warning("Could not determine first image dimensions. Using project default resolution.");
-      }
+    // Priority 2: If no shot aspect ratio, fall back to project aspect ratio
+    if (!resolution && effectiveAspectRatio) {
+      resolution = ASPECT_RATIO_TO_RESOLUTION[effectiveAspectRatio];
+      console.log('[Resolution] Using project aspect ratio:', {
+        aspectRatio: effectiveAspectRatio,
+        resolution
+      });
     }
 
-    if (!resolution && dimensionSource === 'custom') {
-      if (customWidth && customHeight) {
-        resolution = `${customWidth}x${customHeight}`;        
-      } else {
-        toast.error('Custom dimensions are selected, but width or height is not set.');
-        setIsSteerableMotionEnqueuing(false);
-        return;
-      }
+    // Priority 3: Use default resolution if nothing else is set
+    if (!resolution) {
+      resolution = DEFAULT_RESOLUTION;
+      console.log('[Resolution] Using default resolution:', resolution);
     }
 
     // Use getDisplayUrl to convert relative paths to absolute URLs
@@ -1879,23 +1961,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)
       ...(advancedMode ? {} : { steps: batchVideoSteps }),
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
-      // Force these settings to consistent defaults, except use_lighti2x_lora which follows accelerated mode (unless Wan 2.2)
-      apply_reward_lora: DEFAULT_STEERABLE_MOTION_SETTINGS.apply_reward_lora,
-      apply_causvid: steerableMotionSettings.apply_causvid,
-      use_lighti2x_lora: accelerated,
-      use_styleboost_loras: steerableMotionSettings.use_styleboost_loras ?? DEFAULT_STEERABLE_MOTION_SETTINGS.use_styleboost_loras,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
-      colour_match_videos: DEFAULT_STEERABLE_MOTION_SETTINGS.colour_match_videos, // Force to false, ignore saved settings
-      fade_in_duration: steerableMotionSettings.fade_in_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_in_duration,
-      fade_out_duration: steerableMotionSettings.fade_out_duration ?? DEFAULT_STEERABLE_MOTION_SETTINGS.fade_out_duration,
-      after_first_post_generation_saturation: steerableMotionSettings.after_first_post_generation_saturation ?? DEFAULT_STEERABLE_MOTION_SETTINGS.after_first_post_generation_saturation,
-      after_first_post_generation_brightness: steerableMotionSettings.after_first_post_generation_brightness ?? DEFAULT_STEERABLE_MOTION_SETTINGS.after_first_post_generation_brightness,
       enhance_prompt: enhancePrompt || autoCreateIndividualPrompts,
       openai_api_key: enhancePrompt ? openaiApiKey : '',
-      // Save UI state settings
-      dimension_source: dimensionSource,
+      // Save UI state settings (dimension_source removed - now using aspect ratios only)
       generation_mode: generationMode,
-      accelerated_mode: accelerated,
       random_seed: randomSeed,
       turbo_mode: turboMode,
       // Only include amount_of_motion if NOT in Advanced Mode
@@ -1903,7 +1973,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Advanced mode flag and phase config
       advanced_mode: advancedMode,
       phase_config: advancedMode && phaseConfig ? phaseConfig : undefined,
-      // selected_mode removed - now hardcoded to use specific model
+      // Include selected phase preset ID for UI state restoration
+      selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
       // Add generation name if provided
       generation_name: variantName.trim() || undefined,
     };
@@ -2000,6 +2071,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     amountOfMotion,
     advancedMode,
     phaseConfig,
+    selectedPhasePresetId,
     variantName,
     // selectedMode removed - now hardcoded to use specific model
     loraManager.selectedLoras,
@@ -2250,6 +2322,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onAdvancedModeChange={onAdvancedModeChange}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={onPhaseConfigChange}
+                            selectedPhasePresetId={selectedPhasePresetId}
+                            onPhasePresetSelect={onPhasePresetSelect}
+                            onPhasePresetRemove={onPhasePresetRemove}
+                            onBlurSave={onBlurSave}
                             onClearEnhancedPrompts={clearAllEnhancedPrompts}
                         />
                         

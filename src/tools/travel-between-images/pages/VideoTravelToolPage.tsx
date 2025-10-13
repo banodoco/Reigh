@@ -13,7 +13,7 @@ import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
-import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +31,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import ShotEditor from '../components/ShotEditor';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
+import { useShotSettings } from '../hooks/useShotSettings';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
@@ -176,11 +177,11 @@ const VideoTravelToolPage: React.FC = () => {
     refetchShots,
     availableLoras,
     lorasLoading,
-    settings,
-    updateSettings,
-    settingsLoading: isLoadingSettings,
+    settings: _oldSettings, // Keep for reference during migration, will remove
+    updateSettings: _oldUpdateSettings, // Keep for reference during migration, will remove
+    settingsLoading: _oldIsLoadingSettings,
     settingsUpdating: isUpdating,
-    settingsError,
+    settingsError: _oldSettingsError,
     projectSettings,
     updateProjectSettings,
     projectSettingsLoading,
@@ -188,6 +189,9 @@ const VideoTravelToolPage: React.FC = () => {
     projectUISettings,
     shotLoraSettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
+  
+  // NEW: Modern settings management using dedicated hook
+  const shotSettings = useShotSettings(selectedShot?.id, selectedProjectId);
 
   // [VideoTravelDebug] Log the data loading states - reduced frequency
   if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
@@ -226,115 +230,96 @@ const VideoTravelToolPage: React.FC = () => {
   // Memoized callbacks to prevent infinite re-renders
   const noOpCallback = useCallback(() => {}, []);
   
+  // ✅ NEW: All handlers now use shotSettings.updateField - much simpler!
   const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setVideoControlMode(mode);
-  }, []);
+    shotSettings.updateField('videoControlMode', mode);
+  }, [shotSettings]);
 
   const handlePairConfigChange = useCallback((pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setVideoPairConfigs(prev => prev.map(p => p.id === pairId ? { ...p, [field]: value } : p));
-  }, []);
+    const currentPairConfigs = shotSettings.settings?.pairConfigs || [];
+    const updated = currentPairConfigs.map(p => p.id === pairId ? { ...p, [field]: value } : p);
+    shotSettings.updateField('pairConfigs', updated);
+  }, [shotSettings]);
 
   const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setBatchVideoPrompt(prompt);
-  }, []);
+    shotSettings.updateField('batchVideoPrompt', prompt);
+  }, [shotSettings]);
+  
+  // ✅ NEW: Immediate save handler using hook - much simpler!
+  const handleBlurSave = useCallback(() => {
+    console.log('[PhaseConfigTrack] 🔵 Blur save triggered - saving immediately');
+    shotSettings.saveImmediate();
+  }, [shotSettings]);
 
   const handleBatchVideoFramesChange = useCallback((frames: number) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setBatchVideoFrames(frames);
-  }, []);
+    shotSettings.updateField('batchVideoFrames', frames);
+  }, [shotSettings]);
 
   const handleBatchVideoContextChange = useCallback((context: number) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setBatchVideoContext(context);
-  }, []);
+    shotSettings.updateField('batchVideoContext', context);
+  }, [shotSettings]);
 
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
-    if (!hasLoadedInitialSettings.current) {
-      console.log('[BatchVideoSteps] Ignoring change - settings not loaded yet:', steps);
-      return;
-    }
     console.log('[BatchVideoSteps] User changing steps to:', steps);
-    userHasInteracted.current = true;
-    setBatchVideoSteps(steps);
-  }, []);
+    shotSettings.updateField('batchVideoSteps', steps);
+  }, [shotSettings]);
 
   const handleDimensionSourceChange = useCallback((source: 'project' | 'firstImage' | 'custom') => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
     setDimensionSource(source);
   }, []);
 
   const handleCustomWidthChange = useCallback((width?: number) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
     setCustomWidth(width);
   }, []);
 
   const handleCustomHeightChange = useCallback((height?: number) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
     setCustomHeight(height);
   }, []);
 
   const handleEnhancePromptChange = useCallback((enhance: boolean) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setEnhancePrompt(enhance);
-  }, []);
+    shotSettings.updateField('enhancePrompt', enhance);
+  }, [shotSettings]);
 
   const handleAutoCreateIndividualPromptsChange = useCallback((autoCreate: boolean) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setAutoCreateIndividualPrompts(autoCreate);
-  }, []);
+    shotSettings.updateField('autoCreateIndividualPrompts', autoCreate);
+  }, [shotSettings]);
 
   const handleTurboModeChange = useCallback((turbo: boolean) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setTurboMode(turbo);
-  }, []);
+    shotSettings.updateField('turboMode', turbo);
+  }, [shotSettings]);
 
   const handleAmountOfMotionChange = useCallback((motion: number) => {
-    if (!hasLoadedInitialSettings.current) return;
-    userHasInteracted.current = true;
-    setAmountOfMotion(motion);
-  }, []);
+    shotSettings.updateField('amountOfMotion', motion);
+  }, [shotSettings]);
 
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
-    if (!hasLoadedInitialSettings.current) return;
-    console.log('[AdvancedMode] User toggling advancedMode to:', advanced);
-    userHasInteracted.current = true;
-    setAdvancedMode(advanced);
+    console.log('[PhaseConfigTrack] 🎚️ User toggling advancedMode:', {
+      to: advanced,
+      shotId: selectedShot?.id?.substring(0, 8),
+      timestamp: Date.now()
+    });
     
-    // Initialize phaseConfig if turning on Advanced Mode and it's not set
-    if (advanced) {
-      setPhaseConfig((currentPhaseConfig) => {
-        if (!currentPhaseConfig) {
-          console.log('[AdvancedMode] Initializing phaseConfig to DEFAULT_PHASE_CONFIG');
-          return DEFAULT_PHASE_CONFIG;
-        }
-        return currentPhaseConfig;
+    // When turning on advanced mode, initialize phaseConfig if needed
+    const currentPhaseConfig = shotSettings.settings?.phaseConfig;
+    if (advanced && !currentPhaseConfig) {
+      console.log('[PhaseConfigTrack] Initializing phaseConfig to DEFAULT_PHASE_CONFIG');
+      shotSettings.updateFields({
+        advancedMode: advanced,
+        phaseConfig: DEFAULT_PHASE_CONFIG
       });
+    } else {
+      shotSettings.updateField('advancedMode', advanced);
     }
-  }, []);
+  }, [shotSettings, selectedShot?.id]);
 
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
-    if (!hasLoadedInitialSettings.current) return;
-    
     // Auto-set model_switch_phase to 1 when num_phases is 2
     const adjustedConfig = config.num_phases === 2 
       ? { ...config, model_switch_phase: 1 }
       : config;
     
-    console.log('[PhaseConfigDebug] Phase config changed by user:', {
+    console.log('[PhaseConfigTrack] 📝 User changed phase config:', {
+      shotId: selectedShot?.id?.substring(0, 8),
       num_phases: adjustedConfig.num_phases,
       model_switch_phase: adjustedConfig.model_switch_phase,
       phases_array_length: adjustedConfig.phases?.length,
@@ -346,21 +331,40 @@ const VideoTravelToolPage: React.FC = () => {
         lora_urls: p.loras?.map(l => l.url.split('/').pop()) // Show filenames for easier debugging
       })),
       steps_per_phase: adjustedConfig.steps_per_phase,
-      auto_adjusted: config.num_phases === 2 && config.model_switch_phase !== 1
+      auto_adjusted: config.num_phases === 2 && config.model_switch_phase !== 1,
+      timestamp: Date.now()
     });
-    userHasInteracted.current = true;
-    setPhaseConfig(adjustedConfig);
-  }, []);
+    
+    shotSettings.updateField('phaseConfig', adjustedConfig);
+  }, [shotSettings, selectedShot?.id]);
+
+  const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig) => {
+    console.log('[PhasePreset] User selected preset:', {
+      presetId: presetId.substring(0, 8),
+      shotId: selectedShot?.id?.substring(0, 8),
+      timestamp: Date.now()
+    });
+    
+    // Save both the preset ID and apply its config
+    shotSettings.updateFields({
+      selectedPhasePresetId: presetId,
+      phaseConfig: config
+    });
+  }, [shotSettings, selectedShot?.id]);
+
+  const handlePhasePresetRemove = useCallback(() => {
+    console.log('[PhasePreset] User removed preset:', {
+      shotId: selectedShot?.id?.substring(0, 8),
+      timestamp: Date.now()
+    });
+    
+    // Clear preset ID but keep the current config
+    shotSettings.updateField('selectedPhasePresetId', null);
+  }, [shotSettings, selectedShot?.id]);
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
-    // Always allow toggle to work - don't wait for settings to load
-    // This prevents the toggle from getting stuck if settings load slowly or fail
-    userHasInteracted.current = true;
-    setGenerationMode(mode);
-    
-    // If settings haven't loaded yet, we'll still save when they do load
-    // The user's selection will be preserved in the state
-  }, []);
+    shotSettings.updateField('generationMode', mode);
+  }, [shotSettings]);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
@@ -490,28 +494,31 @@ const VideoTravelToolPage: React.FC = () => {
     return loading;
   }, [shotsLoadingRaw, initializingFromHash]);
 
-  // Add state for video generation settings - wait for settings to load before initializing
-  const [videoControlMode, setVideoControlMode] = useState<'individual' | 'batch'>('batch');
-  const [batchVideoPrompt, setBatchVideoPrompt] = useState('');
-  const [batchVideoFrames, setBatchVideoFrames] = useState(60);
-  const [batchVideoContext, setBatchVideoContext] = useState(10);
-  const [batchVideoSteps, setBatchVideoSteps] = useState(6);
+  // ✅ NEW: All settings now derived from hook - no more individual useState calls!
+  const isMobile = useIsMobile();
+  const {
+    videoControlMode = 'batch',
+    batchVideoPrompt = '',
+    batchVideoFrames = 60,
+    batchVideoContext = 10,
+    batchVideoSteps = 6,
+    enhancePrompt = false,
+    autoCreateIndividualPrompts = true,
+    turboMode = false,
+    amountOfMotion = 50,
+    advancedMode = false,
+    phaseConfig,
+    selectedPhasePresetId,
+    pairConfigs = [],
+    generationMode = (isMobile ? 'batch' : 'timeline'),
+    steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
+  } = shotSettings.settings || {};
+  
+  // These remain as local state (not persisted per-shot)
   const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
   const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
-  const [enhancePrompt, setEnhancePrompt] = useState<boolean>(false);
-  const [autoCreateIndividualPrompts, setAutoCreateIndividualPrompts] = useState<boolean>(true);
-  const [turboMode, setTurboMode] = useState<boolean>(false);
-  const [amountOfMotion, setAmountOfMotion] = useState<number>(50); // 0-100 range for UI, defaults to 50
-  const [advancedMode, setAdvancedMode] = useState<boolean>(false);
-  const [phaseConfig, setPhaseConfig] = useState<PhaseConfig | undefined>(undefined);
   const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
-  const [pairConfigs, setPairConfigs] = useState<any[]>([]);
-  // Mode selection removed - now hardcoded to use specific model
-  // const [afterEachPromptText, setAfterEachPromptText] = useState<string>(''); // Removed - not used in ShotEditor
-
-  const isMobile = useIsMobile();
-  const [generationMode, setGenerationMode] = useState<'batch' | 'timeline'>(isMobile ? 'batch' : 'timeline');
   
   // Add state for toggling between shots and videos view
   const [showVideosView, setShowVideosView] = useState<boolean>(false);
@@ -725,16 +732,8 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate]);
   
-  const [steerableMotionSettings, setSteerableMotionSettings] = useState<SteerableMotionSettings>(DEFAULT_STEERABLE_MOTION_SETTINGS);
-
-  const hasLoadedInitialSettings = useRef(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const userHasInteracted = useRef(false);
-  const lastSavedSettingsRef = useRef<VideoTravelSettings | null>(null);
-  const isLoadingSettingsRef = useRef(false);
-  
-  // Update loading ref to stabilize callbacks
-  isLoadingSettingsRef.current = isLoadingSettings;
+  // ✅ REMOVED: steerableMotionSettings now comes from shotSettings.settings above
+  // ✅ REMOVED: All settings-related refs - hook handles loading/saving/dirty tracking internally
 
   // [NavPerf] Stop timers once the page mounts
   useEffect(() => {
@@ -874,218 +873,16 @@ const VideoTravelToolPage: React.FC = () => {
     return () => clearHeader();
   }, []);
 
-  // FAILSAFE: Force enable inputs after 2 seconds if settings haven't loaded
-  // This prevents the UI from being permanently locked due to query failures
-  useEffect(() => {
-    if (!selectedShot?.id) return;
-    
-    const timeoutId = setTimeout(() => {
-      if (!hasLoadedInitialSettings.current) {
-        console.warn('[SettingsLoadingFailsafe] ⚠️ Settings failed to load within 2s, force-enabling UI with defaults');
-        hasLoadedInitialSettings.current = true;
-        userHasInteracted.current = false;
-      }
-    }, 2000);
-    
-    return () => clearTimeout(timeoutId);
-  }, [selectedShot?.id]);
-
-  // Update state when settings are loaded from database (or confirmed absent)
-  // OPTIMIZATION: Use React.startTransition to batch state updates and reduce renders
-  useEffect(() => {
-    // CRITICAL FIX: Allow settings initialization even if query was cancelled or failed
-    // We need to mark as loaded to enable user input, using whatever settings we have
-    const isQueryCancelled = settingsError?.message?.includes('Request was cancelled');
-    const isAuthError = settingsError?.message?.includes('Authentication') || settingsError?.message?.includes('Auth timeout');
-    const isNetworkError = settingsError?.message?.includes('Failed to fetch') || settingsError?.message?.includes('Network');
-    
-    console.log('[BatchVideoSteps] Settings effect triggered:', {
-      isLoadingSettings,
-      hasLoadedInitialSettings: hasLoadedInitialSettings.current,
-      isQueryCancelled,
-      isAuthError,
-      isNetworkError,
-      settingsError: settingsError?.message,
-      shotId: selectedShot?.id?.substring(0, 8),
-      willRun: !isLoadingSettings && !hasLoadedInitialSettings.current
-    });
-    
-    // Always mark as loaded when not loading, even if query was cancelled or had errors
-    // This ensures UI remains editable instead of being permanently locked
-    // Network/auth errors should fall back to defaults (handled by useToolSettings)
-    if (!isLoadingSettings && !hasLoadedInitialSettings.current) {
-      hasLoadedInitialSettings.current = true;
-      // Reset user interaction flag when loading new settings
-      userHasInteracted.current = false;
-
-      // Warn if we're initializing with potentially incomplete data due to cancellation or errors
-      if (isQueryCancelled) {
-        console.warn('[BatchVideoSteps] Initializing with available settings after query cancellation - UI will be editable');
-      }
-      if (isAuthError || isNetworkError) {
-        console.error('[BatchVideoSteps] ⚠️ Network/auth error loading settings - using defaults. Settings may not save!', {
-          error: settingsError?.message,
-          shotId: selectedShot?.id?.substring(0, 8)
-        });
-      }
-
-      // Start from existing settings if present, otherwise empty defaults
-      let settingsToApply: VideoTravelSettings = (settings as VideoTravelSettings) || ({} as VideoTravelSettings);
-
-      // Check if this shot needs project defaults applied
-      if (selectedShot?.id) {
-        const projectDefaultsKey = `apply-project-defaults-${selectedShot.id}`;
-        const storedProjectDefaults = sessionStorage.getItem(projectDefaultsKey);
-        
-        if (storedProjectDefaults) {
-          try {
-            const projectDefaults = JSON.parse(storedProjectDefaults);
-            
-            // CRITICAL FIX: Deep clone phaseConfig to prevent reference sharing
-            // Shallow spread doesn't work for nested objects/arrays
-            const projectDefaultsWithClonedPhaseConfig = {
-              ...projectDefaults,
-              // Deep clone phaseConfig if it exists
-              phaseConfig: projectDefaults.phaseConfig 
-                ? JSON.parse(JSON.stringify(projectDefaults.phaseConfig))
-                : undefined
-            };
-            
-            // Merge project defaults with any existing shot settings, with shot settings taking precedence
-            // For phaseConfig, if shot has one, use it entirely; otherwise use project default
-            settingsToApply = {
-              ...projectDefaultsWithClonedPhaseConfig,
-              ...(settings || {}),
-              // Explicitly handle phaseConfig to avoid partial merges
-              phaseConfig: (settings as VideoTravelSettings)?.phaseConfig 
-                ? JSON.parse(JSON.stringify((settings as VideoTravelSettings).phaseConfig))
-                : projectDefaultsWithClonedPhaseConfig.phaseConfig
-            } as VideoTravelSettings;
-            
-            console.log('[PhaseConfigMerge] Applied project defaults to new shot:', {
-              shotId: selectedShot.id.substring(0, 8),
-              hasProjectPhaseConfig: !!projectDefaults.phaseConfig,
-              hasShotPhaseConfig: !!(settings as VideoTravelSettings)?.phaseConfig,
-              usingPhaseConfigFrom: (settings as VideoTravelSettings)?.phaseConfig ? 'shot' : 'project',
-              finalPhaseConfig: settingsToApply.phaseConfig
-            });
-            
-            // Apply the merged settings to the database
-            setTimeout(() => {
-              updateSettings('shot', settingsToApply);
-              console.log('[VideoTravelToolPage] Applied project defaults to new shot:', selectedShot.id);
-            }, 100);
-            
-            // Clean up the session storage
-            sessionStorage.removeItem(projectDefaultsKey);
-          } catch (error) {
-            console.warn('[VideoTravelToolPage] Failed to parse stored project defaults:', error);
-            settingsToApply = (settings as VideoTravelSettings) || ({} as VideoTravelSettings);
-          }
-        }
-      }
-      
-      // CRITICAL FIX: Batch all state updates using startTransition to prevent cascade renders
-      console.log('[BatchVideoSteps] Loading settings:', {
-        fromDB: settingsToApply.batchVideoSteps,
-        willSetTo: settingsToApply.batchVideoSteps || 4,
-        shotId: selectedShot?.id?.substring(0, 8),
-        hasLoadedBefore: hasLoadedInitialSettings.current,
-        advancedMode: settingsToApply.advancedMode,
-        hasAdvancedModeField: 'advancedMode' in settingsToApply,
-        fullSettings: settingsToApply
-      });
-      
-      const advancedModeValue = settingsToApply.advancedMode ?? false;
-      let phaseConfigValue = settingsToApply.phaseConfig;
-      
-      // Validate phaseConfig consistency: ensure num_phases matches array lengths
-      // IMPORTANT: Only log warnings, don't auto-correct to prevent data loss
-      if (phaseConfigValue) {
-        const phasesLength = phaseConfigValue.phases?.length || 0;
-        const stepsLength = phaseConfigValue.steps_per_phase?.length || 0;
-        const numPhases = phaseConfigValue.num_phases;
-        
-        // Log detailed phase config for debugging
-        console.log('[PhaseConfigLoad] Loading phase config:', {
-          shotId: selectedShot?.id?.substring(0, 8),
-          num_phases: numPhases,
-          phases_length: phasesLength,
-          steps_length: stepsLength,
-          phases_with_loras: phaseConfigValue.phases?.map(p => ({
-            phase: p.phase,
-            guidance_scale: p.guidance_scale,
-            loras_count: p.loras?.length,
-            lora_urls: p.loras?.map(l => l.url.split('/').pop())
-          }))
-        });
-        
-        // Only warn if there's a mismatch - DON'T auto-correct
-        // Auto-correction was causing LoRAs to be randomly removed
-        if (numPhases !== phasesLength || numPhases !== stepsLength) {
-          console.error('[PhaseConfig] ⚠️ INCONSISTENT PHASE CONFIG DETECTED:', {
-            shotId: selectedShot?.id?.substring(0, 8),
-            num_phases: numPhases,
-            phases_array_length: phasesLength,
-            steps_array_length: stepsLength,
-            WARNING: 'Inconsistency detected but NOT auto-correcting to prevent data loss',
-            RECOMMENDATION: 'User should manually verify phase configuration'
-          });
-          
-          // DO NOT MODIFY phaseConfigValue here - this was causing the random changes
-          // The user's saved data should be preserved even if inconsistent
-          // The UI should handle this gracefully
-        }
-      }
-      
-      console.log('[AdvancedMode] Setting advancedMode from loaded settings:', {
-        shotId: selectedShot?.id?.substring(0, 8),
-        rawValue: settingsToApply.advancedMode,
-        willSetTo: advancedModeValue,
-        hasPhaseConfig: !!phaseConfigValue,
-        phaseConfigNumPhases: phaseConfigValue?.num_phases
-      });
-      
-      startTransition(() => {
-        setVideoControlMode(settingsToApply.videoControlMode || 'batch');
-        setBatchVideoPrompt(settingsToApply.batchVideoPrompt || '');
-        setBatchVideoFrames(settingsToApply.batchVideoFrames || 60);
-        setBatchVideoContext(settingsToApply.batchVideoContext || 10);
-        setBatchVideoSteps(settingsToApply.batchVideoSteps || 6);
-        setDimensionSource(settingsToApply.dimensionSource || 'firstImage');
-        setCustomWidth(settingsToApply.customWidth);
-        setCustomHeight(settingsToApply.customHeight);
-        setEnhancePrompt(settingsToApply.enhancePrompt || false);
-        setAutoCreateIndividualPrompts(settingsToApply.autoCreateIndividualPrompts ?? true);
-        setTurboMode(settingsToApply.turboMode || false);
-        setAmountOfMotion(settingsToApply.amountOfMotion ?? 50); // Default to 50 if not present
-        setAdvancedMode(advancedModeValue);
-        setPhaseConfig(phaseConfigValue);
-        setVideoPairConfigs(settingsToApply.pairConfigs || []);
-        // Always load generationMode from settings when switching shots
-        // The hasLoadedInitialSettings flag prevents this from running after initial load
-        setGenerationMode(settingsToApply.generationMode === 'by-pair' ? 'batch' : (settingsToApply.generationMode || 'batch'));
-        setPairConfigs(settingsToApply.pairConfigs || []);
-        // selectedMode removed - now hardcoded to use specific model
-        setSteerableMotionSettings({
-          ...(settingsToApply.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS),
-          apply_causvid: false // Force apply_causvid to false regardless of saved settings
-        });
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, isLoadingSettings, settingsError, selectedShot?.id]); // Don't include updateSettings - it's unstable and causes loops
-
-  // Auto-disable turbo mode when not using cloud generation
+  // ✅ DELETED: Settings loading failsafe - hook handles loading reliably now!
+  // ✅ DELETED: Complex 250-line settings loading effect - hook handles all loading now!
+  
+  // Auto-disable turbo mode when not using cloud generation (preserved from old effect)
   useEffect(() => {
     if (!isCloudGenerationEnabled && turboMode) {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - not using cloud generation');
-      setTurboMode(false);
-      userHasInteracted.current = true; // Mark as user interaction to save the change
+      shotSettings.updateField('turboMode', false);
     }
-  }, [isCloudGenerationEnabled, turboMode]);
-
-
+  }, [isCloudGenerationEnabled, turboMode, shotSettings]);
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   const selectedShotRef = useRef(selectedShot);
@@ -1310,7 +1107,7 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [currentShotId, selectedShot]);
 
-  const handleBackToShotList = () => {
+  const handleBackToShotList = useCallback(() => {
     setSelectedShot(null);
     setVideoPairConfigs([]);
     setCurrentShotId(null);
@@ -1321,39 +1118,39 @@ const VideoTravelToolPage: React.FC = () => {
     // This ensures that subsequent interactions with the shot list behave as if 
     // it's the first visit, resolving the "two-click" issue on mobile.
     navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
-  };
+  }, [setCurrentShotId, navigate, location.pathname]);
 
   // Navigation handlers
-  const handlePreviousShot = () => {
+  const handlePreviousShot = useCallback(() => {
     if (shots && selectedShot) {
       navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
     }
-  };
+  }, [shots, selectedShot, navigateToPreviousShot]);
 
-  const handleNextShot = () => {
+  const handleNextShot = useCallback(() => {
     if (shots && selectedShot) {
       navigateToNextShot(shots, selectedShot, { scrollToTop: false });
     }
-  };
+  }, [shots, selectedShot, navigateToNextShot]);
 
   // Navigation handlers that preserve scroll position (for sticky header)
-  const handlePreviousShotNoScroll = () => {
+  const handlePreviousShotNoScroll = useCallback(() => {
     if (shots && selectedShot) {
       navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
     }
-  };
+  }, [shots, selectedShot, navigateToPreviousShot]);
 
-  const handleNextShotNoScroll = () => {
+  const handleNextShotNoScroll = useCallback(() => {
     if (shots && selectedShot) {
       navigateToNextShot(shots, selectedShot, { scrollToTop: false });
     }
-  };
+  }, [shots, selectedShot, navigateToNextShot]);
 
   // Navigation state is now memoized above
   const { currentShotIndex, hasPrevious, hasNext } = navigationState;
 
   // Shot name update handler
-  const handleUpdateShotName = (newName: string) => {
+  const handleUpdateShotName = useCallback((newName: string) => {
     if (selectedShot && selectedProjectId) {
       updateShotNameMutation.mutate({
         shotId: selectedShot.id,
@@ -1361,7 +1158,7 @@ const VideoTravelToolPage: React.FC = () => {
         projectId: selectedProjectId,
       });
     }
-  };
+  }, [selectedShot, selectedProjectId, updateShotNameMutation]);
 
   // shouldShowShotEditor and shotToEdit are now memoized above
 
@@ -1510,153 +1307,16 @@ const VideoTravelToolPage: React.FC = () => {
   // };
 
   const handleSteerableMotionSettingsChange = useCallback((settings: Partial<typeof steerableMotionSettings>) => {
-    if (isLoadingSettingsRef.current) return;
-    userHasInteracted.current = true;
-    setSteerableMotionSettings(prev => ({
-      ...prev,
+    shotSettings.updateField('steerableMotionSettings', {
+      ...steerableMotionSettings,
       ...settings
-    }));
-  }, []);
+    });
+  }, [shotSettings, steerableMotionSettings]);
 
   // Mode change handler removed - now hardcoded to use specific model
 
   // Memoize current settings to reduce effect runs
-  const currentSettings = useMemo<VideoTravelSettings>(() => ({
-    videoControlMode,
-    batchVideoPrompt,
-    batchVideoFrames,
-    batchVideoContext,
-    batchVideoSteps,
-    dimensionSource,
-    customWidth,
-    customHeight,
-    steerableMotionSettings,
-    enhancePrompt,
-    autoCreateIndividualPrompts,
-    turboMode,
-    amountOfMotion,
-    advancedMode,
-    phaseConfig,
-    generationMode,
-    pairConfigs,
-    // selectedMode removed - now hardcoded to use specific model
-    // selectedLoras removed - now managed directly in ShotEditor
-  }), [
-          videoControlMode,
-          batchVideoPrompt,
-          batchVideoFrames,
-          batchVideoContext,
-          batchVideoSteps,
-          dimensionSource,
-          customWidth,
-          customHeight,
-          steerableMotionSettings,
-          enhancePrompt,
-          autoCreateIndividualPrompts,
-          turboMode,
-          advancedMode,
-          phaseConfig,
-          amountOfMotion,
-          generationMode,
-          pairConfigs,
-          // selectedMode removed - now hardcoded to use specific model
-          // selectedLoras removed - now managed directly in ShotEditor
-  ]);
 
-  // Reset loaded flag when switching shots - MUST be after currentSettings is defined
-  // Use refs to access current values without triggering re-renders
-  const currentSettingsRef = useRef(currentSettings);
-  const settingsRef = useRef(settings);
-  const updateSettingsRef = useRef(updateSettings);
-  const updateProjectSettingsRef = useRef(updateProjectSettings);
-  
-  // Keep refs updated
-  // Track previous shot ID to prevent cross-contamination
-  const previousShotIdRef = useRef<string | undefined>(undefined);
-  
-  useEffect(() => {
-    currentSettingsRef.current = currentSettings;
-    settingsRef.current = settings;
-    updateSettingsRef.current = updateSettings;
-    updateProjectSettingsRef.current = updateProjectSettings;
-  });
-  
-  useEffect(() => {
-    const currentShotId = selectedShot?.id;
-    const previousShotId = previousShotIdRef.current;
-    
-    // Only flush if we're actually switching to a different shot
-    if (previousShotId && previousShotId !== currentShotId) {
-      // Flush any pending saves before resetting
-      if (saveTimeoutRef.current) {
-        console.log('[BatchVideoSteps] Flushing pending save before shot switch from', previousShotId.substring(0, 8), 'to', currentShotId?.substring(0, 8));
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-        
-        // DON'T SAVE HERE - the settings have already been auto-saved for the previous shot
-        // Saving here would write the old shot's settings to the new shot (bug!)
-      }
-    }
-    
-    // Reset flags when shot changes
-    if (previousShotId !== currentShotId) {
-      console.log('[BatchVideoSteps] Resetting flags for shot:', currentShotId?.substring(0, 8));
-      hasLoadedInitialSettings.current = false;
-      userHasInteracted.current = false;
-      lastSavedSettingsRef.current = null;
-    }
-    
-    // Update previous shot ID for next comparison
-    previousShotIdRef.current = currentShotId;
-  }, [selectedShot?.id, selectedProjectId]); // ONLY trigger on shot/project changes
-
-  // Save settings to database whenever they change (optimized)
-  useEffect(() => {
-    if (selectedShot?.id && hasLoadedInitialSettings.current && userHasInteracted.current) {
-      // Clear any pending save
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      
-      // Debounce the save
-      saveTimeoutRef.current = setTimeout(() => {
-        // Check if we just saved these exact settings
-        if (lastSavedSettingsRef.current && deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(lastSavedSettingsRef.current))) {
-          console.log('[BatchVideoSteps] Skipping save - settings unchanged');
-          return;
-        }
-
-        if (!isUpdating && !deepEqual(sanitizeSettings(currentSettings), sanitizeSettings(settings))) {
-          console.log('[BatchVideoSteps] Saving settings to DB (shot level only):', {
-            batchVideoSteps: currentSettings.batchVideoSteps,
-            advancedMode: currentSettings.advancedMode,
-            phaseConfig_num_phases: currentSettings.phaseConfig?.num_phases,
-            phaseConfig_model_switch_phase: currentSettings.phaseConfig?.model_switch_phase,
-            phaseConfig_phases_length: currentSettings.phaseConfig?.phases?.length,
-            phaseConfig_steps_length: currentSettings.phaseConfig?.steps_per_phase?.length,
-            phaseConfig_loras: currentSettings.phaseConfig?.phases?.map(p => ({
-              phase: p.phase,
-              loras_count: p.loras?.length,
-              lora_urls: p.loras?.map(l => l.url.split('/').pop())
-            })),
-            shotId: selectedShot?.id?.substring(0, 8)
-          });
-          lastSavedSettingsRef.current = currentSettings;
-          // Only save to shot level - project settings should only be updated via explicit "Save Project Settings" button
-          updateSettings('shot', currentSettings);
-        } else {
-          console.log('[BatchVideoSteps] Skipping save - already updating or no changes');
-        }
-      }, 200); // Reduced wait time for better performance
-    }
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [selectedShot?.id, currentSettings, settings, updateSettings, isUpdating, selectedProjectId, updateProjectSettings]);
 
   // LoRA handlers removed - now managed directly in ShotEditor
   // const handleAddLora = (loraToAdd: LoraModel) => { ... };
@@ -1945,7 +1605,11 @@ const VideoTravelToolPage: React.FC = () => {
               onAdvancedModeChange={handleAdvancedModeChange}
               phaseConfig={phaseConfig}
               onPhaseConfigChange={handlePhaseConfigChange}
-              generationMode={generationMode}
+              selectedPhasePresetId={selectedPhasePresetId}
+              onPhasePresetSelect={handlePhasePresetSelect}
+              onPhasePresetRemove={handlePhasePresetRemove}
+              onBlurSave={handleBlurSave}
+              generationMode={generationMode === 'by-pair' ? 'batch' : generationMode}
               onGenerationModeChange={handleGenerationModeChange}
 
               onPreviousShot={handlePreviousShot}
@@ -1955,7 +1619,7 @@ const VideoTravelToolPage: React.FC = () => {
               hasPrevious={hasPrevious}
               hasNext={hasNext}
               onUpdateShotName={handleUpdateShotName}
-              settingsLoading={isLoadingSettings}
+              settingsLoading={shotSettings.status === 'loading'}
               getShotVideoCount={getShotVideoCount}
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               // afterEachPromptText props removed - not in ShotEditorProps interface

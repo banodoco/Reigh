@@ -28,7 +28,8 @@ interface HeaderProps {
   projectId?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+// Internal component - not memoized to allow hooks
+const HeaderComponent: React.FC<HeaderProps> = ({
   selectedShot,
   isEditingName,
   editingName,
@@ -163,6 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
                 Cancel
               </Button>
               <Input
+                key="shot-name-input" // Stable key to maintain focus across re-renders
                 value={editingName}
                 onChange={(e) => onEditingNameChange(e.target.value)}
                 onKeyDown={onNameKeyDown}
@@ -236,6 +238,7 @@ export const Header: React.FC<HeaderProps> = ({
               Cancel
             </Button>
             <Input
+              key="shot-name-input-mobile" // Stable key to maintain focus across re-renders
               value={editingName}
               onChange={(e) => onEditingNameChange(e.target.value)}
               onKeyDown={onNameKeyDown}
@@ -308,4 +311,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </div>
   );
-}; 
+};
+
+// Memoize Header to prevent re-renders from parent when props haven't changed
+// This fixes the issue where clicking the shot name to edit loses focus immediately
+export const Header = React.memo(HeaderComponent); 

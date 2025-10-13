@@ -258,7 +258,7 @@ export default function HomePage() {
   // Preload assets
   useEffect(() => {
     const img = new Image();
-    img.src = '/brush-paintbrush-icon.webp';
+    img.src = '/files/brush-paintbrush-icon.webp';
     img.onload = () => {
       setAssetsLoaded(true);
     };
@@ -678,7 +678,7 @@ export default function HomePage() {
                       <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
                         <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
                           <img 
-                            src="/brush-paintbrush-icon.webp"
+                            src="/files/brush-paintbrush-icon.webp"
                             alt="Paintbrush"
                             className="w-full h-full brightness-0 invert" 
                           />
@@ -705,7 +705,7 @@ export default function HomePage() {
                       <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
                         <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
                           <img 
-                            src="/brush-paintbrush-icon.webp"
+                            src="/files/brush-paintbrush-icon.webp"
                             alt="Paintbrush"
                             className="w-full h-full brightness-0 invert" 
                           />
@@ -765,17 +765,17 @@ export default function HomePage() {
                   href="https://github.com/your-repo"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 bg-white/40 backdrop-blur-sm rounded-full border border-wes-vintage-gold/10 hover:border-wes-vintage-gold/20 transition-all duration-300 hover:bg-white/60 group opacity-70 hover:opacity-100"
+                  className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
                 >
-                  <Github className="w-3 h-3 text-wes-vintage-gold/70 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                  <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
                 </a>
                 <a
                   href="https://discord.gg/D5K2c6kfhy"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 bg-white/40 backdrop-blur-sm rounded-full border border-wes-vintage-gold/10 hover:border-wes-vintage-gold/20 transition-all duration-300 hover:bg-white/60 group opacity-70 hover:opacity-100"
+                  className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
                 >
-                  <MessageCircle className="w-3 h-3 text-wes-vintage-gold/70 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                  <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
                 </a>
               </div>
               

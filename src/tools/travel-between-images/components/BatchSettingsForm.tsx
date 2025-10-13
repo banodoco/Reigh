@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { Info, Plus, Trash2, Search, Download, ChevronDown, ChevronLeft, Sparkles, RotateCcw } from 'lucide-react';
+import { Info, Plus, Trash2, Search, Download, ChevronDown, ChevronLeft, Sparkles, RotateCcw, Library, Pencil } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Checkbox } from "@/shared/components/ui/checkbox";
@@ -24,6 +24,8 @@ import { Project } from '@/types/project';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
+import { PhaseConfigSelectorModal } from '@/shared/components/PhaseConfigSelectorModal';
+import { PhaseConfigMetadata } from '@/shared/hooks/useResources';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { useProject } from '@/shared/contexts/ProjectContext';
@@ -34,57 +36,68 @@ import { framesToSeconds } from './Timeline/utils/time-utils';
 // Pre-defined LoRA options for quick selection
 const PREDEFINED_LORAS = [
   {
-    name: "High Noise Model (250928)",
+    name: "High Noise (Official 250928)",
+    displayName: "High Noise (Official 250928)",
     url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
     category: "Lightning Official"
   },
   {
-    name: "Low Noise Model (250928)",
+    name: "Low Noise (Official 250928)",
+    displayName: "Low Noise (Official 250928)",
     url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors",
     category: "Lightning Official"
   },
   {
-    name: "Fun InP High Noise HPS2.1",
+    name: "Fun InP - High Noise HPS2.1",
+    displayName: "Fun InP - High Noise HPS2.1",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Fun-A14B-InP-high-noise-HPS2.1.safetensors",
     category: "Fun InP"
   },
   {
-    name: "Fun InP High Noise MPS",
+    name: "Fun InP - High Noise MPS",
+    displayName: "Fun InP - High Noise MPS",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Fun-A14B-InP-high-noise-MPS.safetensors",
     category: "Fun InP"
   },
   {
-    name: "Fun InP Low Noise HPS2.1",
+    name: "Fun InP - Low Noise HPS2.1",
+    displayName: "Fun InP - Low Noise HPS2.1",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Fun-A14B-InP-low-noise-HPS2.1.safetensors",
     category: "Fun InP"
   },
   {
-    name: "Fun InP Low Noise MPS",
+    name: "Fun InP - Low Noise MPS",
+    displayName: "Fun InP - Low Noise MPS",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Fun-A14B-InP-low-noise-MPS.safetensors",
     category: "Fun InP"
   },
   {
     name: "Lightning T2V HIGH (fp16)",
+    displayName: "Lightning T2V HIGH (fp16)",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Lightning_T2V-A14B-4steps-lora_HIGH_fp16.safetensors",
     category: "Lightning Accelerators"
   },
   {
-    name: "Lightning T2V v1.1 HIGH (fp16)",
+    name: "Lightning T2V v1.1 HIGH",
+    displayName: "Lightning T2V v1.1 HIGH",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_HIGH_fp16.safetensors",
     category: "Lightning Accelerators"
   },
   {
-    name: "Lightning T2V v1.1 LOW (fp16)",
+    name: "Lightning T2V v1.1 LOW",
+    displayName: "Lightning T2V v1.1 LOW",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan2.2-Lightning_T2V-v1.1-A14B-4steps-lora_LOW_fp16.safetensors",
     category: "Lightning Accelerators"
   },
   {
-    name: "HIGH Lightning 250928 (rank128, fp16)",
+    name: "HIGH Lightning 250928 (rank128)",
+    displayName: "HIGH Lightning 250928 (rank128)",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan22_A14B_T2V_HIGH_Lightning_4steps_lora_250928_rank128_fp16.safetensors",
     category: "Lightning Accelerators"
   },
   {
-    name: "LOW Lightning 250928 (rank64, fp16)",
+    name: "LOW Lightning 250928 (rank64)",
+    displayName: "LOW Lightning 250928 (rank64)",
     url: "https://huggingface.co/DeepBeepMeep/Wan2.2/resolve/main/loras_accelerators/Wan22_A14B_T2V_LOW_Lightning_4steps_lora_250928_rank64_fp16.safetensors",
     category: "Lightning Accelerators"
   },
@@ -141,9 +154,17 @@ interface BatchSettingsFormProps {
   
   // Advanced mode props
   advancedMode: boolean;
+  
+  // Blur save - triggers immediate save when user clicks away from field
+  onBlurSave?: () => void;
   onAdvancedModeChange: (value: boolean) => void;
   phaseConfig?: PhaseConfig;
   onPhaseConfigChange: (config: PhaseConfig) => void;
+  
+  // Phase preset props
+  selectedPhasePresetId?: string | null;
+  onPhasePresetSelect?: (presetId: string, config: PhaseConfig) => void;
+  onPhasePresetRemove?: () => void;
   
   // Clear enhanced prompts handler
   onClearEnhancedPrompts?: () => Promise<void>;
@@ -187,6 +208,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onAdvancedModeChange,
   phaseConfig = DEFAULT_PHASE_CONFIG,
   onPhaseConfigChange,
+  selectedPhasePresetId,
+  onPhasePresetSelect,
+  onPhasePresetRemove,
+  onBlurSave,
   onClearEnhancedPrompts,
 }) => {
     // Get project context for persistent state
@@ -217,12 +242,91 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     const [activePhaseForLoraSelection, setActivePhaseForLoraSelection] = React.useState<number | null>(null);
     const [isLoraModalOpen, setIsLoraModalOpen] = React.useState(false);
     
+    // State for Phase Config Preset modal
+    const [isPhasePresetModalOpen, setIsPhasePresetModalOpen] = React.useState(false);
+    const [selectedPresetMetadata, setSelectedPresetMetadata] = React.useState<PhaseConfigMetadata | null>(null);
+    
     // Track which LoRA URL input is focused
     const [focusedLoraInput, setFocusedLoraInput] = React.useState<string | null>(null);
     
-    // Helper function to extract filename from URL
-    const getFilenameFromUrl = (url: string) => {
+    // Load preset metadata when selectedPhasePresetId changes (e.g., on page refresh or shot switch)
+    React.useEffect(() => {
+      if (selectedPhasePresetId && !selectedPresetMetadata) {
+        console.log('[PhasePreset] Loading preset metadata for ID:', selectedPhasePresetId.substring(0, 8));
+        
+        // Import both supabase and toast
+        Promise.all([
+          import('@/integrations/supabase/client'),
+          import('sonner')
+        ]).then(([{ supabase }, { toast }]) => {
+          supabase
+            .from('resources')
+            .select('id, metadata')
+            .eq('id', selectedPhasePresetId)
+            .eq('type', 'phase-config')
+            .single()
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('[PhasePreset] Failed to load preset metadata:', error);
+                
+                // If preset was deleted, clear the reference and notify user
+                if (error.code === 'PGRST116') { // No rows returned
+                  console.warn('[PhasePreset] Preset was deleted, clearing reference');
+                  toast.warning('The selected preset was deleted. Switching to manual mode.');
+                  onPhasePresetRemove?.();
+                }
+                return;
+              }
+              
+              if (data && data.metadata) {
+                const metadata = data.metadata as unknown as PhaseConfigMetadata;
+                console.log('[PhasePreset] Loaded preset metadata:', metadata.name);
+                setSelectedPresetMetadata(metadata);
+              }
+            });
+        });
+      } else if (!selectedPhasePresetId && selectedPresetMetadata) {
+        // Clear metadata if preset is removed
+        setSelectedPresetMetadata(null);
+      }
+    }, [selectedPhasePresetId, selectedPresetMetadata, onPhasePresetRemove]);
+    
+    // Determine if we're in preset mode (has a selected preset)
+    const isPresetMode = !!selectedPhasePresetId;
+    
+    // Handlers for preset selection
+    const handlePresetSelect = (preset: { id: string; metadata: PhaseConfigMetadata }) => {
+      console.log('[PhasePreset] Selecting preset:', preset.metadata.name);
+      setSelectedPresetMetadata(preset.metadata);
+      onPhasePresetSelect?.(preset.id, preset.metadata.phaseConfig);
+      setIsPhasePresetModalOpen(false);
+    };
+    
+    const handlePresetRemove = () => {
+      console.log('[PhasePreset] Removing preset');
+      setSelectedPresetMetadata(null);
+      onPhasePresetRemove?.();
+    };
+    
+    const handleSwitchToManualMode = () => {
+      console.log('[PhasePreset] Switching to manual mode');
+      // Keep the current config but clear the preset ID
+      // This allows editing the config independently
+      setSelectedPresetMetadata(null);
+      onPhasePresetRemove?.();
+    };
+    
+    // Helper function to get display name from URL (checks predefined LoRAs first)
+    const getDisplayNameFromUrl = (url: string) => {
       if (!url) return '';
+      
+      // Check if this is a predefined LoRA
+      const predefinedLora = PREDEFINED_LORAS.find(lora => lora.url === url);
+      if (predefinedLora?.displayName) {
+        return predefinedLora.displayName;
+      }
+      
+      // Otherwise, extract filename from URL
       const parts = url.split('/');
       return parts[parts.length - 1] || url;
     };
@@ -297,6 +401,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     id="batchVideoPrompt"
                     value={batchVideoPrompt}
                     onChange={(e) => onBatchVideoPromptChange(e.target.value)}
+                    onBlur={() => onBlurSave?.()}
                     placeholder={
                       autoCreateIndividualPrompts && isTimelineMode
                         ? "e.g., cinematic style, high quality"
@@ -326,6 +431,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     id="negative_prompt"
                     value={steerableMotionSettings.negative_prompt}
                     onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
+                    onBlur={() => onBlurSave?.()}
                     placeholder="e.g., blurry, low quality"
                     className="min-h-[70px]"
                     rows={3}
@@ -501,40 +607,93 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             )}
 
-            {/* Advanced Mode Toggle */}
-            <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
-              <Switch
-                id="advanced-mode-toggle"
-                checked={advancedMode}
-                onCheckedChange={(checked) => {
-                  onAdvancedModeChange(checked);
-                  // When enabling, open the section and set debug to false; when disabling, close it
-                  if (checked) {
-                    setAdvancedSectionExpanded(true);
-                    onSteerableMotionSettingsChange({ debug: false });
-                  } else {
-                    setAdvancedSectionExpanded(false);
-                  }
-                }}
-              />
-              <div className="flex-1">
-                <Label htmlFor="advanced-mode-toggle" className="font-medium">
-                  Advanced Mode
-                </Label>
+            {/* Advanced Mode Toggle and Load Preset Button */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border flex-1">
+                  <Switch
+                    id="advanced-mode-toggle"
+                    checked={advancedMode}
+                    onCheckedChange={(checked) => {
+                      onAdvancedModeChange(checked);
+                      // When enabling, open the section and set debug to false; when disabling, close it
+                      if (checked) {
+                        setAdvancedSectionExpanded(true);
+                        onSteerableMotionSettingsChange({ debug: false });
+                      } else {
+                        setAdvancedSectionExpanded(false);
+                      }
+                    }}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="advanced-mode-toggle" className="font-medium">
+                      Advanced Mode
+                    </Label>
+                  </div>
+                </div>
+                
+                {/* Phase Config Preset Button - only show when advanced mode is enabled */}
+                {advancedMode && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsPhasePresetModalOpen(true)}
+                    className="gap-2 whitespace-nowrap"
+                  >
+                    <Library className="h-4 w-4" />
+                    {isPresetMode ? 'Change Preset' : 'Load Preset'}
+                  </Button>
+                )}
               </div>
+              
+              {/* Preset Info Display */}
+              {advancedMode && isPresetMode && selectedPresetMetadata && (
+                  <div className="flex items-start justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <p className="font-medium text-sm text-blue-900 dark:text-blue-100 truncate">
+                        Using Preset: {selectedPresetMetadata.name}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 line-clamp-2 mt-0.5">
+                        {selectedPresetMetadata.description}
+                      </p>
+                      {selectedPresetMetadata.tags && selectedPresetMetadata.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {selectedPresetMetadata.tags.slice(0, 3).map((tag, idx) => (
+                            <span key={idx} className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded">
+                              {tag}
+                            </span>
+                          ))}
+                          {selectedPresetMetadata.tags.length > 3 && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded">
+                              +{selectedPresetMetadata.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSwitchToManualMode}
+                      className="flex items-center gap-1 flex-shrink-0 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  </div>
+                )}
             </div>
             
-            {/* Advanced Mode Collapsible Section - only openable when advancedMode is true */}
+            {/* Advanced Mode Collapsible Section - only openable when advancedMode is true and NOT in preset mode */}
             <Collapsible 
-              open={advancedSectionExpanded && advancedMode} 
+              open={advancedSectionExpanded && advancedMode && !isPresetMode} 
               onOpenChange={(open) => {
-                // Only allow opening if advancedMode is true
-                if (advancedMode) {
+                // Only allow opening if advancedMode is true and not in preset mode
+                if (advancedMode && !isPresetMode) {
                   setAdvancedSectionExpanded(open);
                 }
               }}
             >
-              {advancedMode && (
+              {advancedMode && !isPresetMode && (
                 <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
@@ -736,24 +895,53 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                             >
                               <Search className="h-3 w-3 mr-1" /> Search
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => {
-                                const newPhases = [...phaseConfig.phases];
-                                newPhases[phaseIdx].loras.push({
-                                  url: "",
-                                  multiplier: "1.0"
-                                });
-                                onPhaseConfigChange({
-                                  ...phaseConfig,
-                                  phases: newPhases
-                                });
-                              }}
-                            >
-                              <Plus className="h-3 w-3 mr-1" /> Add LoRA
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> Utility
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-72">
+                                {/* Group by category */}
+                                {Object.entries(
+                                  PREDEFINED_LORAS.reduce((acc, lora) => {
+                                    if (!acc[lora.category]) acc[lora.category] = [];
+                                    acc[lora.category].push(lora);
+                                    return acc;
+                                  }, {} as Record<string, typeof PREDEFINED_LORAS>)
+                                ).map(([category, loras], idx) => (
+                                  <React.Fragment key={category}>
+                                    {idx > 0 && <DropdownMenuSeparator />}
+                                    <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
+                                      {category}
+                                    </DropdownMenuLabel>
+                                    {loras.map((predefinedLora) => (
+                                      <DropdownMenuItem
+                                        key={predefinedLora.url}
+                                        onClick={() => {
+                                          const newPhases = [...phaseConfig.phases];
+                                          newPhases[phaseIdx].loras.push({
+                                            url: predefinedLora.url,
+                                            multiplier: "1.0"
+                                          });
+                                          onPhaseConfigChange({
+                                            ...phaseConfig,
+                                            phases: newPhases
+                                          });
+                                        }}
+                                        className="text-xs"
+                                      >
+                                        {predefinedLora.name}
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                           
                           {phase.loras.map((lora, loraIdx) => {
@@ -764,7 +952,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                               <div className="relative flex-1">
                                 <Input
                                   placeholder="LoRA URL"
-                                  value={isFocused ? lora.url : getFilenameFromUrl(lora.url)}
+                                  value={isFocused ? lora.url : getDisplayNameFromUrl(lora.url)}
                                   onChange={(e) => {
                                     const newPhases = [...phaseConfig.phases];
                                     newPhases[phaseIdx].loras[loraIdx].url = e.target.value;
@@ -774,55 +962,14 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                                     });
                                   }}
                                   onFocus={() => setFocusedLoraInput(inputId)}
-                                  onBlur={() => setFocusedLoraInput(null)}
-                                  className="pr-16"
+                                  onBlur={() => {
+                                    setFocusedLoraInput(null);
+                                    onBlurSave?.();
+                                  }}
+                                  className="pr-8"
                                   title={lora.url} // Show full URL on hover
                                 />
-                                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0 hover:bg-accent"
-                                      >
-                                        <Download className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-72">
-                                      {/* Group by category */}
-                                      {Object.entries(
-                                        PREDEFINED_LORAS.reduce((acc, lora) => {
-                                          if (!acc[lora.category]) acc[lora.category] = [];
-                                          acc[lora.category].push(lora);
-                                          return acc;
-                                        }, {} as Record<string, typeof PREDEFINED_LORAS>)
-                                      ).map(([category, loras], idx) => (
-                                        <React.Fragment key={category}>
-                                          {idx > 0 && <DropdownMenuSeparator />}
-                                          <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
-                                            {category}
-                                          </DropdownMenuLabel>
-                                          {loras.map((predefinedLora) => (
-                                            <DropdownMenuItem
-                                              key={predefinedLora.url}
-                                              onClick={() => {
-                                                const newPhases = [...phaseConfig.phases];
-                                                newPhases[phaseIdx].loras[loraIdx].url = predefinedLora.url;
-                                                onPhaseConfigChange({
-                                                  ...phaseConfig,
-                                                  phases: newPhases
-                                                });
-                                              }}
-                                              className="text-xs"
-                                            >
-                                              {predefinedLora.name}
-                                            </DropdownMenuItem>
-                                          ))}
-                                        </React.Fragment>
-                                      ))}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                <div className="absolute right-1 top-1/2 -translate-y-1/2">
                                   <Button
                                     size="sm"
                                     variant="ghost"
@@ -837,7 +984,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                                     }}
                                   >
                                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                                  </Button>
                                 </div>
                               </div>
                               <Input
@@ -855,11 +1002,30 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                                     phases: newPhases
                                   });
                                 }}
+                                onBlur={() => onBlurSave?.()}
                                 className="w-16"
                               />
                             </div>
                             );
                           })}
+                          
+                          {/* Add LoRA button at bottom */}
+                          <button
+                            onClick={() => {
+                              const newPhases = [...phaseConfig.phases];
+                              newPhases[phaseIdx].loras.push({
+                                url: "",
+                                multiplier: "1.0"
+                              });
+                              onPhaseConfigChange({
+                                ...phaseConfig,
+                                phases: newPhases
+                              });
+                            }}
+                            className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-2 mt-1"
+                          >
+                            Add LoRA
+                          </button>
                         </div>
                       </CardContent>
                     </Card>
@@ -907,7 +1073,17 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               }}
               onRemoveLora={() => {}}
               onUpdateLoraStrength={() => {}}
-              lora_type="image"
+              lora_type="Wan 2.1 14b"
+            />
+            
+            {/* Phase Config Preset Selector Modal */}
+            <PhaseConfigSelectorModal
+              isOpen={isPhasePresetModalOpen}
+              onClose={() => setIsPhasePresetModalOpen(false)}
+              onSelectPreset={handlePresetSelect}
+              onRemovePreset={handlePresetRemove}
+              selectedPresetId={selectedPhasePresetId || null}
+              currentPhaseConfig={phaseConfig}
             />
         </div>
     );

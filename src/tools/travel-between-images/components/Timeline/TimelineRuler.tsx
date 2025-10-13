@@ -70,7 +70,7 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
       }}
     >
       <div className="relative h-full">
-        {markers.map((frame) => {
+        {markers.map((frame, index) => {
           // Use exact same calculation as TimelineItem
           const pixelPosition = TIMELINE_PADDING_OFFSET + ((frame - fullMin) / fullRange) * effectiveWidth;
           // Convert to position within ruler (which starts at TIMELINE_PADDING_OFFSET)
@@ -79,7 +79,7 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
 
           return (
             <div
-              key={frame}
+              key={`marker-${index}-${frame}`}
               className="absolute flex flex-col items-center"
               style={{ left: `${leftPercent}%`, transform: 'translateX(-50%)' }}
             >

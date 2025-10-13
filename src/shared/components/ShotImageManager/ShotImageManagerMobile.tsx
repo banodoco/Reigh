@@ -47,7 +47,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   const [reconciliationId, setReconciliationId] = useState(0);
   
   const isMobile = useIsMobile();
-  const { imageDeletionSettings } = useUserUIState();
+  const { value: imageDeletionSettings } = useUserUIState('imageDeletion', { skipConfirmation: false });
   const { 
     isShotsPaneLocked, 
     isTasksPaneLocked, 

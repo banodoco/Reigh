@@ -237,7 +237,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
 /**
  * Update tool settings using direct Supabase calls
  */
-async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<void> {
+export async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<void> {
   const { scope, id, toolId, patch } = params;
 
   try {

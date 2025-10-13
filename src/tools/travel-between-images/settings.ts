@@ -68,9 +68,9 @@ export interface VideoTravelSettings {
   batchVideoFrames: number;
   batchVideoContext: number;
   batchVideoSteps: number;
-  dimensionSource: 'project' | 'firstImage' | 'custom';
-  customWidth?: number;
-  customHeight?: number;
+  dimensionSource?: 'project' | 'firstImage' | 'custom'; // DEPRECATED - now using aspect ratios only
+  customWidth?: number; // DEPRECATED - now using aspect ratios only
+  customHeight?: number; // DEPRECATED - now using aspect ratios only
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
   autoCreateIndividualPrompts: boolean;
@@ -80,6 +80,7 @@ export interface VideoTravelSettings {
   amountOfMotion: number; // 0-100 range for UI
   advancedMode: boolean; // Toggle for showing phase_config settings
   phaseConfig?: PhaseConfig; // Advanced phase configuration
+  selectedPhasePresetId?: string | null; // ID of the selected phase config preset (null if manually configured)
   // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;

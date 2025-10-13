@@ -43,15 +43,6 @@ export interface SteerableMotionSettings {
   model_name: string;
   seed: number;
   debug: boolean;
-  apply_reward_lora: boolean;
-  colour_match_videos: boolean;
-  apply_causvid: boolean;
-  use_lighti2x_lora: boolean;
-  use_styleboost_loras: boolean;
-  fade_in_duration: string;
-  fade_out_duration: string;
-  after_first_post_generation_saturation: number;
-  after_first_post_generation_brightness: number;
   show_input_images: boolean;
 }
 
@@ -61,15 +52,6 @@ export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   model_name: 'lightning_baseline_2_2_2',
   seed: 789,
   debug: false,
-  apply_reward_lora: false,
-  colour_match_videos: false,
-  apply_causvid: false,
-  use_lighti2x_lora: false,
-  use_styleboost_loras: false,
-  fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-  fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-  after_first_post_generation_saturation: 1,
-  after_first_post_generation_brightness: 0,
   show_input_images: false,
 };
 
@@ -90,50 +72,81 @@ export interface ShotSettings {
 }
 
 // Main props interface for ShotEditor
-export interface ShotEditorProps {
-  selectedShotId: string;
-  projectId: string;
-  videoPairConfigs: VideoPairConfig[];
+// NEW: Simplified settings bundle approach
+export interface ShotSettings {
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;
   batchVideoFrames: number;
   batchVideoContext: number;
+  batchVideoSteps: number;
+  steerableMotionSettings: SteerableMotionSettings;
+  generationMode: 'batch' | 'timeline' | 'by-pair';
+  enhancePrompt: boolean;
+  turboMode: boolean;
+  amountOfMotion: number;
+  autoCreateIndividualPrompts: boolean;
+  advancedMode: boolean;
+  phaseConfig?: any;
+  pairConfigs?: any[];
+}
+
+export interface ShotEditorProps {
+  selectedShotId: string;
+  projectId: string;
+  videoPairConfigs: VideoPairConfig[];
+  
+  // NEW: Settings bundle (preferred way)
+  settings?: ShotSettings;
+  onUpdateSetting?: <K extends keyof ShotSettings>(key: K, value: ShotSettings[K]) => void;
+  settingsStatus?: 'idle' | 'loading' | 'ready' | 'saving' | 'error';
+  
+  // OLD: Individual props (kept for backward compatibility)
+  videoControlMode?: 'individual' | 'batch';
+  batchVideoPrompt?: string;
+  batchVideoFrames?: number;
+  batchVideoContext?: number;
   onShotImagesUpdate: () => void;
   onBack: () => void;
-  onVideoControlModeChange: (mode: 'individual' | 'batch') => void;
+  onVideoControlModeChange?: (mode: 'individual' | 'batch') => void;
   onPairConfigChange: (pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => void;
-  onBatchVideoPromptChange: (prompt: string) => void;
-  onBatchVideoFramesChange: (frames: number) => void;
-  onBatchVideoContextChange: (context: number) => void;
-  batchVideoSteps: number;
-  onBatchVideoStepsChange: (steps: number) => void;
-  dimensionSource: 'project' | 'firstImage' | 'custom';
-  onDimensionSourceChange: (source: 'project' | 'firstImage' | 'custom') => void;
+  onBatchVideoPromptChange?: (prompt: string) => void;
+  onBatchVideoFramesChange?: (frames: number) => void;
+  onBatchVideoContextChange?: (context: number) => void;
+  batchVideoSteps?: number;
+  onBatchVideoStepsChange?: (steps: number) => void;
+  dimensionSource?: 'project' | 'firstImage' | 'custom';
+  onDimensionSourceChange?: (source: 'project' | 'firstImage' | 'custom') => void;
   customWidth?: number;
-  onCustomWidthChange: (width?: number) => void;
+  onCustomWidthChange?: (width?: number) => void;
   customHeight?: number;
-  onCustomHeightChange: (height?: number) => void;
-  steerableMotionSettings: SteerableMotionSettings;
-  onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
+  onCustomHeightChange?: (height?: number) => void;
+  steerableMotionSettings?: SteerableMotionSettings;
+  onSteerableMotionSettingsChange?: (settings: Partial<SteerableMotionSettings>) => void;
   onGenerateAllSegments: () => void;
   availableLoras: LoraModel[];
 
-  generationMode: 'batch' | 'timeline';
-  onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
-  enhancePrompt: boolean;
-  onEnhancePromptChange: (enhance: boolean) => void;
-  turboMode: boolean;
-  onTurboModeChange: (turbo: boolean) => void;
-  amountOfMotion: number;
-  onAmountOfMotionChange: (motion: number) => void;
+  generationMode?: 'batch' | 'timeline';
+  onGenerationModeChange?: (mode: 'batch' | 'timeline') => void;
+  enhancePrompt?: boolean;
+  onEnhancePromptChange?: (enhance: boolean) => void;
+  turboMode?: boolean;
+  onTurboModeChange?: (turbo: boolean) => void;
+  amountOfMotion?: number;
+  onAmountOfMotionChange?: (motion: number) => void;
   // Auto-create individual prompts
-  autoCreateIndividualPrompts: boolean;
-  onAutoCreateIndividualPromptsChange: (autoCreate: boolean) => void;
+  autoCreateIndividualPrompts?: boolean;
+  onAutoCreateIndividualPromptsChange?: (autoCreate: boolean) => void;
   // Advanced mode
-  advancedMode: boolean;
-  onAdvancedModeChange: (advanced: boolean) => void;
+  advancedMode?: boolean;
+  onAdvancedModeChange?: (advanced: boolean) => void;
   phaseConfig?: any; // PhaseConfig type from settings
-  onPhaseConfigChange: (config: any) => void;
+  onPhaseConfigChange?: (config: any) => void;
+  // Phase preset props
+  selectedPhasePresetId?: string | null;
+  onPhasePresetSelect?: (presetId: string, config: any) => void;
+  onPhasePresetRemove?: () => void;
+  // Blur save - triggers immediate save when user clicks away from field
+  onBlurSave?: () => void;
   // Mode selection removed - now hardcoded to use specific model
   // Navigation props
   onPreviousShot?: () => void;

@@ -758,11 +758,6 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             return;
         }
         
-        if (!addForm.description.trim() || addForm.description.trim().length < 50) {
-            toast.error("Description must be at least 50 characters");
-            return;
-        }
-        
         if (sampleFiles.length === 0) {
             toast.error("At least one sample image or video is required");
             return;
@@ -891,20 +886,14 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     </div>
                     
                     <div className="space-y-1">
-                        <Label htmlFor="lora-description">Description *</Label>
+                        <Label htmlFor="lora-description">Description (optional)</Label>
                         <Textarea 
                             id="lora-description" 
-                            placeholder="Describe what this LoRA does... (minimum 50 characters)" 
+                            placeholder="Describe what this LoRA does..." 
                             value={addForm.description} 
                             onChange={e => handleFormChange('description', e.target.value)} 
                             rows={2}
-                            className={addForm.description.trim().length > 0 && addForm.description.trim().length < 50 ? 'border-red-500' : ''}
                         />
-                        <div className="flex justify-between items-center text-xs">
-                            <span className={`${addForm.description.trim().length < 50 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                                {addForm.description.trim().length}/50 characters minimum
-                            </span>
-                        </div>
                     </div>
 
                     <div className="space-y-1">
@@ -1091,8 +1080,6 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         disabled={
                             isSubmitting || 
                             !addForm.name.trim() || 
-                            !addForm.description.trim() || 
-                            addForm.description.trim().length < 50 ||
                             sampleFiles.length === 0 ||
                             !validateHuggingFaceUrl(addForm.huggingface_url).isValid
                         }

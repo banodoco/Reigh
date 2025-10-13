@@ -27,15 +27,6 @@ export interface TravelBetweenImagesTaskParams {
   model_name?: string;
   seed?: number;
   debug?: boolean;
-  apply_reward_lora?: boolean;
-  colour_match_videos?: boolean;
-  apply_causvid?: boolean;
-  use_lighti2x_lora?: boolean;
-  use_styleboost_loras?: boolean;
-  fade_in_duration?: any;
-  fade_out_duration?: any;
-  after_first_post_generation_saturation?: number;
-  after_first_post_generation_brightness?: number;
   params_json_str?: string;
   steps?: number;
   main_output_dir_for_run?: string;
@@ -43,10 +34,9 @@ export interface TravelBetweenImagesTaskParams {
   openai_api_key?: string;
   loras?: Array<{ path: string; strength: number }>;
   show_input_images?: boolean;
-  accelerated_mode?: boolean;
   generation_mode?: 'batch' | 'timeline';
   dimension_source?: 'project' | 'firstImage' | 'custom';
-  // Additional parameter sent by ShotEditor
+  // Additional parameters sent by ShotEditor
   random_seed?: boolean;
   turbo_mode?: boolean;
   amount_of_motion?: number;
@@ -74,6 +64,8 @@ export interface TravelBetweenImagesTaskParams {
       }>;
     }>;
   };
+  // Selected phase config preset ID (for UI state restoration)
+  selected_phase_preset_id?: string | null;
 }
 
 /**
@@ -265,6 +257,12 @@ function buildTravelBetweenImagesPayload(
   if (params.phase_config) {
     orchestratorPayload.phase_config = params.phase_config;
     console.log("[createTravelBetweenImagesTask] Including phase_config in orchestrator payload:", params.phase_config);
+  }
+
+  // Add selected_phase_preset_id if provided (for UI state restoration)
+  if (params.selected_phase_preset_id) {
+    orchestratorPayload.selected_phase_preset_id = params.selected_phase_preset_id;
+    console.log("[createTravelBetweenImagesTask] Including selected_phase_preset_id in orchestrator payload:", params.selected_phase_preset_id);
   }
 
   return orchestratorPayload;
