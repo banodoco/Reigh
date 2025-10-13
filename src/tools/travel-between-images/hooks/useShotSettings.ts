@@ -64,6 +64,7 @@ export const useShotSettings = (
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentShotIdRef = useRef<string | null>(null);
   const pendingSettingsRef = useRef<VideoTravelSettings | null>(null); // Track pending changes for flush
+  const isUserEditingRef = useRef<boolean>(false); // Track if user is actively editing to prevent overwrites
   
   // Fetch settings from database
   const { 
@@ -179,6 +180,12 @@ export const useShotSettings = (
       return;
     }
     
+    // FIX: Don't overwrite user's changes while they're actively editing
+    if (isUserEditingRef.current) {
+      console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing');
+      return;
+    }
+    
     // Load settings into state - deep clone to prevent reference sharing across shots!
     const loadedSettings: VideoTravelSettings = {
       ...DEFAULT_SETTINGS,
@@ -197,7 +204,8 @@ export const useShotSettings = (
       shotId: shotId.substring(0, 8),
       advancedMode: deepClonedSettings.advancedMode,
       hasPhaseConfig: !!deepClonedSettings.phaseConfig,
-      phaseConfig: deepClonedSettings.phaseConfig
+      phaseConfig: deepClonedSettings.phaseConfig,
+      batchVideoPrompt: deepClonedSettings.batchVideoPrompt?.substring(0, 50) + (deepClonedSettings.batchVideoPrompt?.length > 50 ? '...' : '')
     });
     
     setSettings(deepClonedSettings);
@@ -214,7 +222,17 @@ export const useShotSettings = (
       return;
     }
     
-    const toSave = settingsToSave || settings;
+    // FIX: If no settings provided, get latest from state via functional update
+    let toSave = settingsToSave;
+    if (!toSave) {
+      // Use a promise to get the absolute latest state
+      toSave = await new Promise<VideoTravelSettings>((resolve) => {
+        setSettings(current => {
+          resolve(current);
+          return current; // Don't modify, just read
+        });
+      });
+    }
     
     // Don't save if nothing changed
     if (deepEqual(toSave, loadedSettingsRef.current)) {
@@ -229,7 +247,8 @@ export const useShotSettings = (
       phaseConfigLoras: toSave.phaseConfig?.phases?.map(p => ({
         phase: p.phase,
         lorasCount: p.loras?.length
-      }))
+      })),
+      batchVideoPrompt: toSave.batchVideoPrompt?.substring(0, 50) + (toSave.batchVideoPrompt?.length > 50 ? '...' : '')
     });
     
     setStatus('saving');
@@ -242,6 +261,9 @@ export const useShotSettings = (
       setStatus('ready');
       setError(null);
       
+      // Clear editing flag after successful save
+      isUserEditingRef.current = false;
+      
       console.log('[useShotSettings] ✅ Save successful');
     } catch (err) {
       console.error('[useShotSettings] ❌ Save failed:', err);
@@ -249,7 +271,7 @@ export const useShotSettings = (
       setError(err as Error);
       throw err;
     }
-  }, [shotId, settings, updateSettings]);
+  }, [shotId, updateSettings]);
   
   // Update single field
   const updateField = useCallback(<K extends keyof VideoTravelSettings>(
@@ -257,6 +279,9 @@ export const useShotSettings = (
     value: VideoTravelSettings[K]
   ) => {
     console.log('[useShotSettings] 📝 Field updated:', { key, value });
+    
+    // Mark that user is actively editing
+    isUserEditingRef.current = true;
     
     setSettings(prev => {
       const updated = { ...prev, [key]: value };
@@ -286,6 +311,9 @@ export const useShotSettings = (
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<VideoTravelSettings>) => {
     console.log('[useShotSettings] 📝 Multiple fields updated:', Object.keys(updates));
+    
+    // Mark that user is actively editing
+    isUserEditingRef.current = true;
     
     setSettings(prev => {
       const updated = { ...prev, ...updates };
