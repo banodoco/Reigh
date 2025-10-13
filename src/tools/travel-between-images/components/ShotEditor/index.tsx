@@ -1332,17 +1332,50 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
 
       // Apply LoRAs (only if NOT in Advanced Mode)
-      // Note: LoRAs are managed internally by the LoRA manager hook, so we need to trigger a reload
-      // The LoRA manager will sync with the saved LoRAs from the shot settings
-      if (newLoras && newLoras.length > 0 && !newAdvancedMode) {
-        console.log('[ApplySettings] LoRAs found in task params:', {
-          lorasCount: newLoras.length,
-          loras: newLoras.map(l => ({ path: l.path, strength: l.strength })),
-          source: orchestrator.loras !== undefined ? 'orchestrator' : 'params',
-          note: 'LoRA restoration requires page refresh or manual re-selection'
-        });
-        // TODO: LoRAs need to be restored via the LoRA manager
-        // For now, just log them - user can manually re-add them
+      if (newLoras !== undefined && !newAdvancedMode) {
+        if (newLoras && newLoras.length > 0) {
+          console.log('[ApplySettings] Restoring LoRAs from task:', {
+            lorasCount: newLoras.length,
+            loras: newLoras.map(l => ({ path: l.path, strength: l.strength })),
+            source: orchestrator.loras !== undefined ? 'orchestrator' : 'params'
+          });
+          
+          // Clear existing LoRAs first
+          if (loraManager.setSelectedLoras) {
+            loraManager.setSelectedLoras([]);
+          }
+          
+          // Map paths to available LoRAs and restore them
+          setTimeout(() => {
+            newLoras.forEach(loraData => {
+              // Try to find the LoRA by matching the path/URL
+              const matchingLora = availableLoras.find(lora => {
+                const loraUrl = (lora as any).huggingface_url || lora['Download Link'] || '';
+                // Match by exact URL or by filename at the end of the path
+                return loraUrl === loraData.path || 
+                       loraUrl.endsWith(loraData.path) ||
+                       loraData.path.endsWith(loraUrl.split('/').pop() || '');
+              });
+              
+              if (matchingLora) {
+                console.log('[ApplySettings] Restoring LoRA:', {
+                  id: matchingLora['Model ID'],
+                  name: matchingLora.Name,
+                  strength: loraData.strength
+                });
+                loraManager.handleAddLora(matchingLora, false, loraData.strength);
+              } else {
+                console.warn('[ApplySettings] Could not find LoRA for path:', loraData.path);
+              }
+            });
+          }, 100); // Small delay to ensure state is cleared
+        } else {
+          // Task has no LoRAs - clear existing ones
+          console.log('[ApplySettings] Clearing LoRAs (task had none)');
+          if (loraManager.setSelectedLoras) {
+            loraManager.setSelectedLoras([]);
+          }
+        }
       }
 
       // Apply structure video settings
@@ -1452,6 +1485,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     addImageToShotMutation,
     removeImageFromShotMutation,
     steerableMotionSettings.model_name,
+    availableLoras,
+    loraManager,
   ]);
 
   const applySettingsDirect = useCallback((settings: any) => {
