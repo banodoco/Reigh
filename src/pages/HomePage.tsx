@@ -258,7 +258,7 @@ export default function HomePage() {
   // Preload assets
   useEffect(() => {
     const img = new Image();
-    img.src = '/files/brush-paintbrush-icon.webp';
+    img.src = '/brush-paintbrush-icon.webp';
     img.onload = () => {
       setAssetsLoaded(true);
     };
@@ -678,7 +678,7 @@ export default function HomePage() {
                       <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
                         <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
                           <img 
-                            src="/files/brush-paintbrush-icon.webp"
+                            src="/brush-paintbrush-icon.webp"
                             alt="Paintbrush"
                             className="w-full h-full brightness-0 invert" 
                           />
@@ -705,7 +705,7 @@ export default function HomePage() {
                       <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
                         <div className="w-full h-full group-hover:animate-paintbrush-stroke origin-[50%_90%]">
                           <img 
-                            src="/files/brush-paintbrush-icon.webp"
+                            src="/brush-paintbrush-icon.webp"
                             alt="Paintbrush"
                             className="w-full h-full brightness-0 invert" 
                           />
