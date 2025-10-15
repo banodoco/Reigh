@@ -197,14 +197,14 @@ export const useLoraSync = ({
     if (!hasInitializedLorasRef.current) {
       prevSelectedLorasRef.current = currentLorasKey;
       hasInitializedLorasRef.current = true;
-      console.log('[useLoraSync] Initial load - not saving, just recording state');
+      console.log('[PromptRetentionDebug] [useLoraSync] Initial load - not saving, just recording state');
       return;
     }
     
     // Only save if LoRAs actually changed after initialization
     if (currentLorasKey !== prevSelectedLorasRef.current) {
       prevSelectedLorasRef.current = currentLorasKey;
-      console.log('[useLoraSync] LoRAs changed, saving:', loraManager.selectedLoras.length, 'loras');
+      console.log('[PromptRetentionDebug] [useLoraSync] LoRAs changed, saving:', loraManager.selectedLoras.length, 'loras');
       
       if (loraManager.selectedLoras.length > 0) {
         const lorasToSave = loraManager.selectedLoras.map(lora => ({

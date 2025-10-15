@@ -175,7 +175,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
       const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
 
-      console.log('[fetchToolSettingsSupabase] Loading from DB:', {
+      console.log('[PromptRetentionDebug] [fetchToolSettingsSupabase] Loading from DB:', {
         toolId,
         shotId: ctx.shotId?.substring(0, 8),
         projectId: ctx.projectId?.substring(0, 8),
@@ -195,7 +195,7 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         shotSettings
       );
       
-      console.log('[fetchToolSettingsSupabase] Merged result:', {
+      console.log('[PromptRetentionDebug] [fetchToolSettingsSupabase] Merged result:', {
         toolId,
         mergedKeys: Object.keys(merged).length,
         mergedPrompt: merged.batchVideoPrompt?.substring(0, 50)
@@ -306,7 +306,7 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     const currentToolSettings = currentSettings[toolId] ?? {};
     const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
 
-    console.log('[updateToolSettingsSupabase] Saving to DB:', {
+    console.log('[PromptRetentionDebug] [updateToolSettingsSupabase] Saving to DB:', {
       scope,
       toolId,
       id: id.substring(0, 8),
@@ -316,7 +316,7 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
       hasPrompt: 'batchVideoPrompt' in updatedToolSettings,
       promptValue: updatedToolSettings.batchVideoPrompt?.substring(0, 50)
     });
-    console.trace('[updateToolSettingsSupabase] Save triggered from:');
+    console.trace('[PromptRetentionDebug] [updateToolSettingsSupabase] Save triggered from:');
 
     // Use atomic PostgreSQL function to update settings
     // This is much faster than update() because it happens in a single DB operation
@@ -331,7 +331,7 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
       throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
     }
 
-    console.log('[updateToolSettingsSupabase] ✅ Save successful');
+    console.log('[PromptRetentionDebug] [updateToolSettingsSupabase] ✅ Save successful');
 
     // CRITICAL: Return the full merged settings, not just the patch
     // This ensures the cache gets the exact same data that was saved to the DB
@@ -474,7 +474,7 @@ export function useToolSettings<T>(
       queryClient.setQueryData<T>(
         ['toolSettings', toolId, projectId, shotId],
         (oldData) => {
-          console.log('[useToolSettings] Cache update:', {
+          console.log('[PromptRetentionDebug] [useToolSettings] Cache update:', {
             toolId,
             oldDataKeys: oldData ? Object.keys(oldData).length : 0,
             oldPrompt: (oldData as any)?.batchVideoPrompt?.substring(0, 50),
@@ -486,7 +486,7 @@ export function useToolSettings<T>(
           // Merge the updated shot settings over the existing cache (which includes defaults)
           const merged = deepMerge({}, oldData, fullMergedSettings) as T;
           
-          console.log('[useToolSettings] After merge:', {
+          console.log('[PromptRetentionDebug] [useToolSettings] After merge:', {
             toolId,
             mergedKeys: Object.keys(merged).length,
             mergedPrompt: (merged as any)?.batchVideoPrompt?.substring(0, 50)

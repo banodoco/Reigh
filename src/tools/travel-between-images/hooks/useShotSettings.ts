@@ -202,7 +202,7 @@ export const useShotSettings = (
     // Deep clone to prevent React Query cache reference sharing
     const deepClonedSettings = JSON.parse(JSON.stringify(loadedSettings));
     
-    console.log('[useShotSettings] 📥 Loading settings:', {
+    console.log('[PromptRetentionDebug] [useShotSettings] 📥 Loading settings:', {
       shotId: shotId.substring(0, 8),
       advancedMode: deepClonedSettings.advancedMode,
       hasPhaseConfig: !!deepClonedSettings.phaseConfig,
@@ -242,7 +242,7 @@ export const useShotSettings = (
       return;
     }
     
-    console.log('[useShotSettings] 💾 Saving settings:', {
+    console.log('[PromptRetentionDebug] [useShotSettings] 💾 Saving settings:', {
       shotId: shotId.substring(0, 8),
       advancedMode: toSave.advancedMode,
       hasPhaseConfig: !!toSave.phaseConfig,
@@ -280,7 +280,10 @@ export const useShotSettings = (
     key: K,
     value: VideoTravelSettings[K]
   ) => {
-    console.log('[useShotSettings] 📝 Field updated:', { key, value });
+    console.log('[PromptRetentionDebug] [useShotSettings] 📝 Field updated:', { 
+      key, 
+      value: key === 'batchVideoPrompt' && typeof value === 'string' ? value.substring(0, 50) : value 
+    });
     
     // Mark that user is actively editing
     isUserEditingRef.current = true;
@@ -312,7 +315,10 @@ export const useShotSettings = (
   
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<VideoTravelSettings>) => {
-    console.log('[useShotSettings] 📝 Multiple fields updated:', Object.keys(updates));
+    console.log('[PromptRetentionDebug] [useShotSettings] 📝 Multiple fields updated:', { 
+      keys: Object.keys(updates),
+      batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
+    });
     
     // Mark that user is actively editing
     isUserEditingRef.current = true;
