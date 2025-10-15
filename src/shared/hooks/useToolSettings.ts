@@ -237,8 +237,10 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
 /**
  * Update tool settings using atomic Supabase function
  * This eliminates the read-modify-write pattern for better performance and consistency
+ * 
+ * @returns The full merged settings after update (for optimistic cache updates)
  */
-export async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<void> {
+export async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<any> {
   const { scope, id, toolId, patch } = params;
 
   try {
@@ -297,6 +299,11 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     if (rpcError) {
       throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
     }
+
+    // CRITICAL: Return the full merged settings, not just the patch
+    // This ensures the cache gets the exact same data that was saved to the DB
+    // Prevents data loss when cache is stale (e.g., multiple tabs, concurrent edits)
+    return updatedToolSettings;
 
   } catch (error) {
     // Handle abort errors silently to reduce noise during task cancellation
@@ -416,29 +423,27 @@ export function useToolSettings<T>(
         throw new Error(`Missing identifier for ${scope} tool settings update`);
       }
   
-      await updateToolSettingsSupabase({
+      // updateToolSettingsSupabase now returns the full merged settings
+      const fullMergedSettings = await updateToolSettingsSupabase({
           scope,
           id: idForScope,
           toolId,
           patch: newSettings,
       }, signal);
       
-      // Return the settings patch for optimistic update
-      return newSettings;
+      // Return the full merged settings (not just the patch) for cache update
+      return fullMergedSettings;
     },
-    onSuccess: (updatedSettings) => {
-      // Optimistically update the cache instead of refetching
-      // This is much faster and eliminates the need for reload protection
+    onSuccess: (fullMergedSettings) => {
+      // Optimistically update the cache with the exact merged settings that were saved to DB
+      // CRITICAL: fullMergedSettings is the complete merged result from the DB fetch,
+      // not just the patch. This ensures cache and DB are perfectly in sync.
       queryClient.setQueryData<T>(
         ['toolSettings', toolId, projectId, shotId],
-        (oldData) => {
-          if (!oldData) return updatedSettings as T;
-          // Deep merge the updated settings with existing data
-          return deepMerge({}, oldData, updatedSettings) as T;
-        }
+        fullMergedSettings as T
       );
       
-      console.log('[useToolSettings] Cache optimistically updated for', toolId);
+      console.log('[useToolSettings] Cache updated with full merged settings for', toolId);
     },
     onError: (error: Error) => {
       // Don't log or show errors for cancelled requests during task cancellation
