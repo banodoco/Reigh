@@ -934,13 +934,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Track previous values to detect changes
   const prevAcceleratedRef = useRef(accelerated);
   const prevModelRef = useRef(steerableMotionSettings.model_name);
+  const hasInitializedStepsRef = useRef(false);
   
   useEffect(() => {
+    // Skip on first mount - don't overwrite loaded settings
+    if (!hasInitializedStepsRef.current) {
+      hasInitializedStepsRef.current = true;
+      prevAcceleratedRef.current = accelerated;
+      prevModelRef.current = steerableMotionSettings.model_name;
+      console.log('[PromptRetentionDebug] [ShotEditor] Initial mount - NOT auto-adjusting steps');
+      return;
+    }
+    
     const acceleratedChanged = prevAcceleratedRef.current !== accelerated;
     const modelChanged = prevModelRef.current !== steerableMotionSettings.model_name;
     
     // Only auto-adjust steps when accelerated mode or model changes (not manual user input)
     if (acceleratedChanged || modelChanged) {
+      console.log('[PromptRetentionDebug] [ShotEditor] Model/accelerated changed - auto-adjusting steps', {
+        acceleratedChanged,
+        modelChanged,
+        from: prevAcceleratedRef.current,
+        to: accelerated
+      });
       updateStepsForCurrentSettings();
     }
     
