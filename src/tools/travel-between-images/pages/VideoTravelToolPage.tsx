@@ -187,6 +187,10 @@ const VideoTravelToolPage: React.FC = () => {
   
   // NEW: Modern settings management using dedicated hook
   const shotSettings = useShotSettings(selectedShot?.id, selectedProjectId);
+  
+  // Ref to always access latest shotSettings without triggering effects
+  const shotSettingsRef = useRef(shotSettings);
+  shotSettingsRef.current = shotSettings;
 
   // [VideoTravelDebug] Log the data loading states - reduced frequency
   if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
@@ -807,17 +811,17 @@ const VideoTravelToolPage: React.FC = () => {
   useEffect(() => {
     if (!isCloudGenerationEnabled && turboMode) {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
-      shotSettings.updateField('turboMode', false);
+      shotSettingsRef.current.updateField('turboMode', false);
     }
-  }, [isCloudGenerationEnabled, turboMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isCloudGenerationEnabled, turboMode]);
 
   // Auto-disable advanced mode when turbo mode is on
   useEffect(() => {
     if (turboMode && advancedMode) {
       console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
-      shotSettings.updateField('advancedMode', false);
+      shotSettingsRef.current.updateField('advancedMode', false);
     }
-  }, [turboMode, advancedMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [turboMode, advancedMode]);
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   const selectedShotRef = useRef(selectedShot);
