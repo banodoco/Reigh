@@ -286,10 +286,11 @@ const VideoTravelToolPage: React.FC = () => {
   const handleTurboModeChange = useCallback((turbo: boolean) => {
     // When enabling turbo mode, automatically disable advanced mode
     if (turbo && shotSettings.settings?.advancedMode) {
-      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode');
+      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode and clearing preset');
       shotSettings.updateFields({
         turboMode: turbo,
-        advancedMode: false
+        advancedMode: false,
+        selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
       });
     } else {
       shotSettings.updateField('turboMode', turbo);
@@ -320,6 +321,13 @@ const VideoTravelToolPage: React.FC = () => {
       shotSettings.updateFields({
         advancedMode: advanced,
         phaseConfig: DEFAULT_PHASE_CONFIG
+      });
+    } else if (!advanced) {
+      // When turning OFF advanced mode, clear the preset reference
+      console.log('[PhaseConfigTrack] Disabling advanced mode and clearing preset reference');
+      shotSettings.updateFields({
+        advancedMode: advanced,
+        selectedPhasePresetId: null
       });
     } else {
       shotSettings.updateField('advancedMode', advanced);
@@ -819,7 +827,10 @@ const VideoTravelToolPage: React.FC = () => {
   useEffect(() => {
     if (turboMode && advancedMode) {
       console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
-      shotSettingsRef.current.updateField('advancedMode', false);
+      shotSettingsRef.current.updateFields({
+        advancedMode: false,
+        selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
+      });
     }
   }, [turboMode, advancedMode]);
 
