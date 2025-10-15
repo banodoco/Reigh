@@ -449,7 +449,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   className={(turboMode || isTimelineMode) ? 'opacity-50' : ''}
                 />
               </div>
-              {(isTimelineMode || imageCount >= 2) && (
+              {(isTimelineMode || imageCount >= 2) && !turboMode && (
                 <div className="relative">
                   <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Context: {framesToSeconds(batchVideoContext)} ({batchVideoContext} frames)</Label>
                   <Tooltip>
