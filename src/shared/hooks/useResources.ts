@@ -111,6 +111,41 @@ export const useCreateResource = () => {
     });
 };
 
+// Update a resource
+interface UpdateResourceArgs {
+    id: string;
+    type: ResourceType;
+    metadata: ResourceMetadata;
+}
+
+export const useUpdateResource = () => {
+    const queryClient = useQueryClient();
+    return useMutation<Resource, Error, UpdateResourceArgs>({
+        mutationFn: async ({ id, type, metadata }) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+            
+            const { data, error } = await supabase
+                .from('resources')
+                .update({ metadata })
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .select()
+                .single();
+            
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['resources', data.type] });
+            queryClient.invalidateQueries({ queryKey: ['public-resources', data.type] });
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
+};
+
 // Delete a resource
 export const useDeleteResource = () => {
     const queryClient = useQueryClient();

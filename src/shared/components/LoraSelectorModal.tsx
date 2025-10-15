@@ -9,7 +9,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useExtraLargeModal } from '@/shared/hooks/useModal';
 import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { useListResources, useCreateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
+import { useListResources, useCreateResource, useUpdateResource, useDeleteResource, Resource } from '@/shared/hooks/useResources';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
@@ -20,7 +20,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/shared/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
-import { Info, X } from 'lucide-react';
+import { Info, X, Pencil, Trash2 } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { Slider } from "@/shared/components/ui/slider";
 import { supabase } from '@/integrations/supabase/client';
@@ -120,7 +120,9 @@ interface CommunityLorasTabProps {
   lora_type: string;
   myLorasResource: UseQueryResult<Resource[], Error>;
   createResource: UseMutationResult<Resource, Error, { type: 'lora'; metadata: LoraModel; }, unknown>;
+  updateResource: UseMutationResult<Resource, Error, { id: string; type: 'lora'; metadata: LoraModel; }, unknown>;
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
+  onEdit: (lora: Resource & { metadata: LoraModel }) => void;
 }
 
 const CommunityLorasTab: React.FC<CommunityLorasTabProps & { 
@@ -138,9 +140,11 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   selectedLoras,
   lora_type, 
   myLorasResource, 
-  createResource, 
+  createResource,
+  updateResource,
   deleteResource,
   onClose,
+  onEdit,
   showMyLorasOnly,
   setShowMyLorasOnly,
   showAddedLorasOnly,
@@ -175,9 +179,9 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   const allLoras = useMemo(() => {
     const communityLoras = loras.filter(l => l.lora_type === lora_type);
     const savedLoras = myLorasResource.data?.map(r => ({
-      ...r.metadata,
+      ...(r.metadata as LoraModel),
       _resourceId: r.id, // Add resource ID for deletion
-      created_by: r.metadata.created_by || { is_you: true },
+      created_by: (r.metadata as LoraModel).created_by || { is_you: true },
     })) || [];
     const localLoras = localWanLoras.filter(l => l.lora_type === lora_type);
     
@@ -388,6 +392,27 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                           {isInSavedLoras ? 'Saved' : 'Save'}
                                       </Button>
                                     )}
+                                    {isMyLora && !isLocalLora && resourceId && (
+                                      <>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            onEdit({ id: resourceId, metadata: lora } as Resource & { metadata: LoraModel });
+                                          }}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="destructive"
+                                          size="sm"
+                                          onClick={() => deleteResource.mutate({ id: resourceId, type: 'lora' })}
+                                          disabled={deleteResource.isPending}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                                 <p className="text-sm text-muted-foreground" title={lora.Author}>By: {lora.Author}</p>
@@ -430,6 +455,27 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                   >
                                       {isInSavedLoras ? 'Saved' : 'Save'}
                                   </Button>
+                                )}
+                                {isMyLora && !isLocalLora && resourceId && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        onEdit({ id: resourceId, metadata: lora } as Resource & { metadata: LoraModel });
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => deleteResource.mutate({ id: resourceId, type: 'lora' })}
+                                      disabled={deleteResource.isPending}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -605,13 +651,19 @@ interface MyLorasTabProps {
   selectedLoraIds: string[];
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
   createResource: UseMutationResult<Resource, Error, { type: 'lora'; metadata: LoraModel; }, unknown>;
+  updateResource: UseMutationResult<Resource, Error, { id: string; type: 'lora'; metadata: LoraModel; }, unknown>;
   /** The LoRA type currently being viewed/edited */
   lora_type: string;
   /** Callback to switch to the browse tab */
   onSwitchToBrowse: () => void;
+  /** LoRA being edited (if any) */
+  editingLora?: (Resource & { metadata: LoraModel }) | null;
+  /** Callback to clear edit state */
+  onClearEdit: () => void;
 }
 
-const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, lora_type, onSwitchToBrowse }) => {
+const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onRemoveLora, selectedLoraIds, deleteResource, createResource, updateResource, lora_type, onSwitchToBrowse, editingLora, onClearEdit }) => {
+    const isEditMode = !!editingLora;
     const [addForm, setAddForm] = useState({
         name: '',
         description: '',
@@ -624,6 +676,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
     });
     
     const [sampleFiles, setSampleFiles] = useState<File[]>([]);
+    const [deletedExistingSampleUrls, setDeletedExistingSampleUrls] = useState<string[]>([]);
     const [mainGenerationIndex, setMainGenerationIndex] = useState<number>(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -652,6 +705,29 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             newUrls.forEach(url => URL.revokeObjectURL(url));
         };
     }, [sampleFiles, mainGenerationIndex]); // Removed previewUrls from dependencies to prevent infinite loop
+
+    // Pre-populate form when editing
+    useEffect(() => {
+        if (editingLora && editingLora.metadata) {
+            const metadata = editingLora.metadata;
+            setAddForm({
+                name: metadata.Name || '',
+                description: metadata.Description || '',
+                created_by_is_you: metadata.created_by?.is_you ?? false,
+                created_by_username: metadata.created_by?.username || '',
+                huggingface_url: metadata["Model Files"]?.[0]?.url || '',
+                base_model: metadata.base_model || 'Wan 2.1 T2V',
+                is_public: metadata.is_public ?? true,
+                trigger_word: metadata.trigger_word || '',
+            });
+            
+            // Reset new uploads and deleted samples when switching to a different LoRA
+            setSampleFiles([]);
+            setDeletedExistingSampleUrls([]);
+            setMainGenerationIndex(0);
+            setFileInputKey(prev => prev + 1);
+        }
+    }, [editingLora]);
 
     // Fetch current user's name
     useEffect(() => {
@@ -721,7 +797,7 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
 
     // Get existing filenames from saved LoRAs and local LoRAs
     const getExistingFilenames = () => {
-        const savedFilenames = myLorasResource.data?.map(r => r.metadata.filename || r.metadata["Model ID"]) || [];
+        const savedFilenames = myLorasResource.data?.map(r => (r.metadata as LoraModel).filename || (r.metadata as LoraModel)["Model ID"]) || [];
         const localFilenames = localWanLoras.map(l => l.filename || l["Model ID"]);
         return [...savedFilenames, ...localFilenames];
     };
@@ -758,7 +834,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
             return;
         }
         
-        if (sampleFiles.length === 0) {
+        // When editing, samples are optional (keep existing if none provided)
+        // When creating, at least one sample is required
+        if (!isEditMode && sampleFiles.length === 0) {
             toast.error("At least one sample image or video is required");
             return;
         }
@@ -784,26 +862,49 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 });
             }
 
+            // Combine existing samples (minus deleted ones) with new uploads
+            const existingSamples = isEditMode 
+                ? (editingLora?.metadata.sample_generations || []).filter(s => !deletedExistingSampleUrls.includes(s.url))
+                : [];
+            const existingImages = isEditMode 
+                ? (editingLora?.metadata.Images || []).filter(img => !deletedExistingSampleUrls.includes(img.url))
+                : [];
+            
+            const finalSamples = [...existingSamples, ...uploadedSamples];
+            const finalImages = [
+                ...existingImages,
+                ...uploadedSamples.map(sample => ({
+                    url: sample.url,
+                    alt_text: sample.alt_text || '',
+                    type: sample.type,
+                }))
+            ];
+
             // Determine main generation
-            const mainGeneration = uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex] 
-                ? uploadedSamples[mainGenerationIndex].url 
-                : undefined;
+            let mainGeneration: string | undefined;
+            if (uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex]) {
+                mainGeneration = uploadedSamples[mainGenerationIndex].url;
+            } else if (isEditMode && editingLora?.metadata.main_generation && !deletedExistingSampleUrls.includes(editingLora.metadata.main_generation)) {
+                // Keep existing main generation if it wasn't deleted
+                mainGeneration = editingLora.metadata.main_generation;
+            } else if (finalSamples.length > 0) {
+                // Default to first sample if no main generation set
+                mainGeneration = finalSamples[0].url;
+            }
 
-            // Generate unique filename
+            // Generate unique filename - or use existing if editing
             const existingFilenames = getExistingFilenames();
-            const uniqueFilename = generateUniqueFilename(addForm.name, addForm.base_model, addForm.huggingface_url, existingFilenames);
+            const uniqueFilename = isEditMode 
+                ? (editingLora?.metadata["Model ID"] || editingLora?.metadata.filename || generateUniqueFilename(addForm.name, addForm.base_model, addForm.huggingface_url, existingFilenames))
+                : generateUniqueFilename(addForm.name, addForm.base_model, addForm.huggingface_url, existingFilenames);
 
-            // Create the LoRA model
-            const newLora: LoraModel = {
+            // Create/Update the LoRA model
+            const loraMetadata: LoraModel = {
                 "Model ID": uniqueFilename,
                 Name: addForm.name,
                 Author: addForm.created_by_is_you ? (userName || 'You') : (addForm.created_by_username || 'Unknown'),
                 Description: addForm.description || undefined,
-                Images: uploadedSamples.map(sample => ({
-                    url: sample.url,
-                    alt_text: sample.alt_text || '',
-                    type: sample.type,
-                })),
+                Images: finalImages,
                 "Model Files": [{
                     path: uniqueFilename,
                     url: addForm.huggingface_url,
@@ -816,14 +917,25 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 huggingface_url: addForm.huggingface_url,
                 filename: uniqueFilename,
                 base_model: addForm.base_model,
-                sample_generations: uploadedSamples,
+                sample_generations: finalSamples,
                 main_generation: mainGeneration,
                 is_public: addForm.is_public,
                 "Last Modified": new Date().toISOString(),
                 trigger_word: addForm.trigger_word,
             };
 
-            await createResource.mutateAsync({ type: 'lora', metadata: newLora as any });
+            if (isEditMode && editingLora) {
+                await updateResource.mutateAsync({ 
+                    id: editingLora.id, 
+                    type: 'lora', 
+                    metadata: loraMetadata as any 
+                });
+                toast.success('LoRA updated successfully');
+                onClearEdit();
+            } else {
+                await createResource.mutateAsync({ type: 'lora', metadata: loraMetadata as any });
+                toast.success('LoRA created successfully');
+            }
 
             // Reset form
             setAddForm({
@@ -837,16 +949,15 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                 trigger_word: '',
             });
             setSampleFiles([]);
+            setDeletedExistingSampleUrls([]);
             setMainGenerationIndex(0);
             setFileInputKey(prev => prev + 1); // Reset file input
-
-      
             
-            // Switch to browse tab to show the newly added LoRA
+            // Switch to browse tab to show the LoRA
             onSwitchToBrowse();
         } catch (error) {
-            console.error("Error adding LoRA:", error);
-            toast.error("Failed to add LoRA: " + (error instanceof Error ? error.message : String(error)));
+            console.error(`Error ${isEditMode ? 'updating' : 'adding'} LoRA:`, error);
+            toast.error(`Failed to ${isEditMode ? 'update' : 'add'} LoRA: ` + (error instanceof Error ? error.message : String(error)));
         } finally {
             setIsSubmitting(false);
         }
@@ -854,12 +965,46 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
     
     return (
         <div className="space-y-4">
-
+            {isEditMode && (
+                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Editing: {editingLora?.metadata.Name}
+                    </span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      onClearEdit();
+                      setAddForm({
+                        name: '',
+                        description: '',
+                        created_by_is_you: false,
+                        created_by_username: '',
+                        huggingface_url: '',
+                        base_model: 'Wan 2.1 T2V',
+                        is_public: true,
+                        trigger_word: '',
+                      });
+                      setSampleFiles([]);
+                      setDeletedExistingSampleUrls([]);
+                      setMainGenerationIndex(0);
+                      setFileInputKey(prev => prev + 1);
+                    }}
+                  >
+                    Cancel Edit
+                  </Button>
+                </div>
+            )}
             
             <Card>
                 <CardHeader>
-                    <CardTitle>Add a New LoRA</CardTitle>
-                    <CardDescription>Create and save a new LoRA to your collection.</CardDescription>
+                    <CardTitle>{isEditMode ? 'Edit LoRA' : 'Add a New LoRA'}</CardTitle>
+                    <CardDescription>
+                        {isEditMode ? 'Update your LoRA details.' : 'Create and save a new LoRA to your collection.'}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -973,7 +1118,76 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                         )}
                     </div>
 
-                    <div className="space-y-2">                        
+                    <div className="space-y-2">
+                        {/* Display existing samples when editing */}
+                        {isEditMode && editingLora?.metadata.sample_generations && editingLora.metadata.sample_generations.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                                <Label className="text-sm font-light">Existing Samples ({editingLora.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {editingLora.metadata.sample_generations
+                                        .filter(sample => !deletedExistingSampleUrls.includes(sample.url))
+                                        .map((sample, index) => {
+                                            const isPrimary = sample.url === editingLora.metadata.main_generation;
+                                            return (
+                                                <div key={sample.url} className="relative group">
+                                                    <div 
+                                                        className={`relative rounded-lg border-2 overflow-hidden ${
+                                                            isPrimary 
+                                                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' 
+                                                                : 'border-gray-200'
+                                                        }`}
+                                                    >
+                                                        {sample.type === 'image' ? (
+                                                            <img
+                                                                src={sample.url}
+                                                                alt={sample.alt_text || 'Sample'}
+                                                                className="w-full h-24 object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="relative h-24 w-full">
+                                                                <HoverScrubVideo
+                                                                    src={sample.url}
+                                                                    className="h-full w-full"
+                                                                    videoClassName="object-cover"
+                                                                    autoplayOnHover={false}
+                                                                    preload="metadata"
+                                                                    loop
+                                                                    muted
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Primary indicator */}
+                                                        {isPrimary && (
+                                                            <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                                                                Primary
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Delete button */}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setDeletedExistingSampleUrls(prev => [...prev, sample.url]);
+                                                            }}
+                                                            title="Delete sample"
+                                                        >
+                                                            ×
+                                                        </Button>
+                                                    </div>
+                                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+                                                        {sample.alt_text || `Sample ${index + 1}`}
+                                                    </p>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        )}
+                                        
                         <FileInput
                             key={fileInputKey} // Reset component when key changes
                             onFileChange={(newFiles) => {
@@ -984,9 +1198,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             }}
                             acceptTypes={['image', 'video']}
                             multiple={true}
-                            label="Upload sample images/videos *"
+                            label={isEditMode ? "Add more sample images/videos (optional)" : "Upload sample images/videos *"}
                         />
-                        {sampleFiles.length === 0 && (
+                        {!isEditMode && sampleFiles.length === 0 && (
                             <p className="text-xs text-red-600">
                                 At least one sample image or video is required
                             </p>
@@ -1084,7 +1298,10 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                             !validateHuggingFaceUrl(addForm.huggingface_url).isValid
                         }
                     >
-                        {isSubmitting ? 'Adding LoRA...' : 'Add LoRA'}
+                        {isSubmitting 
+                            ? (isEditMode ? 'Saving Changes...' : 'Adding LoRA...') 
+                            : (isEditMode ? 'Save Changes' : 'Add LoRA')
+                        }
                     </Button>
                 </ItemCardFooter>
             </Card>
@@ -1106,15 +1323,30 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const isMobile = useIsMobile();
   const myLorasResource = useListResources('lora');
   const createResource = useCreateResource();
+  const updateResource = useUpdateResource();
   const deleteResource = useDeleteResource();
   
   // Tab state management
   const [activeTab, setActiveTab] = useState<string>('browse');
   
+  // Edit state management
+  const [editingLora, setEditingLora] = useState<(Resource & { metadata: LoraModel }) | null>(null);
+  
   // Filter state for footer controls
   const [showMyLorasOnly, setShowMyLorasOnly] = useState(false);
   const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
   const [processedLorasLength, setProcessedLorasLength] = useState(0);
+  
+  // Handle edit action
+  const handleEdit = (lora: Resource & { metadata: LoraModel }) => {
+    setEditingLora(lora);
+    setActiveTab('add-new');
+  };
+  
+  // Handle clear edit
+  const handleClearEdit = () => {
+    setEditingLora(null);
+  };
   
   // Modal styling and scroll fade
   const modal = useExtraLargeModal('loraSelector');
@@ -1164,10 +1396,12 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     onUpdateLoraStrength={onUpdateLoraStrength}
                     selectedLoras={selectedLoras} 
                     lora_type={lora_type}
-                    myLorasResource={myLorasResource}
-                    createResource={createResource}
-                    deleteResource={deleteResource}
+                    myLorasResource={myLorasResource as any}
+                    createResource={createResource as any}
+                    updateResource={updateResource as any}
+                    deleteResource={deleteResource as any}
                     onClose={onClose}
+                    onEdit={handleEdit}
                     showMyLorasOnly={showMyLorasOnly}
                     setShowMyLorasOnly={setShowMyLorasOnly}
                     showAddedLorasOnly={showAddedLorasOnly}
@@ -1177,14 +1411,20 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
               </TabsContent>
               <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
                   <MyLorasTab 
-                      myLorasResource={myLorasResource}
+                      myLorasResource={myLorasResource as any}
                       onAddLora={onAddLora}
                       onRemoveLora={onRemoveLora}
                       selectedLoraIds={selectedLoras.map(l => l['Model ID'])}
-                      deleteResource={deleteResource}
-                      createResource={createResource}
+                      deleteResource={deleteResource as any}
+                      createResource={createResource as any}
+                      updateResource={updateResource as any}
                       lora_type={lora_type}
-                      onSwitchToBrowse={() => setActiveTab('browse')}
+                      onSwitchToBrowse={() => {
+                        setActiveTab('browse');
+                        handleClearEdit();
+                      }}
+                      editingLora={editingLora}
+                      onClearEdit={handleClearEdit}
                   />
                 </TabsContent>
             </Tabs>

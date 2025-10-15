@@ -9,7 +9,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useExtraLargeModal } from '@/shared/hooks/useModal';
 import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
-import { useListResources, useListPublicResources, useCreateResource, useDeleteResource, Resource, PhaseConfigMetadata } from '@/shared/hooks/useResources';
+import { useListResources, useListPublicResources, useCreateResource, useUpdateResource, useDeleteResource, Resource, PhaseConfigMetadata } from '@/shared/hooks/useResources';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ import { Checkbox } from "@/shared/components/ui/checkbox";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/shared/components/ui/alert-dialog";
-import { Info, X, Layers, Zap, Settings2, Trash2 } from 'lucide-react';
+import { Info, X, Layers, Zap, Settings2, Trash2, Pencil } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from "@/shared/components/ui/badge";
@@ -44,8 +44,10 @@ interface BrowsePresetsTabProps {
   myPresetsResource: UseQueryResult<Resource[], Error>;
   publicPresetsResource: UseQueryResult<Resource[], Error>;
   createResource: UseMutationResult<Resource, Error, { type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
+  updateResource: UseMutationResult<Resource, Error, { id: string; type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
   deleteResource: UseMutationResult<void, Error, { id: string; type: "phase-config"; }, unknown>;
   onClose: () => void;
+  onEdit: (preset: Resource & { metadata: PhaseConfigMetadata }) => void;
   showMyPresetsOnly: boolean;
   setShowMyPresetsOnly: (value: boolean) => void;
   showSelectedPresetOnly: boolean;
@@ -59,9 +61,11 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
   selectedPresetId,
   myPresetsResource, 
   publicPresetsResource,
-  createResource, 
+  createResource,
+  updateResource,
   deleteResource,
   onClose,
+  onEdit,
   showMyPresetsOnly,
   setShowMyPresetsOnly,
   showSelectedPresetOnly,
@@ -320,17 +324,28 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                             </Button>
                           )}
                           {isMyPreset && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                setPresetToDelete({ id: preset.id, name: metadata.name, isSelected });
-                                setDeleteDialogOpen(true);
-                              }}
-                              disabled={deleteResource.isPending}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  onEdit(preset as Resource & { metadata: PhaseConfigMetadata });
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  setPresetToDelete({ id: preset.id, name: metadata.name, isSelected });
+                                  setDeleteDialogOpen(true);
+                                }}
+                                disabled={deleteResource.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -539,11 +554,15 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
 
 interface AddNewTabProps {
   createResource: UseMutationResult<Resource, Error, { type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
+  updateResource: UseMutationResult<Resource, Error, { id: string; type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
   onSwitchToBrowse: () => void;
   currentPhaseConfig?: PhaseConfig;
+  editingPreset?: (Resource & { metadata: PhaseConfigMetadata }) | null;
+  onClearEdit: () => void;
 }
 
-const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse, currentPhaseConfig }) => {
+const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit }) => {
+  const isEditMode = !!editingPreset;
   const [addForm, setAddForm] = useState({
     name: '',
     description: '',
@@ -552,12 +571,33 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
     is_public: true,
   });
   const [sampleFiles, setSampleFiles] = useState<File[]>([]);
+  const [deletedExistingSampleUrls, setDeletedExistingSampleUrls] = useState<string[]>([]);
   const [mainGenerationIndex, setMainGenerationIndex] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [fileInputKey, setFileInputKey] = useState<number>(0);
   const [userName, setUserName] = useState<string>('');
   const isMobile = useIsMobile();
+  
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (editingPreset && editingPreset.metadata) {
+      const metadata = editingPreset.metadata;
+      setAddForm({
+        name: metadata.name || '',
+        description: metadata.description || '',
+        created_by_is_you: metadata.created_by?.is_you ?? true,
+        created_by_username: metadata.created_by?.username || '',
+        is_public: metadata.is_public ?? true,
+      });
+      
+      // Reset new uploads and deleted samples when switching to a different preset
+      setSampleFiles([]);
+      setDeletedExistingSampleUrls([]);
+      setMainGenerationIndex(0);
+      setFileInputKey(prev => prev + 1);
+    }
+  }, [editingPreset]);
 
   // Manage preview URLs for sample files
   useEffect(() => {
@@ -619,7 +659,10 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
       return;
     }
     
-    if (!currentPhaseConfig) {
+    // When editing, we can use the existing phase config from the preset
+    // When creating, we need a current phase config
+    const phaseConfigToUse = isEditMode ? (editingPreset?.metadata.phaseConfig || currentPhaseConfig) : currentPhaseConfig;
+    if (!phaseConfigToUse) {
       toast.error("No phase config available to save");
       return;
     }
@@ -639,27 +682,51 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
         });
       }
 
-      // Determine main generation
-      const mainGeneration = uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex] 
-        ? uploadedSamples[mainGenerationIndex].url 
-        : undefined;
+      // Combine existing samples (minus deleted ones) with new uploads
+      const existingSamples = isEditMode 
+        ? (editingPreset?.metadata.sample_generations || []).filter(s => !deletedExistingSampleUrls.includes(s.url))
+        : [];
+      const finalSamples = [...existingSamples, ...uploadedSamples];
 
-      const newPreset: PhaseConfigMetadata = {
+      // Determine main generation
+      let mainGeneration: string | undefined;
+      if (uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex]) {
+        mainGeneration = uploadedSamples[mainGenerationIndex].url;
+      } else if (isEditMode && editingPreset?.metadata.main_generation && !deletedExistingSampleUrls.includes(editingPreset.metadata.main_generation)) {
+        // Keep existing main generation if it wasn't deleted
+        mainGeneration = editingPreset.metadata.main_generation;
+      } else if (finalSamples.length > 0) {
+        // Default to first sample if no main generation set
+        mainGeneration = finalSamples[0].url;
+      }
+
+      const presetMetadata: PhaseConfigMetadata = {
         name: addForm.name,
         description: addForm.description,
-        phaseConfig: currentPhaseConfig,
+        phaseConfig: phaseConfigToUse,
         created_by: {
           is_you: addForm.created_by_is_you,
           username: addForm.created_by_is_you ? undefined : addForm.created_by_username,
         },
         is_public: addForm.is_public,
-        sample_generations: uploadedSamples.length > 0 ? uploadedSamples : undefined,
+        sample_generations: finalSamples.length > 0 ? finalSamples : undefined,
         main_generation: mainGeneration,
-        use_count: 0,
-        created_at: new Date().toISOString(),
+        use_count: isEditMode ? (editingPreset?.metadata.use_count || 0) : 0,
+        created_at: isEditMode ? (editingPreset?.metadata.created_at || new Date().toISOString()) : new Date().toISOString(),
       };
 
-      await createResource.mutateAsync({ type: 'phase-config', metadata: newPreset as any });
+      if (isEditMode && editingPreset) {
+        await updateResource.mutateAsync({ 
+          id: editingPreset.id, 
+          type: 'phase-config', 
+          metadata: presetMetadata as any 
+        });
+        toast.success('Preset updated successfully');
+        onClearEdit();
+      } else {
+        await createResource.mutateAsync({ type: 'phase-config', metadata: presetMetadata as any });
+        toast.success('Preset created successfully');
+      }
 
       // Reset form
       setAddForm({
@@ -670,16 +737,15 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
         is_public: true,
       });
       setSampleFiles([]);
+      setDeletedExistingSampleUrls([]);
       setMainGenerationIndex(0);
       setFileInputKey(prev => prev + 1);
       
-      toast.success('Preset created successfully');
-      
-      // Switch to browse tab to show the newly added preset
+      // Switch to browse tab to show the preset
       onSwitchToBrowse();
     } catch (error) {
-      console.error("Error adding preset:", error);
-      toast.error("Failed to add preset: " + (error instanceof Error ? error.message : String(error)));
+      console.error(`Error ${isEditMode ? 'updating' : 'adding'} preset:`, error);
+      toast.error(`Failed to ${isEditMode ? 'update' : 'add'} preset: ` + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsSubmitting(false);
     }
@@ -687,10 +753,42 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
   
   return (
     <div className="space-y-4">
+      {isEditMode && (
+        <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              Editing: {editingPreset?.metadata.name}
+            </span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => {
+              onClearEdit();
+              setAddForm({
+                name: '',
+                description: '',
+                created_by_is_you: true,
+                created_by_username: '',
+                is_public: true,
+              });
+              setSampleFiles([]);
+              setDeletedExistingSampleUrls([]);
+              setMainGenerationIndex(0);
+              setFileInputKey(prev => prev + 1);
+            }}
+          >
+            Cancel Edit
+          </Button>
+        </div>
+      )}
       <Card>
         <CardHeader>
-          <CardTitle>Create New Phase Config Preset</CardTitle>
-          <CardDescription>Save your current phase configuration for reuse.</CardDescription>
+          <CardTitle>{isEditMode ? 'Edit Phase Config Preset' : 'Create New Phase Config Preset'}</CardTitle>
+          <CardDescription>
+            {isEditMode ? 'Update your phase configuration preset.' : 'Save your current phase configuration for reuse.'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
@@ -715,7 +813,76 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
             />
           </div>
 
-          <div className="space-y-2">                        
+          <div className="space-y-2">
+            {/* Display existing samples when editing */}
+            {isEditMode && editingPreset?.metadata.sample_generations && editingPreset.metadata.sample_generations.length > 0 && (
+              <div className="space-y-2 mb-3">
+                <Label className="text-sm font-light">Existing Samples ({editingPreset.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {editingPreset.metadata.sample_generations
+                    .filter(sample => !deletedExistingSampleUrls.includes(sample.url))
+                    .map((sample, index) => {
+                      const isPrimary = sample.url === editingPreset.metadata.main_generation;
+                      return (
+                        <div key={sample.url} className="relative group">
+                          <div 
+                            className={`relative rounded-lg border-2 overflow-hidden ${
+                              isPrimary 
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' 
+                                : 'border-gray-200'
+                            }`}
+                          >
+                            {sample.type === 'image' ? (
+                              <img
+                                src={sample.url}
+                                alt={sample.alt_text || 'Sample'}
+                                className="w-full h-24 object-cover"
+                              />
+                            ) : (
+                              <div className="relative h-24 w-full">
+                                <HoverScrubVideo
+                                  src={sample.url}
+                                  className="h-full w-full"
+                                  videoClassName="object-cover"
+                                  autoplayOnHover={!isMobile}
+                                  preload="metadata"
+                                  loop
+                                  muted
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Primary indicator */}
+                            {isPrimary && (
+                              <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                                Primary
+                              </div>
+                            )}
+                            
+                            {/* Delete button */}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletedExistingSampleUrls(prev => [...prev, sample.url]);
+                              }}
+                              title="Delete sample"
+                            >
+                              ×
+                            </Button>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+                            {sample.alt_text || `Sample ${index + 1}`}
+                          </p>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+                        
             <FileInput
               key={fileInputKey}
               onFileChange={(newFiles) => {
@@ -724,7 +891,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
               }}
               acceptTypes={['image', 'video']}
               multiple={true}
-              label="Upload sample images/videos (optional)"
+              label={isEditMode ? "Add more sample images/videos (optional)" : "Upload sample images/videos (optional)"}
             />
             
             {/* Display uploaded files */}
@@ -903,10 +1070,13 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, onSwitchToBrowse,
             disabled={
               isSubmitting || 
               !addForm.name.trim() || 
-              !currentPhaseConfig
+              (!isEditMode && !currentPhaseConfig)
             }
           >
-            {isSubmitting ? 'Creating Preset...' : 'Create Preset'}
+            {isSubmitting 
+              ? (isEditMode ? 'Saving Changes...' : 'Creating Preset...') 
+              : (isEditMode ? 'Save Changes' : 'Create Preset')
+            }
           </Button>
         </ItemCardFooter>
       </Card>
@@ -926,15 +1096,30 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   const myPresetsResource = useListResources('phase-config');
   const publicPresetsResource = useListPublicResources('phase-config');
   const createResource = useCreateResource();
+  const updateResource = useUpdateResource();
   const deleteResource = useDeleteResource();
   
   // Tab state management
   const [activeTab, setActiveTab] = useState<string>('browse');
   
+  // Edit state management
+  const [editingPreset, setEditingPreset] = useState<(Resource & { metadata: PhaseConfigMetadata }) | null>(null);
+  
   // Filter state for footer controls
   const [showMyPresetsOnly, setShowMyPresetsOnly] = useState(false);
   const [showSelectedPresetOnly, setShowSelectedPresetOnly] = useState(false);
   const [processedPresetsLength, setProcessedPresetsLength] = useState(0);
+  
+  // Handle edit action
+  const handleEdit = (preset: Resource & { metadata: PhaseConfigMetadata }) => {
+    setEditingPreset(preset);
+    setActiveTab('add-new');
+  };
+  
+  // Handle clear edit
+  const handleClearEdit = () => {
+    setEditingPreset(null);
+  };
   
   // Modal styling and scroll fade
   const modal = useExtraLargeModal('phaseConfigSelector');
@@ -985,8 +1170,10 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   myPresetsResource={myPresetsResource}
                   publicPresetsResource={publicPresetsResource}
                   createResource={createResource}
+                  updateResource={updateResource}
                   deleteResource={deleteResource}
                   onClose={onClose}
+                  onEdit={handleEdit}
                   showMyPresetsOnly={showMyPresetsOnly}
                   setShowMyPresetsOnly={setShowMyPresetsOnly}
                   showSelectedPresetOnly={showSelectedPresetOnly}
@@ -997,8 +1184,14 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
               <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
                 <AddNewTab 
                   createResource={createResource}
-                  onSwitchToBrowse={() => setActiveTab('browse')}
+                  updateResource={updateResource}
+                  onSwitchToBrowse={() => {
+                    setActiveTab('browse');
+                    handleClearEdit();
+                  }}
                   currentPhaseConfig={currentPhaseConfig}
+                  editingPreset={editingPreset}
+                  onClearEdit={handleClearEdit}
                 />
               </TabsContent>
             </Tabs>

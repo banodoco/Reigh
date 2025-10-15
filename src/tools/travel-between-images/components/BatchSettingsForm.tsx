@@ -939,7 +939,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                                 phases: newPhases
                               });
                             }}
-                            className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-2 mt-1"
+                            className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2 mt-1"
                           >
                             Add LoRA
                           </button>

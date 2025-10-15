@@ -448,7 +448,14 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
               <Checkbox
                 id="in-scene-boost"
                 checked={isInSceneBoostEnabled}
-                onCheckedChange={(checked) => setIsInSceneBoostEnabled(checked === true)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setIsInSceneBoostEnabled(true);
+                    setIsNextSceneBoostEnabled(false);
+                  } else {
+                    setIsInSceneBoostEnabled(false);
+                  }
+                }}
               />
               <label
                 htmlFor="in-scene-boost"
@@ -461,7 +468,14 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
               <Checkbox
                 id="next-scene-boost"
                 checked={isNextSceneBoostEnabled}
-                onCheckedChange={(checked) => setIsNextSceneBoostEnabled(checked === true)}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setIsNextSceneBoostEnabled(true);
+                    setIsInSceneBoostEnabled(false);
+                  } else {
+                    setIsNextSceneBoostEnabled(false);
+                  }
+                }}
               />
               <label
                 htmlFor="next-scene-boost"
