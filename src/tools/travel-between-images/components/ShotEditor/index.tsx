@@ -937,12 +937,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const hasInitializedStepsRef = useRef(false);
   
   useEffect(() => {
-    // Skip on first mount - don't overwrite loaded settings
+    // CRITICAL: Wait until settings finish loading before tracking changes
+    // This prevents treating initial load changes as user actions
+    if (isShotUISettingsLoading || settingsLoading) {
+      console.log('[PromptRetentionDebug] [ShotEditor] Settings still loading - skipping step auto-adjustment');
+      return;
+    }
+    
+    // Skip on first mount after settings load - just record initial state
     if (!hasInitializedStepsRef.current) {
       hasInitializedStepsRef.current = true;
       prevAcceleratedRef.current = accelerated;
       prevModelRef.current = steerableMotionSettings.model_name;
-      console.log('[PromptRetentionDebug] [ShotEditor] Initial mount - NOT auto-adjusting steps');
+      console.log('[PromptRetentionDebug] [ShotEditor] Settings loaded - recording initial state, NOT auto-adjusting steps');
       return;
     }
     
@@ -963,7 +970,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Update refs
     prevAcceleratedRef.current = accelerated;
     prevModelRef.current = steerableMotionSettings.model_name;
-  }, [accelerated, steerableMotionSettings.model_name, updateStepsForCurrentSettings]);
+  }, [accelerated, steerableMotionSettings.model_name, updateStepsForCurrentSettings, isShotUISettingsLoading, settingsLoading]);
+  
+  // Reset initialization flag when shot changes
+  useEffect(() => {
+    hasInitializedStepsRef.current = false;
+    console.log('[PromptRetentionDebug] [ShotEditor] Shot changed - resetting step adjustment initialization');
+  }, [selectedShot?.id]);
   
   const setAccelerated = useCallback((value: boolean) => {
     // Only save to shot level - project settings inherit automatically via useToolSettings merge
