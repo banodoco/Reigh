@@ -809,7 +809,7 @@ const VideoTravelToolPage: React.FC = () => {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
       shotSettings.updateField('turboMode', false);
     }
-  }, [isCloudGenerationEnabled, turboMode, shotSettings]);
+  }, [isCloudGenerationEnabled, turboMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-disable advanced mode when turbo mode is on
   useEffect(() => {
@@ -817,7 +817,7 @@ const VideoTravelToolPage: React.FC = () => {
       console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
       shotSettings.updateField('advancedMode', false);
     }
-  }, [turboMode, advancedMode, shotSettings]);
+  }, [turboMode, advancedMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   const selectedShotRef = useRef(selectedShot);

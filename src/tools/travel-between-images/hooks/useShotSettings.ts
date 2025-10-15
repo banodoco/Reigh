@@ -180,9 +180,9 @@ export const useShotSettings = (
       return;
     }
     
-    // FIX: Don't overwrite user's changes while they're actively editing
-    if (isUserEditingRef.current) {
-      console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing');
+    // FIX: Don't overwrite user's changes while they're actively editing or have pending saves
+    if (isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null) {
+      console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing or has pending changes');
       return;
     }
     
