@@ -175,14 +175,33 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
       const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
 
+      console.log('[fetchToolSettingsSupabase] Loading from DB:', {
+        toolId,
+        shotId: ctx.shotId?.substring(0, 8),
+        projectId: ctx.projectId?.substring(0, 8),
+        hasUserSettings: Object.keys(userSettings).length > 0,
+        hasProjectSettings: Object.keys(projectSettings).length > 0,
+        hasShotSettings: Object.keys(shotSettings).length > 0,
+        shotSettingsKeys: Object.keys(shotSettings),
+        shotPrompt: shotSettings.batchVideoPrompt?.substring(0, 50)
+      });
+
       // Merge in priority order: defaults → user → project → shot
-      return deepMerge(
+      const merged = deepMerge(
         {},
         toolDefaults[toolId] ?? {},
         userSettings,
         projectSettings,
         shotSettings
       );
+      
+      console.log('[fetchToolSettingsSupabase] Merged result:', {
+        toolId,
+        mergedKeys: Object.keys(merged).length,
+        mergedPrompt: merged.batchVideoPrompt?.substring(0, 50)
+      });
+      
+      return merged;
     })();
 
     inflightSettingsFetches.set(singleFlightKey, promise);
@@ -287,6 +306,21 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     const currentToolSettings = currentSettings[toolId] ?? {};
     const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
 
+    console.log('[updateToolSettingsSupabase] Saving to DB:', {
+      scope,
+      toolId,
+      id: id.substring(0, 8),
+      patchKeys: Object.keys(patch),
+      patchSample: Object.keys(patch).slice(0, 3).reduce((acc, key) => {
+        const val = patch[key];
+        acc[key] = typeof val === 'string' ? val.substring(0, 50) : val;
+        return acc;
+      }, {} as any),
+      updatedKeys: Object.keys(updatedToolSettings).length,
+      hasPrompt: 'batchVideoPrompt' in updatedToolSettings,
+      promptValue: updatedToolSettings.batchVideoPrompt?.substring(0, 50)
+    });
+
     // Use atomic PostgreSQL function to update settings
     // This is much faster than update() because it happens in a single DB operation
     const { error: rpcError } = await supabase.rpc('update_tool_settings_atomic', {
@@ -299,6 +333,8 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     if (rpcError) {
       throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
     }
+
+    console.log('[updateToolSettingsSupabase] ✅ Save successful');
 
     // CRITICAL: Return the full merged settings, not just the patch
     // This ensures the cache gets the exact same data that was saved to the DB
