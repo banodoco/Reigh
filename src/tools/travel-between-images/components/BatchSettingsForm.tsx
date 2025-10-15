@@ -316,7 +316,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
       onPhasePresetRemove?.();
     };
     
-    // Helper function to get display name from URL (checks predefined LoRAs first)
+    // Helper function to get display name from URL (checks predefined LoRAs first, then availableLoras)
     const getDisplayNameFromUrl = (url: string) => {
       if (!url) return '';
       
@@ -324,6 +324,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
       const predefinedLora = PREDEFINED_LORAS.find(lora => lora.url === url);
       if (predefinedLora?.displayName) {
         return predefinedLora.displayName;
+      }
+      
+      // Check if this is a lora from the search/database
+      const availableLora = availableLoras?.find(lora => lora.huggingface_url === url);
+      if (availableLora?.Name && availableLora.Name !== "N/A") {
+        return availableLora.Name;
       }
       
       // Otherwise, extract filename from URL
@@ -736,7 +742,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   <CardContent className="space-y-4">
                   {/* Core Settings - Vertically aligned */}
                   <div className="space-y-4">
-                    <div className="flex items-end gap-6">
+                    <div className="flex flex-wrap items-end gap-6">
                       <div className="w-44">
                         <Label htmlFor="num_phases" className="text-sm font-light block mb-2">
                           Number of Phases
@@ -804,9 +810,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         </div>
                       </div>
                       
-                      <div className="flex-1" />
-                      
-                      <div className="flex items-center space-x-2 h-10">
+                      <div className="flex items-center space-x-2 h-10 md:ml-auto">
                         <Switch
                           id="random-seed"
                           checked={randomSeed}
@@ -883,11 +887,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         {/* LoRAs */}
                         <div>
                           <Label className="text-sm font-medium mb-2 block">LoRAs</Label>
-                          <div className="flex gap-2 mb-2 w-full">
+                          <div className="grid grid-cols-2 gap-2 mb-2 w-full">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="flex-1"
                               onClick={() => {
                                 setActivePhaseForLoraSelection(phaseIdx);
                                 setIsLoraModalOpen(true);
@@ -900,7 +903,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="flex-1"
                                 >
                                   <Download className="h-3 w-3 mr-1" /> Utility
                                 </Button>

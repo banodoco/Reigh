@@ -6,7 +6,6 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Search, X } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -17,12 +16,10 @@ import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useT
 import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
-import { Skeleton } from '@/shared/components/ui/skeleton';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
-import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
 
@@ -38,6 +35,8 @@ import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
+import { useVideoTravelHeader } from '../hooks/useVideoTravelHeader';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -177,11 +176,7 @@ const VideoTravelToolPage: React.FC = () => {
     refetchShots,
     availableLoras,
     lorasLoading,
-    settings: _oldSettings, // Keep for reference during migration, will remove
-    updateSettings: _oldUpdateSettings, // Keep for reference during migration, will remove
-    settingsLoading: _oldIsLoadingSettings,
     settingsUpdating: isUpdating,
-    settingsError: _oldSettingsError,
     projectSettings,
     updateProjectSettings,
     projectSettingsLoading,
@@ -370,7 +365,6 @@ const VideoTravelToolPage: React.FC = () => {
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
   // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   // const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
-  const { setHeader, clearHeader } = useToolPageHeader();
   
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
@@ -536,6 +530,29 @@ const VideoTravelToolPage: React.FC = () => {
   // Search helper functions
   const clearSearch = useCallback(() => {
     setShotSearchQuery('');
+  }, []);
+  
+  // Handle toggling between shots and videos view
+  const handleToggleVideosView = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const willShowVideos = !showVideosView;
+    setShowVideosView(willShowVideos);
+    
+    // Set flag when switching TO videos view to prevent empty state flash
+    if (willShowVideos) {
+      setVideosViewJustEnabled(true);
+      console.log('[VideoViewTransition] Switching to videos view, setting videosViewJustEnabled=true');
+    }
+    
+    // Clear search when switching views
+    if (willShowVideos) {
+      setShotSearchQuery('');
+    }
+    e.currentTarget.blur(); // Remove focus immediately after click
+  }, [showVideosView]);
+  
+  // Memoize create shot handler to prevent infinite loops in useVideoTravelHeader
+  const handleCreateNewShot = useCallback(() => {
+    setIsCreateShotModalOpen(true);
   }, []);
   
   // Filter shots based on search query
@@ -731,9 +748,6 @@ const VideoTravelToolPage: React.FC = () => {
       window.history.replaceState(null, '', basePath);
     }
   }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate]);
-  
-  // ✅ REMOVED: steerableMotionSettings now comes from shotSettings.settings above
-  // ✅ REMOVED: All settings-related refs - hook handles loading/saving/dirty tracking internally
 
   // [NavPerf] Stop timers once the page mounts
   useEffect(() => {
@@ -758,125 +772,23 @@ const VideoTravelToolPage: React.FC = () => {
   }, [selectedProjectId]);
 
   // Set up the page header with dynamic content based on state
-  // Only show header when we're NOT viewing a specific shot
-  useLayoutEffect(() => {
-    if (shouldShowShotEditor || hashShotId) {
-      // Clear header when viewing a specific shot
-      clearHeader();
-    } else {
-      // Show header when in shot list or videos view
-      const headerContent = (
-        <div className="mb-2 sm:mb-4 mt-4 sm:mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-end gap-4">
-              <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
-                {showVideosView ? 'Videos' : 'Shots'}
-              </h1>
-              <button
-                onClick={(e) => {
-                  const willShowVideos = !showVideosView;
-                  setShowVideosView(willShowVideos);
-                  
-                  // Set flag when switching TO videos view to prevent empty state flash
-                  if (willShowVideos) {
-                    setVideosViewJustEnabled(true);
-                    console.log('[VideoViewTransition] Switching to videos view, setting videosViewJustEnabled=true');
-                  }
-                  
-                  // Clear search when switching views
-                  if (willShowVideos) {
-                    setShotSearchQuery('');
-                  }
-                  e.currentTarget.blur(); // Remove focus immediately after click
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground focus:text-foreground transition-colors underline mb-1.5 focus:outline-none"
-              >
-                {showVideosView ? 'See all shots' : 'See all videos'}
-              </button>
-            </div>
-            {/* Always reserve space for the button to maintain consistent layout */}
-            <div className="flex items-center">
-              {(!showVideosView && !isLoading && shots && shots.length > 0) && (
-                <Button onClick={() => setIsCreateShotModalOpen(true)}>New Shot</Button>
-              )}
-            </div>
-          </div>
-          {/* Search box - only show when in shots view and there are shots */}
-          {!showVideosView && shots && shots.length > 0 && (
-            <div className="px-4">
-              <div className="flex items-center space-x-2 border rounded-md px-3 py-1 h-8 bg-background w-full max-w-xs">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search shots..."
-                  value={shotSearchQuery}
-                  onChange={(e) => setShotSearchQuery(e.target.value)}
-                  className="bg-transparent border-none outline-none text-base flex-1"
-                />
-                {shotSearchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearSearch}
-                    className="h-auto p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-              
-              {/* Sort mode buttons */}
-              <div className="flex items-center space-x-2 mt-4 mb-1">
-                <button
-                  onClick={() => setShotSortMode('ordered')}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
-                    shotSortMode === 'ordered' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  Ordered
-                </button>
-                <button
-                  onClick={() => setShotSortMode('newest')}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
-                    shotSortMode === 'newest' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  Newest First
-                </button>
-                <button
-                  onClick={() => setShotSortMode('oldest')}
-                  className={`text-sm px-3 py-1 rounded-md transition-colors ${
-                    shotSortMode === 'oldest' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  Oldest First
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-      setHeader(headerContent);
-    }
-    // Only clear header on component unmount, not on every effect re-run
-  }, [setHeader, clearHeader, isLoading, shots, setIsCreateShotModalOpen, shouldShowShotEditor, hashShotId, showVideosView, shotSearchQuery, clearSearch, shotSortMode]);
+  useVideoTravelHeader({
+    shouldShowShotEditor,
+    hashShotId,
+    showVideosView,
+    isLoading,
+    shots,
+    shotSearchQuery,
+    onSearchQueryChange: setShotSearchQuery,
+    clearSearch,
+    shotSortMode,
+    onSortModeChange: setShotSortMode,
+    onCreateNewShot: handleCreateNewShot,
+    onToggleVideosView: handleToggleVideosView,
+    searchInputRef,
+  });
 
-  // Clean up header on component unmount
-  useLayoutEffect(() => {
-    return () => clearHeader();
-  }, []);
-
-  // ✅ DELETED: Settings loading failsafe - hook handles loading reliably now!
-  // ✅ DELETED: Complex 250-line settings loading effect - hook handles all loading now!
-  
-  // Auto-disable turbo mode when not using cloud generation (preserved from old effect)
+  // Auto-disable turbo mode when not using cloud generation
   useEffect(() => {
     if (!isCloudGenerationEnabled && turboMode) {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - not using cloud generation');
@@ -1366,42 +1278,10 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // If deep-linked to a shot, show an editor-style skeleton instead of the main list skeleton
     if (hashShotId) {
-      return (
-        <PageFadeIn className="pt-3 sm:pt-5">
-          <div className="flex flex-col space-y-4 pb-16">
-            <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
-              {/* Desktop skeleton - centered shot name navigation */}
-              <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-12 w-64" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </div>
-              
-              {/* Mobile skeleton - centered shot name navigation only */}
-              <div className="sm:hidden flex justify-center px-2">
-                <div className="flex items-center space-x-1">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </div>
-            </div>
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-96 w-full" />
-          </div>
-        </PageFadeIn>
-      );
+      return <LoadingSkeleton type="editor" />;
     }
     // Otherwise show the main grid skeleton while the project hydrates
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
-        {Array.from({ length: 6 }).map((_, idx) => (
-          <Skeleton key={idx} className="h-40 rounded-lg" />
-        ))}
-      </div>
-    );
+    return <LoadingSkeleton type="grid" gridItemCount={6} />;
   }
 
   if (error) {
@@ -1412,42 +1292,10 @@ const VideoTravelToolPage: React.FC = () => {
   if (showStableSkeleton) {
     // If we have a hashShotId but shots are still loading, show editor skeleton
     if (hashShotId) {
-      return (
-        <PageFadeIn className="pt-3 sm:pt-5">
-          <div className="flex flex-col space-y-4 pb-16">
-            <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
-              {/* Desktop skeleton - centered shot name navigation */}
-              <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-12 w-64" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </div>
-              
-              {/* Mobile skeleton - centered shot name navigation only */}
-              <div className="sm:hidden flex justify-center px-2">
-                <div className="flex items-center space-x-1">
-                  <Skeleton className="h-8 w-8" />
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              </div>
-            </div>
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-96 w-full" />
-          </div>
-        </PageFadeIn>
-      );
+      return <LoadingSkeleton type="editor" />;
     }
     // Otherwise show main list skeleton
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
-        {Array.from({ length: 6 }).map((_, idx) => (
-          <Skeleton key={idx} className="h-40 rounded-lg" />
-        ))}
-      </div>
-    );
+    return <LoadingSkeleton type="grid" gridItemCount={6} />;
   }
 
   // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
@@ -1529,7 +1377,7 @@ const VideoTravelToolPage: React.FC = () => {
             ) : (
               <ShotListDisplay
                 onSelectShot={handleShotSelect}
-                onCreateNewShot={() => setIsCreateShotModalOpen(true)}
+                onCreateNewShot={handleCreateNewShot}
                 shots={filteredShots}
                 sortMode={shotSortMode}
               />
@@ -1538,33 +1386,7 @@ const VideoTravelToolPage: React.FC = () => {
         </>
       ) : (
         // Show a loading state while settings or component are being fetched
-        <Suspense fallback={
-          <PageFadeIn className="pt-3 sm:pt-5">
-            <div className="flex flex-col space-y-4 pb-16">
-              <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
-                {/* Desktop skeleton - centered shot name navigation */}
-                <div className="hidden sm:flex justify-center items-center gap-y-2 px-2">
-                  <div className="flex items-center space-x-2">
-                    <Skeleton className="h-8 w-8" />
-                    <Skeleton className="h-12 w-64" />
-                    <Skeleton className="h-8 w-8" />
-                  </div>
-                </div>
-                
-                {/* Mobile skeleton - centered shot name navigation only */}
-                <div className="sm:hidden flex justify-center px-2">
-                  <div className="flex items-center space-x-1">
-                    <Skeleton className="h-8 w-8" />
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-8 w-8" />
-                  </div>
-                </div>
-              </div>
-              <Skeleton className="h-64 w-full" />
-              <Skeleton className="h-96 w-full" />
-            </div>
-          </PageFadeIn>
-        }>
+        <Suspense fallback={<LoadingSkeleton type="editor" />}>
           <PageFadeIn className="pt-3 sm:pt-5">
             {/* Only render ShotEditor if we have a valid shot to edit */}
             {shotToEdit ? (
