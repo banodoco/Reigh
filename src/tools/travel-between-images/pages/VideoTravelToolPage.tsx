@@ -143,7 +143,7 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Get generation location settings to auto-disable turbo mode when not in cloud
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
-  const isCloudGenerationEnabled = generationMethods.inCloud && !generationMethods.onComputer;
+  const isCloudGenerationEnabled = generationMethods.inCloud;
   
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
@@ -803,10 +803,10 @@ const VideoTravelToolPage: React.FC = () => {
     searchInputRef,
   });
 
-  // Auto-disable turbo mode when not using cloud generation
+  // Auto-disable turbo mode when cloud generation is disabled
   useEffect(() => {
     if (!isCloudGenerationEnabled && turboMode) {
-      console.log('[VideoTravelToolPage] Auto-disabling turbo mode - not using cloud generation');
+      console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
       shotSettings.updateField('turboMode', false);
     }
   }, [isCloudGenerationEnabled, turboMode, shotSettings]);
