@@ -311,15 +311,12 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
       toolId,
       id: id.substring(0, 8),
       patchKeys: Object.keys(patch),
-      patchSample: Object.keys(patch).slice(0, 3).reduce((acc, key) => {
-        const val = patch[key];
-        acc[key] = typeof val === 'string' ? val.substring(0, 50) : val;
-        return acc;
-      }, {} as any),
+      patch: patch, // Full patch to see what's being saved
       updatedKeys: Object.keys(updatedToolSettings).length,
       hasPrompt: 'batchVideoPrompt' in updatedToolSettings,
       promptValue: updatedToolSettings.batchVideoPrompt?.substring(0, 50)
     });
+    console.trace('[updateToolSettingsSupabase] Save triggered from:');
 
     // Use atomic PostgreSQL function to update settings
     // This is much faster than update() because it happens in a single DB operation
@@ -477,9 +474,25 @@ export function useToolSettings<T>(
       queryClient.setQueryData<T>(
         ['toolSettings', toolId, projectId, shotId],
         (oldData) => {
+          console.log('[useToolSettings] Cache update:', {
+            toolId,
+            oldDataKeys: oldData ? Object.keys(oldData).length : 0,
+            oldPrompt: (oldData as any)?.batchVideoPrompt?.substring(0, 50),
+            fullMergedKeys: Object.keys(fullMergedSettings).length,
+            fullMergedPrompt: (fullMergedSettings as any)?.batchVideoPrompt?.substring(0, 50)
+          });
+          
           if (!oldData) return fullMergedSettings as T;
           // Merge the updated shot settings over the existing cache (which includes defaults)
-          return deepMerge({}, oldData, fullMergedSettings) as T;
+          const merged = deepMerge({}, oldData, fullMergedSettings) as T;
+          
+          console.log('[useToolSettings] After merge:', {
+            toolId,
+            mergedKeys: Object.keys(merged).length,
+            mergedPrompt: (merged as any)?.batchVideoPrompt?.substring(0, 50)
+          });
+          
+          return merged;
         }
       );
       
