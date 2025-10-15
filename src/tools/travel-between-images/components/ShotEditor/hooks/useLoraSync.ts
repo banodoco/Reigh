@@ -183,6 +183,8 @@ export const useLoraSync = ({
 
   // Save LoRA changes to shot settings whenever they change
   const prevSelectedLorasRef = useRef<string>('');
+  const hasInitializedLorasRef = useRef<boolean>(false);
+  
   useEffect(() => {
     // Skip if settings are still loading or shot not ready
     if (isShotLoraSettingsLoading || !selectedShot?.id || hasInitializedShot !== selectedShot.id) {
@@ -191,9 +193,18 @@ export const useLoraSync = ({
 
     const currentLorasKey = JSON.stringify(loraManager.selectedLoras.map(l => ({ id: l.id, strength: l.strength })));
     
-    // Only save if LoRAs actually changed
+    // On first initialization, just record the current state without saving
+    if (!hasInitializedLorasRef.current) {
+      prevSelectedLorasRef.current = currentLorasKey;
+      hasInitializedLorasRef.current = true;
+      console.log('[useLoraSync] Initial load - not saving, just recording state');
+      return;
+    }
+    
+    // Only save if LoRAs actually changed after initialization
     if (currentLorasKey !== prevSelectedLorasRef.current) {
       prevSelectedLorasRef.current = currentLorasKey;
+      console.log('[useLoraSync] LoRAs changed, saving:', loraManager.selectedLoras.length, 'loras');
       
       if (loraManager.selectedLoras.length > 0) {
         const lorasToSave = loraManager.selectedLoras.map(lora => ({
@@ -212,6 +223,11 @@ export const useLoraSync = ({
     isShotLoraSettingsLoading, 
     updateShotLoraSettings
   ]);
+  
+  // Reset initialization flag when shot changes
+  useEffect(() => {
+    hasInitializedLorasRef.current = false;
+  }, [selectedShot?.id]);
 
   return {
     loraManager,
