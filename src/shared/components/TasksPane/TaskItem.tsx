@@ -406,10 +406,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const cascadedTaskIdMatch = task.errorMessage?.match(/Cascaded failed from related task ([a-f0-9-]+)/i);
   const cascadedTaskId = cascadedTaskIdMatch ? cascadedTaskIdMatch[1] : null;
   
-  const { data: cascadedTask } = useQuery({
+  const { data: cascadedTask, isLoading: isCascadedTaskLoading } = useQuery({
     queryKey: ['cascaded-task-error', cascadedTaskId],
     queryFn: async () => {
       if (!cascadedTaskId) return null;
+      
+      console.log('[TaskItem] Fetching cascaded task error for:', cascadedTaskId);
       
       const { data, error } = await supabase
         .from('tasks')
@@ -421,6 +423,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         console.error('[TaskItem] Failed to fetch cascaded task error:', error);
         return null;
       }
+      
+      console.log('[TaskItem] Cascaded task data:', {
+        task_type: data?.task_type,
+        has_error_message: !!data?.error_message,
+        error_message: data?.error_message
+      });
       
       return data;
     },
@@ -830,17 +838,42 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       {task.status === 'Failed' && task.errorMessage && (
         <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-200">
           <div className="font-semibold text-red-300 mb-1">Error:</div>
-          {cascadedTask?.error_message ? (
+          {cascadedTaskId ? (
             <div>
-              <div className="text-zinc-400 text-[10px] mb-1">
-                Cascaded from related task ({getTaskDisplayName(cascadedTask.task_type)}):
-              </div>
-              <div className="whitespace-pre-wrap break-words">{cascadedTask.error_message}</div>
-            </div>
-          ) : cascadedTaskId && !cascadedTask ? (
-            <div className="flex items-center gap-2">
-              <div className="whitespace-pre-wrap break-words">{task.errorMessage}</div>
-              <div className="text-zinc-400 text-[10px]">(loading related error...)</div>
+              {isCascadedTaskLoading ? (
+                <div className="text-zinc-400 text-[10px] mb-1">Loading error from related task...</div>
+              ) : cascadedTask?.error_message ? (
+                <div>
+                  <div className="text-zinc-400 text-[10px] mb-1">
+                    Cascaded from related task ({getTaskDisplayName(cascadedTask.task_type)}):
+                  </div>
+                  <div className="whitespace-pre-wrap break-words">{cascadedTask.error_message}</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-zinc-400 text-[10px] mb-1">
+                    Cascaded from related task{cascadedTask ? ` (${getTaskDisplayName(cascadedTask.task_type)})` : ''}:
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-400">No error message available</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(cascadedTaskId);
+                        toast({
+                          title: 'Task ID Copied',
+                          description: 'Related task ID copied to clipboard',
+                          variant: 'default',
+                        });
+                      }}
+                      className="px-1.5 py-0.5 text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded transition-colors border border-zinc-600 hover:border-zinc-400"
+                      title="Copy related task ID"
+                    >
+                      copy id
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="whitespace-pre-wrap break-words">{task.errorMessage}</div>
