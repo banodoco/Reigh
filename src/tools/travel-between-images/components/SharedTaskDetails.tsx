@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { framesToSeconds } from './Timeline/utils/time-utils';
+import { LoraModel } from '@/shared/components/LoraSelectorModal';
+import { getDisplayNameFromUrl } from '../utils/loraDisplayUtils';
 
 interface SharedTaskDetailsProps {
   task: any;
@@ -18,6 +20,8 @@ interface SharedTaskDetailsProps {
   onGenerationNameChange?: (name: string) => void;
   isEditingGenerationName?: boolean;
   onEditingGenerationNameChange?: (editing: boolean) => void;
+  // Available LoRAs for proper name display
+  availableLoras?: LoraModel[];
 }
 
 export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
@@ -35,6 +39,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   onGenerationNameChange,
   isEditingGenerationName = false,
   onEditingGenerationNameChange,
+  availableLoras,
 }) => {
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [characterVideoLoaded, setCharacterVideoLoaded] = useState(false);
@@ -874,8 +879,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                       </div>
                       <div className="space-y-1 ml-2">
                         {phase.loras.map((lora: any, idx: number) => {
-                          const fileName = lora.url.split('/').pop() || 'Unknown';
-                          const displayName = fileName.replace(/\.(safetensors|ckpt|pt)$/, '');
+                          const displayName = getDisplayNameFromUrl(lora.url, availableLoras);
                           return (
                             <div key={idx} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
                               <div className="flex-1 min-w-0">
