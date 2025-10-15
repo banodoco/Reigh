@@ -67,6 +67,7 @@ const mapDbTaskToTask = (row: any): Task => ({
   costCents: row.cost_cents ?? undefined,
   generationStartedAt: row.generation_started_at ?? undefined,
   generationProcessedAt: row.generation_processed_at ?? undefined,
+  errorMessage: row.error_message ?? undefined,
 });
 
 /**

@@ -85,6 +85,7 @@ export interface Task {
   costCents?: number;
   generationStartedAt?: string;
   generationProcessedAt?: string;
+  errorMessage?: string;
 }
 
 export interface Worker {

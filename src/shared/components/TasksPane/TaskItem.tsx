@@ -399,6 +399,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const [showVideoLightbox, setShowVideoLightbox] = useState<boolean>(false);
   const [videoLightboxIndex, setVideoLightboxIndex] = useState<number>(0);
   
+  // State for ID copy indicator
+  const [idCopied, setIdCopied] = useState<boolean>(false);
+  
   // Reset hover state when lightboxes open to prevent persistent hover state
   useEffect(() => {
     if (showLightbox || showVideoLightbox) {
@@ -637,9 +640,35 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       onClick={handleMobileTap}
     >
       <div className="flex justify-between items-center mb-1 gap-2">
-        <span className="text-sm font-light text-zinc-200 flex-1 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
-          {abbreviatedTaskType}
-        </span>
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          <span className="text-sm font-light text-zinc-200 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
+            {abbreviatedTaskType}
+          </span>
+          {task.status !== 'Complete' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(task.id);
+                setIdCopied(true);
+                setTimeout(() => setIdCopied(false), 2000);
+                toast({
+                  title: 'ID Copied',
+                  description: 'Task ID copied to clipboard',
+                  variant: 'default',
+                });
+              }}
+              className={cn(
+                "flex-shrink-0 px-1.5 py-0.5 text-[10px] rounded transition-colors border",
+                idCopied 
+                  ? "text-green-400 bg-green-900/20 border-green-500" 
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 border-zinc-600 hover:border-zinc-400"
+              )}
+              title="Copy task ID"
+            >
+              {idCopied ? 'copied' : 'id'}
+            </button>
+          )}
+        </div>
         <span
           className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
             task.status === 'In Progress' ? 'bg-blue-500 text-blue-100' :
@@ -771,6 +800,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         )}
         
       </div>
+      
+      {/* Error message for failed tasks */}
+      {task.status === 'Failed' && task.errorMessage && (
+        <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-200">
+          <div className="font-semibold text-red-300 mb-1">Error:</div>
+          <div className="whitespace-pre-wrap break-words">{task.errorMessage}</div>
+        </div>
+      )}
+      
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
       

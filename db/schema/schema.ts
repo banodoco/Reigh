@@ -46,6 +46,7 @@ export const tasks = pgTable('tasks', {
   costCents: decimal('cost_cents', { precision: 10, scale: 2 }),
   generationStartedAt: timestamp('generation_started_at', { withTimezone: true }),
   generationCreated: boolean('generation_created').default(false).notNull(),
+  errorMessage: text('error_message'),
 });
 
 export const generations = pgTable('generations', {
