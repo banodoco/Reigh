@@ -24,6 +24,8 @@ import { useGetTaskIdForGeneration } from '@/shared/lib/generationTaskBridge';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { Check, X } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
+import { useListPublicResources } from '@/shared/hooks/useResources';
+import { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 
 interface TaskDetailsModalProps {
@@ -61,6 +63,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   // Use the new hooks
   const getTaskIdMutation = useGetTaskIdForGeneration();
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId || '');
+  
+  // Fetch public LoRAs for proper name display
+  const publicLorasQuery = useListPublicResources('lora');
+  const availableLoras = ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[];
 
   // Derive input images from multiple possible locations within task params
   // Strips any surrounding quotes from URLs that may have been improperly stored
@@ -187,6 +193,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
                   onShowFullPromptChange={setShowFullPrompt}
                   showFullNegativePrompt={showFullNegativePrompt}
                   onShowFullNegativePromptChange={setShowFullNegativePrompt}
+                  availableLoras={availableLoras}
                 />
               </div>
               
