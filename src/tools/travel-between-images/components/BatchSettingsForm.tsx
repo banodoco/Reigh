@@ -524,43 +524,44 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             )}
 
-            {/* Advanced Mode Toggle and Load Preset Button */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border flex-1">
-                  <Switch
-                    id="advanced-mode-toggle"
-                    checked={advancedMode}
-                    onCheckedChange={(checked) => {
-                      onAdvancedModeChange(checked);
-                      // When enabling, open the section and set debug to false; when disabling, close it
-                      if (checked) {
-                        setAdvancedSectionExpanded(true);
-                        onSteerableMotionSettingsChange({ debug: false });
-                      } else {
-                        setAdvancedSectionExpanded(false);
-                      }
-                    }}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor="advanced-mode-toggle" className="font-medium">
-                      Advanced Mode
-                    </Label>
+            {/* Advanced Mode Toggle and Load Preset Button - Hidden when Turbo Mode is active */}
+            {!turboMode && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border flex-1">
+                    <Switch
+                      id="advanced-mode-toggle"
+                      checked={advancedMode}
+                      onCheckedChange={(checked) => {
+                        onAdvancedModeChange(checked);
+                        // When enabling, open the section and set debug to false; when disabling, close it
+                        if (checked) {
+                          setAdvancedSectionExpanded(true);
+                          onSteerableMotionSettingsChange({ debug: false });
+                        } else {
+                          setAdvancedSectionExpanded(false);
+                        }
+                      }}
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="advanced-mode-toggle" className="font-medium">
+                        Advanced Mode
+                      </Label>
+                    </div>
                   </div>
+                  
+                  {/* Phase Config Preset Button - only show when advanced mode is enabled */}
+                  {advancedMode && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsPhasePresetModalOpen(true)}
+                      className="gap-2 whitespace-nowrap"
+                    >
+                      <Library className="h-4 w-4" />
+                      {isPresetMode ? 'Change Preset' : 'Load Preset'}
+                    </Button>
+                  )}
                 </div>
-                
-                {/* Phase Config Preset Button - only show when advanced mode is enabled */}
-                {advancedMode && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsPhasePresetModalOpen(true)}
-                    className="gap-2 whitespace-nowrap"
-                  >
-                    <Library className="h-4 w-4" />
-                    {isPresetMode ? 'Change Preset' : 'Load Preset'}
-                  </Button>
-                )}
-              </div>
               
               {/* Preset Info Display */}
               {advancedMode && isPresetMode && selectedPresetMetadata && (
@@ -598,11 +599,13 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </Button>
                   </div>
                 )}
-            </div>
+              </div>
+            )}
             
             {/* Advanced Mode Collapsible Section - only openable when advancedMode is true and NOT in preset mode */}
-            <Collapsible 
-              open={advancedSectionExpanded && advancedMode && !isPresetMode} 
+            {!turboMode && (
+              <Collapsible 
+                open={advancedSectionExpanded && advancedMode && !isPresetMode} 
               onOpenChange={(open) => {
                 // Only allow opening if advancedMode is true and not in preset mode
                 if (advancedMode && !isPresetMode) {
@@ -948,7 +951,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   </CardContent>
                 </Card>
               </CollapsibleContent>
-            </Collapsible>
+              </Collapsible>
+            )}
             
             {/* LoRA Selector Modal for Phase Config */}
             <LoraSelectorModal

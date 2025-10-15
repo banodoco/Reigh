@@ -280,7 +280,16 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings]);
 
   const handleTurboModeChange = useCallback((turbo: boolean) => {
-    shotSettings.updateField('turboMode', turbo);
+    // When enabling turbo mode, automatically disable advanced mode
+    if (turbo && shotSettings.settings?.advancedMode) {
+      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode');
+      shotSettings.updateFields({
+        turboMode: turbo,
+        advancedMode: false
+      });
+    } else {
+      shotSettings.updateField('turboMode', turbo);
+    }
   }, [shotSettings]);
 
   const handleAmountOfMotionChange = useCallback((motion: number) => {
@@ -288,6 +297,12 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings]);
 
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
+    // Prevent enabling advanced mode when turbo mode is on
+    if (advanced && shotSettings.settings?.turboMode) {
+      console.log('[PhaseConfigTrack] ⚠️ Cannot enable advanced mode while turbo mode is active');
+      return;
+    }
+    
     console.log('[PhaseConfigTrack] 🎚️ User toggling advancedMode:', {
       to: advanced,
       shotId: selectedShot?.id?.substring(0, 8),
@@ -795,6 +810,14 @@ const VideoTravelToolPage: React.FC = () => {
       shotSettings.updateField('turboMode', false);
     }
   }, [isCloudGenerationEnabled, turboMode, shotSettings]);
+
+  // Auto-disable advanced mode when turbo mode is on
+  useEffect(() => {
+    if (turboMode && advancedMode) {
+      console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
+      shotSettings.updateField('advancedMode', false);
+    }
+  }, [turboMode, advancedMode, shotSettings]);
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   const selectedShotRef = useRef(selectedShot);
