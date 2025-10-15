@@ -402,6 +402,31 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // State for ID copy indicator
   const [idCopied, setIdCopied] = useState<boolean>(false);
   
+  // Fetch the actual error message if this is a cascaded failure
+  const cascadedTaskIdMatch = task.errorMessage?.match(/Cascaded failed from related task ([a-f0-9-]+)/i);
+  const cascadedTaskId = cascadedTaskIdMatch ? cascadedTaskIdMatch[1] : null;
+  
+  const { data: cascadedTask } = useQuery({
+    queryKey: ['cascaded-task-error', cascadedTaskId],
+    queryFn: async () => {
+      if (!cascadedTaskId) return null;
+      
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('error_message, task_type')
+        .eq('id', cascadedTaskId)
+        .single();
+      
+      if (error) {
+        console.error('[TaskItem] Failed to fetch cascaded task error:', error);
+        return null;
+      }
+      
+      return data;
+    },
+    enabled: !!cascadedTaskId && task.status === 'Failed',
+  });
+  
   // Reset hover state when lightboxes open to prevent persistent hover state
   useEffect(() => {
     if (showLightbox || showVideoLightbox) {
@@ -805,7 +830,21 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       {task.status === 'Failed' && task.errorMessage && (
         <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-200">
           <div className="font-semibold text-red-300 mb-1">Error:</div>
-          <div className="whitespace-pre-wrap break-words">{task.errorMessage}</div>
+          {cascadedTask?.error_message ? (
+            <div>
+              <div className="text-zinc-400 text-[10px] mb-1">
+                Cascaded from related task ({getTaskDisplayName(cascadedTask.task_type)}):
+              </div>
+              <div className="whitespace-pre-wrap break-words">{cascadedTask.error_message}</div>
+            </div>
+          ) : cascadedTaskId && !cascadedTask ? (
+            <div className="flex items-center gap-2">
+              <div className="whitespace-pre-wrap break-words">{task.errorMessage}</div>
+              <div className="text-zinc-400 text-[10px]">(loading related error...)</div>
+            </div>
+          ) : (
+            <div className="whitespace-pre-wrap break-words">{task.errorMessage}</div>
+          )}
         </div>
       )}
       
