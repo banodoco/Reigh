@@ -235,7 +235,8 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
 }
 
 /**
- * Update tool settings using direct Supabase calls
+ * Update tool settings using atomic Supabase function
+ * This eliminates the read-modify-write pattern for better performance and consistency
  */
 export async function updateToolSettingsSupabase(params: UpdateToolSettingsParams, signal?: AbortSignal): Promise<void> {
   const { scope, id, toolId, patch } = params;
@@ -245,6 +246,7 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     if (signal?.aborted) {
       throw new Error('Request was cancelled');
     }
+    
     let tableName: string;
     switch (scope) {
       case 'user':
@@ -260,7 +262,9 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
         throw new Error(`Invalid scope: ${scope}`);
     }
 
-    // Get current settings for this entity
+    // For patch updates, we need to fetch current settings to merge
+    // This is necessary because the caller provides a partial update
+    // TODO: In the future, consider passing full settings to eliminate this fetch
     const { data: currentEntity, error: fetchError } = await supabase
       .from(tableName)
       .select('settings')
@@ -276,23 +280,22 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
       throw new Error('Request was cancelled');
     }
 
+    // Merge patch with current tool settings
     const currentSettings = (currentEntity?.settings as any) ?? {};
     const currentToolSettings = currentSettings[toolId] ?? {};
     const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
 
-    // Update the settings
-    const { error: updateError } = await supabase
-      .from(tableName)
-      .update({
-        settings: {
-          ...currentSettings,
-          [toolId]: updatedToolSettings
-        }
-      })
-      .eq('id', id);
+    // Use atomic PostgreSQL function to update settings
+    // This is much faster than update() because it happens in a single DB operation
+    const { error: rpcError } = await supabase.rpc('update_tool_settings_atomic', {
+      p_table_name: tableName,
+      p_id: id,
+      p_tool_id: toolId,
+      p_settings: updatedToolSettings
+    });
 
-    if (updateError) {
-      throw new Error(`Failed to update ${scope} settings: ${updateError.message}`);
+    if (rpcError) {
+      throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
     }
 
   } catch (error) {
@@ -419,12 +422,23 @@ export function useToolSettings<T>(
           toolId,
           patch: newSettings,
       }, signal);
+      
+      // Return the settings patch for optimistic update
+      return newSettings;
     },
-    onSuccess: () => {
-      // Invalidate the query to refetch updated settings
-      queryClient.invalidateQueries({ 
-        queryKey: ['toolSettings', toolId, projectId, shotId] 
-      });
+    onSuccess: (updatedSettings) => {
+      // Optimistically update the cache instead of refetching
+      // This is much faster and eliminates the need for reload protection
+      queryClient.setQueryData<T>(
+        ['toolSettings', toolId, projectId, shotId],
+        (oldData) => {
+          if (!oldData) return updatedSettings as T;
+          // Deep merge the updated settings with existing data
+          return deepMerge({}, oldData, updatedSettings) as T;
+        }
+      );
+      
+      console.log('[useToolSettings] Cache optimistically updated for', toolId);
     },
     onError: (error: Error) => {
       // Don't log or show errors for cancelled requests during task cancellation
@@ -436,6 +450,11 @@ export function useToolSettings<T>(
       
       console.error('[useToolSettings] Update error:', error);
       toast.error(`Failed to save ${toolId} settings: ${error.message}`);
+      
+      // On error, invalidate to refetch correct state from server
+      queryClient.invalidateQueries({ 
+        queryKey: ['toolSettings', toolId, projectId, shotId] 
+      });
     },
   });
 
