@@ -435,15 +435,19 @@ export function useToolSettings<T>(
       return fullMergedSettings;
     },
     onSuccess: (fullMergedSettings) => {
-      // Optimistically update the cache with the exact merged settings that were saved to DB
-      // CRITICAL: fullMergedSettings is the complete merged result from the DB fetch,
-      // not just the patch. This ensures cache and DB are perfectly in sync.
+      // Optimistically update the cache by merging with existing cache
+      // CRITICAL: We must merge, not replace, because the cache includes user/project defaults
+      // that aren't in fullMergedSettings (which only has shot-level settings)
       queryClient.setQueryData<T>(
         ['toolSettings', toolId, projectId, shotId],
-        fullMergedSettings as T
+        (oldData) => {
+          if (!oldData) return fullMergedSettings as T;
+          // Merge the updated shot settings over the existing cache (which includes defaults)
+          return deepMerge({}, oldData, fullMergedSettings) as T;
+        }
       );
       
-      console.log('[useToolSettings] Cache updated with full merged settings for', toolId);
+      console.log('[useToolSettings] Cache optimistically updated with merged settings for', toolId);
     },
     onError: (error: Error) => {
       // Don't log or show errors for cancelled requests during task cancellation
