@@ -77,7 +77,16 @@ verify_jwt = false
 [functions.generate-pat]
 verify_jwt = false
 
+[functions.generate-thumbnail]
+verify_jwt = false
+
+[functions.generate-upload-url]
+verify_jwt = false
+
 [functions.get-completed-segments]
+verify_jwt = false
+
+[functions.get-predecessor-output]
 verify_jwt = false
 
 [functions.grant-credits]
