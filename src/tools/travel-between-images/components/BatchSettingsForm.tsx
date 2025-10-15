@@ -426,7 +426,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               <div className="relative">
                 <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
                   {isTimelineMode ? 'Duration per pair' : (imageCount === 1 ? 'Duration to generate' : 'Duration per pair')}: {framesToSeconds(batchVideoFrames)} ({batchVideoFrames} frames)
-                  {turboMode && <span className="text-sm text-muted-foreground ml-2">(Fixed at {framesToSeconds(81)} in Turbo Mode)</span>}
                 </Label>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -435,7 +434,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                      <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.</p>
+                      <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.
+                      {turboMode && <><br /><br /><strong>Turbo Mode:</strong> Duration is fixed at {framesToSeconds(81)} (81 frames) for optimal speed.</>}
+                      </p>
                   </TooltipContent>
                 </Tooltip>
                 <Slider
