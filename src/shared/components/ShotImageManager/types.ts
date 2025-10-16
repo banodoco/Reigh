@@ -22,6 +22,7 @@ export interface BaseShotImageManagerProps {
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
   onSelectionChange?: (hasSelection: boolean) => void; // Callback when selection state changes
+  readOnly?: boolean; // Read-only mode - hides all interactive elements
 }
 
 export interface MobileImageItemProps {

@@ -75,6 +75,8 @@ interface TimelineContainerProps {
   autoCreateIndividualPrompts?: boolean;
   // Empty state flag for blur effect
   hasNoImages?: boolean;
+  // Read-only mode - disables all interactions
+  readOnly?: boolean;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -98,6 +100,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   onClearEnhancedPrompt,
   onImageDelete,
   onImageDuplicate,
+  readOnly = false,
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
@@ -419,8 +422,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Timeline wrapper with fixed overlays */}
       <div className="relative">
-        {/* Fixed top controls overlay - zoom and structure controls */}
-        {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+        {/* Fixed top controls overlay - zoom and structure controls (hidden in read-only mode) */}
+        {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
           <div
             className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
             style={{ top: '55px' }}
@@ -549,8 +552,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           containerWidth={containerWidth}
         />
 
-        {/* Structure video strip or uploader */}
-        {shotId && projectId && onStructureVideoChange && (
+        {/* Structure video strip or uploader (hidden in read-only mode) */}
+        {!readOnly && shotId && projectId && onStructureVideoChange && (
           structureVideoPath && structureVideoMetadata ? (
             <GuidanceVideoStrip
               videoUrl={structureVideoPath}
@@ -783,7 +786,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 isDragging={isDragging}
                 isSwapTarget={swapTargetId === image.shotImageEntryId}
                 dragOffset={isDragging ? dragOffset : null}
-                onMouseDown={(e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
+                onMouseDown={readOnly ? undefined : (e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
                 onDoubleClick={isMobile ? undefined : () => handleDesktopDoubleClick(idx)}
                 onMobileTap={isMobile ? () => handleMobileTap(idx) : undefined}
                 zoomLevel={zoomLevel}
@@ -800,13 +803,15 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 duplicatingImageId={duplicatingImageId}
                 duplicateSuccessImageId={duplicateSuccessImageId}
                 projectAspectRatio={projectAspectRatio}
+                readOnly={readOnly}
               />
             );
           })}
         </div>
         </div>
 
-        {/* Fixed bottom controls overlay - gap and add images */}
+        {/* Fixed bottom controls overlay - gap and add images (hidden in read-only mode) */}
+        {!readOnly && (
         <div
           className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
           style={{ bottom: '90px' }}
@@ -875,6 +880,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             </div>
           ) : <div />}
         </div>
+        )}
       </div>
       
       {/* Magic Edit Modal - rendered at TimelineContainer level to avoid event handling conflicts */}

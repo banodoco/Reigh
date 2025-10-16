@@ -385,53 +385,58 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               )}
             </CardTitle>
             
-            {/* Download All Images Button - Icon only, next to title */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDownloadAllImages}
-                    disabled={isDownloadingImages || !images || images.length === 0}
-                    className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                  >
-                    {isDownloadingImages ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Download className="h-3 w-3" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Download all images in this shot as a zip file</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* Download All Images Button - Icon only, next to title (hidden in read-only mode) */}
+            {!readOnly && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDownloadAllImages}
+                      disabled={isDownloadingImages || !images || images.length === 0}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {isDownloadingImages ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Download className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Download all images in this shot as a zip file</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Generation Mode Toggle - Hidden on mobile */}
+            {/* Generation Mode Toggle - Hidden on mobile, disabled look in read-only mode */}
             {!isMobile && (
               <ToggleGroup
                 type="single"
                 value={generationMode}
                 onValueChange={(value) => {
-                  if (value && (value === "batch" || value === "timeline")) {
+                  if (!readOnly && value && (value === "batch" || value === "timeline")) {
                     onGenerationModeChange(value);
                   }
                 }}
-                className="h-9 border rounded-md bg-muted/50"
+                className={`h-9 border rounded-md ${readOnly ? 'bg-muted/30 opacity-60 cursor-not-allowed' : 'bg-muted/50'}`}
+                disabled={readOnly}
               >
                 <ToggleGroupItem 
                   value="timeline" 
-                  className="text-sm px-3 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+                  disabled={readOnly}
+                  className={`text-sm px-3 h-9 font-medium ${readOnly ? 'cursor-not-allowed' : 'transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm'}`}
                 >
                   Timeline
                 </ToggleGroupItem>
                 <ToggleGroupItem 
                   value="batch" 
-                  className="text-sm px-3 h-9 font-medium transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm"
+                  disabled={readOnly}
+                  className={`text-sm px-3 h-9 font-medium ${readOnly ? 'cursor-not-allowed' : 'transition-all duration-300 ease-in-out data-[state=on]:scale-105 data-[state=on]:shadow-sm'}`}
                 >
                   Batch
                 </ToggleGroupItem>
@@ -470,6 +475,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 duplicatingImageId={duplicatingImageId}
                 duplicateSuccessImageId={duplicateSuccessImageId}
                 projectAspectRatio={projectAspectRatio}
+                readOnly={readOnly}
                 // Pass shared data to prevent reloading
                 shotGenerations={memoizedShotGenerations}
                 updateTimelineFrame={updateTimelineFrame}
@@ -575,6 +581,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   isUploadingImage={isUploadingImage}
                   batchVideoFrames={batchVideoFrames}
                   onSelectionChange={onSelectionChange}
+                  readOnly={readOnly}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

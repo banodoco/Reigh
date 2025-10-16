@@ -59,6 +59,7 @@ export interface ShotImageManagerProps {
   onOpenLightbox?: (index: number) => void; // Handler to open lightbox at specific index
   batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
   onSelectionChange?: (hasSelection: boolean) => void; // Callback when selection state changes
+  readOnly?: boolean; // Read-only mode - hides all interactive elements
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -79,6 +80,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   isUploadingImage,
   batchVideoFrames = 60,
   onSelectionChange,
+  readOnly = false,
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
@@ -1123,6 +1125,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           projectAspectRatio={projectAspectRatio}
           batchVideoFrames={batchVideoFrames}
           onImageUpload={onImageUpload}
+          readOnly={readOnly}
           isUploadingImage={isUploadingImage}
           onSelectionChange={onSelectionChange}
         />

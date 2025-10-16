@@ -78,6 +78,8 @@ export interface TimelineProps {
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   pendingPositions?: Map<string, number>;
   onPendingPositionApplied?: (generationId: string) => void;
+  // Read-only mode - disables all interactions
+  readOnly?: boolean;
   // Shared data props to prevent hook re-instantiation
   shotGenerations?: import("@/shared/hooks/useEnhancedShotPositions").ShotGeneration[];
   updateTimelineFrame?: (generationId: string, frame: number) => Promise<void>;
@@ -154,6 +156,7 @@ const Timeline: React.FC<TimelineProps> = ({
   onImageDrop,
   pendingPositions,
   onPendingPositionApplied,
+  readOnly = false,
   // Shared data props
   shotGenerations: propShotGenerations,
   updateTimelineFrame: propUpdateTimelineFrame,
@@ -656,6 +659,7 @@ const Timeline: React.FC<TimelineProps> = ({
         onStructureVideoChange={onStructureVideoChange}
         autoCreateIndividualPrompts={autoCreateIndividualPrompts}
         hasNoImages={hasNoImages}
+        readOnly={readOnly}
       />
 
       {/* Lightbox */}
@@ -665,6 +669,7 @@ const Timeline: React.FC<TimelineProps> = ({
           onClose={closeLightbox}
           onNext={images.length > 1 ? goNext : undefined}
           onPrevious={images.length > 1 ? goPrev : undefined}
+          readOnly={readOnly}
           onImageSaved={async (newUrl: string, createNew?: boolean) => {
             console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
               imageId: currentLightboxImage.id,

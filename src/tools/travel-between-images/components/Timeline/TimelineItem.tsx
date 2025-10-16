@@ -36,6 +36,8 @@ interface TimelineItemProps {
   duplicatingImageId?: string;
   duplicateSuccessImageId?: string;
   projectAspectRatio?: string;
+  // Read-only mode - hides all action buttons
+  readOnly?: boolean;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -63,6 +65,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio = undefined,
+  readOnly = false,
 }) => {
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -369,7 +372,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           />
 
           {/* Hover action buttons */}
-          {!isDragging && (
+          {!isDragging && !readOnly && (
             <>
               {/* Click blocker for Magic Edit Button to prevent timeline item clicks */}
               <div

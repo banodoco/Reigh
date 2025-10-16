@@ -38,6 +38,7 @@ interface MediaLightboxProps {
   onPrevious?: () => void;
   onImageSaved?: (newImageUrl: string, createNew?: boolean) => Promise<void>;
   // Configuration props to control features
+  readOnly?: boolean; // Read-only mode - hides all interactive elements
   showNavigation?: boolean;
   showImageEditTools?: boolean;
   showDownload?: boolean;
@@ -99,6 +100,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onNext, 
   onPrevious, 
   onImageSaved,
+  readOnly = false,
   showNavigation = true,
   showImageEditTools = true,
   showDownload = true,
@@ -1621,7 +1623,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   }}
                 >
                   {/* Navigation Controls - Left Arrow */}
-                  {showNavigation && onPrevious && hasPrevious && (
+                  {showNavigation && !readOnly && onPrevious && hasPrevious && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -1749,7 +1751,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Tooltip>
                       )}
 
-                      {!isVideo && showMagicEdit && (
+                      {!isVideo && showMagicEdit && !readOnly && (
                         <MagicEditLauncher
                           imageUrl={displayUrl}
                           imageDimensions={imageDimensions}
@@ -1759,7 +1761,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         />
                       )}
 
-                      {!isVideo && showImageEditTools && (
+                      {!isVideo && showImageEditTools && !readOnly && (
                         <>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1794,7 +1796,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </>
                       )}
 
-                      {showDownload && (
+                      {showDownload && !readOnly && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -1934,7 +1936,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   </div>
 
                   {/* Navigation Controls - Right Arrow */}
-                  {showNavigation && onNext && hasNext && (
+                  {showNavigation && !readOnly && onNext && hasNext && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -2207,7 +2209,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
 
                     {/* Mobile navigation */}
-                    {showNavigation && onPrevious && hasPrevious && (
+                    {showNavigation && !readOnly && onPrevious && hasPrevious && (
                       <Button
                         variant="secondary"
                         size="lg"
@@ -2218,7 +2220,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </Button>
                     )}
                     
-                    {showNavigation && onNext && hasNext && (
+                    {showNavigation && !readOnly && onNext && hasNext && (
                       <Button
                         variant="secondary"
                         size="lg"
@@ -2398,7 +2400,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 className="relative flex items-center justify-center w-full"
               >
               {/* Navigation Controls - Left Arrow */}
-              {showNavigation && onPrevious && hasPrevious && (
+              {showNavigation && !readOnly && onPrevious && hasPrevious && (
                 <Button
                   variant="secondary"
                   size="lg"
@@ -2527,7 +2529,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Tooltip>
                   )}
 
-                  {!isVideo && showMagicEdit && (
+                  {!isVideo && showMagicEdit && !readOnly && (
                     <MagicEditLauncher
                       imageUrl={displayUrl}
                       imageDimensions={imageDimensions}
@@ -2537,7 +2539,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   )}
 
-                  {!isVideo && showImageEditTools && (
+                  {!isVideo && showImageEditTools && !readOnly && (
                     <>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -2572,7 +2574,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </>
                   )}
 
-                  {showDownload && (
+                  {showDownload && !readOnly && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -2728,7 +2730,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Mobile Navigation Controls */}
                 <div className="sm:hidden">
-                  {showNavigation && onPrevious && hasPrevious && (
+                  {showNavigation && !readOnly && onPrevious && hasPrevious && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -2739,7 +2741,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Button>
                   )}
                   
-                  {showNavigation && onNext && hasNext && (
+                  {showNavigation && !readOnly && onNext && hasNext && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -2755,7 +2757,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
 
               {/* Navigation Controls - Right Arrow (Desktop Only) */}
-              {showNavigation && onNext && hasNext && (
+              {showNavigation && !readOnly && onNext && hasNext && (
                 <Button
                   variant="secondary"
                   size="lg"
