@@ -140,6 +140,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [styleReferenceStrength, setStyleReferenceStrength] = useState<number>(1.0);
   const [subjectStrength, setSubjectStrength] = useState<number>(0.0);
   const [subjectDescription, setSubjectDescription] = useState<string>('');
+  const [isEditingSubjectDescription, setIsEditingSubjectDescription] = useState<boolean>(false);
+  const [lastSubjectDescriptionFromParent, setLastSubjectDescriptionFromParent] = useState<string>('');
   const [inThisScene, setInThisScene] = useState<boolean>(false);
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('custom');
   const pendingReferenceModeUpdate = useRef<ReferenceMode | null>(null);
@@ -606,12 +608,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [projectImageSettings?.subjectStrength]);
 
-  // Sync local subject description with project settings
+  // Sync local subject description with project settings (same pattern as PromptInputRow)
   useEffect(() => {
-    if (projectImageSettings?.subjectDescription !== undefined) {
-      setSubjectDescription(projectImageSettings.subjectDescription);
+    // Only sync when NOT actively editing - prevents reset while typing
+    if (!isEditingSubjectDescription) {
+      const parentValue = projectImageSettings?.subjectDescription ?? '';
+      // Only sync if parent actually changed from what we last knew
+      if (parentValue !== lastSubjectDescriptionFromParent) {
+        setSubjectDescription(parentValue);
+        setLastSubjectDescriptionFromParent(parentValue);
+      }
     }
-  }, [projectImageSettings?.subjectDescription]);
+  }, [projectImageSettings?.subjectDescription, isEditingSubjectDescription, lastSubjectDescriptionFromParent]);
 
   // Sync local inThisScene with project settings
   useEffect(() => {
@@ -1139,12 +1147,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     await handleUpdateReference(selectedReferenceId, { subjectStrength: value });
   }, [selectedReferenceId, handleUpdateReference]);
 
-  // Handle subject description change
+  // Handle subject description change (same pattern as PromptInputRow)
   const handleSubjectDescriptionChange = useCallback(async (value: string) => {
     if (!selectedReferenceId) return;
+    
+    // Update local state immediately for responsive UI
     setSubjectDescription(value);
+    
+    // CRITICAL: Update lastFromParent to prevent race condition with delayed DB updates
+    // This ensures we don't sync back stale data when async saves complete
+    setLastSubjectDescriptionFromParent(value);
+    
+    // Save changes to database (optimistic + debounced 300ms)
     await handleUpdateReference(selectedReferenceId, { subjectDescription: value });
   }, [selectedReferenceId, handleUpdateReference]);
+  
+  // Handle focus on subject description field
+  const handleSubjectDescriptionFocus = useCallback(() => {
+    setIsEditingSubjectDescription(true);
+  }, []);
+  
+  // Handle blur on subject description field
+  const handleSubjectDescriptionBlur = useCallback(() => {
+    setIsEditingSubjectDescription(false);
+  }, []);
 
   const handleInThisSceneChange = useCallback(async (value: boolean) => {
     if (!selectedReferenceId) return;
@@ -1564,6 +1590,37 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   };
 
+  // This large effect syncs the entire form state from either the selected reference or project settings
+  useEffect(() => {
+    if (isEditingSubjectDescription) return;
+
+    // When a reference image is selected, sync the form state to match its settings
+    if (selectedReference) {
+      console.log('[RefSettings] Syncing state from selected reference:', selectedReference.name);
+      setStyleReferenceStrength(selectedReference.styleReferenceStrength);
+      setSubjectStrength(selectedReference.subjectStrength);
+      setSubjectDescription(selectedReference.subjectDescription);
+      setInThisScene(selectedReference.inThisScene);
+      setReferenceMode(selectedReference.referenceMode);
+    }
+  }, [selectedReference, projectImageSettings, isEditingSubjectDescription]);
+
+  // This effect syncs local state fields with the derived `current...` values
+  useEffect(() => {
+    if (styleReferenceStrength !== currentStyleStrength) {
+      setStyleReferenceStrength(currentStyleStrength);
+    }
+    if (subjectStrength !== currentSubjectStrength) {
+      setSubjectStrength(currentSubjectStrength);
+    }
+    if (subjectDescription !== currentSubjectDescription) {
+      setSubjectDescription(currentSubjectDescription);
+    }
+    if (inThisScene !== currentInThisScene) {
+      setInThisScene(currentInThisScene);
+    }
+  }, [styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene]);
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -1629,6 +1686,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onStyleStrengthChange={handleStyleStrengthChange}
             onSubjectStrengthChange={handleSubjectStrengthChange}
             onSubjectDescriptionChange={handleSubjectDescriptionChange}
+            onSubjectDescriptionFocus={handleSubjectDescriptionFocus}
+            onSubjectDescriptionBlur={handleSubjectDescriptionBlur}
             onInThisSceneChange={handleInThisSceneChange}
             referenceMode={referenceMode}
             onReferenceModeChange={handleReferenceModeChange}

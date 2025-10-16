@@ -195,8 +195,13 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   // Check if this is a video travel task (not character animate or join clips)
   const isVideoTravelTask = !isCharacterAnimateTask && !isJoinClipsTask;
 
+  // Check if we should show Advanced Phase Settings and LoRAs in right column
+  const showPhaseContentInRightColumn = isVideoTravelTask && phaseConfig?.phases;
+
   return (
-    <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'}`}>
+    <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full' : variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'} ${showPhaseContentInRightColumn ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}`}>
+      {/* Main Content Column */}
+      <div className={showPhaseContentInRightColumn ? 'space-y-3 min-w-0' : 'contents'}>
       {/* Variant Name Section - Only for Video Travel tasks in modal or panel variant */}
       {isVideoTravelTask && (variant === 'modal' || variant === 'panel') && (generationName !== undefined || onGenerationNameChange) && (
         <div className="space-y-1 pb-3 border-b border-muted-foreground/20">
@@ -519,8 +524,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </div>
       )}
 
-      {/* Advanced Phase Settings - Show after images when phase_config is present */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && phaseConfig?.phases && (
+      {/* Advanced Phase Settings - Only show here when NOT in right column layout */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && phaseConfig?.phases && !showPhaseContentInRightColumn && (
         <div className="pt-3 border-t border-muted-foreground/20">
           <div className="space-y-2">
             <p className={`${config.textSize} font-medium text-muted-foreground mb-2`}>Advanced Phase Settings</p>
@@ -600,7 +605,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             aspectRatio = width / height;
           }
         }
-        const videoWidth = 160;
+        const videoWidth = 80;
         const videoHeight = videoWidth / aspectRatio;
         
         return (
@@ -615,8 +620,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                     className="w-full h-full bg-black rounded border shadow-sm flex items-center justify-center"
                     onClick={() => setVideoLoaded(true)}
                   >
-                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-3 transition-colors">
-                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-white/20 group-hover:bg-white/30 rounded-full p-2 transition-colors">
+                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z"/>
                       </svg>
                     </div>
@@ -640,8 +645,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                       }}
                     />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="bg-black/50 rounded-full p-2">
-                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <div className="bg-black/50 rounded-full p-1.5">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M8 5v14l11-7z"/>
                         </svg>
                       </div>
@@ -731,8 +736,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       })()}
       
       {/* Prompts and Technical Settings (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && !phaseConfig?.phases && (
-      <div className={`grid gap-3 ${variant === 'hover' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2'}`}>
+      {!isCharacterAnimateTask && !isJoinClipsTask && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Prompts Section */}
         <div className="space-y-3">
           {/* Prompt */}
@@ -809,7 +814,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         </div>
         
         {/* Technical Settings */}
-        <div className={`grid gap-2 ${config.gridCols}`}>
+        <div className="space-y-3">
           {/* Hide basic Steps when phase_config is present (shown in detail above) */}
           {!phaseConfig?.phases && (
             <div className="space-y-1">
@@ -842,8 +847,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
       </div>
       )}
 
-      {/* LoRAs Section (for non-character-animate and non-join-clips tasks) */}
-      {!isCharacterAnimateTask && !isJoinClipsTask && (() => {
+      {/* LoRAs Section (for non-character-animate and non-join-clips tasks) - Only show here when NOT in right column */}
+      {!isCharacterAnimateTask && !isJoinClipsTask && !showPhaseContentInRightColumn && (() => {
         // Check if we have phase_config with phases
         const hasPhaseConfig = phasesWithLoras.length > 0;
         
@@ -936,6 +941,110 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         
         return null;
       })()}
+      </div>
+
+      {/* Right Column: Advanced Phase Settings and LoRAs by Phase (only when showPhaseContentInRightColumn is true) */}
+      {showPhaseContentInRightColumn && (
+        <div className="space-y-3 lg:border-l lg:border-muted-foreground/20 lg:pl-4 min-w-0">
+          {/* Advanced Phase Settings */}
+          {phaseConfig?.phases && (
+            <div className="space-y-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground mb-2`}>Advanced Phase Settings</p>
+              <div className={`grid gap-2 ${config.gridCols}`}>
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Phases</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {phaseConfig.num_phases || phaseConfig.phases.length}
+                  </p>
+                </div>
+                {phaseConfig.flow_shift !== undefined && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} font-medium text-muted-foreground`}>Flow Shift</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                      {phaseConfig.flow_shift}
+                    </p>
+                  </div>
+                )}
+                {phaseConfig.sample_solver && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} font-medium text-muted-foreground`}>Solver</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground capitalize`}>
+                      {phaseConfig.sample_solver}
+                    </p>
+                  </div>
+                )}
+                {phaseConfig.model_switch_phase !== undefined && (
+                  <div className="space-y-1">
+                    <p className={`${config.textSize} font-medium text-muted-foreground`}>Model Switch</p>
+                    <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                      Phase {phaseConfig.model_switch_phase}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {phaseStepsDisplay && (
+                <div className="space-y-1 pt-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Steps per Phase</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    {phaseStepsDisplay}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* LoRAs by Phase */}
+          {phasesWithLoras.length > 0 && (
+            <div className="pt-3 border-t border-muted-foreground/20">
+              <p className={`${config.textSize} font-medium text-muted-foreground mb-2`}>LoRAs by Phase</p>
+              {phasesWithLoras.map((phase: any) => {
+                const stepsPerPhase = phaseConfig.steps_per_phase?.[phase.phase - 1];
+                return (
+                  <div key={phase.phase} className="space-y-1.5 mb-3">
+                    <div className="flex items-center gap-2">
+                      <p className={`${config.textSize} font-medium text-foreground`}>
+                        Phase {phase.phase}
+                      </p>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        {stepsPerPhase && (
+                          <span className={`${config.textSize} ${config.fontWeight}`}>
+                            {stepsPerPhase} step{stepsPerPhase !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {phase.guidance_scale !== undefined && (
+                          <>
+                            <span className={`${config.textSize}`}>•</span>
+                            <span className={`${config.textSize} ${config.fontWeight}`}>
+                              CFG: {phase.guidance_scale}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1 ml-2">
+                      {phase.loras.map((lora: any, idx: number) => {
+                        const displayName = getDisplayNameFromUrl(lora.url, availableLoras);
+                        return (
+                          <div key={idx} className={`flex items-center justify-between p-1.5 bg-background/50 rounded border ${config.textSize}`}>
+                            <div className="flex-1 min-w-0">
+                              <p className={`${config.fontWeight} truncate`} title={displayName}>
+                                {displayName.length > config.loraNameLength ? displayName.slice(0, config.loraNameLength) + '...' : displayName}
+                              </p>
+                            </div>
+                            <div className={`${config.fontWeight} text-muted-foreground ml-1`}>
+                              {lora.multiplier}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -101,6 +101,24 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     onBackfillRequest
   } = props;
 
+  // [VideoSkeletonDebug] Mount/props summary for video gallery use
+  React.useEffect(() => {
+    const isVideoGallery = currentToolType === 'travel-between-images' && initialMediaTypeFilter === 'video';
+    if (!isVideoGallery) return;
+    console.log('[VideoSkeletonDebug] ImageGallery mount/props:', {
+      isVideoGallery,
+      imagesLength: images?.length,
+      totalCount,
+      columnsPerRow,
+      itemsPerPage,
+      initialMediaTypeFilter,
+      currentToolType,
+      initialToolTypeFilter,
+      showShotFilter,
+      timestamp: Date.now()
+    });
+  }, [images, totalCount, columnsPerRow, itemsPerPage, initialMediaTypeFilter, currentToolType, initialToolTypeFilter, showShotFilter]);
+
   // Get project context for cache clearing and aspect ratio
   const { selectedProjectId, projects } = useProject();
   const { currentShotId } = useCurrentShot();

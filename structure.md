@@ -181,6 +181,7 @@ Serverless functions handle AI processing, payments, and task management. For co
 | **HomePage** | `/` | Landing page (web env only) with hero section, social icons (GitHub/Discord), and Banodoco logo linking to banodoco.ai |
 | **ShotsPage** | `/shots` | Project shots management |
 | **GenerationsPage** | `/generations` | Media gallery with filtering (type/shot/search) & pagination |
+| **SharePage** | `/share/:shareId` | Public page for shared generations with video preview, input images, settings display, and "Copy to My Account" CTA |
 | **PaymentSuccessPage** | `/payments/success` | Stripe payment confirmation |
 | **PaymentCancelPage** | `/payments/cancel` | Stripe payment cancellation |
 

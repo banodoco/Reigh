@@ -25,6 +25,8 @@ interface ModelSectionProps {
   onStyleStrengthChange: (value: number) => void;
   onSubjectStrengthChange: (value: number) => void;
   onSubjectDescriptionChange: (value: string) => void;
+  onSubjectDescriptionFocus?: () => void;
+  onSubjectDescriptionBlur?: () => void;
   onInThisSceneChange: (value: boolean) => void;
   // New multiple references props
   references?: ReferenceImage[];
@@ -211,6 +213,8 @@ const StyleReferenceSection: React.FC<{
   onStyleStrengthChange: (value: number) => void;
   onSubjectStrengthChange: (value: number) => void;
   onSubjectDescriptionChange: (value: string) => void;
+  onSubjectDescriptionFocus?: () => void;
+  onSubjectDescriptionBlur?: () => void;
   onInThisSceneChange: (value: boolean) => void;
   referenceMode?: ReferenceMode;
   onReferenceModeChange?: (mode: ReferenceMode) => void;
@@ -234,6 +238,8 @@ const StyleReferenceSection: React.FC<{
   onStyleStrengthChange,
   onSubjectStrengthChange,
   onSubjectDescriptionChange,
+  onSubjectDescriptionFocus,
+  onSubjectDescriptionBlur,
   onInThisSceneChange,
   referenceMode = 'custom',
   onReferenceModeChange,
@@ -405,6 +411,8 @@ const StyleReferenceSection: React.FC<{
                   type="text"
                   value={subjectDescription}
                   onChange={(e) => onSubjectDescriptionChange(e.target.value)}
+                  onFocus={onSubjectDescriptionFocus}
+                  onBlur={onSubjectDescriptionBlur}
                   placeholder="man, woman, cactus"
                   disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
                   className="flex-1"

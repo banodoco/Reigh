@@ -37,6 +37,18 @@ export function SkeletonGallery({
   projectAspectRatio
 }: SkeletonGalleryProps) {
   
+  // [VideoSkeletonDebug] Trace mount/render for skeleton usage with key parameters
+  React.useEffect(() => {
+    console.log('[VideoSkeletonDebug] SkeletonGallery mount/render:', {
+      count,
+      columns,
+      whiteText,
+      showControls,
+      projectAspectRatio,
+      timestamp: Date.now()
+    });
+  }, [count, columns, whiteText, showControls, projectAspectRatio]);
+
   const gridCols = cn(
     'grid gap-4',
     columns.base === 1 && 'grid-cols-1',

@@ -562,12 +562,21 @@ const VideoTravelToolPage: React.FC = () => {
   // Handle toggling between shots and videos view
   const handleToggleVideosView = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const willShowVideos = !showVideosView;
+    
+    console.log('[VideoSkeletonDebug] === TOGGLE START ===', {
+      from: showVideosView ? 'videos' : 'shots',
+      to: willShowVideos ? 'videos' : 'shots',
+      willShowVideos,
+      currentShowVideosView: showVideosView,
+      timestamp: Date.now()
+    });
+    
     setShowVideosView(willShowVideos);
     
     // Set flag when switching TO videos view to prevent empty state flash
     if (willShowVideos) {
       setVideosViewJustEnabled(true);
-      console.log('[VideoViewTransition] Switching to videos view, setting videosViewJustEnabled=true');
+      console.log('[VideoSkeletonDebug] Setting videosViewJustEnabled=true to show skeletons during transition');
     }
     
     // Clear search when switching views
@@ -650,24 +659,42 @@ const VideoTravelToolPage: React.FC = () => {
     }
   );
 
+  // [VideoSkeletonDebug] Log query state changes to understand skeleton logic
+  React.useEffect(() => {
+    const vd: any = videosData as any;
+    console.log('[VideoSkeletonDebug] useGenerations state changed:', {
+      showVideosView,
+      videosLoading,
+      videosFetching,
+      hasVideosData: !!vd,
+      videosDataTotal: vd?.total,
+      videosDataItemsLength: vd?.items?.length,
+      videosError: videosError?.message,
+      timestamp: Date.now()
+    });
+  }, [showVideosView, videosLoading, videosFetching, videosData, videosError]);
+
   // Clear videosViewJustEnabled flag when data loads
   React.useEffect(() => {
-    if (showVideosView && videosViewJustEnabled && videosData?.items) {
+    const vd: any = videosData as any;
+    if (showVideosView && videosViewJustEnabled && vd?.items) {
       // Data has loaded, clear the flag
       setVideosViewJustEnabled(false);
-      console.log('[VideoViewTransition] Data loaded, clearing videosViewJustEnabled flag', {
-        itemsCount: videosData.items.length,
+      console.log('[VideoSkeletonDebug] Data loaded, clearing videosViewJustEnabled flag', {
+        itemsCount: vd.items.length,
+        videosDataTotal: vd.total,
         timestamp: Date.now()
       });
     }
-  }, [showVideosView, videosViewJustEnabled, videosData?.items]);
+  }, [showVideosView, videosViewJustEnabled, videosData]);
   
   // [VideoThumbnailIssue] Log what data we're passing to ImageGallery
   React.useEffect(() => {
-    if (showVideosView && videosData?.items) {
+    const vd: any = videosData as any;
+    if (showVideosView && vd?.items) {
       console.log('[VideoThumbnailIssue] VideoTravelToolPage passing to ImageGallery:', {
-        itemsCount: videosData.items.length,
-        sampleItems: videosData.items.slice(0, 3).map(item => ({
+        itemsCount: vd.items.length,
+        sampleItems: vd.items.slice(0, 3).map((item: any) => ({
           id: item.id?.substring(0, 8),
           url: item.url?.substring(0, 50) + '...',
           thumbUrl: item.thumbUrl?.substring(0, 50) + '...',
@@ -678,7 +705,7 @@ const VideoTravelToolPage: React.FC = () => {
         timestamp: Date.now()
       });
     }
-  }, [showVideosView, videosData?.items]);
+  }, [showVideosView, videosData]);
   
   // Memoize expensive computations
   const shouldShowShotEditor = useMemo(() => {
@@ -1352,7 +1379,8 @@ const VideoTravelToolPage: React.FC = () => {
             // Show SkeletonGallery when loading videos or when no data yet
             // IMPROVED: Track view transition to prevent empty state flash
             (() => {
-              const hasValidData = videosData?.items && videosData.items.length > 0;
+              const vd: any = videosData as any;
+              const hasValidData = vd?.items && vd.items.length > 0;
               const isLoadingOrFetching = videosLoading || videosFetching;
               
               // Show skeleton if:
@@ -1362,9 +1390,9 @@ const VideoTravelToolPage: React.FC = () => {
               const shouldShowSkeleton = !selectedProjectId || (isLoadingOrFetching && !hasValidData) || videosViewJustEnabled;
               
               // Use actual count if available, otherwise default to 12
-              const skeletonCount = videosData?.total || 12;
+              const skeletonCount = (vd?.total) || 12;
               
-              console.log('[VideoViewSkeleton] Rendering decision:', {
+              console.log('[VideoSkeletonDebug] === RENDER DECISION ===', {
                 showVideosView,
                 selectedProjectId,
                 videosLoading,
@@ -1373,8 +1401,15 @@ const VideoTravelToolPage: React.FC = () => {
                 videosViewJustEnabled,
                 shouldShowSkeleton,
                 skeletonCount,
-                videosDataTotal: videosData?.total,
-                videosDataItemsLength: videosData?.items?.length,
+                videosDataTotal: vd?.total,
+                videosDataItemsLength: vd?.items?.length,
+                decisionBreakdown: {
+                  condition1_noProject: !selectedProjectId,
+                  condition2_loadingNoData: isLoadingOrFetching && !hasValidData,
+                  condition3_justEnabled: videosViewJustEnabled,
+                  result: `${!selectedProjectId} || (${isLoadingOrFetching} && ${!hasValidData}) || ${videosViewJustEnabled} = ${shouldShowSkeleton}`
+                },
+                willRender: shouldShowSkeleton ? 'SKELETON' : 'GALLERY',
                 timestamp: Date.now()
               });
               
@@ -1390,7 +1425,7 @@ const VideoTravelToolPage: React.FC = () => {
               ) : (
                 <div className="px-4 pb-2">
                   <ImageGallery
-                    images={videosData?.items || []}
+                    images={(videosData as any)?.items || []}
                     allShots={shots || []}
                     onAddToLastShot={async () => false} // No-op for video gallery
                     onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery

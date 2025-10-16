@@ -132,6 +132,25 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
     prevPaginatedLengthRef.current = paginatedImages.length;
   }, [paginatedImages.length, isBackfillLoading, setIsBackfillLoading, setBackfillSkeletonCount, onSkeletonCleared]);
 
+  // [VideoSkeletonDebug] Track grid render and loading/skeleton decisions for video gallery context
+  React.useEffect(() => {
+    // Heuristic: in videos view, mediaType is enforced at parent; here we just log state
+    console.log('[VideoSkeletonDebug] ImageGalleryGrid render state:', {
+      paginatedImagesLength: paginatedImages.length,
+      filteredImagesLength: filteredImages.length,
+      imagesLength: images.length,
+      isGalleryLoading,
+      isServerPagination,
+      isBackfillLoading,
+      backfillSkeletonCount,
+      itemsPerPage,
+      page,
+      serverPage,
+      hasFilters,
+      timestamp: Date.now()
+    });
+  }, [paginatedImages.length, filteredImages.length, images.length, isGalleryLoading, isServerPagination, isBackfillLoading, backfillSkeletonCount, itemsPerPage, page, serverPage, hasFilters]);
+
   // Compute aspect ratio padding to match ImageGalleryItem container
   const aspectRatioPadding = React.useMemo(() => {
     // Default to 16:9 if not provided

@@ -8,12 +8,21 @@ declare global {
 }
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Info } from 'lucide-react';
+import { Trash2, Info, CornerDownLeft, Check, Share2, Copy, Loader2 } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useVideoLoader, useThumbnailLoader, useVideoElementIntegration } from '../hooks';
 import { determineVideoPhase, createLoadingSummary } from '../utils/video-loading-utils';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/shared/components/ui/tooltip';
+import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/shared/hooks/use-toast';
 
 interface VideoItemProps {
   video: GenerationRow;
@@ -33,6 +42,9 @@ interface VideoItemProps {
   onMobileModalOpen: (video: GenerationRow) => void;
   selectedVideoForDetails: GenerationRow | null;
   showTaskDetailsModal: boolean;
+  onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  existingShareSlug?: string;
+  onShareCreated?: (videoId: string, shareSlug: string) => void;
 }
 
 export const VideoItem = React.memo<VideoItemProps>(({ 
@@ -52,8 +64,32 @@ export const VideoItem = React.memo<VideoItemProps>(({
   onHoverEnd,
   onMobileModalOpen,
   selectedVideoForDetails,
-  showTaskDetailsModal
+  showTaskDetailsModal,
+  onApplySettingsFromTask,
+  existingShareSlug,
+  onShareCreated
 }) => {
+  // Get task mapping for this video to enable Apply Settings button
+  const { data: taskMapping } = useTaskFromUnifiedCache(video.id || '');
+  
+  // Track success state for Apply Settings button
+  const [settingsApplied, setSettingsApplied] = useState(false);
+  
+  // Track share state
+  const [shareSlug, setShareSlug] = useState<string | null>(null);
+  const [isCreatingShare, setIsCreatingShare] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  
+  // Toast notifications
+  const { toast } = useToast();
+  
+  // Initialize share slug from prop (batch fetched by parent)
+  useEffect(() => {
+    if (existingShareSlug) {
+      setShareSlug(existingShareSlug);
+    }
+  }, [existingShareSlug]);
+  
   // DEBUG: Track re-renders to verify memo is working
   if (process.env.NODE_ENV === 'development' && isFirstVideo) {
     console.log('[HoverIssue] 🔄 VideoItem re-render (first item):', {
@@ -252,6 +288,234 @@ export const VideoItem = React.memo<VideoItemProps>(({
       };
     }
   }, [originalIndex, handleMobilePreload, onMobilePreload]);
+  
+  // ===============================================================================
+  // SHARE FUNCTIONALITY
+  // ===============================================================================
+  
+  /**
+   * Generate a short, URL-friendly random string (like nanoid)
+   */
+  const generateShareSlug = (length: number = 10): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    const randomValues = new Uint8Array(length);
+    crypto.getRandomValues(randomValues);
+    
+    for (let i = 0; i < length; i++) {
+      result += chars[randomValues[i] % chars.length];
+    }
+    
+    return result;
+  };
+
+  /**
+   * Handle share button click - create share link or copy existing
+   * Optimized to avoid Edge Function - handles everything client-side
+   */
+  const handleShare = React.useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!taskMapping?.taskId) {
+      toast({
+        title: "Cannot create share",
+        description: "Task information not available",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // If share already exists, copy to clipboard
+    if (shareSlug) {
+      const shareUrl = `${window.location.origin}/share/${shareSlug}`;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareCopied(true);
+        toast({
+          title: "Link copied!",
+          description: "Share link copied to clipboard"
+        });
+        
+        // Reset copied state after 2 seconds
+        setTimeout(() => {
+          setShareCopied(false);
+        }, 2000);
+      } catch (error) {
+        console.error('[Share] Failed to copy to clipboard:', error);
+        toast({
+          title: "Copy failed",
+          description: "Please try again",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+    
+    // Create new share (client-side)
+    setIsCreatingShare(true);
+    
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session?.session?.access_token) {
+        toast({
+          title: "Authentication required",
+          description: "Please sign in to create share links",
+          variant: "destructive"
+        });
+        setIsCreatingShare(false);
+        return;
+      }
+      
+      // First, check if share already exists
+      const { data: existingShare, error: existingError } = await supabase
+        .from('shared_generations')
+        .select('share_slug')
+        .eq('generation_id', video.id)
+        .eq('creator_id', session.session.user.id)
+        .maybeSingle();
+
+      if (existingError && existingError.code !== 'PGRST116') { // PGRST116 = no rows
+        console.error('[Share] Failed to check existing share:', existingError);
+        toast({
+          title: "Share failed",
+          description: "Please try again",
+          variant: "destructive"
+        });
+        setIsCreatingShare(false);
+        return;
+      }
+
+      if (existingShare) {
+        // Share already exists, just copy it
+        setShareSlug(existingShare.share_slug);
+        const shareUrl = `${window.location.origin}/share/${existingShare.share_slug}`;
+        
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast({
+            title: "Link copied!",
+            description: "Existing share link copied to clipboard"
+          });
+        } catch (clipboardError) {
+          toast({
+            title: "Share found",
+            description: "Click the copy button to copy the link",
+          });
+        }
+        
+        setIsCreatingShare(false);
+        return;
+      }
+
+      // Fetch full generation and task data for caching
+      const [generationResult, taskResult] = await Promise.all([
+        supabase.from('generations').select('*').eq('id', video.id).single(),
+        supabase.from('tasks').select('*').eq('id', taskMapping.taskId).single()
+      ]);
+
+      if (generationResult.error || taskResult.error) {
+        console.error('[Share] Failed to fetch data:', { 
+          generationError: generationResult.error, 
+          taskError: taskResult.error 
+        });
+        toast({
+          title: "Share failed",
+          description: "Failed to load generation data",
+          variant: "destructive"
+        });
+        setIsCreatingShare(false);
+        return;
+      }
+
+      // Generate unique slug with retry logic
+      let attempts = 0;
+      const maxAttempts = 5;
+      let newSlug: string | null = null;
+
+      while (attempts < maxAttempts && !newSlug) {
+        const candidateSlug = generateShareSlug(10);
+        
+        // Try to insert - unique constraint will prevent duplicates
+        const { data: newShare, error: insertError } = await supabase
+          .from('shared_generations')
+          .insert({
+            share_slug: candidateSlug,
+            task_id: taskMapping.taskId,
+            generation_id: video.id,
+            creator_id: session.session.user.id,
+            cached_generation_data: generationResult.data,
+            cached_task_data: taskResult.data,
+          })
+          .select('share_slug')
+          .single();
+
+        if (!insertError && newShare) {
+          newSlug = newShare.share_slug;
+          break;
+        }
+
+        // If error is unique constraint violation, retry with new slug
+        if (insertError?.code === '23505') { // Unique constraint violation
+          attempts++;
+          continue;
+        }
+
+        // Other error - fail
+        if (insertError) {
+          console.error('[Share] Failed to create share:', insertError);
+          toast({
+            title: "Share failed",
+            description: insertError.message || "Please try again",
+            variant: "destructive"
+          });
+          setIsCreatingShare(false);
+          return;
+        }
+      }
+
+      if (!newSlug) {
+        toast({
+          title: "Share failed",
+          description: "Failed to generate unique link. Please try again.",
+          variant: "destructive"
+        });
+        setIsCreatingShare(false);
+        return;
+      }
+
+      setShareSlug(newSlug);
+      
+      // Notify parent to update batch cache
+      if (video.id) {
+        onShareCreated?.(video.id, newSlug);
+      }
+      
+      // Automatically copy to clipboard
+      const shareUrl = `${window.location.origin}/share/${newSlug}`;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Share created!",
+          description: "Share link copied to clipboard"
+        });
+      } catch (clipboardError) {
+        toast({
+          title: "Share created",
+          description: "Click the copy button to copy the link",
+        });
+      }
+    } catch (error) {
+      console.error('[Share] Unexpected error:', error);
+      toast({
+        title: "Something went wrong",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingShare(false);
+    }
+  }, [shareSlug, taskMapping, video.id, toast, onShareCreated]);
   
   useEffect(() => {
     if (videoPosterLoaded) {
@@ -527,6 +791,40 @@ export const VideoItem = React.memo<VideoItemProps>(({
         
         {/* Action buttons – positioned directly on the video/poster container */}
         <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
+          {/* Share Button */}
+          {taskMapping?.taskId && (
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={handleShare}
+                    disabled={isCreatingShare}
+                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${
+                      shareCopied 
+                        ? 'bg-green-500 hover:bg-green-600' 
+                        : 'bg-black/50 hover:bg-black/70'
+                    }`}
+                  >
+                    {isCreatingShare ? (
+                      <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
+                    ) : shareCopied ? (
+                      <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    ) : shareSlug ? (
+                      <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    ) : (
+                      <Share2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>{shareCopied ? 'Link copied!' : shareSlug ? 'Copy share link' : 'Share this video'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
           <Button
             variant="secondary"
             size="icon"
@@ -570,6 +868,48 @@ export const VideoItem = React.memo<VideoItemProps>(({
           >
             <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           </Button>
+          
+          {/* Apply Settings Button */}
+          {taskMapping?.taskId && (
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (taskMapping.taskId && !settingsApplied) {
+                        // Call with empty inputImages array - will be populated from task data on server side
+                        onApplySettingsFromTask(taskMapping.taskId, false, []);
+                        // Show success state
+                        setSettingsApplied(true);
+                        // Reset after 2 seconds
+                        setTimeout(() => {
+                          setSettingsApplied(false);
+                        }, 2000);
+                      }
+                    }}
+                    disabled={settingsApplied}
+                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${
+                      settingsApplied 
+                        ? 'bg-green-500 hover:bg-green-600' 
+                        : 'bg-black/50 hover:bg-black/70'
+                    }`}
+                  >
+                    {settingsApplied ? (
+                      <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    ) : (
+                      <CornerDownLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>{settingsApplied ? 'Settings applied!' : 'Apply settings from this video to the current shot'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           <Button
             variant="destructive"
             size="icon"
@@ -651,6 +991,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     prevProps.onDelete === nextProps.onDelete &&
     prevProps.onHoverStart === nextProps.onHoverStart &&
     prevProps.onHoverEnd === nextProps.onHoverEnd &&
-    prevProps.onMobileModalOpen === nextProps.onMobileModalOpen
+    prevProps.onMobileModalOpen === nextProps.onMobileModalOpen &&
+    prevProps.onApplySettingsFromTask === nextProps.onApplySettingsFromTask
   );
 });

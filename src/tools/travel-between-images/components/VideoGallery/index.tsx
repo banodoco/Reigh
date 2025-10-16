@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUnifiedGenerations, useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGenerationTaskPreloader, useEnhancedGenerations } from '@/shared/contexts/GenerationTaskContext';
 import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
+import { supabase } from '@/integrations/supabase/client';
 
 // Import our extracted hooks and components
 import { useGalleryPagination, useVideoHover } from './hooks';
@@ -118,6 +119,17 @@ interface VideoOutputsGalleryProps {
    * Used to immediately show the empty state before project-wide counts load.
    */
   localZeroHint?: boolean;
+  
+  /**
+   * Optional pre-loaded generation data (for shared/read-only views)
+   * If provided, bypasses database queries
+   */
+  preloadedGenerations?: GenerationRow[];
+  
+  /**
+   * Read-only mode - disables delete/edit actions
+   */
+  readOnly?: boolean;
 }
 
 const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
@@ -132,6 +144,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   invalidateVideoCountsCache,
   projectAspectRatio,
   localZeroHint,
+  preloadedGenerations,
+  readOnly = false,
 }) => {
   // ===============================================================================
   // STATE MANAGEMENT
@@ -253,8 +267,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   });
 
 
-  // Use unified generations hook with task data preloading
-  const { data: generationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, error: generationsError } = useUnifiedGenerations({
+  // Use preloaded data if provided, otherwise fetch from database
+  const { data: fetchedGenerationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, error: generationsError } = useUnifiedGenerations({
     projectId,
     mode: 'shot-specific',
     shotId,
@@ -263,8 +277,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     filters,
     includeTaskData: false, // We'll load task data on-demand for hover/lightbox
     preloadTaskData: true, // Background preload for better UX
-    enabled: !!(projectId && shotId),
+    enabled: !preloadedGenerations && !!(projectId && shotId), // Disable if preloaded data provided
   });
+  
+  // Use preloaded data if provided, otherwise use fetched data
+  const generationsData = preloadedGenerations 
+    ? { items: preloadedGenerations, total: preloadedGenerations.length }
+    : fetchedGenerationsData;
 
   // DEEP DEBUG: Log every change in loading states
   useEffect(() => {
@@ -323,6 +342,41 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   
   // Background preload task data for current page
   useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
+  
+  // Batch fetch share slugs for all videos (single query instead of N queries)
+  const [shareSlugs, setShareSlugs] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const fetchShareSlugs = async () => {
+      if (!videoOutputs.length || readOnly) return;
+      
+      const generationIds = videoOutputs.map(v => v.id).filter(Boolean) as string[];
+      if (!generationIds.length) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('shared_generations')
+          .select('generation_id, share_slug')
+          .in('generation_id', generationIds);
+        
+        if (!error && data) {
+          const slugMap: Record<string, string> = {};
+          data.forEach(item => {
+            slugMap[item.generation_id] = item.share_slug;
+          });
+          setShareSlugs(slugMap);
+        }
+      } catch (err) {
+        console.error('[VideoGallery] Failed to batch fetch share slugs:', err);
+      }
+    };
+    
+    fetchShareSlugs();
+  }, [videoOutputs, readOnly]);
+  
+  // Handle share creation callback to update batch cache
+  const handleShareCreated = useCallback((videoId: string, shareSlug: string) => {
+    setShareSlugs(prev => ({ ...prev, [videoId]: shareSlug }));
+  }, []);
   
   // Sort video outputs by creation date
   const sortedVideoOutputs = useMemo(() => {
@@ -442,8 +496,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // If project cache hasn't loaded yet but local shot data hints 0 videos,
   // treat the effective cached count as 0 to avoid a skeleton flicker.
   const cachedCount = (typeof cachedCountRaw === 'number') ? cachedCountRaw : (localZeroHint ? 0 : null);
-  console.log(`[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}] GET_CACHED_COUNT:`, {
-    shotId,
+  console.log(`[VideoSkeletonDebug] GET_CACHED_COUNT for shot gallery:`, {
+    shotId: shotId?.substring(0, 8) || 'no-shot',
     cachedCount,
     cachedCountRaw,
     localZeroHint,
@@ -457,9 +511,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const skeletonCount = showSkeletons ? Math.min(cachedCount || itemsPerPage, itemsPerPage) : 0;
   
   // UNIQUE DEBUG ID for tracking this specific issue
-  const debugId = `[SkeletonIssue:${shotId?.substring(0, 8) || 'no-shot'}:${Date.now()}]`;
-  console.log(`${debugId} SKELETON_DECISION_BREAKDOWN:`, {
-    shotId,
+  const debugId = `[VideoSkeletonDebug]`;
+  console.log(`${debugId} SKELETON_DECISION for shot gallery:`, {
+    shotId: shotId?.substring(0, 8) || 'no-shot',
     isLoadingGenerations,
     videoOutputsLength: videoOutputs.length,
     generationsError: !!generationsError,
@@ -474,6 +528,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       condition4_cacheAllows: cachedCount === null || cachedCount > 0,
       finalDecision: `${isLoadingGenerations} && ${videoOutputs.length === 0} && ${!hasEverFetched} && ${cachedCount === null || cachedCount > 0} = ${showSkeletons}`
     },
+    willRender: showSkeletons ? 'SKELETONS' : 'VIDEOS_OR_EMPTY',
     timestamp: Date.now()
   });
   
@@ -494,7 +549,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Enhanced empty state check - show immediately if cache says 0 OR local hint says 0, 
   // otherwise show after loading completes with 0 results.
-  const effectiveZero = (cachedCount === 0) || Boolean(localZeroHint);
+  // IMPORTANT: If cachedCount suggests videos exist, trust it over localZeroHint during loading!
+  const effectiveZero = (cachedCount === 0) || (Boolean(localZeroHint) && cachedCount === null);
   const shouldShowEmpty = (
     (sortedVideoOutputs.length === 0 && effectiveZero) ||
     (!isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0)
@@ -785,6 +841,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                   onMobileModalOpen={handleMobileModalOpen}
                   selectedVideoForDetails={selectedVideoForDetails}
                   showTaskDetailsModal={showTaskDetailsModal}
+                  onApplySettingsFromTask={onApplySettingsFromTask}
+                  existingShareSlug={video.id ? shareSlugs[video.id] : undefined}
+                  onShareCreated={handleShareCreated}
                 />
               );
             })}

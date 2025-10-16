@@ -5,6 +5,7 @@ import HomePage from '@/pages/HomePage';
 import ArtPage from '@/pages/ArtPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCancelPage from '@/pages/PaymentCancelPage';
+import SharePage from '@/pages/SharePage';
 
 // Import ImageGenerationToolPage directly to prevent lazy loading issues with TanStack Query
 import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
@@ -65,6 +66,13 @@ const router = createBrowserRouter([
   {
     path: '/payments/cancel',
     element: <PaymentCancelPage />,
+    errorElement: <NotFoundPage />,
+  },
+  
+  // Share page (public, outside of Layout)
+  {
+    path: '/share/:shareId',
+    element: <SharePage />,
     errorElement: <NotFoundPage />,
   },
 

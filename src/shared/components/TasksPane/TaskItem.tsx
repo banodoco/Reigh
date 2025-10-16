@@ -677,7 +677,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
           <span className="text-sm font-light text-zinc-200 whitespace-nowrap overflow-hidden text-ellipsis cursor-default min-w-0">
             {abbreviatedTaskType}
           </span>
-          {task.status !== 'Complete' && (
+          {task.status !== 'Complete' && isHoveringTaskItem && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -834,9 +834,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         
       </div>
       
-      {/* Error message for failed tasks */}
-      {task.status === 'Failed' && task.errorMessage && (
-        <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-200">
+      {/* Error message for failed tasks - only shows on hover */}
+      {task.status === 'Failed' && task.errorMessage && isHoveringTaskItem && (
+        <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-xs text-red-200 animate-in slide-in-from-top-2 duration-200">
           <div className="font-semibold text-red-300 mb-1">Error:</div>
           {cascadedTaskId ? (
             <div>

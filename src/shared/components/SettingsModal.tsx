@@ -101,6 +101,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Debug logs preference (persistent)
   const [showDebugLogs, setShowDebugLogs] = usePersistentState<boolean>("show-debug-logs", false);
   
+  // Memory profile preference (persistent)
+  const [memoryProfile, setMemoryProfile] = usePersistentState<string>("memory-profile", "4");
+  
   // Generation method preferences (database-backed)
   const { 
     value: generationMethods, 
@@ -383,6 +386,7 @@ Please be very specific with file paths, command syntax, and verification steps 
     // Use the actual token from database or freshly generated one
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     const debugFlag = showDebugLogs ? ' --debug' : '';
+    const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
     if (computerType === "windows") {
       return `git clone https://github.com/peteromallet/Headless-Wan2GP.git
@@ -394,7 +398,7 @@ pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
 python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA devices: {torch.cuda.device_count()}'); print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
-python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
+python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux command (existing)
       return `git clone https://github.com/peteromallet/Headless-Wan2GP && \\
@@ -407,7 +411,7 @@ pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
-  --supabase-access-token ${token}${debugFlag}`;
+  --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     }
   };
 
@@ -415,18 +419,19 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
     // Use the actual token from database or freshly generated one
     const token = generatedToken || getActiveToken()?.token || 'your-api-token';
     const debugFlag = showDebugLogs ? ' --debug' : '';
+    const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
     if (computerType === "windows") {
       return `git pull
 venv\\Scripts\\activate.bat
-python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}`;
+python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co --supabase-anon-key ${SUPABASE_ANON_KEY} --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     } else {
       // Linux / Mac command
       return `git pull && \\
 source venv/bin/activate && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
   --supabase-anon-key ${SUPABASE_ANON_KEY} \\
-  --supabase-access-token ${token}${debugFlag}`;
+  --supabase-access-token ${token}${debugFlag}${profileFlag}`;
     }
   };
 
@@ -691,24 +696,98 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                           </TabsTrigger>
                         </TabsList>
 
-                        {/* Debug Logs Toggle */}
-                        <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg mb-4">
-                          <div className="flex items-center space-x-2">
-                            <Terminal className="h-4 w-4 text-gray-600" />
-                            <span className="text-sm font-light text-gray-700">Show Debug Logs</span>
-                          </div>
-                          <button
-                            onClick={() => setShowDebugLogs(!showDebugLogs)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                              showDebugLogs ? 'bg-blue-600' : 'bg-gray-200'
-                            }`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                showDebugLogs ? 'translate-x-6' : 'translate-x-1'
+                        {/* Debug Logs Toggle and Memory Profile - Side by Side */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          {/* Debug Logs Toggle */}
+                          <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <Terminal className="h-4 w-4 text-gray-600" />
+                              <span className="text-sm font-light text-gray-700">Show Debug Logs</span>
+                            </div>
+                            <button
+                              onClick={() => setShowDebugLogs(!showDebugLogs)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                showDebugLogs ? 'bg-blue-600' : 'bg-gray-200'
                               }`}
-                            />
-                          </button>
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  showDebugLogs ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </div>
+
+                          {/* Memory Profile Dropdown */}
+                          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Monitor className="h-4 w-4 text-gray-600" />
+                              <span className="text-sm font-light text-gray-700">Memory Profile</span>
+                            </div>
+                            <Select value={memoryProfile} onValueChange={setMemoryProfile}>
+                              <SelectTrigger className="w-full bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <TooltipProvider>
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <SelectItem value="1" className="cursor-pointer">
+                                        Maximum Performance
+                                      </SelectItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
+                                      <p className="text-sm">Preloads entire model + LoRAs into VRAM. Fastest inference but requires 64GB+ RAM and 24GB VRAM. Best for RTX 3090/4090 with high RAM.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <SelectItem value="2" className="cursor-pointer">
+                                        Long Videos, High RAM
+                                      </SelectItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
+                                      <p className="text-sm">Streams model parts to VRAM as needed. Requires 64GB+ RAM but only 12GB VRAM. Best for RTX 3070/3080 or 4090 doing long videos.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <SelectItem value="3" className="cursor-pointer">
+                                        Balanced High-End
+                                      </SelectItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
+                                      <p className="text-sm">Loads full model in VRAM, minimal RAM usage. Requires 32GB RAM + 24GB VRAM. Recommended for RTX 3090/4090 with 32-64GB RAM.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <SelectItem value="4" className="cursor-pointer">
+                                        Conservative Default
+                                      </SelectItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
+                                      <p className="text-sm">Keeps models in RAM, shuttles to VRAM during inference. Requires 32GB RAM + 12GB VRAM. Works everywhere but slower due to RAM↔VRAM transfers.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip delayDuration={0}>
+                                    <TooltipTrigger asChild>
+                                      <SelectItem value="5" className="cursor-pointer">
+                                        Minimum Spec Failsafe
+                                      </SelectItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="!z-[50003] max-w-md" sideOffset={5}>
+                                      <p className="text-sm">Maximum memory conservation at cost of speed. Requires only 24GB RAM + 10GB VRAM. Use only if other profiles OOM.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
 
                       <TabsContent value="need-install" className="space-y-4">
