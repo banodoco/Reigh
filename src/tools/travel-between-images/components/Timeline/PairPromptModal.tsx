@@ -34,10 +34,12 @@ interface PairPromptModalProps {
   defaultPrompt: string;
   defaultNegativePrompt: string;
   onSave: (pairIndex: number, prompt: string, negativePrompt: string) => void;
+  readOnly?: boolean;
 }
 
 const PairPromptModal: React.FC<PairPromptModalProps> = ({
   isOpen,
+  readOnly = false,
   onClose,
   pairData,
   pairPrompt,
@@ -151,9 +153,11 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
             <div>
               <Label htmlFor="pairPrompt" className="text-sm font-medium">
                 Prompt
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Leave empty to use default)
-                </span>
+                {!readOnly && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (Leave empty to use default)
+                  </span>
+                )}
               </Label>
               <Textarea
                 id="pairPrompt"
@@ -161,6 +165,8 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder={prompt.trim() ? "Enter your custom prompt..." : `Default: ${defaultPrompt || "No default prompt"}`}
                 className="min-h-[100px] mt-1"
+                disabled={readOnly}
+                readOnly={readOnly}
               />
             </div>
 
@@ -168,9 +174,11 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
             <div>
               <Label htmlFor="pairNegativePrompt" className="text-sm font-medium">
                 Negative Prompt
-                <span className="text-xs text-muted-foreground ml-2">
-                  (Leave empty to use default)
-                </span>
+                {!readOnly && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (Leave empty to use default)
+                  </span>
+                )}
               </Label>
               <Textarea
                 id="pairNegativePrompt"
@@ -178,6 +186,8 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                 onChange={(e) => setNegativePrompt(e.target.value)}
                 placeholder={negativePrompt.trim() ? "Enter your custom negative prompt..." : `Default: ${defaultNegativePrompt || "No default negative prompt"}`}
                 className="min-h-[100px] mt-1"
+                disabled={readOnly}
+                readOnly={readOnly}
               />
             </div>
           </div>
@@ -185,25 +195,31 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
         
         <div className={modal.footerClass}>
           <DialogFooter className={`${modal.isMobile ? 'px-4 pt-4 pb-0 flex-col gap-3' : 'px-6 pt-5 pb-0'} border-t`}>
-            <div className={`${modal.isMobile ? 'flex flex-col gap-3 w-full' : 'flex justify-between w-full'}`}>
-              <Button
-                variant="outline"
-                onClick={handleReset}
-                disabled={!hasCustomPrompts}
-                className={`flex items-center gap-2 ${modal.isMobile ? 'order-3' : ''}`}
-              >
-                Reset to Defaults
+            {readOnly ? (
+              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
+                Close
               </Button>
-              <div className={`flex gap-2 ${modal.isMobile ? 'order-1 justify-between' : ''}`}>
-                <Button variant="outline" onClick={onClose} className={modal.isMobile ? 'flex-1' : ''}>
-                  Cancel
+            ) : (
+              <div className={`${modal.isMobile ? 'flex flex-col gap-3 w-full' : 'flex justify-between w-full'}`}>
+                <Button
+                  variant="outline"
+                  onClick={handleReset}
+                  disabled={!hasCustomPrompts}
+                  className={`flex items-center gap-2 ${modal.isMobile ? 'order-3' : ''}`}
+                >
+                  Reset to Defaults
                 </Button>
-                <Button onClick={handleSave} className={`flex items-center gap-2 ${modal.isMobile ? 'flex-1' : ''}`}>
-                  <Save className="h-4 w-4" />
-                  Save
-                </Button>
+                <div className={`flex gap-2 ${modal.isMobile ? 'order-1 justify-between' : ''}`}>
+                  <Button variant="outline" onClick={onClose} className={modal.isMobile ? 'flex-1' : ''}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSave} className={`flex items-center gap-2 ${modal.isMobile ? 'flex-1' : ''}`}>
+                    <Save className="h-4 w-4" />
+                    Save
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </DialogFooter>
         </div>
       </DialogContent>

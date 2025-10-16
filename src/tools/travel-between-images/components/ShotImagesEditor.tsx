@@ -675,6 +675,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         isOpen={pairPromptModalData.isOpen}
         onClose={() => setPairPromptModalData({ isOpen: false, pairData: null })}
         pairData={pairPromptModalData.pairData}
+        readOnly={readOnly}
         pairPrompt={(() => {
           // CRITICAL: Read prompt from the exact shot_generation being displayed
           // instead of using index-based lookup (which can fail with duplicates)

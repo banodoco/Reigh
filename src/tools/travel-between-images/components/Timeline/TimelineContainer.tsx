@@ -422,13 +422,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Timeline wrapper with fixed overlays */}
       <div className="relative">
-        {/* Fixed top controls overlay - zoom and structure controls (hidden in read-only mode) */}
-        {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+        {/* Fixed top controls overlay */}
+        {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
           <div
             className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
             style={{ top: '55px' }}
           >
-            {/* Top-left: Zoom controls */}
+            {/* Top-left: Zoom controls (always visible, even in read-only) */}
             <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
               <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
               <Button
@@ -473,7 +473,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               </Button>
             </div>
             
-            {/* Top-right: Structure controls */}
+            {/* Top-right: Structure controls (hidden in read-only mode) */}
+            {!readOnly && (
             <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
               {/* Structure type selector */}
               <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
@@ -523,6 +524,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 />
               </div>
             </div>
+            )}
           </div>
         )}
 
