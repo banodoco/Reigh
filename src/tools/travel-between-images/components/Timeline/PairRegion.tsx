@@ -1,5 +1,5 @@
 import React from "react";
-import { Pencil, X } from "lucide-react";
+import { Pencil, X, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Button } from "@/shared/components/ui/button";
 import { framesToSeconds } from "./utils/time-utils";
@@ -146,6 +146,12 @@ const PairRegion: React.FC<PairRegionProps> = ({
                 <Pencil 
                   className={`h-3 w-3 ${hasCustomPrompt ? colorScheme.text : 'text-gray-400'} ${hasCustomPrompt ? 'opacity-100' : 'opacity-60'}`}
                 />
+                {enhancedPrompt && enhancedPrompt.trim() && (
+                  <Sparkles 
+                    className={`h-3 w-3 ${colorScheme.text} opacity-100`}
+                    title="Has enhanced prompt"
+                  />
+                )}
               </div>
             </div>
           </TooltipTrigger>

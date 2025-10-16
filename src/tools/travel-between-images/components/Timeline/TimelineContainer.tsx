@@ -422,111 +422,109 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Timeline wrapper with fixed overlays */}
       <div className="relative">
-        {/* Fixed top controls overlay */}
-        {shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
-          <div
-            className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
-            style={{ top: '55px' }}
-          >
-            {/* Top-left: Zoom controls (always visible, even in read-only) */}
-            <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-              <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleZoomToStart}
-                className="h-7 text-xs px-2"
-              >
-                ← Start
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleZoomOutFromCenter}
-                disabled={zoomLevel <= 1}
-                className="h-7 w-7 p-0"
-              >
-                −
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleZoomInToCenter}
-                className="h-7 w-7 p-0"
-              >
-                +
-              </Button>
-              <Button
-                variant={zoomLevel > 1.5 ? "default" : "outline"}
-                size="sm"
-                onClick={handleZoomReset}
-                disabled={zoomLevel <= 1}
-                className={`h-7 text-xs px-2 transition-all ${
-                  zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
-                  zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
-                }`}
-                style={{
-                  transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
-                }}
-              >
-                Reset
-              </Button>
-            </div>
-            
-            {/* Top-right: Structure controls (hidden in read-only mode) */}
-            {!readOnly && (
-            <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-              {/* Structure type selector */}
-              <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
-                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
-              }}>
-                <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                  <SelectValue>
-                    {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="flow">
-                    <span className="text-xs">Optical flow</span>
-                  </SelectItem>
-                  <SelectItem value="canny">
-                    <span className="text-xs">Canny</span>
-                  </SelectItem>
-                  <SelectItem value="depth">
-                    <span className="text-xs">Depth</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Strength compact display */}
-              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-xs">
-                <span className="text-muted-foreground">Strength:</span>
-                <span className={`font-medium ${
-                  structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
-                  structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
-                  'text-foreground'
-                }`}>
-                  {structureVideoMotionStrength.toFixed(1)}x
-                </span>
-              </div>
-
-              {/* Strength slider (compact) */}
-              <div className="w-16">
-                <Slider
-                  value={[structureVideoMotionStrength]}
-                  onValueChange={([value]) => {
-                    onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
-                  }}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  className="h-4"
-                />
-              </div>
-            </div>
-            )}
+        {/* Fixed top controls overlay - Zoom controls (always visible) */}
+        <div
+          className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
+          style={{ top: '55px' }}
+        >
+          {/* Top-left: Zoom controls */}
+          <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+            <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleZoomToStart}
+              className="h-7 text-xs px-2"
+            >
+              ← Start
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleZoomOutFromCenter}
+              disabled={zoomLevel <= 1}
+              className="h-7 w-7 p-0"
+            >
+              −
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleZoomInToCenter}
+              className="h-7 w-7 p-0"
+            >
+              +
+            </Button>
+            <Button
+              variant={zoomLevel > 1.5 ? "default" : "outline"}
+              size="sm"
+              onClick={handleZoomReset}
+              disabled={zoomLevel <= 1}
+              className={`h-7 text-xs px-2 transition-all ${
+                zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
+                zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
+              }`}
+              style={{
+                transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
+              }}
+            >
+              Reset
+            </Button>
           </div>
-        )}
+          
+          {/* Top-right: Structure controls (only when structure video exists and not read-only) */}
+          {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+          <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+            {/* Structure type selector */}
+            <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+              onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
+            }}>
+              <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                <SelectValue>
+                  {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flow">
+                  <span className="text-xs">Optical flow</span>
+                </SelectItem>
+                <SelectItem value="canny">
+                  <span className="text-xs">Canny</span>
+                </SelectItem>
+                <SelectItem value="depth">
+                  <span className="text-xs">Depth</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Strength compact display */}
+            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-xs">
+              <span className="text-muted-foreground">Strength:</span>
+              <span className={`font-medium ${
+                structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
+                structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
+                'text-foreground'
+              }`}>
+                {structureVideoMotionStrength.toFixed(1)}x
+              </span>
+            </div>
+
+            {/* Strength slider (compact) */}
+            <div className="w-16">
+              <Slider
+                value={[structureVideoMotionStrength]}
+                onValueChange={([value]) => {
+                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
+                }}
+                min={0}
+                max={2}
+                step={0.1}
+                className="h-4"
+              />
+            </div>
+          </div>
+          )}
+        </div>
 
         {/* Timeline scrolling container */}
         <div
