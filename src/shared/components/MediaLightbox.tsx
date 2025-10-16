@@ -1691,38 +1691,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                     {/* Top Controls */}
                     <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
-                      {/* Star Button */}
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          const newStarred = !localStarred;
-                          console.log('[StarDebug:MediaLightbox] Star button clicked', {
-                            mediaId: media.id,
-                            oldLocalStarred: localStarred,
-                            newStarred,
-                            hasOnToggleStar: !!onToggleStar,
-                            timestamp: Date.now()
-                          });
-                          
-                          setLocalStarred(newStarred); // Optimistic UI update
+                      {/* Star Button (hidden in readOnly) */}
+                      {!readOnly && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const newStarred = !localStarred;
+                            console.log('[StarDebug:MediaLightbox] Star button clicked', {
+                              mediaId: media.id,
+                              oldLocalStarred: localStarred,
+                              newStarred,
+                              hasOnToggleStar: !!onToggleStar,
+                              timestamp: Date.now()
+                            });
+                            
+                            setLocalStarred(newStarred); // Optimistic UI update
 
-                          if (onToggleStar) {
-                            console.log('[StarDebug:MediaLightbox] Calling onToggleStar prop');
-                            onToggleStar(media.id, newStarred);
-                          } else {
-                            console.log('[StarDebug:MediaLightbox] Calling toggleStarMutation');
-                            toggleStarMutation.mutate({ id: media.id, starred: newStarred });
-                          }
-                        }}
-                        disabled={toggleStarMutation.isPending}
-                        className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                      >
-                        <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                      </Button>
+                            if (onToggleStar) {
+                              console.log('[StarDebug:MediaLightbox] Calling onToggleStar prop');
+                              onToggleStar(media.id, newStarred);
+                            } else {
+                              console.log('[StarDebug:MediaLightbox] Calling toggleStarMutation');
+                              toggleStarMutation.mutate({ id: media.id, starred: newStarred });
+                            }
+                          }}
+                          disabled={toggleStarMutation.isPending}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                        </Button>
+                      )}
 
-                      {/* Add to References Button - Desktop Task Details View */}
-                      {!isVideo && selectedProjectId && (
+                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly) */}
+                      {!readOnly && !isVideo && selectedProjectId && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -2166,26 +2168,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                     {/* Mobile controls - same as existing mobile controls */}
                     <div className="absolute top-2 right-2 flex items-center space-x-1 z-10">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          const newStarred = !localStarred;
-                          setLocalStarred(newStarred);
-                          if (onToggleStar) {
-                            onToggleStar(media.id, newStarred);
-                          } else {
-                            toggleStarMutation.mutate({ id: media.id, starred: newStarred });
-                          }
-                        }}
-                        disabled={toggleStarMutation.isPending}
-                        className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                      >
-                        <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                      </Button>
+                      {!readOnly && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const newStarred = !localStarred;
+                            setLocalStarred(newStarred);
+                            if (onToggleStar) {
+                              onToggleStar(media.id, newStarred);
+                            } else {
+                              toggleStarMutation.mutate({ id: media.id, starred: newStarred });
+                            }
+                          }}
+                          disabled={toggleStarMutation.isPending}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                        </Button>
+                      )}
 
-                      {/* Add to References Button - Mobile Task Details View */}
-                      {!isVideo && selectedProjectId && (
+                      {/* Add to References Button - Mobile Task Details View (hidden in readOnly) */}
+                      {!readOnly && !isVideo && selectedProjectId && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -2469,38 +2473,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Top Controls */}
                 <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
-                  {/* Star Button */}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      const newStarred = !localStarred;
-                      console.log('[StarDebug:MediaLightbox] Star button clicked', {
-                        mediaId: media.id,
-                        oldLocalStarred: localStarred,
-                        newStarred,
-                        hasOnToggleStar: !!onToggleStar,
-                        timestamp: Date.now()
-                      });
-                      
-                      setLocalStarred(newStarred); // Optimistic UI update
+                  {/* Star Button (hidden in readOnly) */}
+                  {!readOnly && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const newStarred = !localStarred;
+                        console.log('[StarDebug:MediaLightbox] Star button clicked', {
+                          mediaId: media.id,
+                          oldLocalStarred: localStarred,
+                          newStarred,
+                          hasOnToggleStar: !!onToggleStar,
+                          timestamp: Date.now()
+                        });
+                        
+                        setLocalStarred(newStarred); // Optimistic UI update
 
-                      if (onToggleStar) {
-                        console.log('[StarDebug:MediaLightbox] Calling onToggleStar prop');
-                        onToggleStar(media.id, newStarred);
-                      } else {
-                        console.log('[StarDebug:MediaLightbox] Calling toggleStarMutation');
-                        toggleStarMutation.mutate({ id: media.id, starred: newStarred });
-                      }
-                    }}
-                    disabled={toggleStarMutation.isPending}
-                    className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                  >
-                    <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                  </Button>
+                        if (onToggleStar) {
+                          console.log('[StarDebug:MediaLightbox] Calling onToggleStar prop');
+                          onToggleStar(media.id, newStarred);
+                        } else {
+                          console.log('[StarDebug:MediaLightbox] Calling toggleStarMutation');
+                          toggleStarMutation.mutate({ id: media.id, starred: newStarred });
+                        }
+                      }}
+                      disabled={toggleStarMutation.isPending}
+                      className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                    >
+                      <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                    </Button>
+                  )}
 
-                  {/* Add to References Button - Regular View */}
-                  {!isVideo && selectedProjectId && (
+                  {/* Add to References Button - Regular View (hidden in readOnly) */}
+                  {!readOnly && !isVideo && selectedProjectId && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button

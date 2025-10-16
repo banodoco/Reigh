@@ -422,10 +422,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Timeline wrapper with fixed overlays */}
       <div className="relative">
-        {/* Fixed controls overlay - position based on readOnly mode */}
+        {/* Fixed top controls overlay - Zoom and Structure controls (not in read-only) */}
+        {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
         <div
           className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
-          style={readOnly ? { bottom: '90px' } : { top: '55px' }}
+          style={{ top: '55px' }}
         >
           {/* Zoom controls */}
           <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
@@ -472,8 +473,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             </Button>
           </div>
           
-          {/* Structure controls (only when structure video exists and not read-only) */}
-          {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+          {/* Structure controls */}
           <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
             {/* Structure type selector */}
             <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
@@ -523,8 +523,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               />
             </div>
           </div>
-          )}
         </div>
+        )}
 
         {/* Timeline scrolling container */}
         <div
@@ -810,77 +810,124 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         </div>
         </div>
 
-        {/* Fixed bottom controls overlay - gap and add images (hidden in read-only mode) */}
-        {!readOnly && (
+        {/* Fixed bottom controls overlay */}
         <div
           className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
           style={{ bottom: '90px' }}
         >
-          {/* Bottom-left: Gap control and Reset button */}
-          <div 
-            className={`flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-          >
-            {/* Gap to reset */}
-            <div className="flex items-center gap-1.5">
-              <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap: {framesToSeconds(resetGap)}</Label>
-              <Slider
-                value={[resetGap]}
-                onValueChange={([value]) => setResetGap(value)}
-                min={1}
-                max={maxGap}
-                step={1}
-                className="w-24 h-4"
-              />
-            </div>
-
-            {/* Reset button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              className="h-7 text-xs px-2"
-            >
-              Reset
-            </Button>
-          </div>
-
-          {/* Bottom-right: Add Images button */}
-          {onImageDrop ? (
-            <div 
-              className={`pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    onImageDrop(files);
-                    e.target.value = ''; // Reset input
-                  }
+          {readOnly ? (
+            // Read-only mode: Just zoom controls
+            <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+              <span className="text-xs text-muted-foreground">Zoom: {zoomLevel.toFixed(1)}x</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomToStart}
+                className="h-7 text-xs px-2"
+              >
+                ← Start
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomOutFromCenter}
+                disabled={zoomLevel <= 1}
+                className="h-7 w-7 p-0"
+              >
+                −
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomInToCenter}
+                className="h-7 w-7 p-0"
+              >
+                +
+              </Button>
+              <Button
+                variant={zoomLevel > 1.5 ? "default" : "outline"}
+                size="sm"
+                onClick={handleZoomReset}
+                disabled={zoomLevel <= 1}
+                className={`h-7 text-xs px-2 transition-all ${
+                  zoomLevel > 3 ? 'animate-pulse ring-2 ring-primary' : 
+                  zoomLevel > 1.5 ? 'ring-1 ring-primary/50' : ''
+                }`}
+                style={{
+                  transform: zoomLevel > 1.5 ? `scale(${Math.min(1 + (zoomLevel - 1.5) * 0.08, 1.3)})` : 'scale(1)',
                 }}
-                className="hidden"
-                id="timeline-image-upload"
-              />
-              <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
+              >
+                Reset
+              </Button>
+            </div>
+          ) : (
+            <>
+              {/* Bottom-left: Gap control and Reset button */}
+              <div 
+                className={`flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
+              >
+                {/* Gap to reset */}
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs text-muted-foreground whitespace-nowrap">Gap: {framesToSeconds(resetGap)}</Label>
+                  <Slider
+                    value={[resetGap]}
+                    onValueChange={([value]) => setResetGap(value)}
+                    min={1}
+                    max={maxGap}
+                    step={1}
+                    className="w-24 h-4"
+                  />
+                </div>
+
+                {/* Reset button */}
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs px-3 sm:px-2 lg:px-3"
-                  asChild
+                  onClick={handleReset}
+                  className="h-7 text-xs px-2"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <Plus className="h-3.5 w-3.5" />
-                    <span className="sm:hidden lg:inline">Add Images</span>
-                  </span>
+                  Reset
                 </Button>
-              </Label>
-            </div>
-          ) : <div />}
+              </div>
+
+              {/* Bottom-right: Add Images button */}
+              {onImageDrop ? (
+                <div 
+                  className={`pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 0) {
+                        onImageDrop(files);
+                        e.target.value = ''; // Reset input
+                      }
+                    }}
+                    className="hidden"
+                    id="timeline-image-upload"
+                  />
+                  <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs px-3 sm:px-2 lg:px-3"
+                      asChild
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        <span className="sm:hidden lg:inline">Add Images</span>
+                      </span>
+                    </Button>
+                  </Label>
+                </div>
+              ) : <div />}
+            </>
+          )}
         </div>
-        )}
       </div>
       
       {/* Magic Edit Modal - rendered at TimelineContainer level to avoid event handling conflicts */}
