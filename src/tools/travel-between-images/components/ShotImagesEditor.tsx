@@ -29,6 +29,10 @@ interface ShotImagesEditorProps {
   onGenerationModeChange: (mode: "batch" | "timeline") => void;
   /** Selected shot id */
   selectedShotId: string;
+  /** Optional preloaded images (for read-only/share views) - bypasses database queries */
+  preloadedImages?: any[];
+  /** Read-only mode - disables all interactions */
+  readOnly?: boolean;
   /** Project id for video uploads */
   projectId?: string;
   /** Shot name for download filename */
@@ -111,6 +115,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   generationMode,
   onGenerationModeChange,
   selectedShotId,
+  preloadedImages,
+  readOnly = false,
   projectId,
   shotName,
   batchVideoFrames,
@@ -187,11 +193,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
-  const hookData = useEnhancedShotPositions(selectedShotId);
+  // When preloadedImages is provided, bypass database queries
+  const hookData = useEnhancedShotPositions(preloadedImages ? null : selectedShotId);
   const {
     getImagesForMode,
     isLoading: positionsLoading,
-    shotGenerations,
+    shotGenerations: dbShotGenerations,
     updateTimelineFrame,
     exchangePositions,
     exchangePositionsNoReload,
@@ -205,22 +212,41 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     clearAllEnhancedPrompts
   } = hookData;
   
+  // Use preloaded images if provided, otherwise use database images
+  const shotGenerations = preloadedImages || dbShotGenerations;
+  
   // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
-  const { handleReorder, handleDelete } = useEnhancedShotImageReorder(selectedShotId, {
-    shotGenerations,
-    getImagesForMode,
-    exchangePositions,
-    exchangePositionsNoReload,
-    batchExchangePositions,
-    deleteItem,
-    loadPositions,
-    isLoading: positionsLoading
-  });
+  // Skip this hook when in read-only mode with preloaded images
+  const { handleReorder, handleDelete } = useEnhancedShotImageReorder(
+    preloadedImages ? null : selectedShotId, 
+    preloadedImages ? {
+      shotGenerations: preloadedImages,
+      getImagesForMode: (mode: 'batch' | 'timeline') => preloadedImages,
+      exchangePositions: async (genIdA: string, genIdB: string) => {},
+      exchangePositionsNoReload: async (shotGenIdA: string, shotGenIdB: string) => {},
+      batchExchangePositions: async (exchanges: any[]) => {}, // Type mismatch in codebase, use any for read-only mode
+      deleteItem: async (genId: string) => {},
+      loadPositions: async () => {},
+      isLoading: false
+    } as any : {
+      shotGenerations,
+      getImagesForMode,
+      exchangePositions,
+      exchangePositionsNoReload,
+      batchExchangePositions,
+      deleteItem,
+      loadPositions,
+      isLoading: positionsLoading
+    }
+  );
 
   // Memoize images and shotGenerations to prevent infinite re-renders in Timeline
   const images = React.useMemo(() => {
+    if (preloadedImages) {
+      return preloadedImages;
+    }
     return getImagesForMode(generationMode);
-  }, [getImagesForMode, generationMode]);
+  }, [preloadedImages, getImagesForMode, generationMode]);
 
   // Memoize shotGenerations to prevent reference changes
   const memoizedShotGenerations = React.useMemo(() => {

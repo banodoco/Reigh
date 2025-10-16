@@ -533,7 +533,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               <div className="space-y-1">
                 <p className={`${config.textSize} font-medium text-muted-foreground`}>Phases</p>
                 <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                  {phaseConfig.num_phases || phaseConfig.phases.length}
+                  {phaseConfig?.num_phases || phaseConfig?.phases?.length}
                 </p>
               </div>
               {phaseConfig?.flow_shift !== undefined && (
@@ -954,7 +954,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 <div className="space-y-1">
                   <p className={`${config.textSize} font-medium text-muted-foreground`}>Phases</p>
                   <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-                    {phaseConfig.num_phases || phaseConfig.phases.length}
+                    {phaseConfig?.num_phases || phaseConfig?.phases?.length}
                   </p>
                 </div>
                 {phaseConfig?.flow_shift !== undefined && (

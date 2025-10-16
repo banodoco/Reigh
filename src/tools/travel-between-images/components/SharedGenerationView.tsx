@@ -10,6 +10,8 @@ import BatchSettingsForm from './BatchSettingsForm';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import ShotImagesEditor from './ShotImagesEditor';
+import type { GenerationRow } from '@/types/shots';
 
 interface SharedGenerationViewProps {
   shareData: {
@@ -285,6 +287,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       negative_prompt: orchestratorPayload.negative_prompt || orchestratorDetails.negative_prompt || params.negative_prompt || '',
       advancedMode: orchestratorPayload.phase_config || orchestratorDetails.phase_config || params.phase_config ? true : false,
       phaseConfig: orchestratorPayload.phase_config || orchestratorDetails.phase_config || params.phase_config || null,
+      generationMode: orchestratorPayload.generation_mode || orchestratorDetails.generation_mode || params.generation_mode || 'batch',
     };
   }, [task]);
 
@@ -336,27 +339,62 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
           </div>
         </Card>
 
-        {/* Input Images - Simple Grid Display - SECOND */}
+        {/* Input Images - Timeline/Batch Editor (Read-Only) - SECOND */}
         {shotImages.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base sm:text-lg font-light">Input Images</CardTitle>
+              <CardTitle className="text-base sm:text-lg font-light">
+                {taskSettings.generationMode === 'timeline' ? 'Timeline View' : 'Batch View'}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-3 lg:grid-cols-4'}`}>
-                {shotImages.map((image, index) => (
-                  <div key={image.id} className="relative aspect-square rounded-lg overflow-hidden bg-muted border border-border">
-                    <img
-                      src={image.image_url}
-                      alt={`Input image ${index + 1}`}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 px-2">
-                      Frame {index + 1}
-                    </div>
-                  </div>
-                ))}
+              <div className="pointer-events-none select-none opacity-90">
+                <ShotImagesEditor
+                  isModeReady={true}
+                  settingsError={null}
+                  isMobile={isMobile}
+                  generationMode={taskSettings.generationMode as 'batch' | 'timeline'}
+                  onGenerationModeChange={() => {}} // Read-only
+                  selectedShotId="shared-shot"
+                  preloadedImages={shotImages}
+                  readOnly={true}
+                  projectId="shared-project"
+                  shotName="Shared Generation"
+                  batchVideoFrames={taskSettings.frames}
+                  batchVideoContext={taskSettings.context_frames}
+                  onImageReorder={() => {}} // Read-only
+                  onImageSaved={async () => {}} // Read-only
+                  onContextFramesChange={() => {}} // Read-only
+                  onFramePositionsChange={() => {}} // Read-only
+                  onImageDrop={async () => {}} // Read-only
+                  pendingPositions={new Map()}
+                  onPendingPositionApplied={() => {}} // Read-only
+                  onImageDelete={() => {}} // Read-only
+                  onBatchImageDelete={() => {}} // Read-only
+                  onImageDuplicate={() => {}} // Read-only
+                  columns={isMobile ? 2 : 3}
+                  skeleton={null}
+                  unpositionedGenerationsCount={0}
+                  onOpenUnpositionedPane={() => {}} // Read-only
+                  fileInputKey={0}
+                  onImageUpload={async () => {}} // Read-only
+                  isUploadingImage={false}
+                  duplicatingImageId={null}
+                  duplicateSuccessImageId={null}
+                  projectAspectRatio={undefined}
+                  defaultPrompt={taskSettings.prompt}
+                  onDefaultPromptChange={() => {}} // Read-only
+                  defaultNegativePrompt={taskSettings.negative_prompt}
+                  onDefaultNegativePromptChange={() => {}} // Read-only
+                  structureVideoPath={null}
+                  structureVideoMetadata={null}
+                  structureVideoTreatment="motion"
+                  structureVideoMotionStrength={taskSettings.motion}
+                  structureVideoType="flow"
+                  onStructureVideoChange={() => {}} // Read-only
+                  autoCreateIndividualPrompts={false}
+                  onSelectionChange={() => {}} // Read-only
+                />
               </div>
             </CardContent>
           </Card>
