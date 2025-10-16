@@ -655,6 +655,12 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </Button>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                  {!phaseConfig ? (
+                    <div className="text-sm text-muted-foreground p-4">
+                      No phase configuration available
+                    </div>
+                  ) : (
+                    <>
                   {/* Core Settings - Vertically aligned */}
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-end gap-6">
@@ -949,6 +955,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   );
                   })}
                   </div>
+                  </>
+                  )}
                   </CardContent>
                 </Card>
               </CollapsibleContent>

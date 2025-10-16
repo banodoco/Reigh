@@ -13,6 +13,8 @@ import { RadioGroup, RadioGroupItem } from '@/shared/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Plus } from 'lucide-react';
 import { Input } from '@/shared/components/ui/input';
+import { useMediumModal } from '@/shared/hooks/useModal';
+import { useScrollFade } from '@/shared/hooks/useScrollFade';
 
 interface Project {
   id: string;
@@ -47,6 +49,10 @@ export const ProjectSelectorModal: React.FC<ProjectSelectorModalProps> = ({
   const [creating, setCreating] = useState(false);
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  
+  // Modal styling
+  const modal = useMediumModal();
+  const { showFade, scrollRef } = useScrollFade({ isOpen: open });
 
   useEffect(() => {
     if (open) {
@@ -122,13 +128,19 @@ export const ProjectSelectorModal: React.FC<ProjectSelectorModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+      <DialogContent 
+        className={modal.className}
+        style={modal.style}
+        {...modal.props}
+      >
+        <div className={modal.headerClass}>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-4 py-4">
+        <div ref={scrollRef} className={modal.scrollClass}>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -229,17 +241,29 @@ export const ProjectSelectorModal: React.FC<ProjectSelectorModalProps> = ({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={!selectedProjectId || loading}
-          >
-            Confirm
-          </Button>
-        </DialogFooter>
+        <div className={`${modal.footerClass} relative`}>
+          {/* Scroll fade effect */}
+          {showFade && (
+            <div 
+              className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-10"
+              style={{ transform: 'translateY(-64px)' }}
+            >
+              <div className="h-full bg-gradient-to-t from-white via-white/95 to-transparent dark:from-gray-950 dark:via-gray-950/95 dark:to-transparent" />
+            </div>
+          )}
+          
+          <DialogFooter className="border-t relative z-20">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={!selectedProjectId || loading}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
