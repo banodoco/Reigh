@@ -48,6 +48,13 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   const task = shareData.task;
   const isMobile = useIsMobile();
 
+  // Extract generation mode and frames early for shotImages calculation
+  const params = task?.params || {};
+  const orchestratorPayload = params.full_orchestrator_payload || {};
+  const orchestratorDetails = params.orchestrator_details || {};
+  const generationMode = orchestratorPayload.generation_mode || orchestratorDetails.generation_mode || params.generation_mode || 'batch';
+  const frames = orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16;
+
   // Extract input images from task params
   const inputImages = useMemo(() => {
     console.log('[SharedGenDebug] Extracting input images from task:', {
@@ -108,21 +115,29 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   const shotImages = useMemo(() => {
     const images = inputImages.map((url, index) => ({
       id: `shared-image-${index}`,
+      shotImageEntryId: `shared-image-${index}`, // Required for Timeline component
       shot_id: 'shared-shot',
       generation_id: null,
       position: index,
+      imageUrl: url,
       image_url: url,
+      location: url,
+      timeline_frame: generationMode === 'timeline' 
+        ? Math.round(index * (frames / (inputImages.length - 1 || 1)))
+        : undefined,
       created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     }));
     
     console.log('[SharedGenDebug] Created shotImages:', {
       inputImagesCount: inputImages.length,
       shotImagesCount: images.length,
-      shotImages: images
+      shotImages: images,
+      generationMode: generationMode
     });
     
     return images;
-  }, [inputImages]);
+  }, [inputImages, generationMode, frames]);
 
   // Check authentication status
   useEffect(() => {
