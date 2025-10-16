@@ -536,7 +536,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                   {phaseConfig.num_phases || phaseConfig.phases.length}
                 </p>
               </div>
-              {phaseConfig.flow_shift !== undefined && (
+              {phaseConfig?.flow_shift !== undefined && (
                 <div className="space-y-1">
                   <p className={`${config.textSize} font-medium text-muted-foreground`}>Flow Shift</p>
                   <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
@@ -544,7 +544,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                   </p>
                 </div>
               )}
-              {phaseConfig.sample_solver && (
+              {phaseConfig?.sample_solver && (
                 <div className="space-y-1">
                   <p className={`${config.textSize} font-medium text-muted-foreground`}>Solver</p>
                   <p className={`${config.textSize} ${config.fontWeight} text-foreground capitalize`}>
@@ -552,7 +552,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                   </p>
                 </div>
               )}
-              {phaseConfig.model_switch_phase !== undefined && (
+              {phaseConfig?.model_switch_phase !== undefined && (
                 <div className="space-y-1">
                   <p className={`${config.textSize} font-medium text-muted-foreground`}>Model Switch</p>
                   <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
@@ -957,7 +957,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                     {phaseConfig.num_phases || phaseConfig.phases.length}
                   </p>
                 </div>
-                {phaseConfig.flow_shift !== undefined && (
+                {phaseConfig?.flow_shift !== undefined && (
                   <div className="space-y-1">
                     <p className={`${config.textSize} font-medium text-muted-foreground`}>Flow Shift</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
@@ -965,7 +965,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                     </p>
                   </div>
                 )}
-                {phaseConfig.sample_solver && (
+                {phaseConfig?.sample_solver && (
                   <div className="space-y-1">
                     <p className={`${config.textSize} font-medium text-muted-foreground`}>Solver</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground capitalize`}>
@@ -973,7 +973,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                     </p>
                   </div>
                 )}
-                {phaseConfig.model_switch_phase !== undefined && (
+                {phaseConfig?.model_switch_phase !== undefined && (
                   <div className="space-y-1">
                     <p className={`${config.textSize} font-medium text-muted-foreground`}>Model Switch</p>
                     <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
