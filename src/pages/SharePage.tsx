@@ -10,6 +10,15 @@ interface SharedData {
   task: any;
   creator_id: string | null;
   view_count: number;
+  creator_username?: string | null;
+  creator_name?: string | null;
+  creator_avatar_url?: string | null;
+}
+
+interface CreatorProfile {
+  name: string | null;
+  username: string | null;
+  avatar_url: string | null;
 }
 
 /**
@@ -25,6 +34,7 @@ const SharePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareData, setShareData] = useState<SharedData | null>(null);
+  const [creator, setCreator] = useState<CreatorProfile | null>(null);
 
   useEffect(() => {
     if (!shareId) {
@@ -125,7 +135,17 @@ const SharePage: React.FC = () => {
         generation: data.cached_generation_data,
         task: data.cached_task_data,
         creator_id: data.creator_id,
-        view_count: data.view_count
+        view_count: data.view_count,
+        creator_username: (data as any).creator_username ?? null,
+        creator_name: (data as any).creator_name ?? null,
+        creator_avatar_url: (data as any).creator_avatar_url ?? null,
+      });
+
+      // Use denormalized fields if present; otherwise leave nulls
+      setCreator({
+        name: (data as any).creator_name ?? null,
+        username: (data as any).creator_username ?? null,
+        avatar_url: (data as any).creator_avatar_url ?? null,
       });
 
     } catch (err) {
@@ -136,6 +156,15 @@ const SharePage: React.FC = () => {
     }
   };
 
+  const signupUrl = React.useMemo(() => {
+    const code = creator?.username?.trim();
+    if (code) {
+      // Always include referral code in signup/landing link
+      return `/?from=${encodeURIComponent(code)}`;
+    }
+    return '/';
+  }, [creator?.username]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -145,7 +174,7 @@ const SharePage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="h-8 w-24 bg-muted animate-pulse rounded" />
               <div className="flex items-center gap-4">
-                <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+                <div className="h-4 w-48 bg-muted animate-pulse rounded" />
                 <div className="h-10 w-32 bg-muted animate-pulse rounded" />
               </div>
             </div>
@@ -226,12 +255,25 @@ const SharePage: React.FC = () => {
             </button>
             
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                {shareData.view_count > 0 && `${shareData.view_count} ${shareData.view_count === 1 ? 'view' : 'views'}`}
-              </span>
+              {/* Creator info (replaces view count) */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {creator?.avatar_url ? (
+                  <img
+                    src={creator.avatar_url}
+                    alt={creator?.name || creator?.username || 'Creator'}
+                    className="h-6 w-6 rounded-full border"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="h-6 w-6 rounded-full bg-muted border" />
+                )}
+                <span>
+                  Shot shared by {creator?.name || creator?.username || 'a Reigh artist'}
+                </span>
+              </div>
               <Button 
                 variant="outline"
-                onClick={() => navigate('/')}
+                onClick={() => navigate(signupUrl)}
               >
                 Create Your Own
               </Button>

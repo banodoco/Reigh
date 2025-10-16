@@ -104,6 +104,36 @@ async function getUserWithTimeout(timeoutMs = 7000) {
     }
     throw error;
   }
+
+  // Ensure user profile basics exist (username, avatar_url) after we have a session
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const userId = sess?.session?.user?.id;
+    if (userId) {
+      // Read current users row
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('id, username, avatar_url')
+        .eq('id', userId)
+        .maybeSingle();
+
+      // Attempt to derive defaults from auth metadata
+      const authUser = sess.session.user;
+      const md = (authUser as any)?.user_metadata || {};
+      const derivedUsername = userRow?.username ?? md?.preferred_username ?? md?.user_name ?? md?.nickname ?? md?.name ?? null;
+      const derivedAvatar = userRow?.avatar_url ?? md?.avatar_url ?? md?.picture ?? null;
+
+      if (!userRow || !userRow.username || !userRow.avatar_url) {
+        await supabase
+          .from('users')
+          .upsert({
+            id: userId,
+            username: derivedUsername,
+            avatar_url: derivedAvatar,
+          }, { onConflict: 'id' });
+      }
+    }
+  } catch {}
 }
 
 async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContext, signal?: AbortSignal): Promise<unknown> {

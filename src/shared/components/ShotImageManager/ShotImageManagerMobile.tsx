@@ -30,6 +30,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   onImageUpload,
   isUploadingImage,
   onSelectionChange,
+  readOnly = false,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -120,8 +121,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     }
   }, [images, isOptimisticUpdate, optimisticOrder]);
 
-  // Mobile tap handler for selection
+  // Mobile tap handler for selection (disabled in readOnly)
   const handleMobileTap = useCallback((imageId: string, index: number) => {
+    if (readOnly) return; // Don't allow selection in readOnly mode
+    
     const isCurrentlySelected = mobileSelectedIds.includes(imageId);
     
     if (isCurrentlySelected) {
@@ -133,7 +136,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       setMobileSelectedIds(prev => [...prev, imageId]);
       setLastSelectedIndex(index);
     }
-  }, [mobileSelectedIds]);
+  }, [mobileSelectedIds, readOnly]);
 
   // Mobile reordering function
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
@@ -269,16 +272,17 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
                   onDuplicate={onImageDuplicate}
                   onOpenLightbox={onOpenLightbox}
-                  hideDeleteButton={mobileSelectedIds.length > 0}
+                  hideDeleteButton={mobileSelectedIds.length > 0 || readOnly}
                   duplicatingImageId={duplicatingImageId}
                   duplicateSuccessImageId={duplicateSuccessImageId}
                   shouldLoad={true}
                   projectAspectRatio={projectAspectRatio}
                   frameNumber={frameNumber}
+                  readOnly={readOnly}
                 />
                 
-                {/* Move button on left side of each non-selected item */}
-                {showLeftArrow && (
+                {/* Move button on left side of each non-selected item (hidden in readOnly) */}
+                {!readOnly && showLeftArrow && (
                   <div className="absolute top-1/2 -left-1 -translate-y-1/2 -translate-x-1/2 z-10">
                     <Button
                       size="icon"
@@ -295,8 +299,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   </div>
                 )}
 
-                {/* Move to end button on right side of last item (if not selected) */}
-                {showRightArrow && (
+                {/* Move to end button on right side of last item (if not selected) (hidden in readOnly) */}
+                {!readOnly && showRightArrow && (
                   <div className="absolute top-1/2 -right-1 -translate-y-1/2 translate-x-1/2 z-10">
                     <Button
                       size="icon"
@@ -317,8 +321,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
           );
         })}
         
-        {/* Add Images card - appears as next item in grid */}
-        {onImageUpload && (() => {
+        {/* Add Images card - appears as next item in grid (hidden in readOnly) */}
+        {!readOnly && onImageUpload && (() => {
           // Calculate aspect ratio to match project settings
           const getAspectRatioStyle = () => {
             // Use project aspect ratio if available
@@ -374,8 +378,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         })()}
       </div>
 
-      {/* Floating Action Bar for Multiple Selection */}
-      {showSelectionBar && mobileSelectedIds.length >= 1 && (() => {
+      {/* Floating Action Bar for Multiple Selection (hidden in readOnly) */}
+      {!readOnly && showSelectionBar && mobileSelectedIds.length >= 1 && (() => {
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         

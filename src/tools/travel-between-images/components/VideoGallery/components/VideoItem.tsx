@@ -436,6 +436,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
       while (attempts < maxAttempts && !newSlug) {
         const candidateSlug = generateShareSlug(10);
         
+        // Fetch creator profile basics
+        const { data: creatorRow } = await supabase
+          .from('users')
+          .select('username, name, avatar_url')
+          .eq('id', session.session.user.id)
+          .maybeSingle();
+
         // Try to insert - unique constraint will prevent duplicates
         const { data: newShare, error: insertError } = await supabase
           .from('shared_generations')
@@ -444,6 +451,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
             task_id: taskMapping.taskId,
             generation_id: video.id,
             creator_id: session.session.user.id,
+            creator_username: (creatorRow as any)?.username ?? null,
+            creator_name: (creatorRow as any)?.name ?? null,
+            creator_avatar_url: (creatorRow as any)?.avatar_url ?? null,
             cached_generation_data: generationResult.data,
             cached_task_data: taskResult.data,
           })

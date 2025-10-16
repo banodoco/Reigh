@@ -603,65 +603,66 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   )}
                 </div>
                 
-                {/* Batch mode structure video */}
-                {selectedShotId && projectId && propOnStructureVideoChange && (
+                {/* Batch mode structure video (hidden in readOnly when no video exists) */}
+                {selectedShotId && projectId && propOnStructureVideoChange && (propStructureVideoPath || !readOnly) && (
                   <>
                     <div className="mb-4 mt-6">
                       <SectionHeader title="Guidance Video" theme="green" />
                     </div>
                     <BatchGuidanceVideo
-                    shotId={selectedShotId}
-                    projectId={projectId}
-                    videoUrl={propStructureVideoPath}
-                    videoMetadata={propStructureVideoMetadata}
-                    treatment={propStructureVideoTreatment}
-                    motionStrength={propStructureVideoMotionStrength}
-                    structureType={propStructureVideoType}
-                    imageCount={images.length}
-                    timelineFramePositions={images.map((img, index) => index * batchVideoFrames)}
-                    onVideoUploaded={(videoUrl, metadata) => {
-                      propOnStructureVideoChange(
-                        videoUrl,
-                        metadata,
-                        propStructureVideoTreatment,
-                        propStructureVideoMotionStrength,
-                        propStructureVideoType
-                      );
-                    }}
-                    onTreatmentChange={(treatment) => {
-                      if (propStructureVideoPath && propStructureVideoMetadata) {
+                      shotId={selectedShotId}
+                      projectId={projectId}
+                      videoUrl={propStructureVideoPath}
+                      videoMetadata={propStructureVideoMetadata}
+                      treatment={propStructureVideoTreatment}
+                      motionStrength={propStructureVideoMotionStrength}
+                      structureType={propStructureVideoType}
+                      imageCount={images.length}
+                      timelineFramePositions={images.map((img, index) => index * batchVideoFrames)}
+                      onVideoUploaded={(videoUrl, metadata) => {
                         propOnStructureVideoChange(
-                          propStructureVideoPath,
-                          propStructureVideoMetadata,
-                          treatment,
+                          videoUrl,
+                          metadata,
+                          propStructureVideoTreatment,
                           propStructureVideoMotionStrength,
                           propStructureVideoType
                         );
-                      }
-                    }}
-                    onMotionStrengthChange={(strength) => {
-                      if (propStructureVideoPath && propStructureVideoMetadata) {
+                      }}
+                      onTreatmentChange={(treatment) => {
+                        if (propStructureVideoPath && propStructureVideoMetadata) {
+                          propOnStructureVideoChange(
+                            propStructureVideoPath,
+                            propStructureVideoMetadata,
+                            treatment,
+                            propStructureVideoMotionStrength,
+                            propStructureVideoType
+                          );
+                        }
+                      }}
+                      onMotionStrengthChange={(strength) => {
+                        if (propStructureVideoPath && propStructureVideoMetadata) {
+                          propOnStructureVideoChange(
+                            propStructureVideoPath,
+                            propStructureVideoMetadata,
+                            propStructureVideoTreatment,
+                            strength,
+                            propStructureVideoType
+                          );
+                        }
+                      }}
+                      onStructureTypeChange={(type) => {
+                        // Always save structure type selection, even if no video uploaded yet
+                        // When video is uploaded, it will use the pre-selected type
                         propOnStructureVideoChange(
                           propStructureVideoPath,
                           propStructureVideoMetadata,
                           propStructureVideoTreatment,
-                          strength,
-                          propStructureVideoType
+                          propStructureVideoMotionStrength,
+                          type
                         );
-                      }
-                    }}
-                    onStructureTypeChange={(type) => {
-                      // Always save structure type selection, even if no video uploaded yet
-                      // When video is uploaded, it will use the pre-selected type
-                      propOnStructureVideoChange(
-                        propStructureVideoPath,
-                        propStructureVideoMetadata,
-                        propStructureVideoTreatment,
-                        propStructureVideoMotionStrength,
-                        type
-                      );
-                    }}
-                  />
+                      }}
+                      readOnly={readOnly}
+                    />
                   </>
                 )}
               </>

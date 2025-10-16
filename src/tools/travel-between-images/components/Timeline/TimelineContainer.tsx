@@ -529,7 +529,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         {/* Timeline scrolling container */}
         <div
           ref={timelineRef}
-          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto mb-10 ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
           style={{ 
@@ -552,9 +552,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           containerWidth={containerWidth}
         />
 
-        {/* Structure video strip or uploader (hidden in read-only mode) */}
-        {!readOnly && shotId && projectId && onStructureVideoChange && (
+        {/* Structure video strip (show if exists) or uploader (only if not readOnly) */}
+        {shotId && projectId && onStructureVideoChange && (
           structureVideoPath && structureVideoMetadata ? (
+            // Show video strip if there's a video (even in readOnly mode for viewing)
             <GuidanceVideoStrip
               videoUrl={structureVideoPath}
               videoMetadata={structureVideoMetadata}
@@ -576,8 +577,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               zoomLevel={zoomLevel}
               timelineFrameCount={images.length}
               frameSpacing={contextFrames}
+              readOnly={readOnly}
             />
-          ) : (
+          ) : !readOnly ? (
+            // Only show uploader if NOT readOnly and no video exists
             <GuidanceVideoUploader
               shotId={shotId}
               projectId={projectId}
@@ -595,7 +598,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               onZoomToStart={handleZoomToStart}
               hasNoImages={hasNoImages}
             />
-          )
+          ) : null
         )}
 
         {/* Timeline container - visually connected to structure video above */}

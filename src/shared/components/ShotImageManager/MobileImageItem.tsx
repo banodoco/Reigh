@@ -26,6 +26,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   shouldLoad = true,
   projectAspectRatio,
   frameNumber,
+  readOnly = false,
 }) => {
   const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
   
@@ -146,7 +147,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Top left action buttons - all 4 icons evenly spaced */}
         <div className="absolute top-2 left-1 right-1 flex justify-between opacity-100 transition-opacity">
-          {/* Lightbox button */}
+          {/* Lightbox button (always visible) */}
           <Button
             size="icon"
             variant="secondary"
@@ -160,22 +161,24 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             <Eye className="h-3 w-3" />
           </Button>
 
-          {/* Magic Edit button */}
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-8 w-8 bg-white/75 hover:bg-white/90"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsMagicEditOpen(true);
-            }}
-            title="Magic Edit"
-          >
-            <Sparkles className="h-3 w-3" />
-          </Button>
+          {/* Magic Edit button (hidden in readOnly) */}
+          {!readOnly && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8 bg-white/75 hover:bg-white/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMagicEditOpen(true);
+              }}
+              title="Magic Edit"
+            >
+              <Sparkles className="h-3 w-3" />
+            </Button>
+          )}
 
-          {/* Duplicate button */}
-          {onDuplicate && (
+          {/* Duplicate button (hidden in readOnly) */}
+          {!readOnly && onDuplicate && (
             <Button
               size="icon"
               variant="secondary"
@@ -200,8 +203,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
             </Button>
           )}
 
-          {/* Delete button */}
-          {!hideDeleteButton && (
+          {/* Delete button (hidden in readOnly) */}
+          {!readOnly && !hideDeleteButton && (
             <Button
               size="icon"
               variant="destructive"

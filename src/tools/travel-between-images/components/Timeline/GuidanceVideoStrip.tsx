@@ -25,6 +25,7 @@ interface GuidanceVideoStripProps {
   // Timeline dimensions
   timelineFrameCount: number;
   frameSpacing: number;
+  readOnly?: boolean; // Hide interactive controls in read-only mode
 }
 
 /**
@@ -86,7 +87,8 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   containerWidth,
   zoomLevel,
   timelineFrameCount,
-  frameSpacing
+  frameSpacing,
+  readOnly = false
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const stripContainerRef = useRef<HTMLDivElement>(null);
@@ -670,82 +672,86 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           playsInline
         />
         
-          {/* Treatment selector - top left */}
-          <div className="absolute top-3 left-2 z-30">
-            <Select value={treatment} onValueChange={(treatment: 'adjust' | 'clip') => {
-              onTreatmentChange(treatment);
-            }}>
-              <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                <SelectValue>
-                  {treatment === 'adjust' 
-                    ? (videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
-                    : 'Use video as is'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="adjust">
-                  <div className="flex flex-col gap-0.5 py-1">
-                    <span className="text-xs font-medium">
-                      {videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match'} to timeline
-                    </span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      {(() => {
-                        const totalVideoFrames = videoMetadata.total_frames;
-                        const timelineRange = fullMax - fullMin + 1;
-                        if (totalVideoFrames === 0 || timelineRange === 0) return '';
-                        if (totalVideoFrames > timelineRange) {
-                          const framesToDrop = totalVideoFrames - timelineRange;
-                          return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to fit timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
-                        } else if (totalVideoFrames < timelineRange) {
-                          const framesToDuplicate = timelineRange - totalVideoFrames;
-                          return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to fit timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
-                        } else {
-                          return `Perfect! Your input video has ${timelineRange} frame${timelineRange === 1 ? '' : 's'}, matching timeline frames ${fullMin}-${fullMax} exactly.`;
-                        }
-                      })()}
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="clip">
-                  <div className="flex flex-col gap-0.5 py-1">
-                    <span className="text-xs font-medium">Use video as is</span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      {(() => {
-                        const totalVideoFrames = videoMetadata.total_frames;
-                        const timelineRange = fullMax - fullMin + 1;
-                        if (totalVideoFrames === 0 || timelineRange === 0) return '';
-                        if (totalVideoFrames > timelineRange) {
-                          const unusedFrames = totalVideoFrames - timelineRange;
-                          return `Your video will guide timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}). The last ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} of your video (video frame${unusedFrames === 1 ? '' : 's'} ${timelineRange + 1}-${totalVideoFrames}) will be ignored.`;
-                        } else if (totalVideoFrames < timelineRange) {
-                          const uncoveredFrames = timelineRange - totalVideoFrames;
-                          const guidedEnd = fullMin + totalVideoFrames - 1;
-                          return `Your video will guide timeline frames ${fullMin}-${guidedEnd} (${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'}). Timeline frames ${guidedEnd + 1}-${fullMax} (${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'}) won't have video guidance.`;
-                        } else {
-                          return `Perfect! Your video length matches timeline frames ${fullMin}-${fullMax} exactly (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
-                        }
-                      })()}
-                    </span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Treatment selector - top left (hidden in readOnly) */}
+          {!readOnly && (
+            <div className="absolute top-3 left-2 z-30">
+              <Select value={treatment} onValueChange={(treatment: 'adjust' | 'clip') => {
+                onTreatmentChange(treatment);
+              }}>
+                <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                  <SelectValue>
+                    {treatment === 'adjust' 
+                      ? (videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
+                      : 'Use video as is'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="adjust">
+                    <div className="flex flex-col gap-0.5 py-1">
+                      <span className="text-xs font-medium">
+                        {videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match'} to timeline
+                      </span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        {(() => {
+                          const totalVideoFrames = videoMetadata.total_frames;
+                          const timelineRange = fullMax - fullMin + 1;
+                          if (totalVideoFrames === 0 || timelineRange === 0) return '';
+                          if (totalVideoFrames > timelineRange) {
+                            const framesToDrop = totalVideoFrames - timelineRange;
+                            return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll drop ${framesToDrop} frame${framesToDrop === 1 ? '' : 's'} to compress your guide video to fit timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
+                          } else if (totalVideoFrames < timelineRange) {
+                            const framesToDuplicate = timelineRange - totalVideoFrames;
+                            return `Your input video has ${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'} so we'll duplicate ${framesToDuplicate} frame${framesToDuplicate === 1 ? '' : 's'} to stretch your guide video to fit timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
+                          } else {
+                            return `Perfect! Your input video has ${timelineRange} frame${timelineRange === 1 ? '' : 's'}, matching timeline frames ${fullMin}-${fullMax} exactly.`;
+                          }
+                        })()}
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="clip">
+                    <div className="flex flex-col gap-0.5 py-1">
+                      <span className="text-xs font-medium">Use video as is</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">
+                        {(() => {
+                          const totalVideoFrames = videoMetadata.total_frames;
+                          const timelineRange = fullMax - fullMin + 1;
+                          if (totalVideoFrames === 0 || timelineRange === 0) return '';
+                          if (totalVideoFrames > timelineRange) {
+                            const unusedFrames = totalVideoFrames - timelineRange;
+                            return `Your video will guide timeline frames ${fullMin}-${fullMax} (${timelineRange} frame${timelineRange === 1 ? '' : 's'}). The last ${unusedFrames} frame${unusedFrames === 1 ? '' : 's'} of your video (video frame${unusedFrames === 1 ? '' : 's'} ${timelineRange + 1}-${totalVideoFrames}) will be ignored.`;
+                          } else if (totalVideoFrames < timelineRange) {
+                            const uncoveredFrames = timelineRange - totalVideoFrames;
+                            const guidedEnd = fullMin + totalVideoFrames - 1;
+                            return `Your video will guide timeline frames ${fullMin}-${guidedEnd} (${totalVideoFrames} frame${totalVideoFrames === 1 ? '' : 's'}). Timeline frames ${guidedEnd + 1}-${fullMax} (${uncoveredFrames} frame${uncoveredFrames === 1 ? '' : 's'}) won't have video guidance.`;
+                          } else {
+                            return `Perfect! Your video length matches timeline frames ${fullMin}-${fullMax} exactly (${timelineRange} frame${timelineRange === 1 ? '' : 's'}).`;
+                          }
+                        })()}
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          {/* Delete button - top right, but minimum position is to the right of selector (left: 200px = 8px + 180px + 12px gap) */}
-          <Button
-            variant="destructive"
-            size="sm"
-            className="absolute top-2 z-30 h-7 w-7 p-0 opacity-90 hover:opacity-100 shadow-lg rounded-full"
-            style={{
-              right: '8px',
-              left: 'max(200px, calc(100% - 36px))' // At least 200px from left, or natural right position
-            }}
-            onClick={onRemove}
-            title="Remove guidance video"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {/* Delete button - top right (hidden in readOnly) */}
+          {!readOnly && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="absolute top-2 z-30 h-7 w-7 p-0 opacity-90 hover:opacity-100 shadow-lg rounded-full"
+              style={{
+                right: '8px',
+                left: 'max(200px, calc(100% - 36px))' // At least 200px from left, or natural right position
+              }}
+              onClick={onRemove}
+              title="Remove guidance video"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
 
           {/* Frame strip - showing frames side by side with padding to align with timeline */}
         {displayFrameImages.length > 0 ? (

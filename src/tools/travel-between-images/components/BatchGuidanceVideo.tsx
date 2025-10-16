@@ -21,6 +21,7 @@ interface BatchGuidanceVideoProps {
   onStructureTypeChange?: (type: 'flow' | 'canny' | 'depth') => void;
   imageCount?: number; // Number of images in the batch
   timelineFramePositions?: number[]; // Actual frame positions from timeline
+  readOnly?: boolean;
 }
 
 export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
@@ -36,7 +37,8 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   onMotionStrengthChange,
   onStructureTypeChange,
   imageCount = 0,
-  timelineFramePositions = []
+  timelineFramePositions = [],
+  readOnly = false,
 }) => {
   // ALL HOOKS MUST BE AT THE TOP - before any conditional returns
   const [isUploading, setIsUploading] = useState(false);
@@ -308,21 +310,24 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
               max={maxFrame}
               step={1}
               className="w-full"
+              disabled={readOnly}
             />
           </div>
         </div>
 
         {/* Remove Video button - below video on mobile only */}
         <div className="md:hidden p-3 border-t">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={handleRemoveVideo}
-          >
-            <X className="h-4 w-4 mr-2" />
-            Remove Video
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleRemoveVideo}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Remove Video
+            </Button>
+          )}
         </div>
 
         {/* Settings panel - below on mobile, right two thirds on desktop */}
@@ -332,7 +337,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             <Label className="text-sm">How would you like to cut the guidance video to match the timeline?</Label>
             <div className="flex flex-col md:flex-row md:items-center gap-3">
               <div className="flex-shrink-0 w-full md:w-[200px]">
-                <Select value={treatment} onValueChange={onTreatmentChange}>
+                <Select value={treatment} onValueChange={onTreatmentChange} disabled={readOnly}>
                   <SelectTrigger className="h-9 w-full">
                     <SelectValue>
                       {treatment === 'adjust' 
@@ -362,9 +367,13 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             {onStructureTypeChange && (
               <div className="space-y-2">
                 <Label className="text-sm">What type of guidance would you like to use?</Label>
-                <Select value={structureType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
-                  onStructureTypeChange(type);
-                }}>
+                <Select
+                  value={structureType}
+                  onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+                    onStructureTypeChange(type);
+                  }}
+                  disabled={readOnly}
+                >
                   <SelectTrigger className="h-9 w-full text-sm">
                     <SelectValue>
                       {structureType === 'flow' ? 'Optical flow' : structureType === 'canny' ? 'Canny' : 'Depth'}
@@ -398,6 +407,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                 max={2}
                 step={0.1}
                 className="w-full"
+                disabled={readOnly}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>0x (No motion)</span>
@@ -409,15 +419,17 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
 
           {/* Delete button at bottom - desktop only */}
           <div className="mt-auto pt-2 hidden md:block">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={handleRemoveVideo}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove Video
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleRemoveVideo}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Remove Video
+              </Button>
+            )}
           </div>
         </div>
         </div>

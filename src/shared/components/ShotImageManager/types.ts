@@ -39,4 +39,5 @@ export interface MobileImageItemProps {
   shouldLoad?: boolean;
   projectAspectRatio?: string;
   frameNumber?: number; // Frame number to display at bottom
+  readOnly?: boolean; // Read-only mode - only show lightbox button
 }
