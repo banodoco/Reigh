@@ -113,6 +113,22 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
 
   // Convert input images to shot images format for ShotImagesEditor
   const shotImages = useMemo(() => {
+    // Extract segment_frames_expanded from task params
+    const p = task?.params || {};
+    const orchestratorPayload = p.full_orchestrator_payload || {};
+    const orchestratorDetails = p.orchestrator_details || {};
+    const segmentFrames = orchestratorPayload.segment_frames_expanded 
+      || orchestratorDetails.segment_frames_expanded 
+      || p.segment_frames_expanded
+      || [];
+    
+    console.log('[SharedGenDebug] Segment frames from task:', {
+      segmentFrames,
+      orchestratorPayload_segment_frames: orchestratorPayload.segment_frames_expanded,
+      orchestratorDetails_segment_frames: orchestratorDetails.segment_frames_expanded,
+      params_segment_frames: p.segment_frames_expanded,
+    });
+
     const images = inputImages.map((url, index) => ({
       id: `shared-image-${index}`,
       shotImageEntryId: `shared-image-${index}`, // Required for Timeline component
@@ -122,8 +138,11 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       imageUrl: url,
       image_url: url,
       location: url,
+      // Use actual segment_frames_expanded if available, otherwise calculate
       timeline_frame: generationMode === 'timeline' 
-        ? Math.round(index * (frames / (inputImages.length - 1 || 1)))
+        ? (segmentFrames[index] !== undefined 
+            ? segmentFrames[index] 
+            : Math.round(index * (frames / (inputImages.length - 1 || 1))))
         : undefined,
       created_at: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -133,11 +152,12 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       inputImagesCount: inputImages.length,
       shotImagesCount: images.length,
       shotImages: images,
-      generationMode: generationMode
+      generationMode: generationMode,
+      usedSegmentFrames: segmentFrames.length > 0,
     });
     
     return images;
-  }, [inputImages, generationMode, frames]);
+  }, [inputImages, generationMode, frames, task]);
 
   // Check authentication status
   useEffect(() => {
