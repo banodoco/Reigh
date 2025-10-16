@@ -122,8 +122,16 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       || p.segment_frames_expanded
       || [];
     
+    // In timeline mode, first image is ALWAYS at frame 0
+    // segment_frames_expanded contains positions for images AFTER the first
+    // e.g., [45] means: image0=0, image1=45
+    const timelineFrames = generationMode === 'timeline' && segmentFrames.length > 0
+      ? [0, ...segmentFrames]  // Prepend 0 for first image
+      : [];
+    
     console.log('[SharedGenDebug] Segment frames from task:', {
-      segmentFrames,
+      rawSegmentFrames: segmentFrames,
+      timelineFramesWithZero: timelineFrames,
       orchestratorPayload_segment_frames: orchestratorPayload.segment_frames_expanded,
       orchestratorDetails_segment_frames: orchestratorDetails.segment_frames_expanded,
       params_segment_frames: p.segment_frames_expanded,
@@ -138,10 +146,10 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       imageUrl: url,
       image_url: url,
       location: url,
-      // Use actual segment_frames_expanded if available, otherwise calculate
+      // Use actual timeline frames (with 0 prepended) if available, otherwise calculate
       timeline_frame: generationMode === 'timeline' 
-        ? (segmentFrames[index] !== undefined 
-            ? segmentFrames[index] 
+        ? (timelineFrames[index] !== undefined 
+            ? timelineFrames[index] 
             : Math.round(index * (frames / (inputImages.length - 1 || 1))))
         : undefined,
       created_at: new Date().toISOString(),
@@ -153,7 +161,8 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       shotImagesCount: images.length,
       shotImages: images,
       generationMode: generationMode,
-      usedSegmentFrames: segmentFrames.length > 0,
+      usedSegmentFrames: timelineFrames.length > 0,
+      framePositions: images.map(img => img.timeline_frame),
     });
     
     return images;
