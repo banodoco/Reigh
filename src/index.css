@@ -2214,7 +2214,7 @@
 .palette-wrapper {
   position: relative;
   overflow: hidden;
-  transition: none; /* override any fast transitions */
+  transition: border-color 300ms ease;
 }
 .palette-wrapper:hover {
   border-color: rgba(253, 226, 228, 0.6);
@@ -2301,14 +2301,12 @@
 /* ----------------------------------------------------------------------- */
 
 .dehovering .palette-icon path {
-  animation: none !important;
-  transition: stroke 10s ease;
+  animation: none;
+  transition: stroke 300ms ease;
   stroke: currentColor;
 }
 .dehovering {
-  border-color: hsl(var(--lala-golden-yellow) / 0.2) !important;
-  animation: none !important;
-  transition: border-color 10s ease;
+  /* Just remove all special styling and let it return naturally */
 }
 
 @layer utilities {

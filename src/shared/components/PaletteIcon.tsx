@@ -10,7 +10,7 @@ type QuoteState = 'closed' | 'opening' | 'open' | 'closing';
 
 // Configuration constants
 const ANIMATION_CONFIG = {
-  DEHOVERING_TIMEOUT: 10000,
+  DEHOVERING_TIMEOUT: 1000,
   QUOTE_CLOSE_DURATION: 250,
   TOOLTIP_HEIGHT_THRESHOLD: 200,
 } as const;
@@ -36,8 +36,7 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
 
   const handleMouseLeave = useCallback(() => {
     setIsHovering(false);
-    setIsDehovering(true);
-    setTimeout(() => setIsDehovering(false), ANIMATION_CONFIG.DEHOVERING_TIMEOUT);
+    setIsDehovering(false);
   }, []);
 
   const handlePaletteClick = useCallback(() => {

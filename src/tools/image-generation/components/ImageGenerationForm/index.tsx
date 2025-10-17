@@ -1262,6 +1262,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   };
   
+  const handleDeleteAllPrompts = () => {
+    markAsInteracted();
+    const newId = generatePromptId();
+    setPrompts([{ id: newId, fullPrompt: "", shortPrompt: "Prompt 1" }]);
+  };
+  
   const handleSavePromptsFromModal = (updatedPrompts: PromptEntry[]) => {
     markAsInteracted();
     // De-duplicate IDs and assign new ones where necessary.
@@ -1654,6 +1660,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 markAsInteracted();
                 setAfterEachPromptText('');
               }}
+              onDeleteAllPrompts={handleDeleteAllPrompts}
             />
 
             <ShotSelector

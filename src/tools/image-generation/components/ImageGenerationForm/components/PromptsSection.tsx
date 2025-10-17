@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { PlusCircle, Edit3, Sparkles } from "lucide-react";
+import { PlusCircle, Edit3, Sparkles, Trash2 } from "lucide-react";
 import { 
   Tooltip, 
   TooltipContent, 
@@ -33,6 +33,7 @@ interface PromptsSectionProps {
   onAfterEachPromptTextChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onClearBeforeEachPromptText?: () => void;
   onClearAfterEachPromptText?: () => void;
+  onDeleteAllPrompts?: () => void;
 }
 
 export const PromptsSection: React.FC<PromptsSectionProps> = ({
@@ -55,11 +56,14 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
   onAfterEachPromptTextChange,
   onClearBeforeEachPromptText,
   onClearAfterEachPromptText,
+  onDeleteAllPrompts,
 }) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-2">
-        <SectionHeader title="Prompts" theme="orange" />
+        <div className="flex items-center gap-2">
+          <SectionHeader title="Prompts" theme="orange" />
+        </div>
         <div className="flex items-center space-x-2">
           {/* Magic Prompt button - always visible */}
           <TooltipProvider delayDuration={300}>
@@ -130,7 +134,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
           </div>
         ) : (
           // Multiple prompts case (normal spacing)
-          <div className="mt-2 p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" onClick={onOpenPromptModal}>
+          <div className="mt-2 group relative p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" onClick={onOpenPromptModal}>
             {actionablePromptsCount === prompts.length ? (
               <p className="text-sm text-muted-foreground">
                 <span className="font-light text-primary">{prompts.length} prompts</span> currently active.
@@ -139,6 +143,32 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
               <p className="text-sm text-muted-foreground">
                 {prompts.length} prompts, <span className="font-light text-primary">{actionablePromptsCount} currently active</span>
               </p>
+            )}
+            {/* Delete All button - visible on hover in top right corner */}
+            {onDeleteAllPrompts && (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteAllPrompts();
+                      }}
+                      disabled={isGenerating || !ready}
+                      aria-label="Delete all prompts"
+                      className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Delete all and reset to one empty prompt
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         )}
