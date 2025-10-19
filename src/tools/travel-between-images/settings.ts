@@ -81,6 +81,8 @@ export interface VideoTravelSettings {
   advancedMode: boolean; // Toggle for showing phase_config settings
   phaseConfig?: PhaseConfig; // Advanced phase configuration
   selectedPhasePresetId?: string | null; // ID of the selected phase config preset (null if manually configured)
+  textBeforePrompts?: string; // Text to prepend to all prompts
+  textAfterPrompts?: string; // Text to append to all prompts
   // selectedMode removed - now hardcoded to use specific model
   pairConfigs?: Array<{
     id: string;
@@ -118,6 +120,8 @@ export const videoTravelSettings = {
     shotImageIds: [],
     phaseConfig: undefined,
     structureVideo: undefined,
+    textBeforePrompts: '',
+    textAfterPrompts: '',
     
     // Configuration fields (can inherit to new projects)
     videoControlMode: 'batch' as const,

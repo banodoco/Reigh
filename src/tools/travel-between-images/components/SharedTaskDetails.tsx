@@ -811,6 +811,38 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
               );
             }
           })()}
+          
+          {/* Text Before Prompts */}
+          {(() => {
+            const textBeforePrompts = orchestratorDetails?.text_before_prompts || orchestratorPayload?.text_before_prompts || task?.params?.text_before_prompts;
+            if (textBeforePrompts) {
+              return (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Before Each Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                    {textBeforePrompts}
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
+          
+          {/* Text After Prompts */}
+          {(() => {
+            const textAfterPrompts = orchestratorDetails?.text_after_prompts || orchestratorPayload?.text_after_prompts || task?.params?.text_after_prompts;
+            if (textAfterPrompts) {
+              return (
+                <div className="space-y-1">
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>After Each Prompt</p>
+                  <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
+                    {textAfterPrompts}
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
         
         {/* Technical Settings */}

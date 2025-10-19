@@ -87,6 +87,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   generationMode,
   onGenerationModeChange,
   // selectedMode and onModeChange removed - now hardcoded to use specific model
+  textBeforePrompts,
+  onTextBeforePromptsChange,
+  textAfterPrompts,
+  onTextAfterPromptsChange,
   onPreviousShot,
   onNextShot,
   onPreviousShotNoScroll,
@@ -1289,6 +1293,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const newStructureVideoTreatment: 'adjust' | 'clip' | undefined = orchestrator.structure_video_treatment ?? params.structure_video_treatment;
       const newStructureVideoMotionStrength: number | undefined = orchestrator.structure_video_motion_strength ?? params.structure_video_motion_strength;
       const newStructureVideoType: 'flow' | 'canny' | 'depth' | undefined = orchestrator.structure_video_type ?? params.structure_video_type;
+      const newTextBeforePrompts: string | undefined = orchestrator.text_before_prompts ?? params.text_before_prompts;
+      const newTextAfterPrompts: string | undefined = orchestrator.text_after_prompts ?? params.text_after_prompts;
 
       if (newModel && newModel !== steerableMotionSettings.model_name) {
         // Apply model directly to settings
@@ -1392,6 +1398,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           WARNING: newEnhancePrompt !== enhancePrompt ? `⚠️ VALUE CHANGED from ${enhancePrompt} to ${newEnhancePrompt}` : '✅ No change'
         });
         onEnhancePromptChange(newEnhancePrompt);
+      }
+
+      // Apply text before prompts
+      if (newTextBeforePrompts !== undefined && onTextBeforePromptsChange) {
+        console.log('[ApplySettings] Setting text before prompts:', {
+          newTextBeforePrompts,
+          currentTextBeforePrompts: textBeforePrompts,
+          source: orchestrator.text_before_prompts !== undefined ? 'orchestrator' : 'params'
+        });
+        onTextBeforePromptsChange(newTextBeforePrompts);
+      }
+
+      // Apply text after prompts
+      if (newTextAfterPrompts !== undefined && onTextAfterPromptsChange) {
+        console.log('[ApplySettings] Setting text after prompts:', {
+          newTextAfterPrompts,
+          currentTextAfterPrompts: textAfterPrompts,
+          source: orchestrator.text_after_prompts !== undefined ? 'orchestrator' : 'params'
+        });
+        onTextAfterPromptsChange(newTextAfterPrompts);
       }
 
       // Apply amount of motion (only if NOT in Advanced Mode)
@@ -2037,6 +2063,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
       // Add generation name if provided
       generation_name: variantName.trim() || undefined,
+      // Text before/after prompts
+      ...(textBeforePrompts ? { text_before_prompts: textBeforePrompts } : {}),
+      ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
     };
 
     // Only add regular LoRAs if Advanced Mode is OFF
@@ -2400,6 +2429,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onPhasePresetRemove={onPhasePresetRemove}
                             onBlurSave={onBlurSave}
                             onClearEnhancedPrompts={clearAllEnhancedPrompts}
+                            videoControlMode={videoControlMode}
+                            textBeforePrompts={textBeforePrompts}
+                            onTextBeforePromptsChange={onTextBeforePromptsChange}
+                            textAfterPrompts={textAfterPrompts}
+                            onTextAfterPromptsChange={onTextAfterPromptsChange}
                         />
                         
                         

@@ -332,6 +332,8 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       advancedMode: orchestratorPayload.phase_config || orchestratorDetails.phase_config || params.phase_config ? true : false,
       phaseConfig: orchestratorPayload.phase_config || orchestratorDetails.phase_config || params.phase_config || null,
       generationMode: orchestratorPayload.generation_mode || orchestratorDetails.generation_mode || params.generation_mode || 'batch',
+      textBeforePrompts: orchestratorPayload.text_before_prompts || orchestratorDetails.text_before_prompts || params.text_before_prompts || '',
+      textAfterPrompts: orchestratorPayload.text_after_prompts || orchestratorDetails.text_after_prompts || params.text_after_prompts || '',
     };
   }, [task]);
 

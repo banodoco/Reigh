@@ -31,6 +31,8 @@ export const NEVER_INHERIT_FIELDS = [
   'prompts',
   'beforeEachPromptText',
   'afterEachPromptText',
+  'textBeforePrompts',
+  'textAfterPrompts',
   'pairConfigs',
   
   // Reference-related (content)
@@ -86,6 +88,8 @@ export const TOOL_FIELD_CATEGORIES = {
       'shotImageIds',       // Images in this shot
       'phaseConfig',        // Advanced phase configuration
       'structureVideo',     // Structure video path and metadata
+      'textBeforePrompts',  // Text to prepend to prompts
+      'textAfterPrompts',   // Text to append to prompts
     ],
     configuration: [
       'videoControlMode',   // Individual vs batch

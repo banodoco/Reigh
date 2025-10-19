@@ -55,22 +55,6 @@ export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   show_input_images: false,
 };
 
-// Shot settings interface
-export interface ShotSettings {
-  videoControlMode: 'individual' | 'batch';
-  batchVideoPrompt: string;
-  batchVideoFrames: number;
-  batchVideoContext: number;
-  batchVideoSteps: number;
-  dimensionSource: 'project' | 'firstImage' | 'custom';
-  customWidth?: number;
-  customHeight?: number;
-  steerableMotionSettings: SteerableMotionSettings;
-  enhancePrompt: boolean;
-  autoCreateIndividualPrompts: boolean;
-  generationMode?: 'batch' | 'timeline';
-}
-
 // Main props interface for ShotEditor
 // NEW: Simplified settings bundle approach
 export interface ShotSettings {
@@ -88,6 +72,8 @@ export interface ShotSettings {
   advancedMode: boolean;
   phaseConfig?: any;
   pairConfigs?: any[];
+  textBeforePrompts?: string;
+  textAfterPrompts?: string;
 }
 
 export interface ShotEditorProps {
@@ -124,6 +110,12 @@ export interface ShotEditorProps {
   onSteerableMotionSettingsChange?: (settings: Partial<SteerableMotionSettings>) => void;
   onGenerateAllSegments: () => void;
   availableLoras: LoraModel[];
+  
+  // Text before/after prompts
+  textBeforePrompts?: string;
+  onTextBeforePromptsChange?: (text: string) => void;
+  textAfterPrompts?: string;
+  onTextAfterPromptsChange?: (text: string) => void;
 
   generationMode?: 'batch' | 'timeline';
   onGenerationModeChange?: (mode: 'batch' | 'timeline') => void;
@@ -233,4 +225,6 @@ export interface TaskSettings {
   height?: number;
   replaceImages?: boolean;
   inputImages?: string[];
+  textBeforePrompts?: string;
+  textAfterPrompts?: string;
 } 

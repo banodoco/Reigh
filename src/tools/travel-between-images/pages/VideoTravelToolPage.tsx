@@ -244,6 +244,14 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('batchVideoPrompt', prompt);
   }, [shotSettings]);
   
+  const handleTextBeforePromptsChange = useCallback((text: string) => {
+    shotSettings.updateField('textBeforePrompts', text);
+  }, [shotSettings]);
+  
+  const handleTextAfterPromptsChange = useCallback((text: string) => {
+    shotSettings.updateField('textAfterPrompts', text);
+  }, [shotSettings]);
+  
   // ✅ NEW: Immediate save handler using hook - much simpler!
   const handleBlurSave = useCallback(() => {
     console.log('[PhaseConfigTrack] 🔵 Blur save triggered - saving immediately');
@@ -533,6 +541,8 @@ const VideoTravelToolPage: React.FC = () => {
     pairConfigs = [],
     generationMode = (isMobile ? 'batch' : 'timeline'),
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
+    textBeforePrompts = '',
+    textAfterPrompts = '',
   } = shotSettings.settings || {};
   
   // Debug: Log enhance_prompt value whenever it changes
@@ -1487,6 +1497,10 @@ const VideoTravelToolPage: React.FC = () => {
               onVideoControlModeChange={handleVideoControlModeChange}
               onPairConfigChange={handlePairConfigChange}
               onBatchVideoPromptChange={handleBatchVideoPromptChange}
+              textBeforePrompts={textBeforePrompts}
+              onTextBeforePromptsChange={handleTextBeforePromptsChange}
+              textAfterPrompts={textAfterPrompts}
+              onTextAfterPromptsChange={handleTextAfterPromptsChange}
               onBatchVideoFramesChange={handleBatchVideoFramesChange}
               onBatchVideoContextChange={handleBatchVideoContextChange}
               batchVideoSteps={batchVideoSteps}

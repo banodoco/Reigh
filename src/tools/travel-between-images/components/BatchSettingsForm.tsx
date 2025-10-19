@@ -103,6 +103,15 @@ interface BatchSettingsFormProps {
   
   // Clear enhanced prompts handler
   onClearEnhancedPrompts?: () => Promise<void>;
+  
+  // Video control mode for conditional display
+  videoControlMode?: 'individual' | 'batch';
+  
+  // Text before/after prompts
+  textBeforePrompts?: string;
+  onTextBeforePromptsChange?: (value: string) => void;
+  textAfterPrompts?: string;
+  onTextAfterPromptsChange?: (value: string) => void;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -150,6 +159,11 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onPhasePresetRemove,
   onBlurSave,
   onClearEnhancedPrompts,
+  videoControlMode = 'batch',
+  textBeforePrompts = '',
+  onTextBeforePromptsChange,
+  textAfterPrompts = '',
+  onTextAfterPromptsChange,
 }) => {
     // Get project context for persistent state
     const { selectedProjectId: contextProjectId } = useProject();
@@ -299,44 +313,51 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     return (
         <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
-                  <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">
-                    {isTimelineMode 
-                      ? 'Default/Base Prompt:'
-                      : 'Prompt:'
-                    }
-                  </Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>
-                        {autoCreateIndividualPrompts && isTimelineMode 
-                          ? 'This text will be appended after AI-generated individual prompts for each pair.'
-                          : 'This prompt guides the style and transition for all video segments.'
-                        } <br /> Small changes can have a big impact.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Textarea 
-                    id="batchVideoPrompt"
-                    value={batchVideoPrompt}
-                    onChange={(e) => onBatchVideoPromptChange(e.target.value)}
-                    onBlur={() => onBlurSave?.()}
-                    placeholder={
-                      autoCreateIndividualPrompts && isTimelineMode
-                        ? "e.g., cinematic style, high quality"
-                        : "Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                    }
-                    className="min-h-[70px]"
-                    rows={3}
-                    clearable
-                    onClear={() => onBatchVideoPromptChange('')}
-                  />
+                {/* Left Column: Prompts with text before/after when applicable */}
+                <div className="space-y-4">
+                  {/* Main Prompt */}
+                  <div className="relative">
+                    <Label htmlFor="batchVideoPrompt" className="text-sm font-light block mb-1.5">
+                      {(isTimelineMode || enhancePrompt)
+                        ? 'Default/Base Prompt:'
+                        : 'Prompt:'
+                      }
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {(autoCreateIndividualPrompts && isTimelineMode) || enhancePrompt
+                            ? 'This text will be appended after AI-generated individual prompts for each pair.'
+                            : 'This prompt guides the style and transition for all video segments.'
+                          } <br /> Small changes can have a big impact.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Textarea 
+                      id="batchVideoPrompt"
+                      value={batchVideoPrompt}
+                      onChange={(e) => onBatchVideoPromptChange(e.target.value)}
+                      onBlur={() => onBlurSave?.()}
+                      placeholder={
+                        autoCreateIndividualPrompts && isTimelineMode
+                          ? "e.g., cinematic style, high quality"
+                          : "Enter a global prompt for all video segments... (e.g., cinematic transition)"
+                      }
+                      className="min-h-[70px]"
+                      rows={3}
+                      clearable
+                      onClear={() => onBatchVideoPromptChange('')}
+                    />
+                  </div>
+                  
                 </div>
+                
+                {/* Right Column: Negative Prompt - same height as main prompt */}
                 <div className="relative">
                   <Label htmlFor="negative_prompt" className="text-sm font-light block mb-1.5">
                     {isTimelineMode ? 'Default Negative Prompt:' : 'Negative prompt:'}
@@ -399,6 +420,39 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </span>
                   </Button>
                 )}
+              </div>
+            )}
+            
+            {/* Text Before/After Prompts - Show when enhancePrompt=true OR timeline mode */}
+            {(enhancePrompt || isTimelineMode) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="textBeforePrompts" className="text-sm font-light block mb-1.5">
+                    Before each prompt:
+                  </Label>
+                  <Input
+                    id="textBeforePrompts"
+                    value={textBeforePrompts}
+                    onChange={(e) => onTextBeforePromptsChange?.(e.target.value)}
+                    onBlur={() => onBlurSave?.()}
+                    placeholder="Text to prepend to each prompt..."
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="textAfterPrompts" className="text-sm font-light block mb-1.5">
+                    After each prompt:
+                  </Label>
+                  <Input
+                    id="textAfterPrompts"
+                    value={textAfterPrompts}
+                    onChange={(e) => onTextAfterPromptsChange?.(e.target.value)}
+                    onBlur={() => onBlurSave?.()}
+                    placeholder="Text to append to each prompt..."
+                    className="w-full"
+                  />
+                </div>
               </div>
             )}
             
