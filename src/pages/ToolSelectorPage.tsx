@@ -168,7 +168,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
   const content = (
     <div 
-      className={`wes-tool-card click-ripple relative overflow-hidden ${isSquare ? 'min-h-32' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
+      className={`wes-tool-card click-ripple relative ${isSquare ? 'min-h-32' : 'h-32 sm:h-32'} ${isDisabled ? 'opacity-40' : ''} ${isRippleActive ? 'ripple-active' : ''} h-full`}
       style={rippleStyles}
     >
       {/* Disabled/Coming Soon Badge */}
@@ -356,7 +356,7 @@ const ToolSelectorPage: React.FC = () => {
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
   return (
-    <PageFadeIn className="min-h-[70vh] relative overflow-hidden">
+    <PageFadeIn className="min-h-[70vh] relative">
       {/* Background elements removed to prevent inset-0 overlay issues */}
       
       {/* Reduced floating elements to prevent visual clutter */}

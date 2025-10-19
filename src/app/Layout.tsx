@@ -180,7 +180,7 @@ const Layout: React.FC = () => {
       >
         <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
 
-        <main className={cn("container mx-auto h-full overflow-y-auto", containerPadding, containerSpacing)}>
+        <main className={cn("container mx-auto", containerPadding, containerSpacing)}>
           {header}
           <Outlet /> 
         </main>
