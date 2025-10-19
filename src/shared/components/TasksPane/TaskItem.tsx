@@ -556,20 +556,23 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     });
 
     console.log('[TaskProgressDebug] Found', subtasks.length, 'subtasks');
+    
+    let percent = 0;
+    
     if (subtasks.length === 0) {
-      console.log('[TaskProgressDebug] No subtasks found, showing toast');
-      toast({ title: 'Progress', description: 'No subtasks found yet.', variant: 'default' });
-      return;
-    }
-    // Progress is based on the ratio of completed subtasks to (total subtasks - 1)
-    const completed = subtasks.filter((t) => t.status === 'Complete').length;
-    console.log('[TaskProgressDebug] Completed subtasks:', completed);
-    const denominator = Math.max(subtasks.length - 1, 1); // Avoid divide-by-zero and remove the final stitch task
-    console.log('[TaskProgressDebug] Denominator:', denominator);
+      console.log('[TaskProgressDebug] No subtasks found yet, showing 0% progress');
+      percent = 0;
+    } else {
+      // Progress is based on the ratio of completed subtasks to (total subtasks - 1)
+      const completed = subtasks.filter((t) => t.status === 'Complete').length;
+      console.log('[TaskProgressDebug] Completed subtasks:', completed);
+      const denominator = Math.max(subtasks.length - 1, 1); // Avoid divide-by-zero and remove the final stitch task
+      console.log('[TaskProgressDebug] Denominator:', denominator);
 
-    const rawPercent = (completed / denominator) * 100;
-    const percent = Math.round(Math.min(rawPercent, 100));
-    console.log('[TaskProgressDebug] Calculated progress:', percent, '% (raw:', rawPercent, ')');
+      const rawPercent = (completed / denominator) * 100;
+      percent = Math.round(Math.min(rawPercent, 100));
+      console.log('[TaskProgressDebug] Calculated progress:', percent, '% (raw:', rawPercent, ')');
+    }
 
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
 

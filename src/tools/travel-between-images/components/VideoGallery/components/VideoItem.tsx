@@ -75,6 +75,18 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // Track success state for Apply Settings button
   const [settingsApplied, setSettingsApplied] = useState(false);
   
+  // Debug log for Apply Settings button rendering
+  useEffect(() => {
+    console.log('[ApplySettings] VideoItem render check:', {
+      videoId: video.id?.substring(0, 8),
+      hasTaskMapping: !!taskMapping,
+      taskId: taskMapping?.taskId,
+      willRenderButton: !!taskMapping?.taskId,
+      onApplySettingsFromTaskType: typeof onApplySettingsFromTask,
+      timestamp: Date.now()
+    });
+  }, [video.id, taskMapping, onApplySettingsFromTask]);
+  
   // Track share state
   const [shareSlug, setShareSlug] = useState<string | null>(null);
   const [isCreatingShare, setIsCreatingShare] = useState(false);
@@ -889,7 +901,15 @@ export const VideoItem = React.memo<VideoItemProps>(({
                     size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
+                      console.log('[ApplySettings] Button clicked:', {
+                        videoId: video.id?.substring(0, 8),
+                        taskId: taskMapping.taskId,
+                        settingsApplied,
+                        onApplySettingsFromTaskType: typeof onApplySettingsFromTask,
+                        timestamp: Date.now()
+                      });
                       if (taskMapping.taskId && !settingsApplied) {
+                        console.log('[ApplySettings] Calling onApplySettingsFromTask...');
                         // Call with empty inputImages array - will be populated from task data on server side
                         onApplySettingsFromTask(taskMapping.taskId, false, []);
                         // Show success state
@@ -898,6 +918,11 @@ export const VideoItem = React.memo<VideoItemProps>(({
                         setTimeout(() => {
                           setSettingsApplied(false);
                         }, 2000);
+                      } else {
+                        console.log('[ApplySettings] Click ignored:', {
+                          hasTaskId: !!taskMapping.taskId,
+                          settingsApplied
+                        });
                       }
                     }}
                     disabled={settingsApplied}

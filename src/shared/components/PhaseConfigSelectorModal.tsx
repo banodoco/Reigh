@@ -35,6 +35,7 @@ interface PhaseConfigSelectorModalProps {
   onRemovePreset: () => void;
   selectedPresetId: string | null;
   currentPhaseConfig?: PhaseConfig; // The current config (for "Save Current" feature)
+  initialTab?: 'browse' | 'add-new'; // Which tab to open with
 }
 
 interface BrowsePresetsTabProps {
@@ -53,6 +54,7 @@ interface BrowsePresetsTabProps {
   showSelectedPresetOnly: boolean;
   setShowSelectedPresetOnly: (value: boolean) => void;
   onProcessedPresetsLengthChange: (length: number) => void;
+  onPageChange?: (page: number, totalPages: number, setPage: (page: number) => void) => void;
 }
 
 const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({ 
@@ -70,13 +72,14 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
   setShowMyPresetsOnly,
   showSelectedPresetOnly,
   setShowSelectedPresetOnly,
-  onProcessedPresetsLengthChange
+  onProcessedPresetsLengthChange,
+  onPageChange
 }) => {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [page, setPage] = useState(0);
-  const ITEMS_PER_PAGE = 20;
+  const ITEMS_PER_PAGE = 12;
   
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -174,6 +177,13 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
 
   const totalPages = Math.ceil(processedPresets.length / ITEMS_PER_PAGE);
   const paginatedPresets = useMemo(() => processedPresets.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE), [processedPresets, page]);
+
+  // Notify parent about pagination state
+  React.useEffect(() => {
+    if (onPageChange) {
+      onPageChange(page, totalPages, setPage);
+    }
+  }, [page, totalPages, onPageChange]);
 
   const myPresetsCount = allPresets.filter(preset => preset._isMyPreset).length;
 
@@ -359,15 +369,67 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                       </p>
                     )}
                     
-                    {/* Sample generations */}
-                    {metadata.sample_generations && metadata.sample_generations.length > 0 && (
-                      <div className="flex space-x-2 overflow-x-auto pb-2 pt-1">
-                        {metadata.sample_generations.slice(0, 5).map((sample, sampleIdx) => {
+                    {/* Sample generation - show only main generation */}
+                    {metadata.main_generation ? (
+                      <div className="flex justify-center pb-2 pt-1">
+                        {(() => {
+                          const mainSample = metadata.sample_generations?.find(s => s.url === metadata.main_generation);
+                          const isVideo = mainSample?.type === 'video';
+                          return isVideo ? (
+                            <div
+                              className="relative h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                              onClickCapture={(e) => {
+                                if (!isMobile) return;
+                                const container = e.currentTarget as HTMLElement;
+                                const video = container.querySelector('video') as HTMLVideoElement | null;
+                                if (!video) return;
+                                if (video.paused) {
+                                  video.play().catch(() => {});
+                                } else {
+                                  video.pause();
+                                }
+                              }}
+                              onTouchEndCapture={(e) => {
+                                if (!isMobile) return;
+                                const container = e.currentTarget as HTMLElement;
+                                const video = container.querySelector('video') as HTMLVideoElement | null;
+                                if (!video) return;
+                                if (video.paused) {
+                                  video.play().catch(() => {});
+                                } else {
+                                  video.pause();
+                                }
+                              }}
+                            >
+                              <HoverScrubVideo
+                                src={metadata.main_generation}
+                                className="h-full w-auto"
+                                videoClassName="object-contain"
+                                autoplayOnHover={!isMobile}
+                                preload="metadata"
+                                loop
+                                muted
+                              />
+                            </div>
+                          ) : (
+                            <img
+                              src={metadata.main_generation}
+                              alt={mainSample?.alt_text || 'Main sample'}
+                              className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                              title={mainSample?.alt_text || metadata.main_generation}
+                              loading="lazy"
+                            />
+                          );
+                        })()}
+                      </div>
+                    ) : metadata.sample_generations && metadata.sample_generations.length > 0 && (
+                      <div className="flex justify-center pb-2 pt-1">
+                        {(() => {
+                          const sample = metadata.sample_generations[0];
                           const isVideo = sample.type === 'video';
                           return isVideo ? (
                             <div
-                              key={sampleIdx}
-                              className="relative h-28 w-auto min-w-20 sm:min-w-0 rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                              className="relative h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                               onClickCapture={(e) => {
                                 if (!isMobile) return;
                                 const container = e.currentTarget as HTMLElement;
@@ -403,15 +465,14 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                             </div>
                           ) : (
                             <img
-                              key={sampleIdx}
                               src={sample.url}
-                              alt={sample.alt_text || `Sample ${sampleIdx + 1}`}
-                              className="h-28 w-auto min-w-20 sm:min-w-0 object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                              alt={sample.alt_text || 'Sample'}
+                              className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                               title={sample.alt_text || sample.url}
                               loading="lazy"
                             />
                           );
-                        })}
+                        })()}
                       </div>
                     )}
                     
@@ -485,41 +546,6 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
           ) : (
             <p className="text-center text-muted-foreground py-8 col-span-full">No presets match your search criteria.</p>
           )}
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="col-span-full">
-              <Pagination className="pt-4">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(e) => { e.preventDefault(); if (page > 0) setPage(page - 1); }}
-                      className={page === 0 ? 'pointer-events-none opacity-50' : ''}
-                    />
-                  </PaginationItem>
-                  {Array.from({ length: totalPages }).map((_, idx) => (
-                    <PaginationItem key={idx}>
-                      <PaginationLink
-                        href="#"
-                        isActive={idx === page}
-                        onClick={(e) => { e.preventDefault(); setPage(idx); }}
-                      >
-                        {idx + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => { e.preventDefault(); if (page < totalPages - 1) setPage(page + 1); }}
-                      className={page === totalPages - 1 ? 'pointer-events-none opacity-50' : ''}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
         </div>
       </div>
       
@@ -530,6 +556,11 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
             <AlertDialogTitle>Delete Preset</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete "{presetToDelete?.name}"? This action cannot be undone.
+              {presetToDelete?.isSelected && (
+                <span className="block mt-2 text-amber-600 dark:text-amber-400">
+                  Note: This preset is currently selected and will be deselected.
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1091,6 +1122,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   onRemovePreset,
   selectedPresetId,
   currentPhaseConfig,
+  initialTab = 'browse',
 }) => {
   const isMobile = useIsMobile();
   const myPresetsResource = useListResources('phase-config');
@@ -1099,8 +1131,15 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   const updateResource = useUpdateResource();
   const deleteResource = useDeleteResource();
   
-  // Tab state management
-  const [activeTab, setActiveTab] = useState<string>('browse');
+  // Tab state management - initialize with initialTab prop
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  
+  // Update activeTab when initialTab prop changes and modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   
   // Edit state management
   const [editingPreset, setEditingPreset] = useState<(Resource & { metadata: PhaseConfigMetadata }) | null>(null);
@@ -1109,6 +1148,18 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   const [showMyPresetsOnly, setShowMyPresetsOnly] = useState(false);
   const [showSelectedPresetOnly, setShowSelectedPresetOnly] = useState(false);
   const [processedPresetsLength, setProcessedPresetsLength] = useState(0);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [setPageFn, setSetPageFn] = useState<((page: number) => void) | null>(null);
+  
+  // Handle pagination state from tab
+  const handlePageChange = (page: number, total: number, setPage: (page: number) => void) => {
+    setCurrentPage(page);
+    setTotalPages(total);
+    setSetPageFn(() => setPage);
+  };
   
   // Handle edit action
   const handleEdit = (preset: Resource & { metadata: PhaseConfigMetadata }) => {
@@ -1179,6 +1230,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   showSelectedPresetOnly={showSelectedPresetOnly}
                   setShowSelectedPresetOnly={setShowSelectedPresetOnly}
                   onProcessedPresetsLengthChange={setProcessedPresetsLength}
+                  onPageChange={handlePageChange}
                 />
               </TabsContent>
               <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
@@ -1258,6 +1310,33 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                       <>{processedPresetsLength} total</>
                     )}
                   </span>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && setPageFn && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageFn(currentPage - 1)}
+                        disabled={currentPage === 0}
+                        className="h-8 w-8 p-0"
+                      >
+                        ←
+                      </Button>
+                      <span className="text-sm text-muted-foreground px-2">
+                        {currentPage + 1} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageFn(currentPage + 1)}
+                        disabled={currentPage >= totalPages - 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        →
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Close Button */}
                   <Button 

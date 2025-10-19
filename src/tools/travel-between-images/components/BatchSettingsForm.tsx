@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { Info, Plus, Trash2, Search, Download, ChevronDown, ChevronLeft, Sparkles, RotateCcw, Library, Pencil } from 'lucide-react';
+import { Info, Plus, Trash2, Search, Download, ChevronDown, ChevronLeft, Sparkles, RotateCcw, Library, Pencil, Save } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Checkbox } from "@/shared/components/ui/checkbox";
@@ -175,6 +175,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     
     // State for Phase Config Preset modal
     const [isPhasePresetModalOpen, setIsPhasePresetModalOpen] = React.useState(false);
+    const [phasePresetModalInitialTab, setPhasePresetModalInitialTab] = React.useState<'browse' | 'add-new'>('browse');
     const [selectedPresetMetadata, setSelectedPresetMetadata] = React.useState<PhaseConfigMetadata | null>(null);
     
     // Track which LoRA URL input is focused
@@ -551,16 +552,40 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </div>
                   </div>
                   
-                  {/* Phase Config Preset Button - only show when advanced mode is enabled */}
+                  {/* Phase Config Preset Buttons - only show when advanced mode is enabled */}
                   {advancedMode && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsPhasePresetModalOpen(true)}
-                      className="gap-2 whitespace-nowrap"
-                    >
-                      <Library className="h-4 w-4" />
-                      {isPresetMode ? 'Change Preset' : 'Load Preset'}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setPhasePresetModalInitialTab('browse');
+                          setIsPhasePresetModalOpen(true);
+                        }}
+                        className="gap-2 whitespace-nowrap"
+                      >
+                        <Library className="h-4 w-4" />
+                        {isPresetMode ? 'Change Preset' : 'Load Preset'}
+                      </Button>
+                      {!isPresetMode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                setPhasePresetModalInitialTab('add-new');
+                                setIsPhasePresetModalOpen(true);
+                              }}
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Save Preset</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </>
                   )}
                 </div>
               
@@ -668,15 +693,50 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                         <Label htmlFor="num_phases" className="text-sm font-light block mb-2">
                           Number of Phases
                         </Label>
-                        {/* Fixed to 3 phases - this is the optimal configuration */}
-                        <Input
-                          id="num_phases"
-                          type="number"
-                          className="h-10"
-                          value={3}
-                          disabled
-                          readOnly
-                        />
+                        <RadioGroup
+                          value={String(phaseConfig.num_phases)}
+                          onValueChange={(value) => {
+                            const newNumPhases = parseInt(value);
+                            const currentPhases = phaseConfig.phases || [];
+                            const currentSteps = phaseConfig.steps_per_phase || [];
+                            
+                            // Adjust arrays to match the new number of phases
+                            let newPhases = currentPhases.slice(0, newNumPhases);
+                            let newSteps = currentSteps.slice(0, newNumPhases);
+                            
+                            // If we're increasing phases, fill with defaults
+                            while (newPhases.length < newNumPhases) {
+                              newPhases.push({
+                                phase: newPhases.length + 1,
+                                guidance_scale: 1.0,
+                                loras: []
+                              });
+                            }
+                            
+                            while (newSteps.length < newNumPhases) {
+                              newSteps.push(2);
+                            }
+                            
+                            onPhaseConfigChange({
+                              ...phaseConfig,
+                              num_phases: newNumPhases,
+                              phases: newPhases,
+                              steps_per_phase: newSteps,
+                              // Auto-set model_switch_phase to 1 when num_phases is 2
+                              model_switch_phase: newNumPhases === 2 ? 1 : phaseConfig.model_switch_phase
+                            });
+                          }}
+                          className="flex flex-row gap-4 h-10 items-center"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="2" id="phases-2" />
+                            <Label htmlFor="phases-2" className="text-sm">2</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="3" id="phases-3" />
+                            <Label htmlFor="phases-3" className="text-sm">3</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
                       
                       <div>
@@ -746,11 +806,13 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     </div>
                   </div>
                   
-                  {/* Per-Phase Settings - 3 side by side when space available */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {/* Per-Phase Settings - Dynamic width based on number of phases */}
+                  <div className={`grid gap-4 ${phaseConfig.num_phases === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
                   {phaseConfig.phases.map((phase, phaseIdx) => {
-                    // Fixed 3-phase labels
-                    const phaseLabels = ["High Noise Sampler 1", "High Noise Sampler 2", "Low Noise Sampler"];
+                    // Dynamic phase labels based on number of phases
+                    const phaseLabels2 = ["High Noise Sampler", "Low Noise Sampler"];
+                    const phaseLabels3 = ["High Noise Sampler 1", "High Noise Sampler 2", "Low Noise Sampler"];
+                    const phaseLabels = phaseConfig.num_phases === 2 ? phaseLabels2 : phaseLabels3;
                     return (
                     <Card key={phaseIdx} className="bg-muted/30">
                       <CardHeader className="pb-3">
@@ -1010,6 +1072,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               onRemovePreset={handlePresetRemove}
               selectedPresetId={selectedPhasePresetId || null}
               currentPhaseConfig={phaseConfig}
+              initialTab={phasePresetModalInitialTab}
             />
         </div>
     );

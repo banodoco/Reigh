@@ -1193,9 +1193,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // All modes are always available - no restrictions based on image count
 
-  // Get model based on turbo mode
+  // Get model based on advanced mode (num_phases) or turbo mode
   const getModelName = () => {
-    return turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
+    // In advanced mode, use num_phases to determine model
+    if (advancedMode && phaseConfig) {
+      const numPhases = phaseConfig.num_phases;
+      let selectedModel: string;
+      
+      if (numPhases === 2) {
+        selectedModel = 'lightning_baseline_3_3';
+      } else if (numPhases === 3) {
+        selectedModel = 'lightning_baseline_2_2_2';
+      } else {
+        // Fallback for other num_phases values
+        selectedModel = 'lightning_baseline_2_2_2';
+      }
+      
+      console.log('[ModelSelection] Advanced Mode - Selected model based on phases:', {
+        numPhases,
+        selectedModel,
+        advancedMode,
+        timestamp: Date.now()
+      });
+      
+      return selectedModel;
+    }
+    
+    // In normal mode, use turbo mode setting
+    const selectedModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
+    
+    console.log('[ModelSelection] Normal Mode - Selected model based on turbo:', {
+      turboMode,
+      selectedModel,
+      advancedMode: false,
+      timestamp: Date.now()
+    });
+    
+    return selectedModel;
   };
 
   // Mode synchronization removed - now hardcoded to use specific model
@@ -1209,6 +1243,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const removeImageFromShotMutation = useRemoveImageFromShot();
 
   const applySettingsFromTask = useCallback(async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
+    console.log('[ApplySettings] applySettingsFromTask called:', {
+      taskId,
+      replaceImages,
+      inputImagesCount: inputImages.length,
+      timestamp: Date.now()
+    });
     try {
       // Fetch the task to extract params
       const { data: taskRow, error } = await supabase
@@ -1216,7 +1256,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         .select('*')
         .eq('id', taskId)
         .single();
+      console.log('[ApplySettings] Task fetch result:', {
+        hasData: !!taskRow,
+        error: error?.message,
+        timestamp: Date.now()
+      });
       if (error || !taskRow) {
+        console.error('[ApplySettings] Failed to fetch task:', error);
         return;
       }
 

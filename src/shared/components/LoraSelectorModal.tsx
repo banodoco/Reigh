@@ -123,6 +123,7 @@ interface CommunityLorasTabProps {
   updateResource: UseMutationResult<Resource, Error, { id: string; type: 'lora'; metadata: LoraModel; }, unknown>;
   deleteResource: UseMutationResult<void, Error, { id: string; type: "lora"; }, unknown>;
   onEdit: (lora: Resource & { metadata: LoraModel }) => void;
+  onPageChange?: (page: number, totalPages: number, setPage: (page: number) => void) => void;
 }
 
 const CommunityLorasTab: React.FC<CommunityLorasTabProps & { 
@@ -149,17 +150,34 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   setShowMyLorasOnly,
   showAddedLorasOnly,
   setShowAddedLorasOnly,
-  onProcessedLorasLengthChange
+  onProcessedLorasLengthChange,
+  onPageChange
 }) => {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>('downloads');
   const [page, setPage] = useState(0);
-  const ITEMS_PER_PAGE = 20;
+  const ITEMS_PER_PAGE = 12;
 
   // Description modal state
   const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
   const [selectedDescription, setSelectedDescription] = useState<{ title: string; description: string }>({ title: '', description: '' });
+
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [loraToDelete, setLoraToDelete] = useState<{ id: string; name: string; isAdded: boolean } | null>(null);
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = () => {
+    if (loraToDelete) {
+      deleteResource.mutate({ id: loraToDelete.id, type: 'lora' });
+      if (loraToDelete.isAdded) {
+        onRemoveLora(loraToDelete.id);
+      }
+      setDeleteDialogOpen(false);
+      setLoraToDelete(null);
+    }
+  };
 
   const selectedLoraMap = useMemo(() => new Map(selectedLoras.map(l => [l['Model ID'], l.strength])), [selectedLoras]);
   const selectedLoraIds = useMemo(() => Array.from(selectedLoraMap.keys()), [selectedLoraMap]);
@@ -284,6 +302,13 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
   const totalPages = Math.ceil(processedLoras.length / ITEMS_PER_PAGE);
   const paginatedLoras = useMemo(() => processedLoras.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE), [processedLoras, page]);
 
+  // Notify parent about pagination state
+  React.useEffect(() => {
+    if (onPageChange) {
+      onPageChange(page, totalPages, setPage);
+    }
+  }, [page, totalPages, onPageChange]);
+
   const myLorasCount = allLoras.filter(lora => 
     lora.created_by?.is_you || 
     lora.Author === 'You' || 
@@ -406,7 +431,14 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                         <Button
                                           variant="destructive"
                                           size="sm"
-                                          onClick={() => deleteResource.mutate({ id: resourceId, type: 'lora' })}
+                                          onClick={() => {
+                                            setLoraToDelete({ 
+                                              id: resourceId, 
+                                              name: lora.Name, 
+                                              isAdded: isSelectedOnGenerator 
+                                            });
+                                            setDeleteDialogOpen(true);
+                                          }}
                                           disabled={deleteResource.isPending}
                                         >
                                           <Trash2 className="h-4 w-4" />
@@ -470,7 +502,14 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                     <Button
                                       variant="destructive"
                                       size="sm"
-                                      onClick={() => deleteResource.mutate({ id: resourceId, type: 'lora' })}
+                                      onClick={() => {
+                                        setLoraToDelete({ 
+                                          id: resourceId, 
+                                          name: lora.Name, 
+                                          isAdded: isSelectedOnGenerator 
+                                        });
+                                        setDeleteDialogOpen(true);
+                                      }}
                                       disabled={deleteResource.isPending}
                                     >
                                       <Trash2 className="h-4 w-4" />
@@ -505,14 +544,66 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                           </Button>
                         </div>
                       )}
-                      {lora.Images && lora.Images.length > 0 ? (
-                        <div className="flex space-x-2 overflow-x-auto pb-2 pt-1">
-                          {lora.Images.slice(0, 5).map((image, index) => {
+                      {lora.main_generation ? (
+                        <div className="flex justify-center pb-2 pt-1">
+                          {(() => {
+                            const mainSample = lora.sample_generations?.find(s => s.url === lora.main_generation);
+                            const isVideo = mainSample?.type === 'video';
+                            return isVideo ? (
+                              <div
+                                className="relative h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                onClickCapture={(e) => {
+                                  if (!isMobile) return;
+                                  const container = e.currentTarget as HTMLElement;
+                                  const video = container.querySelector('video') as HTMLVideoElement | null;
+                                  if (!video) return;
+                                  if (video.paused) {
+                                    video.play().catch(() => {});
+                                  } else {
+                                    video.pause();
+                                  }
+                                }}
+                                onTouchEndCapture={(e) => {
+                                  if (!isMobile) return;
+                                  const container = e.currentTarget as HTMLElement;
+                                  const video = container.querySelector('video') as HTMLVideoElement | null;
+                                  if (!video) return;
+                                  if (video.paused) {
+                                    video.play().catch(() => {});
+                                  } else {
+                                    video.pause();
+                                  }
+                                }}
+                              >
+                                <HoverScrubVideo
+                                  src={lora.main_generation}
+                                  className="h-full w-auto"
+                                  videoClassName="object-contain"
+                                  autoplayOnHover={!isMobile}
+                                  preload="metadata"
+                                  loop
+                                  muted
+                                />
+                              </div>
+                            ) : (
+                              <img
+                                src={lora.main_generation}
+                                alt={mainSample?.alt_text || `${lora.Name} main sample`}
+                                className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                title={mainSample?.alt_text || lora.main_generation}
+                                loading="lazy"
+                              />
+                            );
+                          })()}
+                        </div>
+                      ) : lora.Images && lora.Images.length > 0 ? (
+                        <div className="flex justify-center pb-2 pt-1">
+                          {(() => {
+                            const image = lora.Images[0];
                             const isVideo = image.type?.startsWith('video');
                             return isVideo ? (
                               <div
-                                key={index}
-                                className="relative h-28 w-auto min-w-20 sm:min-w-0 rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                className="relative h-28 w-auto rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                                 onClickCapture={(e) => {
                                   if (!isMobile) return;
                                   const container = e.currentTarget as HTMLElement;
@@ -548,15 +639,14 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                               </div>
                             ) : (
                               <img
-                                key={index}
                                 src={image.url}
-                                alt={image.alt_text || `${lora.Name} sample ${index + 1}`}
-                                className="h-28 w-auto min-w-20 sm:min-w-0 object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
+                                alt={image.alt_text || `${lora.Name} sample`}
+                                className="h-28 w-auto object-contain rounded border p-0.5 hover:opacity-80 transition-opacity cursor-pointer"
                                 title={image.alt_text || image.url}
                                 loading="lazy"
                               />
                             );
-                          })}
+                          })()}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">No sample images available.</p>
@@ -594,39 +684,6 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
           ) : (
             <p className="text-center text-muted-foreground py-8">No LoRA models match your search criteria.</p>
           )}
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <Pagination className="pt-4">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); if (page > 0) setPage(page - 1); }}
-                    className={page === 0 ? 'pointer-events-none opacity-50' : ''}
-                  />
-                </PaginationItem>
-                {Array.from({ length: totalPages }).map((_, idx) => (
-                  <PaginationItem key={idx}>
-                    <PaginationLink
-                      href="#"
-                      isActive={idx === page}
-                      onClick={(e) => { e.preventDefault(); setPage(idx); }}
-                    >
-                      {idx + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); if (page < totalPages - 1) setPage(page + 1); }}
-                    className={page === totalPages - 1 ? 'pointer-events-none opacity-50' : ''}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
         </div>
 
 
@@ -639,6 +696,37 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
         title={selectedDescription.title}
         description={selectedDescription.description}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete LoRA</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{loraToDelete?.name}"? This action cannot be undone.
+              {loraToDelete?.isAdded && (
+                <span className="block mt-2 text-amber-600 dark:text-amber-400">
+                  Note: This LoRA is currently added to your generator and will be removed.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setLoraToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete LoRA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 };
@@ -1337,6 +1425,18 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
   const [showAddedLorasOnly, setShowAddedLorasOnly] = useState(false);
   const [processedLorasLength, setProcessedLorasLength] = useState(0);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [setPageFn, setSetPageFn] = useState<((page: number) => void) | null>(null);
+  
+  // Handle pagination state from tab
+  const handlePageChange = (page: number, total: number, setPage: (page: number) => void) => {
+    setCurrentPage(page);
+    setTotalPages(total);
+    setSetPageFn(() => setPage);
+  };
+  
   // Handle edit action
   const handleEdit = (lora: Resource & { metadata: LoraModel }) => {
     setEditingLora(lora);
@@ -1407,6 +1507,7 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                     showAddedLorasOnly={showAddedLorasOnly}
                     setShowAddedLorasOnly={setShowAddedLorasOnly}
                     onProcessedLorasLengthChange={setProcessedLorasLength}
+                    onPageChange={handlePageChange}
                 />
               </TabsContent>
               <TabsContent value="add-new" className="flex-1 min-h-0 overflow-auto">
@@ -1490,6 +1591,33 @@ export const LoraSelectorModal: React.FC<LoraSelectorModalProps> = ({
                       <>{processedLorasLength} total</>
                     )}
                   </span>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && setPageFn && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageFn(currentPage - 1)}
+                        disabled={currentPage === 0}
+                        className="h-8 w-8 p-0"
+                      >
+                        ←
+                      </Button>
+                      <span className="text-sm text-muted-foreground px-2">
+                        {currentPage + 1} / {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPageFn(currentPage + 1)}
+                        disabled={currentPage >= totalPages - 1}
+                        className="h-8 w-8 p-0"
+                      >
+                        →
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Close Button */}
                   <Button 

@@ -14,7 +14,7 @@ export interface PhaseSettings {
 }
 
 export interface PhaseConfig {
-  num_phases: number; // Fixed to 3 - this is the optimal configuration
+  num_phases: number; // 2 or 3 phases - determines which model is used (2=lightning_baseline_3_3, 3=lightning_baseline_2_2_2)
   steps_per_phase: number[];
   flow_shift: number;
   sample_solver: string;
