@@ -61,6 +61,10 @@ const JoinClipsPage: React.FC = () => {
   const startingVideoInputRef = useRef<HTMLInputElement>(null);
   const endingVideoInputRef = useRef<HTMLInputElement>(null);
   
+  // Video refs for forcefully pausing
+  const startingVideoRef = useRef<HTMLVideoElement>(null);
+  const endingVideoRef = useRef<HTMLVideoElement>(null);
+  
   // Debounce timer for context frames updates (number input fires rapidly on hold)
   const contextFramesTimerRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -205,6 +209,21 @@ const JoinClipsPage: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [endingVideo, endingVideoLoaded]);
+
+  // Force pause videos to prevent auto-play on mobile
+  useEffect(() => {
+    if (startingVideoRef.current) {
+      startingVideoRef.current.pause();
+      console.log('[JoinClips] Force-paused starting video');
+    }
+  }, [startingVideo]);
+
+  useEffect(() => {
+    if (endingVideoRef.current) {
+      endingVideoRef.current.pause();
+      console.log('[JoinClips] Force-paused ending video');
+    }
+  }, [endingVideo]);
   
   // Helper function to upload a video file
   const uploadVideoFile = async (file: File, type: 'starting' | 'ending') => {
@@ -520,9 +539,10 @@ const JoinClipsPage: React.FC = () => {
                 <>
                   {!startingVideoLoaded && <VideoContainerSkeleton />}
                   <video
+                    ref={startingVideoRef}
                     src={startingVideo.url}
                     controls
-                    preload="metadata"
+                    preload="none"
                     playsInline
                     muted
                     poster={startingVideo.url}
@@ -533,21 +553,27 @@ const JoinClipsPage: React.FC = () => {
                     onLoadedMetadata={() => {
                       console.log('[JoinClips] Starting video onLoadedMetadata fired', { url: startingVideo.url, timestamp: Date.now() });
                       setStartingVideoLoaded(true);
+                      // Force pause on mobile
+                      if (startingVideoRef.current) {
+                        startingVideoRef.current.pause();
+                      }
                     }}
                     onCanPlay={() => {
                       console.log('[JoinClips] Starting video onCanPlay fired', { url: startingVideo.url, timestamp: Date.now() });
                       setStartingVideoLoaded(true);
+                      // Force pause on mobile
+                      if (startingVideoRef.current) {
+                        startingVideoRef.current.pause();
+                      }
                     }}
                     onLoadStart={() => {
                       console.log('[JoinClips] Starting video onLoadStart fired', { url: startingVideo.url, timestamp: Date.now() });
                     }}
                     onPlay={(e) => {
                       console.log('[JoinClips] Starting video onPlay fired', { timestamp: Date.now() });
-                      // Pause immediately if it somehow starts playing
-                      if ((e.target as HTMLVideoElement).autoplay) {
-                        console.log('[JoinClips] Auto-playing detected, pausing...');
-                        (e.target as HTMLVideoElement).pause();
-                      }
+                      // Pause immediately - catch any autoplay attempts
+                      (e.target as HTMLVideoElement).pause();
+                      console.log('[JoinClips] Paused video on play event');
                     }}
                   />
                   {/* Remove button */}
@@ -679,9 +705,10 @@ const JoinClipsPage: React.FC = () => {
                 <>
                   {!endingVideoLoaded && <VideoContainerSkeleton />}
                   <video
+                    ref={endingVideoRef}
                     src={endingVideo.url}
                     controls
-                    preload="metadata"
+                    preload="none"
                     playsInline
                     muted
                     poster={endingVideo.url}
@@ -692,21 +719,27 @@ const JoinClipsPage: React.FC = () => {
                     onLoadedMetadata={() => {
                       console.log('[JoinClips] Ending video onLoadedMetadata fired', { url: endingVideo.url, timestamp: Date.now() });
                       setEndingVideoLoaded(true);
+                      // Force pause on mobile
+                      if (endingVideoRef.current) {
+                        endingVideoRef.current.pause();
+                      }
                     }}
                     onCanPlay={() => {
                       console.log('[JoinClips] Ending video onCanPlay fired', { url: endingVideo.url, timestamp: Date.now() });
                       setEndingVideoLoaded(true);
+                      // Force pause on mobile
+                      if (endingVideoRef.current) {
+                        endingVideoRef.current.pause();
+                      }
                     }}
                     onLoadStart={() => {
                       console.log('[JoinClips] Ending video onLoadStart fired', { url: endingVideo.url, timestamp: Date.now() });
                     }}
                     onPlay={(e) => {
                       console.log('[JoinClips] Ending video onPlay fired', { timestamp: Date.now() });
-                      // Pause immediately if it somehow starts playing
-                      if ((e.target as HTMLVideoElement).autoplay) {
-                        console.log('[JoinClips] Auto-playing detected, pausing...');
-                        (e.target as HTMLVideoElement).pause();
-                      }
+                      // Pause immediately - catch any autoplay attempts
+                      (e.target as HTMLVideoElement).pause();
+                      console.log('[JoinClips] Paused video on play event');
                     }}
                   />
                   {/* Remove button */}
