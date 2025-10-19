@@ -231,9 +231,14 @@ function buildTravelBetweenImagesPayload(
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator
-  console.log("[createTravelBetweenImagesTask] Orchestrator payload enhance_prompt:", {
-    enhance_prompt_value: orchestratorPayload.enhance_prompt,
-    openai_api_key_provided: !!(params.openai_api_key ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.openai_api_key)
+  console.log("[EnhancePromptDebug] ⚠️ Task Creation - Value being sent to orchestrator:", {
+    enhance_prompt_in_orchestratorPayload: orchestratorPayload.enhance_prompt,
+    enhance_prompt_in_params: params.enhance_prompt,
+    enhance_prompt_default: DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
+    was_params_value_undefined: params.enhance_prompt === undefined,
+    was_params_value_null: params.enhance_prompt === null,
+    openai_api_key_provided: !!(params.openai_api_key ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.openai_api_key),
+    WARNING: orchestratorPayload.enhance_prompt === true ? '⚠️ enhance_prompt is TRUE - check if this is intentional' : '✅ enhance_prompt is false'
   });
 
   // Add structure video parameters if provided
@@ -276,8 +281,8 @@ function buildTravelBetweenImagesPayload(
  * @returns Promise resolving to the created task
  */
 export async function createTravelBetweenImagesTask(params: TravelBetweenImagesTaskParams): Promise<any> {
-  console.log("[createTravelBetweenImagesTask] Creating task with params:", params);
-  console.log("[createTravelBetweenImagesTask] enhance_prompt parameter:", {
+  console.log("[EnhancePromptDebug] Creating task with params:", params);
+  console.log("[EnhancePromptDebug] enhance_prompt parameter received:", {
     enhance_prompt: params.enhance_prompt,
     default_enhance_prompt: DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
     will_be_set_to: params.enhance_prompt ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt

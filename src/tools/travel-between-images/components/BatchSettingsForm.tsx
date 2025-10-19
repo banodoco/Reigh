@@ -83,6 +83,10 @@ interface BatchSettingsFormProps {
   autoCreateIndividualPrompts: boolean;
   onAutoCreateIndividualPromptsChange: (value: boolean) => void;
   
+  // Enhance prompt toggle (AI enhancement of prompts)
+  enhancePrompt: boolean;
+  onEnhancePromptChange: (value: boolean) => void;
+  
   // Advanced mode props
   advancedMode: boolean;
   
@@ -135,6 +139,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onAmountOfMotionChange,
   autoCreateIndividualPrompts,
   onAutoCreateIndividualPromptsChange,
+  enhancePrompt,
+  onEnhancePromptChange,
   advancedMode,
   onAdvancedModeChange,
   phaseConfig = DEFAULT_PHASE_CONFIG,
@@ -359,16 +365,16 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
             </div>
             
-            {/* Auto-Create Individual Prompts Toggle - show when turbo mode is disabled */}
+            {/* Enhance Prompt Toggle - show when turbo mode is disabled */}
             {!turboMode && (
               <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
                 <Switch
-                  id="auto-create-individual-prompts"
-                  checked={autoCreateIndividualPrompts}
-                  onCheckedChange={onAutoCreateIndividualPromptsChange}
+                  id="enhance-prompt"
+                  checked={enhancePrompt}
+                  onCheckedChange={onEnhancePromptChange}
                 />
                 <div className="flex-1">
-                  <Label htmlFor="auto-create-individual-prompts" className="font-medium">
+                  <Label htmlFor="enhance-prompt" className="font-medium">
                     Enhance/Create Prompts
                   </Label>
                 </div>

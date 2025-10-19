@@ -535,6 +535,17 @@ const VideoTravelToolPage: React.FC = () => {
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
   } = shotSettings.settings || {};
   
+  // Debug: Log enhance_prompt value whenever it changes
+  React.useEffect(() => {
+    console.log('[EnhancePromptDebug] 🔍 Current enhancePrompt value from shotSettings:', {
+      enhancePrompt,
+      shotId: selectedShot?.id?.substring(0, 8),
+      shotSettingsRaw: shotSettings.settings?.enhancePrompt,
+      advancedMode,
+      timestamp: Date.now()
+    });
+  }, [enhancePrompt, selectedShot?.id, shotSettings.settings?.enhancePrompt, advancedMode]);
+  
   // These remain as local state (not persisted per-shot)
   const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
   const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);

@@ -59,6 +59,26 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   onOpenDatasetBrowser,
 }) => {
   const [isDraggingOverAdd, setIsDraggingOverAdd] = React.useState(false);
+  // Track loading state for each reference image
+  const [loadedImages, setLoadedImages] = React.useState<Set<string>>(new Set());
+  
+  const handleImageLoad = React.useCallback((refId: string) => {
+    setLoadedImages(prev => new Set(prev).add(refId));
+  }, []);
+  
+  // Reset loaded state when references change (new references added/removed)
+  React.useEffect(() => {
+    const currentRefIds = new Set(references.map(ref => ref.id));
+    setLoadedImages(prev => {
+      const filtered = new Set<string>();
+      prev.forEach(id => {
+        if (currentRefIds.has(id)) {
+          filtered.add(id);
+        }
+      });
+      return filtered;
+    });
+  }, [references]);
   
   return (
     <div className="space-y-3">
@@ -66,7 +86,9 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
       <div className="grid grid-cols-4 gap-2">
         {references.map(ref => {
           const isSelected = selectedReferenceId === ref.id;
-          const imageUrl = ref.styleReferenceImageOriginal || ref.styleReferenceImage;
+          // Use thumbnail for grid display, fallback to original or processed
+          const imageUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
+          const isLoaded = loadedImages.has(ref.id);
           
           return (
             <div
@@ -82,11 +104,35 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
               title={ref.name}
             >
               {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt={ref.name}
-                  className="w-full h-full object-cover"
-                />
+                <>
+                  {/* Visible image - only shown when loaded */}
+                  {isLoaded && (
+                    <img
+                      src={imageUrl}
+                      alt={ref.name}
+                      className="w-full h-full object-cover"
+                      draggable={false}
+                    />
+                  )}
+                  
+                  {/* Hidden image for loading */}
+                  {!isLoaded && (
+                    <img
+                      src={imageUrl}
+                      alt={ref.name}
+                      style={{ display: 'none' }}
+                      onLoad={() => handleImageLoad(ref.id)}
+                      draggable={false}
+                    />
+                  )}
+                  
+                  {/* Loading skeleton */}
+                  {!isLoaded && (
+                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
+                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
                   <Images className="h-6 w-6 text-gray-400" />

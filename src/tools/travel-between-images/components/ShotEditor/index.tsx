@@ -1385,10 +1385,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
       // Apply enhance prompt
       if (newEnhancePrompt !== undefined && onEnhancePromptChange) {
-        console.log('[ApplySettings] Setting enhance prompt:', {
+        console.log('[EnhancePromptDebug] [ApplySettings] Overriding enhancePrompt from task history:', {
           newEnhancePrompt,
           currentEnhancePrompt: enhancePrompt,
-          source: orchestrator.enhance_prompt !== undefined ? 'orchestrator' : 'params'
+          source: orchestrator.enhance_prompt !== undefined ? 'orchestrator' : 'params',
+          WARNING: newEnhancePrompt !== enhancePrompt ? `⚠️ VALUE CHANGED from ${enhancePrompt} to ${newEnhancePrompt}` : '✅ No change'
         });
         onEnhancePromptChange(newEnhancePrompt);
       }
@@ -2074,11 +2075,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     
     // Debug logging for enhance_prompt parameter and enhanced_prompts array
-    console.log("[ShotEditor] enhance_prompt debugging:", {
-      enhancePrompt,
-      autoCreateIndividualPrompts, 
-      enhance_prompt_value: enhancePrompt,
+    console.log("[EnhancePromptDebug] ⚠️ ShotEditor - Value being sent to task creation:", {
+      enhancePrompt_from_props: enhancePrompt,
       requestBody_enhance_prompt: requestBody.enhance_prompt,
+      VALUES_MATCH: enhancePrompt === requestBody.enhance_prompt,
+      autoCreateIndividualPrompts,
+      NOTE: 'autoCreateIndividualPrompts is DIFFERENT from enhancePrompt!',
       // CRITICAL: Verify enhanced_prompts is NOT being sent when empty
       enhanced_prompts_included_in_request: 'enhanced_prompts' in requestBody,
       enhanced_prompts_array_length: requestBody.enhanced_prompts?.length || 0,
@@ -2086,7 +2088,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         index: i,
         preview: p ? p.substring(0, 30) + '...' : '(empty)',
         length: p?.length || 0
-      })) || 'NOT_INCLUDED'
+      })) || 'NOT_INCLUDED',
+      WARNING: enhancePrompt === false && requestBody.enhance_prompt === true ? '❌ MISMATCH DETECTED! requestBody has true but prop is false' : '✅ Values match'
     });
     
     try {
@@ -2386,6 +2389,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             imageCount={simpleFilteredImages.length}
                             autoCreateIndividualPrompts={autoCreateIndividualPrompts}
                             onAutoCreateIndividualPromptsChange={onAutoCreateIndividualPromptsChange}
+                            enhancePrompt={enhancePrompt}
+                            onEnhancePromptChange={onEnhancePromptChange}
                             advancedMode={advancedMode}
                             onAdvancedModeChange={onAdvancedModeChange}
                             phaseConfig={phaseConfig}

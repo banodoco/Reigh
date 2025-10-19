@@ -8,6 +8,7 @@ export interface ReferenceImage {
   name: string;
   styleReferenceImage: string | null;
   styleReferenceImageOriginal: string | null;
+  thumbnailUrl?: string | null;
   styleReferenceStrength: number;
   subjectStrength: number;
   subjectDescription: string;

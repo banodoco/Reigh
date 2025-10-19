@@ -55,6 +55,7 @@ export interface ReferenceImage {
   name: string; // User-editable display name
   styleReferenceImage: string | null; // Processed URL for generation
   styleReferenceImageOriginal: string | null; // Original URL for display
+  thumbnailUrl?: string | null; // Small thumbnail URL for grid display (300px max)
   styleReferenceStrength: number; // 0.1 - 2.0
   subjectStrength: number; // 0.0 - 2.0
   subjectDescription: string; // Text description

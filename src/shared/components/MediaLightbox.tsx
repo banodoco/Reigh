@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shar
 import ShotSelector from '@/shared/components/ShotSelector';
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { generateClientThumbnail } from '@/shared/lib/clientThumbnailGenerator';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { useToggleGenerationStar, useDerivedGenerations, useSourceGeneration } from '@/shared/hooks/useGenerations';
 import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
@@ -1255,6 +1256,47 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       // Upload original image
       const originalUploadedUrl = await uploadImageToStorage(originalFile);
       
+      // Generate and upload thumbnail for grid display
+      console.log('[AddToReferences] Generating thumbnail for reference image...');
+      let thumbnailUrl: string | null = null;
+      try {
+        const thumbnailResult = await generateClientThumbnail(originalFile, 300, 0.8);
+        console.log('[AddToReferences] Thumbnail generated:', {
+          width: thumbnailResult.thumbnailWidth,
+          height: thumbnailResult.thumbnailHeight,
+          size: thumbnailResult.thumbnailBlob.size
+        });
+        
+        // Upload thumbnail to storage
+        const timestamp = Date.now();
+        const randomString = Math.random().toString(36).substring(2, 10);
+        const thumbnailFilename = `thumb_${timestamp}_${randomString}.jpg`;
+        const thumbnailPath = `files/thumbnails/${thumbnailFilename}`;
+        
+        const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabase.storage
+          .from('image_uploads')
+          .upload(thumbnailPath, thumbnailResult.thumbnailBlob, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
+        
+        if (thumbnailUploadError) {
+          console.error('[AddToReferences] Thumbnail upload error:', thumbnailUploadError);
+          // Use original as fallback
+          thumbnailUrl = originalUploadedUrl;
+        } else {
+          const { data: thumbnailUrlData } = supabase.storage
+            .from('image_uploads')
+            .getPublicUrl(thumbnailPath);
+          thumbnailUrl = thumbnailUrlData.publicUrl;
+          console.log('[AddToReferences] Thumbnail uploaded successfully:', thumbnailUrl);
+        }
+      } catch (thumbnailError) {
+        console.error('[AddToReferences] Error generating thumbnail:', thumbnailError);
+        // Use original as fallback
+        thumbnailUrl = originalUploadedUrl;
+      }
+      
       // Convert blob to data URL for processing
       const reader = new FileReader();
       const dataURL = await new Promise<string>((resolve, reject) => {
@@ -1292,6 +1334,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         name: `Reference ${references.length + 1}`,
         styleReferenceImage: processedUploadedUrl,
         styleReferenceImageOriginal: originalUploadedUrl,
+        thumbnailUrl: thumbnailUrl,
         styleReferenceStrength: 1.1,
         subjectStrength: 0.0,
         subjectDescription: '',

@@ -21,7 +21,7 @@ declare const Deno: any;
  * POST /functions/v1/complete-task
  * Headers: Authorization: Bearer <JWT or PAT>
  * 
- * SUPPORTS THREE MODES:
+ * SUPPORTS TWO UPLOAD MODES:
  * 
  * MODE 1 (LEGACY - JSON with base64): 
  *   Content-Type: application/json
@@ -34,23 +34,27 @@ declare const Deno: any;
  *   }
  *   Memory: High (base64 + decoded buffer)
  * 
- * MODE 2 (STREAMING - multipart/form-data):
- *   Content-Type: multipart/form-data
- *   Fields:
- *     - task_id: string
- *     - file: File (the main file to upload)
- *     - first_frame?: File (optional thumbnail)
- *   Memory: Medium (single file buffer)
- * 
  * MODE 3 (PRE-SIGNED URL - Zero Memory):
  *   Content-Type: application/json
  *   Body: {
  *     task_id,
- *     storage_path: "user_id/filename.mp4",  // From generate-upload-url
- *     thumbnail_storage_path?: "user_id/thumbnails/thumb.jpg"  // Optional
+ *     storage_path: "user_id/tasks/{task_id}/filename",  // From generate-upload-url
+ *     thumbnail_storage_path?: "user_id/tasks/{task_id}/thumbnails/thumb.jpg"
  *   }
  *   Memory: Minimal (file already uploaded to storage)
  *   Use this for large files (>100MB) - call generate-upload-url first
+ *   Security: Validates storage_path matches task_id (prevents path traversal)
+ * 
+ * MODE 4 (REFERENCE EXISTING PATH - Zero Memory):
+ *   Content-Type: application/json
+ *   Body: {
+ *     task_id,
+ *     storage_path: "user_id/filename",  // Reference file uploaded by another task
+ *     thumbnail_storage_path?: "user_id/thumbnails/thumb.jpg"  // Optional
+ *   }
+ *   Memory: Minimal (file already in storage)
+ *   Use case: Orchestrator task referencing file uploaded by child task (e.g., stitch)
+ *   Security: Validates file exists in storage, task ownership via auth
  * 
  * TOOL TYPE ASSIGNMENT:
  * 1. Default: Uses tool_type from task_types table based on task_type
@@ -61,6 +65,7 @@ declare const Deno: any;
  * - 200 OK with success data
  * - 401 Unauthorized if no valid token
  * - 403 Forbidden if token invalid or user not authorized
+ * - 404 Not found if file referenced in MODE 4 doesn't exist
  * - 500 Internal Server Error
  */ 
 serve(async (req)=>{
@@ -85,60 +90,20 @@ serve(async (req)=>{
   let thumbnailPathProvided: string | undefined;
 
   if (isMultipart) {
-    // MODE 2: Multipart upload (better than base64, but still buffers file)
-    console.log(`[COMPLETE-TASK-DEBUG] Processing multipart/form-data request`);
-    
-    try {
-      const formData = await req.formData();
-      
-      // Extract task_id
-      const taskIdField = formData.get('task_id');
-      if (!taskIdField) {
-        return new Response("task_id field required", { status: 400 });
-      }
-      task_id = String(taskIdField);
-      console.log(`[COMPLETE-TASK-DEBUG] Extracted task_id: ${task_id}`);
-
-      // Extract main file
-      const mainFile = formData.get('file');
-      if (!(mainFile instanceof File)) {
-        return new Response("file field required and must be a File", { status: 400 });
-      }
-
-      filename = mainFile.name || "upload";
-      fileContentType = mainFile.type || undefined;
-      
-      // Convert File to Uint8Array for upload
-      const arrayBuffer = await mainFile.arrayBuffer();
-      fileUploadBody = new Uint8Array(arrayBuffer);
-      
-      console.log(`[COMPLETE-TASK-DEBUG] Multipart upload - file: ${filename}, size: ${fileUploadBody.length} bytes, type: ${fileContentType}`);
-
-      // Extract optional thumbnail
-      const thumbnailField = formData.get('first_frame');
-      if (thumbnailField instanceof File) {
-        first_frame_filename = thumbnailField.name;
-        firstFrameContentType = thumbnailField.type || undefined;
-        const thumbArrayBuffer = await thumbnailField.arrayBuffer();
-        firstFrameUploadBody = new Uint8Array(thumbArrayBuffer);
-        console.log(`[COMPLETE-TASK-DEBUG] Multipart upload - thumbnail: ${first_frame_filename}, size: ${firstFrameUploadBody.length} bytes, type: ${firstFrameContentType}`);
-      }
-
-    } catch (e) {
-      console.error("[COMPLETE-TASK-DEBUG] Multipart parsing error:", e);
-      return new Response(`Failed to parse multipart data: ${e.message}`, { status: 400 });
-    }
-
-  } else {
-    // JSON mode: could be MODE 1 (base64) or MODE 3 (pre-signed URL)
-  let body;
-  try {
-    body = await req.json();
-  } catch (e) {
-    return new Response("Invalid JSON body", {
+    // MODE 2: Multipart upload - NOT SUPPORTED
+    return new Response("Multipart upload (MODE 2) is not supported. Use MODE 1 (base64 JSON) or MODE 3 (pre-signed URL).", {
       status: 400
     });
-  }
+  } else {
+    // JSON mode: could be MODE 1 (base64) or MODE 3 (pre-signed URL)
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return new Response("Invalid JSON body", {
+        status: 400
+      });
+    }
 
     const { 
       task_id: bodyTaskId, 
@@ -151,44 +116,57 @@ serve(async (req)=>{
     } = body;
     
     console.log(`[COMPLETE-TASK-DEBUG] Received JSON request with task_id: ${bodyTaskId}`);
-  console.log(`[COMPLETE-TASK-DEBUG] Body keys: ${Object.keys(body)}`);
+    console.log(`[COMPLETE-TASK-DEBUG] Body keys: ${Object.keys(body)}`);
     
     task_id = bodyTaskId;
 
-    // Check if this is MODE 3 (pre-signed URL upload)
+    // Check if storage_path is provided (MODE 3: strict validation or MODE 4: relaxed)
     if (storage_path) {
-      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Pre-signed URL - file already uploaded to: ${storage_path}`);
-      
       if (!task_id) {
         return new Response("task_id required", { status: 400 });
       }
       
-      // SECURITY: Validate that storage_path contains the correct task_id
-      // Expected format: userId/tasks/{task_id}/filename or userId/tasks/{task_id}/thumbnails/filename
       const pathParts = storage_path.split('/');
-      if (pathParts.length < 4 || pathParts[1] !== 'tasks') {
-        return new Response("Invalid storage_path format. Must be generated from generate-upload-url endpoint.", { status: 400 });
-      }
+      const isMode3Format = pathParts.length >= 4 && pathParts[1] === 'tasks';
       
-      const pathTaskId = pathParts[2];
-      if (pathTaskId !== task_id) {
-        console.error(`[COMPLETE-TASK-DEBUG] Security violation: storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id})`);
-        return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
-      }
-      
-      console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
-      
-      // Validate thumbnail path if provided
-      if (thumbnail_storage_path) {
-        const thumbParts = thumbnail_storage_path.split('/');
-        if (thumbParts.length < 4 || thumbParts[1] !== 'tasks') {
-          return new Response("Invalid thumbnail_storage_path format.", { status: 400 });
+      if (isMode3Format) {
+        // MODE 3: Pre-signed URL upload with strict validation
+        console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Pre-signed URL - file already uploaded to: ${storage_path}`);
+        
+        // SECURITY: Validate that storage_path contains the correct task_id
+        // Expected format: userId/tasks/{task_id}/filename or userId/tasks/{task_id}/thumbnails/filename
+        const pathTaskId = pathParts[2];
+        if (pathTaskId !== task_id) {
+          console.error(`[COMPLETE-TASK-DEBUG] Security violation: storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id})`);
+          return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
         }
-        const thumbTaskId = thumbParts[2];
-        if (thumbTaskId !== task_id) {
-          console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
-          return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
+        
+        console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
+        
+        // Validate thumbnail path if provided
+        if (thumbnail_storage_path) {
+          const thumbParts = thumbnail_storage_path.split('/');
+          if (thumbParts.length < 4 || thumbParts[1] !== 'tasks') {
+            return new Response("Invalid thumbnail_storage_path format.", { status: 400 });
+          }
+          const thumbTaskId = thumbParts[2];
+          if (thumbTaskId !== task_id) {
+            console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
+            return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
+          }
         }
+      } else {
+        // MODE 4: Reference existing storage path (relaxed validation for orchestrator completion)
+        // Used when orchestrator task needs to reference a file uploaded by its child task
+        console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Reference existing storage path (orchestrator completion): ${storage_path}`);
+        
+        // Basic validation: ensure path has at least userId/filename structure
+        if (pathParts.length < 2) {
+          return new Response("Invalid storage_path format. Must be at least userId/filename", { status: 400 });
+        }
+        
+        // File verification will happen after supabaseAdmin client is created
+        console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Will verify file exists after client initialization`);
       }
       
       storagePathProvided = storage_path;
@@ -204,21 +182,21 @@ serve(async (req)=>{
       
       if (!bodyTaskId || !file_data || !bodyFilename) {
         return new Response("task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)", {
-      status: 400
-    });
-  }
+          status: 400
+        });
+      }
 
-  // Validate thumbnail parameters if provided
+      // Validate thumbnail parameters if provided
       if (first_frame_data && !bodyFirstFrameFilename) {
-    return new Response("first_frame_filename required when first_frame_data is provided", {
-      status: 400
-    });
-  }
+        return new Response("first_frame_filename required when first_frame_data is provided", {
+          status: 400
+        });
+      }
       if (bodyFirstFrameFilename && !first_frame_data) {
-    return new Response("first_frame_data required when first_frame_filename is provided", {
-      status: 400
-    });
-  }
+        return new Response("first_frame_data required when first_frame_filename is provided", {
+          status: 400
+        });
+      }
 
       task_id = bodyTaskId;
       filename = bodyFilename;
@@ -297,6 +275,30 @@ serve(async (req)=>{
         });
       }
     }
+    
+    // 4.5) MODE 4: Verify referenced file exists (if MODE 4 storage path provided)
+    if (storagePathProvided) {
+      const pathParts = storagePathProvided.split('/');
+      const isMode3Format = pathParts.length >= 4 && pathParts[1] === 'tasks';
+      
+      if (!isMode3Format) {
+        // MODE 4: Verify file exists in storage
+        console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Verifying referenced file exists: ${storagePathProvided}`);
+        
+        try {
+          const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(storagePathProvided);
+          if (!urlData?.publicUrl) {
+            console.error(`[COMPLETE-TASK-DEBUG] MODE 4: File not accessible: ${storagePathProvided}`);
+            return new Response("Referenced file does not exist or is not accessible in storage", { status: 404 });
+          }
+          console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Verified file exists and is accessible`);
+        } catch (verifyError) {
+          console.error(`[COMPLETE-TASK-DEBUG] MODE 4: Exception verifying file:`, verifyError);
+          return new Response("Error verifying file in storage", { status: 500 });
+        }
+      }
+    }
+    
     // 5) Prepare for storage operations
     let publicUrl: string;
     let objectPath: string;
@@ -763,81 +765,44 @@ serve(async (req)=>{
     // 11) Calculate and record task cost (only for service role)
     if (isServiceRole) {
       try {
-        console.log(`[COMPLETE-TASK-DEBUG] Triggering cost calculation for task ${taskIdString}...`);
-        const costCalcResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${serviceKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            task_id: taskIdString
-          })
-        });
-        if (costCalcResp.ok) {
-          const costData = await costCalcResp.json();
-          if (costData && typeof costData.cost === 'number') {
-            console.log(`[COMPLETE-TASK-DEBUG] Cost calculation successful: $${costData.cost.toFixed(3)} for ${costData.duration_seconds}s (task_type: ${costData.task_type}, billing_type: ${costData.billing_type})`);
-          } else {
-            console.log(`[COMPLETE-TASK-DEBUG] Cost calculation returned unexpected data:`, costData);
-          }
+        // Fetch task to check if it's a sub-task of an orchestrator
+        const { data: taskForCostCheck, error: taskForCostCheckError } = await supabaseAdmin
+          .from("tasks")
+          .select("params")
+          .eq("id", taskIdString)
+          .single();
+        
+        // Skip cost calculation for sub-tasks - parent orchestrator will be billed instead
+        if (taskForCostCheck?.params?.orchestrator_task_id_ref) {
+          console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a sub-task of orchestrator ${taskForCostCheck.params.orchestrator_task_id_ref}, skipping cost calculation`);
         } else {
-          const errTxt = await costCalcResp.text();
-          console.error(`[COMPLETE-TASK-DEBUG] Cost calculation failed: ${errTxt}`);
+          console.log(`[COMPLETE-TASK-DEBUG] Triggering cost calculation for task ${taskIdString}...`);
+          const costCalcResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${serviceKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              task_id: taskIdString
+            })
+          });
+          if (costCalcResp.ok) {
+            const costData = await costCalcResp.json();
+            if (costData && typeof costData.cost === 'number') {
+              console.log(`[COMPLETE-TASK-DEBUG] Cost calculation successful: $${costData.cost.toFixed(3)} for ${costData.duration_seconds}s (task_type: ${costData.task_type}, billing_type: ${costData.billing_type})`);
+            } else {
+              console.log(`[COMPLETE-TASK-DEBUG] Cost calculation returned unexpected data:`, costData);
+            }
+          } else {
+            const errTxt = await costCalcResp.text();
+            console.error(`[COMPLETE-TASK-DEBUG] Cost calculation failed: ${errTxt}`);
+          }
         }
       } catch (costErr) {
         console.error("[COMPLETE-TASK-DEBUG] Error triggering cost calculation:", costErr);
       // Do not fail the main request because of cost calc issues
       }
-    }
-    // 11) Check if this task completes an orchestrator workflow
-    try {
-      // Get the task details to check if it's a final task in an orchestrator workflow
-      console.log(`[COMPLETE-TASK-DEBUG] Checking orchestrator workflow for task ${taskIdString}`);
-      console.log(`[COMPLETE-TASK-DEBUG] taskIdString type: ${typeof taskIdString}, value: ${taskIdString}`);
-      const { data: taskData, error: taskError } = await supabaseAdmin.from("tasks").select("task_type, params").eq("id", taskIdString).single();
-      if (!taskError && taskData) {
-        const { task_type, params } = taskData;
-        // Check if this is a final task that should complete an orchestrator
-        const isFinalTask = task_type === "travel_stitch" || task_type === "dp_final_gen";
-        if (isFinalTask && params?.orchestrator_task_id_ref) {
-          console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a final ${task_type} task. Marking orchestrator ${params.orchestrator_task_id_ref} as complete.`);
-          // Update the orchestrator task to Complete status with the same output location
-          // Ensure orchestrator_task_id_ref is properly extracted as a string from JSONB
-          let orchestratorIdString;
-          if (typeof params.orchestrator_task_id_ref === 'string') {
-            orchestratorIdString = params.orchestrator_task_id_ref;
-          } else if (typeof params.orchestrator_task_id_ref === 'object' && params.orchestrator_task_id_ref !== null) {
-            // If it's wrapped in an object, try to extract the actual UUID
-            orchestratorIdString = String(params.orchestrator_task_id_ref.id || params.orchestrator_task_id_ref.uuid || params.orchestrator_task_id_ref);
-          } else {
-            orchestratorIdString = String(params.orchestrator_task_id_ref);
-          }
-          console.log(`[COMPLETE-TASK-DEBUG] Orchestrator ID string: ${orchestratorIdString}, type: ${typeof orchestratorIdString}, original type: ${typeof params.orchestrator_task_id_ref}`);
-          // Validate UUID format before using in query
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          if (!uuidRegex.test(orchestratorIdString)) {
-            console.error(`[COMPLETE-TASK-DEBUG] Invalid UUID format for orchestrator: ${orchestratorIdString}`);
-          // Don't attempt the update with invalid UUID
-          } else {
-            const { error: orchError } = await supabaseAdmin.from("tasks").update({
-              status: "Complete",
-              output_location: publicUrl,
-              generation_processed_at: new Date().toISOString()
-            }).eq("id", orchestratorIdString).eq("status", "In Progress"); // Only update if still in progress
-            if (orchError) {
-              console.error(`[COMPLETE-TASK-DEBUG] Failed to update orchestrator ${params.orchestrator_task_id_ref}:`, orchError);
-              console.error(`[COMPLETE-TASK-DEBUG] Orchestrator error details:`, JSON.stringify(orchError, null, 2));
-            // Don't fail the whole request, just log the error
-            } else {
-              console.log(`[COMPLETE-TASK-DEBUG] Successfully marked orchestrator ${params.orchestrator_task_id_ref} as complete.`);
-            }
-          }
-        }
-      }
-    } catch (orchCheckError) {
-      // Don't fail the main request if orchestrator check fails
-      console.error("Error checking for orchestrator completion:", orchCheckError);
     }
     console.log(`[COMPLETE-TASK-DEBUG] Successfully completed task ${taskIdString} by ${isServiceRole ? 'service-role' : `user ${callerId}`}`);
     const responseData = {

@@ -202,12 +202,15 @@ export const useShotSettings = (
     // Deep clone to prevent React Query cache reference sharing
     const deepClonedSettings = JSON.parse(JSON.stringify(loadedSettings));
     
-    console.log('[PromptRetentionDebug] [useShotSettings] 📥 Loading settings:', {
+    console.log('[EnhancePromptDebug] [useShotSettings] 📥 Loading settings from database:', {
       shotId: shotId.substring(0, 8),
+      enhancePrompt: deepClonedSettings.enhancePrompt,
+      autoCreateIndividualPrompts: deepClonedSettings.autoCreateIndividualPrompts,
       advancedMode: deepClonedSettings.advancedMode,
       hasPhaseConfig: !!deepClonedSettings.phaseConfig,
       phaseConfig: deepClonedSettings.phaseConfig,
-      batchVideoPrompt: deepClonedSettings.batchVideoPrompt?.substring(0, 50) + (deepClonedSettings.batchVideoPrompt?.length > 50 ? '...' : '')
+      batchVideoPrompt: deepClonedSettings.batchVideoPrompt?.substring(0, 50) + (deepClonedSettings.batchVideoPrompt?.length > 50 ? '...' : ''),
+      dbSettings_raw: dbSettings
     });
     
     setSettings(deepClonedSettings);
@@ -242,8 +245,10 @@ export const useShotSettings = (
       return;
     }
     
-    console.log('[PromptRetentionDebug] [useShotSettings] 💾 Saving settings:', {
+    console.log('[EnhancePromptDebug] [useShotSettings] 💾 Saving settings to database:', {
       shotId: shotId.substring(0, 8),
+      enhancePrompt: toSave.enhancePrompt,
+      autoCreateIndividualPrompts: toSave.autoCreateIndividualPrompts,
       advancedMode: toSave.advancedMode,
       hasPhaseConfig: !!toSave.phaseConfig,
       phaseConfigLoras: toSave.phaseConfig?.phases?.map(p => ({
@@ -280,9 +285,11 @@ export const useShotSettings = (
     key: K,
     value: VideoTravelSettings[K]
   ) => {
-    console.log('[PromptRetentionDebug] [useShotSettings] 📝 Field updated:', { 
+    console.log('[EnhancePromptDebug] [useShotSettings] 📝 Field updated:', { 
       key, 
-      value: key === 'batchVideoPrompt' && typeof value === 'string' ? value.substring(0, 50) : value 
+      value: key === 'batchVideoPrompt' && typeof value === 'string' ? value.substring(0, 50) : value,
+      isEnhancePrompt: key === 'enhancePrompt',
+      isAutoCreateIndividualPrompts: key === 'autoCreateIndividualPrompts'
     });
     
     // Mark that user is actively editing
@@ -315,8 +322,10 @@ export const useShotSettings = (
   
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<VideoTravelSettings>) => {
-    console.log('[PromptRetentionDebug] [useShotSettings] 📝 Multiple fields updated:', { 
+    console.log('[EnhancePromptDebug] [useShotSettings] 📝 Multiple fields updated:', { 
       keys: Object.keys(updates),
+      enhancePrompt: updates.enhancePrompt,
+      autoCreateIndividualPrompts: updates.autoCreateIndividualPrompts,
       batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
     });
     
