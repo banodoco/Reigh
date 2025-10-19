@@ -530,11 +530,22 @@ const JoinClipsPage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadedMetadata={() => setStartingVideoLoaded(true)}
-                    onCanPlay={() => setStartingVideoLoaded(true)}
+                    onLoadedMetadata={() => {
+                      console.log('[JoinClips] Starting video onLoadedMetadata fired', { url: startingVideo.url, timestamp: Date.now() });
+                      setStartingVideoLoaded(true);
+                    }}
+                    onCanPlay={() => {
+                      console.log('[JoinClips] Starting video onCanPlay fired', { url: startingVideo.url, timestamp: Date.now() });
+                      setStartingVideoLoaded(true);
+                    }}
+                    onLoadStart={() => {
+                      console.log('[JoinClips] Starting video onLoadStart fired', { url: startingVideo.url, timestamp: Date.now() });
+                    }}
                     onPlay={(e) => {
+                      console.log('[JoinClips] Starting video onPlay fired', { timestamp: Date.now() });
                       // Pause immediately if it somehow starts playing
                       if ((e.target as HTMLVideoElement).autoplay) {
+                        console.log('[JoinClips] Auto-playing detected, pausing...');
                         (e.target as HTMLVideoElement).pause();
                       }
                     }}
@@ -678,11 +689,22 @@ const JoinClipsPage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadedMetadata={() => setEndingVideoLoaded(true)}
-                    onCanPlay={() => setEndingVideoLoaded(true)}
+                    onLoadedMetadata={() => {
+                      console.log('[JoinClips] Ending video onLoadedMetadata fired', { url: endingVideo.url, timestamp: Date.now() });
+                      setEndingVideoLoaded(true);
+                    }}
+                    onCanPlay={() => {
+                      console.log('[JoinClips] Ending video onCanPlay fired', { url: endingVideo.url, timestamp: Date.now() });
+                      setEndingVideoLoaded(true);
+                    }}
+                    onLoadStart={() => {
+                      console.log('[JoinClips] Ending video onLoadStart fired', { url: endingVideo.url, timestamp: Date.now() });
+                    }}
                     onPlay={(e) => {
+                      console.log('[JoinClips] Ending video onPlay fired', { timestamp: Date.now() });
                       // Pause immediately if it somehow starts playing
                       if ((e.target as HTMLVideoElement).autoplay) {
+                        console.log('[JoinClips] Auto-playing detected, pausing...');
                         (e.target as HTMLVideoElement).pause();
                       }
                     }}
