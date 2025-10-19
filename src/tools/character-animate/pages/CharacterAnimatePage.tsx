@@ -501,8 +501,8 @@ const CharacterAnimatePage: React.FC = () => {
                     controls
                     preload="metadata"
                     playsInline
+                    muted
                     poster={motionVideo.url}
-                    autoPlay={false}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       motionVideoLoaded ? 'opacity-100' : 'opacity-0'
@@ -510,6 +510,12 @@ const CharacterAnimatePage: React.FC = () => {
                     onLoadStart={() => setMotionVideoLoaded(true)}
                     onLoadedMetadata={() => setMotionVideoLoaded(true)}
                     onCanPlay={() => setMotionVideoLoaded(true)}
+                    onPlay={(e) => {
+                      // Pause immediately if it somehow starts playing
+                      if ((e.target as HTMLVideoElement).autoplay) {
+                        (e.target as HTMLVideoElement).pause();
+                      }
+                    }}
                   />
                 </>
               ) : !settingsLoaded ? (

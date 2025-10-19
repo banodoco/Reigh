@@ -524,8 +524,8 @@ const JoinClipsPage: React.FC = () => {
                     controls
                     preload="metadata"
                     playsInline
+                    muted
                     poster={startingVideo.url}
-                    autoPlay={false}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       startingVideoLoaded ? 'opacity-100' : 'opacity-0'
@@ -533,6 +533,12 @@ const JoinClipsPage: React.FC = () => {
                     onLoadStart={() => setStartingVideoLoaded(true)}
                     onLoadedMetadata={() => setStartingVideoLoaded(true)}
                     onCanPlay={() => setStartingVideoLoaded(true)}
+                    onPlay={(e) => {
+                      // Pause immediately if it somehow starts playing
+                      if ((e.target as HTMLVideoElement).autoplay) {
+                        (e.target as HTMLVideoElement).pause();
+                      }
+                    }}
                   />
                   {/* Remove button */}
                   <Button
@@ -667,8 +673,8 @@ const JoinClipsPage: React.FC = () => {
                     controls
                     preload="metadata"
                     playsInline
+                    muted
                     poster={endingVideo.url}
-                    autoPlay={false}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       endingVideoLoaded ? 'opacity-100' : 'opacity-0'
@@ -676,6 +682,12 @@ const JoinClipsPage: React.FC = () => {
                     onLoadStart={() => setEndingVideoLoaded(true)}
                     onLoadedMetadata={() => setEndingVideoLoaded(true)}
                     onCanPlay={() => setEndingVideoLoaded(true)}
+                    onPlay={(e) => {
+                      // Pause immediately if it somehow starts playing
+                      if ((e.target as HTMLVideoElement).autoplay) {
+                        (e.target as HTMLVideoElement).pause();
+                      }
+                    }}
                   />
                   {/* Remove button */}
                   <Button
