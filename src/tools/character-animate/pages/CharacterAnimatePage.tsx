@@ -17,6 +17,16 @@ import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hook
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { cn } from '@/shared/lib/utils';
+
+// Image/Video container skeleton loader
+const MediaContainerSkeleton: React.FC = () => (
+  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+    </div>
+  </div>
+);
 
 const CharacterAnimatePage: React.FC = () => {
   const { toast } = useToast();
@@ -30,6 +40,10 @@ const CharacterAnimatePage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [localMode, setLocalMode] = useState<'animate' | 'replace'>('animate');
+  
+  // Loading states for smooth transitions
+  const [characterImageLoaded, setCharacterImageLoaded] = useState(false);
+  const [motionVideoLoaded, setMotionVideoLoaded] = useState(false);
   
   const characterImageInputRef = useRef<HTMLInputElement>(null);
   const motionVideoInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +162,8 @@ const CharacterAnimatePage: React.FC = () => {
       // Upload to Supabase storage
       const uploadedUrl = await uploadImageToStorage(file);
       
+      // Reset loaded state to show skeleton during image load
+      setCharacterImageLoaded(false);
       setCharacterImage({ url: uploadedUrl, file });
       
       // Save URL to project settings for persistence
@@ -205,6 +221,8 @@ const CharacterAnimatePage: React.FC = () => {
         .from('image_uploads')
         .getPublicUrl(fileName);
       
+      // Reset loaded state to show skeleton during video load
+      setMotionVideoLoaded(false);
       setMotionVideo({ url: publicUrl, file });
       
       // Save URL to project settings for persistence
@@ -357,11 +375,18 @@ const CharacterAnimatePage: React.FC = () => {
             </Label>
             <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
               {characterImage ? (
-                <img
-                  src={characterImage.url}
-                  alt="Character"
-                  className="w-full h-full object-contain"
-                />
+                <>
+                  {!characterImageLoaded && <MediaContainerSkeleton />}
+                  <img
+                    src={characterImage.url}
+                    alt="Character"
+                    className={cn(
+                      'w-full h-full object-contain transition-all duration-300',
+                      characterImageLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                    )}
+                    onLoad={() => setCharacterImageLoaded(true)}
+                  />
+                </>
               ) : (
                 <div className="text-center p-6">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -408,11 +433,18 @@ const CharacterAnimatePage: React.FC = () => {
             </Label>
             <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
               {motionVideo ? (
-                <video
-                  src={motionVideo.url}
-                  controls
-                  className="w-full h-full object-contain"
-                />
+                <>
+                  {!motionVideoLoaded && <MediaContainerSkeleton />}
+                  <video
+                    src={motionVideo.url}
+                    controls
+                    className={cn(
+                      'w-full h-full object-contain transition-all duration-300',
+                      motionVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                    )}
+                    onCanPlay={() => setMotionVideoLoaded(true)}
+                  />
+                </>
               ) : (
                 <div className="text-center p-6">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />

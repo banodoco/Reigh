@@ -21,6 +21,16 @@ import { LoraManager } from '@/shared/components/LoraManager';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
+import { cn } from '@/shared/lib/utils';
+
+// Video container skeleton loader
+const VideoContainerSkeleton: React.FC = () => (
+  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+    <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
+    </div>
+  </div>
+);
 
 const JoinClipsPage: React.FC = () => {
   const { toast } = useToast();
@@ -33,6 +43,10 @@ const JoinClipsPage: React.FC = () => {
   const [endingVideo, setEndingVideo] = useState<{ url: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Loading states for smooth transitions
+  const [startingVideoLoaded, setStartingVideoLoaded] = useState(false);
+  const [endingVideoLoaded, setEndingVideoLoaded] = useState(false);
   
   // Local state for generation parameters
   const [contextFrameCount, setContextFrameCount] = useState(10);
@@ -214,6 +228,8 @@ const JoinClipsPage: React.FC = () => {
     const publicUrl = await uploadVideoFile(file, 'starting');
     if (!publicUrl) return;
     
+    // Reset loaded state to show skeleton during video load
+    setStartingVideoLoaded(false);
     setStartingVideo({ url: publicUrl, file });
     
     // Save URL to project settings for persistence
@@ -230,6 +246,8 @@ const JoinClipsPage: React.FC = () => {
     const publicUrl = await uploadVideoFile(file, 'ending');
     if (!publicUrl) return;
     
+    // Reset loaded state to show skeleton during video load
+    setEndingVideoLoaded(false);
     setEndingVideo({ url: publicUrl, file });
     
     // Save URL to project settings for persistence
@@ -270,6 +288,8 @@ const JoinClipsPage: React.FC = () => {
     const publicUrl = await uploadVideoFile(file, 'starting');
     if (!publicUrl) return;
     
+    // Reset loaded state to show skeleton during video load
+    setStartingVideoLoaded(false);
     setStartingVideo({ url: publicUrl, file });
     
     // Save URL to project settings for persistence
@@ -310,6 +330,8 @@ const JoinClipsPage: React.FC = () => {
     const publicUrl = await uploadVideoFile(file, 'ending');
     if (!publicUrl) return;
     
+    // Reset loaded state to show skeleton during video load
+    setEndingVideoLoaded(false);
     setEndingVideo({ url: publicUrl, file });
     
     // Save URL to project settings for persistence
@@ -438,10 +460,15 @@ const JoinClipsPage: React.FC = () => {
             >
               {startingVideo ? (
                 <>
+                  {!startingVideoLoaded && <VideoContainerSkeleton />}
                   <video
                     src={startingVideo.url}
                     controls
-                    className="w-full h-full object-contain"
+                    className={cn(
+                      'w-full h-full object-contain transition-all duration-300',
+                      startingVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                    )}
+                    onCanPlay={() => setStartingVideoLoaded(true)}
                   />
                   {/* Remove button */}
                   <Button
@@ -451,6 +478,7 @@ const JoinClipsPage: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setStartingVideo(null);
+                      setStartingVideoLoaded(false);
                       if (selectedProjectId) {
                         updateSettings('project', { ...settings, startingVideoUrl: undefined });
                       }
@@ -564,10 +592,15 @@ const JoinClipsPage: React.FC = () => {
             >
               {endingVideo ? (
                 <>
+                  {!endingVideoLoaded && <VideoContainerSkeleton />}
                   <video
                     src={endingVideo.url}
                     controls
-                    className="w-full h-full object-contain"
+                    className={cn(
+                      'w-full h-full object-contain transition-all duration-300',
+                      endingVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                    )}
+                    onCanPlay={() => setEndingVideoLoaded(true)}
                   />
                   {/* Remove button */}
                   <Button
@@ -577,6 +610,7 @@ const JoinClipsPage: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setEndingVideo(null);
+                      setEndingVideoLoaded(false);
                       if (selectedProjectId) {
                         updateSettings('project', { ...settings, endingVideoUrl: undefined });
                       }
