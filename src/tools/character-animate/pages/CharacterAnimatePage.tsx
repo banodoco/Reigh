@@ -60,6 +60,16 @@ const CharacterAnimatePage: React.FC = () => {
     { projectId: selectedProjectId || null, enabled: !!selectedProjectId }
   );
   
+  // Track whether settings have completed their initial load
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  
+  useEffect(() => {
+    // Mark settings as loaded after initial mount
+    if (settings !== undefined) {
+      setSettingsLoaded(true);
+    }
+  }, [settings]);
+  
   // Get current project for aspect ratio
   const { projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -387,6 +397,9 @@ const CharacterAnimatePage: React.FC = () => {
                     onLoad={() => setCharacterImageLoaded(true)}
                   />
                 </>
+              ) : !settingsLoaded ? (
+                // Show skeleton while settings are loading
+                <MediaContainerSkeleton />
               ) : (
                 <div className="text-center p-6">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -445,6 +458,9 @@ const CharacterAnimatePage: React.FC = () => {
                     onCanPlay={() => setMotionVideoLoaded(true)}
                   />
                 </>
+              ) : !settingsLoaded ? (
+                // Show skeleton while settings are loading
+                <MediaContainerSkeleton />
               ) : (
                 <div className="text-center p-6">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />

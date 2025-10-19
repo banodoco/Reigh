@@ -74,6 +74,16 @@ const JoinClipsPage: React.FC = () => {
     { projectId: selectedProjectId || null, enabled: !!selectedProjectId }
   );
   
+  // Track whether settings have completed their initial load
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  
+  useEffect(() => {
+    // Mark settings as loaded after initial mount
+    if (settings !== undefined) {
+      setSettingsLoaded(true);
+    }
+  }, [settings]);
+  
   // Get current project for aspect ratio
   const { projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -493,6 +503,9 @@ const JoinClipsPage: React.FC = () => {
                     </div>
                   )}
                 </>
+              ) : !settingsLoaded ? (
+                // Show skeleton while settings are loading
+                <VideoContainerSkeleton />
               ) : (
                 <div className="text-center p-6 pointer-events-none">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -625,6 +638,9 @@ const JoinClipsPage: React.FC = () => {
                     </div>
                   )}
                 </>
+              ) : !settingsLoaded ? (
+                // Show skeleton while settings are loading
+                <VideoContainerSkeleton />
               ) : (
                 <div className="text-center p-6 pointer-events-none">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
