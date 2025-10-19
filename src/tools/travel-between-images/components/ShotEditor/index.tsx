@@ -1275,7 +1275,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const newSteps: number | undefined = orchestrator.steps ?? params.num_inference_steps;
       const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded;
       const newContext: number | undefined = (params.frame_overlap_settings_expanded?.[0]) ?? orchestrator.frame_overlap_expanded?.[0] ?? params.frame_overlap_expanded;
-      const newModel: string | undefined = params.model_name || orchestrator.model_name;
+      const newModel: string | undefined = params.model_name ?? orchestrator.model_name;
       const parsedResolution: string | undefined = params.parsed_resolution_wh;
       const newGenerationMode: 'batch' | 'timeline' | undefined = orchestrator.generation_mode ?? params.generation_mode;
       const newAdvancedMode: boolean | undefined = orchestrator.advanced_mode ?? params.advanced_mode;
@@ -2001,7 +2001,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Show what we're sending for prompt appending
       base_prompt_singular: batchVideoPrompt,
       base_prompts_array: basePrompts,
-      willAppendBasePrompt: enhancePrompt || autoCreateIndividualPrompts
+      willAppendBasePrompt: enhancePrompt
     });
     
     const requestBody: any = {
@@ -2022,7 +2022,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       ...(advancedMode ? {} : { steps: batchVideoSteps }),
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
-      enhance_prompt: enhancePrompt || autoCreateIndividualPrompts,
+      enhance_prompt: enhancePrompt,
       // Save UI state settings (dimension_source removed - now using aspect ratios only)
       generation_mode: generationMode,
       random_seed: randomSeed,
@@ -2077,7 +2077,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     console.log("[ShotEditor] enhance_prompt debugging:", {
       enhancePrompt,
       autoCreateIndividualPrompts, 
-      enhance_prompt_value: enhancePrompt || autoCreateIndividualPrompts,
+      enhance_prompt_value: enhancePrompt,
       requestBody_enhance_prompt: requestBody.enhance_prompt,
       // CRITICAL: Verify enhanced_prompts is NOT being sent when empty
       enhanced_prompts_included_in_request: 'enhanced_prompts' in requestBody,
@@ -2090,6 +2090,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
     
     try {
+      // IMPORTANT: If enhance_prompt is false, clear all existing enhanced prompts
+      // This ensures we don't use stale enhanced prompts from previous generations
+      if (!enhancePrompt) {
+        console.log("[ShotEditor] enhance_prompt is false - clearing all enhanced prompts before task submission");
+        try {
+          await clearAllEnhancedPrompts();
+          console.log("[ShotEditor] ✅ Successfully cleared all enhanced prompts");
+        } catch (clearError) {
+          console.error("[ShotEditor] ⚠️ Failed to clear enhanced prompts:", clearError);
+          // Continue with task submission even if clearing fails (non-critical)
+        }
+      }
       // Use the new client-side travel between images task creation instead of calling the edge function
       await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
       

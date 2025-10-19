@@ -54,8 +54,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
-  const [isNextSceneBoostEnabled, setIsNextSceneBoostEnabled] = useState(false);
-  const [isInSceneBoostEnabled, setIsInSceneBoostEnabled] = useState(false);
+  const [isInSceneBoostEnabled, setIsInSceneBoostEnabled] = useState(true);
   
   // Log when modal is opened/closed
   useEffect(() => {
@@ -127,17 +126,11 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       // Determine shot_id: prioritize currentShotId (when ON a shot), then magicEditShotId (when selected from dropdown)
       const shotId = currentShotId || magicEditShotId || undefined;
       
-      // Build loras array if any boosts are enabled
+      // Build loras array if In-Scene boost is enabled
       const loras = [];
-      if (isNextSceneBoostEnabled) {
-        loras.push({
-          url: 'https://huggingface.co/lovis93/next-scene-qwen-image-lora-2509/resolve/main/next-scene_lora_v1-3000.safetensors',
-          strength: 1.0
-        });
-      }
       if (isInSceneBoostEnabled) {
         loras.push({
-          url: 'https://huggingface.co/peteromallet/mystery_models/resolve/main/in_scene_qwen_edit_2_000006750.safetensors',
+          url: 'https://huggingface.co/peteromallet/ad_motion_loras/resolve/main/in_scene_different_perspective_000019000.safetensors',
           strength: 1.0
         });
       }
@@ -180,7 +173,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
           await addMagicEditPrompt(
             magicEditPrompt.trim(), 
             magicEditNumImages,
-            isNextSceneBoostEnabled,
+            false, // Legacy parameter (was isNextSceneBoostEnabled)
             isInSceneBoostEnabled
           );
           console.log('[MagicEditPromptPersist] ✅ SAVE SUCCESS:', {
@@ -219,8 +212,7 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         setMagicEditPrompt('');
         setMagicEditNumImages(4);
         setMagicEditShotId(null);
-        setIsNextSceneBoostEnabled(false);
-        setIsInSceneBoostEnabled(false);
+        setIsInSceneBoostEnabled(true);
         setTasksCreated(false);
       }, 2000); // Wait 2 seconds to show success state
     } catch (error) {
@@ -305,7 +297,6 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
         });
         setMagicEditPrompt(lastPrompt);
         setMagicEditNumImages(lastSettings.numImages);
-        setIsNextSceneBoostEnabled(lastSettings.isNextSceneBoostEnabled);
         setIsInSceneBoostEnabled(lastSettings.isInSceneBoostEnabled);
       } else if (lastPrompt && magicEditPrompt) {
         console.log('[MagicEditPromptPersist] ⏭️  SKIPPING LOAD - current prompt exists:', {
@@ -448,40 +439,13 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
               <Checkbox
                 id="in-scene-boost"
                 checked={isInSceneBoostEnabled}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    setIsInSceneBoostEnabled(true);
-                    setIsNextSceneBoostEnabled(false);
-                  } else {
-                    setIsInSceneBoostEnabled(false);
-                  }
-                }}
+                onCheckedChange={(checked) => setIsInSceneBoostEnabled(!!checked)}
               />
               <label
                 htmlFor="in-scene-boost"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
               >
                 In-Scene
-              </label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="next-scene-boost"
-                checked={isNextSceneBoostEnabled}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    setIsNextSceneBoostEnabled(true);
-                    setIsInSceneBoostEnabled(false);
-                  } else {
-                    setIsNextSceneBoostEnabled(false);
-                  }
-                }}
-              />
-              <label
-                htmlFor="next-scene-boost"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Next Shot
               </label>
             </div>
           </div>
