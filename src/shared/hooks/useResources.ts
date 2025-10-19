@@ -40,6 +40,8 @@ export const useListPublicResources = (type: ResourceType) => {
     return useQuery<Resource[], Error>({
         queryKey: ['public-resources', type],
         queryFn: async () => {
+            console.log('[PublicResources] Fetching public resources:', { type, timestamp: Date.now() });
+            
             // Public resources should be readable by anyone
             // Filter for is_public = true using proper JSONB boolean check
             const { data, error } = await supabase
@@ -48,7 +50,23 @@ export const useListPublicResources = (type: ResourceType) => {
                 .eq('type', type)
                 .filter('metadata->is_public', 'eq', true);
             
-            if (error) throw error;
+            if (error) {
+                console.error('[PublicResources] Query error:', { type, error, timestamp: Date.now() });
+                throw error;
+            }
+            
+            console.log('[PublicResources] Query successful:', {
+                type,
+                count: data?.length || 0,
+                resources: data?.map(r => ({
+                    id: r.id?.substring(0, 8),
+                    userId: r.user_id?.substring(0, 8),
+                    name: (r.metadata as any)?.name || (r.metadata as any)?.Name,
+                    isPublic: (r.metadata as any)?.is_public,
+                })),
+                timestamp: Date.now()
+            });
+            
             return data || [];
         },
         staleTime: 15 * 60 * 1000, // 15 minutes - increased for better performance since resources don't change often

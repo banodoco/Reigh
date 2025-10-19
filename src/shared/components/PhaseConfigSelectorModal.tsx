@@ -101,6 +101,13 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
 
   // Combine all presets (my presets + public presets)
   const allPresets = useMemo(() => {
+    console.log('[PhaseConfigModal] Combining presets:', {
+      myPresetsCount: myPresetsResource.data?.length || 0,
+      publicPresetsCount: publicPresetsResource.data?.length || 0,
+      myPresetIds: myPresetIds.map(id => id.substring(0, 8)),
+      timestamp: Date.now()
+    });
+    
     const myPresets = (myPresetsResource.data || []).map(r => ({
       ...r,
       metadata: r.metadata as PhaseConfigMetadata,
@@ -112,12 +119,41 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
       _isMyPreset: myPresetIds.includes(r.id)
     }));
     
+    console.log('[PhaseConfigModal] Preset details:', {
+      myPresets: myPresets.map(p => ({
+        id: p.id.substring(0, 8),
+        name: p.metadata.name,
+        isPublic: p.metadata.is_public,
+        userId: p.userId?.substring(0, 8)
+      })),
+      publicPresets: publicPresets.map(p => ({
+        id: p.id.substring(0, 8),
+        name: p.metadata.name,
+        isPublic: p.metadata.is_public,
+        userId: p.userId?.substring(0, 8),
+        _isMyPreset: p._isMyPreset
+      })),
+      timestamp: Date.now()
+    });
+    
     // Deduplicate by ID, prioritizing my presets
     const presetMap = new Map<string, typeof myPresets[0]>();
     publicPresets.forEach(preset => presetMap.set(preset.id, preset));
     myPresets.forEach(preset => presetMap.set(preset.id, preset));
     
-    return Array.from(presetMap.values());
+    const combined = Array.from(presetMap.values());
+    console.log('[PhaseConfigModal] Combined presets:', {
+      totalCount: combined.length,
+      presets: combined.map(p => ({
+        id: p.id.substring(0, 8),
+        name: p.metadata.name,
+        isPublic: p.metadata.is_public,
+        _isMyPreset: p._isMyPreset
+      })),
+      timestamp: Date.now()
+    });
+    
+    return combined;
   }, [myPresetsResource.data, publicPresetsResource.data, myPresetIds]);
 
   const processedPresets = useMemo(() => {
