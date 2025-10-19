@@ -190,6 +190,25 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [settings?.startingVideoUrl, settings?.endingVideoUrl]);
   
+  // Add timeout fallback for video loading on mobile
+  useEffect(() => {
+    if (startingVideo && !startingVideoLoaded) {
+      const timer = setTimeout(() => {
+        setStartingVideoLoaded(true);
+      }, 3000); // Show video after 3 seconds even if not fully loaded
+      return () => clearTimeout(timer);
+    }
+  }, [startingVideo, startingVideoLoaded]);
+  
+  useEffect(() => {
+    if (endingVideo && !endingVideoLoaded) {
+      const timer = setTimeout(() => {
+        setEndingVideoLoaded(true);
+      }, 3000); // Show video after 3 seconds even if not fully loaded
+      return () => clearTimeout(timer);
+    }
+  }, [endingVideo, endingVideoLoaded]);
+  
   // Helper function to upload a video file
   const uploadVideoFile = async (file: File, type: 'starting' | 'ending') => {
     if (!file.type.startsWith('video/')) {
@@ -486,10 +505,13 @@ const JoinClipsPage: React.FC = () => {
                   <video
                     src={startingVideo.url}
                     controls
+                    preload="metadata"
+                    playsInline
                     className={cn(
                       'w-full h-full object-contain transition-all duration-300',
                       startingVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
                     )}
+                    onLoadedMetadata={() => setStartingVideoLoaded(true)}
                     onCanPlay={() => setStartingVideoLoaded(true)}
                   />
                   {/* Remove button */}
@@ -623,10 +645,13 @@ const JoinClipsPage: React.FC = () => {
                   <video
                     src={endingVideo.url}
                     controls
+                    preload="metadata"
+                    playsInline
                     className={cn(
                       'w-full h-full object-contain transition-all duration-300',
                       endingVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
                     )}
+                    onLoadedMetadata={() => setEndingVideoLoaded(true)}
                     onCanPlay={() => setEndingVideoLoaded(true)}
                   />
                   {/* Remove button */}

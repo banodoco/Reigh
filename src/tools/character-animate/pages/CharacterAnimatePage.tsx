@@ -154,6 +154,26 @@ const CharacterAnimatePage: React.FC = () => {
     }
   }, [settings?.inputImageUrl, settings?.inputVideoUrl, settings?.mode]);
   
+  // Add timeout fallback for image loading on mobile
+  useEffect(() => {
+    if (characterImage && !characterImageLoaded) {
+      const timer = setTimeout(() => {
+        setCharacterImageLoaded(true);
+      }, 2000); // Show image after 2 seconds even if not fully loaded
+      return () => clearTimeout(timer);
+    }
+  }, [characterImage, characterImageLoaded]);
+  
+  // Add timeout fallback for video loading on mobile
+  useEffect(() => {
+    if (motionVideo && !motionVideoLoaded) {
+      const timer = setTimeout(() => {
+        setMotionVideoLoaded(true);
+      }, 3000); // Show video after 3 seconds even if not fully loaded
+      return () => clearTimeout(timer);
+    }
+  }, [motionVideo, motionVideoLoaded]);
+  
   // Always generate a random seed for each generation
   const generateRandomSeed = useCallback(() => {
     return Math.floor(Math.random() * 1000000);
@@ -467,10 +487,13 @@ const CharacterAnimatePage: React.FC = () => {
                   <video
                     src={motionVideo.url}
                     controls
+                    preload="metadata"
+                    playsInline
                     className={cn(
                       'w-full h-full object-contain transition-all duration-300',
                       motionVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
                     )}
+                    onLoadedMetadata={() => setMotionVideoLoaded(true)}
                     onCanPlay={() => setMotionVideoLoaded(true)}
                   />
                 </>
