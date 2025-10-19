@@ -440,6 +440,7 @@ const CharacterAnimatePage: React.FC = () => {
                       characterImageLoaded ? 'opacity-100' : 'opacity-0'
                     )}
                     onLoad={() => setCharacterImageLoaded(true)}
+                    onLoadStart={() => setCharacterImageLoaded(true)}
                   />
                 </>
               ) : !settingsLoaded ? (
@@ -500,10 +501,12 @@ const CharacterAnimatePage: React.FC = () => {
                     controls
                     preload="metadata"
                     playsInline
+                    poster={motionVideo.url}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       motionVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
+                    onLoadStart={() => setMotionVideoLoaded(true)}
                     onLoadedMetadata={() => setMotionVideoLoaded(true)}
                     onCanPlay={() => setMotionVideoLoaded(true)}
                   />
