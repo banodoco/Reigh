@@ -164,6 +164,7 @@ export interface ShotEditorProps {
 export interface ShotEditorState {
   // Upload and UI state
   isUploadingImage: boolean;
+  uploadProgress: number; // 0-100 percentage for image uploads
   fileInputKey: number;
   deletingVideoId: string | null;
   duplicatingImageId: string | null;
@@ -193,6 +194,7 @@ export interface ShotEditorState {
 // Action types for state management
 export type ShotEditorAction =
   | { type: 'SET_UPLOADING_IMAGE'; payload: boolean }
+  | { type: 'SET_UPLOAD_PROGRESS'; payload: number }
   | { type: 'SET_FILE_INPUT_KEY'; payload: number }
   | { type: 'SET_DELETING_VIDEO_ID'; payload: string | null }
   | { type: 'SET_DUPLICATING_IMAGE_ID'; payload: string | null }

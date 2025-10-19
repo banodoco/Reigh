@@ -139,6 +139,7 @@ export interface TimelineProps {
   // Image upload handler for empty state
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
+  uploadProgress?: number;
 }
 
 /**
@@ -183,7 +184,8 @@ const Timeline: React.FC<TimelineProps> = ({
   onStructureVideoChange,
   autoCreateIndividualPrompts,
   onImageUpload,
-  isUploadingImage
+  isUploadingImage,
+  uploadProgress = 0
 }) => {
   
   // Navigation
@@ -660,6 +662,8 @@ const Timeline: React.FC<TimelineProps> = ({
         autoCreateIndividualPrompts={autoCreateIndividualPrompts}
         hasNoImages={hasNoImages}
         readOnly={readOnly}
+        isUploadingImage={isUploadingImage}
+        uploadProgress={uploadProgress}
       />
 
       {/* Lightbox */}

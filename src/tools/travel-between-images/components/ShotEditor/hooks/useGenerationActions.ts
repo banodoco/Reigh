@@ -494,6 +494,10 @@ export const useGenerationActions = ({
     }
 
     try {
+      // Set uploading state
+      actions.setUploadingImage(true);
+      actions.setUploadProgress(0);
+      
       // Crop images to shot aspect ratio before uploading
       let processedFiles = files;
       
@@ -528,7 +532,12 @@ export const useGenerationActions = ({
         targetShotId: selectedShot.id,
         currentProjectQueryKey: projectId,
         currentShotCount: 0, // Not needed when adding to existing shot
-        skipAutoPosition: true // CRITICAL: Skip auto-positioning so we can set positions ourselves
+        skipAutoPosition: true, // CRITICAL: Skip auto-positioning so we can set positions ourselves
+        onProgress: (fileIndex, fileProgress, overallProgress) => {
+          console.log(`[UploadProgress] File ${fileIndex + 1}/${processedFiles.length}: ${fileProgress}% (Overall: ${overallProgress}%)`);
+          // Update progress state if actions has a method for it
+          actions.setUploadProgress?.(overallProgress);
+        }
       });
 
       console.log('[AddImagesDebug] 📥 Upload result:', {
@@ -927,6 +936,10 @@ export const useGenerationActions = ({
       console.error('[AddImagesDebug] ❌ Error adding images to timeline:', error);
       // Let Timeline component handle the error display via re-throw
       throw error; 
+    } finally {
+      // Clear uploading state
+      actions.setUploadingImage(false);
+      actions.setUploadProgress(0);
     }
   }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, batchVideoFrames, actions, handleExternalImageDropMutation, onShotImagesUpdate, state.pendingFramePositions]);
 

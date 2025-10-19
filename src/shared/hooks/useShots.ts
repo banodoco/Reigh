@@ -1740,9 +1740,10 @@ export const useHandleExternalImageDrop = () => {
         targetShotId: string | null, 
         currentProjectQueryKey: string | null,
         currentShotCount: number,
-        skipAutoPosition?: boolean // NEW: Flag to skip auto-positioning for timeline uploads
+        skipAutoPosition?: boolean, // NEW: Flag to skip auto-positioning for timeline uploads
+        onProgress?: (fileIndex: number, fileProgress: number, overallProgress: number) => void // NEW: Progress callback
     }) => {
-    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition } = variables;
+    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition, onProgress } = variables;
     
     if (!currentProjectQueryKey) { // Should be actual projectId
         toast.error("Cannot add image(s): current project is not identified.");
@@ -1777,7 +1778,8 @@ export const useHandleExternalImageDrop = () => {
       }
 
       // 2. Process each file
-      for (const imageFile of imageFiles) {
+      for (let fileIndex = 0; fileIndex < imageFiles.length; fileIndex++) {
+        const imageFile = imageFiles[fileIndex];
         let newGeneration: Database['public']['Tables']['generations']['Row'] | null = null;
         try {
           // 2a. Generate client-side thumbnail and upload both images
@@ -1797,16 +1799,32 @@ export const useHandleExternalImageDrop = () => {
             const thumbnailResult = await generateClientThumbnail(imageFile, 300, 0.8);
             console.log(`[ThumbnailGenDebug] Generated thumbnail: ${thumbnailResult.thumbnailWidth}x${thumbnailResult.thumbnailHeight} (original: ${thumbnailResult.originalWidth}x${thumbnailResult.originalHeight})`);
             
-            // Upload both main image and thumbnail
-            const uploadResult = await uploadImageWithThumbnail(imageFile, thumbnailResult.thumbnailBlob, userId);
+            // Upload both main image and thumbnail (with progress tracking)
+            const uploadResult = await uploadImageWithThumbnail(
+              imageFile, 
+              thumbnailResult.thumbnailBlob, 
+              userId,
+              onProgress ? (progress) => {
+                // Calculate overall progress: each file is 1/totalFiles of the overall progress
+                const overallProgress = Math.round(((fileIndex + (progress / 100)) / imageFiles.length) * 100);
+                onProgress(fileIndex, progress, overallProgress);
+              } : undefined
+            );
             imageUrl = uploadResult.imageUrl;
             thumbnailUrl = uploadResult.thumbnailUrl;
             
             console.log(`[ThumbnailGenDebug] Upload complete - Image: ${imageUrl}, Thumbnail: ${thumbnailUrl}`);
           } catch (thumbnailError) {
             console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${imageFile.name}:`, thumbnailError);
-            // Fallback to original upload flow without thumbnail
-            imageUrl = await uploadImageToStorage(imageFile);
+            // Fallback to original upload flow without thumbnail (with progress tracking)
+            imageUrl = await uploadImageToStorage(
+              imageFile,
+              3, // maxRetries
+              onProgress ? (progress) => {
+                const overallProgress = Math.round(((fileIndex + (progress / 100)) / imageFiles.length) * 100);
+                onProgress(fileIndex, progress, overallProgress);
+              } : undefined
+            );
             thumbnailUrl = imageUrl; // Use main image as fallback
           }
           

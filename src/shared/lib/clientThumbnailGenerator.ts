@@ -114,12 +114,14 @@ export async function generateClientThumbnail(
  * @param originalFile - The original image file
  * @param thumbnailBlob - The generated thumbnail blob
  * @param userId - User ID for storage path organization
+ * @param onProgress - Optional callback for upload progress (0-100)
  * @returns Promise<{imageUrl: string, thumbnailUrl: string}>
  */
 export async function uploadImageWithThumbnail(
   originalFile: File,
   thumbnailBlob: Blob,
-  userId: string
+  userId: string,
+  onProgress?: (progress: number) => void
 ): Promise<{imageUrl: string, thumbnailUrl: string}> {
   const { uploadImageToStorage } = await import('./imageUploader');
   const { supabase } = await import('@/integrations/supabase/client');
@@ -129,12 +131,23 @@ export async function uploadImageWithThumbnail(
   const randomString = Math.random().toString(36).substring(2, 10);
   const fileExtension = originalFile.name.split('.').pop();
   
-  // Upload original image using existing utility
-  const imageUrl = await uploadImageToStorage(originalFile);
+  // Upload original image using existing utility (with progress tracking)
+  // Original image is ~90% of the work, thumbnail is ~10%
+  const imageUrl = await uploadImageToStorage(
+    originalFile,
+    3, // maxRetries
+    onProgress ? (progress) => {
+      // Map 0-100 to 0-90 for main image
+      onProgress(Math.round(progress * 0.9));
+    } : undefined
+  );
   
   // Upload thumbnail
   const thumbnailFilename = `thumb_${timestamp}_${randomString}.jpg`;
   const thumbnailPath = `${userId}/thumbnails/${thumbnailFilename}`;
+  
+  // Report 90% progress before thumbnail upload
+  onProgress?.(90);
   
   const { data: thumbnailUploadData, error: thumbnailUploadError } = await supabase.storage
     .from('image_uploads')
@@ -142,6 +155,9 @@ export async function uploadImageWithThumbnail(
       contentType: 'image/jpeg',
       upsert: true
     });
+  
+  // Report 100% progress after thumbnail upload
+  onProgress?.(100);
   
   if (thumbnailUploadError) {
     console.error('Thumbnail upload error:', thumbnailUploadError);

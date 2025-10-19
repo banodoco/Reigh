@@ -2349,6 +2349,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             fileInputKey={state.fileInputKey}
             onImageUpload={generationActions.handleImageUploadToShot}
             isUploadingImage={state.isUploadingImage}
+            uploadProgress={state.uploadProgress}
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={effectiveAspectRatio}

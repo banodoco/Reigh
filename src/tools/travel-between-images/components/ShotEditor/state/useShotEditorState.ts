@@ -5,6 +5,7 @@ import { ShotEditorState, ShotEditorAction } from './types';
 // Initial state
 const createInitialState = (): ShotEditorState => ({
   isUploadingImage: false,
+  uploadProgress: 0,
   fileInputKey: Date.now(),
   deletingVideoId: null,
   duplicatingImageId: null,
@@ -29,6 +30,9 @@ const shotEditorReducer = (state: ShotEditorState, action: ShotEditorAction): Sh
     case 'SET_UPLOADING_IMAGE':
       if (action.payload === state.isUploadingImage) return state;
       return { ...state, isUploadingImage: action.payload };
+    case 'SET_UPLOAD_PROGRESS':
+      if (action.payload === state.uploadProgress) return state;
+      return { ...state, uploadProgress: action.payload };
     case 'SET_FILE_INPUT_KEY':
       if (action.payload === state.fileInputKey) return state;
       return { ...state, fileInputKey: action.payload };
@@ -96,6 +100,10 @@ export const useShotEditorState = () => {
   const actions = {
     setUploadingImage: useCallback((value: boolean) => {
       dispatch({ type: 'SET_UPLOADING_IMAGE', payload: value });
+    }, []),
+
+    setUploadProgress: useCallback((value: number) => {
+      dispatch({ type: 'SET_UPLOAD_PROGRESS', payload: value });
     }, []),
 
     setFileInputKey: useCallback((value: number) => {
@@ -166,6 +174,7 @@ export const useShotEditorState = () => {
   // Memoize the actions object to prevent unnecessary re-renders
   const memoizedActions = useMemo(() => actions, [
     actions.setUploadingImage,
+    actions.setUploadProgress,
     actions.setFileInputKey,
     actions.setDeletingVideoId,
     actions.setDuplicatingImageId,

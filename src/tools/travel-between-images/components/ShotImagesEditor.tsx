@@ -75,6 +75,8 @@ interface ShotImagesEditorProps {
   onImageUpload: (files: File[]) => Promise<void>;
   /** Whether currently uploading image */
   isUploadingImage: boolean;
+  /** Upload progress (0-100) */
+  uploadProgress?: number;
   /** ID of image currently being duplicated */
   duplicatingImageId?: string | null;
   /** ID of image that was just duplicated (for success indication) */
@@ -138,6 +140,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   fileInputKey,
   onImageUpload,
   isUploadingImage,
+  uploadProgress = 0,
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
@@ -533,6 +536,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Image upload for empty state
                 onImageUpload={onImageUpload}
                 isUploadingImage={isUploadingImage}
+                uploadProgress={uploadProgress}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}

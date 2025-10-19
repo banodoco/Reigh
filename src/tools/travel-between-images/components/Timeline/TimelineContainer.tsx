@@ -77,12 +77,17 @@ interface TimelineContainerProps {
   hasNoImages?: boolean;
   // Read-only mode - disables all interactions
   readOnly?: boolean;
+  // Upload progress tracking
+  isUploadingImage?: boolean;
+  uploadProgress?: number;
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
   shotId,
   projectId,
   images,
+  isUploadingImage = false,
+  uploadProgress = 0,
   contextFrames,
   framePositions,
   setFramePositions,
@@ -893,7 +898,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 </Button>
               </div>
 
-              {/* Bottom-right: Add Images button */}
+              {/* Bottom-right: Add Images button with progress */}
               {onImageDrop ? (
                 <div 
                   className={`pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
@@ -912,20 +917,35 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                     }}
                     className="hidden"
                     id="timeline-image-upload"
+                    disabled={isUploadingImage}
                   />
-                  <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs px-3 sm:px-2 lg:px-3"
-                      asChild
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Plus className="h-3.5 w-3.5" />
-                        <span className="sm:hidden lg:inline">Add Images</span>
-                      </span>
-                    </Button>
-                  </Label>
+                  {isUploadingImage ? (
+                    <div className="flex flex-col gap-1.5 min-w-[120px]">
+                      <div className="text-xs text-muted-foreground">
+                        Uploading... {uploadProgress}%
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5">
+                        <div 
+                          className="bg-primary h-1.5 rounded-full transition-all duration-200"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <Label htmlFor="timeline-image-upload" className="m-0 cursor-pointer">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs px-3 sm:px-2 lg:px-3"
+                        asChild
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Plus className="h-3.5 w-3.5" />
+                          <span className="sm:hidden lg:inline">Add Images</span>
+                        </span>
+                      </Button>
+                    </Label>
+                  )}
                 </div>
               ) : <div />}
             </>

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL } from "@/integrations/supabase/config/env";
 
 /**
  * Helper function to wait for a specified amount of time
@@ -6,12 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Uploads an image file with retry mechanism.
- * In local development, it sends the file to a local server endpoint.
- * Otherwise, it uploads to Supabase storage.
+ * Uploads an image file with retry mechanism and optional progress tracking.
  * Returns the public URL of the uploaded image.
  */
-export const uploadImageToStorage = async (file: File, maxRetries: number = 3): Promise<string> => {
+export const uploadImageToStorage = async (
+  file: File, 
+  maxRetries: number = 3,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
   if (!file) {
     throw new Error("No file provided");
   }
@@ -36,14 +39,66 @@ export const uploadImageToStorage = async (file: File, maxRetries: number = 3): 
     try {
       console.log(`[ImageUploadDebug] Upload attempt ${attempt}/${maxRetries} for ${file.name}`);
       
-      // Upload directly to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(filePath, file, {
-          contentType: file.type,
-          cacheControl: '3600',
-          upsert: false,
-        });
+      let data: any, error: any;
+      
+      // Use XHR for progress tracking if callback is provided
+      if (onProgress) {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          if (!session?.session?.access_token) {
+            throw new Error('No active session');
+          }
+          
+          const bucketUrl = `${SUPABASE_URL}/storage/v1/object/${BUCKET_NAME}/${filePath}`;
+          
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+              if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                onProgress(percentComplete);
+              }
+            });
+            
+            xhr.addEventListener('load', () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                onProgress(100);
+                resolve();
+              } else {
+                reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+              }
+            });
+            
+            xhr.addEventListener('error', () => reject(new Error('Network error')));
+            xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+            
+            xhr.open('POST', bucketUrl);
+            xhr.setRequestHeader('Authorization', `Bearer ${session.session.access_token}`);
+            xhr.setRequestHeader('Content-Type', file.type);
+            xhr.setRequestHeader('Cache-Control', '3600');
+            
+            xhr.send(file);
+          });
+          
+          data = { path: filePath };
+          error = null;
+        } catch (xhrError) {
+          error = xhrError;
+          data = null;
+        }
+      } else {
+        // Fallback to Supabase client (no progress tracking)
+        const result = await supabase.storage
+          .from(BUCKET_NAME)
+          .upload(filePath, file, {
+            contentType: file.type,
+            cacheControl: '3600',
+            upsert: false,
+          });
+        data = result.data;
+        error = result.error;
+      }
 
       const uploadDuration = Date.now() - uploadStartTime;
       

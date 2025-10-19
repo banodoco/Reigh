@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL } from "@/integrations/supabase/config/env";
 
 export interface VideoMetadata {
   duration_seconds: number;
@@ -48,8 +49,8 @@ export const extractVideoMetadata = async (file: File): Promise<VideoMetadata> =
 };
 
 /**
- * Uploads a video file to Supabase storage.
- * Follows same pattern as uploadImageToStorage from imageUploader.ts
+ * Uploads a video file to Supabase storage with real progress tracking.
+ * Uses XMLHttpRequest to track actual upload progress.
  */
 export const uploadVideoToStorage = async (
   file: File,
@@ -67,30 +68,56 @@ export const uploadVideoToStorage = async (
     try {
       console.log(`[videoUploader] Upload attempt ${attempt + 1}/${maxRetries}:`, fileName);
       
-      // Report initial progress
-      onProgress?.(10);
-      
-      const { data, error } = await supabase.storage
-        .from('image_uploads')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      if (error) {
-        throw error;
+      // Get upload URL from Supabase
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('No active session');
       }
       
-      // Report upload complete
-      onProgress?.(90);
+      const bucketUrl = `${SUPABASE_URL}/storage/v1/object/image_uploads/${fileName}`;
+      
+      // Upload with XMLHttpRequest to track progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            console.log(`[videoUploader] Upload progress: ${percentComplete}%`);
+            onProgress?.(percentComplete);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onProgress?.(100);
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload aborted'));
+        });
+        
+        xhr.open('POST', bucketUrl);
+        xhr.setRequestHeader('Authorization', `Bearer ${session.session.access_token}`);
+        xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+        xhr.setRequestHeader('Cache-Control', '3600');
+        
+        xhr.send(file);
+      });
       
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('image_uploads')
         .getPublicUrl(fileName);
-      
-      // Report final progress
-      onProgress?.(100);
       
       console.log('[videoUploader] Upload successful:', publicUrl);
       return publicUrl;
@@ -102,6 +129,7 @@ export const uploadVideoToStorage = async (
       if (attempt < maxRetries - 1) {
         // Wait before retrying (exponential backoff)
         const delay = Math.pow(2, attempt) * 1000;
+        console.log(`[videoUploader] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
