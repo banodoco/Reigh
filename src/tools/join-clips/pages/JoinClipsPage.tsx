@@ -530,7 +530,6 @@ const JoinClipsPage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadStart={() => setStartingVideoLoaded(true)}
                     onLoadedMetadata={() => setStartingVideoLoaded(true)}
                     onCanPlay={() => setStartingVideoLoaded(true)}
                     onPlay={(e) => {
@@ -679,7 +678,6 @@ const JoinClipsPage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadStart={() => setEndingVideoLoaded(true)}
                     onLoadedMetadata={() => setEndingVideoLoaded(true)}
                     onCanPlay={() => setEndingVideoLoaded(true)}
                     onPlay={(e) => {
