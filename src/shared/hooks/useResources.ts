@@ -41,11 +41,12 @@ export const useListPublicResources = (type: ResourceType) => {
         queryKey: ['public-resources', type],
         queryFn: async () => {
             // Public resources should be readable by anyone
+            // Filter for is_public = true using proper JSONB boolean check
             const { data, error } = await supabase
                 .from('resources')
                 .select('*')
                 .eq('type', type)
-                .eq('metadata->>is_public', 'true');
+                .filter('metadata->is_public', 'eq', true);
             
             if (error) throw error;
             return data || [];
