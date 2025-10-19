@@ -25,20 +25,16 @@ import { cn } from '@/shared/lib/utils';
 
 // Video container skeleton loader
 const VideoContainerSkeleton: React.FC = () => (
-  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
-    <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-    </div>
+  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted animate-pulse">
+    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
   </div>
 );
 
 // Upload loading state
 const UploadingVideoState: React.FC = () => (
-  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
-    <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-3"></div>
-      <p className="text-sm font-medium text-foreground">Uploading video...</p>
-    </div>
+  <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm">
+    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-3"></div>
+    <p className="text-sm font-medium text-foreground">Uploading video...</p>
   </div>
 );
 
@@ -74,9 +70,10 @@ const JoinClipsPage: React.FC = () => {
   // Track success state for button feedback
   const [showSuccessState, setShowSuccessState] = useState(false);
   
-  // Track drag state for visual feedback
+  // Track drag state and scroll state separately to prevent mobile scroll conflicts
   const [isDraggingOverStarting, setIsDraggingOverStarting] = useState(false);
   const [isDraggingOverEnding, setIsDraggingOverEnding] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
   
   // Load settings
   const { settings, update: updateSettings } = useToolSettings<JoinClipsSettings>(
@@ -297,17 +294,20 @@ const JoinClipsPage: React.FC = () => {
   
   // Drag and drop handlers for starting video
   const handleStartingDragOver = (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
   };
   
   const handleStartingDragEnter = (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingOverStarting(true);
   };
   
   const handleStartingDragLeave = (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
     // Only set to false if we're leaving the drop zone itself
@@ -317,6 +317,7 @@ const JoinClipsPage: React.FC = () => {
   };
   
   const handleStartingDrop = async (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingOverStarting(false);
@@ -339,17 +340,20 @@ const JoinClipsPage: React.FC = () => {
   
   // Drag and drop handlers for ending video
   const handleEndingDragOver = (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
   };
   
   const handleEndingDragEnter = (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingOverEnding(true);
   };
   
   const handleEndingDragLeave = (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
     // Only set to false if we're leaving the drop zone itself
@@ -359,6 +363,7 @@ const JoinClipsPage: React.FC = () => {
   };
   
   const handleEndingDrop = async (e: React.DragEvent) => {
+    if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
     setIsDraggingOverEnding(false);
@@ -378,6 +383,18 @@ const JoinClipsPage: React.FC = () => {
       updateSettings('project', { ...settings, endingVideoUrl: publicUrl });
     }
   };
+
+  // Track scroll state to prevent drag conflicts
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolling(true);
+      const timer = setTimeout(() => setIsScrolling(false), 200);
+      return () => clearTimeout(timer);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   // Generate join clips mutation
   const generateJoinClipsMutation = useMutation({
@@ -508,8 +525,8 @@ const JoinClipsPage: React.FC = () => {
                     preload="metadata"
                     playsInline
                     className={cn(
-                      'w-full h-full object-contain transition-all duration-300',
-                      startingVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                      startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
                     onLoadedMetadata={() => setStartingVideoLoaded(true)}
                     onCanPlay={() => setStartingVideoLoaded(true)}
@@ -531,7 +548,7 @@ const JoinClipsPage: React.FC = () => {
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                  {isDraggingOverStarting && (
+                  {isDraggingOverStarting && !isScrolling && (
                     <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
                       <p className="text-lg font-medium text-foreground">Drop to replace</p>
                     </div>
@@ -648,8 +665,8 @@ const JoinClipsPage: React.FC = () => {
                     preload="metadata"
                     playsInline
                     className={cn(
-                      'w-full h-full object-contain transition-all duration-300',
-                      endingVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                      endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
                     onLoadedMetadata={() => setEndingVideoLoaded(true)}
                     onCanPlay={() => setEndingVideoLoaded(true)}
@@ -671,7 +688,7 @@ const JoinClipsPage: React.FC = () => {
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                  {isDraggingOverEnding && (
+                  {isDraggingOverEnding && !isScrolling && (
                     <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
                       <p className="text-lg font-medium text-foreground">Drop to replace</p>
                     </div>

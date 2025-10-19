@@ -21,22 +21,18 @@ import { cn } from '@/shared/lib/utils';
 
 // Image/Video container skeleton loader
 const MediaContainerSkeleton: React.FC = () => (
-  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
-    <div className="w-full h-full flex items-center justify-center bg-muted animate-pulse">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-    </div>
+  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted animate-pulse">
+    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
   </div>
 );
 
 // Upload loading state
 const UploadingMediaState: React.FC<{ type: 'image' | 'video' }> = ({ type }) => (
-  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
-    <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm">
-      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-3"></div>
-      <p className="text-sm font-medium text-foreground">
-        Uploading {type === 'image' ? 'image' : 'video'}...
-      </p>
-    </div>
+  <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm">
+    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-3"></div>
+    <p className="text-sm font-medium text-foreground">
+      Uploading {type === 'image' ? 'image' : 'video'}...
+    </p>
   </div>
 );
 
@@ -60,6 +56,9 @@ const CharacterAnimatePage: React.FC = () => {
   const characterImageInputRef = useRef<HTMLInputElement>(null);
   const motionVideoInputRef = useRef<HTMLInputElement>(null);
   
+  // Track scroll state to prevent layout shifts
+  const [isScrolling, setIsScrolling] = useState(false);
+
   // Track when we've just triggered a generation to prevent empty state flash
   const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
   
@@ -173,6 +172,18 @@ const CharacterAnimatePage: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [motionVideo, motionVideoLoaded]);
+  
+  // Track scroll state to prevent layout shifts
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolling(true);
+      const timer = setTimeout(() => setIsScrolling(false), 200);
+      return () => clearTimeout(timer);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   // Always generate a random seed for each generation
   const generateRandomSeed = useCallback(() => {
@@ -425,8 +436,8 @@ const CharacterAnimatePage: React.FC = () => {
                     src={characterImage.url}
                     alt="Character"
                     className={cn(
-                      'w-full h-full object-contain transition-all duration-300',
-                      characterImageLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                      characterImageLoaded ? 'opacity-100' : 'opacity-0'
                     )}
                     onLoad={() => setCharacterImageLoaded(true)}
                   />
@@ -490,8 +501,8 @@ const CharacterAnimatePage: React.FC = () => {
                     preload="metadata"
                     playsInline
                     className={cn(
-                      'w-full h-full object-contain transition-all duration-300',
-                      motionVideoLoaded ? 'opacity-100' : 'opacity-0 absolute'
+                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                      motionVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
                     onLoadedMetadata={() => setMotionVideoLoaded(true)}
                     onCanPlay={() => setMotionVideoLoaded(true)}
