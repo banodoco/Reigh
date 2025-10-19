@@ -426,7 +426,7 @@ const CharacterAnimatePage: React.FC = () => {
                 : '✨ Character to insert'
               }
             </Label>
-            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden relative">
               {isUploading ? (
                 <UploadingMediaState type="image" />
               ) : characterImage ? (
@@ -490,7 +490,7 @@ const CharacterAnimatePage: React.FC = () => {
                 : '🎬 Video to replace character in'
               }
             </Label>
-            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden relative">
               {isUploading ? (
                 <UploadingMediaState type="video" />
               ) : motionVideo ? (
