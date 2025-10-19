@@ -210,20 +210,34 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [endingVideo, endingVideoLoaded]);
 
-  // Force pause videos to prevent auto-play on mobile
+  // The definitive fix for preventing autoplay on mobile browsers
   useEffect(() => {
-    if (startingVideoRef.current) {
-      startingVideoRef.current.pause();
-      console.log('[JoinClips] Force-paused starting video');
+    const video = startingVideoRef.current;
+    if (video) {
+      // Prevent play events from doing anything
+      const preventPlay = () => video.pause();
+      video.addEventListener('play', preventPlay);
+      
+      // Ensure it's paused on mount and on src change
+      video.pause();
+
+      return () => video.removeEventListener('play', preventPlay);
     }
-  }, [startingVideo]);
+  }, [startingVideo]); // Re-run when the video source changes
 
   useEffect(() => {
-    if (endingVideoRef.current) {
-      endingVideoRef.current.pause();
-      console.log('[JoinClips] Force-paused ending video');
+    const video = endingVideoRef.current;
+    if (video) {
+      // Prevent play events from doing anything
+      const preventPlay = () => video.pause();
+      video.addEventListener('play', preventPlay);
+
+      // Ensure it's paused on mount and on src change
+      video.pause();
+
+      return () => video.removeEventListener('play', preventPlay);
     }
-  }, [endingVideo]);
+  }, [endingVideo]); // Re-run when the video source changes
   
   // Helper function to upload a video file
   const uploadVideoFile = async (file: File, type: 'starting' | 'ending') => {
@@ -542,7 +556,7 @@ const JoinClipsPage: React.FC = () => {
                     ref={startingVideoRef}
                     src={startingVideo.url}
                     controls
-                    preload="none"
+                    preload="metadata"
                     playsInline
                     muted
                     poster={startingVideo.url}
@@ -550,30 +564,9 @@ const JoinClipsPage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadedMetadata={() => {
-                      console.log('[JoinClips] Starting video onLoadedMetadata fired', { url: startingVideo.url, timestamp: Date.now() });
+                    onLoadedData={() => {
+                      console.log('[JoinClips] Starting video onLoadedData fired', { url: startingVideo.url, timestamp: Date.now() });
                       setStartingVideoLoaded(true);
-                      // Force pause on mobile
-                      if (startingVideoRef.current) {
-                        startingVideoRef.current.pause();
-                      }
-                    }}
-                    onCanPlay={() => {
-                      console.log('[JoinClips] Starting video onCanPlay fired', { url: startingVideo.url, timestamp: Date.now() });
-                      setStartingVideoLoaded(true);
-                      // Force pause on mobile
-                      if (startingVideoRef.current) {
-                        startingVideoRef.current.pause();
-                      }
-                    }}
-                    onLoadStart={() => {
-                      console.log('[JoinClips] Starting video onLoadStart fired', { url: startingVideo.url, timestamp: Date.now() });
-                    }}
-                    onPlay={(e) => {
-                      console.log('[JoinClips] Starting video onPlay fired', { timestamp: Date.now() });
-                      // Pause immediately - catch any autoplay attempts
-                      (e.target as HTMLVideoElement).pause();
-                      console.log('[JoinClips] Paused video on play event');
                     }}
                   />
                   {/* Remove button */}
@@ -708,7 +701,7 @@ const JoinClipsPage: React.FC = () => {
                     ref={endingVideoRef}
                     src={endingVideo.url}
                     controls
-                    preload="none"
+                    preload="metadata"
                     playsInline
                     muted
                     poster={endingVideo.url}
@@ -716,30 +709,9 @@ const JoinClipsPage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadedMetadata={() => {
-                      console.log('[JoinClips] Ending video onLoadedMetadata fired', { url: endingVideo.url, timestamp: Date.now() });
+                    onLoadedData={() => {
+                      console.log('[JoinClips] Ending video onLoadedData fired', { url: endingVideo.url, timestamp: Date.now() });
                       setEndingVideoLoaded(true);
-                      // Force pause on mobile
-                      if (endingVideoRef.current) {
-                        endingVideoRef.current.pause();
-                      }
-                    }}
-                    onCanPlay={() => {
-                      console.log('[JoinClips] Ending video onCanPlay fired', { url: endingVideo.url, timestamp: Date.now() });
-                      setEndingVideoLoaded(true);
-                      // Force pause on mobile
-                      if (endingVideoRef.current) {
-                        endingVideoRef.current.pause();
-                      }
-                    }}
-                    onLoadStart={() => {
-                      console.log('[JoinClips] Ending video onLoadStart fired', { url: endingVideo.url, timestamp: Date.now() });
-                    }}
-                    onPlay={(e) => {
-                      console.log('[JoinClips] Ending video onPlay fired', { timestamp: Date.now() });
-                      // Pause immediately - catch any autoplay attempts
-                      (e.target as HTMLVideoElement).pause();
-                      console.log('[JoinClips] Paused video on play event');
                     }}
                   />
                   {/* Remove button */}

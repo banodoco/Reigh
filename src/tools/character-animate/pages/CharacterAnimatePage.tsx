@@ -176,14 +176,21 @@ const CharacterAnimatePage: React.FC = () => {
     }
   }, [motionVideo, motionVideoLoaded]);
   
-  // Force pause motion video to prevent auto-play on mobile
+  // The definitive fix for preventing autoplay on mobile browsers
   useEffect(() => {
-    if (motionVideoRef.current) {
-      motionVideoRef.current.pause();
-      console.log('[CharacterAnimate] Force-paused motion video');
+    const video = motionVideoRef.current;
+    if (video) {
+      // Prevent play events from doing anything
+      const preventPlay = () => video.pause();
+      video.addEventListener('play', preventPlay);
+      
+      // Ensure it's paused on mount and on src change
+      video.pause();
+
+      return () => video.removeEventListener('play', preventPlay);
     }
-  }, [motionVideo]);
-  
+  }, [motionVideo]); // Re-run when the video source changes
+
   // Track scroll state to prevent layout shifts
   useEffect(() => {
     const handleScroll = () => {
@@ -511,7 +518,7 @@ const CharacterAnimatePage: React.FC = () => {
                     ref={motionVideoRef}
                     src={motionVideo.url}
                     controls
-                    preload="none"
+                    preload="metadata"
                     playsInline
                     muted
                     poster={motionVideo.url}
@@ -519,23 +526,8 @@ const CharacterAnimatePage: React.FC = () => {
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       motionVideoLoaded ? 'opacity-100' : 'opacity-0'
                     )}
-                    onLoadedMetadata={() => {
+                    onLoadedData={() => {
                       setMotionVideoLoaded(true);
-                      // Force pause on mobile
-                      if (motionVideoRef.current) {
-                        motionVideoRef.current.pause();
-                      }
-                    }}
-                    onCanPlay={() => {
-                      setMotionVideoLoaded(true);
-                      // Force pause on mobile
-                      if (motionVideoRef.current) {
-                        motionVideoRef.current.pause();
-                      }
-                    }}
-                    onPlay={(e) => {
-                      // Pause immediately - catch any autoplay attempts
-                      (e.target as HTMLVideoElement).pause();
                     }}
                   />
                 </>
