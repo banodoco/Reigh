@@ -525,6 +525,7 @@ const JoinClipsPage: React.FC = () => {
                     preload="metadata"
                     playsInline
                     poster={startingVideo.url}
+                    autoPlay={false}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       startingVideoLoaded ? 'opacity-100' : 'opacity-0'
@@ -667,6 +668,7 @@ const JoinClipsPage: React.FC = () => {
                     preload="metadata"
                     playsInline
                     poster={endingVideo.url}
+                    autoPlay={false}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       endingVideoLoaded ? 'opacity-100' : 'opacity-0'

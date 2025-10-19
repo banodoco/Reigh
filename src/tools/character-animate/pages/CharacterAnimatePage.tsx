@@ -502,6 +502,7 @@ const CharacterAnimatePage: React.FC = () => {
                     preload="metadata"
                     playsInline
                     poster={motionVideo.url}
+                    autoPlay={false}
                     className={cn(
                       'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
                       motionVideoLoaded ? 'opacity-100' : 'opacity-0'
