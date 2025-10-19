@@ -2180,7 +2180,6 @@
 .palette-icon path {
   /* outer border starts with current color */
   stroke: currentColor;
-  transition: stroke 1s ease;
 }
 .group:hover .palette-icon path {
   animation:
@@ -2214,11 +2213,15 @@
 .palette-wrapper {
   position: relative;
   overflow: hidden;
-  transition: border-color 300ms ease;
+  transition: border-color 800ms ease, box-shadow 800ms ease;
 }
 .palette-wrapper:hover {
   border-color: rgba(253, 226, 228, 0.6);
   animation: palette-border-wrapper-cycle 32s ease-in-out 1s infinite;
+}
+.palette-wrapper.dehovering {
+  animation: none;
+  border-color: rgba(250, 221, 151, 0.2); /* original border color */
 }
 @keyframes palette-border-wrapper-cycle {
   0% { border-color: rgba(253, 226, 228, 0.6); }
@@ -2301,10 +2304,17 @@
 /* ----------------------------------------------------------------------- */
 
 .dehovering .palette-icon path {
-  animation: none;
-  transition: stroke 300ms ease;
+  animation: none !important;
   stroke: currentColor;
+  transition: stroke 800ms ease;
 }
+
+.dehovering .palette-icon circle {
+  fill: transparent;
+  stroke: currentColor;
+  transition: fill 800ms ease, stroke 800ms ease;
+}
+
 .dehovering {
   /* Just remove all special styling and let it return naturally */
 }
@@ -2364,5 +2374,23 @@
   --ring: var(--theme-cat-secondary) !important;
   border-color: #1e2834 !important;
   background-color: #2a3441 !important;
+}
+
+/* Add a reverse animation for dehovering */
+@keyframes palette-exit {
+  from { stroke: rgba(253, 226, 228, 0.6); } /* Last color from hover animation */
+  to { stroke: currentColor; }
+}
+
+.dehovering .palette-icon path {
+  /* Use the new exit animation */
+  animation: palette-exit 800ms ease forwards;
+  /* Remove the transition property as animation is now used */
+}
+.dehovering .palette-icon circle {
+  /* Allow circles to continue their smooth transition back to empty */
+  fill: transparent;
+  stroke: currentColor;
+  transition: fill 800ms ease, stroke 800ms ease;
 }
 

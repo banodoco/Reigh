@@ -22,6 +22,7 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
   const [quoteState, setQuoteState] = useState<QuoteState>('closed');
   const [tooltipBelow, setTooltipBelow] = useState(false);
   const paletteRef = useRef<HTMLElement>(null);
+  const dehoverTimerRef = useRef<number | null>(null);
 
   // Computed state based on quote state
   const showQuote = quoteState !== 'closed';
@@ -30,13 +31,24 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
 
   // Event handlers with useCallback for performance
   const handleMouseEnter = useCallback(() => {
+    // Clear any pending dehovering timer to prevent race conditions
+    if (dehoverTimerRef.current) {
+      clearTimeout(dehoverTimerRef.current);
+      dehoverTimerRef.current = null;
+    }
     setIsHovering(true);
     setIsDehovering(false);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
     setIsHovering(false);
-    setIsDehovering(false);
+    setIsDehovering(true);
+    
+    // Keep dehovering class active to allow smooth transitions
+    dehoverTimerRef.current = window.setTimeout(() => {
+      setIsDehovering(false);
+      dehoverTimerRef.current = null;
+    }, ANIMATION_CONFIG.DEHOVERING_TIMEOUT);
   }, []);
 
   const handlePaletteClick = useCallback(() => {
