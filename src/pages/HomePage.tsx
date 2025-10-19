@@ -544,7 +544,7 @@ export default function HomePage() {
         </button>
       </div> */}
 
-      <div className="container mx-auto px-4 relative z-10 flex items-center justify-center min-h-screen py-8 sm:py-16">
+      <div className="container mx-auto px-4 relative z-10 flex items-center justify-center min-h-screen py-8">
         {/* Hero Section */}
         <div className="text-center w-full">
           <div className="max-w-4xl mx-auto">
@@ -552,7 +552,7 @@ export default function HomePage() {
 
             {/* Icon above title */}
             <FadeInSection delayMs={25}>
-              <PaletteIcon className="mb-6 mt-0 sm:mt-6" />
+              <PaletteIcon className="mb-6 mt-0" />
             </FadeInSection>
             
             {/* Main title */}
@@ -720,7 +720,7 @@ export default function HomePage() {
 
             {/* Social Icons */}
             <FadeInSection delayMs={350}>
-              <div className="mt-8 sm:mt-12 flex justify-center">
+              <div className="mt-8 flex justify-center">
                 <div className="flex flex-col items-center space-y-3">
                   {/* GitHub and Discord icons side by side */}
                   <div className="flex items-center space-x-3">

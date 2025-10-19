@@ -90,10 +90,10 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
     const baseClasses = [
       'palette-wrapper',
       'flex items-center justify-center',
-      'w-12 h-12 md:w-14 md:h-14',
+      'w-12 h-12 md:w-[4.2rem] md:h-[4.2rem]',
       'bg-gradient-to-br from-wes-coral/60 via-wes-salmon/60 to-wes-vintage-gold/60',
       'rounded-lg border border-wes-vintage-gold/20',
-      'shadow-sm opacity-70',
+      'shadow-sm opacity-90',
       'group group-hover:opacity-100',
       'cursor-pointer',
       'transition-opacity duration-300 transition-transform duration-300'
@@ -111,7 +111,7 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
   const paletteIconClasses = useMemo(() => {
     const baseClasses = [
       'palette-icon',
-      'h-6 w-6 md:h-7 md:w-7',
+      'h-6 w-6 md:h-[2.1rem] md:w-[2.1rem]',
       'text-white/90',
       'transition-transform duration-300',
       'group-hover:rotate-3 group-hover:scale-105'
