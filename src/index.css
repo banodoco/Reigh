@@ -1746,6 +1746,36 @@
   50% { opacity: 0.4; }
 }
 
+@keyframes gradientBreathe {
+  0%, 100% { 
+    opacity: 0.5;
+  }
+  25% { 
+    opacity: 0.6;
+  }
+  50% { 
+    opacity: 0.4;
+  }
+  75% { 
+    opacity: 0.55;
+  }
+}
+
+@keyframes gradientDrift {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1);
+    opacity: 0.4;
+  }
+  33% { 
+    transform: translate(5%, 5%) scale(1.05);
+    opacity: 0.5;
+  }
+  66% { 
+    transform: translate(-3%, 3%) scale(0.98);
+    opacity: 0.35;
+  }
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -1811,6 +1841,14 @@
 
 .animate-pulse-subtle {
   animation: pulseSubtle 8s ease-in-out infinite;
+}
+
+.animate-gradient-breathe {
+  animation: gradientBreathe 20s ease-in-out infinite;
+}
+
+.animate-gradient-drift {
+  animation: gradientDrift 25s ease-in-out infinite;
 }
 
 .animate-shimmer {
@@ -1962,7 +2000,37 @@
   animation: paintbrushStroke 0.8s ease-in-out;
 }
 
+.animate-paintbrush-subtle-wiggle {
+  animation: paintbrushSubtleWiggle 1.5s ease-in-out infinite;
+}
+
 /* Paintbrush wiggle animation */
+@keyframes paintbrushSubtleWiggle {
+  0%, 100% {
+    transform: scaleX(-1) rotate(12deg);
+  }
+  50% {
+    transform: scaleX(-1) rotate(-8deg);
+  }
+}
+
+/* A static, single-frame animation for the "at rest" state */
+@keyframes paintbrushRest {
+  from { transform: scaleX(-1) rotate(0deg); }
+  to { transform: scaleX(-1) rotate(0deg); }
+}
+
+/* Base state - paintbrush is always running the "rest" animation */
+.paintbrush-anim {
+  /* This animation does nothing but hold the transform state */
+  animation: paintbrushRest 1s infinite;
+}
+
+/* On hover, swap to the wiggle animation */
+.group:hover .paintbrush-anim {
+  animation: paintbrushSubtleWiggle 2s ease-in-out infinite;
+}
+
 @keyframes paintbrushWiggle {
   0%, 100% {
     transform: rotate(0deg);
@@ -2317,6 +2385,13 @@
 
 .dehovering {
   /* Just remove all special styling and let it return naturally */
+}
+
+@layer utilities {
+  /* Radial gradient utility for subtle background effects */
+  .bg-gradient-radial {
+    background-image: radial-gradient(circle at bottom right, var(--tw-gradient-stops));
+  }
 }
 
 @layer utilities {

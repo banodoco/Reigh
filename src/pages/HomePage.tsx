@@ -665,18 +665,6 @@ export default function HomePage() {
                 <div className="group">
                   <button
                     onClick={handleDiscordSignIn}
-                    onMouseEnter={(e) => {
-                      const brush = e.currentTarget.querySelector('.paintbrush-anim') as HTMLElement;
-                      if (brush) {
-                        brush.style.animation = 'paintbrush-stroke 1.8s ease-in-out infinite';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      const brush = e.currentTarget.querySelector('.paintbrush-anim') as HTMLElement;
-                      if (brush) {
-                        brush.style.animation = 'none';
-                      }
-                    }}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
                     style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                   >
@@ -688,13 +676,9 @@ export default function HomePage() {
                       <PaintParticles />
                       
                       {/* Paintbrush Icon - in front */}
-                      <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
+                      <div className="w-5 h-5 relative z-10">
                         <div 
                           className="paintbrush-anim w-full h-full origin-[50%_90%]"
-                          style={{
-                            transform: 'rotate(5deg)',
-                            transition: 'transform 0.3s ease-out'
-                          }}
                         >
                           <img 
                             src="/brush-paintbrush-icon.webp"
@@ -711,18 +695,6 @@ export default function HomePage() {
                 <div className="group">
                   <button
                     onPointerUp={() => navigate('/tools')}
-                    onMouseEnter={(e) => {
-                      const brush = e.currentTarget.querySelector('.paintbrush-anim') as HTMLElement;
-                      if (brush) {
-                        brush.style.animation = 'paintbrush-stroke 1.8s ease-in-out infinite';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      const brush = e.currentTarget.querySelector('.paintbrush-anim') as HTMLElement;
-                      if (brush) {
-                        brush.style.animation = 'none';
-                      }
-                    }}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
                     style={{ transition: 'transform 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.5s ease-in-out' }}
                   >
@@ -734,13 +706,9 @@ export default function HomePage() {
                       <PaintParticles />
                       
                       {/* Paintbrush Icon - in front */}
-                      <div className="w-5 h-5 transform scale-x-[-1] transition-transform duration-300 relative z-10">
+                      <div className="w-5 h-5 relative z-10">
                         <div 
                           className="paintbrush-anim w-full h-full origin-[50%_90%]"
-                          style={{
-                            transform: 'rotate(5deg)',
-                            transition: 'transform 0.3s ease-out'
-                          }}
                         >
                           <img 
                             src="/brush-paintbrush-icon.webp"

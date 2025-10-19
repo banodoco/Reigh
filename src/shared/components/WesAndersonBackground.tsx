@@ -3,8 +3,15 @@ import React from 'react';
 export const WesAndersonBackground: React.FC = () => {
   return (
     <>
-      {/* Animated Background */}
+      {/* Animated Background - Base Layer */}
       <div className="absolute inset-0 bg-gradient-to-br from-wes-cream via-white to-wes-mint/20 opacity-60 animate-gradient-shift"></div>
+      
+      {/* Secondary Dynamic Gradient - Subtle Color Breathing */}
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-wes-mint/15 opacity-50 animate-gradient-breathe"></div>
+      
+      {/* Tertiary Gentle Movement Layer */}
+      <div className="absolute inset-0 bg-gradient-radial from-transparent via-transparent to-wes-lavender/8 opacity-40 animate-gradient-drift"></div>
+      
       <div className="absolute inset-0 wes-chevron-pattern opacity-30 animate-pulse-subtle"></div>
       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-wes-vintage-gold via-wes-coral to-wes-mint animate-shimmer"></div>
       
