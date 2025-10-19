@@ -28,6 +28,18 @@ const MediaContainerSkeleton: React.FC = () => (
   </div>
 );
 
+// Upload loading state
+const UploadingMediaState: React.FC<{ type: 'image' | 'video' }> = ({ type }) => (
+  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-3"></div>
+      <p className="text-sm font-medium text-foreground">
+        Uploading {type === 'image' ? 'image' : 'video'}...
+      </p>
+    </div>
+  </div>
+);
+
 const CharacterAnimatePage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -384,7 +396,9 @@ const CharacterAnimatePage: React.FC = () => {
               }
             </Label>
             <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
-              {characterImage ? (
+              {isUploading ? (
+                <UploadingMediaState type="image" />
+              ) : characterImage ? (
                 <>
                   {!characterImageLoaded && <MediaContainerSkeleton />}
                   <img
@@ -445,7 +459,9 @@ const CharacterAnimatePage: React.FC = () => {
               }
             </Label>
             <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
-              {motionVideo ? (
+              {isUploading ? (
+                <UploadingMediaState type="video" />
+              ) : motionVideo ? (
                 <>
                   {!motionVideoLoaded && <MediaContainerSkeleton />}
                   <video

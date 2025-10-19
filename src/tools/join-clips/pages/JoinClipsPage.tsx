@@ -32,6 +32,16 @@ const VideoContainerSkeleton: React.FC = () => (
   </div>
 );
 
+// Upload loading state
+const UploadingVideoState: React.FC = () => (
+  <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 backdrop-blur-sm">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-3"></div>
+      <p className="text-sm font-medium text-foreground">Uploading video...</p>
+    </div>
+  </div>
+);
+
 const JoinClipsPage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -461,14 +471,16 @@ const JoinClipsPage: React.FC = () => {
                 isDraggingOverStarting 
                   ? 'border-primary bg-primary/10' 
                   : 'border-border hover:border-primary/50'
-              } ${!startingVideo ? 'cursor-pointer' : ''}`}
+              } ${!startingVideo && !isUploading ? 'cursor-pointer' : ''}`}
               onDragOver={handleStartingDragOver}
               onDragEnter={handleStartingDragEnter}
               onDragLeave={handleStartingDragLeave}
               onDrop={handleStartingDrop}
-              onClick={() => !startingVideo && startingVideoInputRef.current?.click()}
+              onClick={() => !startingVideo && !isUploading && startingVideoInputRef.current?.click()}
             >
-              {startingVideo ? (
+              {isUploading ? (
+                <UploadingVideoState />
+              ) : startingVideo ? (
                 <>
                   {!startingVideoLoaded && <VideoContainerSkeleton />}
                   <video
@@ -596,14 +608,16 @@ const JoinClipsPage: React.FC = () => {
                 isDraggingOverEnding 
                   ? 'border-primary bg-primary/10' 
                   : 'border-border hover:border-primary/50'
-              } ${!endingVideo ? 'cursor-pointer' : ''}`}
+              } ${!endingVideo && !isUploading ? 'cursor-pointer' : ''}`}
               onDragOver={handleEndingDragOver}
               onDragEnter={handleEndingDragEnter}
               onDragLeave={handleEndingDragLeave}
               onDrop={handleEndingDrop}
-              onClick={() => !endingVideo && endingVideoInputRef.current?.click()}
+              onClick={() => !endingVideo && !isUploading && endingVideoInputRef.current?.click()}
             >
-              {endingVideo ? (
+              {isUploading ? (
+                <UploadingVideoState />
+              ) : endingVideo ? (
                 <>
                   {!endingVideoLoaded && <VideoContainerSkeleton />}
                   <video
