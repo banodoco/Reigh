@@ -237,11 +237,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [isPendingUpscale, setIsPendingUpscale] = useState(() => {
     try {
       const pending = localStorage.getItem(`upscale-pending-${media.id}`);
+      console.log('[ImageUpscale] Initial pending state from localStorage:', {
+        mediaId: media.id,
+        pending,
+        isPending: pending === 'true'
+      });
       return pending === 'true';
     } catch {
       return false;
     }
   });
+
+  // Log upscale state changes
+  useEffect(() => {
+    console.log('[ImageUpscale] State update:', {
+      mediaId: media.id,
+      hasUpscaledVersion,
+      upscaledUrl: (media as any).upscaled_url,
+      isPendingUpscale,
+      isUpscaling,
+      showingUpscaled,
+      mediaKeys: Object.keys(media),
+      timestamp: Date.now()
+    });
+  }, [media.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, showingUpscaled, media]);
 
   // Fetch derived generations (generations based on this one)
   const { data: derivedGenerations, isLoading: isDerivedLoading } = useDerivedGenerations(media.id);
@@ -1260,16 +1279,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Clear pending state when upscaled version becomes available
   useEffect(() => {
+    console.log('[ImageUpscale] Checking if should clear pending state:', {
+      hasUpscaledVersion,
+      isPendingUpscale,
+      upscaledUrl: (media as any).upscaled_url,
+      shouldClear: hasUpscaledVersion && isPendingUpscale
+    });
+    
     if (hasUpscaledVersion && isPendingUpscale) {
-      console.log('[ImageUpscale] Upscaled version now available, clearing pending state');
+      console.log('[ImageUpscale] ✅ Upscaled version now available, clearing pending state');
       setIsPendingUpscale(false);
       try {
         localStorage.removeItem(`upscale-pending-${media.id}`);
+        console.log('[ImageUpscale] ✅ Successfully removed pending state from localStorage');
       } catch (e) {
-        console.error('[ImageUpscale] Error removing pending state:', e);
+        console.error('[ImageUpscale] ❌ Error removing pending state:', e);
       }
+    } else {
+      console.log('[ImageUpscale] Not clearing pending state because:', {
+        reason: !hasUpscaledVersion ? 'no upscaled version yet' : 'not in pending state'
+      });
     }
-  }, [hasUpscaledVersion, isPendingUpscale, media.id]);
+  }, [hasUpscaledVersion, isPendingUpscale, media.id, media]);
 
   // Handle upscale
   const handleUpscale = async () => {
@@ -1294,14 +1325,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         generation_id: media.id,
       });
 
-      console.log('[ImageUpscale] Upscale task created successfully');
+      console.log('[ImageUpscale] ✅ Upscale task created successfully');
       
       // Mark as pending in localStorage so it persists across component remounts
       setIsPendingUpscale(true);
       try {
         localStorage.setItem(`upscale-pending-${media.id}`, 'true');
+        console.log('[ImageUpscale] ✅ Set pending state in localStorage:', {
+          mediaId: media.id,
+          key: `upscale-pending-${media.id}`
+        });
       } catch (e) {
-        console.error('[ImageUpscale] Error setting pending state:', e);
+        console.error('[ImageUpscale] ❌ Error setting pending state:', e);
       }
       
     } catch (error) {
