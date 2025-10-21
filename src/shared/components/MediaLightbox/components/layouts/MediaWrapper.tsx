@@ -10,8 +10,8 @@ interface MediaWrapperProps extends React.HTMLAttributes<HTMLDivElement> {
  * 
  * Provides:
  * - Relative positioning context for absolute-positioned controls
- * - Flexible sizing to fill available space
- * - Proper aspect ratio handling
+ * - Flexible sizing to accommodate media of any aspect ratio
+ * - Proper overflow handling
  */
 export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className, ...props }) => {
   return (
@@ -23,13 +23,14 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
         "flex items-center justify-center",
         // Responsive sizing
         "w-full flex-shrink-0",
-        // Max dimensions
+        // Max dimensions - responsive for different screens
         "max-w-[100vw] sm:max-w-[90vw] md:max-w-[85vw]",
         className
       )}
       style={{
-        maxHeight: 'calc(95vh - 200px)', // Leave room for padding + workflow controls
-        aspectRatio: 'auto',
+        // Allow media to grow naturally while staying within viewport
+        minHeight: '300px',
+        maxHeight: 'min(80vh, calc(100vh - 300px))', // Flexible max height
         ...props.style
       }}
       {...props}
