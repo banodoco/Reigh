@@ -40,6 +40,7 @@ import { useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
+import { resolveImageUrl } from '@/shared/lib/imageUrlResolver';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -1724,6 +1725,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           generations:generation_id (
             id,
             location,
+            upscaled_url,
             type
           )
         `)
@@ -1738,6 +1740,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
 
       // Filter and process exactly like simpleFilteredImages does
+      // IMPORTANT: Now prioritizes upscaled_url when available
       const freshImages = (freshShotGenerations || [])
         .filter(sg => {
           // Has valid timeline frame
@@ -1752,15 +1755,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           return !isVideo;
         })
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
-        .map(sg => (sg.generations as any)?.location)
+        .map(sg => {
+          const gen = sg.generations as any;
+          // Prioritize upscaled URL if available
+          return resolveImageUrl(gen?.location, gen?.upscaled_url);
+        })
         .filter((location): location is string => Boolean(location));
 
       absoluteImageUrls = freshImages
         .map((location) => getDisplayUrl(location))
         .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
 
-      console.log('[TaskSubmission] Using fresh image URLs:', {
+      const upscaledCount = (freshShotGenerations || []).filter(sg => {
+        const gen = sg.generations as any;
+        return gen?.upscaled_url && gen.upscaled_url.trim();
+      }).length;
+
+      console.log('[TaskSubmission] Using fresh image URLs (with upscale priority):', {
         count: absoluteImageUrls.length,
+        upscaledCount,
         urls: absoluteImageUrls.map(url => url.substring(0, 50) + '...')
       });
     } catch (err) {
@@ -1796,6 +1809,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             generations:generation_id (
               id,
               location,
+              upscaled_url,
               type
             )
           `)

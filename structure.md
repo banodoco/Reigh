@@ -303,8 +303,13 @@ See [README.md](README.md) for:
 - **Migrations**: 
   - `20251021000001_add_upscaled_url_to_generations.sql` - Adds upscaled_url column with index
   - `20251021000002_add_image_upscale_task_type.sql` - Registers image-upscale task type
+- **Universal Upscale URL Prioritization**: 
+  - New `src/shared/lib/imageUrlResolver.ts` utility for consistent URL resolution across codebase
+  - VideoTravelToolPage now sends upscaled images (when available) for video generation tasks
+  - MagicEditModal automatically uses upscaled images as source for higher quality edits
+  - All task creation now queries `upscaled_url` from database and prioritizes it
 
-**Usage**: Click upscale button on any image in MediaLightbox → task created → upscaled image appears when complete → toggle between versions with eye icon.
+**Usage**: Click upscale button on any image in MediaLightbox → task created → upscaled image appears when complete → toggle between versions with eye icon. Upscaled images are automatically used as high-quality inputs for subsequent video generation and editing tasks.
 
 ### Project Settings Isolation Fix (2024)
 

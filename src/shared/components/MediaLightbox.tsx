@@ -536,6 +536,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Use progressive src if available, otherwise fallback to effective display URL
   const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(effectiveImageUrl);
+  
+  // For task creation (Magic Edit, etc.), always prefer upscaled URL if available
+  const sourceUrlForTasks = upscaledUrl ? getDisplayUrl(upscaledUrl) : displayUrl;
 
 
 
@@ -1876,7 +1879,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                       {!isVideo && showMagicEdit && !readOnly && (
                         <MagicEditLauncher
-                          imageUrl={displayUrl}
+                          imageUrl={sourceUrlForTasks}
                           imageDimensions={imageDimensions}
                           toolTypeOverride={toolTypeOverride}
                           zIndexOverride={100100}
@@ -2703,7 +2706,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {!isVideo && showMagicEdit && !readOnly && (
                     <MagicEditLauncher
-                      imageUrl={displayUrl}
+                      imageUrl={sourceUrlForTasks}
                       imageDimensions={imageDimensions}
                       toolTypeOverride={toolTypeOverride}
                       zIndexOverride={100100}
