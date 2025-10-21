@@ -525,6 +525,12 @@ const VideoTravelToolPage: React.FC = () => {
 
   // ✅ NEW: All settings now derived from hook - no more individual useState calls!
   const isMobile = useIsMobile();
+  
+  // Detect tablets/iPads - treat them like desktop for timeline mode
+  // iPads have screen width >= 768px, so they should get timeline mode option
+  const isTabletOrLarger = typeof window !== 'undefined' && window.innerWidth >= 768;
+  const shouldDefaultToBatch = isMobile && !isTabletOrLarger;
+  
   const {
     videoControlMode = 'batch',
     batchVideoPrompt = '',
@@ -539,7 +545,7 @@ const VideoTravelToolPage: React.FC = () => {
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
-    generationMode = (isMobile ? 'batch' : 'timeline'),
+    generationMode = (shouldDefaultToBatch ? 'batch' : 'timeline'),
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
     textBeforePrompts = '',
     textAfterPrompts = '',

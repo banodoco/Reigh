@@ -1122,6 +1122,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           onImageDuplicate={onImageDuplicate}
           onImageReorder={onImageReorder}
           onOpenLightbox={onOpenLightbox || setLightboxIndex}
+          onInpaintClick={(index) => {
+            setShouldAutoEnterInpaint(true);
+            setLightboxIndex(index);
+          }}
           columns={columns}
           generationMode={generationMode}
           onImageSaved={onImageSaved}

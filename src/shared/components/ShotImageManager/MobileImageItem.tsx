@@ -20,6 +20,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   onDelete,
   onDuplicate,
   onOpenLightbox,
+  onInpaintClick,
   hideDeleteButton = false,
   duplicatingImageId,
   duplicateSuccessImageId,
@@ -133,7 +134,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
         {/* Bottom left - Inpaint and Magic Edit buttons */}
         <div className="absolute bottom-2 left-2 flex gap-2 items-start opacity-100 transition-opacity">
           {/* Inpaint button (hidden in readOnly) */}
-          {!readOnly && onOpenLightbox && (
+          {!readOnly && onInpaintClick && (
             <Button
               size="icon"
               variant="secondary"
@@ -141,7 +142,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 // Open lightbox in inpaint mode
-                onOpenLightbox(index);
+                onInpaintClick();
               }}
               title="Inpaint"
             >

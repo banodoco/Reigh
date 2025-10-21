@@ -408,6 +408,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     );
   });
   
+  // For UI purposes, treat tablets like desktop (show timeline toggle, etc.)
+  // Only hide advanced UI on actual phones
+  const isPhone = isMobile && !isTablet;
+  
   const [orientation, setOrientation] = React.useState<'portrait' | 'landscape'>(() => {
     if (typeof window === 'undefined') return 'portrait';
     try {
@@ -2273,7 +2277,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             <ShotImagesEditor
             isModeReady={state.isModeReady}
             settingsError={state.settingsError}
-            isMobile={isMobile}
+            isMobile={isPhone}
             generationMode={generationMode}
             onGenerationModeChange={onGenerationModeChange}
             selectedShotId={selectedShot.id}

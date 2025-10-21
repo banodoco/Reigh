@@ -22,6 +22,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   onImageDuplicate,
   onImageReorder,
   onOpenLightbox,
+  onInpaintClick,
   columns = 4,
   duplicatingImageId,
   duplicateSuccessImageId,
@@ -314,6 +315,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
                   onDuplicate={onImageDuplicate}
                   onOpenLightbox={onOpenLightbox}
+                  onInpaintClick={onInpaintClick ? () => onInpaintClick(index) : undefined}
                   hideDeleteButton={mobileSelectedIds.length > 0 || readOnly}
                   duplicatingImageId={duplicatingImageId}
                   duplicateSuccessImageId={duplicateSuccessImageId}

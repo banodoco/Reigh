@@ -11,6 +11,7 @@ export interface BaseShotImageManagerProps {
   onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   onImageReorder: (orderedShotGenerationIds: string[]) => void;
   onOpenLightbox?: (index: number) => void;
+  onInpaintClick?: (index: number) => void; // Opens lightbox in inpaint mode
   columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   generationMode: 'batch' | 'timeline';
   onImageSaved?: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
@@ -33,6 +34,7 @@ export interface MobileImageItemProps {
   onDelete: () => void;
   onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   onOpenLightbox?: (index: number) => void; // Kept for backward compatibility (lightbox opens via double-tap)
+  onInpaintClick?: () => void; // Opens lightbox in inpaint mode
   hideDeleteButton?: boolean;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
