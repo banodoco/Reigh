@@ -731,7 +731,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               (showTaskDetails && !isMobile) || (isInpaintMode && !isMobile)
                 ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode
                 : isMobile 
-                  ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full h-auto py-4 sm:py-6 md:py-8 lg:py-12 px-0 sm:px-4 md:px-6" // Mobile: full width with responsive padding
+                  ? "left-0 top-0 w-full h-full" // Mobile: full screen
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onPointerDownOutside={(event) => {
@@ -1978,15 +1978,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
             ) : (
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
-              <FlexContainer onClick={onClose}>
-                {/* Close Button */}
-                <DialogPrimitive.Close
-                  className="absolute top-3 right-3 z-50 rounded-full p-1 bg-black/50 text-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-                  onClick={onClose}
-                >
-                  <X className="h-5 w-5" />
-                  <span className="sr-only">Close</span>
-                </DialogPrimitive.Close>
+              <FlexContainer onClick={onClose} className="bg-transparent">
+                {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls */}
                 <MediaWrapper onClick={(e) => e.stopPropagation()}>
