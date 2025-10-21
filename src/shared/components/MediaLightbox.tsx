@@ -232,6 +232,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing upscaled if available
   const hasUpscaledVersion = !!(media as any).upscaled_url;
+  
+  // Track pending upscale tasks using localStorage
+  const [isPendingUpscale, setIsPendingUpscale] = useState(() => {
+    try {
+      const pending = localStorage.getItem(`upscale-pending-${media.id}`);
+      return pending === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   // Fetch derived generations (generations based on this one)
   const { data: derivedGenerations, isLoading: isDerivedLoading } = useDerivedGenerations(media.id);
@@ -1248,6 +1258,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  // Clear pending state when upscaled version becomes available
+  useEffect(() => {
+    if (hasUpscaledVersion && isPendingUpscale) {
+      console.log('[ImageUpscale] Upscaled version now available, clearing pending state');
+      setIsPendingUpscale(false);
+      try {
+        localStorage.removeItem(`upscale-pending-${media.id}`);
+      } catch (e) {
+        console.error('[ImageUpscale] Error removing pending state:', e);
+      }
+    }
+  }, [hasUpscaledVersion, isPendingUpscale, media.id]);
+
   // Handle upscale
   const handleUpscale = async () => {
     if (!selectedProjectId || isVideo) {
@@ -1272,6 +1295,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       });
 
       console.log('[ImageUpscale] Upscale task created successfully');
+      
+      // Mark as pending in localStorage so it persists across component remounts
+      setIsPendingUpscale(true);
+      try {
+        localStorage.setItem(`upscale-pending-${media.id}`, 'true');
+      } catch (e) {
+        console.error('[ImageUpscale] Error setting pending state:', e);
+      }
       
     } catch (error) {
       console.error('[ImageUpscale] Error creating upscale task:', error);
