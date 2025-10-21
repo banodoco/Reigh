@@ -100,7 +100,6 @@ export function useDeleteGenerationModular() {
       }
     },
     onSuccess: () => {
-      toast.success('Generation deleted successfully');
       // Invalidate all generation queries
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
     },

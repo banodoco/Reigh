@@ -421,7 +421,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           });
           
           console.log('[ImageGenerationForm] Successfully migrated base64 style reference to URL:', uploadedUrl);
-          toast.success('Style reference image migrated to cloud storage');
         } catch (error) {
           console.error('[ImageGenerationForm] Failed to migrate base64 style reference:', error);
           toast.error('Failed to migrate style reference image');
@@ -494,7 +493,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         try {
           await updateProjectImageSettings('project', updates);
           console.log('[RefSettings] ✅ Successfully migrated legacy reference settings');
-          toast.success('Reference settings migrated to new format');
         } catch (error) {
           console.error('[RefSettings] ❌ Failed to migrate legacy reference:', error);
         }

@@ -984,8 +984,6 @@ export const useGenerationActions = ({
         timelineFrame: targetFrame, // Position on timeline if provided
         project_id: projectId
       });
-
-      toast.success(`Added generation to ${selectedShot.name || 'shot'}`);
       
       console.log('[GenerationDrop] ✅ Generation added successfully, refreshing shot data...');
       
@@ -1081,8 +1079,6 @@ export const useGenerationActions = ({
         // Use the pending positions mechanism to safely update frames
         actions.setPendingFramePositions(new Map([...state.pendingFramePositions, ...newPendingPositions]));
       }
-
-      toast.success(`Added ${processedFiles.length} image${processedFiles.length !== 1 ? 's' : ''} to ${selectedShot.name || 'shot'}`);
       
       console.log('[BatchDrop] ✅ Images added successfully, refreshing shot data...');
       
@@ -1142,8 +1138,6 @@ export const useGenerationActions = ({
         // Use the calculated frame position for insertion
         timelineFrame: framePosition ?? targetPosition, // Prefer framePosition, fall back to targetPosition
       });
-
-      toast.success(`Added generation to ${selectedShot.name || 'shot'}`);
       
       console.log('[BatchDrop] ✅ Generation added successfully, refreshing shot data...');
       

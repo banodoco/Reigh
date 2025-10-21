@@ -250,7 +250,6 @@ const MagicEditModal: React.FC<MagicEditModalProps> = ({
       // Switch to the newly created shot
       setMagicEditShotId(result.shot.id);
       setIsCreateShotModalOpen(false);
-      toast.success(`Shot "${shotName}" created and selected`);
     } catch (error) {
       console.error('Error creating shot:', error);
       toast.error("Failed to create shot");

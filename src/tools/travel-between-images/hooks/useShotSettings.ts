@@ -391,8 +391,6 @@ export const useShotSettings = (
         
         // Save immediately (no debounce for explicit operations)
         await saveImmediate(cloned);
-        
-        toast.success('Settings applied successfully');
       } else {
         toast.error('Source shot has no settings');
         setStatus('ready');
@@ -430,7 +428,6 @@ export const useShotSettings = (
         const cloned: VideoTravelSettings = JSON.parse(JSON.stringify(projectDefaults));
         setSettings(cloned);
         await saveImmediate(cloned);
-        toast.success('Project defaults applied');
       } else {
         toast.error('Project has no default settings');
         setStatus('ready');

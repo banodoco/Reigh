@@ -1272,7 +1272,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       });
 
       console.log('[ImageUpscale] Upscale task created successfully');
-      toast.success('Upscale task created! It will appear when complete.');
       
     } catch (error) {
       console.error('[ImageUpscale] Error creating upscale task:', error);

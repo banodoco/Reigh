@@ -788,11 +788,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           type: 'phase-config', 
           metadata: presetMetadata as any 
         });
-        toast.success('Preset updated successfully');
         onClearEdit();
       } else {
         await createResource.mutateAsync({ type: 'phase-config', metadata: presetMetadata as any });
-        toast.success('Preset created successfully');
       }
 
       // Reset form

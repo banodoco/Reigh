@@ -30,7 +30,6 @@ const PaymentSuccessPage: React.FC = () => {
     const timeoutId = setTimeout(() => {
       if (verificationStatus === 'loading') {
         setVerificationStatus('success');
-        toast.success('Payment received! Your credits should be available shortly.');
       }
     }, 5000);
 

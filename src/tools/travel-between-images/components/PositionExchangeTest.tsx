@@ -187,7 +187,6 @@ const PositionExchangeTest: React.FC<PositionExchangeTestProps> = ({ shotId }) =
                 key={sg.id}
                 onClick={() => {
                   navigator.clipboard.writeText(sg.generation_id);
-                  toast.success('ID copied to clipboard');
                 }}
                 className="mr-2 underline hover:no-underline"
               >

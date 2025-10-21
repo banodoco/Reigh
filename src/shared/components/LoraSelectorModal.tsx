@@ -1018,11 +1018,9 @@ const MyLorasTab: React.FC<MyLorasTabProps> = ({ myLorasResource, onAddLora, onR
                     type: 'lora', 
                     metadata: loraMetadata as any 
                 });
-                toast.success('LoRA updated successfully');
                 onClearEdit();
             } else {
                 await createResource.mutateAsync({ type: 'lora', metadata: loraMetadata as any });
-                toast.success('LoRA created successfully');
             }
 
             // Reset form

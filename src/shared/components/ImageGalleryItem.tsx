@@ -291,10 +291,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     try {
       await onCreateShot(shotName, files);
       setIsCreateShotModalOpen(false);
-      toast({ 
-        title: "Shot Created", 
-        description: `"${shotName}" has been created successfully.` 
-      });
     } catch (error) {
       console.error("Error creating shot:", error);
       toast({ 
@@ -334,11 +330,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       
       // Set the newly created shot as the last affected shot
       updateLastAffectedShotId(result.shotId);
-      
-      toast({ 
-        title: "Shot Created & Image Added", 
-        description: `Created "${result.shotName}" and added image successfully.` 
-      });
       
       // Set success state immediately and let the mutation's onSuccess handle the data refresh
       // The mutation should have triggered query invalidation, so the shot will be available soon

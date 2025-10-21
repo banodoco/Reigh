@@ -241,11 +241,6 @@ const CharacterAnimatePage: React.FC = () => {
       if (selectedProjectId) {
         updateSettings('project', { ...settings, inputImageUrl: uploadedUrl });
       }
-      
-      toast({
-        title: 'Image uploaded',
-        description: 'Your character image has been saved',
-      });
     } catch (error) {
       console.error('Error uploading image:', error);
       toast({
@@ -300,11 +295,6 @@ const CharacterAnimatePage: React.FC = () => {
       if (selectedProjectId) {
         updateSettings('project', { ...settings, inputVideoUrl: publicUrl });
       }
-      
-      toast({
-        title: 'Video uploaded',
-        description: 'Your motion video has been saved',
-      });
     } catch (error) {
       console.error('Error uploading video:', error);
       toast({
@@ -342,11 +332,6 @@ const CharacterAnimatePage: React.FC = () => {
       return result;
     },
     onSuccess: (data) => {
-      toast({
-        title: 'Task created',
-        description: 'Your character animation task has been queued',
-      });
-      
       // Show success state on button
       setShowSuccessState(true);
       setTimeout(() => setShowSuccessState(false), 3000);

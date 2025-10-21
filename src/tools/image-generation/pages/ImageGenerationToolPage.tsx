@@ -910,8 +910,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         setLastAffectedShotId(result.shot.id);
         // Note: We're NOT changing setSelectedShotFilter here to keep the gallery populated
       }
-      
-      toast.success(`Shot "${shotName}" created successfully`);
     } catch (error) {
       console.error('Error creating shot:', error);
       toast.error("Failed to create shot");

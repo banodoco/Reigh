@@ -58,8 +58,6 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
 
       onVideoUploaded(videoUrl, metadata);
       
-      toast.success('Video uploaded successfully');
-      
       // Clear the input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';

@@ -112,10 +112,7 @@ export const useCreateTask = (options?: { showToast?: boolean }) => {
         selectedProjectId,
       });
       
-      // Show per-task success toast only if not suppressed
-      if (showToast) {
-        toast.success('Task created successfully');
-      }
+      
       
       // Use InvalidationRouter for centralized, canonical invalidations
       if (selectedProjectId) {

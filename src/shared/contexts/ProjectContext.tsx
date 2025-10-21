@@ -573,11 +573,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       // Save the new project as last opened in user settings
       updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
 
-      if (Object.keys(settingsToInherit).length > 0) {
-        toast.success(`Project "${projectData.name}" created!`);
-      } else {
-        toast.success(`Project "${projectData.name}" created!`);
-      }
             
       return mappedProject;
     } catch (err: any) {
