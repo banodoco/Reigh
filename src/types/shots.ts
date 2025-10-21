@@ -12,6 +12,7 @@ export interface GenerationRow {
   shotImageEntryId?: string; // ID from the shot_images table linking shot to generation
   name?: string; // Optional variant name
   timeline_frame?: number; // Position in timeline (from shot_generations table)
+  starred?: boolean; // Whether this generation is starred
 }
 
 export interface Shot {

@@ -598,6 +598,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   readOnly={readOnly}
                   onFileDrop={onBatchFileDrop}
                   onGenerationDrop={onBatchGenerationDrop}
+                  shotId={selectedShotId}
+                  toolTypeOverride="travel-between-images"
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

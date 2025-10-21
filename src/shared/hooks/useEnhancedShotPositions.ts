@@ -19,6 +19,7 @@ export interface ShotGeneration {
     type?: string;
     created_at: string;
     upscaled_url?: string; // URL of upscaled version if available
+    starred?: boolean; // Whether this generation is starred
   };
 }
 
@@ -84,7 +85,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
             location,
             type,
             created_at,
-            upscaled_url
+            upscaled_url,
+            starred
           )
         `)
         .eq('shot_id', shotId)

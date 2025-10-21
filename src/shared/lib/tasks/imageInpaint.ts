@@ -7,13 +7,16 @@ export interface CreateImageInpaintTaskParams {
   prompt: string;
   num_generations: number;
   generation_id?: string;
+  shot_id?: string;
+  tool_type?: string;
 }
 
 /**
- * Creates an image inpainting task
+ * Creates image inpainting tasks
+ * Creates multiple tasks if num_generations > 1
  * 
  * @param params - Task parameters
- * @returns Task ID
+ * @returns Array of task IDs
  */
 export async function createImageInpaintTask(params: CreateImageInpaintTaskParams): Promise<string> {
   const {
@@ -23,48 +26,64 @@ export async function createImageInpaintTask(params: CreateImageInpaintTaskParam
     prompt,
     num_generations,
     generation_id,
+    shot_id,
+    tool_type,
   } = params;
 
-  console.log('[ImageInpaint] Creating inpaint task:', {
+  console.log('[ImageInpaint] Creating inpaint tasks:', {
     project_id: project_id.substring(0, 8),
     image_url: image_url.substring(0, 60),
     mask_url: mask_url.substring(0, 60),
     prompt: prompt.substring(0, 50),
     num_generations,
     generation_id: generation_id?.substring(0, 8),
+    shot_id: shot_id?.substring(0, 8),
+    tool_type,
   });
 
-  // Create task in database
-  const { data: task, error: taskError } = await supabase
+  console.log('[InpaintDebug] 🔍 Detailed params check:', {
+    has_shot_id: !!shot_id,
+    shot_id_value: shot_id,
+    has_tool_type: !!tool_type,
+    tool_type_value: tool_type
+  });
+
+  // Create multiple tasks (one per generation)
+  const tasksToCreate = Array(num_generations).fill(null).map(() => ({
+    project_id,
+    task_type: 'image_inpaint',
+    status: 'Queued',
+    params: {
+      image_url,
+      mask_url,
+      prompt,
+      num_generations: 1, // Each task creates one generation
+      generation_id,
+      based_on: generation_id, // Explicitly track source generation for lineage
+      ...(shot_id ? { shot_id } : {}), // Include shot_id only if provided
+      ...(tool_type ? { tool_type } : {}), // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
+    },
+  }));
+
+  const { data: tasks, error: taskError } = await supabase
     .from('tasks')
-    .insert({
-      project_id,
-      type: 'image_inpaint',
-      status: 'pending',
-      parameters: {
-        image_url,
-        mask_url,
-        prompt,
-        num_generations,
-        generation_id,
-      },
-    })
-    .select('id')
-    .single();
+    .insert(tasksToCreate)
+    .select('id');
 
   if (taskError) {
-    console.error('[ImageInpaint] Error creating task:', taskError);
-    throw new Error(`Failed to create inpaint task: ${taskError.message}`);
+    console.error('[ImageInpaint] Error creating tasks:', taskError);
+    throw new Error(`Failed to create inpaint tasks: ${taskError.message}`);
   }
 
-  if (!task) {
-    throw new Error('Failed to create inpaint task: No task returned');
+  if (!tasks || tasks.length === 0) {
+    throw new Error('Failed to create inpaint tasks: No tasks returned');
   }
 
-  console.log('[ImageInpaint] ✅ Inpaint task created successfully:', {
-    taskId: task.id.substring(0, 8),
+  console.log('[ImageInpaint] ✅ Inpaint tasks created successfully:', {
+    count: tasks.length,
+    taskIds: tasks.map(t => t.id.substring(0, 8)),
   });
 
-  return task.id;
+  return tasks[0].id; // Return first task ID for compatibility
 }
 

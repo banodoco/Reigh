@@ -715,13 +715,15 @@ serve(async (req)=>{
         const { toolType, category: taskCategory, contentType } = toolTypeInfo;
         console.log(`[GenMigration] Task ${taskIdString} resolved to category: ${taskCategory}, tool_type: ${toolType}, content_type: ${contentType}`);
 
+        // Create combined task data with resolved tool_type and content_type (used by multiple branches)
+        const combinedTaskData = {
+          ...taskData,
+          tool_type: toolType,
+          content_type: contentType
+        };
+
         if (taskCategory === 'generation') {
           console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
-          const combinedTaskData = {
-            ...taskData,
-            tool_type: toolType,
-            content_type: contentType
-          };
           try {
             await createGenerationFromTask(
               supabaseAdmin,
@@ -772,6 +774,12 @@ serve(async (req)=>{
           if (sourceGenerationId) {
             console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
             
+            // Extract shot_id from task params
+            const shotIdForInpaint = taskData.params?.shot_id;
+            if (shotIdForInpaint) {
+              console.log(`[ImageInpaint] Shot ID found in task params: ${shotIdForInpaint}`);
+            }
+            
             // Build inpaint generation params
             const inpaintParams = {
               ...taskData.params,
@@ -782,14 +790,18 @@ serve(async (req)=>{
               mask_url: taskData.params?.mask_url, // Reference to mask used
             };
             
+            // For inpaint tasks, always use 'image' as the type since inpainting always produces images
+            // even if tool_type override suggests video (tool_type is for tracking/UI, not content type)
+            console.log(`[ImageInpaint] Using 'image' type for inpaint generation (ignoring tool_type override if present)`);
+            
             // Create generation record for inpaint result
             const newGenerationId = crypto.randomUUID();
             const generationRecord = {
               id: newGenerationId,
-              tasks: [taskId],
+              tasks: [taskIdString],
               params: inpaintParams,
               location: publicUrl,
-              type: 'image',
+              type: 'image', // Inpaint always produces images regardless of tool_type
               project_id: taskData.project_id,
               thumbnail_url: thumbnailUrl,
               based_on: sourceGenerationId, // Track lineage
@@ -799,6 +811,13 @@ serve(async (req)=>{
             try {
               const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
               console.log(`[ImageInpaint] Created inpaint generation ${newGeneration.id} based on ${sourceGenerationId}`);
+              
+              // Link to shot if shot_id is provided (unpositioned by default)
+              if (shotIdForInpaint) {
+                console.log(`[ImageInpaint] Linking inpaint generation ${newGeneration.id} to shot ${shotIdForInpaint} (unpositioned)`);
+                await linkGenerationToShot(supabaseAdmin, shotIdForInpaint, newGeneration.id, false);
+                console.log(`[ImageInpaint] Successfully linked generation to shot without position`);
+              }
             } catch (genError) {
               console.error(`[ImageInpaint] Error creating inpaint generation:`, genError);
               // Don't fail the task - the inpaint result is still in output_location
@@ -990,8 +1009,12 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
   }
 
   let finalToolType = taskTypeData.tool_type;
-  let finalContentType = taskTypeData.content_type || 'image'; // Default to image if not set
+  // ALWAYS use content_type from base task_type, never from override
+  // The tool_type override is for tracking/UI purposes only
+  const finalContentType = taskTypeData.content_type || 'image'; // Default to image if not set
   const category = taskTypeData.category;
+
+  console.log(`[ToolTypeResolver] Base task_type '${taskType}' has content_type: ${finalContentType}`);
 
   // Check for tool_type override in params
   const paramsToolType = taskParams?.tool_type;
@@ -1001,7 +1024,7 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
     // Validate that the override tool_type is a known valid tool type
     const { data: validToolTypes } = await supabase
       .from("task_types")
-      .select("tool_type, content_type")
+      .select("tool_type")
       .not("tool_type", "is", null)
       .eq("is_active", true);
     
@@ -1009,14 +1032,8 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
     
     if (validToolTypeSet.has(paramsToolType)) {
       console.log(`[ToolTypeResolver] Using tool_type override: ${paramsToolType} (was: ${finalToolType})`);
+      console.log(`[ToolTypeResolver] Content type remains: ${finalContentType} (from base task_type, not override)`);
       finalToolType = paramsToolType;
-      
-      // Update content_type based on the override tool_type
-      const overrideToolTypeData = validToolTypes?.find(t => t.tool_type === paramsToolType);
-      if (overrideToolTypeData?.content_type) {
-        finalContentType = overrideToolTypeData.content_type;
-        console.log(`[ToolTypeResolver] Using content_type from override: ${finalContentType}`);
-      }
     } else {
       console.log(`[ToolTypeResolver] Invalid tool_type override '${paramsToolType}', using default: ${finalToolType}`);
       console.log(`[ToolTypeResolver] Valid tool types: ${Array.from(validToolTypeSet).join(', ')}`);

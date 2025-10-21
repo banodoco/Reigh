@@ -288,9 +288,11 @@ const Timeline: React.FC<TimelineProps> = ({
   const {
     lightboxIndex,
     currentLightboxImage,
+    autoEnterInpaint,
     goNext,
     goPrev,
     closeLightbox,
+    openLightboxWithInpaint,
     handleDesktopDoubleClick,
     handleMobileTap,
     hasNext,
@@ -298,31 +300,52 @@ const Timeline: React.FC<TimelineProps> = ({
     showNavigation
   } = useLightbox({ images, shotId, isMobile });
 
-  // Preload adjacent images when lightbox is open for faster navigation
+  // Preload next/previous images when lightbox is open for faster navigation
   useEffect(() => {
-    if (!currentLightboxImage || lightboxIndex === null) return;
-
-    const preloadImage = (url: string | undefined) => {
-      if (!url) return;
-      // Use window.Image to avoid conflict with lucide-react Image component
-      const img = new window.Image();
-      img.src = url;
-    };
-
+    if (!currentLightboxImage) return;
+    
     // Preload next image
-    if (hasNext && lightboxIndex < images.length - 1) {
+    if (hasNext && lightboxIndex !== null && lightboxIndex + 1 < images.length) {
       const nextImage = images[lightboxIndex + 1];
-      preloadImage(nextImage.imageUrl || nextImage.location);
-      if (nextImage.thumbUrl) preloadImage(nextImage.thumbUrl);
+      if (nextImage?.imageUrl) {
+        const img = new window.Image();
+        img.src = nextImage.imageUrl;
+      }
     }
-
+    
     // Preload previous image
-    if (hasPrevious && lightboxIndex > 0) {
+    if (hasPrevious && lightboxIndex !== null && lightboxIndex > 0) {
       const prevImage = images[lightboxIndex - 1];
-      preloadImage(prevImage.imageUrl || prevImage.location);
-      if (prevImage.thumbUrl) preloadImage(prevImage.thumbUrl);
+      if (prevImage?.imageUrl) {
+        const img = new window.Image();
+        img.src = prevImage.imageUrl;
+      }
     }
   }, [currentLightboxImage, lightboxIndex, images, hasNext, hasPrevious]);
+
+  // Listen for star updates and refetch shot data
+  useEffect(() => {
+    const handleStarUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { shotId: updatedShotId } = customEvent.detail || {};
+      
+      // Only refetch if this event is for our current shot
+      if (updatedShotId === shotId) {
+        console.log('[StarPersist] 🎯 Timeline received star-updated event, refetching...', {
+          shotId,
+          timestamp: Date.now()
+        });
+        
+        // Trigger a refetch of shot generations
+        if (hookData?.loadPositions) {
+          hookData.loadPositions({ silent: true, reason: 'shot_change' });
+        }
+      }
+    };
+    
+    window.addEventListener('generation-star-updated', handleStarUpdated);
+    return () => window.removeEventListener('generation-star-updated', handleStarUpdated);
+  }, [shotId, hookData]);
 
   // Track previous context frames to detect increases
   const prevContextFramesRef = useRef<number>(contextFrames);
@@ -674,6 +697,7 @@ const Timeline: React.FC<TimelineProps> = ({
         projectAspectRatio={projectAspectRatio}
         handleDesktopDoubleClick={handleDesktopDoubleClick}
         handleMobileTap={handleMobileTap}
+        handleInpaintClick={openLightboxWithInpaint}
         structureVideoPath={structureVideoPath}
         structureVideoMetadata={structureVideoMetadata}
         structureVideoTreatment={structureVideoTreatment}
@@ -692,6 +716,9 @@ const Timeline: React.FC<TimelineProps> = ({
         <MediaLightbox
           media={currentLightboxImage}
           shotId={shotId}
+          starred={currentLightboxImage.starred ?? false}
+          autoEnterInpaint={autoEnterInpaint}
+          toolTypeOverride="travel-between-images"
           onClose={closeLightbox}
           onNext={images.length > 1 ? goNext : undefined}
           onPrevious={images.length > 1 ? goPrev : undefined}

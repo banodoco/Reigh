@@ -3,6 +3,7 @@ import MediaLightbox from "@/shared/components/MediaLightbox";
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { GenerationRow, Shot } from "@/types/shots";
 import { GeneratedImageWithMetadata } from '../ImageGallery';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface ImageGalleryLightboxProps {
   // Lightbox state
@@ -198,6 +199,64 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return starred;
   }, [filteredImages, activeLightboxMedia?.id]);
 
+  // Get query client for direct cache access
+  const queryClient = useQueryClient();
+  
+  // Subscribe to cache updates to force re-render when starred changes
+  const [cacheVersion, setCacheVersion] = React.useState(0);
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      // Only trigger on mutations that might affect starred state
+      if (event.type === 'updated' && event.query.queryKey[0] === 'unified-generations') {
+        console.log('[StarPersist] 📡 Cache updated, forcing enhancedMedia recompute');
+        setCacheVersion(v => v + 1);
+      }
+    });
+    return unsubscribe;
+  }, [queryClient]);
+  
+  // Enhance media object with starred field - subscribe to React Query cache for real-time updates
+  const enhancedMedia = useMemo(() => {
+    if (!activeLightboxMedia) return null;
+    
+    // First, try to find in filteredImages (normal case)
+    let foundImage = filteredImages.find(img => img.id === activeLightboxMedia.id);
+    
+    // If not found or starred is undefined, check React Query cache directly
+    // This ensures we get the latest optimistically-updated value
+    if (!foundImage || foundImage.starred === undefined) {
+      const queries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
+      for (const [, data] of queries) {
+        if (data && typeof data === 'object' && 'items' in data) {
+          const cacheItem = (data as any).items.find((g: any) => g.id === activeLightboxMedia.id);
+          if (cacheItem) {
+            foundImage = cacheItem;
+            console.log('[StarPersist] 📦 Found starred value in React Query cache:', {
+              mediaId: activeLightboxMedia.id,
+              starred: cacheItem.starred,
+              source: 'queryCache'
+            });
+            break;
+          }
+        }
+      }
+    }
+    
+    const starred = foundImage?.starred || false;
+    console.log('[StarPersist] 🎨 Enhanced media created:', {
+      mediaId: activeLightboxMedia.id,
+      starred,
+      foundInFilteredImages: !!filteredImages.find(img => img.id === activeLightboxMedia.id),
+      source: foundImage ? 'found' : 'default',
+      cacheVersion
+    });
+    
+    return {
+      ...activeLightboxMedia,
+      starred
+    };
+  }, [activeLightboxMedia, filteredImages, queryClient, cacheVersion]);
+
   // Compute positioned/associated state from gallery source record (mirrors ImageGalleryItem logic)
   const sourceRecord = useMemo(() => {
     const found = filteredImages.find(img => img.id === activeLightboxMedia?.id);
@@ -347,9 +406,9 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   return (
     <>
       {/* Main Lightbox Modal */}
-      {activeLightboxMedia && (
+      {enhancedMedia && (
         <MediaLightbox
-          media={activeLightboxMedia}
+          media={enhancedMedia}
           onClose={onClose}
           onNext={onNext}
           onPrevious={onPrevious}
@@ -362,6 +421,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           hasPrevious={hasPrevious}
           allShots={simplifiedShotOptions}
           selectedShotId={selectedShotIdLocal}
+          shotId={selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined}
           onShotChange={onShotChange}
           onAddToShot={onAddToShot}
           onAddToShotWithoutPosition={onAddToShotWithoutPosition}

@@ -759,18 +759,35 @@ export function useToggleGenerationStar() {
 
       // 1) Optimistically update all generations-list caches
       const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
-      console.log('[StarDebug:useToggleGenerationStar] Found generations queries:', generationsQueries.length);
+      console.log('[StarPersist] 📊 Found generations queries to update:', {
+        queriesCount: generationsQueries.length,
+        generationId: id,
+        newStarred: starred,
+        queryKeys: generationsQueries.map(([key]) => key)
+      });
       
       generationsQueries.forEach(([queryKey, data]) => {
         if (data && typeof data === 'object' && 'items' in data) {
           previousGenerationsQueries.set(queryKey, data);
-
+          
+          const oldItem = (data as any).items.find((g: any) => g.id === id);
           const updated = {
             ...data,
             items: (data as any).items.map((g: any) => (g.id === id ? { ...g, starred } : g)),
           };
-          console.log('[StarDebug:useToggleGenerationStar] Updating generations cache', { queryKey, itemsCount: updated.items.length });
+          
+          console.log('[StarPersist] 🎨 Updating generations cache:', { 
+            queryKey, 
+            itemsCount: updated.items.length,
+            foundItem: !!oldItem,
+            oldStarred: oldItem?.starred,
+            newStarred: starred,
+            updatedItem: updated.items.find((g: any) => g.id === id)
+          });
+          
           queryClient.setQueryData(queryKey, updated);
+        } else {
+          console.log('[StarPersist] ⚠️ Skipping query (no items):', { queryKey, hasData: !!data, dataKeys: data ? Object.keys(data) : [] });
         }
       });
 
@@ -869,6 +886,14 @@ export function useToggleGenerationStar() {
       });
       // Emit domain event for generation star toggle
       // Generation star toggle events are now handled by DataFreshnessManager via realtime events
+      
+      // Emit custom event so Timeline knows to refetch star data
+      if (variables.shotId) {
+        console.log('[StarPersist] 📢 Emitting star-updated event for shot:', variables.shotId);
+        window.dispatchEvent(new CustomEvent('generation-star-updated', { 
+          detail: { generationId: variables.id, shotId: variables.shotId, starred: variables.starred }
+        }));
+      }
       
       console.log('[StarPersist] ✨ Optimistic updates complete - all caches updated');
     },

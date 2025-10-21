@@ -78,6 +78,7 @@ interface MediaLightboxProps {
   showImageEditTools?: boolean;
   showDownload?: boolean;
   showMagicEdit?: boolean;
+  autoEnterInpaint?: boolean; // Automatically enter inpaint mode when lightbox opens
   // Navigation availability
   hasNext?: boolean;
   hasPrevious?: boolean;
@@ -142,6 +143,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   showImageEditTools = true,
   showDownload = true,
   showMagicEdit = false,
+  autoEnterInpaint = false,
   // Navigation availability
   hasNext = true,
   hasPrevious = true,
@@ -290,21 +292,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     canvasRef,
   } = imageFlipHook;
 
-  // Define handleExitInpaintMode before useInpainting
-  const handleExitInpaintMode = () => {
-    // Will be called by inpainting hook
-  };
-
   // Inpainting hook
+  console.log('[InpaintDebug] 🔍 Passing to useInpainting hook:', {
+    shotId: shotId?.substring(0, 8),
+    toolTypeOverride,
+    selectedProjectId: selectedProjectId?.substring(0, 8),
+    mediaId: media.id.substring(0, 8)
+  });
+  
   const inpaintingHook = useInpainting({
     media,
     selectedProjectId,
+    shotId,
+    toolTypeOverride,
       isVideo,
     displayCanvasRef,
     maskCanvasRef,
     imageContainerRef,
     imageDimensions,
-    handleExitInpaintMode,
+    handleExitInpaintMode: () => {
+      console.log('[InpaintPaint] 🚪 Exiting inpaint mode from component');
+      // The hook will handle the state reset
+      // We just need to provide this callback for when the hook needs to exit
+    },
   });
   const {
     isInpaintMode,
@@ -312,11 +322,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     isEraseMode,
     inpaintPrompt,
     inpaintNumGenerations,
+    brushSize,
     isGeneratingInpaint,
+    inpaintGenerateSuccess,
     setIsInpaintMode,
     setIsEraseMode,
     setInpaintPrompt,
     setInpaintNumGenerations,
+    setBrushSize,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -325,6 +338,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleEnterInpaintMode,
     handleGenerateInpaint,
   } = inpaintingHook;
+  
+  // Handle exiting inpaint mode from UI buttons
+  const handleExitInpaintMode = () => {
+    console.log('[InpaintPaint] 🚪 Exit button clicked');
+    setIsInpaintMode(false);
+  };
+
+  // Auto-enter inpaint mode if requested
+  React.useEffect(() => {
+    if (autoEnterInpaint && !isInpaintMode && !isVideo && selectedProjectId) {
+      console.log('[InpaintAutoEnter] 🎨 Auto-entering inpaint mode');
+      handleEnterInpaintMode();
+    }
+  }, [autoEnterInpaint, isInpaintMode, isVideo, selectedProjectId, handleEnterInpaintMode]);
 
   // Generation name hook
   const generationNameHook = useGenerationName({ media, selectedProjectId });
@@ -680,8 +707,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Disable animations on mobile to prevent blink during zoom/fade
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
-              showTaskDetails && !isMobile
-                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details
+              (showTaskDetails && !isMobile) || (isInpaintMode && !isMobile)
+                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode
                 : isMobile 
                   ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full h-auto" // Mobile: full width
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
@@ -739,8 +766,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               View and interact with {media.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.
             </DialogPrimitive.Description>
             
-            {showTaskDetails && !isMobile ? (
-              // Desktop layout with task details - side by side
+            {(showTaskDetails && !isMobile) || (isInpaintMode && !isMobile) ? (
+              // Desktop layout with task details OR inpaint mode - side by side
               <div 
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
@@ -794,7 +821,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <img 
                           src={effectiveImageUrl} 
                           alt="Media content"
-                          className={`object-contain transition-opacity duration-300 ${
+                          draggable={false}
+                          className={`object-contain transition-opacity duration-300 select-none ${
                             isFlippedHorizontally ? 'scale-x-[-1]' : ''
                           } ${
                             isSaving ? 'opacity-30' : 'opacity-100'
@@ -802,7 +830,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           style={{ 
                             maxHeight: '90vh',
                             maxWidth: '55vw',
-                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none',
+                            pointerEvents: isInpaintMode ? 'none' : 'auto'
                           }}
                           onLoad={(e) => {
                             const img = e.target as HTMLImageElement;
@@ -833,15 +862,42 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <>
                             <canvas
                               ref={displayCanvasRef}
-                              className="absolute pointer-events-auto cursor-crosshair"
+                              className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
                               style={{
                                 touchAction: 'none',
-                                zIndex: 50
+                                zIndex: 50,
+                                userSelect: 'none'
                               }}
-                              onPointerDown={handlePointerDown}
-                              onPointerMove={handlePointerMove}
-                              onPointerUp={handlePointerUp}
-                              onPointerLeave={handlePointerUp}
+                              onPointerDown={(e) => {
+                                console.log('[InpaintPaint] 🎨 Canvas onPointerDown', {
+                                  clientX: e.clientX,
+                                  clientY: e.clientY,
+                                  canvasWidth: displayCanvasRef.current?.width,
+                                  canvasHeight: displayCanvasRef.current?.height,
+                                  isInpaintMode,
+                                  hasHandler: !!handlePointerDown
+                                });
+                                handlePointerDown(e);
+                              }}
+                              onPointerMove={(e) => {
+                                console.log('[InpaintPaint] 🖌️ Canvas onPointerMove', {
+                                  clientX: e.clientX,
+                                  clientY: e.clientY
+                                });
+                                handlePointerMove(e);
+                              }}
+                              onPointerUp={(e) => {
+                                console.log('[InpaintPaint] 🛑 Canvas onPointerUp');
+                                handlePointerUp(e);
+                              }}
+                              onPointerCancel={(e) => {
+                                console.log('[InpaintPaint] ⚠️ Canvas onPointerCancel');
+                                handlePointerUp(e);
+                              }}
+                              onDragStart={(e) => {
+                                console.log('[InpaintPaint] 🚫 Preventing drag');
+                                e.preventDefault();
+                              }}
                             />
                             <canvas
                               ref={maskCanvasRef}
@@ -868,8 +924,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       )}
 
-                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly) */}
-                      {!readOnly && !isVideo && selectedProjectId && (
+                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly and inpaint mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -948,6 +1004,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Tooltip>
                       )}
 
+                      {(() => {
+                        console.log('[InpaintButton] Desktop bottom left render check:', {
+                          isVideo,
+                          showMagicEdit,
+                          readOnly,
+                          isInpaintMode,
+                          willShow: !isVideo && showMagicEdit && !readOnly && !isInpaintMode
+                        });
+                        return null;
+                      })()}
+                      
                       {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
                         <MagicEditLauncher
                           imageUrl={sourceUrlForTasks}
@@ -956,6 +1023,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           zIndexOverride={100100}
                           shotGenerationId={media.shotImageEntryId}
                         />
+                      )}
+
+                      {/* Inpaint Button - Bottom Left Controls (next to Magic Edit) */}
+                      {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleEnterInpaintMode}
+                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                            >
+                              <Paintbrush className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
+                        </Tooltip>
                       )}
 
                       {!isVideo && showImageEditTools && !readOnly && !isInpaintMode && (
@@ -1145,14 +1229,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
                 </div>
 
-                {/* Task Details Panel - Right side (40% width) */}
+                {/* Task Details / Inpaint Panel - Right side (40% width) */}
                 <div 
                   data-task-details-panel
                   className="bg-background border-l border-border overflow-y-auto"
                   style={{ width: '40%' }}
                 >
                   {isInpaintMode ? (
-                    // Inpaint Controls Panel
+                    // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
                     <div className="p-6 space-y-4">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-2xl font-light">Inpaint Settings</h2>
@@ -1180,11 +1264,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               )}
                             >
                               <Eraser className="h-4 w-4 mr-2" />
-                              {isEraseMode ? 'Erasing' : 'Erase'}
+                              {isEraseMode ? 'Remove Paint Mode' : 'Paint Mode'}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent className="z-[100001]">
-                            {isEraseMode ? 'Switch to paint mode' : 'Switch to erase mode'}
+                            {isEraseMode ? 'Switch to paint mode' : 'Switch to remove paint mode'}
                           </TooltipContent>
                         </Tooltip>
                         
@@ -1215,12 +1299,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         Clear All Strokes
                       </Button>
                       
-                      {/* Stroke Count */}
-                      <div className="text-sm text-muted-foreground">
-                        {brushStrokes.length === 0 ? 'No strokes yet' : `${brushStrokes.length} stroke${brushStrokes.length === 1 ? '' : 's'}`}
-                      </div>
-                      
                       <div className="border-t border-border pt-4 space-y-4">
+                        {/* Brush Size Slider */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium">Brush Size</label>
+                            <span className="text-sm text-muted-foreground">{brushSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={5}
+                            max={100}
+                            value={brushSize}
+                            onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                        </div>
+                      
                         {/* Prompt Field */}
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Inpaint Prompt</label>
@@ -1233,18 +1328,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           />
                         </div>
                         
-                        {/* Number of Generations */}
+                        {/* Number of Generations Slider */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Number of Generations</label>
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium">Number of Generations</label>
+                            <span className="text-sm text-muted-foreground">{inpaintNumGenerations}</span>
+                          </div>
                           <input
-                            type="number"
+                            type="range"
                             min={1}
-                            max={4}
+                            max={16}
                             value={inpaintNumGenerations}
-                            onChange={(e) => setInpaintNumGenerations(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
-                            className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
+                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                           />
-                          <p className="text-xs text-muted-foreground">Generate 1-4 variations</p>
+                          <p className="text-xs text-muted-foreground">Generate 1-16 variations</p>
                         </div>
                         
                         {/* Generate Button */}
@@ -1252,13 +1350,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="default"
                           size="default"
                           onClick={handleGenerateInpaint}
-                          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint}
-                          className="w-full"
+                          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
+                          className={cn(
+                            "w-full",
+                            inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
+                          )}
                         >
                           {isGeneratingInpaint ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               Generating...
+                            </>
+                          ) : inpaintGenerateSuccess ? (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Success!
                             </>
                           ) : (
                             <>
@@ -1269,7 +1375,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       </div>
                     </div>
-                  ) : taskDetailsData && (
+                  ) : taskDetailsData ? (
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
                       isLoading={taskDetailsData.isLoading}
@@ -1415,6 +1521,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         );
                       })()}
                     />
+                  ) : (
+                    // Fallback: sidebar is open but no content (shouldn't happen in normal flow)
+                    <div className="p-6 text-center text-muted-foreground">
+                      <p className="text-sm">No details available</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1493,8 +1604,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       )}
 
-                      {/* Add to References Button - Mobile Task Details View (hidden in readOnly) */}
-                      {!readOnly && !isVideo && selectedProjectId && (
+                      {/* Add to References Button - Mobile Task Details View (hidden in readOnly and inpaint mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -1608,7 +1719,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                         >
                           <Eraser className="h-3 w-3 mr-1" />
-                          {isEraseMode ? 'Erasing' : 'Erase'}
+                          {isEraseMode ? 'Remove Paint Mode' : 'Paint Mode'}
                         </Button>
                         
                         <Button
@@ -1633,12 +1744,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         Clear All
                       </Button>
                       
-                      {/* Stroke Count */}
-                      <div className="text-xs text-muted-foreground">
-                        {brushStrokes.length === 0 ? 'No strokes' : `${brushStrokes.length} stroke${brushStrokes.length === 1 ? '' : 's'}`}
-                      </div>
-                      
                       <div className="border-t border-border pt-3 space-y-3">
+                        {/* Brush Size Slider - Mobile */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-medium">Brush Size</label>
+                            <span className="text-xs text-muted-foreground">{brushSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={5}
+                            max={100}
+                            value={brushSize}
+                            onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                          />
+                        </div>
+                      
                         {/* Prompt Field */}
                         <div className="space-y-1">
                           <label className="text-xs font-medium">Inpaint Prompt</label>
@@ -1651,17 +1773,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           />
                         </div>
                         
-                        {/* Number of Generations */}
+                        {/* Number of Generations Slider - Mobile */}
                         <div className="space-y-1">
-                          <label className="text-xs font-medium">Generations (1-4)</label>
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-medium">Generations</label>
+                            <span className="text-xs text-muted-foreground">{inpaintNumGenerations}</span>
+                          </div>
                           <input
-                            type="number"
+                            type="range"
                             min={1}
-                            max={4}
+                            max={16}
                             value={inpaintNumGenerations}
-                            onChange={(e) => setInpaintNumGenerations(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
-                            className="w-full bg-background border border-input rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
+                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                           />
+                          <p className="text-xs text-muted-foreground">1-16 variations</p>
                         </div>
                         
                         {/* Generate Button */}
@@ -1669,13 +1795,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="default"
                           size="sm"
                           onClick={handleGenerateInpaint}
-                          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint}
-                          className="w-full"
+                          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
+                          className={cn(
+                            "w-full",
+                            inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
+                          )}
                         >
                           {isGeneratingInpaint ? (
                             <>
                               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
                               Generating...
+                            </>
+                          ) : inpaintGenerateSuccess ? (
+                            <>
+                              <CheckCircle className="h-3 w-3 mr-2" />
+                              Success!
                             </>
                           ) : (
                             <>
@@ -2020,6 +2154,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   )}
 
+                  {/* Inpaint Button - Mobile Bottom Left Controls (next to Magic Edit) */}
+                  {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleEnterInpaintMode}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Paintbrush className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
+                    </Tooltip>
+                  )}
+
                   {!isVideo && showImageEditTools && !readOnly && (
                     <>
                       <Tooltip>
@@ -2205,126 +2356,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <TooltipContent className="z-[100001]">Delete image</TooltipContent>
                         </Tooltip>
                       )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Floating Inpaint Controls Panel - Regular View Only (not task details) */}
-                {isInpaintMode && !isVideo && !showTaskDetails && (
-                  <div className="absolute right-4 top-20 bg-background border border-border rounded-lg p-4 z-[60] w-80 shadow-lg max-h-[calc(100vh-180px)] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium">Inpaint Settings</h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleExitInpaintMode}
-                        className="hover:bg-accent"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    {/* Paint/Erase Toggle and Undo */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={isEraseMode ? "default" : "secondary"}
-                            size="sm"
-                            onClick={() => setIsEraseMode(!isEraseMode)}
-                            className={cn(
-                              "flex-1",
-                              isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
-                            )}
-                          >
-                            <Eraser className="h-4 w-4 mr-2" />
-                            {isEraseMode ? 'Erasing' : 'Erase'}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="z-[100001]">
-                          {isEraseMode ? 'Switch to paint mode' : 'Switch to erase mode'}
-                        </TooltipContent>
-                      </Tooltip>
-                      
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleUndo}
-                            disabled={brushStrokes.length === 0}
-                          >
-                            <Undo2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="z-[100001]">Undo last stroke</TooltipContent>
-                      </Tooltip>
-                    </div>
-
-                    {/* Clear Button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleClearMask}
-                      disabled={brushStrokes.length === 0}
-                      className="w-full mb-3"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Clear All Strokes
-                    </Button>
-                    
-                    {/* Stroke Count */}
-                    <div className="text-sm text-muted-foreground mb-4">
-                      {brushStrokes.length === 0 ? 'No strokes yet' : `${brushStrokes.length} stroke${brushStrokes.length === 1 ? '' : 's'}`}
-                    </div>
-                    
-                    <div className="border-t border-border pt-4 space-y-4">
-                      {/* Prompt Field */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Inpaint Prompt</label>
-                        <textarea
-                          value={inpaintPrompt}
-                          onChange={(e) => setInpaintPrompt(e.target.value)}
-                          placeholder="Describe what to generate in the masked area..."
-                          className="w-full min-h-[100px] bg-background border border-input rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                          rows={4}
-                        />
-                      </div>
-                      
-                      {/* Number of Generations */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Number of Generations</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={4}
-                          value={inpaintNumGenerations}
-                          onChange={(e) => setInpaintNumGenerations(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
-                          className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                        <p className="text-xs text-muted-foreground">Generate 1-4 variations</p>
-                      </div>
-                      
-                      {/* Generate Button */}
-                      <Button
-                        variant="default"
-                        size="default"
-                        onClick={handleGenerateInpaint}
-                        disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint}
-                        className="w-full"
-                      >
-                        {isGeneratingInpaint ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <Paintbrush className="h-4 w-4 mr-2" />
-                            Generate Inpaint
-                          </>
-                        )}
-                      </Button>
                     </div>
                   </div>
                 )}

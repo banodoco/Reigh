@@ -59,6 +59,7 @@ interface TimelineContainerProps {
   // Lightbox handlers
   handleDesktopDoubleClick: (idx: number) => void;
   handleMobileTap: (idx: number) => void;
+  handleInpaintClick?: (idx: number) => void;
   // Structure video props
   structureVideoPath?: string | null;
   structureVideoMetadata?: VideoMetadata | null;
@@ -113,6 +114,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   projectAspectRatio,
   handleDesktopDoubleClick,
   handleMobileTap,
+  handleInpaintClick,
   structureVideoPath,
   structureVideoMetadata,
   structureVideoTreatment = 'adjust',
@@ -812,6 +814,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 onDelete={onImageDelete}
                 onDuplicate={onImageDuplicate}
                 onMagicEdit={handleOpenMagicEdit}
+                onInpaintClick={handleInpaintClick ? () => handleInpaintClick(idx) : undefined}
                 duplicatingImageId={duplicatingImageId}
                 duplicateSuccessImageId={duplicateSuccessImageId}
                 projectAspectRatio={projectAspectRatio}

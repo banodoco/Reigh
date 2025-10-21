@@ -64,6 +64,9 @@ export interface ShotImageManagerProps {
   // Drop handlers for batch mode
   onFileDrop?: (files: File[], targetPosition?: number, framePosition?: number) => Promise<void>; // External file drop
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetPosition?: number, framePosition?: number) => Promise<void>; // Generation drop from pane
+  // Props for inpaint tasks
+  shotId?: string; // Shot ID to associate inpaint results with
+  toolTypeOverride?: string; // Tool type for inpaint tasks (e.g., 'travel-between-images')
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -87,6 +90,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   readOnly = false,
   onFileDrop,
   onGenerationDrop,
+  shotId,
+  toolTypeOverride,
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
@@ -155,6 +160,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   mobileSelectedIdsRef.current = mobileSelectedIds;
   
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [shouldAutoEnterInpaint, setShouldAutoEnterInpaint] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   const currentDialogSkipChoiceRef = useRef(false);
@@ -1140,9 +1146,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         {lightboxIndex !== null && currentImages[lightboxIndex] && (
           <MediaLightbox
             media={currentImages[lightboxIndex]}
+            shotId={shotId}
+            toolTypeOverride={toolTypeOverride}
+            autoEnterInpaint={shouldAutoEnterInpaint}
             onClose={() => {
               console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
               setLightboxIndex(null);
+              setShouldAutoEnterInpaint(false);
             }}
             onNext={handleNext}
             onPrevious={handlePrevious}
@@ -1292,6 +1302,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                   onDuplicate={onImageDuplicate}
                   timeline_frame={frameNumber}
                   onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
+                  onInpaintClick={isMobile ? undefined : () => {
+                    setShouldAutoEnterInpaint(true);
+                    setLightboxIndex(index);
+                  }}
                   skipConfirmation={imageDeletionSettings.skipConfirmation}
                   onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
                   duplicatingImageId={duplicatingImageId}
@@ -1376,7 +1390,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       {lightboxIndex !== null && currentImages[lightboxIndex] && (
         <MediaLightbox
           media={currentImages[lightboxIndex]}
-          onClose={() => setLightboxIndex(null)}
+          shotId={shotId}
+          toolTypeOverride={toolTypeOverride}
+          autoEnterInpaint={shouldAutoEnterInpaint}
+          onClose={() => {
+            setLightboxIndex(null);
+            setShouldAutoEnterInpaint(false);
+          }}
           onNext={handleNext}
           onPrevious={handlePrevious}
           onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}

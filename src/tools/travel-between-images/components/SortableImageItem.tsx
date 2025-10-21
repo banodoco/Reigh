@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Sparkles } from 'lucide-react';
+import { Trash2, Copy, Check, Sparkles, Paintbrush } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +32,7 @@ interface SortableImageItemProps {
   onMobileTap?: () => void;
   onClick: (event: React.MouseEvent) => void;
   onPointerDown?: (event: React.PointerEvent) => void;
+  onInpaintClick?: () => void;
   isSelected: boolean;
   isDragDisabled?: boolean;
   timeline_frame?: number;
@@ -53,6 +54,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   onMobileTap,
   onClick,
   onPointerDown,
+  onInpaintClick,
   isSelected,
   isDragDisabled = false,
   timeline_frame,
@@ -346,6 +348,35 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
           >
             <Sparkles className="h-3.5 w-3.5" />
           </Button>
+          
+          {/* Inpaint trigger - next to Magic Edit */}
+          {onInpaintClick && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute bottom-1 left-10 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+                onInpaintClick();
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+              }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+              }}
+              title="Inpaint"
+            >
+              <Paintbrush className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          
           {onDuplicate && timeline_frame !== undefined && (
             <Button
               variant="secondary"

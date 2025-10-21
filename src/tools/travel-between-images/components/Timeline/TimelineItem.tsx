@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl, cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
-import { Trash2, Copy, Sparkles, Check } from "lucide-react";
+import { Trash2, Copy, Sparkles, Check, Paintbrush } from "lucide-react";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
 import { framesToSeconds } from "./utils/time-utils";
@@ -33,6 +33,7 @@ interface TimelineItemProps {
   onDelete: (imageId: string) => void;
   onDuplicate: (imageId: string, timeline_frame: number) => void;
   onMagicEdit?: (imageUrl: string, shotGenerationId: string) => void;
+  onInpaintClick?: () => void;
   duplicatingImageId?: string;
   duplicateSuccessImageId?: string;
   projectAspectRatio?: string;
@@ -62,6 +63,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   onDelete,
   onDuplicate,
   onMagicEdit,
+  onInpaintClick,
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio = undefined,
@@ -455,6 +457,40 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               >
                 <Sparkles className="h-3 w-3" />
               </Button>
+
+              {/* Inpaint Button - next to Magic Edit */}
+              {onInpaintClick && (
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute bottom-1 left-8 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.nativeEvent.stopImmediatePropagation();
+                    onInpaintClick();
+                  }}
+                  onMouseDown={(e) => {
+                    buttonClickedRef.current = true;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTimeout(() => {
+                      buttonClickedRef.current = false;
+                    }, 100);
+                  }}
+                  onPointerDown={(e) => {
+                    buttonClickedRef.current = true;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTimeout(() => {
+                      buttonClickedRef.current = false;
+                    }, 100);
+                  }}
+                  title="Inpaint"
+                >
+                  <Paintbrush className="h-3 w-3" />
+                </Button>
+              )}
 
               {/* Duplicate Button */}
               <Button

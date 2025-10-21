@@ -12,6 +12,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
   
   // Lightbox state
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [autoEnterInpaint, setAutoEnterInpaint] = useState(false);
   
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
@@ -71,12 +72,26 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
     }
   }, [images, shotId]);
 
+  const openLightboxWithInpaint = useCallback((index: number) => {
+    if (index >= 0 && index < images.length) {
+      timelineDebugger.logEvent('Lightbox opened with inpaint mode', {
+        shotId,
+        imageIndex: index,
+        imageId: images[index]?.shotImageEntryId?.substring(0, 8),
+        totalImages: images.length
+      });
+      setAutoEnterInpaint(true);
+      setLightboxIndex(index);
+    }
+  }, [images, shotId]);
+
   const closeLightbox = useCallback(() => {
     timelineDebugger.logEvent('Lightbox closed', {
       shotId,
       previousIndex: lightboxIndex
     });
     setLightboxIndex(null);
+    setAutoEnterInpaint(false); // Reset auto-enter flag when closing
   }, [shotId, lightboxIndex]);
 
   // Handle mobile double-tap detection
@@ -142,11 +157,13 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
     // State
     lightboxIndex,
     currentLightboxImage,
+    autoEnterInpaint,
     
     // Navigation
     goNext,
     goPrev,
     openLightbox,
+    openLightboxWithInpaint,
     closeLightbox,
     
     // Event handlers
