@@ -1996,7 +1996,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
                   />
                 ) : (
-                  <div className="relative">
+                  <div className="relative flex items-center justify-center w-full h-full">
                     <img 
                       src={effectiveImageUrl} 
                       alt="Media content"
