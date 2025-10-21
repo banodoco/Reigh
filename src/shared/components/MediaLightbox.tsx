@@ -27,6 +27,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { createImageUpscaleTask } from '@/shared/lib/tasks/imageUpscale';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
 
 interface ShotOption {
   id: string;
@@ -213,6 +214,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     projectId: selectedProjectId,
     enabled: !!selectedProjectId
   });
+  
+  // Get generation method settings to check if cloud mode is enabled
+  const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
+  const isCloudMode = generationMethods.inCloud;
   
   // State for adding to references
   const [isAddingToReferences, setIsAddingToReferences] = useState(false);
@@ -1851,8 +1856,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Tooltip>
                       )}
 
-                      {/* Upscale Button - Desktop Task Details View (hidden in readOnly) */}
-                      {!readOnly && !isVideo && selectedProjectId && (
+                      {/* Upscale Button - Desktop Task Details View (hidden in readOnly, only shown in cloud mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -2335,8 +2340,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       )}
 
-                      {/* Upscale Button - Mobile Task Details View (hidden in readOnly) */}
-                      {!readOnly && !isVideo && selectedProjectId && (
+                      {/* Upscale Button - Mobile Task Details View (hidden in readOnly, only shown in cloud mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -2678,8 +2683,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </Tooltip>
                   )}
 
-                  {/* Upscale Button - Regular View (hidden in readOnly) */}
-                  {!readOnly && !isVideo && selectedProjectId && (
+                  {/* Upscale Button - Regular View (hidden in readOnly, only shown in cloud mode) */}
+                  {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
