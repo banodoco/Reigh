@@ -1990,6 +1990,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         );
                       })()}
                     />
+                    </div>
                   )}
                 </div>
               </div>
@@ -2083,40 +2084,103 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   </div>
                 )}
 
-                  {/* Media Controls - Top Right */}
+                  {/* Bottom Left Controls - Inpaint and Magic Edit on mobile */}
+                  {!readOnly && !isInpaintMode && (
+                    <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
+                      {/* Inpaint Button */}
+                      {!isVideo && selectedProjectId && isCloudMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleEnterInpaintMode}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Paintbrush className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {/* Magic Edit Launcher */}
+                      {!isVideo && showMagicEdit && (
+                        <MagicEditLauncher
+                          imageUrl={effectiveImageUrl}
+                          imageDimensions={imageDimensions}
+                          toolTypeOverride={toolTypeOverride}
+                          zIndexOverride={100100}
+                          shotGenerationId={media.shotImageEntryId}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* Top Right Controls - Star, Flip, Save, Download, Delete */}
                   {!readOnly && (
-                    <MediaControls
-                      mediaId={media.id}
-                      isVideo={isVideo}
-                      shotImageEntryId={media.shotImageEntryId}
-                      readOnly={readOnly}
-                      showDownload={showDownload}
-                      showImageEditTools={showImageEditTools}
-                      showMagicEdit={showMagicEdit}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={generationMethods.inCloud}
-                            toolTypeOverride={toolTypeOverride}
-                      imageDimensions={imageDimensions}
-                      sourceUrlForTasks={effectiveImageUrl}
-                      isInpaintMode={isInpaintMode}
-                      localStarred={localStarred}
-                      handleToggleStar={handleToggleStar}
-                      isAddingToReferences={isAddingToReferences}
-                      addToReferencesSuccess={addToReferencesSuccess}
-                      handleAddToReferences={handleAddToReferences}
-                      handleEnterInpaintMode={handleEnterInpaintMode}
-                      isUpscaling={isUpscaling}
-                      isPendingUpscale={isPendingUpscale}
-                      hasUpscaledVersion={hasUpscaledVersion}
-                      showingUpscaled={showingUpscaled}
-                      handleUpscale={handleUpscale}
-                      handleToggleUpscaled={handleToggleUpscaled}
-                      hasChanges={hasChanges}
-                      isSaving={isSaving}
-                      handleFlip={handleFlip}
-                      handleSave={() => handleSave(effectiveImageUrl)}
-                      handleDownload={handleDownload}
-                    />
+                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+                      {/* Star Button (hidden in inpaint mode) */}
+                      {!isInpaintMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleToggleStar}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                        </Button>
+                      )}
+                      
+                      {/* Image Edit Tools: Flip and Save */}
+                      {!isVideo && showImageEditTools && !isInpaintMode && (
+                        <>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleFlip}
+                            className="bg-black/50 hover:bg-black/70 text-white"
+                          >
+                            <FlipHorizontal className="h-4 w-4" />
+                          </Button>
+
+                          {hasChanges && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleSave(effectiveImageUrl)}
+                              disabled={isSaving}
+                              className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+
+                      {/* Download Button */}
+                      {showDownload && !isInpaintMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload();
+                          }}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {/* Delete Button */}
+                      {onDelete && !isVideo && !isInpaintMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleDelete}
+                          disabled={isDeleting === media.id}
+                          className="bg-red-600/80 hover:bg-red-600 text-white"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   )}
 
                   {/* Navigation Buttons */}
