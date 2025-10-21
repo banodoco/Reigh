@@ -413,56 +413,39 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
   const lastTappedImageIdRef = useRef<string | null>(null);
-  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMobileTap = useCallback((id: string, index: number) => {
-    // Safety check: ensure we have valid images during re-renders
+    // Safety check: ensure we have valid images
     if (!currentImages || currentImages.length === 0 || index >= currentImages.length) {
-      console.log('[DragDebug:ShotImageManager] Skipping mobile tap - invalid state during re-render');
       return;
-    }
-
-    // Clear any pending single-tap action
-    if (tapTimeoutRef.current) {
-      clearTimeout(tapTimeoutRef.current);
-      tapTimeoutRef.current = null;
     }
 
     const currentTime = Date.now();
     const timeDiff = currentTime - lastTouchTimeRef.current;
     const isSameImage = lastTappedImageIdRef.current === id;
-    
-    // Check for double tap
+
+    // On any tap, immediately toggle the selection state.
+    // This provides instant feedback to the user.
+    setMobileSelectedIds(prev =>
+      prev.includes(id)
+        ? prev.filter(selectedId => selectedId !== id)
+        : [...prev, id]
+    );
+
+    // If this tap is a double-tap, also open the lightbox.
     if (timeDiff < 300 && timeDiff > 10 && isSameImage) {
       console.log('[MobileDebug:ShotImageManager] ✅ Double-tap detected! Opening lightbox.');
-      
-      // It's a double tap, so open the lightbox
       const image = currentImages[index];
       if (image?.imageUrl) {
         setLightboxIndex(index);
       }
-      
-      // Reset tap tracking to ensure the next tap is a clean single tap
+      // Reset tap tracking to prevent a third tap from also triggering
       lastTouchTimeRef.current = 0;
       lastTappedImageIdRef.current = null;
-
     } else {
-      // It's a single tap, schedule the selection toggle
-      console.log('[MobileDebug:ShotImageManager] Single-tap detected. Scheduling selection toggle.');
-      
-      // Update tracking refs for the next tap
+      // It's a single tap, so just update the tracking refs
       lastTouchTimeRef.current = currentTime;
       lastTappedImageIdRef.current = id;
-      
-      tapTimeoutRef.current = setTimeout(() => {
-        console.log('[MobileDebug:ShotImageManager] Executing delayed single-tap selection.');
-        setMobileSelectedIds(prev =>
-          prev.includes(id)
-            ? prev.filter(selectedId => selectedId !== id)
-            : [...prev, id]
-        );
-        tapTimeoutRef.current = null;
-      }, 250);
     }
   }, [mobileSelectedIds, currentImages]);
 
