@@ -1398,14 +1398,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   ) : taskDetailsData ? (
                     <div className="w-full">
-                      <TaskDetailsPanel
-                        task={taskDetailsData.task}
-                        isLoading={taskDetailsData.isLoading}
-                        error={taskDetailsData.error}
-                        inputImages={taskDetailsData.inputImages}
-                        taskId={taskDetailsData.taskId}
-                        replaceImages={replaceImages}
-                        onReplaceImagesChange={setReplaceImages}
+                    <TaskDetailsPanel
+                      task={taskDetailsData.task}
+                      isLoading={taskDetailsData.isLoading}
+                      error={taskDetailsData.error}
+                      inputImages={taskDetailsData.inputImages}
+                      taskId={taskDetailsData.taskId}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
@@ -1845,14 +1845,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   ) : taskDetailsData && (
                     <div className="w-full">
-                      <TaskDetailsPanel
-                        task={taskDetailsData.task}
-                        isLoading={taskDetailsData.isLoading}
-                        error={taskDetailsData.error}
-                        inputImages={taskDetailsData.inputImages}
-                        taskId={taskDetailsData.taskId}
-                        replaceImages={replaceImages}
-                        onReplaceImagesChange={setReplaceImages}
+                    <TaskDetailsPanel
+                      task={taskDetailsData.task}
+                      isLoading={taskDetailsData.isLoading}
+                      error={taskDetailsData.error}
+                      inputImages={taskDetailsData.inputImages}
+                      taskId={taskDetailsData.taskId}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
@@ -1996,7 +1996,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
             ) : (
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
-              <FlexContainer onClick={onClose} className="bg-black/90">
+              <FlexContainer onClick={onClose}>
                 {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls */}
@@ -2103,7 +2103,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {!isVideo && showMagicEdit && (
                         <MagicEditLauncher
                           imageUrl={effectiveImageUrl}
-                          imageDimensions={imageDimensions}
+                      imageDimensions={imageDimensions}
                           toolTypeOverride={toolTypeOverride}
                           zIndexOverride={100100}
                           shotGenerationId={media.shotImageEntryId}
