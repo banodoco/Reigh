@@ -496,7 +496,6 @@ export const useGenerationActions = ({
     try {
       // Set uploading state
       actions.setUploadingImage(true);
-      actions.setUploadProgress(0);
       
       // Crop images to shot aspect ratio before uploading
       let processedFiles = files;
@@ -536,7 +535,7 @@ export const useGenerationActions = ({
         onProgress: (fileIndex, fileProgress, overallProgress) => {
           console.log(`[UploadProgress] File ${fileIndex + 1}/${processedFiles.length}: ${fileProgress}% (Overall: ${overallProgress}%)`);
           // Update progress state if actions has a method for it
-          actions.setUploadProgress?.(overallProgress);
+          // actions.setUploadProgress?.(overallProgress); // This line was removed
         }
       });
 
@@ -939,7 +938,7 @@ export const useGenerationActions = ({
     } finally {
       // Clear uploading state
       actions.setUploadingImage(false);
-      actions.setUploadProgress(0);
+      // actions.setUploadProgress(0); // This line was removed
     }
   }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, batchVideoFrames, actions, handleExternalImageDropMutation, onShotImagesUpdate, state.pendingFramePositions]);
 

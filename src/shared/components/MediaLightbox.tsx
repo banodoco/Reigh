@@ -1863,11 +1863,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               variant="secondary"
                               size="sm"
                               onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                              disabled={isUpscaling}
-                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                              disabled={isUpscaling || isPendingUpscale}
+                              className={cn(
+                                "transition-colors text-white",
+                                isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+                              )}
                             >
                               {isUpscaling ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : isPendingUpscale ? (
+                                <CheckCircle className="h-4 w-4" />
                               ) : hasUpscaledVersion ? (
                                 showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
                               ) : (
@@ -1876,7 +1881,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent className="z-[100001]">
-                            {isUpscaling ? 'Creating upscale...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in progress...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -2345,11 +2350,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="secondary"
                           size="sm"
                           onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                          disabled={isUpscaling}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                          disabled={isUpscaling || isPendingUpscale}
+                          className={cn(
+                            "transition-colors text-white",
+                            isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+                          )}
                         >
                           {isUpscaling ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isPendingUpscale ? (
+                            <CheckCircle className="h-4 w-4" />
                           ) : hasUpscaledVersion ? (
                             showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
                           ) : (
@@ -2690,11 +2700,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="secondary"
                           size="sm"
                           onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                          disabled={isUpscaling}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                          disabled={isUpscaling || isPendingUpscale}
+                          className={cn(
+                            "transition-colors text-white",
+                            isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+                          )}
                         >
                           {isUpscaling ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isPendingUpscale ? (
+                            <CheckCircle className="h-4 w-4" />
                           ) : hasUpscaledVersion ? (
                             showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
                           ) : (
@@ -2703,7 +2718,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent className="z-[100001]">
-                        {isUpscaling ? 'Creating upscale...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                        {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in progress...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
                       </TooltipContent>
                     </Tooltip>
                   )}
