@@ -118,8 +118,8 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
         </Button>
       )}
 
-      {/* Add to References Button (hidden in readOnly) */}
-      {!readOnly && !isVideo && selectedProjectId && (
+      {/* Add to References Button (hidden in readOnly and inpaint mode) */}
+      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Eraser, Undo2, Paintbrush, Loader2 } from 'lucide-react';
+import { X, Eraser, Undo2, Paintbrush, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { cn } from '@/shared/lib/utils';
@@ -11,12 +11,15 @@ export interface InpaintControlsPanelProps {
   brushStrokes: BrushStroke[];
   inpaintPrompt: string;
   inpaintNumGenerations: number;
+  brushSize: number;
   isGeneratingInpaint: boolean;
+  inpaintGenerateSuccess?: boolean;
   onSetIsEraseMode: (isErasing: boolean) => void;
   onUndo: () => void;
   onClearMask: () => void;
   onSetInpaintPrompt: (prompt: string) => void;
   onSetInpaintNumGenerations: (num: number) => void;
+  onSetBrushSize: (size: number) => void;
   onGenerateInpaint: () => void;
   onExitInpaintMode: () => void;
 }
@@ -31,12 +34,15 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
   brushStrokes,
   inpaintPrompt,
   inpaintNumGenerations,
+  brushSize,
   isGeneratingInpaint,
+  inpaintGenerateSuccess,
   onSetIsEraseMode,
   onUndo,
   onClearMask,
   onSetInpaintPrompt,
   onSetInpaintNumGenerations,
+  onSetBrushSize,
   onGenerateInpaint,
   onExitInpaintMode,
 }) => {
@@ -47,7 +53,7 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
   const containerClass = isFloating
     ? "absolute right-4 top-20 bg-background border border-border rounded-lg p-4 z-[60] w-80 shadow-lg max-h-[calc(100vh-180px)] overflow-y-auto"
     : isMobile
-    ? "p-4 space-y-3"
+    ? "p-4 space-y-3 bg-white dark:bg-background rounded-lg"
     : "p-6 space-y-4";
 
   const headingClass = isMobile ? "text-lg font-light" : "text-2xl font-light";
@@ -69,29 +75,10 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
         </Button>
       </div>
       
-      {/* Paint/Erase Toggle and Undo */}
-      <div className="flex items-center gap-2">
-        {isFloating || isDesktop ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={isEraseMode ? "default" : "secondary"}
-                size="sm"
-                onClick={() => onSetIsEraseMode(!isEraseMode)}
-                className={cn(
-                  "flex-1",
-                  isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
-                )}
-              >
-                <Eraser className="h-4 w-4 mr-2" />
-                {isEraseMode ? 'Erasing' : 'Erase'}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="z-[100001]">
-              {isEraseMode ? 'Switch to paint mode' : 'Switch to erase mode'}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
+      {/* Paint/Erase Toggle, Clear, and Undo */}
+      {isMobile ? (
+        // Mobile: All 3 buttons on one line
+        <div className="flex items-center gap-2">
           <Button
             variant={isEraseMode ? "default" : "secondary"}
             size="sm"
@@ -101,55 +88,109 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
               isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
             )}
           >
-            <Eraser className={isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2"} />
-            {isEraseMode ? 'Erasing' : 'Erase'}
+            <Eraser className="h-3 w-3 mr-1" />
+            {isEraseMode ? 'Erase' : 'Paint'}
           </Button>
-        )}
-        
-        {isFloating || isDesktop ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onUndo}
-                disabled={brushStrokes.length === 0}
-              >
-                <Undo2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="z-[100001]">Undo last stroke</TooltipContent>
-          </Tooltip>
-        ) : (
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearMask}
+            disabled={brushStrokes.length === 0}
+            className="flex-1"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Clear
+          </Button>
+          
           <Button
             variant="secondary"
             size="sm"
             onClick={onUndo}
             disabled={brushStrokes.length === 0}
           >
-            <Undo2 className={isMobile ? "h-3 w-3" : "h-4 w-4"} />
+            <Undo2 className="h-3 w-3" />
           </Button>
-        )}
-      </div>
+        </div>
+      ) : (
+        // Desktop/Floating: Original layout
+        <>
+          <div className="flex items-center gap-2">
+            {isFloating || isDesktop ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isEraseMode ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => onSetIsEraseMode(!isEraseMode)}
+                    className={cn(
+                      "flex-1",
+                      isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
+                    )}
+                  >
+                    <Eraser className="h-4 w-4 mr-2" />
+                    {isEraseMode ? 'Erasing' : 'Erase'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="z-[100001]">
+                  {isEraseMode ? 'Switch to paint mode' : 'Switch to erase mode'}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
+            
+            {isFloating || isDesktop ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onUndo}
+                    disabled={brushStrokes.length === 0}
+                  >
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="z-[100001]">Undo last stroke</TooltipContent>
+              </Tooltip>
+            ) : null}
+          </div>
 
-      {/* Clear Button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onClearMask}
-        disabled={brushStrokes.length === 0}
-        className="w-full"
-      >
-        <X className={isMobile ? "h-3 w-3 mr-1" : "h-4 w-4 mr-2"} />
-        {isMobile ? 'Clear All' : 'Clear All Strokes'}
-      </Button>
-      
-      {/* Stroke Count */}
-      <div className={isMobile ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>
-        {brushStrokes.length === 0 ? (isMobile ? 'No strokes' : 'No strokes yet') : `${brushStrokes.length} stroke${brushStrokes.length === 1 ? '' : 's'}`}
-      </div>
+          {/* Clear Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClearMask}
+            disabled={brushStrokes.length === 0}
+            className="w-full"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Clear All Strokes
+          </Button>
+          
+          {/* Stroke Count - Desktop only */}
+          <div className="text-sm text-muted-foreground">
+            {brushStrokes.length === 0 ? 'No strokes yet' : `${brushStrokes.length} stroke${brushStrokes.length === 1 ? '' : 's'}`}
+          </div>
+        </>
+      )}
       
       <div className={borderTopClass}>
+        {/* Brush Size Slider */}
+        <div className={isMobile ? "space-y-1" : "space-y-2"}>
+          <div className="flex items-center justify-between">
+            <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>Brush Size</label>
+            <span className={isMobile ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{brushSize}px</span>
+          </div>
+          <input
+            type="range"
+            min={5}
+            max={100}
+            value={brushSize}
+            onChange={(e) => onSetBrushSize(parseInt(e.target.value))}
+            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+          />
+        </div>
+      
         {/* Prompt Field */}
         <div className={isMobile ? "space-y-1" : "space-y-2"}>
           <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>Inpaint Prompt</label>
@@ -189,13 +230,21 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
           variant="default"
           size={isMobile ? "sm" : "default"}
           onClick={onGenerateInpaint}
-          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint}
-          className="w-full"
+          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
+          className={cn(
+            "w-full",
+            inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
+          )}
         >
           {isGeneratingInpaint ? (
             <>
               <Loader2 className={isMobile ? "h-3 w-3 mr-2 animate-spin" : "h-4 w-4 mr-2 animate-spin"} />
               Generating...
+            </>
+          ) : inpaintGenerateSuccess ? (
+            <>
+              <CheckCircle className={isMobile ? "h-3 w-3 mr-2" : "h-4 w-4 mr-2"} />
+              Success!
             </>
           ) : (
             <>

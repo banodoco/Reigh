@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -211,6 +211,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
+  
+  // Detect iPad/tablet size (768px+) for inpaint side-by-side layout
+  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+  );
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsTabletOrLarger(window.innerWidth >= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Safety check
   if (!media) {
@@ -728,8 +742,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Disable animations on mobile to prevent blink during zoom/fade
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
-              (showTaskDetails && !isMobile) || (isInpaintMode && !isMobile)
-                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode
+              (showTaskDetails && !isMobile) || (isInpaintMode && isTabletOrLarger)
+                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode on tablet+
                 : isMobile 
                   ? "left-0 top-0 w-full h-full" // Mobile: full screen
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
@@ -787,8 +801,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               View and interact with {media.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.
             </DialogPrimitive.Description>
             
-            {(showTaskDetails && !isMobile) || (isInpaintMode && !isMobile) ? (
-              // Desktop layout with task details OR inpaint mode - side by side
+            {(showTaskDetails && !isMobile) || (isInpaintMode && isTabletOrLarger) ? (
+              // Desktop/Tablet layout with task details OR inpaint mode - side by side
               <div 
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
@@ -1239,12 +1253,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Task Details / Inpaint Panel - Right side (40% width) */}
                 <div 
                   data-task-details-panel
-                  className="bg-background border-l border-border overflow-y-auto"
+                  className="bg-background border-l border-border overflow-y-auto flex items-center justify-center"
                   style={{ width: '40%' }}
                 >
                   {isInpaintMode ? (
                     // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
-                    <div className="p-6 space-y-4">
+                    <div className="p-6 space-y-4 w-full">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-2xl font-light">Inpaint Settings</h2>
                         <Button
@@ -1383,14 +1397,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     </div>
                   ) : taskDetailsData ? (
-                    <TaskDetailsPanel
-                      task={taskDetailsData.task}
-                      isLoading={taskDetailsData.isLoading}
-                      error={taskDetailsData.error}
-                      inputImages={taskDetailsData.inputImages}
-                      taskId={taskDetailsData.taskId}
-                      replaceImages={replaceImages}
-                      onReplaceImagesChange={setReplaceImages}
+                    <div className="w-full">
+                      <TaskDetailsPanel
+                        task={taskDetailsData.task}
+                        isLoading={taskDetailsData.isLoading}
+                        error={taskDetailsData.error}
+                        inputImages={taskDetailsData.inputImages}
+                        taskId={taskDetailsData.taskId}
+                        replaceImages={replaceImages}
+                        onReplaceImagesChange={setReplaceImages}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
@@ -1528,6 +1543,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         );
                       })()}
                     />
+                    </div>
                   ) : (
                     // Fallback: sidebar is open but no content (shouldn't happen in normal flow)
                     <div className="p-6 text-center text-muted-foreground">
@@ -1696,12 +1712,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Task Details Panel - Bottom (40% height) */}
                 <div 
                   data-task-details-panel
-                  className="bg-background border-t border-border overflow-y-auto"
+                  className="bg-background border-t border-border overflow-y-auto flex items-center justify-center"
                   style={{ height: '40%' }}
                 >
                   {isInpaintMode ? (
                     // Inpaint Controls Panel - Mobile
-                    <div className="p-4 space-y-3">
+                    <div className="p-4 space-y-3 w-full">
                       <div className="flex items-center justify-between mb-3">
                         <h2 className="text-lg font-light">Inpaint Settings</h2>
                         <Button
@@ -1828,14 +1844,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     </div>
                   ) : taskDetailsData && (
-                    <TaskDetailsPanel
-                      task={taskDetailsData.task}
-                      isLoading={taskDetailsData.isLoading}
-                      error={taskDetailsData.error}
-                      inputImages={taskDetailsData.inputImages}
-                      taskId={taskDetailsData.taskId}
-                      replaceImages={replaceImages}
-                      onReplaceImagesChange={setReplaceImages}
+                    <div className="w-full">
+                      <TaskDetailsPanel
+                        task={taskDetailsData.task}
+                        isLoading={taskDetailsData.isLoading}
+                        error={taskDetailsData.error}
+                        inputImages={taskDetailsData.inputImages}
+                        taskId={taskDetailsData.taskId}
+                        replaceImages={replaceImages}
+                        onReplaceImagesChange={setReplaceImages}
                       onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
@@ -1978,7 +1995,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
             ) : (
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
-              <FlexContainer onClick={onClose} className="bg-transparent">
+              <FlexContainer onClick={onClose} className="bg-black/90">
                 {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls */}
@@ -1996,7 +2013,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
                   />
                 ) : (
-                  <div className="relative flex items-center justify-center w-full h-full">
+                  <div ref={imageContainerRef} className="relative flex items-center justify-center w-full h-full">
                     <img 
                       src={effectiveImageUrl} 
                       alt="Media content"
@@ -2026,6 +2043,43 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     )}
                       <canvas ref={canvasRef} className="hidden" />
+                      
+                      {/* Canvas overlay for inpainting */}
+                      {isInpaintMode && (
+                        <>
+                          <canvas
+                            ref={displayCanvasRef}
+                            className="absolute pointer-events-auto cursor-crosshair"
+                            style={{
+                              touchAction: 'none',
+                              zIndex: 50
+                            }}
+                            onPointerDown={(e) => {
+                              console.log('[InpaintPaint] 🎨 Mobile Canvas onPointerDown', {
+                                clientX: e.clientX,
+                                clientY: e.clientY,
+                                canvasWidth: displayCanvasRef.current?.width,
+                                canvasHeight: displayCanvasRef.current?.height,
+                                isInpaintMode,
+                                hasHandler: !!handlePointerDown
+                              });
+                              handlePointerDown(e);
+                            }}
+                            onPointerMove={(e) => {
+                              console.log('[InpaintPaint] 🖌️ Mobile Canvas onPointerMove');
+                              handlePointerMove(e);
+                            }}
+                            onPointerUp={(e) => {
+                              console.log('[InpaintPaint] 🛑 Mobile Canvas onPointerUp');
+                              handlePointerUp(e);
+                            }}
+                          />
+                          <canvas
+                            ref={maskCanvasRef}
+                            className="hidden"
+                          />
+                        </>
+                      )}
                   </div>
                 )}
 
@@ -2136,12 +2190,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       brushStrokes={brushStrokes}
                       inpaintPrompt={inpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
+                      brushSize={brushSize}
                       isGeneratingInpaint={isGeneratingInpaint}
+                      inpaintGenerateSuccess={inpaintGenerateSuccess}
                       onSetIsEraseMode={setIsEraseMode}
                       onUndo={handleUndo}
                       onClearMask={handleClearMask}
                       onSetInpaintPrompt={setInpaintPrompt}
                       onSetInpaintNumGenerations={setInpaintNumGenerations}
+                      onSetBrushSize={setBrushSize}
                       onGenerateInpaint={handleGenerateInpaint}
                       onExitInpaintMode={handleExitInpaintMode}
                     />
