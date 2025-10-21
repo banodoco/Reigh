@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star, ImagePlus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, FlipHorizontal, Save, Download, Trash2, Settings, PlusCircle, CheckCircle, Star, ImagePlus, Loader2, ArrowUpCircle, Eye, EyeOff } from 'lucide-react';
 import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
@@ -26,6 +26,7 @@ import { dataURLtoFile } from '@/shared/lib/utils';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { createImageUpscaleTask } from '@/shared/lib/tasks/imageUpscale';
 
 interface ShotOption {
   id: string;
@@ -221,6 +222,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [generationName, setGenerationName] = useState<string>((media as any).name || '');
   const [isEditingGenerationName, setIsEditingGenerationName] = useState(false);
   const [isUpdatingGenerationName, setIsUpdatingGenerationName] = useState(false);
+
+  // State for upscale functionality
+  const [isUpscaling, setIsUpscaling] = useState(false);
+  const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing upscaled if available
+  const hasUpscaledVersion = !!(media as any).upscaled_url;
 
   // Fetch derived generations (generations based on this one)
   const { data: derivedGenerations, isLoading: isDerivedLoading } = useDerivedGenerations(media.id);
@@ -521,8 +527,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   );
   
-  // Use progressive src if available, otherwise fallback to display URL
-  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(media.location || media.imageUrl);
+  // Determine which image URL to show based on upscale state
+  const upscaledUrl = (media as any).upscaled_url;
+  const originalUrl = media.location || media.imageUrl;
+  
+  // If showing upscaled and upscaled version exists, use it; otherwise use original
+  const effectiveImageUrl = (showingUpscaled && upscaledUrl) ? upscaledUrl : originalUrl;
+  
+  // Use progressive src if available, otherwise fallback to effective display URL
+  const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(effectiveImageUrl);
 
 
 
@@ -1227,6 +1240,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   };
 
+  // Handle upscale
+  const handleUpscale = async () => {
+    if (!selectedProjectId || isVideo) {
+      toast.error('Cannot upscale videos');
+      return;
+    }
+
+    setIsUpscaling(true);
+    try {
+      const imageUrl = media.location || media.imageUrl;
+      if (!imageUrl) {
+        throw new Error('No image URL available');
+      }
+
+      console.log('[ImageUpscale] Starting upscale for generation:', media.id);
+
+      // Create upscale task
+      await createImageUpscaleTask({
+        project_id: selectedProjectId,
+        image_url: imageUrl,
+        generation_id: media.id,
+      });
+
+      console.log('[ImageUpscale] Upscale task created successfully');
+      toast.success('Upscale task created! It will appear when complete.');
+      
+    } catch (error) {
+      console.error('[ImageUpscale] Error creating upscale task:', error);
+      toast.error('Failed to create upscale task');
+    } finally {
+      setIsUpscaling(false);
+    }
+  };
+
+  // Handle toggling between upscaled and original
+  const handleToggleUpscaled = () => {
+    setShowingUpscaled(!showingUpscaled);
+  };
+
   // Handle adding to references
   const handleAddToReferences = async () => {
     if (!selectedProjectId || isVideo) {
@@ -1796,6 +1848,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Tooltip>
                       )}
 
+                      {/* Upscale Button - Desktop Task Details View (hidden in readOnly) */}
+                      {!readOnly && !isVideo && selectedProjectId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+                              disabled={isUpscaling}
+                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                            >
+                              {isUpscaling ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : hasUpscaledVersion ? (
+                                showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+                              ) : (
+                                <ArrowUpCircle className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">
+                            {isUpscaling ? 'Creating upscale...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+
                       {!isVideo && showMagicEdit && !readOnly && (
                         <MagicEditLauncher
                           imageUrl={displayUrl}
@@ -2253,6 +2331,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                         </Button>
                       )}
+
+                      {/* Upscale Button - Mobile Task Details View (hidden in readOnly) */}
+                      {!readOnly && !isVideo && selectedProjectId && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+                          disabled={isUpscaling}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          {isUpscaling ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : hasUpscaledVersion ? (
+                            showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+                          ) : (
+                            <ArrowUpCircle className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
 
                     {/* Mobile navigation */}
@@ -2574,6 +2671,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </TooltipTrigger>
                       <TooltipContent className="z-[100001]">
                         {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  {/* Upscale Button - Regular View (hidden in readOnly) */}
+                  {!readOnly && !isVideo && selectedProjectId && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+                          disabled={isUpscaling}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          {isUpscaling ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : hasUpscaledVersion ? (
+                            showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+                          ) : (
+                            <ArrowUpCircle className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">
+                        {isUpscaling ? 'Creating upscale...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
                       </TooltipContent>
                     </Tooltip>
                   )}

@@ -735,6 +735,32 @@ serve(async (req)=>{
             // Fail the request to keep atomic semantics
             return new Response(`Generation creation failed: ${genError.message}`, { status: 500 });
           }
+        } else if (taskCategory === 'processing' && taskData.task_type === 'image-upscale') {
+          // Special handling for image-upscale tasks: update existing generation with upscaled_url
+          console.log(`[ImageUpscale] Processing image-upscale task ${taskIdString}`);
+          
+          const generationId = taskData.params?.generation_id;
+          if (generationId) {
+            try {
+              console.log(`[ImageUpscale] Updating generation ${generationId} with upscaled_url: ${publicUrl}`);
+              const { error: updateError } = await supabaseAdmin
+                .from('generations')
+                .update({ upscaled_url: publicUrl })
+                .eq('id', generationId);
+              
+              if (updateError) {
+                console.error(`[ImageUpscale] Error updating generation ${generationId}:`, updateError);
+                // Don't fail the task - the upscaled image is still in output_location
+              } else {
+                console.log(`[ImageUpscale] Successfully updated generation ${generationId} with upscaled_url`);
+              }
+            } catch (updateErr) {
+              console.error(`[ImageUpscale] Exception updating generation:`, updateErr);
+              // Don't fail the task
+            }
+          } else {
+            console.log(`[ImageUpscale] No generation_id in task params, skipping generation update`);
+          }
         } else {
           console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
         }

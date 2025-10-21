@@ -286,6 +286,26 @@ See [README.md](README.md) for:
 
 ## 🔄 Recent Updates
 
+### Image Upscale Feature (October 2025)
+
+**Added**: AI-powered image upscaling directly from MediaLightbox with toggle between original and upscaled versions.
+
+**Changes Made:**
+- **Database Schema**: Added `upscaled_url` column to `generations` table to store upscaled image URLs
+- **New Task Type**: Created `image-upscale` task type with category `processing`, per-unit billing at $0.0015 per upscale
+- **Task Creation Utility**: New `src/shared/lib/tasks/imageUpscale.ts` for creating upscale tasks with generation linking
+- **MediaLightbox Enhancement**: 
+  - Added upscale button (ArrowUpCircle icon) to top controls in all layouts (desktop, mobile, task details)
+  - Automatic prioritization of upscaled image when available
+  - Toggle button (Eye/EyeOff icons) to switch between original and upscaled versions
+  - Upscale button shows loading state during task creation
+- **Task Completion Handler**: Extended `complete_task` Edge Function to update `generations.upscaled_url` when image-upscale tasks complete
+- **Migrations**: 
+  - `20251021000001_add_upscaled_url_to_generations.sql` - Adds upscaled_url column with index
+  - `20251021000002_add_image_upscale_task_type.sql` - Registers image-upscale task type
+
+**Usage**: Click upscale button on any image in MediaLightbox → task created → upscaled image appears when complete → toggle between versions with eye icon.
+
 ### Project Settings Isolation Fix (2024)
 
 **Fixed**: PromptEditorModal AI settings no longer leak between projects when creating new projects.

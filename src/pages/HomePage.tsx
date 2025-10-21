@@ -35,6 +35,7 @@ export default function HomePage() {
   const [isCreativePartnerPaneOpening, setIsCreativePartnerPaneOpening] = useState(false);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [isBrushActive, setIsBrushActive] = useState(false);
   // Examples pane state
   const [showExamples, setShowExamples] = useState(false);
   const [isExamplesButtonAnimating, setIsExamplesButtonAnimating] = useState(false);
@@ -662,7 +663,11 @@ export default function HomePage() {
             {/* Sign-in button below hero */}
             <FadeInSection delayMs={250}>
               {!session ? (
-                <div className="group">
+                <div
+                  className="group"
+                  onMouseEnter={() => setIsBrushActive(true)}
+                  onMouseLeave={() => setIsBrushActive(false)}
+                >
                   <button
                     onClick={handleDiscordSignIn}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
@@ -678,7 +683,7 @@ export default function HomePage() {
                       {/* Paintbrush Icon - in front */}
                       <div className="w-5 h-5 relative z-10">
                         <div 
-                          className="paintbrush-anim w-full h-full origin-[50%_90%]"
+                          className={`paintbrush-anim w-full h-full origin-[50%_90%] ${isBrushActive ? 'is-running' : ''}`}
                         >
                           <img 
                             src="/brush-paintbrush-icon.webp"
@@ -692,7 +697,11 @@ export default function HomePage() {
                   </button>
                 </div>
               ) : (
-                <div className="group">
+                <div
+                  className="group"
+                  onMouseEnter={() => setIsBrushActive(true)}
+                  onMouseLeave={() => setIsBrushActive(false)}
+                >
                   <button
                     onPointerUp={() => navigate('/tools')}
                     className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
@@ -708,7 +717,7 @@ export default function HomePage() {
                       {/* Paintbrush Icon - in front */}
                       <div className="w-5 h-5 relative z-10">
                         <div 
-                          className="paintbrush-anim w-full h-full origin-[50%_90%]"
+                          className={`paintbrush-anim w-full h-full origin-[50%_90%] ${isBrushActive ? 'is-running' : ''}`}
                         >
                           <img 
                             src="/brush-paintbrush-icon.webp"

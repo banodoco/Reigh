@@ -2,7 +2,7 @@ import React from 'react';
 
 export const PaintParticles: React.FC = () => {
   return (
-    <div className="absolute left-4 z-0" style={{ bottom: '1px' }}>
+    <div className="absolute left-4 z-0 pointer-events-none" style={{ bottom: '1px' }}>
       {/* Straight diagonal line going up and to the right */}
       <div className="absolute bg-white rounded-full opacity-0 group-hover:animate-paint-particle-1" style={{ bottom: '-2px', left: '2px', width: '2px', height: '2px' }}></div>
       
