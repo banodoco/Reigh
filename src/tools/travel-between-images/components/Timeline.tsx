@@ -298,6 +298,32 @@ const Timeline: React.FC<TimelineProps> = ({
     showNavigation
   } = useLightbox({ images, shotId, isMobile });
 
+  // Preload adjacent images when lightbox is open for faster navigation
+  useEffect(() => {
+    if (!currentLightboxImage || lightboxIndex === null) return;
+
+    const preloadImage = (url: string | undefined) => {
+      if (!url) return;
+      // Use window.Image to avoid conflict with lucide-react Image component
+      const img = new window.Image();
+      img.src = url;
+    };
+
+    // Preload next image
+    if (hasNext && lightboxIndex < images.length - 1) {
+      const nextImage = images[lightboxIndex + 1];
+      preloadImage(nextImage.imageUrl || nextImage.location);
+      if (nextImage.thumbUrl) preloadImage(nextImage.thumbUrl);
+    }
+
+    // Preload previous image
+    if (hasPrevious && lightboxIndex > 0) {
+      const prevImage = images[lightboxIndex - 1];
+      preloadImage(prevImage.imageUrl || prevImage.location);
+      if (prevImage.thumbUrl) preloadImage(prevImage.thumbUrl);
+    }
+  }, [currentLightboxImage, lightboxIndex, images, hasNext, hasPrevious]);
+
   // Track previous context frames to detect increases
   const prevContextFramesRef = useRef<number>(contextFrames);
   const isAdjustingRef = useRef<boolean>(false);
@@ -665,6 +691,7 @@ const Timeline: React.FC<TimelineProps> = ({
       {lightboxIndex !== null && currentLightboxImage && (
         <MediaLightbox
           media={currentLightboxImage}
+          shotId={shotId}
           onClose={closeLightbox}
           onNext={images.length > 1 ? goNext : undefined}
           onPrevious={images.length > 1 ? goPrev : undefined}

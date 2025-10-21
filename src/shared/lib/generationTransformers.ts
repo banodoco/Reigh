@@ -309,6 +309,7 @@ export function transformForTimeline(
     timeline_frame: shotGen.timeline_frame ?? undefined,
     metadata: shotGen.metadata,
     upscaled_url: genData.upscaled_url ?? undefined, // 🚀 Pass through upscaled_url
+    starred: genData.starred ?? false, // ⭐ Pass through starred status
   };
 }
 

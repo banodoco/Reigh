@@ -325,14 +325,48 @@ async function createGeneration(params: {
  * Star/unstar a generation using direct Supabase call
  */
 async function toggleGenerationStar(id: string, starred: boolean): Promise<void> {
-  const { error } = await supabase
+  console.log('[StarPersist] 🚀 Starting database UPDATE', { 
+    id, 
+    starred, 
+    timestamp: Date.now() 
+  });
+
+  const { data, error } = await supabase
     .from('generations')
     .update({ starred })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id, starred'); // Select to verify update
+
+  console.log('[StarPersist] 📊 Database UPDATE response', { 
+    id, 
+    starred, 
+    responseData: data,
+    hasData: !!data,
+    dataLength: data?.length,
+    error: error?.message,
+    timestamp: Date.now() 
+  });
 
   if (error) {
+    console.error('[StarPersist] ❌ Database UPDATE failed', { id, starred, error: error.message });
     throw new Error(`Failed to ${starred ? 'star' : 'unstar'} generation: ${error.message}`);
   }
+
+  if (!data || data.length === 0) {
+    console.error('[StarPersist] ⚠️ Database UPDATE returned no rows - possible RLS block', { 
+      id, 
+      starred,
+      hint: 'Check Row Level Security policies on generations table' 
+    });
+    throw new Error(`Failed to update generation: No rows updated (possible RLS policy issue)`);
+  }
+
+  console.log('[StarPersist] ✅ Database UPDATE successful', { 
+    id, 
+    starred, 
+    updatedData: data[0],
+    timestamp: Date.now() 
+  });
 }
 
 export type GenerationsPaginatedResponse = {
@@ -704,22 +738,24 @@ export function useToggleGenerationStar() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, starred }: { id: string; starred: boolean }) => {
-      console.log('[StarDebug:useToggleGenerationStar] Starting mutation', { id, starred });
+    mutationFn: ({ id, starred, shotId }: { id: string; starred: boolean; shotId?: string }) => {
+      console.log('[StarPersist] 🔵 Mutation function called', { id, starred, shotId });
       return toggleGenerationStar(id, starred);
     },
-    onMutate: async ({ id, starred }) => {
-      console.log('[StarDebug:useToggleGenerationStar] onMutate called', { id, starred });
+    onMutate: async ({ id, starred, shotId }) => {
+      console.log('[StarPersist] 🟡 onMutate: Optimistically updating caches', { id, starred, shotId });
       
       // Cancel outgoing refetches so they don't overwrite our optimistic update
       await Promise.all([
         queryClient.cancelQueries({ queryKey: ['unified-generations'] }),
         queryClient.cancelQueries({ queryKey: ['shots'] }),
+        queryClient.cancelQueries({ queryKey: ['all-shot-generations'] }),
       ]);
 
       // Snapshot previous values for rollback
       const previousGenerationsQueries = new Map();
       const previousShotsQueries = new Map();
+      const previousAllShotGenerationsQueries = new Map();
 
       // 1) Optimistically update all generations-list caches
       const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
@@ -762,15 +798,48 @@ export function useToggleGenerationStar() {
         }
       });
 
+      // 3) Optimistically update the EXACT all-shot-generations cache for this shot (used by Timeline/ShotEditor)
+      if (shotId) {
+        const queryKey = ['all-shot-generations', shotId];
+        const previousData = queryClient.getQueryData(queryKey);
+
+        if (previousData && Array.isArray(previousData)) {
+          console.log('[StarPersist] 🎯 Found EXACT all-shot-generations query:', { queryKey });
+          previousAllShotGenerationsQueries.set(queryKey, previousData);
+
+          const updatedGenerations = previousData.map((gen: any) => {
+            if (gen.id === id) {
+              console.log('[StarPersist] 🎨 Optimistically updating all-shot-generations cache', {
+                queryKey,
+                generationId: id,
+                oldStarred: gen.starred,
+                newStarred: starred
+              });
+              return { ...gen, starred };
+            }
+            return gen;
+          });
+          queryClient.setQueryData(queryKey, updatedGenerations);
+        } else {
+          console.log('[StarPersist] ⚠️ Could not find EXACT all-shot-generations query in cache for key:', { queryKey, hasPreviousData: !!previousData, isArray: Array.isArray(previousData) });
+        }
+      } else {
+        console.log('[StarPersist] ⚠️ No shotId provided, skipping all-shot-generations cache update.');
+      }
+
       console.log('[StarDebug:useToggleGenerationStar] onMutate complete', { 
         generationsQueriesUpdated: previousGenerationsQueries.size,
-        shotsQueriesUpdated: previousShotsQueries.size 
+        shotsQueriesUpdated: previousShotsQueries.size,
+        allShotGenerationsQueriesUpdated: previousAllShotGenerationsQueries.size 
       });
 
-      return { previousGenerationsQueries, previousShotsQueries };
+      return { previousGenerationsQueries, previousShotsQueries, previousAllShotGenerationsQueries };
     },
     onError: (error: Error, _variables, context) => {
-      console.log('[StarDebug:useToggleGenerationStar] onError called', { error: error.message });
+      console.error('[StarPersist] ❌ onError: Mutation failed, rolling back', { 
+        error: error.message,
+        variables: _variables 
+      });
       
       // Rollback optimistic updates
       if (context?.previousGenerationsQueries) {
@@ -783,19 +852,28 @@ export function useToggleGenerationStar() {
           queryClient.setQueryData(key, data);
         });
       }
+      if (context?.previousAllShotGenerationsQueries) {
+        context.previousAllShotGenerationsQueries.forEach((data, key) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
 
       console.error('Error toggling generation star:', error);
       toast.error(error.message || 'Failed to toggle star');
     },
     onSuccess: (data, variables) => {
-      console.log('[StarDebug:useToggleGenerationStar] onSuccess called', { variables, data });
+      console.log('[StarPersist] ✅ onSuccess: Mutation completed successfully', { 
+        variables, 
+        data,
+        willWaitForRealtime: true 
+      });
       // Emit domain event for generation star toggle
       // Generation star toggle events are now handled by DataFreshnessManager via realtime events
+      
+      console.log('[StarPersist] ✨ Optimistic updates complete - all caches updated');
     },
     onSettled: () => {
-      console.log('[StarDebug:useToggleGenerationStar] onSettled called - invalidating caches');
-      
-      // No need for manual invalidations - optimistic updates handle this
+      console.log('[StarPersist] 🏁 onSettled: Mutation lifecycle complete');
     },
   });
 }

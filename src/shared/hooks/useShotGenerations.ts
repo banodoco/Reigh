@@ -223,7 +223,8 @@ export const useAllShotGenerations = (
             id,
             location,
             type,
-            created_at
+            created_at,
+            starred
           )
         `)
         .eq('shot_id', shotId!)
@@ -246,6 +247,19 @@ export const useAllShotGenerations = (
       if (initialData) {
         allGenerations = initialData;
         offset = initialData.length;
+      }
+
+      // [StarPersist] Log raw data structure from Supabase
+      if (initialData && initialData.length > 0) {
+        console.log('[StarPersist] 🔍 RAW Supabase data (before transformation):', {
+          shotId,
+          firstRawItem: initialData[0],
+          firstRawItemKeys: Object.keys(initialData[0]),
+          generationData: initialData[0].generation,
+          generationKeys: initialData[0].generation ? Object.keys(initialData[0].generation) : 'no generation',
+          hasStarredInGeneration: initialData[0].generation ? 'starred' in initialData[0].generation : false,
+          starredValue: initialData[0].generation?.starred
+        });
       }
 
       // PERFORMANCE OPTIMIZATION: For large shots, only load first 200 items initially
@@ -276,6 +290,22 @@ export const useAllShotGenerations = (
         videoCount: result.filter(r => r.type === 'video').length,
         timestamp: Date.now() 
       });
+      
+      // [StarPersist] Log first item to verify starred field is present
+      if (result.length > 0) {
+        console.log('[StarPersist] 📊 Sample shot generation data structure:', {
+          shotId,
+          firstItem: {
+            id: result[0].id,
+            shotImageEntryId: result[0].shotImageEntryId,
+            shot_generation_id: result[0].shot_generation_id,
+            starred: result[0].starred,
+            hasStarredField: 'starred' in result[0],
+            starredType: typeof result[0].starred,
+            allKeys: Object.keys(result[0])
+          }
+        });
+      }
 
       return result;
     },
