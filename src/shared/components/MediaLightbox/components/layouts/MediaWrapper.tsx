@@ -17,11 +17,16 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
   return (
     <div
       className={cn(
-        "relative flex items-center justify-center", // Center content within available space
-        "flex-1", // Take available space in flex container
-        "max-w-full w-full", // Don't exceed parent width
+        "relative flex items-center justify-center", // Center content
+        "max-w-full", // Don't exceed parent width
+        "my-auto", // Vertically center within flex container
         className
       )}
+      style={{
+        // Constrain height to leave room for controls and padding
+        maxHeight: 'calc(100vh - 220px)',
+        ...props.style
+      }}
       {...props}
     >
       {children}
