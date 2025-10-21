@@ -17,22 +17,11 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
   return (
     <div
       className={cn(
-        // Position context for absolute-positioned controls
         "relative",
-        // Flexible sizing
         "flex items-center justify-center",
-        // Responsive sizing
-        "w-full flex-shrink-0",
-        // Max dimensions - responsive for different screens
-        "max-w-[100vw] sm:max-w-[90vw] md:max-w-[85vw]",
+        "w-full h-full flex-grow", // Allow wrapper to grow and fill space
         className
       )}
-      style={{
-        // Allow media to grow naturally while staying within viewport
-        minHeight: '300px',
-        maxHeight: 'min(80vh, calc(100vh - 300px))', // Flexible max height
-        ...props.style
-      }}
       {...props}
     >
       {children}
