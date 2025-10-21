@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Sparkles } from 'lucide-react';
+import { Trash2, Copy, Check, Sparkles, Paintbrush } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
@@ -130,8 +130,43 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Selection overlay - removed blue tick */}
 
-        {/* Top left - Copy/Duplicate button */}
-        <div className="absolute top-2 left-2 flex flex-col items-start opacity-100 transition-opacity">
+        {/* Bottom left - Inpaint and Magic Edit buttons */}
+        <div className="absolute bottom-2 left-2 flex gap-2 items-start opacity-100 transition-opacity">
+          {/* Inpaint button (hidden in readOnly) */}
+          {!readOnly && onOpenLightbox && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8 bg-white/75 hover:bg-white/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open lightbox in inpaint mode
+                onOpenLightbox(index);
+              }}
+              title="Inpaint"
+            >
+              <Paintbrush className="h-3 w-3" />
+            </Button>
+          )}
+          {/* Magic Edit button (hidden in readOnly) */}
+          {!readOnly && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8 bg-white/75 hover:bg-white/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMagicEditOpen(true);
+              }}
+              title="Magic Edit"
+            >
+              <Sparkles className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
+        {/* Top right - Copy and Delete buttons */}
+        <div className="absolute top-2 right-2 flex gap-2 items-end opacity-100 transition-opacity">
           {/* Duplicate button (hidden in readOnly) */}
           {!readOnly && onDuplicate && (
             <Button
@@ -157,29 +192,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               )}
             </Button>
           )}
-        </div>
-
-        {/* Bottom left - Magic Edit button */}
-        <div className="absolute bottom-2 left-2 flex flex-col items-start opacity-100 transition-opacity">
-          {/* Magic Edit button (hidden in readOnly) */}
-          {!readOnly && (
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 bg-white/75 hover:bg-white/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMagicEditOpen(true);
-              }}
-              title="Magic Edit"
-            >
-              <Sparkles className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-
-        {/* Top right - Delete button */}
-        <div className="absolute top-2 right-2 flex flex-col items-end opacity-100 transition-opacity">
           {/* Delete button (hidden in readOnly) */}
           {!readOnly && !hideDeleteButton && (
             <Button
