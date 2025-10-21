@@ -1253,7 +1253,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Task Details / Inpaint Panel - Right side (40% width) */}
                 <div 
                   data-task-details-panel
-                  className="bg-background border-l border-border overflow-y-auto flex items-center justify-center"
+                  className={cn(
+                    "bg-background border-l border-border overflow-y-auto",
+                    isInpaintMode && "flex items-center justify-center" // Only center in inpaint mode
+                  )}
                   style={{ width: '40%' }}
                 >
                   {isInpaintMode ? (
@@ -1712,7 +1715,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Task Details Panel - Bottom (40% height) */}
                 <div 
                   data-task-details-panel
-                  className="bg-background border-t border-border overflow-y-auto flex items-center justify-center"
+                  className={cn(
+                    "bg-background border-t border-border overflow-y-auto",
+                    isInpaintMode && "flex items-center justify-center" // Only center in inpaint mode
+                  )}
                   style={{ height: '40%' }}
                 >
                   {isInpaintMode ? (
