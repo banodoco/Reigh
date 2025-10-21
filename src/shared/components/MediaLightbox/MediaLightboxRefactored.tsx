@@ -1978,7 +1978,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
             ) : (
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
-              <FlexContainer>
+              <FlexContainer onClick={onClose}>
                 {/* Close Button */}
                 <DialogPrimitive.Close
                   className="absolute top-3 right-3 z-50 rounded-full p-1 bg-black/50 text-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
@@ -1989,52 +1989,55 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 </DialogPrimitive.Close>
 
                 {/* Media Container with Controls */}
-                <MediaWrapper>
-                  {/* Media Display */}
-                  {isVideo ? (
-                    <StyledVideoPlayer
-                      src={effectiveImageUrl}
-                      poster={media.thumbUrl}
-                      loop
-                      muted
-                      autoPlay
-                      playsInline
-                      preload="auto"
-                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                    />
-                  ) : (
-                    <div className="relative">
-                      <img 
-                        src={effectiveImageUrl} 
-                        alt="Media content"
-                        className={`max-w-full max-h-full object-contain transition-opacity duration-300 rounded ${
-                          isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                        } ${
-                          isSaving ? 'opacity-30' : 'opacity-100'
-                        }`}
-                        style={{ 
-                          transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                        }}
-                        onLoad={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          setImageDimensions({
-                            width: img.naturalWidth,
-                            height: img.naturalHeight
-                          });
-                        }}
+                <MediaWrapper onClick={(e) => e.stopPropagation()}>
+                  {/* Centering container for the media element */}
+                  <div className="w-full h-full flex items-center justify-center">
+                    {/* Media Display */}
+                    {isVideo ? (
+                      <StyledVideoPlayer
+                        src={effectiveImageUrl}
+                        poster={media.thumbUrl}
+                        loop
+                        muted
+                        autoPlay
+                        playsInline
+                        preload="auto"
+                        className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
                       />
-                      {isSaving && (
-                        <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm rounded">
-                          <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
-                            <p className="text-base font-medium">Saving flipped image...</p>
-                            <p className="text-xs text-white/70 mt-1">Please wait</p>
-                        </div>
+                    ) : (
+                      <div className="relative">
+                        <img 
+                          src={effectiveImageUrl} 
+                          alt="Media content"
+                          className={`max-w-full max-h-full object-contain transition-opacity duration-300 rounded ${
+                            isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                          } ${
+                            isSaving ? 'opacity-30' : 'opacity-100'
+                          }`}
+                          style={{ 
+                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                          }}
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            setImageDimensions({
+                              width: img.naturalWidth,
+                              height: img.naturalHeight
+                            });
+                          }}
+                        />
+                        {isSaving && (
+                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm rounded">
+                            <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
+                              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
+                              <p className="text-base font-medium">Saving flipped image...</p>
+                              <p className="text-xs text-white/70 mt-1">Please wait</p>
+                            </div>
+                          </div>
+                        )}
+                        <canvas ref={canvasRef} className="hidden" />
                       </div>
                     )}
-                      <canvas ref={canvasRef} className="hidden" />
-                    </div>
-                  )}
+                  </div>
 
                   {/* Media Controls - Top Right */}
                   {!readOnly && (
@@ -2101,7 +2104,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Workflow Controls - Below Media */}
                 {!readOnly && (
-                  <div className="w-full">
+                  <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <WorkflowControls
                       mediaId={media.id}
                       isVideo={isVideo}
@@ -2136,7 +2139,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Inpaint Controls */}
                 {isInpaintMode && (
-                  <div className="w-full">
+                  <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <InpaintControlsPanel
                       variant="mobile"
                       isEraseMode={isEraseMode}

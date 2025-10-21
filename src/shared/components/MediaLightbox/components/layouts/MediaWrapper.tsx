@@ -17,9 +17,8 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
   return (
     <div
       className={cn(
-        "relative",
-        "flex items-center justify-center",
-        "w-full h-full flex-grow", // Allow wrapper to grow and fill space
+        "relative", // Keep for positioning controls
+        "w-full h-full flex-grow", // Allow wrapper to grow
         className
       )}
       {...props}
