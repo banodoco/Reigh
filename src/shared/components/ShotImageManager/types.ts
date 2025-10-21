@@ -32,12 +32,12 @@ export interface MobileImageItemProps {
   onMobileTap: () => void;
   onDelete: () => void;
   onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
-  onOpenLightbox?: (index: number) => void;
+  onOpenLightbox?: (index: number) => void; // Kept for backward compatibility (lightbox opens via double-tap)
   hideDeleteButton?: boolean;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   shouldLoad?: boolean;
   projectAspectRatio?: string;
   frameNumber?: number; // Frame number to display at bottom
-  readOnly?: boolean; // Read-only mode - only show lightbox button
+  readOnly?: boolean; // Read-only mode - hides action buttons except for lightbox (opens via double-tap)
 }

@@ -730,7 +730,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               (showTaskDetails && !isMobile) || (isInpaintMode && !isMobile)
                 ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode
                 : isMobile 
-                  ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full h-auto" // Mobile: full width
+                  ? "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full h-auto py-4 sm:py-6 md:py-8 lg:py-12 px-0 sm:px-4 md:px-6" // Mobile: full width with responsive padding
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onPointerDownOutside={(event) => {
@@ -1978,13 +1978,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             ) : (
               // Original layout without task details
               <div 
-                className="flex flex-col items-center justify-center w-full"
+                className="flex flex-col items-center justify-center w-full max-w-full"
                 style={{
-                  maxHeight: '95vh'
+                  maxHeight: 'calc(100vh - 2rem)'
                 }}
               >
               <div 
-                className="relative flex items-center justify-center w-full p-4"
+                className="relative flex items-center justify-center w-full max-w-full p-0 sm:p-4 md:p-6"
               >
               {/* Navigation Controls - Left Arrow */}
               {showNavigation && !readOnly && onPrevious && hasPrevious && (

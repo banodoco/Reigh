@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Sparkles, Eye } from 'lucide-react';
+import { Trash2, Copy, Check, Sparkles } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
@@ -91,21 +91,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
     }
   };
 
-  const handleOpenLightbox = () => {
-    console.log('[MobileImageItemDebug] Eye button clicked:', {
-      index,
-      imageId: (image as any).id?.substring(0, 8),
-      hasOnOpenLightbox: !!onOpenLightbox,
-      timestamp: Date.now()
-    });
-    if (onOpenLightbox) {
-      console.log('[MobileImageItemDebug] Calling onOpenLightbox with index:', index);
-      onOpenLightbox(index);
-    } else {
-      console.warn('[MobileImageItemDebug] onOpenLightbox is not defined!');
-    }
-  };
-
   const isDuplicating = duplicatingImageId === ((image as any).shotImageEntryId ?? (image as any).id);
   const showSuccessIcon = duplicateSuccessImageId === ((image as any).shotImageEntryId ?? (image as any).id);
 
@@ -145,22 +130,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Selection overlay - removed blue tick */}
 
-        {/* Top left action buttons - all 4 icons evenly spaced */}
+        {/* Top left action buttons - evenly spaced (double-tap image to view full size) */}
         <div className="absolute top-2 left-1 right-1 flex justify-between opacity-100 transition-opacity">
-          {/* Lightbox button (always visible) */}
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-8 w-8 bg-white/75 hover:bg-white/90"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenLightbox();
-            }}
-            title="View Full Size"
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-
           {/* Magic Edit button (hidden in readOnly) */}
           {!readOnly && (
             <Button

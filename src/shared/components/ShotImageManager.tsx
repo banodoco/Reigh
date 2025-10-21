@@ -413,46 +413,57 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Mobile double-tap detection refs
   const lastTouchTimeRef = useRef<number>(0);
   const lastTappedImageIdRef = useRef<string | null>(null);
+  const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleMobileTap = useCallback((id: string, index: number) => {
-    const currentTime = Date.now();
-    const timeDiff = currentTime - lastTouchTimeRef.current;
-    const isSameImage = lastTappedImageIdRef.current === id;
-    
     // Safety check: ensure we have valid images during re-renders
     if (!currentImages || currentImages.length === 0 || index >= currentImages.length) {
       console.log('[DragDebug:ShotImageManager] Skipping mobile tap - invalid state during re-render');
       return;
     }
+
+    // Clear any pending single-tap action
+    if (tapTimeoutRef.current) {
+      clearTimeout(tapTimeoutRef.current);
+      tapTimeoutRef.current = null;
+    }
+
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastTouchTimeRef.current;
+    const isSameImage = lastTappedImageIdRef.current === id;
     
-    console.log('[MobileDebug:ShotImageManager] Mobile tap detected:', {
-      id: id.substring(0, 8),
-      timeDiff,
-      isSameImage,
-      lastTappedId: lastTappedImageIdRef.current?.substring(0, 8) || 'none',
-      willOpenLightbox: timeDiff < 300 && isSameImage && timeDiff > 10
-    });
-    
-    if (timeDiff < 300 && timeDiff > 10 && isSameImage && lastTouchTimeRef.current > 0) {
-      // Double tap detected on SAME image
-      console.log('[MobileDebug:ShotImageManager] ✅ Double-tap on same image! Opening lightbox');
+    // Check for double tap
+    if (timeDiff < 300 && timeDiff > 10 && isSameImage) {
+      console.log('[MobileDebug:ShotImageManager] ✅ Double-tap detected! Opening lightbox.');
+      
+      // It's a double tap, so open the lightbox
       const image = currentImages[index];
       if (image?.imageUrl) {
         setLightboxIndex(index);
       }
-      return;
-    }
-    
-    // Single tap or tap on different image - handle selection
-    if (mobileSelectedIds.includes(id)) {
-      setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+      
+      // Reset tap tracking to ensure the next tap is a clean single tap
+      lastTouchTimeRef.current = 0;
+      lastTappedImageIdRef.current = null;
+
     } else {
-      setMobileSelectedIds(prev => [...prev, id]);
+      // It's a single tap, schedule the selection toggle
+      console.log('[MobileDebug:ShotImageManager] Single-tap detected. Scheduling selection toggle.');
+      
+      // Update tracking refs for the next tap
+      lastTouchTimeRef.current = currentTime;
+      lastTappedImageIdRef.current = id;
+      
+      tapTimeoutRef.current = setTimeout(() => {
+        console.log('[MobileDebug:ShotImageManager] Executing delayed single-tap selection.');
+        setMobileSelectedIds(prev =>
+          prev.includes(id)
+            ? prev.filter(selectedId => selectedId !== id)
+            : [...prev, id]
+        );
+        tapTimeoutRef.current = null;
+      }, 250);
     }
-    
-    // Update tracking refs
-    lastTouchTimeRef.current = currentTime;
-    lastTappedImageIdRef.current = id;
   }, [mobileSelectedIds, currentImages]);
 
   const { value: imageDeletionSettings, update: updateImageDeletionSettings } = useUserUIState('imageDeletion', { skipConfirmation: false });
