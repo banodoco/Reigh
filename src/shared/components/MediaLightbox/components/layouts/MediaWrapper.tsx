@@ -17,17 +17,11 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
   return (
     <div
       className={cn(
-        "relative inline-flex items-center justify-center", // Shrink-wrap the content
-        "max-w-full", // Don't exceed parent width
+        "relative flex items-center justify-center", // Center content within available space
+        "flex-1", // Take available space in flex container
+        "max-w-full w-full", // Don't exceed parent width
         className
       )}
-      style={{
-        // Leave room for padding: calc(100% - top padding - bottom padding)
-        // py-4 = 16px, py-6 = 24px, py-8 = 32px on different screen sizes
-        // Use a value that works across all sizes (64px total for padding)
-        maxHeight: 'calc(100% - 64px)',
-        ...props.style
-      }}
       {...props}
     >
       {children}
