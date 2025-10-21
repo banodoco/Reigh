@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/
 import {
   Star,
   Download,
-  Flip as FlipHorizontal,
+  FlipHorizontal,
   Save,
   CheckCircle,
   Loader2,
@@ -15,7 +15,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import MagicEditLauncher from '@/tools/magic-edit/MagicEditLauncher';
+import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
 
 export interface MediaControlsProps {
   // Media info

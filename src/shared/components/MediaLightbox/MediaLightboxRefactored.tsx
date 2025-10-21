@@ -57,6 +57,7 @@ import {
   MediaControls,
   WorkflowControls,
 } from './components';
+import { FlexContainer, MediaWrapper } from './components/layouts';
 
 // Import utils
 import { downloadMedia } from './utils';
@@ -1976,30 +1977,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 </div>
               </div>
             ) : (
-              // Original layout without task details
-              <div 
-                className="flex flex-col items-center justify-center w-full max-w-full"
-                style={{
-                  maxHeight: 'calc(100vh - 2rem)'
-                }}
-              >
-              <div 
-                className="relative flex items-center justify-center w-full max-w-full p-0 sm:p-4 md:p-6"
-              >
-              {/* Navigation Controls - Left Arrow */}
-              {showNavigation && !readOnly && onPrevious && hasPrevious && (
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={onPrevious}
-                  className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-2 top-1/2 -translate-y-1/2"
+              // Mobile/Tablet layout using new FlexContainer + MediaWrapper
+              <FlexContainer>
+                {/* Close Button */}
+                <DialogPrimitive.Close
+                  className="absolute top-3 right-3 z-50 rounded-full p-1 bg-black/50 text-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+                  onClick={onClose}
                 >
-                  <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
-                </Button>
-              )}
+                  <X className="h-5 w-5" />
+                  <span className="sr-only">Close</span>
+                </DialogPrimitive.Close>
 
-              {/* Media Content */}
-              <div className="relative flex items-center justify-center w-full max-w-[100vw] sm:max-w-[90vw] lg:max-w-[85vw]" style={{ maxHeight: '85vh' }}>
+                {/* Media Container with Controls */}
+                <MediaWrapper>
+                  {/* Media Display */}
                 {isVideo ? (
                   <StyledVideoPlayer
                     src={effectiveImageUrl}
@@ -2009,24 +2000,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     autoPlay
                     playsInline
                     preload="auto"
-                    className="w-full shadow-wes border border-border/20"
-                    style={{ maxHeight: '85vh' }}
+                      className="w-full shadow-wes border border-border/20 rounded"
                   />
                 ) : (
                   <div className="relative">
                     <img 
                       src={effectiveImageUrl} 
                       alt="Media content"
-                      className={`w-full h-full object-contain transition-opacity duration-300 ${
+                        className={`w-full h-full object-contain transition-opacity duration-300 rounded ${
                         isFlippedHorizontally ? 'scale-x-[-1]' : ''
                       } ${
                         isSaving ? 'opacity-30' : 'opacity-100'
                       }`}
                       style={{ 
-                        maxHeight: '85vh',
-                        maxWidth: '95vw',
-                        width: 'auto',
-                        height: 'auto',
                         transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
                       }}
                       onLoad={(e) => {
@@ -2038,398 +2024,137 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       }}
                     />
                     {isSaving && (
-                      <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm">
-                        <div className="text-center text-white bg-black/80 rounded-lg p-6 backdrop-blur-sm border border-white/20">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-3"></div>
-                          <p className="text-lg font-medium">Saving flipped image...</p>
-                          <p className="text-sm text-white/70 mt-1">Please wait</p>
+                        <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm rounded">
+                          <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
+                            <p className="text-base font-medium">Saving flipped image...</p>
+                            <p className="text-xs text-white/70 mt-1">Please wait</p>
                         </div>
                       </div>
                     )}
-                    {/* Hidden canvas for image processing */}
-                    <canvas 
-                      ref={canvasRef}
-                      className="hidden"
-                    />
+                      <canvas ref={canvasRef} className="hidden" />
                   </div>
                 )}
 
-                {/* Top Left Controls - Magic Edit, Inpaint, Upscale */}
-                <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex items-center space-x-1 sm:space-x-2 z-10">
-                  {!isVideo && showMagicEdit && !readOnly && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <MagicEditLauncher
-                            imageUrl={sourceUrlForTasks}
-                            imageDimensions={imageDimensions}
-                            toolTypeOverride={toolTypeOverride}
-                            zIndexOverride={100100}
-                            shotGenerationId={media.shotImageEntryId}
-                          />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Edit with text</TooltipContent>
-                    </Tooltip>
-                  )}
-
-                  {/* Inpaint Button - Regular View (hidden in readOnly, only shown in cloud mode) */}
-                  {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleEnterInpaintMode}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Paintbrush className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
-                    </Tooltip>
-                  )}
-
-                  {/* Upscale Button - Regular View (hidden in readOnly, only shown in cloud mode) */}
-                  {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                            disabled={isUpscaling || isPendingUpscale}
-                            className={cn(
-                              "transition-colors text-white",
-                              isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                            )}
-                          >
-                            {isUpscaling ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : isPendingUpscale ? (
-                              <CheckCircle className="h-4 w-4" />
-                            ) : hasUpscaledVersion ? (
-                              showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                            ) : (
-                              <ArrowUpCircle className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                        {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-
-                {/* Bottom Left Controls - Flip Horizontally */}
-                <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 flex items-center space-x-1 sm:space-x-2 z-10">
-                  {!isVideo && showImageEditTools && !readOnly && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleFlip}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <FlipHorizontal className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-
-                {/* Bottom Right Controls - Star, Add to References */}
-                <div className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
-                  {/* Star Button (hidden in readOnly) */}
+                  {/* Media Controls - Top Right */}
                   {!readOnly && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={wrappedHandleToggleStar}
-                      disabled={toggleStarMutation.isPending}
-                      className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                    >
-                      <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                    </Button>
+                    <MediaControls
+                      mediaId={media.id}
+                      isVideo={isVideo}
+                      shotImageEntryId={media.shotImageEntryId}
+                      readOnly={readOnly}
+                      showDownload={showDownload}
+                      showImageEditTools={showImageEditTools}
+                      showMagicEdit={showMagicEdit}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={generationMethods.inCloud}
+                            toolTypeOverride={toolTypeOverride}
+                      imageDimensions={imageDimensions}
+                      sourceUrlForTasks={effectiveImageUrl}
+                      isInpaintMode={isInpaintMode}
+                      localStarred={localStarred}
+                      handleToggleStar={handleToggleStar}
+                      isAddingToReferences={isAddingToReferences}
+                      addToReferencesSuccess={addToReferencesSuccess}
+                      handleAddToReferences={handleAddToReferences}
+                      handleEnterInpaintMode={handleEnterInpaintMode}
+                      isUpscaling={isUpscaling}
+                      isPendingUpscale={isPendingUpscale}
+                      hasUpscaledVersion={hasUpscaledVersion}
+                      showingUpscaled={showingUpscaled}
+                      handleUpscale={handleUpscale}
+                      handleToggleUpscaled={handleToggleUpscaled}
+                      hasChanges={hasChanges}
+                      isSaving={isSaving}
+                      handleFlip={handleFlip}
+                      handleSave={() => handleSave(effectiveImageUrl)}
+                      handleDownload={handleDownload}
+                    />
                   )}
 
-                  {/* Add to References Button - Regular View (hidden in readOnly) */}
-                  {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleAddToReferences}
-                          disabled={isAddingToReferences || addToReferencesSuccess}
-                          className={`transition-colors ${
-                            addToReferencesSuccess 
-                              ? 'bg-green-600/80 hover:bg-green-600 text-white' 
-                              : 'bg-black/50 hover:bg-black/70 text-white'
-                          }`}
-                        >
-                          {isAddingToReferences ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : addToReferencesSuccess ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <ImagePlus className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">
-                        {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-
-                {/* Top Right Controls - Save, Download, Close */}
-                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
-
-                  {!isVideo && showImageEditTools && !readOnly && (
+                  {/* Navigation Buttons */}
+                  {showNavigation && !readOnly && (
                     <>
-                      {hasChanges && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleSave(effectiveImageUrl)}
-                              disabled={isSaving}
-                              className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
-                            >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </>
-                  )}
-
-                  {showDownload && !readOnly && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload();
-                      }}
-                      className="bg-black/50 hover:bg-black/70 text-white"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onPointerDown={(e) => {
-                      // Avoid bubbling to elements behind the dialog when it unmounts
-                      e.stopPropagation();
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClose();
-                    }}
-                    className="bg-black/50 hover:bg-black/70 text-white"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Bottom Workflow Controls */}
-                {(onAddToShot || onDelete || onApplySettings) && (
-                  <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-1 sm:space-x-2 z-10">
-                    <div className="bg-black/80 backdrop-blur-sm rounded-lg p-1 sm:p-2 flex items-center space-x-1 sm:space-x-2">
-                      {/* Shot Selection and Add to Shot */}
-                      {onAddToShot && allShots.length > 0 && !isVideo && (
-                        <>
-                          <ShotSelector
-                            value={selectedShotId || ''}
-                            onValueChange={onShotChange || (() => {})}
-                            shots={allShots}
-                            placeholder="Select shot"
-                            triggerClassName="w-24 sm:w-32 h-7 sm:h-8 bg-black/50 border-white/20 text-white text-xs"
-                            onOpenChange={setIsSelectOpen}
-                            showAddShot={!!onCreateShot}
-                            onCreateShot={handleQuickCreateAndAdd}
-                            isCreatingShot={isCreatingShot}
-                            quickCreateSuccess={quickCreateSuccess}
-                            onQuickCreateSuccess={handleQuickCreateSuccess}
-                            container={contentRef.current}
-                          />
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={handleAddToShot}
-                                disabled={!selectedShotId}
-                                className={`h-7 sm:h-8 px-2 sm:px-3 text-white ${
-                                  isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                                    ? 'bg-green-600/80 hover:bg-green-600'
-                                    : 'bg-blue-600/80 hover:bg-blue-600'
-                                }`}
-                              >
-                                {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
-                                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                ) : (
-                                  <PlusCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                                )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                            {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                              ? 'Added with position. Jump to shot.'
-                              : 'Add to shot'}
-                          </TooltipContent>
-                        </Tooltip>
-
-                              {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={handleAddToShotWithoutPosition}
-                                      disabled={!selectedShotId}
-                                      className={`h-8 px-3 text-white ${
-                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                          ? 'bg-green-600/80 hover:bg-green-600'
-                                          : 'bg-purple-600/80 hover:bg-purple-600'
-                                      }`}
-                                    >
-                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
-                                        <CheckCircle className="h-4 w-4" />
-                                      ) : (
-                                        <PlusCircle className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="z-[100001]">
-                                    {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                      ? 'Added without position. Jump to shot.'
-                                      : 'Add to shot without position'}
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                        </>
-                      )}
-
-                      {/* Apply Settings */}
-                      {onApplySettings && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleApplySettings}
-                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-7 sm:h-8 px-2 sm:px-3"
-                            >
-                              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
-                        </Tooltip>
-                      )}
-
-                      {/* Delete */}
-                      {onDelete && !isVideo && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleDelete}
-                              disabled={isDeleting === media.id}
-                              className="bg-red-600/80 hover:bg-red-600 text-white h-7 sm:h-8 px-2 sm:px-3"
-                            >
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Delete image</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Mobile Navigation Controls */}
-                <div className="sm:hidden">
-                  {showNavigation && !readOnly && onPrevious && hasPrevious && (
+                      {onPrevious && hasPrevious && (
                     <Button
                       variant="secondary"
                       size="lg"
                       onClick={onPrevious}
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
                     >
                       <ChevronLeft className="h-6 w-6" />
                     </Button>
                   )}
-                  
-                  {showNavigation && !readOnly && onNext && hasNext && (
+                      {onNext && hasNext && (
                     <Button
                       variant="secondary"
                       size="lg"
                       onClick={onNext}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
                     >
                       <ChevronRight className="h-6 w-6" />
                     </Button>
                   )}
+                    </>
+                  )}
+                </MediaWrapper>
+
+                {/* Workflow Controls - Below Media */}
+                {!readOnly && (
+                  <div className="w-full">
+                    <WorkflowControls
+                      mediaId={media.id}
+                      isVideo={isVideo}
+                      isInpaintMode={isInpaintMode}
+                      allShots={allShots}
+                      selectedShotId={selectedShotId}
+                      onShotChange={onShotChange}
+                      onCreateShot={onCreateShot}
+                      isSelectOpen={isSelectOpen}
+                      setIsSelectOpen={setIsSelectOpen}
+                      contentRef={contentRef}
+                      isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                      isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                      showTickForImageId={showTickForImageId}
+                      showTickForSecondaryImageId={showTickForSecondaryImageId}
+                      isCreatingShot={isCreatingShot}
+                      quickCreateSuccess={quickCreateSuccess}
+                      handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                      handleQuickCreateSuccess={handleQuickCreateSuccess}
+                      onAddToShot={onAddToShot}
+                      onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                      handleAddToShot={handleAddToShot}
+                      handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                      onApplySettings={onApplySettings}
+                      handleApplySettings={handleApplySettings}
+                      onDelete={onDelete}
+                      handleDelete={handleDelete}
+                      isDeleting={isDeleting}
+                    />
+              </div>
+                )}
+
+                {/* Inpaint Controls */}
+                {isInpaintMode && (
+                  <div className="w-full">
+                    <InpaintControlsPanel
+                      variant="mobile"
+                      isEraseMode={isEraseMode}
+                      brushStrokes={brushStrokes}
+                      inpaintPrompt={inpaintPrompt}
+                      inpaintNumGenerations={inpaintNumGenerations}
+                      isGeneratingInpaint={isGeneratingInpaint}
+                      onSetIsEraseMode={setIsEraseMode}
+                      onUndo={handleUndo}
+                      onClearMask={handleClearMask}
+                      onSetInpaintPrompt={setInpaintPrompt}
+                      onSetInpaintNumGenerations={setInpaintNumGenerations}
+                      onGenerateInpaint={handleGenerateInpaint}
+                      onExitInpaintMode={handleExitInpaintMode}
+                    />
                 </div>
-                
-
-              </div>
-
-              {/* Navigation Controls - Right Arrow (Desktop Only) */}
-              {showNavigation && !readOnly && onNext && hasNext && (
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={onNext}
-                  className="hidden sm:flex bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute right-2 top-1/2 -translate-y-1/2"
-                >
-                  <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
-                </Button>
               )}
-              </div>
-
-              {/* Mobile Task Details Button for Videos - Below the video */}
-              {isMobile && isVideo && onShowTaskDetails && (
-                <div className="mt-4 flex justify-center relative z-40">
-                  <Button
-                    variant="secondary"
-                    size="default"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('[TaskToggle] MediaLightbox: Task Details button clicked', { hasOnShowTaskDetails: !!onShowTaskDetails, mediaId: media.id });
-                      if (onShowTaskDetails) {
-                        console.log('[TaskToggle] MediaLightbox: Calling onShowTaskDetails');
-                        onShowTaskDetails();
-                      } else {
-                        console.error('[TaskToggle] MediaLightbox: No onShowTaskDetails callback provided');
-                      }
-                    }}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                    }}
-                    className="bg-black/80 hover:bg-black/90 text-white backdrop-blur-sm relative z-50 pointer-events-auto"
-                  >
-                    Show Task Details
-                  </Button>
-                </div>
-              )}
-              </div>
+              </FlexContainer>
             )}
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>

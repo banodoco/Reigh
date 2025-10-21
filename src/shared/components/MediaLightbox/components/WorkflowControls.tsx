@@ -7,7 +7,7 @@ import {
   Settings,
   Trash2,
 } from 'lucide-react';
-import ShotSelector from '@/tools/travel-between-images/components/ShotSelector';
+import ShotSelector from '@/shared/components/ShotSelector';
 
 export interface ShotOption {
   id: string;
