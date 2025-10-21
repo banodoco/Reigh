@@ -130,24 +130,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Selection overlay - removed blue tick */}
 
-        {/* Top left action buttons - evenly spaced (double-tap image to view full size) */}
-        <div className="absolute top-2 left-1 right-1 flex justify-between opacity-100 transition-opacity">
-          {/* Magic Edit button (hidden in readOnly) */}
-          {!readOnly && (
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 bg-white/75 hover:bg-white/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMagicEditOpen(true);
-              }}
-              title="Magic Edit"
-            >
-              <Sparkles className="h-3 w-3" />
-            </Button>
-          )}
-
+        {/* Top left - Copy/Duplicate button */}
+        <div className="absolute top-2 left-2 flex flex-col items-start opacity-100 transition-opacity">
           {/* Duplicate button (hidden in readOnly) */}
           {!readOnly && onDuplicate && (
             <Button
@@ -173,7 +157,29 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               )}
             </Button>
           )}
+        </div>
 
+        {/* Bottom left - Magic Edit button */}
+        <div className="absolute bottom-2 left-2 flex flex-col items-start opacity-100 transition-opacity">
+          {/* Magic Edit button (hidden in readOnly) */}
+          {!readOnly && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8 bg-white/75 hover:bg-white/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMagicEditOpen(true);
+              }}
+              title="Magic Edit"
+            >
+              <Sparkles className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
+        {/* Top right - Delete button */}
+        <div className="absolute top-2 right-2 flex flex-col items-end opacity-100 transition-opacity">
           {/* Delete button (hidden in readOnly) */}
           {!readOnly && !hideDeleteButton && (
             <Button

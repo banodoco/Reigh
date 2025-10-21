@@ -729,10 +729,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
               (showTaskDetails && !isMobile) || (isInpaintMode && !isMobile)
-                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode
-                : isMobile 
-                  ? "left-0 top-0 w-full h-full" // Mobile: full screen
-                  : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+                ? "left-0 top-0 w-full h-full flex flex-col" // Mobile: full screen
+                : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onPointerDownOutside={(event) => {
               // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
@@ -1984,50 +1982,50 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Media Container with Controls */}
                 <MediaWrapper onClick={(e) => e.stopPropagation()}>
                   {/* Media Display - The wrapper now handles centering */}
-                  {isVideo ? (
-                    <StyledVideoPlayer
-                      src={effectiveImageUrl}
-                      poster={media.thumbUrl}
-                      loop
-                      muted
-                      autoPlay
-                      playsInline
-                      preload="auto"
+                {isVideo ? (
+                  <StyledVideoPlayer
+                    src={effectiveImageUrl}
+                    poster={media.thumbUrl}
+                    loop
+                    muted
+                    autoPlay
+                    playsInline
+                    preload="auto"
                       className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                    />
-                  ) : (
-                    <div className="relative">
-                      <img 
-                        src={effectiveImageUrl} 
-                        alt="Media content"
+                  />
+                ) : (
+                  <div className="relative">
+                    <img 
+                      src={effectiveImageUrl} 
+                      alt="Media content"
                         className={`max-w-full max-h-full object-contain transition-opacity duration-300 rounded ${
-                          isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                        } ${
-                          isSaving ? 'opacity-30' : 'opacity-100'
-                        }`}
-                        style={{ 
-                          transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                        }}
-                        onLoad={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          setImageDimensions({
-                            width: img.naturalWidth,
-                            height: img.naturalHeight
-                          });
-                        }}
-                      />
-                      {isSaving && (
+                        isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                      } ${
+                        isSaving ? 'opacity-30' : 'opacity-100'
+                      }`}
+                      style={{ 
+                        transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                      }}
+                      onLoad={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        setImageDimensions({
+                          width: img.naturalWidth,
+                          height: img.naturalHeight
+                        });
+                      }}
+                    />
+                    {isSaving && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm rounded">
                           <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
                             <p className="text-base font-medium">Saving flipped image...</p>
                             <p className="text-xs text-white/70 mt-1">Please wait</p>
-                          </div>
                         </div>
-                      )}
+                      </div>
+                    )}
                       <canvas ref={canvasRef} className="hidden" />
-                    </div>
-                  )}
+                  </div>
+                )}
 
                   {/* Media Controls - Top Right */}
                   {!readOnly && (

@@ -56,6 +56,11 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     tasksPaneWidth 
   } = usePanes();
 
+  // Double-tap detection for mobile taps
+  const lastTapTimeRef = useRef<number>(0);
+  const lastTappedIdRef = useRef<string | null>(null);
+  const singleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const mobileGridColsClass = {
     2: 'grid-cols-2',
     3: 'grid-cols-3',
@@ -124,19 +129,56 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Mobile tap handler for selection (disabled in readOnly)
   const handleMobileTap = useCallback((imageId: string, index: number) => {
     if (readOnly) return; // Don't allow selection in readOnly mode
-    
-    const isCurrentlySelected = mobileSelectedIds.includes(imageId);
-    
-    if (isCurrentlySelected) {
-      // Deselect
-      setMobileSelectedIds(prev => prev.filter(id => id !== imageId));
-      setLastSelectedIndex(null);
-    } else {
-      // Select
-      setMobileSelectedIds(prev => [...prev, imageId]);
-      setLastSelectedIndex(index);
+
+    // Clear any pending single-tap action (if a double-tap occurs)
+    if (singleTapTimeoutRef.current) {
+      clearTimeout(singleTapTimeoutRef.current);
+      singleTapTimeoutRef.current = null;
     }
-  }, [mobileSelectedIds, readOnly]);
+
+    const now = Date.now();
+    const timeDiff = now - lastTapTimeRef.current;
+    const isSameImage = lastTappedIdRef.current === imageId;
+
+    // Double-tap: open lightbox immediately and do NOT toggle selection
+    if (timeDiff > 10 && timeDiff < 300 && isSameImage) {
+      if (onOpenLightbox) {
+        onOpenLightbox(index);
+      }
+      // Reset refs to avoid triple taps chaining
+      lastTapTimeRef.current = 0;
+      lastTappedIdRef.current = null;
+      return;
+    }
+
+    // Otherwise, schedule single-tap selection toggle after a short delay
+    lastTapTimeRef.current = now;
+    lastTappedIdRef.current = imageId;
+
+    singleTapTimeoutRef.current = setTimeout(() => {
+      const isCurrentlySelected = mobileSelectedIds.includes(imageId);
+      if (isCurrentlySelected) {
+        // Deselect
+        setMobileSelectedIds(prev => prev.filter(id => id !== imageId));
+        setLastSelectedIndex(null);
+      } else {
+        // Select
+        setMobileSelectedIds(prev => [...prev, imageId]);
+        setLastSelectedIndex(index);
+      }
+      singleTapTimeoutRef.current = null;
+    }, 250);
+  }, [mobileSelectedIds, readOnly, onOpenLightbox]);
+
+  // Cleanup any pending single-tap timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Mobile reordering function
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
