@@ -882,7 +882,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showDownload={true}
             hasNext={lightboxIndex < displaySortedVideoOutputs.length - 1}
             hasPrevious={lightboxIndex > 0}
-            starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred || false}
+            starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
+            shotId={shotId || undefined}
             showTaskDetails={!isTouchLikeDevice}
             taskDetailsData={{
               task,

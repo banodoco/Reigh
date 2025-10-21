@@ -1980,41 +1980,41 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls */}
-                <MediaWrapper onClick={(e) => e.stopPropagation()}>
+                <MediaWrapper>
                   {/* Media Display - The wrapper now handles centering */}
-                {isVideo ? (
-                  <StyledVideoPlayer
-                    src={effectiveImageUrl}
-                    poster={media.thumbUrl}
-                    loop
-                    muted
-                    autoPlay
-                    playsInline
-                    preload="auto"
-                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                  />
-                ) : (
-                  <div className="relative">
-                    <img 
-                      src={effectiveImageUrl} 
-                      alt="Media content"
-                        className={`max-w-full max-h-full object-contain transition-opacity duration-300 rounded ${
-                        isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                      } ${
-                        isSaving ? 'opacity-30' : 'opacity-100'
-                      }`}
-                      style={{ 
-                        transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                      }}
-                      onLoad={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        setImageDimensions({
-                          width: img.naturalWidth,
-                          height: img.naturalHeight
-                        });
-                      }}
+                  {isVideo ? (
+                    <StyledVideoPlayer
+                      src={effectiveImageUrl}
+                      poster={media.thumbUrl}
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      preload="auto"
+                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded pointer-events-auto"
                     />
-                    {isSaving && (
+                  ) : (
+                    <div className="relative pointer-events-auto">
+                      <img 
+                        src={effectiveImageUrl} 
+                        alt="Media content"
+                        className={`max-w-full max-h-full object-contain transition-opacity duration-300 rounded ${
+                          isFlippedHorizontally ? 'scale-x-[-1]' : ''
+                        } ${
+                          isSaving ? 'opacity-30' : 'opacity-100'
+                        }`}
+                        style={{ 
+                          transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
+                        }}
+                        onLoad={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          setImageDimensions({
+                            width: img.naturalWidth,
+                            height: img.naturalHeight
+                          });
+                        }}
+                      />
+                      {isSaving && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm rounded">
                           <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
@@ -2024,75 +2024,77 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     )}
                       <canvas ref={canvasRef} className="hidden" />
-                  </div>
-                )}
+                    </div>
+                  )}
 
                   {/* Media Controls - Top Right */}
                   {!readOnly && (
-                    <MediaControls
-                      mediaId={media.id}
-                      isVideo={isVideo}
-                      shotImageEntryId={media.shotImageEntryId}
-                      readOnly={readOnly}
-                      showDownload={showDownload}
-                      showImageEditTools={showImageEditTools}
-                      showMagicEdit={showMagicEdit}
-                      selectedProjectId={selectedProjectId}
-                      isCloudMode={generationMethods.inCloud}
-                            toolTypeOverride={toolTypeOverride}
-                      imageDimensions={imageDimensions}
-                      sourceUrlForTasks={effectiveImageUrl}
-                      isInpaintMode={isInpaintMode}
-                      localStarred={localStarred}
-                      handleToggleStar={handleToggleStar}
-                      isAddingToReferences={isAddingToReferences}
-                      addToReferencesSuccess={addToReferencesSuccess}
-                      handleAddToReferences={handleAddToReferences}
-                      handleEnterInpaintMode={handleEnterInpaintMode}
-                      isUpscaling={isUpscaling}
-                      isPendingUpscale={isPendingUpscale}
-                      hasUpscaledVersion={hasUpscaledVersion}
-                      showingUpscaled={showingUpscaled}
-                      handleUpscale={handleUpscale}
-                      handleToggleUpscaled={handleToggleUpscaled}
-                      hasChanges={hasChanges}
-                      isSaving={isSaving}
-                      handleFlip={handleFlip}
-                      handleSave={() => handleSave(effectiveImageUrl)}
-                      handleDownload={handleDownload}
-                    />
+                    <div className="pointer-events-auto">
+                      <MediaControls
+                        mediaId={media.id}
+                        isVideo={isVideo}
+                        shotImageEntryId={media.shotImageEntryId}
+                        readOnly={readOnly}
+                        showDownload={showDownload}
+                        showImageEditTools={showImageEditTools}
+                        showMagicEdit={showMagicEdit}
+                        selectedProjectId={selectedProjectId}
+                        isCloudMode={generationMethods.inCloud}
+                        toolTypeOverride={toolTypeOverride}
+                        imageDimensions={imageDimensions}
+                        sourceUrlForTasks={effectiveImageUrl}
+                        isInpaintMode={isInpaintMode}
+                        localStarred={localStarred}
+                        handleToggleStar={handleToggleStar}
+                        isAddingToReferences={isAddingToReferences}
+                        addToReferencesSuccess={addToReferencesSuccess}
+                        handleAddToReferences={handleAddToReferences}
+                        handleEnterInpaintMode={handleEnterInpaintMode}
+                        isUpscaling={isUpscaling}
+                        isPendingUpscale={isPendingUpscale}
+                        hasUpscaledVersion={hasUpscaledVersion}
+                        showingUpscaled={showingUpscaled}
+                        handleUpscale={handleUpscale}
+                        handleToggleUpscaled={handleToggleUpscaled}
+                        hasChanges={hasChanges}
+                        isSaving={isSaving}
+                        handleFlip={handleFlip}
+                        handleSave={() => handleSave(effectiveImageUrl)}
+                        handleDownload={handleDownload}
+                      />
+                    </div>
                   )}
 
                   {/* Navigation Buttons */}
                   {showNavigation && !readOnly && (
-                    <>
+                    <div className="pointer-events-auto">
                       {onPrevious && hasPrevious && (
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={onPrevious}
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={onPrevious}
                           className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                  )}
+                        >
+                          <ChevronLeft className="h-6 w-6" />
+                        </Button>
+                      )}
                       {onNext && hasNext && (
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={onNext}
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={onNext}
                           className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </Button>
-                  )}
-                    </>
+                        >
+                          <ChevronRight className="h-6 w-6" />
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </MediaWrapper>
 
                 {/* Workflow Controls - Below Media */}
                 {!readOnly && (
-                  <div className="w-full" onClick={(e) => e.stopPropagation()}>
+                  <div className="w-full pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                     <WorkflowControls
                       mediaId={media.id}
                       isVideo={isVideo}
@@ -2127,7 +2129,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                 {/* Inpaint Controls */}
                 {isInpaintMode && (
-                  <div className="w-full" onClick={(e) => e.stopPropagation()}>
+                  <div className="w-full pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                     <InpaintControlsPanel
                       variant="mobile"
                       isEraseMode={isEraseMode}

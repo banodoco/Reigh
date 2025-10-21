@@ -17,8 +17,8 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
   return (
     <div
       className={cn(
-        "relative inline-flex items-center justify-center", // Shrink-wrap the content
-        "max-w-full max-h-full", // Don't exceed parent bounds
+        "relative flex flex-grow items-center justify-center", // Grow to fill space and center content
+        "w-full pointer-events-none", // Be full-width but allow clicks to pass through
         className
       )}
       {...props}
