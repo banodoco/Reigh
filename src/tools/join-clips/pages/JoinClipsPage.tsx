@@ -5,7 +5,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Slider } from '@/shared/components/ui/slider';
-import { Upload, Film, X } from 'lucide-react';
+import { Upload, Film, X, Play } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +22,7 @@ import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
+import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
 
 // Video container skeleton loader
 const VideoContainerSkeleton: React.FC = () => (
@@ -45,14 +46,18 @@ const JoinClipsPage: React.FC = () => {
   const isMobile = useIsMobile();
   
   // Local state for inputs
-  const [startingVideo, setStartingVideo] = useState<{ url: string; file?: File } | null>(null);
-  const [endingVideo, setEndingVideo] = useState<{ url: string; file?: File } | null>(null);
+  const [startingVideo, setStartingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
+  const [endingVideo, setEndingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
   // Loading states for smooth transitions
   const [startingVideoLoaded, setStartingVideoLoaded] = useState(false);
   const [endingVideoLoaded, setEndingVideoLoaded] = useState(false);
+  
+  // Playing states - track if user has pressed play
+  const [startingVideoPlaying, setStartingVideoPlaying] = useState(false);
+  const [endingVideoPlaying, setEndingVideoPlaying] = useState(false);
   
   // Local state for generation parameters
   const [contextFrameCount, setContextFrameCount] = useState(10);
@@ -184,12 +189,18 @@ const JoinClipsPage: React.FC = () => {
   // Load saved input videos from settings
   useEffect(() => {
     if (settings?.startingVideoUrl && !startingVideo) {
-      setStartingVideo({ url: settings.startingVideoUrl });
+      setStartingVideo({ 
+        url: settings.startingVideoUrl,
+        posterUrl: settings.startingVideoPosterUrl 
+      });
     }
     if (settings?.endingVideoUrl && !endingVideo) {
-      setEndingVideo({ url: settings.endingVideoUrl });
+      setEndingVideo({ 
+        url: settings.endingVideoUrl,
+        posterUrl: settings.endingVideoPosterUrl 
+      });
     }
-  }, [settings?.startingVideoUrl, settings?.endingVideoUrl]);
+  }, [settings?.startingVideoUrl, settings?.endingVideoUrl, settings?.startingVideoPosterUrl, settings?.endingVideoPosterUrl]);
   
   // Add timeout fallback for video loading on mobile
   useEffect(() => {
@@ -239,8 +250,8 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [endingVideo]); // Re-run when the video source changes
   
-  // Helper function to upload a video file
-  const uploadVideoFile = async (file: File, type: 'starting' | 'ending') => {
+  // Helper function to upload a video file and extract poster frame
+  const uploadVideoFile = async (file: File, type: 'starting' | 'ending'): Promise<{ videoUrl: string; posterUrl: string } | null> => {
     if (!file.type.startsWith('video/')) {
       toast({
         title: 'Invalid file type',
@@ -252,30 +263,52 @@ const JoinClipsPage: React.FC = () => {
     
     setIsUploading(true);
     try {
+      // Extract poster frame
+      const posterBlob = await extractVideoPosterFrame(file);
+      
       // Upload video to Supabase storage
       const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `join-clips/${selectedProjectId}/${Date.now()}-${type}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const fileName = `join-clips/${selectedProjectId}/${timestamp}-${type}-${randomId}.${fileExt}`;
+      const posterFileName = `join-clips/${selectedProjectId}/${timestamp}-${type}-${randomId}-poster.jpg`;
       
-      const { data, error } = await supabase.storage
+      // Upload video
+      const { data: videoData, error: videoError } = await supabase.storage
         .from('image_uploads')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
         });
       
-      if (error) throw error;
+      if (videoError) throw videoError;
       
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Upload poster image
+      const { data: posterData, error: posterError } = await supabase.storage
+        .from('image_uploads')
+        .upload(posterFileName, posterBlob, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'image/jpeg'
+        });
+      
+      if (posterError) throw posterError;
+      
+      // Get public URLs
+      const { data: { publicUrl: videoUrl } } = supabase.storage
         .from('image_uploads')
         .getPublicUrl(fileName);
+        
+      const { data: { publicUrl: posterUrl } } = supabase.storage
+        .from('image_uploads')
+        .getPublicUrl(posterFileName);
       
       toast({
         title: 'Video uploaded',
         description: `Your ${type} video has been saved`,
       });
       
-      return publicUrl;
+      return { videoUrl, posterUrl };
     } catch (error) {
       console.error('Error uploading video:', error);
       toast({
@@ -294,16 +327,21 @@ const JoinClipsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const publicUrl = await uploadVideoFile(file, 'starting');
-    if (!publicUrl) return;
+    const result = await uploadVideoFile(file, 'starting');
+    if (!result) return;
     
-    // Reset loaded state to show skeleton during video load
+    // Reset loaded and playing state
     setStartingVideoLoaded(false);
-    setStartingVideo({ url: publicUrl, file });
+    setStartingVideoPlaying(false);
+    setStartingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
     
-    // Save URL to project settings for persistence
+    // Save URLs to project settings for persistence
     if (selectedProjectId) {
-      updateSettings('project', { ...settings, startingVideoUrl: publicUrl });
+      updateSettings('project', { 
+        ...settings, 
+        startingVideoUrl: result.videoUrl,
+        startingVideoPosterUrl: result.posterUrl
+      });
     }
   };
   
@@ -312,16 +350,21 @@ const JoinClipsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const publicUrl = await uploadVideoFile(file, 'ending');
-    if (!publicUrl) return;
+    const result = await uploadVideoFile(file, 'ending');
+    if (!result) return;
     
-    // Reset loaded state to show skeleton during video load
+    // Reset loaded and playing state
     setEndingVideoLoaded(false);
-    setEndingVideo({ url: publicUrl, file });
+    setEndingVideoPlaying(false);
+    setEndingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
     
-    // Save URL to project settings for persistence
+    // Save URLs to project settings for persistence
     if (selectedProjectId) {
-      updateSettings('project', { ...settings, endingVideoUrl: publicUrl });
+      updateSettings('project', { 
+        ...settings, 
+        endingVideoUrl: result.videoUrl,
+        endingVideoPosterUrl: result.posterUrl
+      });
     }
   };
   
@@ -358,16 +401,21 @@ const JoinClipsPage: React.FC = () => {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     
-    const publicUrl = await uploadVideoFile(file, 'starting');
-    if (!publicUrl) return;
+    const result = await uploadVideoFile(file, 'starting');
+    if (!result) return;
     
-    // Reset loaded state to show skeleton during video load
+    // Reset loaded and playing state
     setStartingVideoLoaded(false);
-    setStartingVideo({ url: publicUrl, file });
+    setStartingVideoPlaying(false);
+    setStartingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
     
-    // Save URL to project settings for persistence
+    // Save URLs to project settings for persistence
     if (selectedProjectId) {
-      updateSettings('project', { ...settings, startingVideoUrl: publicUrl });
+      updateSettings('project', { 
+        ...settings, 
+        startingVideoUrl: result.videoUrl,
+        startingVideoPosterUrl: result.posterUrl
+      });
     }
   };
   
@@ -404,16 +452,21 @@ const JoinClipsPage: React.FC = () => {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     
-    const publicUrl = await uploadVideoFile(file, 'ending');
-    if (!publicUrl) return;
+    const result = await uploadVideoFile(file, 'ending');
+    if (!result) return;
     
-    // Reset loaded state to show skeleton during video load
+    // Reset loaded and playing state
     setEndingVideoLoaded(false);
-    setEndingVideo({ url: publicUrl, file });
+    setEndingVideoPlaying(false);
+    setEndingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
     
-    // Save URL to project settings for persistence
+    // Save URLs to project settings for persistence
     if (selectedProjectId) {
-      updateSettings('project', { ...settings, endingVideoUrl: publicUrl });
+      updateSettings('project', { 
+        ...settings, 
+        endingVideoUrl: result.videoUrl,
+        endingVideoPosterUrl: result.posterUrl
+      });
     }
   };
 
@@ -552,23 +605,47 @@ const JoinClipsPage: React.FC = () => {
               ) : startingVideo ? (
                 <>
                   {!startingVideoLoaded && <VideoContainerSkeleton />}
-                  <video
-                    ref={startingVideoRef}
-                    src={startingVideo.url}
-                    controls
-                    preload="metadata"
-                    playsInline
-                    muted
-                    poster={startingVideo.url}
-                    className={cn(
-                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
-                      startingVideoLoaded ? 'opacity-100' : 'opacity-0'
-                    )}
-                    onLoadedData={() => {
-                      console.log('[JoinClips] Starting video onLoadedData fired', { url: startingVideo.url, timestamp: Date.now() });
-                      setStartingVideoLoaded(true);
-                    }}
-                  />
+                  {/* Show poster image or video based on playing state */}
+                  {!startingVideoPlaying && startingVideo.posterUrl ? (
+                    <>
+                      <img
+                        src={startingVideo.posterUrl}
+                        alt="Video poster"
+                        className={cn(
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                          startingVideoLoaded ? 'opacity-100' : 'opacity-0'
+                        )}
+                        onLoad={() => setStartingVideoLoaded(true)}
+                      />
+                      {/* Play button overlay */}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                        onClick={() => setStartingVideoPlaying(true)}
+                      >
+                        <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
+                          <Play className="h-12 w-12 text-white" fill="white" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <video
+                      ref={startingVideoRef}
+                      src={startingVideo.url}
+                      controls
+                      autoPlay={startingVideoPlaying}
+                      preload="metadata"
+                      playsInline
+                      muted
+                      className={cn(
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                        startingVideoLoaded ? 'opacity-100' : 'opacity-0'
+                      )}
+                      onLoadedData={() => {
+                        console.log('[JoinClips] Starting video onLoadedData fired', { url: startingVideo.url, timestamp: Date.now() });
+                        setStartingVideoLoaded(true);
+                      }}
+                    />
+                  )}
                   {/* Remove button */}
                   <Button
                     variant="destructive"
@@ -578,8 +655,13 @@ const JoinClipsPage: React.FC = () => {
                       e.stopPropagation();
                       setStartingVideo(null);
                       setStartingVideoLoaded(false);
+                      setStartingVideoPlaying(false);
                       if (selectedProjectId) {
-                        updateSettings('project', { ...settings, startingVideoUrl: undefined });
+                        updateSettings('project', { 
+                          ...settings, 
+                          startingVideoUrl: undefined,
+                          startingVideoPosterUrl: undefined 
+                        });
                       }
                     }}
                     disabled={isUploading}
@@ -697,23 +779,47 @@ const JoinClipsPage: React.FC = () => {
               ) : endingVideo ? (
                 <>
                   {!endingVideoLoaded && <VideoContainerSkeleton />}
-                  <video
-                    ref={endingVideoRef}
-                    src={endingVideo.url}
-                    controls
-                    preload="metadata"
-                    playsInline
-                    muted
-                    poster={endingVideo.url}
-                    className={cn(
-                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
-                      endingVideoLoaded ? 'opacity-100' : 'opacity-0'
-                    )}
-                    onLoadedData={() => {
-                      console.log('[JoinClips] Ending video onLoadedData fired', { url: endingVideo.url, timestamp: Date.now() });
-                      setEndingVideoLoaded(true);
-                    }}
-                  />
+                  {/* Show poster image or video based on playing state */}
+                  {!endingVideoPlaying && endingVideo.posterUrl ? (
+                    <>
+                      <img
+                        src={endingVideo.posterUrl}
+                        alt="Video poster"
+                        className={cn(
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                          endingVideoLoaded ? 'opacity-100' : 'opacity-0'
+                        )}
+                        onLoad={() => setEndingVideoLoaded(true)}
+                      />
+                      {/* Play button overlay */}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                        onClick={() => setEndingVideoPlaying(true)}
+                      >
+                        <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
+                          <Play className="h-12 w-12 text-white" fill="white" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <video
+                      ref={endingVideoRef}
+                      src={endingVideo.url}
+                      controls
+                      autoPlay={endingVideoPlaying}
+                      preload="metadata"
+                      playsInline
+                      muted
+                      className={cn(
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                        endingVideoLoaded ? 'opacity-100' : 'opacity-0'
+                      )}
+                      onLoadedData={() => {
+                        console.log('[JoinClips] Ending video onLoadedData fired', { url: endingVideo.url, timestamp: Date.now() });
+                        setEndingVideoLoaded(true);
+                      }}
+                    />
+                  )}
                   {/* Remove button */}
                   <Button
                     variant="destructive"
@@ -723,8 +829,13 @@ const JoinClipsPage: React.FC = () => {
                       e.stopPropagation();
                       setEndingVideo(null);
                       setEndingVideoLoaded(false);
+                      setEndingVideoPlaying(false);
                       if (selectedProjectId) {
-                        updateSettings('project', { ...settings, endingVideoUrl: undefined });
+                        updateSettings('project', { 
+                          ...settings, 
+                          endingVideoUrl: undefined,
+                          endingVideoPosterUrl: undefined 
+                        });
                       }
                     }}
                     disabled={isUploading}

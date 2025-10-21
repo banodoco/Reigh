@@ -4,7 +4,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { Upload, Film } from 'lucide-react';
+import { Upload, Film, Play } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/Image
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { cn } from '@/shared/lib/utils';
+import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
 
 // Image/Video container skeleton loader
 const MediaContainerSkeleton: React.FC = () => (
@@ -44,7 +45,7 @@ const CharacterAnimatePage: React.FC = () => {
   
   // Local state for inputs
   const [characterImage, setCharacterImage] = useState<{ url: string; file?: File } | null>(null);
-  const [motionVideo, setMotionVideo] = useState<{ url: string; file?: File } | null>(null);
+  const [motionVideo, setMotionVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [localMode, setLocalMode] = useState<'animate' | 'replace'>('animate');
@@ -52,6 +53,9 @@ const CharacterAnimatePage: React.FC = () => {
   // Loading states for smooth transitions
   const [characterImageLoaded, setCharacterImageLoaded] = useState(false);
   const [motionVideoLoaded, setMotionVideoLoaded] = useState(false);
+  
+  // Playing state - track if user has pressed play
+  const [motionVideoPlaying, setMotionVideoPlaying] = useState(false);
   
   const characterImageInputRef = useRef<HTMLInputElement>(null);
   const motionVideoInputRef = useRef<HTMLInputElement>(null);
@@ -149,12 +153,15 @@ const CharacterAnimatePage: React.FC = () => {
       setCharacterImage({ url: settings.inputImageUrl });
     }
     if (settings?.inputVideoUrl && !motionVideo) {
-      setMotionVideo({ url: settings.inputVideoUrl });
+      setMotionVideo({ 
+        url: settings.inputVideoUrl,
+        posterUrl: settings.inputVideoPosterUrl 
+      });
     }
     if (settings?.mode) {
       setLocalMode(settings.mode);
     }
-  }, [settings?.inputImageUrl, settings?.inputVideoUrl, settings?.mode]);
+  }, [settings?.inputImageUrl, settings?.inputVideoUrl, settings?.inputVideoPosterUrl, settings?.mode]);
   
   // Add timeout fallback for image loading on mobile
   useEffect(() => {
@@ -269,31 +276,58 @@ const CharacterAnimatePage: React.FC = () => {
     
     setIsUploading(true);
     try {
+      // Extract poster frame
+      const posterBlob = await extractVideoPosterFrame(file);
+      
       // Upload video to Supabase storage
       const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `character-animate/${selectedProjectId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const fileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}.${fileExt}`;
+      const posterFileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}-poster.jpg`;
       
-      const { data, error } = await supabase.storage
+      // Upload video
+      const { data: videoData, error: videoError } = await supabase.storage
         .from('image_uploads')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
         });
       
-      if (error) throw error;
+      if (videoError) throw videoError;
       
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Upload poster image
+      const { data: posterData, error: posterError } = await supabase.storage
+        .from('image_uploads')
+        .upload(posterFileName, posterBlob, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'image/jpeg'
+        });
+      
+      if (posterError) throw posterError;
+      
+      // Get public URLs
+      const { data: { publicUrl: videoUrl } } = supabase.storage
         .from('image_uploads')
         .getPublicUrl(fileName);
+        
+      const { data: { publicUrl: posterUrl } } = supabase.storage
+        .from('image_uploads')
+        .getPublicUrl(posterFileName);
       
-      // Reset loaded state to show skeleton during video load
+      // Reset loaded and playing state
       setMotionVideoLoaded(false);
-      setMotionVideo({ url: publicUrl, file });
+      setMotionVideoPlaying(false);
+      setMotionVideo({ url: videoUrl, posterUrl, file });
       
-      // Save URL to project settings for persistence
+      // Save URLs to project settings for persistence
       if (selectedProjectId) {
-        updateSettings('project', { ...settings, inputVideoUrl: publicUrl });
+        updateSettings('project', { 
+          ...settings, 
+          inputVideoUrl: videoUrl,
+          inputVideoPosterUrl: posterUrl
+        });
       }
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -499,22 +533,46 @@ const CharacterAnimatePage: React.FC = () => {
               ) : motionVideo ? (
                 <>
                   {!motionVideoLoaded && <MediaContainerSkeleton />}
-                  <video
-                    ref={motionVideoRef}
-                    src={motionVideo.url}
-                    controls
-                    preload="metadata"
-                    playsInline
-                    muted
-                    poster={motionVideo.url}
-                    className={cn(
-                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
-                      motionVideoLoaded ? 'opacity-100' : 'opacity-0'
-                    )}
-                    onLoadedData={() => {
-                      setMotionVideoLoaded(true);
-                    }}
-                  />
+                  {/* Show poster image or video based on playing state */}
+                  {!motionVideoPlaying && motionVideo.posterUrl ? (
+                    <>
+                      <img
+                        src={motionVideo.posterUrl}
+                        alt="Video poster"
+                        className={cn(
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                          motionVideoLoaded ? 'opacity-100' : 'opacity-0'
+                        )}
+                        onLoad={() => setMotionVideoLoaded(true)}
+                      />
+                      {/* Play button overlay */}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                        onClick={() => setMotionVideoPlaying(true)}
+                      >
+                        <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
+                          <Play className="h-12 w-12 text-white" fill="white" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <video
+                      ref={motionVideoRef}
+                      src={motionVideo.url}
+                      controls
+                      autoPlay={motionVideoPlaying}
+                      preload="metadata"
+                      playsInline
+                      muted
+                      className={cn(
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                        motionVideoLoaded ? 'opacity-100' : 'opacity-0'
+                      )}
+                      onLoadedData={() => {
+                        setMotionVideoLoaded(true);
+                      }}
+                    />
+                  )}
                 </>
               ) : !settingsLoaded ? (
                 // Show skeleton while settings are loading

@@ -202,6 +202,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
 
+  // Track where pointer/click started to prevent accidental modal closure on drag
+  const pointerDownTargetRef = useRef<EventTarget | null>(null);
+
   // Basic hooks
   const isMobile = useIsMobile();
   const { selectedProjectId } = useProject();
@@ -401,6 +404,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onNext,
     onPrevious,
     onClose,
+    isInpaintMode,
   });
   const { safeClose, activateClickShield } = navigationHook;
 
@@ -512,6 +516,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           <DialogPrimitive.Overlay 
             className="fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             onPointerDown={(e) => {
+              // Track where the pointer down started
+              pointerDownTargetRef.current = e.target;
+              
               // Check if a higher z-index dialog is open - if so, don't block events
               const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
               const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
@@ -531,23 +538,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 e.nativeEvent.stopImmediatePropagation();
               }
             }}
-            onClick={(e) => {
-              // Check if a higher z-index dialog is open - if so, don't handle the click
-              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
-              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
-                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
-                return zIndex > 100000;
-              });
-              
-              if (hasHigherZIndexDialog) {
-                return; // Let the higher dialog handle the event
-              }
-              
-              // Only close if clicking directly on the overlay (background)
-              if (e.target === e.currentTarget) {
-                onClose();
-              }
-            }}
             onPointerUp={(e) => {
               // Check if a higher z-index dialog is open - if so, don't block events
               const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
@@ -560,12 +550,42 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 return; // Let the higher dialog handle the event
               }
               
-              // Also block pointer up events to prevent accidental interactions
+              // Block pointer up events to prevent accidental interactions
               e.preventDefault();
               e.stopPropagation();
               if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
                 e.nativeEvent.stopImmediatePropagation();
               }
+            }}
+            onClick={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't handle the click
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
+              // Prevent closing when in inpaint mode to avoid accidental data loss
+              if (isInpaintMode) {
+                pointerDownTargetRef.current = null; // Reset
+                return;
+              }
+              
+              // Only close if BOTH the click started AND ended on the overlay
+              // This prevents accidental closure when dragging from inside the modal
+              const clickStartedOnOverlay = pointerDownTargetRef.current === e.currentTarget;
+              const clickEndedOnOverlay = e.target === e.currentTarget;
+              
+              if (clickStartedOnOverlay && clickEndedOnOverlay) {
+                onClose();
+              }
+              
+              // Reset the tracking
+              pointerDownTargetRef.current = null;
             }}
             onTouchStart={(e) => {
               // Check if a higher z-index dialog is open - if so, don't block events
@@ -909,48 +929,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
 
 
-                    {/* Top Controls */}
-                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
-                      {/* Star Button (hidden in readOnly and inpaint mode) */}
-                      {!readOnly && !isInpaintMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={wrappedHandleToggleStar}
-                          disabled={toggleStarMutation.isPending}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                        </Button>
-                      )}
-
-                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly and inpaint mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
+                    {/* Top Left Controls - Magic Edit, Inpaint, Upscale */}
+                    <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
+                      {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleAddToReferences}
-                              disabled={isAddingToReferences || addToReferencesSuccess}
-                              className={`transition-colors ${
-                                addToReferencesSuccess 
-                                  ? 'bg-green-600/80 hover:bg-green-600 text-white' 
-                                  : 'bg-black/50 hover:bg-black/70 text-white'
-                              }`}
-                            >
-                              {isAddingToReferences ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : addToReferencesSuccess ? (
-                                <CheckCircle className="h-4 w-4" />
-                              ) : (
-                                <ImagePlus className="h-4 w-4" />
-                              )}
-                            </Button>
+                            <span>
+                              <MagicEditLauncher
+                                imageUrl={sourceUrlForTasks}
+                                imageDimensions={imageDimensions}
+                                toolTypeOverride={toolTypeOverride}
+                                zIndexOverride={100100}
+                                shotGenerationId={media.shotImageEntryId}
+                              />
+                            </span>
                           </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                            {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
-                          </TooltipContent>
+                          <TooltipContent className="z-[100001]">Edit with text</TooltipContent>
                         </Tooltip>
                       )}
 
@@ -1003,61 +997,78 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           </TooltipContent>
                         </Tooltip>
                       )}
+                    </div>
 
-                      {(() => {
-                        console.log('[InpaintButton] Desktop bottom left render check:', {
-                          isVideo,
-                          showMagicEdit,
-                          readOnly,
-                          isInpaintMode,
-                          willShow: !isVideo && showMagicEdit && !readOnly && !isInpaintMode
-                        });
-                        return null;
-                      })()}
-                      
-                      {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
-                        <MagicEditLauncher
-                          imageUrl={sourceUrlForTasks}
-                          imageDimensions={imageDimensions}
-                          toolTypeOverride={toolTypeOverride}
-                          zIndexOverride={100100}
-                          shotGenerationId={media.shotImageEntryId}
-                        />
-                      )}
-
-                      {/* Inpaint Button - Bottom Left Controls (next to Magic Edit) */}
-                      {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
+                    {/* Bottom Left Controls - Flip Horizontally */}
+                    <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
+                      {!isVideo && showImageEditTools && !readOnly && !isInpaintMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={handleEnterInpaintMode}
-                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                              onClick={handleFlip}
+                              className="bg-black/50 hover:bg-black/70 text-white"
                             >
-                              <Paintbrush className="h-4 w-4" />
+                              <FlipHorizontal className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
+                          <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
                         </Tooltip>
                       )}
+                    </div>
+
+                    {/* Bottom Right Controls - Star, Add to References */}
+                    <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
+                      {/* Star Button (hidden in readOnly and inpaint mode) */}
+                      {!readOnly && !isInpaintMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={wrappedHandleToggleStar}
+                          disabled={toggleStarMutation.isPending}
+                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                        </Button>
+                      )}
+
+                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly and inpaint mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleAddToReferences}
+                              disabled={isAddingToReferences || addToReferencesSuccess}
+                              className={`transition-colors ${
+                                addToReferencesSuccess 
+                                  ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                                  : 'bg-black/50 hover:bg-black/70 text-white'
+                              }`}
+                            >
+                              {isAddingToReferences ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : addToReferencesSuccess ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <ImagePlus className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">
+                            {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    {/* Top Right Controls - Save, Download */}
+                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
 
                       {!isVideo && showImageEditTools && !readOnly && !isInpaintMode && (
                         <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={handleFlip}
-                                className="bg-black/50 hover:bg-black/70 text-white"
-                              >
-                                <FlipHorizontal className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-                          </Tooltip>
-
                           {hasChanges && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -1078,22 +1089,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
 
                       {showDownload && !readOnly && !isInpaintMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownload();
-                              }}
-                              className="bg-black/50 hover:bg-black/70 text-white"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
-                        </Tooltip>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload();
+                          }}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
 
@@ -2048,19 +2054,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   </div>
                 )}
 
-                {/* Top Controls */}
-                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
-                  {/* Star Button (hidden in readOnly) */}
-                  {!readOnly && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={wrappedHandleToggleStar}
-                      disabled={toggleStarMutation.isPending}
-                      className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                    >
-                      <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                    </Button>
+                {/* Top Left Controls - Magic Edit, Inpaint, Upscale */}
+                <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex items-center space-x-1 sm:space-x-2 z-10">
+                  {!isVideo && showMagicEdit && !readOnly && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <MagicEditLauncher
+                            imageUrl={sourceUrlForTasks}
+                            imageDimensions={imageDimensions}
+                            toolTypeOverride={toolTypeOverride}
+                            zIndexOverride={100100}
+                            shotGenerationId={media.shotImageEntryId}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">Edit with text</TooltipContent>
+                    </Tooltip>
                   )}
 
                   {/* Inpaint Button - Regular View (hidden in readOnly, only shown in cloud mode) */}
@@ -2079,37 +2089,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
                     </Tooltip>
                   )}
-
-                  {/* Add to References Button - Regular View (hidden in readOnly) */}
-                  {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleAddToReferences}
-                          disabled={isAddingToReferences || addToReferencesSuccess}
-                          className={`transition-colors ${
-                            addToReferencesSuccess 
-                              ? 'bg-green-600/80 hover:bg-green-600 text-white' 
-                              : 'bg-black/50 hover:bg-black/70 text-white'
-                          }`}
-                        >
-                          {isAddingToReferences ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : addToReferencesSuccess ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <ImagePlus className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">
-                        {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-
 
                   {/* Upscale Button - Regular View (hidden in readOnly, only shown in cloud mode) */}
                   {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
@@ -2143,50 +2122,78 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </TooltipContent>
                     </Tooltip>
                   )}
+                </div>
 
-                  {!isVideo && showMagicEdit && !readOnly && (
-                    <MagicEditLauncher
-                      imageUrl={sourceUrlForTasks}
-                      imageDimensions={imageDimensions}
-                      toolTypeOverride={toolTypeOverride}
-                      zIndexOverride={100100}
-                      shotGenerationId={media.shotImageEntryId}
-                    />
-                  )}
-
-                  {/* Inpaint Button - Mobile Bottom Left Controls (next to Magic Edit) */}
-                  {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
+                {/* Bottom Left Controls - Flip Horizontally */}
+                <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 flex items-center space-x-1 sm:space-x-2 z-10">
+                  {!isVideo && showImageEditTools && !readOnly && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={handleEnterInpaintMode}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                          onClick={handleFlip}
+                          className="bg-black/50 hover:bg-black/70 text-white"
                         >
-                          <Paintbrush className="h-4 w-4" />
+                          <FlipHorizontal className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
+                      <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
                     </Tooltip>
                   )}
+                </div>
+
+                {/* Bottom Right Controls - Star, Add to References */}
+                <div className="absolute bottom-2 sm:bottom-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
+                  {/* Star Button (hidden in readOnly) */}
+                  {!readOnly && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={wrappedHandleToggleStar}
+                      disabled={toggleStarMutation.isPending}
+                      className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                    >
+                      <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                    </Button>
+                  )}
+
+                  {/* Add to References Button - Regular View (hidden in readOnly) */}
+                  {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleAddToReferences}
+                          disabled={isAddingToReferences || addToReferencesSuccess}
+                          className={`transition-colors ${
+                            addToReferencesSuccess 
+                              ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                              : 'bg-black/50 hover:bg-black/70 text-white'
+                          }`}
+                        >
+                          {isAddingToReferences ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : addToReferencesSuccess ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <ImagePlus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">
+                        {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+
+                {/* Top Right Controls - Save, Download, Close */}
+                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center space-x-1 sm:space-x-2 z-10">
 
                   {!isVideo && showImageEditTools && !readOnly && (
                     <>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleFlip}
-                            className="bg-black/50 hover:bg-black/70 text-white"
-                          >
-                            <FlipHorizontal className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-                      </Tooltip>
-
                       {hasChanges && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -2207,22 +2214,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
 
                   {showDownload && !readOnly && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload();
-                          }}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
-                    </Tooltip>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload();
+                      }}
+                      className="bg-black/50 hover:bg-black/70 text-white"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   )}
 
                   <Button

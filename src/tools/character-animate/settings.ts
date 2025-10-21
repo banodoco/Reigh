@@ -11,6 +11,7 @@ export const characterAnimateSettings = {
     seed: undefined as number | undefined,
     inputImageUrl: undefined as string | undefined,
     inputVideoUrl: undefined as string | undefined,
+    inputVideoPosterUrl: undefined as string | undefined,
   },
 };
 
