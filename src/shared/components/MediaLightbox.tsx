@@ -1912,7 +1912,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent className="z-[100001]">
-                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in progress...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'In Progress' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -2748,8 +2748,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">
-                        {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in progress...' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                          <TooltipContent className="z-[100001]">
+                        {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'In Progress' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
                       </TooltipContent>
                     </Tooltip>
                   )}
