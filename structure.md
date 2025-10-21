@@ -287,6 +287,32 @@ See [README.md](README.md) for:
 
 ## 🔄 Recent Updates
 
+### iPad Timeline Interaction & Tablet Mode Support (October 21, 2025)
+
+**Added**: iPad/tablet users can now use timeline mode and interact with timeline items using tap-to-select and tap-to-place instead of drag-and-drop.
+
+**Changes Made:**
+- **Tablet Detection**: Added comprehensive tablet detection (iPad, Android tablets) in both `ShotEditor` and `TimelineContainer` components
+  - Detects iPadOS 13+ (which masquerades as Mac)
+  - Width-based detection (768px-1024px) with touch capability checks
+- **Timeline Mode on Tablets**: iPad users can now select between Timeline and Batch generation modes (previously forced to Batch)
+  - Modified `isPhone` logic to distinguish tablets from phones
+  - Updated `modeCorrect` validation to allow timeline mode on tablets
+- **Tap-to-Move Interaction**: New `useTapToMove` hook (`src/tools/travel-between-images/components/Timeline/hooks/useTapToMove.ts`) for tablet-friendly timeline item repositioning
+  - First tap: Selects item with blue glow border and "Tap timeline to place" indicator
+  - Second tap on timeline: Moves item to tapped location using fluid timeline logic
+  - Tap same item again: Deselects without moving
+  - Auto-deselect after 30 seconds
+  - Crosshair cursor when item selected
+- **Visual Feedback**: Enhanced `TimelineItem` with selection state indicators
+  - Blue glowing border around selected items
+  - Animated pulsing badge overlay
+  - Scaled up appearance (1.15x) for selected state
+- **Fluid Timeline Integration**: Tap-to-move uses same `applyFluidTimeline` logic as drag system to ensure proper spacing and conflict resolution
+- **Desktop Unaffected**: All changes only apply to tablets; desktop drag-and-drop and phone lightbox tap behavior unchanged
+
+**Usage**: iPad users can now work efficiently with the timeline view using intuitive tap-based interactions instead of struggling with touch-based drag-and-drop.
+
 ### Mobile UX & Timeline Position Refactor (October 21, 2025)
 
 **Fixed**: TasksPane on mobile/iPad no longer triggers accidental clicks on pane content during slide-in animation.

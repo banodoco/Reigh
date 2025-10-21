@@ -707,6 +707,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             } : undefined}
           >
             <img
+              key={`poster-${video.id}`}
               src={posterImageSrc}
               alt="Video poster"
               loading="eager"
@@ -720,6 +721,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             {/* Thumbnail - shows immediately if available, stays visible until video fully transitions */}
             {hasThumbnail && !thumbnailError && (
               <img
+                key={`thumb-${video.id}`}
                 src={video.thumbUrl}
                 alt="Video thumbnail"
                 loading="eager"
@@ -785,6 +787,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
               <div className="relative w-full h-full">
                 {/* HoverScrubVideo with loading optimization integration */}
                 <HoverScrubVideo
+                  key={`video-${video.id}`}
                   src={video.location || video.imageUrl}
                   preload={shouldPreload as 'auto' | 'metadata' | 'none'}
                   className={`w-full h-full transition-opacity duration-500 ${

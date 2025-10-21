@@ -27,6 +27,8 @@ import { useZoom } from './hooks/useZoom';
 import { useUnifiedDrop } from './hooks/useUnifiedDrop';
 import { useTimelineDrag } from './hooks/useTimelineDrag';
 import { useGlobalEvents } from './hooks/useGlobalEvents';
+import { useTapToMove } from './hooks/useTapToMove';
+import { applyFluidTimeline } from './utils/timeline-utils';
 
 interface TimelineContainerProps {
   shotId: string;
@@ -168,6 +170,35 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const contextTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const isMobile = useIsMobile();
+  
+  // Detect tablets - treat them differently from phones for tap-to-move
+  const isTablet = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const nav: any = navigator || {};
+    const ua: string = nav.userAgent || '';
+    const platform: string = nav.platform || '';
+    const maxTouchPoints: number = nav.maxTouchPoints || 0;
+    
+    // iPad detection (including iPadOS 13+ that masquerades as Mac)
+    const isIpadUA = /iPad/i.test(ua);
+    const isIpadOsLike = platform === 'MacIntel' && maxTouchPoints > 1;
+    
+    // Android tablets
+    const isAndroidTablet = /Android(?!.*Mobile)/i.test(ua);
+    const isOtherTablet = /Tablet|Silk|Kindle|PlayBook/i.test(ua);
+    
+    // Width-based detection
+    const screenWidth = window.innerWidth;
+    const isTabletWidth = screenWidth >= 768 && screenWidth <= 1024;
+    
+    return Boolean(
+      isIpadUA || isIpadOsLike || isAndroidTablet || isOtherTablet || 
+      (isTabletWidth && maxTouchPoints > 0)
+    );
+  }, []);
+  
+  // Only show tap-to-move on tablets (not phones or desktop)
+  const enableTapToMove = isTablet && !readOnly;
 
   // Calculate coordinate system using proper timeline dimensions
   const { fullMin, fullMax, fullRange } = getTimelineDimensions(framePositions);
@@ -200,6 +231,55 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     fullRange,
     containerRect,
     setIsDragInProgress,
+  });
+
+  // Tap-to-move hook (for tablets only)
+  const handleTapToMoveAction = React.useCallback(async (imageId: string, targetFrame: number) => {
+    console.log('[TapToMove] Moving item:', {
+      imageId: imageId.substring(0, 8),
+      targetFrame,
+      currentFrame: framePositions.get(imageId)
+    });
+    
+    // Create new positions map with the moved item at target position
+    const intermediatePositions = new Map(framePositions);
+    intermediatePositions.set(imageId, targetFrame);
+    
+    // Apply fluid timeline logic to ensure proper spacing and no conflicts
+    // This is the same logic used by the drag system
+    const finalPositions = applyFluidTimeline(
+      intermediatePositions,
+      imageId,
+      targetFrame,
+      contextFrames,
+      undefined,
+      fullMin,
+      fullMax
+    );
+    
+    console.log('[TapToMove] Final positions after fluid timeline:', {
+      imageId: imageId.substring(0, 8),
+      targetFrame,
+      finalFrame: finalPositions.get(imageId),
+      totalItems: finalPositions.size
+    });
+    
+    // Update positions via setFramePositions which handles database update
+    // NOTE: We do NOT call onImageReorder because it would trigger the disabled
+    // useUpdateShotImageOrder hook. setFramePositions already updates the database
+    // via updateTimelineFrame in the position management system.
+    await setFramePositions(finalPositions);
+    
+    console.log('[TapToMove] Position update completed');
+  }, [framePositions, setFramePositions, contextFrames, fullMin, fullMax]);
+  
+  const tapToMove = useTapToMove({
+    isEnabled: enableTapToMove,
+    onMove: handleTapToMoveAction,
+    framePositions,
+    fullMin,
+    fullRange,
+    timelineWidth: containerWidth
   });
 
   // Global events hook
@@ -608,12 +688,28 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           id="timeline-container"
           className={`relative h-36 mb-10`}
           onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
+          onClick={(e) => {
+            // On tablets, handle tap-to-place for selected items
+            if (enableTapToMove && tapToMove.selectedItemId) {
+              // Only handle clicks on the timeline background, not on items or buttons
+              const target = e.target as HTMLElement;
+              const isClickingItem = target.closest('[data-item-id]');
+              const isClickingButton = target.closest('button');
+              
+              if (!isClickingItem && !isClickingButton) {
+                e.preventDefault();
+                e.stopPropagation();
+                tapToMove.handleTimelineTap(e.clientX, containerRef);
+              }
+            }
+          }}
           style={{
             width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
             minWidth: "100%",
             userSelect: 'none',
             paddingLeft: `${TIMELINE_HORIZONTAL_PADDING}px`,
             paddingRight: `${TIMELINE_HORIZONTAL_PADDING + 60}px`,
+            cursor: tapToMove.selectedItemId ? 'crosshair' : 'default',
           }}
         >
           {/* Drop position indicator - positioned in timeline area only */}
@@ -801,8 +897,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 isSwapTarget={swapTargetId === image.shotImageEntryId}
                 dragOffset={isDragging ? dragOffset : null}
                 onMouseDown={readOnly ? undefined : (e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
-                onDoubleClick={isMobile ? undefined : () => handleDesktopDoubleClick(idx)}
-                onMobileTap={isMobile ? () => handleMobileTap(idx) : undefined}
+                onDoubleClick={isMobile && !isTablet ? undefined : () => handleDesktopDoubleClick(idx)}
+                onMobileTap={isMobile && !isTablet ? () => handleMobileTap(idx) : undefined}
                 zoomLevel={zoomLevel}
                 timelineWidth={containerWidth}
                 fullMinFrames={fullMin}
@@ -819,6 +915,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 duplicateSuccessImageId={duplicateSuccessImageId}
                 projectAspectRatio={projectAspectRatio}
                 readOnly={readOnly}
+                isSelectedForMove={tapToMove.isItemSelected(image.shotImageEntryId)}
+                onTapToMove={enableTapToMove ? () => tapToMove.handleItemTap(image.shotImageEntryId) : undefined}
               />
             );
           })}

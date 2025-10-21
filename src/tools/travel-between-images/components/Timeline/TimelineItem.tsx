@@ -39,6 +39,9 @@ interface TimelineItemProps {
   projectAspectRatio?: string;
   // Read-only mode - hides all action buttons
   readOnly?: boolean;
+  // Tap-to-move state (for tablets)
+  isSelectedForMove?: boolean;
+  onTapToMove?: () => void;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -68,6 +71,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio = undefined,
   readOnly = false,
+  isSelectedForMove = false,
+  onTapToMove,
 }) => {
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -139,7 +144,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!onMobileTap || !touchStartRef.current) return;
+    if (!touchStartRef.current) return;
 
     const touch = e.changedTouches[0];
     const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
@@ -149,7 +154,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     // This prevents accidental selection during scrolling
     if (deltaX < 10 && deltaY < 10) {
       e.preventDefault();
-      onMobileTap();
+      
+      // If tap-to-move is available (tablet mode), use it. Otherwise fall back to onMobileTap
+      if (onTapToMove) {
+        onTapToMove();
+      } else if (onMobileTap) {
+        onMobileTap();
+      }
     }
     
     touchStartRef.current = null;
@@ -237,12 +248,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         position: 'absolute',
         left: `${leftPercent}%`,
         top: '50%',
-        transform: `translate(-50%, -50%) ${isHovered || isDragging ? 'scale(1.15)' : 'scale(1)'}`,
+        transform: `translate(-50%, -50%) ${isHovered || isDragging || isSelectedForMove ? 'scale(1.15)' : 'scale(1)'}`,
         transition: isDragging ? 'none' : 'all 0.2s ease-out',
         opacity: isDragging ? 0.8 : 1,
-        zIndex: isHovered || isDragging ? 20 : 1,
-        cursor: 'move',
-        boxShadow: isHovered || isDragging ? '0 8px 25px rgba(0, 0, 0, 0.15)' : 'none',
+        zIndex: isHovered || isDragging || isSelectedForMove ? 20 : 1,
+        cursor: isSelectedForMove ? 'pointer' : 'move',
+        boxShadow: isSelectedForMove 
+          ? '0 0 0 3px rgba(59, 130, 246, 0.5), 0 8px 25px rgba(59, 130, 246, 0.3)' 
+          : (isHovered || isDragging ? '0 8px 25px rgba(0, 0, 0, 0.15)' : 'none'),
         // Prevent clicks from reaching items underneath when not hovered
         pointerEvents: isHovered || isDragging ? 'auto' : 'auto',
       }}
@@ -372,6 +385,15 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             onTouchEnd={handleTouchEnd}
             loading="lazy"
           />
+
+          {/* Selected for move indicator (tablet tap-to-move) */}
+          {isSelectedForMove && (
+            <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-[1px] flex items-center justify-center z-30 pointer-events-none">
+              <div className="bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg animate-pulse">
+                Tap timeline to place
+              </div>
+            </div>
+          )}
 
           {/* Hover action buttons */}
           {!isDragging && !readOnly && (

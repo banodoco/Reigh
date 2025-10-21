@@ -884,11 +884,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const readinessState = React.useMemo(() => ({
     hasImageData: contextImages.length > 0,
     criticalSettingsReady: !settingsLoading, // Only wait for main settings, not UI/LoRA
-    modeCorrect: !isMobile || generationMode === 'batch',
+    modeCorrect: !isPhone || generationMode === 'batch', // Tablets can use timeline mode
     hasError: !!state.settingsError,
     shotId: selectedShot?.id,
     isReady: state.isModeReady
-  }), [contextImages.length, settingsLoading, isMobile, generationMode, state.settingsError, selectedShot?.id, state.isModeReady]);
+  }), [contextImages.length, settingsLoading, isPhone, generationMode, state.settingsError, selectedShot?.id, state.isModeReady]);
 
   useEffect(() => {
     const { hasImageData, criticalSettingsReady, modeCorrect, hasError, isReady } = readinessState;
