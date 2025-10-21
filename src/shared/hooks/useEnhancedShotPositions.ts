@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GenerationRow } from '@/types/shots';
+import { transformForTimeline, type RawShotGeneration } from '@/shared/lib/generationTransformers';
 import { timelineDebugger } from '@/tools/travel-between-images/components/Timeline/utils/timeline-debug';
 
 
@@ -17,6 +18,7 @@ export interface ShotGeneration {
     location?: string;
     type?: string;
     created_at: string;
+    upscaled_url?: string; // URL of upscaled version if available
   };
 }
 
@@ -81,7 +83,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
             id,
             location,
             type,
-            created_at
+            created_at,
+            upscaled_url
           )
         `)
         .eq('shot_id', shotId)
@@ -108,10 +111,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         generation_id: sg.generation_id,
         timeline_frame: sg.timeline_frame,
         metadata: sg.metadata as PositionMetadata,
-        generation: sg.generation
+        generation: sg.generation as any // Type assertion for upscaled_url
       }));
 
-      setShotGenerations(shotGenerationsData);
+      setShotGenerations(shotGenerationsData as ShotGeneration[]);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load shot positions';
@@ -146,11 +149,13 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         // Detect shot-related queries
         const isUnifiedGenerationsShot = queryKey[0] === 'unified-generations' && queryKey[1] === 'shot' && queryKey[2] === shotId;
         const isShotsProject = queryKey[0] === 'shots' && queryKey.includes(shotId);
+        const isShotGenerations = queryKey[0] === 'shot-generations' && queryKey[1] === shotId;
 
         // Block shot-related invalidations during drag operations
         const shouldReload = (
           (isUnifiedGenerationsShot && !isDragInProgress && !isPersistingPositions) ||
           (isShotsProject && !isDragInProgress && !isPersistingPositions) ||
+          (isShotGenerations && !isDragInProgress && !isPersistingPositions) || // 🚀 Listen for shot-generations invalidations (e.g., upscale completion)
           (queryKey[0] === 'unpositioned-count' && queryKey[1] === shotId)
         );
 
@@ -162,6 +167,33 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
     return unsubscribe;
   }, [shotId, queryClient, loadPositions, isPersistingPositions, isDragInProgress]);
+
+  // Realtime: force reload when a generation is updated (e.g., upscaled_url added)
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (!shotId) return;
+      if (isDragInProgress || isPersistingPositions) return;
+      // Be permissive: reload positions when any generation updates arrive
+      try {
+        const detail = e?.detail;
+        const payloads = detail?.payloads || [];
+        // If payload contains explicit shot context, ensure it matches, otherwise reload
+        const affectsThisShot = payloads.some((p: any) => {
+          const newRecord = p?.new;
+          const params = newRecord?.params || {};
+          const paramShotId = params?.shot_id || params?.shotId;
+          return !paramShotId || paramShotId === shotId;
+        });
+        if (affectsThisShot || payloads.length === 0) {
+          loadPositions({ reason: 'invalidation' });
+        }
+      } catch {
+        loadPositions({ reason: 'invalidation' });
+      }
+    };
+    window.addEventListener('realtime:generation-update-batch' as any, handler as any);
+    return () => window.removeEventListener('realtime:generation-update-batch' as any, handler as any);
+  }, [shotId, isDragInProgress, isPersistingPositions, loadPositions]);
 
   // Get positions formatted for specific mode
   const getPositionsForMode = useCallback((mode: 'batch' | 'timeline'): Map<string, number> => {
@@ -187,17 +219,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   const getImagesForMode = useCallback((mode: 'batch' | 'timeline'): GenerationRow[] => {
     const images = shotGenerations
       .filter(sg => sg.generation)
-      .map(sg => ({
-        id: sg.generation_id,
-        shotImageEntryId: sg.id,
-        imageUrl: sg.generation?.location,
-        thumbUrl: sg.generation?.location,
-        location: sg.generation?.location,
-        type: sg.generation?.type,
-        createdAt: sg.generation?.created_at,
-        timeline_frame: sg.timeline_frame,
-        metadata: sg.metadata
-      } as GenerationRow & { timeline_frame?: number }))
+      .map(sg => transformForTimeline(sg as any as RawShotGeneration))
       .filter(img => {
         // EXACT same video detection as original ShotEditor/ShotsPane logic
         const isVideo = img.type === 'video' ||

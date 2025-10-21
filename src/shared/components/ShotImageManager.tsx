@@ -1193,35 +1193,54 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Calculate frame position for inserting at a given index
   // The frame position should be the midpoint between surrounding images
   const getFramePositionForIndex = useCallback((index: number): number | undefined => {
+    console.log('[BatchDropPositionIssue] 📊 getFramePositionForIndex called:', {
+      index,
+      currentImagesLength: currentImages.length,
+      batchVideoFrames,
+      timestamp: Date.now()
+    });
+
     if (currentImages.length === 0) {
-      // First image - use frame 0
+      console.log('[BatchDropPositionIssue] 🆕 NO IMAGES - RETURNING 0');
       return 0;
     }
     
     if (index === 0) {
-      // Inserting at the beginning
       const firstImage = currentImages[0];
       const firstFrame = firstImage.timeline_frame ?? 0;
-      // Insert before first image - use half the first image's frame
-      return Math.max(0, Math.floor(firstFrame / 2));
+      const result = Math.max(0, Math.floor(firstFrame / 2));
+      console.log('[BatchDropPositionIssue] 🔝 INSERTING AT START:', {
+        firstFrame,
+        result
+      });
+      return result;
     }
     
     if (index >= currentImages.length) {
-      // Inserting at the end
       const lastImage = currentImages[currentImages.length - 1];
       const lastFrame = lastImage.timeline_frame ?? (currentImages.length - 1) * batchVideoFrames;
-      // Insert after last image - add batchVideoFrames
-      return lastFrame + batchVideoFrames;
+      const result = lastFrame + batchVideoFrames;
+      console.log('[BatchDropPositionIssue] 🔚 INSERTING AT END:', {
+        lastFrame,
+        result
+      });
+      return result;
     }
     
-    // Inserting between two images
     const prevImage = currentImages[index - 1];
     const nextImage = currentImages[index];
     const prevFrame = prevImage.timeline_frame ?? (index - 1) * batchVideoFrames;
     const nextFrame = nextImage.timeline_frame ?? index * batchVideoFrames;
+    const result = Math.floor((prevFrame + nextFrame) / 2);
     
-    // Calculate midpoint
-    return Math.floor((prevFrame + nextFrame) / 2);
+    console.log('[BatchDropPositionIssue] 🔄 INSERTING BETWEEN:', {
+      index,
+      prevFrame,
+      nextFrame,
+      midpoint: result
+    });
+    
+    return result;
   }, [currentImages, batchVideoFrames]);
 
   return (

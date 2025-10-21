@@ -5,6 +5,7 @@ import { GenerationRow } from '@/types/shots';
 import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
+import { transformForUnifiedGenerations, type RawShotGeneration } from '@/shared/lib/generationTransformers';
 
 // Extended interface that includes task data
 export interface GenerationWithTask extends GeneratedImageWithMetadata {
@@ -123,6 +124,7 @@ async function fetchShotSpecificGenerations({
         created_at,
         params,
         starred,
+        upscaled_url,
         name${includeTaskData ? ',tasks' : ''}
       )
     `)
@@ -176,32 +178,20 @@ async function fetchShotSpecificGenerations({
     throw dataError;
   }
   
-  // Transform data
+  // Transform data using shared transformer
   let items = (data || [])
     .filter((sg: any) => sg.generation)
     .map((sg: any) => {
-      const gen = sg.generation;
-      const baseItem: GenerationWithTask = {
-        id: gen.id,
-        url: gen.location,
-        thumbUrl: gen.thumbnail_url || gen.location, // Use thumbnail_url if available, fallback to main location
-        isVideo: gen.type?.includes('video'),
-        createdAt: gen.created_at,
-        starred: gen.starred || false,
-        metadata: gen.params || {},
-        shotImageEntryId: sg.id,
-        position: Math.floor((sg.timeline_frame ?? 0) / 50),
-        taskId: includeTaskData && gen.tasks ? (Array.isArray(gen.tasks) ? gen.tasks[0] : gen.tasks) : null,
-        name: gen.name || undefined, // Include generation name if available
-      };
+      // [UpscaleDebug] Preserve existing debug logging
+      if (sg.generation?.upscaled_url) {
+        console.log('[UpscaleDebug] useUnifiedGenerations found upscaled_url:', {
+          id: sg.generation.id?.substring(0, 8),
+          upscaled_url: sg.generation.upscaled_url?.substring(0, 60)
+        });
+      }
       
-      // Extract prompt from nested structure
-      baseItem.prompt = gen.params?.originalParams?.orchestrator_details?.prompt || 
-                       gen.params?.prompt || 
-                       gen.metadata?.prompt || 
-                       'No prompt';
-      
-      return baseItem;
+      // Use shared transformer - handles all the complex logic
+      return transformForUnifiedGenerations(sg as RawShotGeneration, includeTaskData);
     });
   
   console.log('[VideoGenMissing] Raw transformed items before filtering:', {

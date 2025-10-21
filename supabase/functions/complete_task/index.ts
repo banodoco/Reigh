@@ -735,9 +735,9 @@ serve(async (req)=>{
             // Fail the request to keep atomic semantics
             return new Response(`Generation creation failed: ${genError.message}`, { status: 500 });
           }
-        } else if (taskCategory === 'processing' && taskData.task_type === 'image-upscale') {
-          // Special handling for image-upscale tasks: update existing generation with upscaled_url
-          console.log(`[ImageUpscale] Processing image-upscale task ${taskIdString}`);
+        } else if (taskCategory === 'upscale') {
+          // Special handling for upscale tasks: update existing generation with upscaled_url
+          console.log(`[ImageUpscale] Processing upscale task ${taskIdString} (task_type: ${taskData.task_type})`);
           
           const generationId = taskData.params?.generation_id;
           if (generationId) {
@@ -760,6 +760,59 @@ serve(async (req)=>{
             }
           } else {
             console.log(`[ImageUpscale] No generation_id in task params, skipping generation update`);
+          }
+        } else if (taskCategory === 'inpaint') {
+          // Special handling for inpaint tasks: create new generation(s) based on source
+          console.log(`[ImageInpaint] Processing inpaint task ${taskIdString} (task_type: ${taskData.task_type})`);
+          console.log(`[ImageInpaint] Task params:`, JSON.stringify(taskData.params, null, 2));
+          
+          // Inpaint creates generation(s) as usual, but should link via based_on to source generation
+          const sourceGenerationId = taskData.params?.generation_id;
+          
+          if (sourceGenerationId) {
+            console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
+            
+            // Build inpaint generation params
+            const inpaintParams = {
+              ...taskData.params,
+              based_on: sourceGenerationId, // Link to source generation
+              tool_type: taskData.tool_type,
+              prompt: taskData.params?.prompt, // Inpaint prompt
+              num_generations: taskData.params?.num_generations || 1,
+              mask_url: taskData.params?.mask_url, // Reference to mask used
+            };
+            
+            // Create generation record for inpaint result
+            const newGenerationId = crypto.randomUUID();
+            const generationRecord = {
+              id: newGenerationId,
+              tasks: [taskId],
+              params: inpaintParams,
+              location: publicUrl,
+              type: 'image',
+              project_id: taskData.project_id,
+              thumbnail_url: thumbnailUrl,
+              based_on: sourceGenerationId, // Track lineage
+              created_at: new Date().toISOString()
+            };
+            
+            try {
+              const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
+              console.log(`[ImageInpaint] Created inpaint generation ${newGeneration.id} based on ${sourceGenerationId}`);
+            } catch (genError) {
+              console.error(`[ImageInpaint] Error creating inpaint generation:`, genError);
+              // Don't fail the task - the inpaint result is still in output_location
+            }
+          } else {
+            console.log(`[ImageInpaint] No source generation_id in task params, treating as regular generation`);
+            // Fall back to regular generation creation
+            await createGenerationFromTask(
+              supabaseAdmin,
+              taskIdString,
+              combinedTaskData,
+              publicUrl,
+              thumbnailUrl || undefined
+            );
           }
         } else {
           console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);

@@ -108,6 +108,7 @@ export type Database = {
           thumbnail_url: string | null
           type: string | null
           updated_at: string | null
+          upscaled_url: string | null
         }
         Insert: {
           based_on?: string | null
@@ -122,6 +123,7 @@ export type Database = {
           thumbnail_url?: string | null
           type?: string | null
           updated_at?: string | null
+          upscaled_url?: string | null
         }
         Update: {
           based_on?: string | null
@@ -136,6 +138,7 @@ export type Database = {
           thumbnail_url?: string | null
           type?: string | null
           updated_at?: string | null
+          upscaled_url?: string | null
         }
         Relationships: [
           {

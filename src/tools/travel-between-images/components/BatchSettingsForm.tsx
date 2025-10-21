@@ -867,7 +867,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   </div>
                   
                   {/* Per-Phase Settings - Dynamic width based on number of phases */}
-                  <div className={`grid gap-4 ${phaseConfig.num_phases === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  <div className={`grid gap-4 grid-cols-1 ${phaseConfig.num_phases === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
                   {phaseConfig.phases.map((phase, phaseIdx) => {
                     // Dynamic phase labels based on number of phases
                     const phaseLabels2 = ["High Noise Sampler", "Low Noise Sampler"];

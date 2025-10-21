@@ -15,13 +15,13 @@ INSERT INTO task_types (
 ) VALUES (
   'image-upscale',
   'api',
-  'processing',
+  'upscale',
   'Image Upscale',
   'Upscale image to higher resolution using AI',
   0.0,  -- base_cost_per_second is 0 for per_unit billing
   'per_unit',
   0.0015,  -- $0.0015 per upscale
-  'processing',
+  'image-upscale',
   true
 );
 

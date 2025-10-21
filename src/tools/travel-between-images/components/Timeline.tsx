@@ -49,6 +49,7 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
+import { transformForTimeline, type RawShotGeneration } from "@/shared/lib/generationTransformers";
 
 // Clear legacy timeline cache on import
 import "@/utils/clearTimelineCache";
@@ -220,19 +221,10 @@ const Timeline: React.FC<TimelineProps> = ({
     if (propImages) {
       result = propImages;
     } else {
+      // Use shared transformer instead of inline mapping
       result = shotGenerations
         .filter(sg => sg.generation)
-        .map(sg => ({
-          id: sg.generation_id,
-          shotImageEntryId: sg.id,
-          imageUrl: sg.generation?.location,
-          thumbUrl: sg.generation?.location,
-          location: sg.generation?.location,
-          type: sg.generation?.type,
-          createdAt: sg.generation?.created_at,
-          timeline_frame: sg.timeline_frame,
-          metadata: sg.metadata
-        } as GenerationRow & { timeline_frame?: number }))
+        .map(sg => transformForTimeline(sg as any as RawShotGeneration))
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     }
 

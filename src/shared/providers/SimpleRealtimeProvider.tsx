@@ -150,16 +150,24 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
 
       // ONLY invalidate generation data if tasks completed
       if (hasCompleteTask) {
+        // Invalidate project-level generation queries (e.g., for upscale in main gallery)
+        queryClient.invalidateQueries({ queryKey: ['generations'] });
+        
         // Invalidate only the specific shots that completed
         if (completedShotIds.size > 0) {
           console.log('[TasksPaneRealtimeDebug:Batching] 🎯 Targeted invalidation for', completedShotIds.size, 'completed shots');
           completedShotIds.forEach((shotId) => {
             queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+            queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] }); // 🚀 For useEnhancedShotPositions (Timeline)
           });
         } else {
           // Only if we have completed tasks but no shot IDs, invalidate project-level
           queryClient.invalidateQueries({
             predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'
+          });
+          // Also invalidate all shot-generations (e.g., for upscale tasks that don't have shotId in metadata)
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'shot-generations'
           });
         }
       }

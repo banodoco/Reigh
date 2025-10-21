@@ -10,7 +10,6 @@ import { fileToDataURL, dataURLtoFile } from "@/shared/lib/utils";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { useToolSettings } from "@/shared/hooks/useToolSettings";
-import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
 import { useListPublicResources } from '@/shared/hooks/useResources';
@@ -155,7 +154,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
   
   const { selectedProjectId } = useProject();
-  const isMobile = useIsMobile();
   
   // Access user's generation settings to detect local generation
   const {
@@ -1673,7 +1671,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Main Content Layout */}
-        <div className={`flex gap-6 ${isMobile ? 'flex-col' : 'flex-col md:flex-row'}`}>
+        <div className="flex gap-6 flex-col md:flex-row">
           {/* Left Column - Prompts and Shot Selector */}
           <div className="flex-1 space-y-6">
             <PromptsSection
@@ -1729,7 +1727,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             subjectDescription={subjectDescription}
             inThisScene={inThisScene}
             isUploadingStyleReference={isUploadingStyleReference}
-            isMobile={isMobile}
             onStyleUpload={handleStyleReferenceUpload}
             onStyleRemove={handleRemoveStyleReference}
             onStyleStrengthChange={handleStyleStrengthChange}

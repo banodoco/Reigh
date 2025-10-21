@@ -245,7 +245,8 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 |---------|----------|---------|
 | **edge functions** | `/supabase/functions/` | Task completion, post-execution billing, payments |
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
-| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`) |
+| **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts`), URL resolution (`imageUrlResolver.ts`) |
+| **lib/tasks/** | `/src/shared/lib/tasks/` | Task creation utilities for specific task types: `imageUpscale.ts`, `imageInpaint.ts` |
 
 ---
 
@@ -285,6 +286,26 @@ See [README.md](README.md) for:
 ---
 
 ## 🔄 Recent Updates
+
+### Mobile UX & Timeline Position Refactor (October 21, 2025)
+
+**Fixed**: TasksPane on mobile/iPad no longer triggers accidental clicks on pane content during slide-in animation.
+
+**Changes Made:**
+- **TasksPane Touch Fix**: Modified `TasksPane.tsx` to conditionally apply `pointer-events` based on `isOpen` state, preventing interaction with sliding content during transitions
+- **Timeline Position Persistence**: Refactored position handling in `useGenerationActions.ts`:
+  - Extracted database position persistence logic into dedicated `persistTimelinePositions()` helper in `timelineDropHelpers.ts`
+  - Consolidated duplicate position-writing code between timeline drops and batch drops
+  - Added extensive debug logging with `[BatchDropPositionIssue]` tag for troubleshooting
+- **Generation Transformers**: New `src/shared/lib/generationTransformers.ts` utility for consistent transformation of raw shot_generation records to Timeline format
+- **Image Inpaint Support**: 
+  - New task type `image-inpaint` with category `inpaint` for AI-powered image inpainting
+  - Task creation utility in `src/shared/lib/tasks/imageInpaint.ts`
+  - Enhanced `complete_task` Edge Function to handle inpaint tasks with lineage tracking via `based_on` field
+  - Migration `20251021000003_add_image_inpaint_task_type.sql`
+- **Task Category Updates**: Changed `image-upscale` task category from `processing` to `upscale` for better organization
+
+**Usage**: Mobile users can now tap the TasksPane tab without accidentally triggering buttons inside the pane. Timeline position handling is more reliable with consistent database persistence.
 
 ### Image Upscale Feature (October 2025)
 

@@ -233,6 +233,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing upscaled if available
   const hasUpscaledVersion = !!(media as any).upscaled_url;
   
+  // State for inpainting functionality
+  const [isInpaintMode, setIsInpaintMode] = useState(false);
+  const [brushStrokes, setBrushStrokes] = useState<Array<{
+    id: string;
+    points: Array<{x: number, y: number}>;
+    isErasing: boolean;
+  }>>([]);
+  const [isEraseMode, setIsEraseMode] = useState(false);
+  const [inpaintPrompt, setInpaintPrompt] = useState('');
+  const [inpaintNumGenerations, setInpaintNumGenerations] = useState(1);
+  const [isGeneratingInpaint, setIsGeneratingInpaint] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentStroke, setCurrentStroke] = useState<Array<{x: number, y: number}>>([]);
+  
+  // Refs for inpainting canvases
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  
   // Track pending upscale tasks using localStorage
   const [isPendingUpscale, setIsPendingUpscale] = useState(() => {
     try {
@@ -548,11 +567,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   
-  // Progressive loading for lightbox images
+  // Determine which image URL to show based on upscale state FIRST (before progressive loading)
+  const upscaledUrl = (media as any).upscaled_url;
+  const originalUrl = media.location || media.imageUrl;
+  
+  // If showing upscaled and upscaled version exists, use it; otherwise use original
+  const effectiveImageUrl = (showingUpscaled && upscaledUrl) ? upscaledUrl : originalUrl;
+  
+  // Progressive loading for lightbox images - now uses effectiveImageUrl instead of hardcoded original
   const progressiveEnabled = isProgressiveLoadingEnabled();
   const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, error: progressiveError, retry: retryProgressive, ref: progressiveRef } = useProgressiveImage(
     progressiveEnabled && !isVideo ? media.thumbUrl : null,
-    media.location || media.imageUrl,
+    effectiveImageUrl, // 🚀 Now respects upscale toggle!
     {
       priority: true, // Lightbox images are always high priority
       lazy: false,
@@ -560,13 +586,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       crossfadeMs: 250 // Slightly longer crossfade for lightbox
     }
   );
-  
-  // Determine which image URL to show based on upscale state
-  const upscaledUrl = (media as any).upscaled_url;
-  const originalUrl = media.location || media.imageUrl;
-  
-  // If showing upscaled and upscaled version exists, use it; otherwise use original
-  const effectiveImageUrl = (showingUpscaled && upscaledUrl) ? upscaledUrl : originalUrl;
   
   // Use progressive src if available, otherwise fallback to effective display URL
   const displayUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(effectiveImageUrl);
@@ -1352,6 +1371,303 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setShowingUpscaled(!showingUpscaled);
   };
 
+  // Load saved mask from localStorage when entering inpaint mode
+  useEffect(() => {
+    if (isInpaintMode) {
+      try {
+        const savedMask = localStorage.getItem(`inpaint-mask-${media.id}`);
+        if (savedMask) {
+          const parsed = JSON.parse(savedMask);
+          setBrushStrokes(parsed.strokes || []);
+          setInpaintPrompt(parsed.prompt || '');
+          console.log('[Inpaint] Loaded saved mask from localStorage', {
+            mediaId: media.id,
+            strokeCount: parsed.strokes?.length || 0
+          });
+          
+          // Redraw loaded strokes on next tick
+          setTimeout(() => {
+            redrawStrokes(parsed.strokes || []);
+          }, 100);
+        }
+      } catch (e) {
+        console.error('[Inpaint] Error loading saved mask:', e);
+      }
+    }
+  }, [isInpaintMode, media.id]);
+
+  // Save mask to localStorage when strokes or prompt change
+  useEffect(() => {
+    if (isInpaintMode && (brushStrokes.length > 0 || inpaintPrompt)) {
+      try {
+        localStorage.setItem(`inpaint-mask-${media.id}`, JSON.stringify({
+          strokes: brushStrokes,
+          prompt: inpaintPrompt,
+          savedAt: Date.now()
+        }));
+      } catch (e) {
+        console.error('[Inpaint] Error saving mask:', e);
+      }
+    }
+  }, [brushStrokes, inpaintPrompt, isInpaintMode, media.id]);
+
+  // Initialize canvas when entering inpaint mode
+  useEffect(() => {
+    if (isInpaintMode && displayCanvasRef.current && maskCanvasRef.current && imageContainerRef.current) {
+      const container = imageContainerRef.current;
+      const img = container.querySelector('img');
+      
+      if (img) {
+        const rect = img.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // Set canvas size to match displayed image
+        const canvas = displayCanvasRef.current;
+        const maskCanvas = maskCanvasRef.current;
+        
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+        canvas.style.left = `${rect.left - containerRect.left}px`;
+        canvas.style.top = `${rect.top - containerRect.top}px`;
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        
+        maskCanvas.width = rect.width;
+        maskCanvas.height = rect.height;
+        
+        console.log('[Inpaint] Canvas initialized', {
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    }
+  }, [isInpaintMode, displayUrl, imageDimensions]);
+
+  // Redraw all strokes on canvas
+  const redrawStrokes = useCallback((strokes: typeof brushStrokes) => {
+    const canvas = displayCanvasRef.current;
+    const maskCanvas = maskCanvasRef.current;
+    
+    if (!canvas || !maskCanvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const maskCtx = maskCanvas.getContext('2d');
+    
+    if (!ctx || !maskCtx) return;
+    
+    // Clear both canvases
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    
+    // Redraw all strokes
+    strokes.forEach(stroke => {
+      if (stroke.points.length < 2) return;
+      
+      // Draw on display canvas (semi-transparent red for paint, erase for erasing)
+      ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = stroke.isErasing ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
+      ctx.lineWidth = stroke.isErasing ? 20 : 20;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.stroke();
+      
+      // Draw on mask canvas (always white for mask, erase for erasing)
+      maskCtx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'source-over';
+      maskCtx.strokeStyle = stroke.isErasing ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 255, 255, 1)';
+      maskCtx.lineWidth = stroke.isErasing ? 20 : 20;
+      maskCtx.lineCap = 'round';
+      maskCtx.lineJoin = 'round';
+      
+      maskCtx.beginPath();
+      maskCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        maskCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      maskCtx.stroke();
+    });
+    
+    console.log('[Inpaint] Redrawn strokes', { count: strokes.length });
+  }, []);
+
+  // Handle mouse/touch drawing
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isInpaintMode) return;
+    
+    e.preventDefault();
+    setIsDrawing(true);
+    
+    const canvas = displayCanvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setCurrentStroke([{ x, y }]);
+  }, [isInpaintMode]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isInpaintMode || !isDrawing) return;
+    
+    e.preventDefault();
+    const canvas = displayCanvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setCurrentStroke(prev => [...prev, { x, y }]);
+    
+    // Draw current stroke on display canvas
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    ctx.globalCompositeOperation = isEraseMode ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = isEraseMode ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
+    ctx.lineWidth = 20;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    if (currentStroke.length > 0) {
+      const lastPoint = currentStroke[currentStroke.length - 1];
+      ctx.beginPath();
+      ctx.moveTo(lastPoint.x, lastPoint.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+  }, [isInpaintMode, isDrawing, isEraseMode, currentStroke]);
+
+  const handlePointerUp = useCallback(() => {
+    if (!isInpaintMode || !isDrawing) return;
+    
+    setIsDrawing(false);
+    
+    if (currentStroke.length > 1) {
+      const newStroke = {
+        id: nanoid(),
+        points: currentStroke,
+        isErasing: isEraseMode
+      };
+      
+      setBrushStrokes(prev => [...prev, newStroke]);
+      console.log('[Inpaint] Stroke added', { strokeId: newStroke.id, pointCount: currentStroke.length });
+    }
+    
+    setCurrentStroke([]);
+  }, [isInpaintMode, isDrawing, currentStroke, isEraseMode]);
+
+  // Undo last stroke
+  const handleUndo = useCallback(() => {
+    if (brushStrokes.length === 0) return;
+    
+    const newStrokes = brushStrokes.slice(0, -1);
+    setBrushStrokes(newStrokes);
+    redrawStrokes(newStrokes);
+    
+    console.log('[Inpaint] Undo stroke', { remainingCount: newStrokes.length });
+  }, [brushStrokes, redrawStrokes]);
+
+  // Clear all strokes
+  const handleClearMask = useCallback(() => {
+    setBrushStrokes([]);
+    redrawStrokes([]);
+    console.log('[Inpaint] Cleared all strokes');
+  }, [redrawStrokes]);
+
+  // Redraw when strokes change
+  useEffect(() => {
+    if (isInpaintMode) {
+      redrawStrokes(brushStrokes);
+    }
+  }, [brushStrokes, isInpaintMode, redrawStrokes]);
+
+  // Handle entering/exiting inpaint mode
+  const handleEnterInpaintMode = useCallback(() => {
+    setIsInpaintMode(true);
+    console.log('[Inpaint] Entered inpaint mode');
+  }, []);
+
+  const handleExitInpaintMode = useCallback(() => {
+    setIsInpaintMode(false);
+    setBrushStrokes([]);
+    setCurrentStroke([]);
+    setIsDrawing(false);
+    setIsEraseMode(false);
+    setInpaintPrompt('');
+    setInpaintNumGenerations(1);
+    
+    // Don't clear localStorage - keep for next time
+    console.log('[Inpaint] Exited inpaint mode');
+  }, []);
+
+  // Generate inpaint
+  const handleGenerateInpaint = useCallback(async () => {
+    if (!selectedProjectId || isVideo || brushStrokes.length === 0 || !inpaintPrompt.trim()) {
+      toast.error('Please paint on the image and enter a prompt');
+      return;
+    }
+
+    setIsGeneratingInpaint(true);
+    try {
+      const canvas = displayCanvasRef.current;
+      const maskCanvas = maskCanvasRef.current;
+      
+      if (!canvas || !maskCanvas) {
+        throw new Error('Canvas not initialized');
+      }
+
+      console.log('[Inpaint] Starting inpaint generation...', {
+        mediaId: media.id,
+        prompt: inpaintPrompt,
+        numGenerations: inpaintNumGenerations,
+        strokeCount: brushStrokes.length
+      });
+
+      // Create green mask image from mask canvas
+      const maskImageData = maskCanvas.toDataURL('image/png');
+      
+      // Upload mask to storage
+      const maskFile = await fetch(maskImageData)
+        .then(res => res.blob())
+        .then(blob => new File([blob], `inpaint_mask_${media.id}_${Date.now()}.png`, { type: 'image/png' }));
+      
+      const maskUrl = await uploadImageToStorage(maskFile);
+      console.log('[Inpaint] Mask uploaded:', maskUrl);
+
+      // Get source image URL (prefer upscaled if available)
+      const sourceUrl = (media as any).upscaled_url || media.location || media.imageUrl;
+
+      // Create inpaint task
+      await createImageInpaintTask({
+        project_id: selectedProjectId,
+        image_url: sourceUrl,
+        mask_url: maskUrl,
+        prompt: inpaintPrompt,
+        num_generations: inpaintNumGenerations,
+        generation_id: media.id,
+      });
+
+      console.log('[Inpaint] ✅ Inpaint task created successfully');
+      toast.success(`Inpaint task created! Generating ${inpaintNumGenerations} image(s)...`);
+      
+      // Exit inpaint mode
+      handleExitInpaintMode();
+      
+    } catch (error) {
+      console.error('[Inpaint] Error creating inpaint task:', error);
+      toast.error('Failed to create inpaint task');
+    } finally {
+      setIsGeneratingInpaint(false);
+    }
+  }, [selectedProjectId, isVideo, brushStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode]);
+
   // Handle adding to references
   const handleAddToReferences = async () => {
     if (!selectedProjectId || isVideo) {
@@ -1803,7 +2119,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
 
                   {/* Media Content */}
-                  <div className="relative max-w-full max-h-full flex items-center justify-center">
+                  <div ref={imageContainerRef} className="relative max-w-full max-h-full flex items-center justify-center">
                     {isVideo ? (
                       <StyledVideoPlayer
                         src={displayUrl}
@@ -1921,33 +2237,52 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Tooltip>
                       )}
 
-                      {/* Upscale Button - Desktop Task Details View (hidden in readOnly, only shown in cloud mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
+                      {/* Inpaint Button - Desktop Task Details View (hidden in readOnly, only shown in cloud mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                              disabled={isUpscaling || isPendingUpscale}
-                              className={cn(
-                                "transition-colors text-white",
-                                isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                              )}
+                              onClick={handleEnterInpaintMode}
+                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
                             >
-                              {isUpscaling ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : isPendingUpscale ? (
-                                <CheckCircle className="h-4 w-4" />
-                              ) : hasUpscaledVersion ? (
-                                showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                              ) : (
-                                <ArrowUpCircle className="h-4 w-4" />
-                              )}
+                              <Paintbrush className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {/* Upscale Button - Desktop Task Details View (hidden in readOnly, only shown in cloud mode) */}
+                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+                                disabled={isUpscaling || isPendingUpscale}
+                                className={cn(
+                                  "transition-colors text-white",
+                                  isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+                                )}
+                              >
+                                {isUpscaling ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : isPendingUpscale ? (
+                                  <CheckCircle className="h-4 w-4" />
+                                ) : hasUpscaledVersion ? (
+                                  showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
                           <TooltipContent className="z-[100001]">
-                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'In Progress' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -2412,26 +2747,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                       {/* Upscale Button - Mobile Task Details View (hidden in readOnly, only shown in cloud mode) */}
                       {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                          disabled={isUpscaling || isPendingUpscale}
-                          className={cn(
-                            "transition-colors text-white",
-                            isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                          )}
-                        >
-                          {isUpscaling ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : isPendingUpscale ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : hasUpscaledVersion ? (
-                            showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                          ) : (
-                            <ArrowUpCircle className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+                                disabled={isUpscaling || isPendingUpscale}
+                                className={cn(
+                                  "transition-colors text-white",
+                                  isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+                                )}
+                              >
+                                {isUpscaling ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : isPendingUpscale ? (
+                                  <CheckCircle className="h-4 w-4" />
+                                ) : hasUpscaledVersion ? (
+                                  showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+                                ) : (
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">
+                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
 
@@ -2650,7 +2994,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     playsInline
                     preload="auto"
                     className="w-full shadow-wes border border-border/20"
-                    style={{ maxHeight: '85vh' }}
+                    style={{ maxHeight: 'calc(85vh - 2rem)', margin: '1rem 0' }}
                   />
                 ) : (
                   <div className="relative">
@@ -2762,29 +3106,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                          disabled={isUpscaling || isPendingUpscale}
-                          className={cn(
-                            "transition-colors text-white",
-                            isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                          )}
-                        >
-                          {isUpscaling ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : isPendingUpscale ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : hasUpscaledVersion ? (
-                            showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                          ) : (
-                            <ArrowUpCircle className="h-4 w-4" />
-                          )}
-                        </Button>
+                        <span>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
+                            disabled={isUpscaling || isPendingUpscale}
+                            className={cn(
+                              "transition-colors text-white",
+                              isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
+                            )}
+                          >
+                            {isUpscaling ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : isPendingUpscale ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : hasUpscaledVersion ? (
+                              showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
+                            ) : (
+                              <ArrowUpCircle className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </span>
                       </TooltipTrigger>
                           <TooltipContent className="z-[100001]">
-                        {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'In Progress' : hasUpscaledVersion ? (showingUpscaled ? 'Show original' : 'Show upscaled') : 'Upscale image'}
+                        {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
                       </TooltipContent>
                     </Tooltip>
                   )}

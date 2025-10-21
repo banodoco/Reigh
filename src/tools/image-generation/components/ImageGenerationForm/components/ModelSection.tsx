@@ -19,7 +19,6 @@ interface ModelSectionProps {
   subjectDescription: string;
   inThisScene: boolean;
   isUploadingStyleReference: boolean;
-  isMobile?: boolean;
   onStyleUpload: (files: File[]) => void;
   onStyleRemove: () => void;
   onStyleStrengthChange: (value: number) => void;
@@ -61,6 +60,8 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   const [isDraggingOverAdd, setIsDraggingOverAdd] = React.useState(false);
   // Track loading state for each reference image
   const [loadedImages, setLoadedImages] = React.useState<Set<string>>(new Set());
+  // Track touch interactions to prevent hover interfering with tap
+  const [touchedRef, setTouchedRef] = React.useState<string | null>(null);
   
   const handleImageLoad = React.useCallback((refId: string) => {
     setLoadedImages(prev => new Set(prev).add(refId));
@@ -101,6 +102,19 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                   : "border-gray-300 hover:border-purple-300"
               )}
               onClick={() => !isGenerating && onSelectReference(ref.id)}
+              onTouchEnd={(e) => {
+                // Handle touch to ensure single-tap selection works
+                if (!isGenerating) {
+                  // Don't select if tapping the delete button
+                  const target = e.target as HTMLElement;
+                  if (!target.closest('button')) {
+                    onSelectReference(ref.id);
+                  }
+                }
+                setTouchedRef(null);
+              }}
+              onTouchStart={() => setTouchedRef(ref.id)}
+              onTouchCancel={() => setTouchedRef(null)}
               title={ref.name}
             >
               {imageUrl ? (
@@ -139,7 +153,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                 </div>
               )}
               
-              {/* Delete button - show on hover or always on mobile */}
+              {/* Delete button - show on hover or when touched on mobile */}
               {!isGenerating && (
                 <button
                   type="button"
@@ -148,9 +162,17 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                     e.preventDefault();
                     onDeleteReference(ref.id);
                   }}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 
-                             opacity-0 group-hover:opacity-100 transition-opacity
-                             hover:bg-red-600 z-10"
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onDeleteReference(ref.id);
+                  }}
+                  className={cn(
+                    "absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 transition-opacity hover:bg-red-600 z-10",
+                    touchedRef === ref.id || isSelected
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                  )}
                   title="Delete reference"
                 >
                   <X className="h-3 w-3" />
@@ -253,7 +275,6 @@ const StyleReferenceSection: React.FC<{
   inThisScene: boolean;
   isUploadingStyleReference: boolean;
   isGenerating: boolean;
-  isMobile?: boolean;
   onStyleUpload: (files: File[]) => void;
   onStyleRemove: () => void;
   onStyleStrengthChange: (value: number) => void;
@@ -278,7 +299,6 @@ const StyleReferenceSection: React.FC<{
   inThisScene,
   isUploadingStyleReference,
   isGenerating,
-  isMobile = false,
   onStyleUpload,
   onStyleRemove,
   onStyleStrengthChange,
@@ -331,7 +351,7 @@ const StyleReferenceSection: React.FC<{
     {showMultiReference && references.length > 0 && styleReferenceImage && (
       <div className="space-y-4">
         {/* First Row: Thumbnails and Preview */}
-        <div className={`flex gap-4 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+        <div className="flex gap-4 flex-col md:flex-row">
           {/* Left side - Thumbnails */}
           <div className="flex-[2]">
             <ReferenceSelector
@@ -346,23 +366,21 @@ const StyleReferenceSection: React.FC<{
             />
           </div>
           
-          {/* Right side - Large preview (hidden on mobile) */}
-          {!isMobile && (
-            <div className="flex-1">
-              <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
-                <img
-                  src={styleReferenceImage}
-                  alt="Selected reference"
-                  className="w-full h-full object-contain"
-                  style={{ objectFit: 'contain' }}
-                />
-              </div>
+          {/* Right side - Large preview (hidden on small screens) */}
+          <div className="flex-1 hidden md:block">
+            <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
+              <img
+                src={styleReferenceImage}
+                alt="Selected reference"
+                className="w-full h-full object-contain"
+                style={{ objectFit: 'contain' }}
+              />
             </div>
-          )}
+          </div>
         </div>
 
         {/* Second Row: Settings in Two Columns */}
-        <div className={`flex gap-4 ${isMobile ? 'flex-col' : 'flex-row'}`}>
+        <div className="flex gap-4 flex-col md:flex-row">
           {/* Left column - Reference Mode Selector */}
           <div className="flex-1 space-y-2">
             <Label className="text-sm font-medium">How would you like to use this reference?</Label>
@@ -514,8 +532,8 @@ const StyleReferenceSection: React.FC<{
       {/* Responsive layout: horizontal on desktop, vertical on mobile */}
       <div className="w-full">
         <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
-          <div className={`flex items-start ${isMobile ? 'flex-col space-y-4' : 'space-x-4'}`}>
-            <div className={`relative flex-shrink-0 ${isMobile ? 'w-full' : 'w-48'}`}>
+          <div className="flex items-start flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
+            <div className="relative flex-shrink-0 w-full md:w-48">
               {styleReferenceImage ? (
                 showSkeleton ? (
                   /* Skeleton loading state */
@@ -660,7 +678,6 @@ export const ModelSection: React.FC<ModelSectionProps & {
   subjectDescription,
   inThisScene,
   isUploadingStyleReference,
-  isMobile = false,
   onStyleUpload,
   onStyleRemove,
   onStyleStrengthChange,
@@ -686,7 +703,6 @@ export const ModelSection: React.FC<ModelSectionProps & {
         inThisScene={inThisScene}
         isUploadingStyleReference={isUploadingStyleReference}
         isGenerating={isGenerating}
-        isMobile={isMobile}
         onStyleUpload={onStyleUpload}
         onStyleRemove={onStyleRemove}
         onStyleStrengthChange={onStyleStrengthChange}

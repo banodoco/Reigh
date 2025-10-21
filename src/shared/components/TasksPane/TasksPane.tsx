@@ -672,8 +672,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         <div
           {...paneProps}
           className={cn(
-            'pointer-events-auto absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col',
-            transformClass
+            'absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col',
+            transformClass,
+            // Only enable pointer events when pane is fully open to prevent accidental clicks during slide transition
+            isOpen ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
           <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">

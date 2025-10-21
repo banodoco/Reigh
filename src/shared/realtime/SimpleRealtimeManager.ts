@@ -163,6 +163,14 @@ export class SimpleRealtimeManager {
             console.log('[SimpleRealtime] 📨 Shot generation updated:', payload);
             this.handleShotGenerationChange(payload, 'UPDATE');
           }
+        )
+        // Listen to generations table for upscale completion and other updates
+        .on('postgres_changes', 
+          { event: 'UPDATE', schema: 'public', table: 'generations', filter: `project_id=eq.${projectId}` }, 
+          (payload: any) => {
+            console.log('[SimpleRealtime] 📨 Generation updated (upscale/etc):', payload);
+            this.handleGenerationUpdate(payload);
+          }
         );
 
       // Subscribe with status callback
@@ -316,6 +324,8 @@ export class SimpleRealtimeManager {
         this.dispatchBatchedNewTasks(payloads);
       } else if (eventType === 'shot-generation-change') {
         this.dispatchBatchedShotGenerationChanges(payloads);
+      } else if (eventType === 'generation-update') {
+        this.dispatchBatchedGenerationUpdates(payloads);
       }
     });
 
@@ -341,6 +351,8 @@ export class SimpleRealtimeManager {
       ['tasks'],
       ['task-status-counts'],
       ['unified-generations'],
+      ['shot-generations'], // 🚀 Invalidate shot-specific generation queries (e.g., for upscale in Timeline)
+      ['generations'], // 🚀 Invalidate all generation queries (including useGenerations)
       ['tasks', 'paginated', this.projectId].filter(Boolean)
     ]);
 
@@ -435,6 +447,40 @@ export class SimpleRealtimeManager {
     }
   }
 
+  /**
+   * Dispatch batched generation update events (e.g., upscale completion)
+   */
+  private dispatchBatchedGenerationUpdates(payloads: any[]) {
+    // Update global snapshot with latest event time
+    this.updateGlobalSnapshot('joined', Date.now());
+
+    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched generation updates:', {
+      count: payloads.length,
+      upscaleCompletions: payloads.filter((p: any) => p.upscaleCompleted).length,
+      timestamp: Date.now()
+    });
+
+    // Invalidate all generation-related queries to pick up the upscaled_url
+    const queryKeys = [
+      ['unified-generations'],
+      ['generations'],
+      ['shot-generations']
+    ];
+    
+    dataFreshnessManager.onRealtimeEvent('generation-update', queryKeys);
+
+    // Emit single consolidated event with all payloads
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('realtime:generation-update-batch', {
+        detail: {
+          payloads,
+          count: payloads.length,
+          timestamp: Date.now()
+        }
+      }));
+    }
+  }
+
   private handleTaskUpdate(payload: any) {
     // Batch this event instead of dispatching immediately
     this.batchEvent('task-update', payload);
@@ -485,6 +531,33 @@ export class SimpleRealtimeManager {
     // Batch this event to prevent conflicts with optimistic updates during drag operations
     console.log('[SimpleRealtime:Batching] 📦 Batching shot generation change for shot:', shotId.substring(0, 8));
     this.batchEvent('shot-generation-change', { ...payload, eventType, shotId, isPositioned: isNowPositioned });
+  }
+
+  private handleGenerationUpdate(payload: any) {
+    const newRecord = payload?.new;
+    const oldRecord = payload?.old;
+    const generationId = newRecord?.id;
+    const upscaledUrl = newRecord?.upscaled_url;
+    const oldUpscaledUrl = oldRecord?.upscaled_url;
+    
+    // Check if upscaled_url was added
+    const upscaleCompleted = !oldUpscaledUrl && upscaledUrl;
+    
+    console.log('[SimpleRealtime] 🎯 Generation update analysis:', {
+      generationId: generationId?.substring(0, 8),
+      upscaleCompleted,
+      upscaledUrl: upscaledUrl ? 'present' : 'none',
+      oldUpscaledUrl: oldUpscaledUrl ? 'present' : 'none'
+    });
+    
+    if (!generationId) {
+      console.warn('[SimpleRealtime] ⚠️  Generation update missing id, cannot invalidate');
+      return;
+    }
+    
+    // Invalidate queries to pick up the upscaled_url
+    console.log('[SimpleRealtime:Batching] 📦 Batching generation update:', generationId.substring(0, 8));
+    this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted });
   }
 
   private updateGlobalSnapshot(channelState: string, lastEventAt?: number) {

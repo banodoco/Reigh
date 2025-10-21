@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
+import { transformGeneration, type RawGeneration, type TransformOptions } from '@/shared/lib/generationTransformers';
 
 /**
  * Fetch generations using direct Supabase call with pagination support
@@ -125,6 +126,7 @@ export async function fetchGenerations(
       starred,
       tasks,
       based_on,
+      upscaled_url,
       shot_generations(shot_id, timeline_frame)
     `)
     .eq('project_id', projectId);
@@ -210,6 +212,19 @@ export async function fetchGenerations(
     throw error;
   }
 
+  // [UpscaleDebug] ALWAYS log to confirm function is running
+  console.log('[UpscaleDebug] ===== fetchGenerations called =====', {
+    projectId,
+    totalItems: data?.length || 0,
+    itemsWithUpscaledUrl: data?.filter((item: any) => item.upscaled_url).length || 0,
+    allItemIds: data?.slice(0, 3).map((item: any) => ({
+      id: item.id?.substring(0, 8),
+      hasUpscaledUrl: !!item.upscaled_url,
+      upscaledUrl: item.upscaled_url ? item.upscaled_url.substring(0, 60) + '...' : 'NONE',
+      location: item.location ? item.location.substring(0, 60) + '...' : 'NONE'
+    }))
+  });
+
   // Calculate hasMore and process results based on count strategy
   let finalData = data || [];
   let hasMore = false;
@@ -225,136 +240,21 @@ export async function fetchGenerations(
     hasMore = (offset + limit) < totalCount;
   }
 
+  // Use shared transformer instead of inline transformation logic
   const items = finalData?.map((item: any) => {
-    // Simple URL handling: location for main, thumbnail_url for thumb (fallback to main)
-    const mainUrl = item.location;
-    
-    // Enhanced thumbnail URL extraction - check database field first, then params
-    let thumbnailUrl = item.thumbnail_url;
-    
-    // If no thumbnail in database, check params for travel-between-images videos
-    if (!thumbnailUrl && item.params?.tool_type === 'travel-between-images') {
-      thumbnailUrl = 
-        item.params?.thumbnailUrl ||
-        item.params?.originalParams?.orchestrator_details?.thumbnail_url ||
-        item.params?.full_orchestrator_payload?.thumbnail_url ||
-        item.params?.originalParams?.full_orchestrator_payload?.thumbnail_url;
+    // [UpscaleDebug] Preserve existing debug logging
+    if (item.upscaled_url) {
+      console.log('[UpscaleDebug] Processing item with upscaled_url:', {
+        id: item.id?.substring(0, 8),
+        upscaled_url: item.upscaled_url?.substring(0, 60)
+      });
     }
     
-    // Final fallback to main URL
-    thumbnailUrl = thumbnailUrl || mainUrl;
-    
-    // [VideoThumbnailIssue] Log thumbnail data for travel-between-images videos
-    if (item.params?.tool_type === 'travel-between-images' && item.type?.includes('video')) {
-      // Log first few items in detail, then summary for the rest
-      const shouldLogDetail = finalData.indexOf(item) < 3;
-      
-      if (shouldLogDetail) {
-        console.log('[VideoThumbnailFirst3] DETAILED - Processing travel video:', {
-          id: item.id?.substring(0, 8),
-          type: item.type,
-          mainUrl: mainUrl?.substring(0, 50) + '...',
-          thumbnail_url_raw: item.thumbnail_url,
-          thumbnail_url_type: typeof item.thumbnail_url,
-          thumbnail_url_preview: item.thumbnail_url ? item.thumbnail_url.substring(0, 50) + '...' : 'NULL',
-          finalThumbnailUrl: thumbnailUrl?.substring(0, 50) + '...',
-          extractedFromDB: !!item.thumbnail_url,
-          extractedFromParams: !item.thumbnail_url && thumbnailUrl !== mainUrl,
-          isUsingVideoFallback: thumbnailUrl === mainUrl,
-          // Check if thumbnail might be in params
-          paramsHasThumbnail: !!(item.params?.thumbnailUrl || item.params?.originalParams?.orchestrator_details?.thumbnail_url || item.params?.full_orchestrator_payload?.thumbnail_url),
-          paramsThumbnailUrl: item.params?.thumbnailUrl?.substring(0, 50) + '...' || 'none',
-          orchestratorThumbnailUrl: item.params?.originalParams?.orchestrator_details?.thumbnail_url?.substring(0, 50) + '...' || 'none',
-          fullOrchestratorThumbnailUrl: item.params?.full_orchestrator_payload?.thumbnail_url?.substring(0, 50) + '...' || 'none',
-          // Show full params structure for first item
-          fullParams: finalData.indexOf(item) === 0 ? item.params : 'hidden',
-          timestamp: Date.now()
-        });
-      } else {
-        console.log('[VideoThumbnailIssue] SUMMARY - Travel video:', {
-          id: item.id?.substring(0, 8),
-          thumbnail_url_raw: item.thumbnail_url,
-          extractedFromDB: !!item.thumbnail_url,
-          extractedFromParams: !item.thumbnail_url && thumbnailUrl !== mainUrl,
-          isUsingVideoFallback: thumbnailUrl === mainUrl,
-          finalThumbnailUrl: thumbnailUrl?.substring(0, 50) + '...',
-        });
-      }
-    }
-    
-    // Extract task ID from tasks array (if available)
-    const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
-    
-    const baseItem: GeneratedImageWithMetadata = {
-      id: item.id,
-      url: mainUrl,
-      thumbUrl: thumbnailUrl, // Use thumbnail_url if available, fallback to main URL
-      prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
-              item.params?.prompt || 
-              'No prompt',
-      metadata: {
-        ...(item.params || {}),
-        taskId, // Include task ID in metadata for ImageGalleryItem to access
-        based_on: item.based_on // Include based_on for lineage tracking
-      },
-      createdAt: item.created_at,
-      isVideo: item.type?.includes('video'),
-      starred: item.starred || false,
-      based_on: item.based_on, // Include at top level for easy access
-      position: null,
-      timeline_frame: null,
-    };
-    
-    // Include shot association data from LEFT JOIN
-    const shotGenerations = item.shot_generations || [];
-    
-    const normalizePosition = (timelineFrame: number | null | undefined) => {
-      if (timelineFrame === null || timelineFrame === undefined) return null;
-      return Math.floor(timelineFrame / 50);
-    };
-
-    if (shotGenerations.length > 0) {
-      // Optimize: Only create full associations array if there are multiple shots
-      // For single shot, use simpler structure
-      if (shotGenerations.length === 1) {
-        const singleShot = shotGenerations[0];
-        const timelineFrame = singleShot.timeline_frame;
-        return {
-          ...baseItem,
-          shot_id: singleShot.shot_id,
-          position: normalizePosition(timelineFrame),
-          timeline_frame: timelineFrame,
-        };
-      }
-      
-      // Multiple shots: include all associations for positioning checks
-      const allAssociations = shotGenerations.map(sg => ({
-        shot_id: sg.shot_id,
-        timeline_frame: sg.timeline_frame,
-        position: normalizePosition(sg.timeline_frame),
-      }));
-      
-      // When filtering by specific shot, use that shot as primary
-      let primaryShot = shotGenerations[0];
-      if (filters?.shotId) {
-        const matchingShot = shotGenerations.find(sg => sg.shot_id === filters.shotId);
-        if (matchingShot) {
-          primaryShot = matchingShot;
-        }
-      }
-
-      const primaryTimelineFrame = primaryShot.timeline_frame;
-      
-      return {
-        ...baseItem,
-        shot_id: primaryShot.shot_id,
-        position: normalizePosition(primaryTimelineFrame),
-        timeline_frame: primaryTimelineFrame,
-        all_shot_associations: allAssociations,
-      };
-    }
-    
-    return baseItem;
+    // Transform using shared function - handles all the complex logic
+    return transformGeneration(item as RawGeneration, {
+      shotId: filters?.shotId,
+      verbose: !!item.upscaled_url, // Enable verbose logging for upscaled items
+    });
   }) || [];
 
 
