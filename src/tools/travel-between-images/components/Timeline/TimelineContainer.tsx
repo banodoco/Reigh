@@ -24,7 +24,7 @@ import { Plus } from 'lucide-react';
 
 // Import hooks
 import { useZoom } from './hooks/useZoom';
-import { useFileDrop } from './hooks/useFileDrop';
+import { useUnifiedDrop } from './hooks/useUnifiedDrop';
 import { useTimelineDrag } from './hooks/useTimelineDrag';
 import { useGlobalEvents } from './hooks/useGlobalEvents';
 
@@ -38,6 +38,7 @@ interface TimelineContainerProps {
   onImageReorder: (orderedIds: string[]) => void;
   onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
+  onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
   setIsDragInProgress: (dragging: boolean) => void;
   // Control props
   onContextFramesChange: (context: number) => void;
@@ -94,6 +95,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   onImageReorder,
   onImageSaved,
   onImageDrop,
+  onGenerationDrop,
   setIsDragInProgress,
   onContextFramesChange,
   onResetFrames,
@@ -346,15 +348,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     }
   }, [zoomLevel, zoomCenter, dragState.isDragging, isZooming]);
 
-  // File drop hook
+  // Unified drop hook (handles both file drops and generation drops)
   const {
     isFileOver,
     dropTargetFrame,
+    dragType,
     handleDragEnter,
     handleDragOver,
     handleDragLeave,
     handleDrop,
-  } = useFileDrop({ onImageDrop, fullMin, fullRange });
+  } = useUnifiedDrop({ onImageDrop, onGenerationDrop, fullMin, fullRange });
 
   // Simple drag state tracking - remove excessive logging
 
@@ -548,15 +551,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Drop position indicator */}
-        <DropIndicator
-          isVisible={isFileOver}
-          dropTargetFrame={dropTargetFrame}
-          fullMin={fullMin}
-          fullRange={fullRange}
-          containerWidth={containerWidth}
-        />
-
         {/* Structure video strip (show if exists) or uploader (only if not readOnly) */}
         {shotId && projectId && onStructureVideoChange && (
           structureVideoPath && structureVideoMetadata ? (
@@ -620,6 +614,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             paddingRight: `${TIMELINE_HORIZONTAL_PADDING + 60}px`,
           }}
         >
+          {/* Drop position indicator - positioned in timeline area only */}
+          <DropIndicator
+            isVisible={isFileOver}
+            dropTargetFrame={dropTargetFrame}
+            fullMin={fullMin}
+            fullRange={fullRange}
+            containerWidth={containerWidth}
+            dragType={dragType}
+          />
+
           {/* Ruler - positioned inside timeline container to match image coordinate space */}
           <TimelineRuler
             fullMin={fullMin}

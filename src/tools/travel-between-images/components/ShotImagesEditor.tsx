@@ -51,6 +51,12 @@ interface ShotImagesEditorProps {
   onFramePositionsChange: (newPositions: Map<string, number>) => void;
   /** Callback when external images are dropped on the timeline */
   onImageDrop: (files: File[], targetFrame?: number) => Promise<void>;
+  /** Callback when generations are dropped from GenerationsPane onto the timeline */
+  onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
+  /** Callback when external images are dropped on batch mode grid */
+  onBatchFileDrop?: (files: File[], targetPosition?: number) => Promise<void>;
+  /** Callback when generations are dropped from GenerationsPane onto batch mode grid */
+  onBatchGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetPosition?: number) => Promise<void>;
   /** Map of pending frame positions coming from server */
   pendingPositions: Map<string, number>;
   /** Callback when pending position is applied */
@@ -128,6 +134,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onContextFramesChange,
   onFramePositionsChange,
   onImageDrop,
+  onGenerationDrop,
+  onBatchFileDrop,
+  onBatchGenerationDrop,
   pendingPositions,
   onPendingPositionApplied,
   onImageDelete,
@@ -471,6 +480,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onContextFramesChange={onContextFramesChange}
                 onFramePositionsChange={onFramePositionsChange}
                 onImageDrop={onImageDrop}
+                onGenerationDrop={onGenerationDrop}
                 pendingPositions={pendingPositions}
                 onPendingPositionApplied={onPendingPositionApplied}
                 onImageDelete={onImageDelete}
@@ -586,6 +596,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   batchVideoFrames={batchVideoFrames}
                   onSelectionChange={onSelectionChange}
                   readOnly={readOnly}
+                  onFileDrop={onBatchFileDrop}
+                  onGenerationDrop={onBatchGenerationDrop}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

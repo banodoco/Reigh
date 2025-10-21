@@ -1,5 +1,6 @@
 import React from "react";
 import { TIMELINE_PADDING_OFFSET } from "./constants";
+import type { DragType } from "./hooks/useUnifiedDrop";
 
 interface DropIndicatorProps {
   isVisible: boolean;
@@ -7,6 +8,7 @@ interface DropIndicatorProps {
   fullMin: number;
   fullRange: number;
   containerWidth: number;
+  dragType?: DragType;
 }
 
 const DropIndicator: React.FC<DropIndicatorProps> = ({
@@ -15,6 +17,7 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
   fullMin,
   fullRange,
   containerWidth,
+  dragType = 'none',
 }) => {
   if (!isVisible || dropTargetFrame === null) {
     return null;
@@ -25,6 +28,9 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
   const pixelPosition = TIMELINE_PADDING_OFFSET + ((dropTargetFrame - fullMin) / fullRange) * effectiveWidth;
   const leftPercent = (pixelPosition / containerWidth) * 100;
 
+  // Visual indicator based on drag type
+  const dragIcon = dragType === 'file' ? '📁' : dragType === 'generation' ? '🖼️' : '';
+
   return (
     <div
       className="absolute top-0 bottom-0 w-1 bg-primary z-40 pointer-events-none"
@@ -34,6 +40,7 @@ const DropIndicator: React.FC<DropIndicatorProps> = ({
       }}
     >
       <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded whitespace-nowrap">
+        {dragIcon && <span className="mr-1">{dragIcon}</span>}
         Frame {dropTargetFrame}
       </div>
     </div>

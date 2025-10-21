@@ -12,7 +12,7 @@ export interface ImageUpscaleTaskParams {
   project_id: string;
   image_url: string; // The source image to upscale
   generation_id?: string; // Optional: the generation ID to update with upscaled URL
-  scale_factor?: number; // Default to 4x upscaling
+  scale_factor?: number; // Default to 2x upscaling
   output_format?: string; // Default to "jpeg"
 }
 
@@ -48,7 +48,7 @@ function buildImageUpscaleTaskParams(
 ): Record<string, unknown> {
   const taskParams: Record<string, unknown> = {
     image: params.image_url,
-    scale_factor: params.scale_factor ?? 4,
+    scale_factor: params.scale_factor ?? 2,
     output_format: params.output_format ?? "jpeg",
   };
 

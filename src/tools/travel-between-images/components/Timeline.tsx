@@ -76,6 +76,7 @@ export interface TimelineProps {
   onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
+  onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
   pendingPositions?: Map<string, number>;
   onPendingPositionApplied?: (generationId: string) => void;
   // Read-only mode - disables all interactions
@@ -155,6 +156,7 @@ const Timeline: React.FC<TimelineProps> = ({
   onContextFramesChange,
   onFramePositionsChange,
   onImageDrop,
+  onGenerationDrop,
   pendingPositions,
   onPendingPositionApplied,
   readOnly = false,
@@ -639,6 +641,7 @@ const Timeline: React.FC<TimelineProps> = ({
         onImageReorder={onImageReorder}
         onImageSaved={onImageSaved}
         onImageDrop={onImageDrop}
+        onGenerationDrop={onGenerationDrop}
         setIsDragInProgress={setIsDragInProgress}
         onPairClick={onPairClick}
         pairPrompts={actualPairPrompts}

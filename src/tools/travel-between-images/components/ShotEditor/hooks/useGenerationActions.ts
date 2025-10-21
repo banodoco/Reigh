@@ -943,6 +943,221 @@ export const useGenerationActions = ({
     }
   }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, batchVideoFrames, actions, handleExternalImageDropMutation, onShotImagesUpdate, state.pendingFramePositions]);
 
+  /**
+   * Handle dropping a generation from GenerationsPane onto the timeline
+   * This adds an existing generation to the shot at the specified frame position
+   */
+  const handleTimelineGenerationDrop = useCallback(async (
+    generationId: string, 
+    imageUrl: string, 
+    thumbUrl: string | undefined, 
+    targetFrame?: number
+  ) => {
+    console.log('[GenerationDrop] 🎯 handleTimelineGenerationDrop called:', {
+      generationId: generationId?.substring(0, 8),
+      targetFrame,
+      targetFrameProvided: targetFrame !== undefined,
+      shotId: selectedShot?.id,
+      projectId
+    });
+
+    if (!selectedShot?.id || !projectId) {
+      toast.error("Cannot add generation: No shot or project selected.");
+      return;
+    }
+
+    if (!generationId) {
+      toast.error("Invalid generation: Missing generation ID.");
+      return;
+    }
+
+    try {
+      console.log('[GenerationDrop] 📤 Adding generation to shot...');
+      
+      // Add the generation to the shot using the existing mutation
+      // The addImageToShot API will handle creating the shot_image_entry
+      await addImageToShotMutation.mutateAsync({
+        generation_id: generationId,
+        shot_id: selectedShot.id,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        timelineFrame: targetFrame, // Position on timeline if provided
+        project_id: projectId
+      });
+
+      toast.success(`Added generation to ${selectedShot.name || 'shot'}`);
+      
+      console.log('[GenerationDrop] ✅ Generation added successfully, refreshing shot data...');
+      
+      // Refresh shot data
+      await onShotImagesUpdate();
+      
+      console.log('[GenerationDrop] ✅ handleTimelineGenerationDrop complete');
+    } catch (error) {
+      console.error('[GenerationDrop] ❌ Error adding generation to timeline:', error);
+      toast.error(`Failed to add generation: ${(error as Error).message}`);
+      throw error;
+    }
+  }, [selectedShot?.id, selectedShot?.name, projectId, addImageToShotMutation, onShotImagesUpdate]);
+
+  /**
+   * Handle dropping external images onto batch mode grid
+   * Uploads files and inserts them at the specified position
+   */
+  const handleBatchImageDrop = useCallback(async (
+    files: File[],
+    targetPosition?: number,
+    framePosition?: number
+  ) => {
+    console.log('[BatchDrop] 🎯 handleBatchImageDrop called:', {
+      filesCount: files.length,
+      targetPosition,
+      framePosition,
+      shotId: selectedShot?.id,
+      projectId
+    });
+
+    if (!selectedShot?.id || !projectId) {
+      toast.error("Cannot add images: No shot or project selected.");
+      return;
+    }
+
+    try {
+      // Set uploading state
+      actions.setUploadingImage(true);
+      
+      // Crop images to shot aspect ratio before uploading
+      let processedFiles = files;
+      
+      // Prioritize shot aspect ratio over project aspect ratio
+      const currentProject = projects.find(p => p.id === projectId);
+      const aspectRatioStr = selectedShot?.aspect_ratio || currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
+      
+      if (aspectRatioStr && uploadSettings?.cropToProjectSize !== false) {
+        const targetAspectRatio = parseRatio(aspectRatioStr);
+        
+        if (!isNaN(targetAspectRatio)) {
+          const cropPromises = files.map(async (file) => {
+            try {
+              const result = await cropImageToProjectAspectRatio(file, targetAspectRatio);
+              if (result) {
+                return result.croppedFile;
+              }
+              return file;
+            } catch (error) {
+              console.error(`Failed to crop image ${file.name}:`, error);
+              return file;
+            }
+          });
+          
+          processedFiles = await Promise.all(cropPromises);
+        }
+      }
+      
+      console.log('[BatchDrop] 📤 Uploading images to shot (batch mode)...');
+      const result = await handleExternalImageDropMutation.mutateAsync({
+        imageFiles: processedFiles,
+        targetShotId: selectedShot.id,
+        currentProjectQueryKey: projectId,
+        currentShotCount: 0, // Not needed for batch mode
+        skipAutoPosition: true // Don't auto-position in batch mode
+      });
+      
+      // Update frame positions for the newly uploaded images
+      if (result?.generationIds?.length > 0 && framePosition !== undefined) {
+        console.log('[BatchDrop] 🎯 Setting pending positions for uploaded images:', {
+          generationIds: result.generationIds.map(id => id.substring(0, 8)),
+          startFrame: framePosition,
+          count: result.generationIds.length,
+        });
+
+        const newPendingPositions = new Map<string, number>();
+        result.generationIds.forEach((id, i) => {
+          // Increment frame by 1 for each subsequent image to ensure order
+          const newFrame = framePosition + i;
+          newPendingPositions.set(id, newFrame);
+        });
+        
+        // Use the pending positions mechanism to safely update frames
+        actions.setPendingFramePositions(new Map([...state.pendingFramePositions, ...newPendingPositions]));
+      }
+
+      toast.success(`Added ${processedFiles.length} image${processedFiles.length !== 1 ? 's' : ''} to ${selectedShot.name || 'shot'}`);
+      
+      console.log('[BatchDrop] ✅ Images added successfully, refreshing shot data...');
+      
+      // Refresh shot data, which will trigger position updates
+      await onShotImagesUpdate();
+      
+      console.log('[BatchDrop] ✅ handleBatchImageDrop complete');
+    } catch (error) {
+      console.error('[BatchDrop] ❌ Error adding images to batch:', error);
+      toast.error(`Failed to add images: ${(error as Error).message}`);
+      throw error;
+    } finally {
+      // Clear uploading state
+      actions.setUploadingImage(false);
+    }
+  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, onShotImagesUpdate, state.pendingFramePositions]);
+
+  /**
+   * Handle dropping a generation from GenerationsPane onto batch mode grid
+   * Adds an existing generation to the shot at the specified position
+   */
+  const handleBatchGenerationDrop = useCallback(async (
+    generationId: string,
+    imageUrl: string,
+    thumbUrl: string | undefined,
+    targetPosition?: number,
+    framePosition?: number
+  ) => {
+    console.log('[BatchDrop] 🎯 handleBatchGenerationDrop called:', {
+      generationId: generationId?.substring(0, 8),
+      targetPosition,
+      framePosition,
+      shotId: selectedShot?.id,
+      projectId
+    });
+
+    if (!selectedShot?.id || !projectId) {
+      toast.error("Cannot add generation: No shot or project selected.");
+      return;
+    }
+
+    if (!generationId) {
+      toast.error("Invalid generation: Missing generation ID.");
+      return;
+    }
+
+    try {
+      console.log('[BatchDrop] 📤 Adding generation to shot (batch mode)...');
+      
+      // Add the generation to the shot at the specified position
+      await addImageToShotMutation.mutateAsync({
+        generation_id: generationId,
+        shot_id: selectedShot.id,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        project_id: projectId,
+        // Use the calculated frame position for insertion
+        timelineFrame: framePosition ?? targetPosition, // Prefer framePosition, fall back to targetPosition
+      });
+
+      toast.success(`Added generation to ${selectedShot.name || 'shot'}`);
+      
+      console.log('[BatchDrop] ✅ Generation added successfully, refreshing shot data...');
+      
+      // Refresh shot data
+      await onShotImagesUpdate();
+      
+      console.log('[BatchDrop] ✅ handleBatchGenerationDrop complete');
+    } catch (error) {
+      console.error('[BatchDrop] ❌ Error adding generation to batch:', error);
+      toast.error(`Failed to add generation: ${(error as Error).message}`);
+      throw error;
+    }
+  }, [selectedShot?.id, selectedShot?.name, projectId, addImageToShotMutation, onShotImagesUpdate]);
+
   return {
     handleImageUploadToShot,
     handleDeleteVideoOutput,
@@ -950,6 +1165,9 @@ export const useGenerationActions = ({
     handleBatchDeleteImages,
     handleDuplicateImage,
     handleTimelineImageDrop,
+    handleTimelineGenerationDrop,
+    handleBatchImageDrop,
+    handleBatchGenerationDrop,
     isEnqueuing,
     justQueued,
     enqueueTasks,

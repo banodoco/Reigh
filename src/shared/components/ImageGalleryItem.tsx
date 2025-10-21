@@ -848,13 +848,81 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // Check if this image is optimistically deleted
   const isOptimisticallyDeleted = optimisticDeletedIds?.has(image.id) ?? false;
 
+  // Track drag state for visual feedback
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Handle drag start for dropping onto timeline
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    // Only enable drag on desktop
+    if (isMobile) {
+      e.preventDefault();
+      return;
+    }
+    
+    setIsDragging(true);
+    
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/x-generation', JSON.stringify({
+      generationId: image.id,
+      imageUrl: image.url,
+      thumbUrl: image.thumbUrl,
+      metadata: image.metadata
+    }));
+    
+    // Create a small drag preview element
+    if (e.dataTransfer.setDragImage && e.currentTarget instanceof HTMLElement) {
+      const preview = document.createElement('div');
+      preview.style.position = 'absolute';
+      preview.style.top = '-1000px'; // Position off-screen
+      preview.style.width = '80px';
+      preview.style.height = '80px';
+      preview.style.opacity = '0.7';
+      preview.style.borderRadius = '8px';
+      preview.style.overflow = 'hidden';
+      preview.style.border = '2px solid #fff';
+      preview.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
+      
+      // Clone the image element
+      const imgElement = e.currentTarget.querySelector('img');
+      if (imgElement) {
+        const imgClone = imgElement.cloneNode(true) as HTMLImageElement;
+        imgClone.style.width = '100%';
+        imgClone.style.height = '100%';
+        imgClone.style.objectFit = 'cover';
+        preview.appendChild(imgClone);
+      }
+      
+      document.body.appendChild(preview);
+      e.dataTransfer.setDragImage(preview, 40, 40);
+      
+      // Clean up after a brief moment
+      setTimeout(() => {
+        if (document.body.contains(preview)) {
+          document.body.removeChild(preview);
+        }
+      }, 0);
+    }
+    
+    console.log('[GenerationDrag] Drag started:', {
+      generationId: image.id?.substring(0, 8),
+      imageUrl: image.url?.substring(0, 50),
+      timestamp: Date.now()
+    });
+  }, [image, isMobile]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
   const imageContent = (
     <div 
-        className={`border rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 relative group bg-card ${
+        className={`border rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 relative group bg-card ${
           isOptimisticallyDeleted ? 'opacity-50 scale-95 pointer-events-none' : ''
-        }`}
-        draggable={false}
+        } ${isDragging ? 'opacity-50 scale-75' : ''} ${!isMobile ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        draggable={!isMobile}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         onMouseEnter={() => { 
           if (!isMobile && isVideoContent) {
             if (index < 3) {

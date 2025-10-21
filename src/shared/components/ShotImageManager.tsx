@@ -23,6 +23,7 @@ import { SortableImageItem } from '@/tools/travel-between-images/components/Sort
 import MediaLightbox from './MediaLightbox';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
+import BatchDropZone from './BatchDropZone';
 
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
@@ -60,6 +61,9 @@ export interface ShotImageManagerProps {
   batchVideoFrames?: number; // Frames per pair for batch mode frame numbering
   onSelectionChange?: (hasSelection: boolean) => void; // Callback when selection state changes
   readOnly?: boolean; // Read-only mode - hides all interactive elements
+  // Drop handlers for batch mode
+  onFileDrop?: (files: File[], targetPosition?: number, framePosition?: number) => Promise<void>; // External file drop
+  onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetPosition?: number, framePosition?: number) => Promise<void>; // Generation drop from pane
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -81,6 +85,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   batchVideoFrames = 60,
   onSelectionChange,
   readOnly = false,
+  onFileDrop,
+  onGenerationDrop,
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
@@ -1184,7 +1190,49 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     12: 'grid-cols-12',
   }[columns] || 'grid-cols-4';
 
+  // Calculate frame position for inserting at a given index
+  // The frame position should be the midpoint between surrounding images
+  const getFramePositionForIndex = useCallback((index: number): number | undefined => {
+    if (currentImages.length === 0) {
+      // First image - use frame 0
+      return 0;
+    }
+    
+    if (index === 0) {
+      // Inserting at the beginning
+      const firstImage = currentImages[0];
+      const firstFrame = firstImage.timeline_frame ?? 0;
+      // Insert before first image - use half the first image's frame
+      return Math.max(0, Math.floor(firstFrame / 2));
+    }
+    
+    if (index >= currentImages.length) {
+      // Inserting at the end
+      const lastImage = currentImages[currentImages.length - 1];
+      const lastFrame = lastImage.timeline_frame ?? (currentImages.length - 1) * batchVideoFrames;
+      // Insert after last image - add batchVideoFrames
+      return lastFrame + batchVideoFrames;
+    }
+    
+    // Inserting between two images
+    const prevImage = currentImages[index - 1];
+    const nextImage = currentImages[index];
+    const prevFrame = prevImage.timeline_frame ?? (index - 1) * batchVideoFrames;
+    const nextFrame = nextImage.timeline_frame ?? index * batchVideoFrames;
+    
+    // Calculate midpoint
+    return Math.floor((prevFrame + nextFrame) / 2);
+  }, [currentImages, batchVideoFrames]);
+
   return (
+    <BatchDropZone
+      onImageDrop={onFileDrop}
+      onGenerationDrop={onGenerationDrop}
+      columns={columns}
+      itemCount={currentImages.length}
+      disabled={readOnly || !onFileDrop}
+      getFramePositionForIndex={getFramePositionForIndex}
+    >
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
@@ -1213,25 +1261,26 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             const frameNumber = index * batchVideoFrames;
             
             return (
-              <SortableImageItem
-                key={image.shotImageEntryId}
-                image={image}
-                isSelected={finalSelected}
-                isDragDisabled={isMobile}
-                onClick={isMobile ? undefined : (e) => {
-                  handleItemClick(imageKey, e);
-                }}
-                onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
-                onDuplicate={onImageDuplicate}
-                timeline_frame={frameNumber}
-                onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
-                skipConfirmation={imageDeletionSettings.skipConfirmation}
-                onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
-                duplicatingImageId={duplicatingImageId}
-                duplicateSuccessImageId={duplicateSuccessImageId}
-                shouldLoad={shouldLoad}
-                projectAspectRatio={projectAspectRatio}
-              />
+              <div key={image.shotImageEntryId} data-sortable-item>
+                <SortableImageItem
+                  image={image}
+                  isSelected={finalSelected}
+                  isDragDisabled={isMobile}
+                  onClick={isMobile ? undefined : (e) => {
+                    handleItemClick(imageKey, e);
+                  }}
+                  onDelete={() => handleIndividualDelete(image.shotImageEntryId)}
+                  onDuplicate={onImageDuplicate}
+                  timeline_frame={frameNumber}
+                  onDoubleClick={isMobile ? () => {} : () => setLightboxIndex(index)}
+                  skipConfirmation={imageDeletionSettings.skipConfirmation}
+                  onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
+                  duplicatingImageId={duplicatingImageId}
+                  duplicateSuccessImageId={duplicateSuccessImageId}
+                  shouldLoad={shouldLoad}
+                  projectAspectRatio={projectAspectRatio}
+                />
+              </div>
             );
           })}
           
@@ -1397,6 +1446,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         </AlertDialogContent>
       </AlertDialog>
     </DndContext>
+    </BatchDropZone>
   );
 }
 
