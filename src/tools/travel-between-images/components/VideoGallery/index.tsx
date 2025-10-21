@@ -248,6 +248,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       if (prevShotIdRef.current) {
         setCachedCount(prevShotIdRef.current, null);
       }
+
+      // Clear mobile preload map to avoid cross-shot originalIndex collisions
+      if (window.mobileVideoPreloadMap) {
+        try {
+          window.mobileVideoPreloadMap.clear();
+          console.log('[MobilePreload] Cleared mobileVideoPreloadMap on shot change');
+        } catch {}
+      }
       
       prevShotIdRef.current = shotId;
     }

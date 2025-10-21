@@ -651,6 +651,17 @@ export const VideoItem = React.memo<VideoItemProps>(({
     if (video.location) return video.location; // Use video URL (browser will show first frame)
     return video.imageUrl; // Final fallback
   })();
+
+  // Normalize URLs and append a stable identifier to avoid cross-item cache bleed
+  const resolvedPosterUrl = posterImageSrc ? getDisplayUrl(posterImageSrc) : '/placeholder.svg';
+  const posterSrcStable = resolvedPosterUrl
+    ? `${resolvedPosterUrl}${resolvedPosterUrl.includes('?') ? '&' : '?'}vid=${encodeURIComponent(video.id || '')}`
+    : resolvedPosterUrl;
+
+  const resolvedThumbUrl = video.thumbUrl ? getDisplayUrl(video.thumbUrl) : null;
+  const thumbSrcStable = resolvedThumbUrl
+    ? `${resolvedThumbUrl}${resolvedThumbUrl.includes('?') ? '&' : '?'}vid=${encodeURIComponent(video.id || '')}`
+    : null;
   
   if (process.env.NODE_ENV === 'development' && shouldUsePosterOnMobile) {
     console.log('[AutoplayDebugger:GALLERY] 📱 Using poster optimization', {
@@ -708,7 +719,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
           >
             <img
               key={`poster-${video.id}`}
-              src={posterImageSrc}
+              src={posterSrcStable || resolvedPosterUrl}
               alt="Video poster"
               loading="eager"
               decoding="sync"
@@ -722,7 +733,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             {hasThumbnail && !thumbnailError && (
               <img
                 key={`thumb-${video.id}`}
-                src={video.thumbUrl}
+                src={thumbSrcStable || resolvedThumbUrl || ''}
                 alt="Video thumbnail"
                 loading="eager"
                 decoding="sync"
@@ -794,7 +805,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                     videoPosterLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   videoClassName="object-cover cursor-pointer"
-                  poster={video.thumbUrl}
+                  poster={thumbSrcStable || video.thumbUrl}
                   data-video-id={video.id}
                   // Interaction events
                   onDoubleClick={isMobile ? undefined : () => {
