@@ -18,11 +18,11 @@ export const FlexContainer: React.FC<FlexContainerProps> = ({ children, classNam
     <div
       className={cn(
         // Flexbox layout
-        "relative flex flex-col items-center justify-center gap-3 sm:gap-4 md:gap-6 flex-grow",
+        "relative flex flex-col items-center justify-center gap-3 sm:gap-4 md:gap-6",
         // Responsive padding that increases on tablets
         "px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-8",
-        // Container sizing
-        "w-full",
+        // Container sizing - allow full height with scrolling if needed
+        "w-full h-full",
         className
       )}
       {...props}
