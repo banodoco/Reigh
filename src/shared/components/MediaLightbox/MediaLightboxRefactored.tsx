@@ -1202,7 +1202,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
 
                     {/* Floating Inpaint Controls - Separate from other buttons */}
-                    {isSpecialEditMode && !isMobile && (
+                    {isSpecialEditMode && shouldShowSidePanel && (
                       <div className={cn(
                         "absolute left-4 z-[70]",
                         inpaintPanelPosition === 'top' ? 'top-4' : 'bottom-4'
