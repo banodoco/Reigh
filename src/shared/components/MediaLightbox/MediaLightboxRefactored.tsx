@@ -28,7 +28,8 @@ import {
   Sparkles,
   Pencil,
   ArrowDown,
-  ArrowUp
+  ArrowUp,
+  Maximize2
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
@@ -2010,10 +2011,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                         }}
                                         className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
                                       >
-                                        <ImagePlus className="h-4 w-4" />
+                                        <Maximize2 className="h-4 w-4" />
                                       </button>
                                     </TooltipTrigger>
-                                    <TooltipContent className="z-[100002]">Jump to in gallery</TooltipContent>
+                                    <TooltipContent className="z-[100002]">Open fully</TooltipContent>
                                   </Tooltip>
                                 </div>
                                 
@@ -2183,10 +2184,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                             }}
                                             className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
                                           >
-                                            <ImagePlus className="h-4 w-4" />
+                                            <Maximize2 className="h-4 w-4" />
                                           </button>
                                         </TooltipTrigger>
-                                        <TooltipContent className="z-[100002]">Jump to in gallery</TooltipContent>
+                                        <TooltipContent className="z-[100002]">Open fully</TooltipContent>
                                       </Tooltip>
                                     </div>
                                     
@@ -2868,10 +2869,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                             }}
                                             className="h-7 w-7 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
                                           >
-                                            <ImagePlus className="h-3.5 w-3.5" />
+                                            <Maximize2 className="h-3.5 w-3.5" />
                                           </button>
                                         </TooltipTrigger>
-                                        <TooltipContent className="z-[100002]">Jump to in gallery</TooltipContent>
+                                        <TooltipContent className="z-[100002]">Open fully</TooltipContent>
                                       </Tooltip>
                                     </div>
                                     
