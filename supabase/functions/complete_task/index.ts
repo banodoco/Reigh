@@ -769,8 +769,7 @@ serve(async (req)=>{
           console.log(`[ImageInpaint] Task params:`, JSON.stringify(taskData.params, null, 2));
           
           // Inpaint creates generation(s) as usual, but should link via based_on to source generation
-          // Check both 'based_on' and 'generation_id' fields
-          const sourceGenerationId = taskData.params?.based_on || taskData.params?.generation_id;
+          const sourceGenerationId = extractBasedOn(taskData.params);
           
           if (sourceGenerationId) {
             console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
@@ -824,7 +823,7 @@ serve(async (req)=>{
               // Don't fail the task - the inpaint result is still in output_location
             }
           } else {
-            console.log(`[ImageInpaint] No source generation_id in task params, treating as regular generation`);
+            console.log(`[ImageInpaint] No based_on in task params, treating as regular generation`);
             // Fall back to regular generation creation
             await createGenerationFromTask(
               supabaseAdmin,
@@ -929,57 +928,102 @@ serve(async (req)=>{
 // ===== GENERATION HELPER FUNCTIONS =====
 
 /**
+ * Generic function to extract a value from multiple nested paths in params
+ * Checks paths in order and returns the first non-null/undefined value found
+ * @param params - The params object to search
+ * @param fieldName - The field name being extracted (for logging)
+ * @param paths - Array of path arrays (e.g., [['based_on'], ['orchestrator_details', 'based_on']])
+ * @param logTag - Optional log tag prefix
+ * @returns The extracted value as string, or null if not found
+ */
+function extractFromParams(params: any, fieldName: string, paths: string[][], logTag: string = 'ParamExtractor'): string | null {
+  try {
+    for (const path of paths) {
+      let value = params;
+      let pathValid = true;
+      
+      // Traverse the path
+      for (const key of path) {
+        if (value && typeof value === 'object' && key in value) {
+          value = value[key];
+        } else {
+          pathValid = false;
+          break;
+        }
+      }
+      
+      // If we successfully traversed the path and got a value
+      if (pathValid && value !== null && value !== undefined) {
+        const pathStr = path.join('.');
+        console.log(`[${logTag}] Found ${fieldName} in ${pathStr}: ${value}`);
+        return String(value);
+      }
+    }
+    
+    console.log(`[${logTag}] No ${fieldName} found in task params`);
+    return null;
+  } catch (error) {
+    console.error(`[${logTag}] Error extracting ${fieldName}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Extract based_on from task params
+ * Supports multiple param shapes for flexibility across different task types
+ */
+function extractBasedOn(params: any): string | null {
+  return extractFromParams(
+    params,
+    'based_on',
+    [
+      ['based_on'],                                      // Direct field (most common)
+      ['originalParams', 'orchestrator_details', 'based_on'],
+      ['orchestrator_details', 'based_on'],
+      ['full_orchestrator_payload', 'based_on'],
+      ['originalParams', 'based_on']
+    ],
+    'BasedOn'
+  );
+}
+
+/**
  * Extract shot_id and add_in_position from task params
  * Supports multiple param shapes as per current DB trigger logic
  */
 function extractShotAndPosition(params: any): { shotId?: string, addInPosition: boolean } {
-  let shotId: string | undefined;
+  // Extract shot_id using generic helper
+  const shotId = extractFromParams(
+    params,
+    'shot_id',
+    [
+      ['originalParams', 'orchestrator_details', 'shot_id'],  // MOST COMMON for wan_2_2_i2v
+      ['orchestrator_details', 'shot_id'],
+      ['shot_id'],
+      ['full_orchestrator_payload', 'shot_id'],              // For travel_stitch
+      ['shotId']                                               // camelCase variant
+    ],
+    'GenMigration'
+  ) || undefined;
+
+  // Extract add_in_position flag from multiple locations
   let addInPosition = false; // Default: unpositioned
-
-  try {
-    // PRIORITY 1: Check originalParams.orchestrator_details.shot_id (MOST COMMON for wan_2_2_i2v)
-    if (params?.originalParams?.orchestrator_details?.shot_id) {
-      shotId = String(params.originalParams.orchestrator_details.shot_id);
-      console.log(`[GenMigration] Found shot_id in originalParams.orchestrator_details: ${shotId}`);
-    }
-    // PRIORITY 2: Check direct orchestrator_details.shot_id
-    else if (params?.orchestrator_details?.shot_id) {
-      shotId = String(params.orchestrator_details.shot_id);
-      console.log(`[GenMigration] Found shot_id in orchestrator_details: ${shotId}`);
-    }
-    // PRIORITY 3: Check direct shot_id field
-    else if (params?.shot_id) {
-      shotId = String(params.shot_id);
-      console.log(`[GenMigration] Found shot_id in params: ${shotId}`);
-    }
-    // PRIORITY 4: Check full_orchestrator_payload.shot_id (for travel_stitch)
-    else if (params?.full_orchestrator_payload?.shot_id) {
-      shotId = String(params.full_orchestrator_payload.shot_id);
-      console.log(`[GenMigration] Found shot_id in full_orchestrator_payload: ${shotId}`);
-    }
-    // PRIORITY 5: Check shotId field (camelCase variant)
-    else if (params?.shotId) {
-      shotId = String(params.shotId);
-      console.log(`[GenMigration] Found shotId in params: ${shotId}`);
-    }
-    else {
-      console.log(`[GenMigration] No shot_id found in task params - generation will not be linked to shot`);
-    }
-
-    // Extract add_in_position flag from multiple locations
-    if (params?.add_in_position !== undefined) {
-      addInPosition = Boolean(params.add_in_position);
-    } else if (params?.originalParams?.add_in_position !== undefined) {
-      addInPosition = Boolean(params.originalParams.add_in_position);
-    } else if (params?.orchestrator_details?.add_in_position !== undefined) {
-      addInPosition = Boolean(params.orchestrator_details.add_in_position);
-    } else if (params?.originalParams?.orchestrator_details?.add_in_position !== undefined) {
-      addInPosition = Boolean(params.originalParams.orchestrator_details.add_in_position);
-    }
-
+  
+  const addInPositionValue = extractFromParams(
+    params,
+    'add_in_position',
+    [
+      ['add_in_position'],
+      ['originalParams', 'add_in_position'],
+      ['orchestrator_details', 'add_in_position'],
+      ['originalParams', 'orchestrator_details', 'add_in_position']
+    ],
+    'GenMigration'
+  );
+  
+  if (addInPositionValue !== null) {
+    addInPosition = addInPositionValue === 'true' || addInPositionValue === '1';
     console.log(`[GenMigration] Extracted add_in_position: ${addInPosition}`);
-  } catch (error) {
-    console.error(`[GenMigration] Error extracting shot/position:`, error);
   }
 
   return { shotId, addInPosition };
@@ -1254,18 +1298,25 @@ async function createGenerationFromTask(
     
     console.log(`[GenMigration] Extracted generation_name: ${generationName}`);
     
-    // Find source generation for magic edit tasks (based_on tracking)
+    // Find source generation for based_on tracking
     let basedOnGenerationId: string | null = null;
-    const sourceImageUrl = taskData.params?.image; // Magic edit tasks have source image in params.image
     
-    if (sourceImageUrl) {
-      console.log(`[BasedOn] Task has source image, looking for source generation: ${sourceImageUrl}`);
-      basedOnGenerationId = await findSourceGenerationByImageUrl(supabase, sourceImageUrl);
+    // PRIORITY 1: Check if based_on is provided in task params (searches multiple nested paths)
+    basedOnGenerationId = extractBasedOn(taskData.params);
+    
+    // PRIORITY 2: Fall back to looking up by image URL (for magic edit tasks without explicit based_on)
+    if (!basedOnGenerationId) {
+      const sourceImageUrl = taskData.params?.image; // Magic edit tasks have source image in params.image
       
-      if (basedOnGenerationId) {
-        console.log(`[BasedOn] Will link new generation to source: ${basedOnGenerationId}`);
-      } else {
-        console.log(`[BasedOn] No source generation found, new generation will not have based_on`);
+      if (sourceImageUrl) {
+        console.log(`[BasedOn] Task has source image, looking for source generation: ${sourceImageUrl}`);
+        basedOnGenerationId = await findSourceGenerationByImageUrl(supabase, sourceImageUrl);
+        
+        if (basedOnGenerationId) {
+          console.log(`[BasedOn] Will link new generation to source: ${basedOnGenerationId}`);
+        } else {
+          console.log(`[BasedOn] No source generation found, new generation will not have based_on`);
+        }
       }
     }
     

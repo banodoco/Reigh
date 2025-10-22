@@ -91,6 +91,7 @@ On realtime events, the provider invalidates these query key families:
 - `['tasks']` — paginated tasks, single task queries, etc.
 - `['task-status-counts']` — counts used by task panes and badges
 - `['unified-generations']` — all variants (project/shot/paginated)
+- `['derived-generations']` — generations based on source images (lineage tracking)
 - `['shots']` — shot lists and shot details influenced by task outcomes
 - `['unpositioned-count']` — per-shot generation counts
 - `['project-video-counts']` — aggregated video counts by project
@@ -100,6 +101,7 @@ React Query invalidation uses prefix matching, so the families above cover concr
 - `['task-status-counts', projectId]`
 - `['unified-generations', 'project', projectId, page, limit, filters]`
 - `['unified-generations', 'shot', shotId]`
+- `['derived-generations', sourceGenerationId]`
 - `['shots', projectId]`
 - `['unpositioned-count', shotId]`
 - `['project-video-counts', projectId]`

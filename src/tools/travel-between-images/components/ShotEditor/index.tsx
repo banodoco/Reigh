@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
-import { useUpdateShotImageOrder } from "@/shared/hooks/useShots";
+import { useUpdateShotImageOrder, useCreateShot, useAddImageToShotWithoutPosition } from "@/shared/hooks/useShots";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
@@ -112,6 +112,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Load complete shot data and images
   const { shots } = useShots(); // Get shots from context for shot metadata
   const selectedShot = shots?.find(shot => shot.id === selectedShotId);
+  
+  // Shot management hooks for external generation viewing
+  const { mutateAsync: createShotMutation } = useCreateShot();
+  const { mutateAsync: addToShotMutation } = useAddImageToShot();
+  const { mutateAsync: addToShotWithoutPositionMutation } = useAddImageToShotWithoutPosition();
   
   // Compute effective aspect ratio: prioritize shot-level over project-level
   // This ensures videos in VideoOutputsGallery, items in Timeline, and other components
@@ -2390,6 +2395,34 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             structureVideoType={structureVideoType}
             onStructureVideoChange={handleStructureVideoChange}
             autoCreateIndividualPrompts={autoCreateIndividualPrompts}
+            // Shot management for external generation viewing
+            allShots={shots}
+            onShotChange={(shotId) => {
+              console.log('[ShotEditor] Shot change requested to:', shotId);
+              // Shot change will be handled by parent navigation
+            }}
+            onAddToShot={async (shotId, generationId, position) => {
+              console.log('[ShotEditor] Adding generation to shot with position', { shotId, generationId, position });
+              await addToShotMutation({ 
+                shot_id: shotId, 
+                generation_id: generationId, 
+                timelineFrame: position, 
+                project_id: projectId 
+              });
+            }}
+            onAddToShotWithoutPosition={async (shotId, generationId) => {
+              console.log('[ShotEditor] Adding generation to shot without position', { shotId, generationId });
+              await addToShotWithoutPositionMutation({ 
+                shot_id: shotId, 
+                generation_id: generationId, 
+                project_id: projectId 
+              });
+            }}
+            onCreateShot={async (name) => {
+              console.log('[ShotEditor] Creating new shot', { name });
+              const result = await createShotMutation({ name, projectId });
+              return result.shot.id;
+            }}
           />
         </div>
 

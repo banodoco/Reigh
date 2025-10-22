@@ -39,34 +39,32 @@ export const TaskDetailsSection: React.FC<TaskDetailsSectionProps> = ({
     <>
       {/* Based On Section */}
       {hasSource && (
-        <div className="space-y-3 mb-6">
-          <div className="border-t border-border p-4 space-y-2 bg-muted/20">
-            <h3 className="text-lg font-light">
-              Based on
-            </h3>
-            <button
-              onClick={() => {
-                if (onNavigateToGeneration) {
-                  onNavigateToGeneration(sourceGeneration.id);
-                } else {
-                  toast.info('Navigation requires parent support');
-                }
-              }}
-              className="relative w-1/3 group overflow-hidden rounded border border-border hover:border-primary transition-colors aspect-square"
-            >
+        <div className="border-t border-border p-4">
+          <button
+            onClick={() => {
+              if (onNavigateToGeneration) {
+                onNavigateToGeneration(sourceGeneration.id);
+              } else {
+                toast.info('Navigation requires parent support');
+              }
+            }}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+          >
+            <span>Based on:</span>
+            <div className="relative w-10 h-10 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
               <img
                 src={sourceGeneration.thumbUrl}
                 alt="Source generation"
-                className="w-full h-full object-cover rounded"
+                className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
               {sourceGeneration.starred && (
                 <div className="absolute top-1 right-1">
                   <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                 </div>
               )}
-            </button>
-          </div>
+            </div>
+            <span className="group-hover:underline">Click to view</span>
+          </button>
         </div>
       )}
 

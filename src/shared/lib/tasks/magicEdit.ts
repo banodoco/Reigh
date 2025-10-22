@@ -31,6 +31,7 @@ export interface MagicEditTaskParams {
   enable_base64_output?: boolean; // Default to false
   tool_type?: string; // Optional: override tool type for generation association
   loras?: LoraConfig[]; // Optional: array of lora configurations for model enhancement
+  based_on?: string; // Optional: source generation ID for lineage tracking
 }
 
 /**
@@ -52,6 +53,7 @@ export interface BatchMagicEditTaskParams {
   enable_base64_output?: boolean;
   tool_type?: string; // Optional: override tool type for generation association
   loras?: LoraConfig[]; // Optional: array of lora configurations for model enhancement
+  based_on?: string; // Optional: source generation ID for lineage tracking
 }
 
 /**
@@ -176,6 +178,11 @@ function buildMagicEditTaskParams(
     taskParams.loras = params.loras;
   }
 
+  // Add based_on if provided (for lineage tracking)
+  if (params.based_on) {
+    taskParams.based_on = params.based_on;
+  }
+
   return taskParams;
 }
 
@@ -258,6 +265,7 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
         enable_base64_output: params.enable_base64_output,
         tool_type: params.tool_type, // Pass through tool type override
         loras: params.loras, // Pass through lora configurations
+        based_on: params.based_on, // Pass through source generation ID for lineage tracking
       } as MagicEditTaskParams;
     });
 

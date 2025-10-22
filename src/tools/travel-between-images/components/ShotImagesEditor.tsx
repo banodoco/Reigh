@@ -112,6 +112,12 @@ interface ShotImagesEditorProps {
   autoCreateIndividualPrompts?: boolean;
   /** Callback when selection state changes */
   onSelectionChange?: (hasSelection: boolean) => void;
+  /** Shot management for external generation viewing */
+  allShots?: any[];
+  onShotChange?: (shotId: string) => void;
+  onAddToShot?: (shotId: string, generationId: string, position: number) => Promise<void>;
+  onAddToShotWithoutPosition?: (shotId: string, generationId: string) => Promise<void>;
+  onCreateShot?: (name: string) => Promise<string>;
 }
 
 // Force TypeScript to re-evaluate this interface
@@ -166,6 +172,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onStructureVideoChange: propOnStructureVideoChange,
   autoCreateIndividualPrompts,
   onSelectionChange,
+  // Shot management for external generation viewing
+  allShots,
+  onShotChange,
+  onAddToShot,
+  onAddToShotWithoutPosition,
+  onCreateShot,
 }) => {
   // Force mobile to use batch mode regardless of desktop setting
   const effectiveGenerationMode = isMobile ? 'batch' : generationMode;
@@ -600,6 +612,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onGenerationDrop={onBatchGenerationDrop}
                   shotId={selectedShotId}
                   toolTypeOverride="travel-between-images"
+                  // Shot management for external generation viewing
+                  allShots={allShots}
+                  selectedShotId={selectedShotId}
+                  onShotChange={onShotChange}
+                  // onAddToShot and onAddToShotWithoutPosition are handled internally by ShotImageManager for external generations
+                  onCreateShot={onCreateShot ? async (shotName: string, files: File[]) => {
+                    const shotId = await onCreateShot(shotName);
+                    return { shotId, shotName };
+                  } : undefined}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

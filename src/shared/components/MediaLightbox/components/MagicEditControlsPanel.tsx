@@ -136,6 +136,7 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
         shot_id: shotId,
         tool_type: toolTypeOverride,
         loras: loras.length > 0 ? loras : undefined,
+        based_on: shotGenerationId, // Track source generation for lineage
       };
       
       console.log(`[TaskDetailsSidebar] MagicEditPanel: Creating tasks with shot_id: ${shotId}, tool_type: ${toolTypeOverride}`);

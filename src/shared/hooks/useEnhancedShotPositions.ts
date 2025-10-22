@@ -86,7 +86,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
             type,
             created_at,
             upscaled_url,
-            starred
+            starred,
+            based_on
           )
         `)
         .eq('shot_id', shotId)

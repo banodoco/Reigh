@@ -41,6 +41,7 @@ import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { createBatchMagicEditTasks } from '@/shared/lib/tasks/magicEdit';
 import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
+import { supabase } from '@/integrations/supabase/client';
 
 // Import all extracted hooks
 import {
@@ -138,6 +139,8 @@ interface MediaLightboxProps {
   associatedWithoutPositionInSelectedShot?: boolean;
   // Navigation to specific generation
   onNavigateToGeneration?: (generationId: string) => void;
+  // Open external generation (fetch from DB if not in current context)
+  onOpenExternalGeneration?: (generationId: string) => Promise<void>;
   // Shot ID for star persistence
   shotId?: string;
 }
@@ -195,12 +198,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   associatedWithoutPositionInSelectedShot,
   // Navigation to specific generation
   onNavigateToGeneration,
+  onOpenExternalGeneration,
   // Shot ID for star persistence
   shotId,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
   // ========================================
+  
+  // DEBUG: Log raw media object on mount/update
+  const mediaKeys = Object.keys(media);
+  console.log('[BasedOnLineage] 🎬 MediaLightbox received media:', 
+    '\n  mediaId:', media.id.substring(0, 8),
+    '\n  fullMediaId:', media.id,
+    '\n  hasBasedOn:', !!(media as any).based_on,
+    '\n  basedOnValue:', (media as any).based_on?.substring(0, 8) || null,
+    '\n  fullBasedOnValue:', (media as any).based_on,
+    '\n  mediaType:', media.type,
+    '\n  mediaKeysCount:', mediaKeys.length,
+    '\n  mediaKeys:', mediaKeys.join(', '),
+    '\n  hasBasedOnInKeys:', mediaKeys.includes('based_on')
+  );
 
   // Refs
   const contentRef = useRef<HTMLDivElement>(null);
@@ -211,6 +229,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Basic state - only UI state remains here
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
+  
+  // Preview overlay state for quick preview of derived generations
+  const [previewGenerationId, setPreviewGenerationId] = useState<string | null>(null);
+  const [previewGenerationData, setPreviewGenerationData] = useState<GenerationRow | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  
+  // Source generation state (based_on) to show where this image came from
+  const [sourceGenerationData, setSourceGenerationData] = useState<GenerationRow | null>(null);
 
   // Track where pointer/click started to prevent accidental modal closure on drag
   const pointerDownTargetRef = useRef<EventTarget | null>(null);
@@ -238,6 +264,122 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Fetch preview generation data when preview is requested
+  useEffect(() => {
+    if (!previewGenerationId) {
+      setPreviewGenerationData(null);
+      setIsLoadingPreview(false);
+      return;
+    }
+    
+    const fetchPreviewData = async () => {
+      setIsLoadingPreview(true);
+      console.log('[PreviewOverlay] 📥 Fetching preview generation', {
+        generationId: previewGenerationId.substring(0, 8)
+      });
+      
+      try {
+        const { data, error } = await supabase
+          .from('generations')
+          .select('*')
+          .eq('id', previewGenerationId)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data) {
+          console.log('[PreviewOverlay] ✅ Fetched preview data', {
+            id: data.id.substring(0, 8),
+            type: data.type,
+            location: data.location?.substring(0, 50)
+          });
+          setPreviewGenerationData(data);
+        }
+      } catch (error) {
+        console.error('[PreviewOverlay] ❌ Failed to fetch preview:', error);
+        toast.error('Failed to load preview');
+        setPreviewGenerationId(null);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    };
+    
+    fetchPreviewData();
+  }, [previewGenerationId]);
+  
+  // ESC key to close preview overlay
+  useEffect(() => {
+    if (!previewGenerationId) return;
+    
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        console.log('[PreviewOverlay] ⌨️ ESC key pressed, closing preview');
+        setPreviewGenerationId(null);
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscKey);
+    return () => window.removeEventListener('keydown', handleEscKey);
+  }, [previewGenerationId]);
+  
+  // Fetch source generation (based_on) to show origin
+  useEffect(() => {
+    const basedOnId = (media as any).based_on;
+    const effectMediaKeys = Object.keys(media);
+    
+    console.log('[BasedOnLineage] 🔍 useEffect checking for based_on:',
+      '\n  mediaId:', media.id.substring(0, 8),
+      '\n  hasBasedOn:', !!basedOnId,
+      '\n  basedOnId:', basedOnId ? basedOnId.substring(0, 8) : null,
+      '\n  fullBasedOnId:', basedOnId,
+      '\n  hasOnOpenExternalGeneration:', !!onOpenExternalGeneration,
+      '\n  mediaType:', media.type,
+      '\n  mediaKeysCount:', effectMediaKeys.length,
+      '\n  mediaKeys:', effectMediaKeys.join(', '),
+      '\n  hasBasedOnInKeys:', effectMediaKeys.includes('based_on')
+    );
+    
+    if (!basedOnId) {
+      setSourceGenerationData(null);
+      return;
+    }
+    
+    const fetchSourceGeneration = async () => {
+      console.log('[BasedOnLineage] 📥 Fetching source generation:',
+        '\n  currentMediaId:', media.id.substring(0, 8),
+        '\n  basedOnId:', basedOnId.substring(0, 8)
+      );
+      
+      try {
+        const { data, error } = await supabase
+          .from('generations')
+          .select('*')
+          .eq('id', basedOnId)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data) {
+          console.log('[BasedOnLineage] ✅ Fetched source generation:',
+            '\n  sourceId:', data.id.substring(0, 8),
+            '\n  type:', data.type,
+            '\n  location:', data.location?.substring(0, 50)
+          );
+          setSourceGenerationData(data);
+        } else {
+          console.log('[BasedOnLineage] ⚠️ No data returned from query');
+          setSourceGenerationData(null);
+        }
+      } catch (error) {
+        console.error('[BasedOnLineage] ❌ Failed to fetch source generation:', error);
+        // Don't show toast - this is a non-critical feature
+        setSourceGenerationData(null);
+      }
+    };
+    
+    fetchSourceGeneration();
+  }, [media.id, (media as any).based_on, onOpenExternalGeneration]);
 
   // Safety check
   if (!media) {
@@ -535,6 +677,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           shot_id: currentShotId || undefined,
           tool_type: toolTypeOverride,
           loras: loras.length > 0 ? loras : undefined,
+          based_on: media.id, // Track source generation for lineage
         };
         
         console.log('[MediaLightbox] Creating magic edit tasks with loras:', {
@@ -575,8 +718,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Unified special mode check - both inpaint and magic edit use the same layout
   const isUnifiedEditMode = isInpaintMode || isMagicEditMode;
-  // Show sidebar on tablet/larger for: task details, special edit modes, OR videos (always on iPad)
-  const shouldShowSidePanel = (showTaskDetails && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
+  // Show sidebar on tablet/larger for: task details (with valid task), special edit modes, OR videos (always on iPad)
+  const shouldShowSidePanel = (showTaskDetails && taskDetailsData?.taskId && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
   
   // Debug layout
   React.useEffect(() => {
@@ -1621,6 +1764,41 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {isSpecialEditMode ? (
                     // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
                     <div className="p-6 space-y-4 w-full">
+                      {/* Based On display - Show source image this was derived from */}
+                      {(() => {
+                        console.log('[BasedOn:EditMode] 🎨 Render check', {
+                          hasSourceData: !!sourceGenerationData,
+                          hasHandler: !!onOpenExternalGeneration,
+                          willShow: !!(sourceGenerationData && onOpenExternalGeneration),
+                          sourceId: sourceGenerationData?.id?.substring(0, 8)
+                        });
+                        
+                        if (sourceGenerationData && onOpenExternalGeneration) {
+                          return (
+                            <button
+                              onClick={async () => {
+                                console.log('[BasedOn] 🖼️ Navigating to source generation', {
+                                  sourceId: sourceGenerationData.id.substring(0, 8)
+                                });
+                                await onOpenExternalGeneration(sourceGenerationData.id);
+                              }}
+                              className="mb-3 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+                            >
+                              <span>Based on:</span>
+                              <div className="relative w-10 h-10 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
+                                <img
+                                  src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
+                                  alt="Source generation"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <span className="group-hover:underline">Click to view</span>
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
+                      
                       <div className="mb-4 flex items-center justify-between">
                         <h2 className="text-2xl font-light">Edit Image</h2>
                         <Button
@@ -1726,8 +1904,130 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           </button>
                         )}
                       </div>
+                      
+                      {/* Derived Generations Section - Show images based on this one */}
+                      {derivedGenerations && derivedGenerations.length > 0 && (
+                        <div className="border-t border-border pt-4 mt-4">
+                          <div className="mb-3 flex items-start justify-between">
+                            <div>
+                              <h3 className="text-sm font-medium">
+                                Edits of this image ({derivedGenerations.length})
+                              </h3>
                     </div>
-                  ) : taskDetailsData ? (
+                            
+                            {/* Pagination controls - top right */}
+                            {derivedTotalPages > 1 && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
+                                  disabled={derivedPage === 1}
+                                  className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <ChevronLeft className="h-3 w-3" />
+                                </button>
+                                <span className="text-xs text-muted-foreground">
+                                  {derivedPage}/{derivedTotalPages}
+                                </span>
+                                <button
+                                  onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
+                                  disabled={derivedPage === derivedTotalPages}
+                                  className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <ChevronRight className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-2">
+                            {paginatedDerived.map((derived) => (
+                              <div
+                                key={derived.id}
+                                className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
+                              >
+                                <img
+                                  src={derived.thumbUrl}
+                                  alt="Derived generation"
+                                  className="w-full h-full object-cover"
+                                />
+                                
+                                {/* Hover overlay with action buttons */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          console.log('[DerivedNav] 🔍 Eye button clicked (preview overlay)', {
+                                            derivedId: derived.id.substring(0, 8),
+                                            derivedUrl: derived.location,
+                                            currentMediaId: media.id.substring(0, 8),
+                                            timestamp: Date.now()
+                                          });
+                                          
+                                          // Show floating preview overlay
+                                          setPreviewGenerationId(derived.id);
+                                        }}
+                                        className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="z-[100002]">Quick preview</TooltipContent>
+                                  </Tooltip>
+                                  
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          console.log('[DerivedNav] 🚀 Gallery jump button clicked', {
+                                            derivedId: derived.id.substring(0, 8),
+                                            derivedUrl: derived.location,
+                                            currentMediaId: media.id.substring(0, 8),
+                                            hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                            hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                            timestamp: Date.now()
+                                          });
+                                          
+                                          // Prefer onOpenExternalGeneration (handles both in-context and external)
+                                          if (onOpenExternalGeneration) {
+                                            console.log('[DerivedNav] 🌐 Using onOpenExternalGeneration (universal handler)', {
+                                              derivedId: derived.id.substring(0, 8),
+                                              sourceId: media.id.substring(0, 8)
+                                            });
+                                            await onOpenExternalGeneration(derived.id);
+                                          } else if (onNavigateToGeneration) {
+                                            // Fallback to navigate-only mode (ImageGallery context)
+                                            console.log('[DerivedNav] 🎯 Falling back to onNavigateToGeneration', {
+                                              derivedId: derived.id.substring(0, 8)
+                                            });
+                                            onNavigateToGeneration(derived.id);
+                                          } else {
+                                            console.error('[DerivedNav] ❌ No navigation handlers available!');
+                                          }
+                                        }}
+                                        className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                                      >
+                                        <ImagePlus className="h-4 w-4" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="z-[100002]">Jump to in gallery</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                                
+                                {derived.starred && (
+                                  <div className="absolute top-1 right-1 z-10">
+                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : taskDetailsData && taskDetailsData.taskId ? (
                     <div className="w-full">
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
@@ -1759,11 +2059,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         if (!sourceGeneration) return null;
                         
                         return (
-                          <div className="space-y-3 mb-6">
-                            <div className="border-t border-border p-4 space-y-2 bg-muted/20">
-                              <h3 className="text-lg font-light">
-                                Based on
-                              </h3>
+                          <div className="border-t border-border p-4">
                               <button
                                 onClick={() => {
                                   if (onNavigateToGeneration) {
@@ -1772,21 +2068,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                     toast.info('Navigation requires parent support');
                                   }
                                 }}
-                                className="relative w-1/3 group overflow-hidden rounded border border-border hover:border-primary transition-colors aspect-square"
+                              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
                               >
+                              <span>Based on:</span>
+                              <div className="relative w-10 h-10 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
                                 <img
                                   src={sourceGeneration.thumbUrl}
                                   alt="Source generation"
-                                  className="w-full h-full object-cover rounded"
+                                  className="w-full h-full object-cover"
                                 />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
                                 {(sourceGeneration as any).starred && (
                                   <div className="absolute top-1 right-1">
                                     <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                   </div>
                                 )}
+                              </div>
+                              <span className="group-hover:underline">Click to view</span>
                               </button>
-                            </div>
                           </div>
                         );
                       })()}
@@ -1843,16 +2141,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               
                               <div className="grid grid-cols-3 gap-2">
                                 {paginatedDerived.map((derived) => (
-                                  <button
+                                  <div
                                     key={derived.id}
-                                    onClick={() => {
-                                      if (onNavigateToGeneration) {
-                                        onNavigateToGeneration(derived.id);
-                                      } else {
-                                        console.log('[DerivedGeneration] Clicked:', derived.id);
-                                        toast.info('Navigation requires parent support');
-                                      }
-                                    }}
                                     className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
                                   >
                                     <img
@@ -1860,13 +2150,67 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                       alt="Derived generation"
                                       className="w-full h-full object-cover"
                                     />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                    
+                                    {/* Hover overlay with action buttons */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              console.log('[DerivedNav:TaskPanel] 🔍 Eye button clicked (preview overlay)', {
+                                                derivedId: derived.id.substring(0, 8),
+                                                derivedUrl: derived.location,
+                                                currentMediaId: media.id.substring(0, 8),
+                                                timestamp: Date.now()
+                                              });
+                                              
+                                              // Show floating preview overlay
+                                              setPreviewGenerationId(derived.id);
+                                            }}
+                                            className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                                          >
+                                            <Eye className="h-4 w-4" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-[100002]">Quick preview</TooltipContent>
+                                      </Tooltip>
+                                      
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              console.log('[DerivedNav:TaskPanel] 🚀 Gallery jump button clicked', {
+                                                derivedId: derived.id.substring(0, 8),
+                                                derivedUrl: derived.location,
+                                                currentMediaId: media.id.substring(0, 8),
+                                                hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                                hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                                timestamp: Date.now()
+                                              });
+                                              
+                                              if (onOpenExternalGeneration) {
+                                                await onOpenExternalGeneration(derived.id);
+                                              } else if (onNavigateToGeneration) {
+                                                onNavigateToGeneration(derived.id);
+                                              }
+                                            }}
+                                            className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                                          >
+                                            <ImagePlus className="h-4 w-4" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-[100002]">Jump to in gallery</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                    
                                     {(derived as any).starred && (
-                                      <div className="absolute top-1 right-1">
+                                      <div className="absolute top-1 right-1 z-10">
                                         <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                       </div>
                                     )}
-                                  </button>
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -2264,6 +2608,29 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {isSpecialEditMode ? (
                     // Inpaint Prompt & Generate - Mobile
                     <div className="p-4 space-y-3 w-full">
+                      {/* Based On display - Show source image this was derived from */}
+                      {sourceGenerationData && onOpenExternalGeneration && (
+                        <button
+                          onClick={async () => {
+                            console.log('[BasedOn:Mobile] 🖼️ Navigating to source generation', {
+                              sourceId: sourceGenerationData.id.substring(0, 8)
+                            });
+                            await onOpenExternalGeneration(sourceGenerationData.id);
+                          }}
+                          className="mb-2 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+                        >
+                          <span>Based on:</span>
+                          <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
+                            <img
+                              src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
+                              alt="Source generation"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <span className="group-hover:underline">Click to view</span>
+                        </button>
+                      )}
+                      
                       {/* Header with close button */}
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="text-lg font-light">Edit Image</h3>
@@ -2361,7 +2728,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       </div>
                     </div>
-                  ) : taskDetailsData && (
+                  ) : taskDetailsData && taskDetailsData.taskId && (
                     <div className="w-full">
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
@@ -2393,11 +2760,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         if (!sourceGeneration) return null;
                         
                         return (
-                          <div className="space-y-3 mb-6">
-                            <div className="border-t border-border p-3 space-y-2 bg-muted/20">
-                              <h3 className="text-lg font-light">
-                                Based on
-                              </h3>
+                          <div className="border-t border-border p-3">
                               <button
                                 onClick={() => {
                                   if (onNavigateToGeneration) {
@@ -2406,21 +2769,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                     toast.info('Navigation requires parent support');
                                   }
                                 }}
-                                className="relative w-1/3 group overflow-hidden rounded border border-border hover:border-primary transition-colors aspect-square"
+                              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
                               >
+                              <span>Based on:</span>
+                              <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
                                 <img
                                   src={sourceGeneration.thumbUrl}
                                   alt="Source generation"
-                                  className="w-full h-full object-cover rounded"
+                                  className="w-full h-full object-cover"
                                 />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded" />
                                 {(sourceGeneration as any).starred && (
                                   <div className="absolute top-0.5 right-0.5">
                                     <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
                                   </div>
                                 )}
+                              </div>
+                              <span className="group-hover:underline">Click to view</span>
                               </button>
-                            </div>
                           </div>
                         );
                       })()}
@@ -2477,16 +2842,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               
                               <div className="grid grid-cols-3 gap-1.5">
                                 {paginatedDerived.map((derived) => (
-                                  <button
+                                  <div
                                     key={derived.id}
-                                    onClick={() => {
-                                      if (onNavigateToGeneration) {
-                                        onNavigateToGeneration(derived.id);
-                                      } else {
-                                        console.log('[DerivedGeneration] Clicked:', derived.id);
-                                        toast.info('Navigation requires parent support');
-                                      }
-                                    }}
                                     className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
                                   >
                                     <img
@@ -2494,13 +2851,67 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                       alt="Derived generation"
                                       className="w-full h-full object-cover"
                                     />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                    
+                                    {/* Hover overlay with action buttons */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              console.log('[DerivedNav:Mobile] 🔍 Eye button clicked (preview overlay)', {
+                                                derivedId: derived.id.substring(0, 8),
+                                                derivedUrl: derived.location,
+                                                currentMediaId: media.id.substring(0, 8),
+                                                timestamp: Date.now()
+                                              });
+                                              
+                                              // Show floating preview overlay
+                                              setPreviewGenerationId(derived.id);
+                                            }}
+                                            className="h-7 w-7 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                                          >
+                                            <Eye className="h-3.5 w-3.5" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-[100002]">Quick preview</TooltipContent>
+                                      </Tooltip>
+                                      
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              console.log('[DerivedNav:Mobile] 🚀 Gallery jump button clicked', {
+                                                derivedId: derived.id.substring(0, 8),
+                                                derivedUrl: derived.location,
+                                                currentMediaId: media.id.substring(0, 8),
+                                                hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                                hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                                timestamp: Date.now()
+                                              });
+                                              
+                                              if (onOpenExternalGeneration) {
+                                                await onOpenExternalGeneration(derived.id);
+                                              } else if (onNavigateToGeneration) {
+                                                onNavigateToGeneration(derived.id);
+                                              }
+                                            }}
+                                            className="h-7 w-7 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                                          >
+                                            <ImagePlus className="h-3.5 w-3.5" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-[100002]">Jump to in gallery</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                    
                                     {(derived as any).starred && (
-                                      <div className="absolute top-0.5 right-0.5">
+                                      <div className="absolute top-0.5 right-0.5 z-10">
                                         <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
                                       </div>
                                     )}
-                                  </button>
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -2522,6 +2933,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   onClick={(e) => e.stopPropagation()}
                   className={cn(isMobile && isInpaintMode && "pointer-events-auto")}
                 >
+                  {/* Based On display - Show source image this was derived from (overlay at top) */}
+                  {(() => {
+                    console.log('[BasedOn:NonEditMode] 🎨 Render check', {
+                      hasSourceData: !!sourceGenerationData,
+                      hasHandler: !!onOpenExternalGeneration,
+                      isSpecialEditMode,
+                      willShow: !!(sourceGenerationData && onOpenExternalGeneration && !isSpecialEditMode),
+                      sourceId: sourceGenerationData?.id?.substring(0, 8)
+                    });
+                    
+                    if (sourceGenerationData && onOpenExternalGeneration && !isSpecialEditMode) {
+                      return (
+                        <div className="absolute top-4 left-4 z-20">
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              console.log('[BasedOn] 🖼️ Navigating to source generation', {
+                                sourceId: sourceGenerationData.id.substring(0, 8)
+                              });
+                              await onOpenExternalGeneration(sourceGenerationData.id);
+                            }}
+                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group bg-background/95 backdrop-blur-sm px-2 py-1.5 rounded border border-border"
+                          >
+                            <span>Based on:</span>
+                            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
+                              <img
+                                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
+                                alt="Source generation"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="group-hover:underline">Click to view</span>
+                          </button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
                   {/* Media Display - The wrapper now handles centering */}
                 {isVideo ? (
                   <StyledVideoPlayer
@@ -2918,6 +3368,91 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </FlexContainer>
             )}
           </DialogPrimitive.Content>
+        
+        {/* Preview Overlay - Floating preview for derived generations - Must be in Portal inside Dialog */}
+        {previewGenerationId && (
+          <DialogPrimitive.Portal>
+            <div
+              className="fixed inset-0 z-[100003] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer"
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => {
+                // Only close if clicking directly on backdrop, not on children
+                if (e.target === e.currentTarget) {
+                  console.log('[PreviewOverlay] 🚪 Backdrop mousedown, closing preview');
+                  setPreviewGenerationId(null);
+                }
+              }}
+              onClick={(e) => {
+                // Backup: also handle click
+                if (e.target === e.currentTarget) {
+                  console.log('[PreviewOverlay] 🚪 Backdrop clicked, closing preview');
+                  setPreviewGenerationId(null);
+                }
+              }}
+            >
+              {/* Preview Container */}
+              <div
+                className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center cursor-default"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {/* Close Button */}
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('[PreviewOverlay] ✖️ Close button mousedown');
+                    setPreviewGenerationId(null);
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('[PreviewOverlay] ✖️ Close button clicked');
+                    setPreviewGenerationId(null);
+                  }}
+                  className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  style={{ pointerEvents: 'auto' }}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                
+                {/* Loading State */}
+                {isLoadingPreview && (
+                  <div className="flex flex-col items-center justify-center gap-4 text-white">
+                    <Loader2 className="h-12 w-12 animate-spin" />
+                    <p className="text-sm text-white/70">Loading preview...</p>
+                  </div>
+                )}
+                
+                {/* Preview Image */}
+                {!isLoadingPreview && previewGenerationData && (
+                  <div className="relative">
+                    <img
+                      src={previewGenerationData.location}
+                      alt="Generation preview"
+                      className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10"
+                      onLoad={() => console.log('[PreviewOverlay] 🖼️ Image loaded')}
+                      onError={() => {
+                        console.error('[PreviewOverlay] ❌ Image failed to load');
+                        toast.error('Failed to load preview image');
+                        setPreviewGenerationId(null);
+                      }}
+                    />
+                    
+                    {/* Optional: Image metadata overlay */}
+                    {previewGenerationData.name && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+                        <p className="text-white text-sm font-medium">
+                          {previewGenerationData.name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogPrimitive.Portal>
+        )}
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     </TooltipProvider>

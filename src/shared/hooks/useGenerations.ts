@@ -608,12 +608,20 @@ export function useDerivedGenerations(
   sourceGenerationId: string | null,
   enabled: boolean = true
 ) {
+  // 🎯 SMART POLLING: Use intelligent polling for derived generations so new edits appear immediately
+  const smartPollingConfig = useSmartPollingConfig(['derived-generations', sourceGenerationId]);
+  
   return useQuery<GeneratedImageWithMetadata[], Error>({
     queryKey: ['derived-generations', sourceGenerationId],
     queryFn: () => fetchDerivedGenerations(sourceGenerationId),
     enabled: !!sourceGenerationId && enabled,
-    staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+    
+    // 🎯 SMART POLLING: Intelligent polling based on realtime health
+    ...smartPollingConfig,
+    refetchIntervalInBackground: true, // Continue polling when tab inactive
+    refetchOnWindowFocus: false, // Prevent double-fetches
+    refetchOnReconnect: false, // Prevent double-fetches
   });
 }
 

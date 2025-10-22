@@ -414,35 +414,68 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
 
   // Handle navigation to a specific generation by ID
   const handleNavigateToGeneration = React.useCallback((generationId: string) => {
-    console.log('[BasedOnDebug] handleNavigateToGeneration called', { 
-      generationId,
+    console.log('[DerivedNav:Gallery] 📍 handleNavigateToGeneration called', { 
+      generationId: generationId.substring(0, 8),
+      fullGenerationId: generationId,
       hasSetActiveLightboxIndex: !!setActiveLightboxIndex,
-      filteredImagesCount: filteredImages.length
+      filteredImagesCount: filteredImages.length,
+      currentMedia: activeLightboxMedia?.id.substring(0, 8),
+      timestamp: Date.now()
     });
     
     // Find the generation in the filtered images
     const index = filteredImages.findIndex(img => img.id === generationId);
     
+    console.log('[DerivedNav:Gallery] 🔍 Search result', {
+      searchedId: generationId.substring(0, 8),
+      foundIndex: index,
+      wasFound: index !== -1,
+      sampleImages: filteredImages.slice(0, 3).map(img => ({
+        id: img.id.substring(0, 8),
+        matches: img.id === generationId
+      }))
+    });
+    
     if (index !== -1) {
-      console.log('[BasedOnDebug] Found generation in filtered images', { index, generationId });
+      console.log('[DerivedNav:Gallery] ✅ Found generation in filtered images', { 
+        index, 
+        generationId: generationId.substring(0, 8),
+        willSetIndex: true 
+      });
       
       if (setActiveLightboxIndex) {
-        console.log('[BasedOnDebug] Calling setActiveLightboxIndex', { index });
+        console.log('[DerivedNav:Gallery] 🎯 Calling setActiveLightboxIndex', { 
+          currentMedia: activeLightboxMedia?.id.substring(0, 8),
+          toIndex: index 
+        });
         setActiveLightboxIndex(index);
-        console.log('[BasedOnDebug] setActiveLightboxIndex called successfully');
+        console.log('[DerivedNav:Gallery] ✨ setActiveLightboxIndex completed');
       } else {
-        console.error('[BasedOnDebug] setActiveLightboxIndex is not defined!');
+        console.error('[DerivedNav:Gallery] ❌ setActiveLightboxIndex is not available!');
       }
     } else {
-      console.log('[BasedOnDebug] Generation not found in current filtered set', {
-        generationId,
+      console.error('[DerivedNav:Gallery] ❌ Generation not found in current filtered set', {
+        searchedId: generationId.substring(0, 8),
+        fullGenerationId: generationId,
         filteredImagesCount: filteredImages.length,
-        filteredImageIds: filteredImages.map(img => img.id).slice(0, 5)
+        firstFiveIds: filteredImages.map(img => img.id.substring(0, 8)).slice(0, 5),
+        allIds: filteredImages.map(img => img.id)
       });
       // TODO: Could potentially fetch the generation and add it to the view
       // For now, just log that it's not available
     }
-  }, [filteredImages, setActiveLightboxIndex]);
+  }, [filteredImages, setActiveLightboxIndex, activeLightboxMedia?.id]);
+
+  // Debug: Log when navigation handler is created
+  React.useEffect(() => {
+    console.log('[DerivedNav:Gallery] 🔧 Navigation handler state', {
+      hasHandleNavigateToGeneration: !!handleNavigateToGeneration,
+      hasSetActiveLightboxIndex: !!setActiveLightboxIndex,
+      filteredImagesCount: filteredImages.length,
+      handlerType: typeof handleNavigateToGeneration,
+      timestamp: Date.now()
+    });
+  }, [handleNavigateToGeneration, setActiveLightboxIndex, filteredImages.length]);
 
   return (
     <>
@@ -500,7 +533,15 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           toolTypeOverride={toolTypeOverride}
           positionedInSelectedShot={positionedInSelectedShot}
           associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
-          onNavigateToGeneration={handleNavigateToGeneration}
+          onNavigateToGeneration={(() => {
+            console.log('[DerivedNav:Gallery] 📤 Passing onNavigateToGeneration to MediaLightbox', {
+              hasHandler: !!handleNavigateToGeneration,
+              handlerType: typeof handleNavigateToGeneration,
+              mediaId: enhancedMedia?.id.substring(0, 8),
+              timestamp: Date.now()
+            });
+            return handleNavigateToGeneration;
+          })()}
         />
       )}
 

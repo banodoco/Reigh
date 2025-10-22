@@ -153,6 +153,9 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         // Invalidate project-level generation queries (e.g., for upscale in main gallery)
         queryClient.invalidateQueries({ queryKey: ['generations'] });
         
+        // Invalidate derived generations (edits based on source images)
+        queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
+        
         // Invalidate only the specific shots that completed
         if (completedShotIds.size > 0) {
           console.log('[TasksPaneRealtimeDebug:Batching] 🎯 Targeted invalidation for', completedShotIds.size, 'completed shots');

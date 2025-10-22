@@ -28,6 +28,8 @@ import BatchDropZone from './BatchDropZone';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
+import { useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from './ui/button';
 import { ArrowDown, Trash2, Check, Sparkles, Image } from 'lucide-react';
 import { Label } from './ui/label';
@@ -41,6 +43,8 @@ import { ShotImageManagerMobile } from './ShotImageManager/ShotImageManagerMobil
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { deriveInputImages } from '@/shared/components/ImageGallery/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
 
@@ -69,6 +73,13 @@ export interface ShotImageManagerProps {
   // Props for inpaint tasks
   shotId?: string; // Shot ID to associate inpaint results with
   toolTypeOverride?: string; // Tool type for inpaint tasks (e.g., 'travel-between-images')
+  // Shot management props for external generations
+  allShots?: Array<{ id: string; name: string }>; // All available shots for shot selector
+  selectedShotId?: string; // Currently selected shot
+  onShotChange?: (shotId: string) => void; // Shot selector change handler
+  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>; // Add to shot with position
+  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>; // Add to shot without position
+  onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>; // Create new shot
 }
 
 const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
@@ -94,6 +105,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   onGenerationDrop,
   shotId,
   toolTypeOverride,
+  // Shot management props
+  allShots,
+  selectedShotId,
+  onShotChange,
+  onAddToShot,
+  onAddToShotWithoutPosition,
+  onCreateShot,
 }) => {
   // Light performance tracking for ShotImageManager
   const renderCountRef = React.useRef(0);
@@ -166,6 +184,20 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(false);
   const currentDialogSkipChoiceRef = useRef(false);
+  
+  // State for external generations (opened from derived generations list)
+  const [externalGenerations, setExternalGenerations] = useState<GenerationRow[]>([]);
+  
+  // State for tracking which shot is selected in the MediaLightbox dropdown for external generations
+  // This allows the user to select any shot when viewing an external generation
+  const [externalGenLightboxSelectedShot, setExternalGenLightboxSelectedShot] = useState<string | undefined>(selectedShotId);
+  
+  // Get project ID from context
+  const { selectedProjectId } = useProject();
+  
+  // Hooks for adding to shots (used for external generations)
+  const { mutateAsync: addToShotMutation } = useAddImageToShot();
+  const { mutateAsync: addToShotWithoutPositionMutation } = useAddImageToShotWithoutPosition();
   
   // State to preserve selected IDs for delete confirmation
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
@@ -299,15 +331,197 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     };
   }, []);
 
+  // Adapter functions for shot management of external generations
+  // These directly call Supabase hooks to add to shots
+  const handleExternalGenAddToShot = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    if (!externalGenLightboxSelectedShot || !selectedProjectId) {
+      console.warn('[ShotImageManager] Cannot add to shot - missing selected shot or project', {
+        selectedShot: externalGenLightboxSelectedShot,
+        projectId: selectedProjectId
+      });
+      return false;
+    }
+    
+    console.log('[ShotImageManager] Adding external generation to shot', {
+      generationId: generationId.substring(0, 8),
+      shotId: externalGenLightboxSelectedShot.substring(0, 8),
+      projectId: selectedProjectId?.substring(0, 8),
+      hasImageUrl: !!imageUrl,
+      hasThumbUrl: !!thumbUrl
+    });
+    
+    try {
+      // Call Supabase hook directly
+      await addToShotMutation({
+        shot_id: externalGenLightboxSelectedShot,
+        generation_id: generationId,
+        imageUrl,
+        thumbUrl,
+        project_id: selectedProjectId,
+      });
+      toast.success('Added to shot');
+      return true;
+    } catch (error) {
+      console.error('[ShotImageManager] Error adding to shot:', error);
+      toast.error('Failed to add to shot');
+      return false;
+    }
+  }, [externalGenLightboxSelectedShot, selectedProjectId, addToShotMutation]);
+  
+  const handleExternalGenAddToShotWithoutPosition = useCallback(async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
+    if (!externalGenLightboxSelectedShot || !selectedProjectId) {
+      console.warn('[ShotImageManager] Cannot add to shot without position - missing selected shot or project', {
+        selectedShot: externalGenLightboxSelectedShot,
+        projectId: selectedProjectId
+      });
+      return false;
+    }
+    
+    console.log('[ShotImageManager] Adding external generation to shot without position', {
+      generationId: generationId.substring(0, 8),
+      shotId: externalGenLightboxSelectedShot.substring(0, 8),
+      projectId: selectedProjectId?.substring(0, 8),
+      hasImageUrl: !!imageUrl,
+      hasThumbUrl: !!thumbUrl
+    });
+    
+    try {
+      // Call Supabase hook directly
+      await addToShotWithoutPositionMutation({
+        shot_id: externalGenLightboxSelectedShot,
+        generation_id: generationId,
+        imageUrl,
+        thumbUrl,
+        project_id: selectedProjectId,
+      });
+      toast.success('Added to shot without position');
+      return true;
+    } catch (error) {
+      console.error('[ShotImageManager] Error adding to shot without position:', error);
+      toast.error('Failed to add to shot');
+      return false;
+    }
+  }, [externalGenLightboxSelectedShot, selectedProjectId, addToShotWithoutPositionMutation]);
+  
+  // Handler to fetch and open an external generation (not in current shot)
+  const handleOpenExternalGeneration = useCallback(async (generationId: string) => {
+    console.log('[BasedOnLineage] 🌐 Opening external generation:',
+      '\n  targetGenerationId:', generationId.substring(0, 8),
+      '\n  currentExternalCount:', externalGenerations.length,
+      '\n  currentImagesCount:', optimisticOrder.length || images.length
+    );
+    
+    // First, check if generation already exists in current images
+    const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
+    const existingIndex = baseImages.findIndex(img => img.id === generationId);
+    
+    if (existingIndex !== -1) {
+      console.log('[ShotImageManager] ✅ Generation already in current images at index', existingIndex);
+      setLightboxIndex(existingIndex);
+      return;
+    }
+    
+    // Check if it's in external generations
+    const externalIndex = externalGenerations.findIndex(img => img.id === generationId);
+    if (externalIndex !== -1) {
+      console.log('[ShotImageManager] ✅ Generation already in external list');
+      setLightboxIndex(baseImages.length + externalIndex);
+      return;
+    }
+    
+    try {
+      // Fetch the generation from database WITH shot associations
+      const { data, error } = await supabase
+        .from('generations')
+        .select(`
+          *,
+          shot_generations(shot_id, timeline_frame)
+        `)
+        .eq('id', generationId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        const dataKeys = Object.keys(data);
+        console.log('[BasedOnLineage] ✅ Fetched external generation from DB:',
+          '\n  generationId:', data.id.substring(0, 8),
+          '\n  type:', data.type,
+          '\n  hasBasedOn:', !!data.based_on,
+          '\n  basedOnId:', data.based_on?.substring(0, 8) || null,
+          '\n  fullBasedOnValue:', data.based_on,
+          '\n  shotAssociationsCount:', (data as any).shot_generations?.length || 0,
+          '\n  dataKeysCount:', dataKeys.length,
+          '\n  allDataKeys:', dataKeys.join(', '),
+          '\n  hasBasedOnInKeys:', dataKeys.includes('based_on')
+        );
+        
+        // Build all_shot_associations array from shot_generations relation
+        const shotGenerations = (data as any).shot_generations || [];
+        const allAssociations = shotGenerations.map((sg: any) => ({
+          shot_id: sg.shot_id,
+          timeline_frame: sg.timeline_frame,
+          position: sg.timeline_frame, // position is same as timeline_frame
+        }));
+        
+        // Attach all_shot_associations to the generation data
+        const enrichedData = {
+          ...data,
+          all_shot_associations: allAssociations,
+          // If there's a primary shot, include it at top level
+          ...(shotGenerations.length > 0 ? {
+            shot_id: shotGenerations[0].shot_id,
+            position: shotGenerations[0].timeline_frame,
+            timeline_frame: shotGenerations[0].timeline_frame,
+          } : {})
+        };
+        
+        console.log('[BasedOnLineage] 🔗 Built shot associations:',
+          '\n  generationId:', data.id.substring(0, 8),
+          '\n  associationsCount:', allAssociations.length,
+          '\n  associations:', allAssociations.map((a: any) => ({
+            shotId: a.shot_id?.substring(0, 8),
+            position: a.position
+          }))
+        );
+        
+        const enrichedKeys = Object.keys(enrichedData);
+        console.log('[BasedOnLineage] 🔍 EnrichedData final check BEFORE passing to MediaLightbox:',
+          '\n  generationId:', data.id.substring(0, 8),
+          '\n  hasBasedOnInEnriched:', !!enrichedData.based_on,
+          '\n  basedOnValue:', enrichedData.based_on?.substring(0, 8) || null,
+          '\n  fullBasedOnValue:', enrichedData.based_on,
+          '\n  enrichedKeysCount:', enrichedKeys.length,
+          '\n  enrichedDataKeys:', enrichedKeys.join(', '),
+          '\n  hasBasedOnInKeys:', enrichedKeys.includes('based_on')
+        );
+        
+        // Add to external generations
+        setExternalGenerations(prev => [...prev, enrichedData]);
+        
+        // Find index in combined images and open it
+        // Use setTimeout to wait for state update
+        setTimeout(() => {
+          const newIndex = baseImages.length + externalGenerations.length;
+          console.log('[ShotImageManager] 📍 Opening external generation at index', newIndex);
+          setLightboxIndex(newIndex);
+        }, 50);
+      }
+    } catch (error) {
+      console.error('[ShotImageManager] ❌ Failed to fetch external generation:', error);
+      toast.error('Failed to load generation');
+    }
+  }, [optimisticOrder, images, externalGenerations]);
+
   // Use optimistic order everywhere instead of the parent `images` prop
   // Memoize to prevent unstable references during re-renders
   const currentImages = useMemo(() => {
     // Safety check: ensure we have valid images during component re-renders
-    if (!optimisticOrder || optimisticOrder.length === 0) {
-      return images || [];
-    }
-    return optimisticOrder;
-  }, [optimisticOrder, images]);
+    const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
+    
+    // Append external generations at the end
+    return [...baseImages, ...externalGenerations];
+  }, [optimisticOrder, images, externalGenerations]);
   
   // Fetch task details for the current lightbox image (must be after currentImages is defined)
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
@@ -1182,43 +1396,87 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         />
         
         {/* MediaLightbox for mobile - must be rendered here since we return early */}
-        {lightboxIndex !== null && currentImages[lightboxIndex] && (
-          <MediaLightbox
-            media={currentImages[lightboxIndex]}
-            shotId={shotId}
-            toolTypeOverride={toolTypeOverride}
-            autoEnterInpaint={shouldAutoEnterInpaint}
-            onClose={() => {
-              console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
-              setLightboxIndex(null);
-              setShouldAutoEnterInpaint(false);
-            }}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
-            showNavigation={true}
-            showImageEditTools={true}
-            showDownload={true}
-            showMagicEdit={true}
-            hasNext={lightboxIndex < currentImages.length - 1}
-            hasPrevious={lightboxIndex > 0}
-            starred={(currentImages[lightboxIndex] as any).starred || false}
-            onMagicEdit={onMagicEdit}
-            // Task details functionality - show on tablet+ (768px+), hide on mobile
-            showTaskDetails={isTabletOrLarger}
-            taskDetailsData={{
-              task: task,
-              isLoading: isLoadingTask,
-              error: taskError,
-              inputImages: inputImages,
-              taskId: task?.id || null,
-              onClose: () => {
+        {lightboxIndex !== null && currentImages[lightboxIndex] && (() => {
+          // Determine if this is an external generation
+          const baseImagesCount = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder.length : (images || []).length;
+          const isExternalGen = lightboxIndex >= baseImagesCount;
+          
+          console.log('[ShotImageManager:Mobile] Rendering lightbox', {
+            lightboxIndex,
+            baseImagesCount,
+            isExternalGen,
+            currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId
+          });
+          
+          return (
+            <MediaLightbox
+              media={currentImages[lightboxIndex]}
+              shotId={shotId}
+              toolTypeOverride={toolTypeOverride}
+              autoEnterInpaint={shouldAutoEnterInpaint}
+              onClose={() => {
+                console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
                 setLightboxIndex(null);
                 setShouldAutoEnterInpaint(false);
-              }
-            }}
-          />
-        )}
+                // Reset external gen shot selector when closing
+                if (isExternalGen) {
+                  setExternalGenLightboxSelectedShot(selectedShotId);
+                }
+              }}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
+              showNavigation={true}
+              showImageEditTools={true}
+              showDownload={true}
+              showMagicEdit={true}
+              hasNext={lightboxIndex < currentImages.length - 1}
+              hasPrevious={lightboxIndex > 0}
+              starred={(currentImages[lightboxIndex] as any).starred || false}
+              onMagicEdit={onMagicEdit}
+              // Task details functionality - show on tablet+ (768px+), hide on mobile
+              showTaskDetails={isTabletOrLarger}
+              taskDetailsData={{
+                task: task,
+                isLoading: isLoadingTask,
+                error: taskError,
+                inputImages: inputImages,
+                taskId: task?.id || null,
+                onClose: () => {
+                  setLightboxIndex(null);
+                  setShouldAutoEnterInpaint(false);
+                }
+              }}
+              onNavigateToGeneration={(generationId: string) => {
+                console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
+                  generationId: generationId.substring(0, 8),
+                  currentImagesCount: currentImages.length,
+                  currentIndex: lightboxIndex
+                });
+                const index = currentImages.findIndex(img => img.id === generationId);
+                if (index !== -1) {
+                  console.log('[ShotImageManager:Mobile] ✅ Found generation at index', index);
+                  setLightboxIndex(index);
+                } else {
+                  console.error('[ShotImageManager:Mobile] ❌ Generation not found in current images', {
+                    searchedId: generationId.substring(0, 8),
+                    availableIds: currentImages.map(img => img.id.substring(0, 8))
+                  });
+                }
+              }}
+              onOpenExternalGeneration={handleOpenExternalGeneration}
+              allShots={allShots}
+              selectedShotId={isExternalGen ? externalGenLightboxSelectedShot : selectedShotId}
+              onShotChange={isExternalGen ? (shotId) => {
+                console.log('[ShotImageManager:Mobile] External gen shot changed', { shotId: shotId?.substring(0, 8) });
+                setExternalGenLightboxSelectedShot(shotId);
+              } : onShotChange}
+              onAddToShot={isExternalGen ? handleExternalGenAddToShot : onAddToShot}
+              onAddToShotWithoutPosition={isExternalGen ? handleExternalGenAddToShotWithoutPosition : onAddToShotWithoutPosition}
+              onCreateShot={onCreateShot}
+            />
+          );
+        })()}
       </>
     );
   }
@@ -1439,42 +1697,86 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         ) : null}
       </DragOverlay>
       
-      {lightboxIndex !== null && currentImages[lightboxIndex] && (
-        <MediaLightbox
-          media={currentImages[lightboxIndex]}
-          shotId={shotId}
-          toolTypeOverride={toolTypeOverride}
-          autoEnterInpaint={shouldAutoEnterInpaint}
-          onClose={() => {
-            setLightboxIndex(null);
-            setShouldAutoEnterInpaint(false);
-          }}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-          onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
-          showNavigation={true}
-          showImageEditTools={true}
-          showDownload={true}
-          showMagicEdit={true}
-          hasNext={lightboxIndex < currentImages.length - 1}
-          hasPrevious={lightboxIndex > 0}
-          starred={(currentImages[lightboxIndex] as any).starred || false}
-          onMagicEdit={onMagicEdit}
-          // Task details functionality - show on tablet+ (768px+), hide on mobile
-          showTaskDetails={isTabletOrLarger}
-          taskDetailsData={{
-            task: task,
-            isLoading: isLoadingTask,
-            error: taskError,
-            inputImages: inputImages,
-            taskId: task?.id || null,
-            onClose: () => {
+      {lightboxIndex !== null && currentImages[lightboxIndex] && (() => {
+        // Determine if this is an external generation
+        const baseImagesCount = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder.length : (images || []).length;
+        const isExternalGen = lightboxIndex >= baseImagesCount;
+        
+        console.log('[ShotImageManager:Desktop] Rendering lightbox', {
+          lightboxIndex,
+          baseImagesCount,
+          isExternalGen,
+          currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId
+        });
+        
+        return (
+          <MediaLightbox
+            media={currentImages[lightboxIndex]}
+            shotId={shotId}
+            toolTypeOverride={toolTypeOverride}
+            autoEnterInpaint={shouldAutoEnterInpaint}
+            onClose={() => {
               setLightboxIndex(null);
               setShouldAutoEnterInpaint(false);
-            }
-          }}
-        />
-      )}
+              // Reset external gen shot selector when closing
+              if (isExternalGen) {
+                setExternalGenLightboxSelectedShot(selectedShotId);
+              }
+            }}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
+            showNavigation={true}
+            showImageEditTools={true}
+            showDownload={true}
+            showMagicEdit={true}
+            hasNext={lightboxIndex < currentImages.length - 1}
+            hasPrevious={lightboxIndex > 0}
+            starred={(currentImages[lightboxIndex] as any).starred || false}
+            onMagicEdit={onMagicEdit}
+            // Task details functionality - show on tablet+ (768px+), hide on mobile
+            showTaskDetails={isTabletOrLarger}
+            taskDetailsData={{
+              task: task,
+              isLoading: isLoadingTask,
+              error: taskError,
+              inputImages: inputImages,
+              taskId: task?.id || null,
+              onClose: () => {
+                setLightboxIndex(null);
+                setShouldAutoEnterInpaint(false);
+              }
+            }}
+            onNavigateToGeneration={(generationId: string) => {
+              console.log('[ShotImageManager:Desktop] 📍 Navigate to generation', {
+                generationId: generationId.substring(0, 8),
+                currentImagesCount: currentImages.length,
+                currentIndex: lightboxIndex
+              });
+              const index = currentImages.findIndex(img => img.id === generationId);
+              if (index !== -1) {
+                console.log('[ShotImageManager:Desktop] ✅ Found generation at index', index);
+                setLightboxIndex(index);
+              } else {
+                console.error('[ShotImageManager:Desktop] ❌ Generation not found in current images', {
+                  searchedId: generationId.substring(0, 8),
+                  availableIds: currentImages.map(img => img.id.substring(0, 8))
+                });
+              }
+            }}
+            onOpenExternalGeneration={handleOpenExternalGeneration}
+            allShots={allShots}
+            selectedShotId={isExternalGen ? externalGenLightboxSelectedShot : selectedShotId}
+            onShotChange={isExternalGen ? (shotId) => {
+              console.log('[ShotImageManager:Desktop] External gen shot changed', { shotId: shotId?.substring(0, 8) });
+              setExternalGenLightboxSelectedShot(shotId);
+            } : onShotChange}
+            onAddToShot={isExternalGen ? handleExternalGenAddToShot : onAddToShot}
+            onAddToShotWithoutPosition={isExternalGen ? handleExternalGenAddToShotWithoutPosition : onAddToShotWithoutPosition}
+            onCreateShot={onCreateShot}
+          />
+        );
+      })()}
 
       {/* Floating Action Bar for Multiple Selection (Desktop) */}
       {showSelectionBar && selectedIds.length >= 1 && (() => {
