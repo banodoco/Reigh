@@ -2029,6 +2029,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   ) : taskDetailsData && taskDetailsData.taskId ? (
                     <div className="w-full">
+                      {/* Based On display - Show source image this was derived from (ABOVE task details) */}
+                      {sourceGenerationData && onOpenExternalGeneration && (
+                        <div className="border-b border-border p-4">
+                          <button
+                            onClick={async () => {
+                              console.log('[BasedOn:NonEditTaskDetails] 🖼️ Navigating to source generation', {
+                                sourceId: sourceGenerationData.id.substring(0, 8)
+                              });
+                              await onOpenExternalGeneration(sourceGenerationData.id);
+                            }}
+                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+                          >
+                            <span>Based on:</span>
+                            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
+                              <img
+                                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
+                                alt="Source generation"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="group-hover:underline">Click to view</span>
+                          </button>
+                        </div>
+                      )}
+                    
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
                       isLoading={taskDetailsData.isLoading}
@@ -2730,6 +2755,31 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   ) : taskDetailsData && taskDetailsData.taskId && (
                     <div className="w-full">
+                      {/* Based On display - Show source image this was derived from (ABOVE task details) - MOBILE */}
+                      {sourceGenerationData && onOpenExternalGeneration && (
+                        <div className="border-b border-border p-4">
+                          <button
+                            onClick={async () => {
+                              console.log('[BasedOn:Mobile:NonEditTaskDetails] 🖼️ Navigating to source generation', {
+                                sourceId: sourceGenerationData.id.substring(0, 8)
+                              });
+                              await onOpenExternalGeneration(sourceGenerationData.id);
+                            }}
+                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
+                          >
+                            <span>Based on:</span>
+                            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
+                              <img
+                                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
+                                alt="Source generation"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="group-hover:underline">Click to view</span>
+                          </button>
+                        </div>
+                      )}
+                    
                     <TaskDetailsPanel
                       task={taskDetailsData.task}
                       isLoading={taskDetailsData.isLoading}
@@ -2933,44 +2983,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   onClick={(e) => e.stopPropagation()}
                   className={cn(isMobile && isInpaintMode && "pointer-events-auto")}
                 >
-                  {/* Based On display - Show source image this was derived from (overlay at top) */}
-                  {(() => {
-                    console.log('[BasedOn:NonEditMode] 🎨 Render check', {
-                      hasSourceData: !!sourceGenerationData,
-                      hasHandler: !!onOpenExternalGeneration,
-                      isSpecialEditMode,
-                      willShow: !!(sourceGenerationData && onOpenExternalGeneration && !isSpecialEditMode),
-                      sourceId: sourceGenerationData?.id?.substring(0, 8)
-                    });
-                    
-                    if (sourceGenerationData && onOpenExternalGeneration && !isSpecialEditMode) {
-                      return (
-                        <div className="absolute top-4 left-4 z-20">
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              console.log('[BasedOn] 🖼️ Navigating to source generation', {
-                                sourceId: sourceGenerationData.id.substring(0, 8)
-                              });
-                              await onOpenExternalGeneration(sourceGenerationData.id);
-                            }}
-                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group bg-background/95 backdrop-blur-sm px-2 py-1.5 rounded border border-border"
-                          >
-                            <span>Based on:</span>
-                            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                              <img
-                                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
-                                alt="Source generation"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <span className="group-hover:underline">Click to view</span>
-                          </button>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                  {/* Based On display removed from overlay - now shows in sidebar above task details */}
                   
                   {/* Media Display - The wrapper now handles centering */}
                 {isVideo ? (
