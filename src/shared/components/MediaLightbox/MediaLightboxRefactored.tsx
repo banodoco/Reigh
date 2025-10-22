@@ -235,6 +235,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [previewGenerationId, setPreviewGenerationId] = useState<string | null>(null);
   const [previewGenerationData, setPreviewGenerationData] = useState<GenerationRow | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number>(0);
   
   // Source generation state (based_on) to show where this image came from
   const [sourceGenerationData, setSourceGenerationData] = useState<GenerationRow | null>(null);
@@ -309,20 +310,39 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     fetchPreviewData();
   }, [previewGenerationId]);
   
-  // ESC key to close preview overlay
+  // Keyboard navigation for preview overlay (ESC, Arrow keys)
   useEffect(() => {
-    if (!previewGenerationId) return;
+    if (!previewGenerationId || !derivedGenerations) return;
     
-    const handleEscKey = (e: KeyboardEvent) => {
+    const handleKeyNavigation = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         console.log('[PreviewOverlay] ⌨️ ESC key pressed, closing preview');
         setPreviewGenerationId(null);
+        setPreviewIndex(0);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        // Navigate to previous
+        const newIndex = Math.max(0, previewIndex - 1);
+        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
+          console.log('[PreviewOverlay] ⌨️ Left arrow pressed, going to previous', { newIndex });
+          setPreviewIndex(newIndex);
+          setPreviewGenerationId(derivedGenerations[newIndex].id);
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        // Navigate to next
+        const newIndex = Math.min(derivedGenerations.length - 1, previewIndex + 1);
+        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
+          console.log('[PreviewOverlay] ⌨️ Right arrow pressed, going to next', { newIndex });
+          setPreviewIndex(newIndex);
+          setPreviewGenerationId(derivedGenerations[newIndex].id);
+        }
       }
     };
     
-    window.addEventListener('keydown', handleEscKey);
-    return () => window.removeEventListener('keydown', handleEscKey);
-  }, [previewGenerationId]);
+    window.addEventListener('keydown', handleKeyNavigation);
+    return () => window.removeEventListener('keydown', handleKeyNavigation);
+  }, [previewGenerationId, previewIndex, derivedGenerations]);
   
   // Fetch source generation (based_on) to show origin
   useEffect(() => {
@@ -1942,7 +1962,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           </div>
                           
                           <div className="grid grid-cols-3 gap-2">
-                            {paginatedDerived.map((derived) => (
+                            {paginatedDerived.map((derived, derivedIdx) => {
+                              // Calculate actual index in full derivedGenerations array
+                              const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
+                              
+                              return (
                               <div
                                 key={derived.id}
                                 className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
@@ -1964,10 +1988,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                             derivedId: derived.id.substring(0, 8),
                                             derivedUrl: derived.location,
                                             currentMediaId: media.id.substring(0, 8),
+                                            actualIndex,
                                             timestamp: Date.now()
                                           });
                                           
-                                          // Show floating preview overlay
+                                          // Show floating preview overlay with index
+                                          setPreviewIndex(actualIndex);
                                           setPreviewGenerationId(derived.id);
                                         }}
                                         className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
@@ -2024,7 +2050,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   </div>
                                 )}
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         </div>
                       )}
@@ -2074,6 +2101,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
+                      showUserImage={false}
                       derivedSection={(() => {
                         console.log('[BasedOnDebug] Desktop render check - Derived Generations section', {
                           hasDerivedGenerations: !!derivedGenerations,
@@ -2126,7 +2154,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </div>
                               
                               <div className="grid grid-cols-3 gap-2">
-                                {paginatedDerived.map((derived) => (
+                                {paginatedDerived.map((derived, derivedIdx) => {
+                                  // Calculate actual index in full derivedGenerations array
+                                  const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
+                                  
+                                  return (
                                   <div
                                     key={derived.id}
                                     className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
@@ -2148,10 +2180,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                                 derivedId: derived.id.substring(0, 8),
                                                 derivedUrl: derived.location,
                                                 currentMediaId: media.id.substring(0, 8),
+                                                actualIndex,
                                                 timestamp: Date.now()
                                               });
                                               
-                                              // Show floating preview overlay
+                                              // Show floating preview overlay with index
+                                              setPreviewIndex(actualIndex);
                                               setPreviewGenerationId(derived.id);
                                             }}
                                             className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
@@ -2197,7 +2231,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                       </div>
                                     )}
                                   </div>
-                                ))}
+                                );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -2759,6 +2794,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
+                      showUserImage={false}
                       derivedSection={(() => {
                         console.log('[BasedOnDebug] Mobile render check - Derived Generations section', {
                           hasDerivedGenerations: !!derivedGenerations,
@@ -2811,7 +2847,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </div>
                               
                               <div className="grid grid-cols-3 gap-1.5">
-                                {paginatedDerived.map((derived) => (
+                                {paginatedDerived.map((derived, derivedIdx) => {
+                                  // Calculate actual index in full derivedGenerations array
+                                  const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
+                                  
+                                  return (
                                   <div
                                     key={derived.id}
                                     className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
@@ -2833,10 +2873,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                                 derivedId: derived.id.substring(0, 8),
                                                 derivedUrl: derived.location,
                                                 currentMediaId: media.id.substring(0, 8),
+                                                actualIndex,
                                                 timestamp: Date.now()
                                               });
                                               
-                                              // Show floating preview overlay
+                                              // Show floating preview overlay with index
+                                              setPreviewIndex(actualIndex);
                                               setPreviewGenerationId(derived.id);
                                             }}
                                             className="h-7 w-7 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
@@ -2882,7 +2924,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                       </div>
                                     )}
                                   </div>
-                                ))}
+                                );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -3313,6 +3356,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 if (e.target === e.currentTarget) {
                   console.log('[PreviewOverlay] 🚪 Backdrop mousedown, closing preview');
                   setPreviewGenerationId(null);
+                  setPreviewIndex(0);
                 }
               }}
               onClick={(e) => {
@@ -3320,6 +3364,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 if (e.target === e.currentTarget) {
                   console.log('[PreviewOverlay] 🚪 Backdrop clicked, closing preview');
                   setPreviewGenerationId(null);
+                  setPreviewIndex(0);
                 }
               }}
             >
@@ -3336,18 +3381,66 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     e.stopPropagation();
                     console.log('[PreviewOverlay] ✖️ Close button mousedown');
                     setPreviewGenerationId(null);
+                    setPreviewIndex(0);
                   }}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('[PreviewOverlay] ✖️ Close button clicked');
                     setPreviewGenerationId(null);
+                    setPreviewIndex(0);
                   }}
                   className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer"
                   style={{ pointerEvents: 'auto' }}
                 >
                   <X className="h-5 w-5" />
                 </button>
+                
+                {/* Navigation Buttons */}
+                {derivedGenerations && derivedGenerations.length > 1 && (
+                  <>
+                    {/* Previous Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newIndex = Math.max(0, previewIndex - 1);
+                        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
+                          console.log('[PreviewOverlay] ◀ Previous button clicked', { newIndex });
+                          setPreviewIndex(newIndex);
+                          setPreviewGenerationId(derivedGenerations[newIndex].id);
+                        }
+                      }}
+                      disabled={previewIndex === 0}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                    
+                    {/* Next Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newIndex = Math.min(derivedGenerations.length - 1, previewIndex + 1);
+                        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
+                          console.log('[PreviewOverlay] ▶ Next button clicked', { newIndex });
+                          setPreviewIndex(newIndex);
+                          setPreviewGenerationId(derivedGenerations[newIndex].id);
+                        }
+                      }}
+                      disabled={previewIndex === derivedGenerations.length - 1}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                    
+                    {/* Counter Display */}
+                    <div className="absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full bg-black/70 text-white text-sm font-medium">
+                      {previewIndex + 1} / {derivedGenerations.length}
+                    </div>
+                  </>
+                )}
                 
                 {/* Loading State */}
                 {isLoadingPreview && (

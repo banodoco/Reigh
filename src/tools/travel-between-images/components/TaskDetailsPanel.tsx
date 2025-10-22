@@ -33,6 +33,8 @@ interface TaskDetailsPanelProps {
   onGenerationNameChange?: (name: string) => void;
   isEditingGenerationName?: boolean;
   onEditingGenerationNameChange?: (editing: boolean) => void;
+  // Control whether to show user-provided source images
+  showUserImage?: boolean;
 }
 
 const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ 
@@ -51,7 +53,8 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   generationName,
   onGenerationNameChange,
   isEditingGenerationName,
-  onEditingGenerationNameChange
+  onEditingGenerationNameChange,
+  showUserImage = true
 }) => {
   const isMobile = useIsMobile();
   const [showDetailedParams, setShowDetailedParams] = useState(false);
@@ -172,7 +175,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
                     onShowFullPromptChange={setShowFullPrompt}
                     showFullNegativePrompt={showFullNegativePrompt}
                     onShowFullNegativePromptChange={setShowFullNegativePrompt}
-                    showUserImage={true}
+                    showUserImage={showUserImage}
                   />
                 );
               }
