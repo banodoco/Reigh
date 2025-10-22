@@ -464,17 +464,29 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           position: sg.timeline_frame, // position is same as timeline_frame
         }));
         
-        // Attach all_shot_associations to the generation data
-        const enrichedData = {
-          ...data,
+        // Transform to GenerationRow format (matching ShotImageManager's expected interface)
+        const transformedData: GenerationRow = {
+          id: data.id,
+          shotImageEntryId: shotGenerations.length > 0 ? shotGenerations[0].id : data.id, // Use shot_generation id if available
+          imageUrl: data.location,
+          thumbUrl: data.thumbnail_url || data.location,
+          location: data.location,
+          type: data.type,
+          createdAt: data.created_at,
+          timeline_frame: shotGenerations.length > 0 ? shotGenerations[0].timeline_frame : undefined,
+          metadata: (typeof data.params === 'object' && data.params !== null && !Array.isArray(data.params)) ? data.params as Record<string, unknown> : {},
+          upscaled_url: data.upscaled_url,
+          starred: data.starred ?? false,
           all_shot_associations: allAssociations,
           // If there's a primary shot, include it at top level
           ...(shotGenerations.length > 0 ? {
             shot_id: shotGenerations[0].shot_id,
             position: shotGenerations[0].timeline_frame,
-            timeline_frame: shotGenerations[0].timeline_frame,
           } : {})
-        };
+        } as any; // Type assertion needed because we're adding based_on dynamically
+        
+        // Add based_on for lineage tracking (not in GenerationRow type but needed for MediaLightbox)
+        (transformedData as any).based_on = data.based_on;
         
         console.log('[BasedOnLineage] 🔗 Built shot associations:',
           '\n  generationId:', data.id.substring(0, 8),
@@ -485,27 +497,24 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           }))
         );
         
-        const enrichedKeys = Object.keys(enrichedData);
-        console.log('[BasedOnLineage] 🔍 EnrichedData final check BEFORE passing to MediaLightbox:',
+        console.log('[BasedOnLineage] 🔍 Transformed data BEFORE passing to MediaLightbox:',
           '\n  generationId:', data.id.substring(0, 8),
-          '\n  hasBasedOnInEnriched:', !!enrichedData.based_on,
-          '\n  basedOnValue:', enrichedData.based_on?.substring(0, 8) || null,
-          '\n  fullBasedOnValue:', enrichedData.based_on,
-          '\n  enrichedKeysCount:', enrichedKeys.length,
-          '\n  enrichedDataKeys:', enrichedKeys.join(', '),
-          '\n  hasBasedOnInKeys:', enrichedKeys.includes('based_on')
+          '\n  hasBasedOn:', !!data.based_on,
+          '\n  basedOnValue:', data.based_on?.substring(0, 8) || null,
+          '\n  hasImageUrl:', !!transformedData.imageUrl,
+          '\n  hasThumbUrl:', !!transformedData.thumbUrl
         );
         
-        // Add to external generations
-        setExternalGenerations(prev => [...prev, enrichedData]);
-        
-        // Find index in combined images and open it
-        // Use setTimeout to wait for state update
-        setTimeout(() => {
-          const newIndex = baseImages.length + externalGenerations.length;
+        // Add to external generations and get the new index immediately
+        setExternalGenerations(prev => {
+          const updated = [...prev, transformedData];
+          // Calculate index using the updated array length
+          const newIndex = baseImages.length + updated.length - 1;
           console.log('[ShotImageManager] 📍 Opening external generation at index', newIndex);
-          setLightboxIndex(newIndex);
-        }, 50);
+          // Use setTimeout to ensure state has updated before setting lightbox
+          setTimeout(() => setLightboxIndex(newIndex), 0);
+          return updated;
+        });
       }
     } catch (error) {
       console.error('[ShotImageManager] ❌ Failed to fetch external generation:', error);
