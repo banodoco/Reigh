@@ -769,7 +769,8 @@ serve(async (req)=>{
           console.log(`[ImageInpaint] Task params:`, JSON.stringify(taskData.params, null, 2));
           
           // Inpaint creates generation(s) as usual, but should link via based_on to source generation
-          const sourceGenerationId = taskData.params?.generation_id;
+          // Check both 'based_on' and 'generation_id' fields
+          const sourceGenerationId = taskData.params?.based_on || taskData.params?.generation_id;
           
           if (sourceGenerationId) {
             console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
