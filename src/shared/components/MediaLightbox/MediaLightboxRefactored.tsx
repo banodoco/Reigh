@@ -426,13 +426,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     console.log('[MobilePaintDebug] ✨ Called handleEnterInpaintMode()');
   }, [handleEnterInpaintMode]);
   
+  // Track if user has manually exited edit mode to prevent auto-re-enter
+  const hasManuallyExitedRef = React.useRef(false);
+  
+  // Reset manual exit flag when media changes
+  React.useEffect(() => {
+    hasManuallyExitedRef.current = false;
+  }, [media.id]);
+  
   const handleExitMagicEditMode = () => {
     console.log('[MediaLightbox] ✨ Exiting unified edit mode');
+    hasManuallyExitedRef.current = true;
     setIsMagicEditMode(false);
     setIsInpaintMode(false);
   };
   
-  // Auto-enter unified edit mode if requested
+  // Auto-enter unified edit mode if requested (only once, not after manual exit)
   React.useEffect(() => {
     console.log('[EditModeDebug] Auto-enter effect check:', {
       autoEnterInpaint,
@@ -440,11 +449,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       isMagicEditMode,
       isVideo,
       selectedProjectId,
-      willEnter: autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && !!selectedProjectId,
+      hasManuallyExited: hasManuallyExitedRef.current,
+      willEnter: autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && !!selectedProjectId && !hasManuallyExitedRef.current,
       timestamp: Date.now()
     });
     
-    if (autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && selectedProjectId) {
+    if (autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && selectedProjectId && !hasManuallyExitedRef.current) {
       console.log('[EditModeDebug] 🎨 Auto-entering unified edit mode NOW');
       handleEnterMagicEditMode();
     }
