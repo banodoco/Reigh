@@ -1285,25 +1285,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             
                             {/* Undo | Clear */}
                             <div className="flex items-center gap-1">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={handleUndo}
-                                disabled={brushStrokes.length === 0}
-                                className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
-                              >
-                                <Undo2 className="h-3 w-3" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleUndo}
+                                    disabled={brushStrokes.length === 0}
+                                    className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
+                                  >
+                                    <Undo2 className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="z-[100001]">Undo</TooltipContent>
+                              </Tooltip>
                               
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleClearMask}
-                                disabled={brushStrokes.length === 0}
-                                className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleClearMask}
+                                    disabled={brushStrokes.length === 0}
+                                    className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="z-[100001]">Clear all</TooltipContent>
+                              </Tooltip>
                             </div>
                           </div>
                           
@@ -2094,25 +2104,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           
                           {/* Undo | Clear */}
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleUndo}
-                              disabled={brushStrokes.length === 0}
-                              className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-6"
-                            >
-                              <Undo2 className="h-3 w-3" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={handleUndo}
+                                  disabled={brushStrokes.length === 0}
+                                  className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-6"
+                                >
+                                  <Undo2 className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Undo</TooltipContent>
+                            </Tooltip>
                             
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleClearMask}
-                              disabled={brushStrokes.length === 0}
-                              className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-6"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleClearMask}
+                                  disabled={brushStrokes.length === 0}
+                                  className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-6"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Clear all</TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
                         
@@ -2727,25 +2747,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           
                           {/* Undo | Clear */}
                           <div className="flex items-center gap-1">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleUndo}
-                              disabled={brushStrokes.length === 0}
-                              className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
-                            >
-                              <Undo2 className="h-3 w-3" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={handleUndo}
+                                  disabled={brushStrokes.length === 0}
+                                  className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
+                                >
+                                  <Undo2 className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Undo</TooltipContent>
+                            </Tooltip>
                             
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleClearMask}
-                              disabled={brushStrokes.length === 0}
-                              className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleClearMask}
+                                  disabled={brushStrokes.length === 0}
+                                  className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Clear all</TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
                       )}
