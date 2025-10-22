@@ -654,6 +654,10 @@ export function useTaskFromUnifiedCache(generationId: string) {
       const cachedMapping = queryClient.getQueryData(['tasks', 'taskId', generationId]) as { taskId: string } | undefined;
       
       if (cachedMapping?.taskId) {
+        console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: found in cache', {
+          generationId,
+          taskId: cachedMapping.taskId
+        });
         return cachedMapping;
       }
       
@@ -664,9 +668,21 @@ export function useTaskFromUnifiedCache(generationId: string) {
         .eq('id', generationId)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('[TaskDetailsSidebar] useTaskFromUnifiedCache: fetch error', {
+          generationId,
+          error
+        });
+        throw error;
+      }
       
       const taskId = Array.isArray(data?.tasks) && data.tasks.length > 0 ? data.tasks[0] : null;
+      console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: fetched from DB', {
+        generationId,
+        tasksArray: data?.tasks,
+        taskId,
+        hasTaskId: !!taskId
+      });
       return { taskId };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

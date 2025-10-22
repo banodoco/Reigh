@@ -119,7 +119,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
         </div>
       </div>
       
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4 overflow-y-auto">
         <div className="space-y-6">
           {/* Generation Summary Section */}
           <div className="space-y-3">
@@ -258,8 +258,8 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
         </div>
       </ScrollArea>
       
-      {/* Footer with controls */}
-      <div className="flex-shrink-0 p-4 border-t">
+      {/* Footer with controls - Sticky to bottom */}
+      <div className="flex-shrink-0 p-4 border-t bg-background sticky bottom-0">
         <div className="flex flex-col space-y-3">
           {inputImages.length > 0 && (
             <div className="flex items-center space-x-2">

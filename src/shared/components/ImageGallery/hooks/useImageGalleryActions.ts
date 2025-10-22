@@ -8,12 +8,13 @@ import { GeneratedImageWithMetadata, DisplayableMetadata } from '../index';
 export interface UseImageGalleryActionsProps {
   onDelete?: (id: string) => void;
   onApplySettings?: (metadata: DisplayableMetadata) => void;
-  onAddToLastShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToLastShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onToggleStar?: (id: string, starred: boolean) => void;
   onImageSaved?: (imageId: string, newImageUrl: string) => void;
   activeLightboxMedia: GenerationRow | null;
   setActiveLightboxMedia: (media: GenerationRow | null) => void;
+  setAutoEnterEditMode: (value: boolean) => void;
   markOptimisticDeleted: (imageId: string) => void;
   removeOptimisticDeleted: (imageId: string) => void;
   setDownloadingImageId: (id: string | null) => void;
@@ -53,6 +54,7 @@ export const useImageGalleryActions = ({
   onImageSaved,
   activeLightboxMedia,
   setActiveLightboxMedia,
+  setAutoEnterEditMode,
   markOptimisticDeleted,
   removeOptimisticDeleted,
   setDownloadingImageId,
@@ -218,11 +220,13 @@ export const useImageGalleryActions = ({
     }
   }, [markOptimisticDeleted, removeOptimisticDeleted, onDelete, activeLightboxMedia, setActiveLightboxMedia, toast, isServerPagination, serverPage, onBackfillRequest, itemsPerPage, setIsBackfillLoading, setBackfillSkeletonCount]);
 
-  const handleOpenLightbox = useCallback((image: GeneratedImageWithMetadata) => {
-    console.log('[MobileDebug] handleOpenLightbox called with image:', {
+  const handleOpenLightbox = useCallback((image: GeneratedImageWithMetadata, autoEnterEditMode = false) => {
+    console.log('[EditModeDebug] handleOpenLightbox called with image:', {
       imageId: image.id?.substring(0, 8),
       imageUrl: image.url?.substring(0, 50) + '...',
       isVideo: image.isVideo,
+      autoEnterEditMode,
+      willSetAutoEnterEditMode: autoEnterEditMode,
       timestamp: Date.now()
     });
     
@@ -233,22 +237,32 @@ export const useImageGalleryActions = ({
       location: image.url, // Assuming url is the location
       type: image.isVideo ? 'video_travel_output' : 'single_image', // Infer type
       createdAt: image.createdAt || new Date().toISOString(),
-      metadata: image.metadata,
+      metadata: {
+        ...image.metadata,
+        __autoEnterEditMode: autoEnterEditMode, // Store the flag in metadata
+      },
       thumbUrl: image.isVideo ? image.url : undefined, // simple fallback
     };
     
-    console.log('[MobileDebug] Setting activeLightboxMedia to:', {
+    console.log('[EditModeDebug] Setting activeLightboxMedia with embedded autoEnterEditMode:', {
       mediaRowId: mediaRow.id?.substring(0, 8),
       mediaRowType: mediaRow.type,
-      hasMetadata: !!mediaRow.metadata
+      hasMetadata: !!mediaRow.metadata,
+      autoEnterEditMode,
+      embeddedInMetadata: mediaRow.metadata?.__autoEnterEditMode,
+      timestamp: Date.now()
     });
     
     setActiveLightboxMedia(mediaRow);
-  }, [setActiveLightboxMedia]);
+    setAutoEnterEditMode(autoEnterEditMode);
+    
+    console.log('[EditModeDebug] State setters called');
+  }, [setActiveLightboxMedia, setAutoEnterEditMode]);
 
   const handleCloseLightbox = useCallback(() => {
     setActiveLightboxMedia(null);
-  }, [setActiveLightboxMedia]);
+    setAutoEnterEditMode(false); // Reset edit mode flag when closing lightbox
+  }, [setActiveLightboxMedia, setAutoEnterEditMode]);
 
   // Conform to MediaLightbox signature: returns Promise<void> and accepts optional createNew flag
   const handleImageSaved = useCallback(async (newImageUrl: string, _createNew?: boolean): Promise<void> => {

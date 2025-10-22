@@ -2,6 +2,8 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
+import { Textarea } from '@/shared/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { 
   ChevronLeft, 
@@ -22,17 +24,22 @@ import {
   EyeOff, 
   Paintbrush, 
   Eraser, 
-  Undo2 
+  Undo2,
+  Sparkles,
+  Pencil,
+  ArrowDown,
+  ArrowUp
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import ShotSelector from '@/shared/components/ShotSelector';
-import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
+import { createBatchMagicEditTasks } from '@/shared/lib/tasks/magicEdit';
 
 // Import all extracted hooks
 import {
@@ -53,6 +60,7 @@ import {
   MediaDisplay,
   NavigationButtons,
   InpaintControlsPanel,
+  MagicEditControlsPanel,
   TaskDetailsSection,
   MediaControls,
   WorkflowControls,
@@ -208,6 +216,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Basic hooks
   const isMobile = useIsMobile();
+  
+  // ========================================
+  // LAYOUT DETERMINATION
+  // ========================================
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
@@ -225,7 +237,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
+
   // Safety check
   if (!media) {
     return null;
@@ -363,13 +375,135 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setIsInpaintMode(false);
   };
 
-  // Auto-enter inpaint mode if requested
+  // Magic Edit mode state - now merged with inpaint mode
+  const [isMagicEditMode, setIsMagicEditMode] = React.useState(false);
+  const [magicEditPrompt, setMagicEditPrompt] = React.useState('');
+  const [magicEditNumImages, setMagicEditNumImages] = React.useState(4);
+  const [isCreatingMagicEditTasks, setIsCreatingMagicEditTasks] = React.useState(false);
+  const [magicEditTasksCreated, setMagicEditTasksCreated] = React.useState(false);
+  const [inpaintPanelPosition, setInpaintPanelPosition] = React.useState<'top' | 'bottom'>('top');
+  
+  const { currentShotId } = useCurrentShot();
+  
+  const handleEnterMagicEditMode = React.useCallback(() => {
+    console.log('[MobilePaintDebug] ✨ Entering unified edit mode - START');
+    
+    setIsMagicEditMode(true);
+    console.log('[MobilePaintDebug] ✨ Called setIsMagicEditMode(true)');
+    
+    console.log('[MobilePaintDebug] About to call handleEnterInpaintMode, ref exists:', !!handleEnterInpaintMode);
+    handleEnterInpaintMode();
+    console.log('[MobilePaintDebug] ✨ Called handleEnterInpaintMode()');
+  }, [handleEnterInpaintMode]);
+  
+  const handleExitMagicEditMode = () => {
+    console.log('[MediaLightbox] ✨ Exiting unified edit mode');
+    setIsMagicEditMode(false);
+    setIsInpaintMode(false);
+  };
+  
+  // Auto-enter unified edit mode if requested
   React.useEffect(() => {
-    if (autoEnterInpaint && !isInpaintMode && !isVideo && selectedProjectId) {
-      console.log('[InpaintAutoEnter] 🎨 Auto-entering inpaint mode');
-      handleEnterInpaintMode();
+    console.log('[EditModeDebug] Auto-enter effect check:', {
+      autoEnterInpaint,
+      isInpaintMode,
+      isMagicEditMode,
+      isVideo,
+      selectedProjectId,
+      willEnter: autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && !!selectedProjectId,
+      timestamp: Date.now()
+    });
+    
+    if (autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && selectedProjectId) {
+      console.log('[EditModeDebug] 🎨 Auto-entering unified edit mode NOW');
+      handleEnterMagicEditMode();
     }
-  }, [autoEnterInpaint, isInpaintMode, isVideo, selectedProjectId, handleEnterInpaintMode]);
+  }, [autoEnterInpaint, isInpaintMode, isMagicEditMode, isVideo, selectedProjectId, handleEnterMagicEditMode]);
+
+  // Unified edit mode - merging inpaint and magic edit
+  const isSpecialEditMode = isInpaintMode || isMagicEditMode;
+  
+  // Debug logging for state changes
+  React.useEffect(() => {
+    console.log('[MediaLightbox] 🔄 State changed');
+    console.log('  - isInpaintMode:', isInpaintMode);
+    console.log('  - isMagicEditMode:', isMagicEditMode);
+    console.log('  - isSpecialEditMode:', isSpecialEditMode);
+    console.log('  - brushStrokesCount:', brushStrokes.length);
+  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, brushStrokes.length]);
+  
+  // Unified generate handler - routes based on brush strokes
+  const handleUnifiedGenerate = async () => {
+    if (!selectedProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+    
+    const prompt = inpaintPrompt.trim();
+    if (!prompt) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+    
+    // Route based on whether there are brush strokes
+    if (brushStrokes.length > 0) {
+      // Has brush strokes -> inpaint
+      console.log('[MediaLightbox] Routing to inpaint (has brush strokes)');
+      await handleGenerateInpaint();
+    } else {
+      // No brush strokes -> magic edit
+      console.log('[MediaLightbox] Routing to magic edit (no brush strokes)');
+      setIsCreatingMagicEditTasks(true);
+      setMagicEditTasksCreated(false);
+      
+      try {
+        const batchParams = {
+          project_id: selectedProjectId,
+          prompt,
+          image_url: sourceUrlForTasks,
+          numImages: inpaintNumGenerations,
+          negative_prompt: "",
+          resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
+          seed: 11111,
+          shot_id: currentShotId || undefined,
+          tool_type: toolTypeOverride,
+          loras: [],
+        };
+        
+        console.log('[MediaLightbox] Creating magic edit tasks:', batchParams);
+        const results = await createBatchMagicEditTasks(batchParams);
+        console.log(`[MediaLightbox] Created ${results.length} magic edit tasks`);
+        
+        setMagicEditTasksCreated(true);
+        setTimeout(() => setMagicEditTasksCreated(false), 2000);
+        toast.success(`Created ${results.length} magic edit tasks`);
+      } catch (error) {
+        console.error('[MediaLightbox] Error creating magic edit tasks:', error);
+        toast.error('Failed to create magic edit tasks');
+      } finally {
+        setIsCreatingMagicEditTasks(false);
+      }
+    }
+  };
+
+  // Unified special mode check - both inpaint and magic edit use the same layout
+  const isUnifiedEditMode = isInpaintMode || isMagicEditMode;
+  // Show sidebar on tablet/larger for: task details, special edit modes, OR videos (always on iPad)
+  const shouldShowSidePanel = (showTaskDetails && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
+  
+  // Debug layout
+  React.useEffect(() => {
+    if (isSpecialEditMode) {
+      console.log('[TaskDetailsSidebar] 🎨 Special edit mode layout:', {
+        isInpaintMode,
+        isMagicEditMode,
+        isSpecialEditMode,
+        isTabletOrLarger,
+        shouldShowSidePanel,
+        windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'unknown'
+      });
+    }
+  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, isTabletOrLarger, shouldShowSidePanel]);
 
   // Generation name hook
   const generationNameHook = useGenerationName({ media, selectedProjectId });
@@ -529,7 +663,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       >
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay 
-            className="fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            className={cn(
+              "fixed inset-0 z-[100000] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+              // Disable animations on mobile to prevent blink during zoom/fade
+              isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+              "p-0 border-none shadow-none",
+              // Layout: Full screen for special modes on tablet+, otherwise centered
+              shouldShowSidePanel
+                ? "left-0 top-0 w-full h-full" // Full screen layout for side panel modes
+                : isMobile 
+                  ? "inset-0 w-full h-full" // Full screen on mobile
+                  : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+            )}
             onPointerDown={(e) => {
               // Track where the pointer down started
               pointerDownTargetRef.current = e.target;
@@ -603,62 +748,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               pointerDownTargetRef.current = null;
             }}
             onTouchStart={(e) => {
-              // Check if a higher z-index dialog is open - if so, don't block events
-              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
-              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
-                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
-                return zIndex > 100000;
-              });
-              
-              if (hasHigherZIndexDialog) {
-                return; // Let the higher dialog handle the event
+              // Allow touch events on canvas when in inpaint mode
+              const target = e.target as HTMLElement;
+              if (isInpaintMode && target.tagName === 'CANVAS') {
+                console.log('[InpaintPaint] 🎨 Allowing touch on canvas');
+                return; // Don't stop propagation for canvas
               }
-              
-              // Block touch events on mobile
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
-              }
+              // Block touch events from bubbling through dialog content
+              if (isMobile) e.stopPropagation();
             }}
             onTouchMove={(e) => {
-              // Check if a higher z-index dialog is open - if so, don't block events
-              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
-              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
-                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
-                return zIndex > 100000;
-              });
-              
-              if (hasHigherZIndexDialog) {
-                return; // Let the higher dialog handle the event
+              // Allow touch events on canvas when in inpaint mode
+              const target = e.target as HTMLElement;
+              if (isInpaintMode && target.tagName === 'CANVAS') {
+                console.log('[InpaintPaint] 🖌️ Allowing touch move on canvas');
+                return; // Don't stop propagation for canvas
               }
-              
-              // Block touch move events on mobile
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
-              }
+              // Block touch move events from bubbling through dialog content
+              if (isMobile) e.stopPropagation();
             }}
             onTouchEnd={(e) => {
-              // Check if a higher z-index dialog is open - if so, don't block events
-              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
-              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
-                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
-                return zIndex > 100000;
-              });
-              
-              if (hasHigherZIndexDialog) {
-                return; // Let the higher dialog handle the event
+              // Allow touch events on canvas when in inpaint mode
+              const target = e.target as HTMLElement;
+              if (isInpaintMode && target.tagName === 'CANVAS') {
+                console.log('[InpaintPaint] 🛑 Allowing touch end on canvas');
+                return; // Don't stop propagation for canvas
               }
-              
-              // Block touch end events on mobile and close lightbox
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
-              }
-              onClose();
+              // Block touch end events from bubbling through dialog content
+              if (isMobile) e.stopPropagation();
             }}
             onTouchCancel={(e) => {
               // Check if a higher z-index dialog is open - if so, don't block events
@@ -717,80 +834,92 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onTouchStart={(e) => {
-              // Block touch events from bubbling through dialog content
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
+              // Allow touch events on canvas when in inpaint mode
+              const target = e.target as HTMLElement;
+              if (isInpaintMode && target.tagName === 'CANVAS') {
+                console.log('[InpaintPaint] 🎨 Allowing touch on canvas');
+                return; // Don't stop propagation for canvas
               }
+              // Block touch events from bubbling through dialog content
+              if (isMobile) e.stopPropagation();
             }}
             onTouchMove={(e) => {
-              // Block touch move events from bubbling through dialog content
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
+              // Allow touch events on canvas when in inpaint mode
+              const target = e.target as HTMLElement;
+              if (isInpaintMode && target.tagName === 'CANVAS') {
+                console.log('[InpaintPaint] 🖌️ Allowing touch move on canvas');
+                return; // Don't stop propagation for canvas
               }
+              // Block touch move events from bubbling through dialog content
+              if (isMobile) e.stopPropagation();
             }}
             onTouchEnd={(e) => {
-              // Block touch end events from bubbling through dialog content
-              e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
+              // Allow touch events on canvas when in inpaint mode
+              const target = e.target as HTMLElement;
+              if (isInpaintMode && target.tagName === 'CANVAS') {
+                console.log('[InpaintPaint] 🛑 Allowing touch end on canvas');
+                return; // Don't stop propagation for canvas
               }
+              // Block touch end events from bubbling through dialog content
+              if (isMobile) e.stopPropagation();
             }}
             className={cn(
               "fixed z-[100000]",
               // Disable animations on mobile to prevent blink during zoom/fade
               isMobile ? "" : "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
               "p-0 border-none bg-transparent shadow-none",
-              (showTaskDetails && !isMobile) || (isInpaintMode && isTabletOrLarger)
-                ? "left-0 top-0 w-full h-full" // Full screen layout for desktop with task details OR inpaint mode on tablet+
+              // Layout: Full screen for special modes on tablet+, otherwise centered
+              shouldShowSidePanel
+                ? "left-0 top-0 w-full h-full" // Full screen layout for side panel modes
                 : isMobile 
-                  ? "left-0 top-0 w-full h-full" // Mobile: full screen
+                  ? "inset-0 w-full h-full" // Mobile: full screen
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
             onPointerDownOutside={(event) => {
-              // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
-              // Always stop propagation and default so the gesture does not reach elements behind
-              event.preventDefault();
-              event.stopPropagation();
-              
-              // Extra mobile protection: block all event propagation
-              if (typeof event.stopImmediatePropagation === 'function') {
-                event.stopImmediatePropagation();
-              }
+              if (isInpaintMode) {
+                // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
+                // Always stop propagation and default so the gesture does not reach elements behind
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Extra mobile protection: block all event propagation
+                if (typeof event.stopImmediatePropagation === 'function') {
+                  event.stopImmediatePropagation();
+                }
 
-              if (showTaskDetails && !isMobile) {
-                // Desktop with task details: only close if clicking on the overlay background
+                if (shouldShowSidePanel) {
+                  // Tablet/Desktop with side panel: only close if clicking on the panel or buttons
+                  const target = event.target as Element;
+                  if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
+                    return;
+                  }
+                }
+
+                // Don't close if clicking inside Radix portals (Select, Popover, DropdownMenu)
                 const target = event.target as Element;
-                if (target.closest('[data-task-details-panel]') || target.closest('[role="button"]')) {
+                if (target.closest('[data-radix-select-content]') || 
+                    target.closest('[data-radix-select-viewport]') ||
+                    target.closest('[data-radix-select-item]') ||
+                    target.closest('[data-radix-popover-content]') || 
+                    target.closest('[data-radix-dropdown-menu-content]')) {
                   return;
                 }
-              }
 
-              // Don't close if clicking inside Radix portals (Select, Popover, DropdownMenu)
-              const target = event.target as Element;
-              if (target.closest('[data-radix-select-content]') || 
-                  target.closest('[data-radix-select-viewport]') ||
-                  target.closest('[data-radix-select-item]') ||
-                  target.closest('[data-radix-popover-content]') || 
-                  target.closest('[data-radix-dropdown-menu-content]')) {
-                return;
-              }
+                // Don't close if Select is open
+                if (isSelectOpen) {
+                  return;
+                }
 
-              // Don't close if Select is open
-              if (isSelectOpen) {
-                return;
+                // Don't close if clicking on ShotSelector trigger or content (additional safety)
+                if (target.closest('[data-radix-select-trigger]') || target.closest('[data-radix-select-content]')) {
+                  return;
+                }
+                
+                // Use setTimeout to ensure the event is fully blocked before closing
+                setTimeout(() => {
+                  onClose();
+                }, 0);
               }
-
-              // Don't close if clicking on ShotSelector trigger or content (additional safety)
-              if (target.closest('[data-radix-select-trigger]') || target.closest('[data-radix-select-content]')) {
-                return;
-              }
-              
-              // Use setTimeout to ensure the event is fully blocked before closing
-              setTimeout(() => {
-                onClose();
-              }, 0);
             }}
           >
             {/* Accessibility: Hidden dialog title for screen readers */}
@@ -801,8 +930,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               View and interact with {media.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.
             </DialogPrimitive.Description>
             
-            {(showTaskDetails && !isMobile) || (isInpaintMode && isTabletOrLarger) ? (
-              // Desktop/Tablet layout with task details OR inpaint mode - side by side
+            {shouldShowSidePanel ? (
+              // Tablet/Desktop layout with side panel (task details, inpaint, or magic edit)
               <div 
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
@@ -826,12 +955,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   }}
                 >
                   {/* Navigation Controls - Left Arrow */}
-                  {showNavigation && !readOnly && onPrevious && hasPrevious && !isInpaintMode && (
+                  {showNavigation && !readOnly && onPrevious && hasPrevious && (
                     <Button
                       variant="secondary"
                       size="lg"
                       onClick={onPrevious}
-                      className="bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute left-4 top-1/2 -translate-y-1/2"
+                      className="bg-black/50 hover:bg-black/70 text-white z-[80] h-10 w-10 sm:h-12 sm:w-12 absolute left-4 top-1/2 -translate-y-1/2"
                     >
                       <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
                     </Button>
@@ -893,7 +1022,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         />
                         
                         {/* Canvas overlay for inpainting */}
-                        {isInpaintMode && (
+                        {(() => {
+                          console.log('[MediaLightbox] 🖼️ Canvas render check - Desktop');
+                          console.log('  - isInpaintMode:', isInpaintMode);
+                          console.log('  - isMagicEditMode:', isMagicEditMode);
+                          console.log('  - isSpecialEditMode:', isSpecialEditMode);
+                          console.log('  - hasDisplayCanvasRef:', !!displayCanvasRef);
+                          console.log('  - hasDisplayCanvas:', !!displayCanvasRef?.current);
+                          console.log('  - WILL RENDER CANVAS:', isInpaintMode);
+                          return isInpaintMode;
+                        })() && (
                           <>
                             <canvas
                               ref={displayCanvasRef}
@@ -944,44 +1082,33 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
 
 
-                    {/* Top Left Controls - Magic Edit, Inpaint, Upscale */}
-                    <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
-                      {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <MagicEditLauncher
-                                imageUrl={sourceUrlForTasks}
-                                imageDimensions={imageDimensions}
-                                toolTypeOverride={toolTypeOverride}
-                                zIndexOverride={100100}
-                                shotGenerationId={media.shotImageEntryId}
-                              />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Edit with text</TooltipContent>
-                        </Tooltip>
-                      )}
+                    {/* Top Left Controls - Edit Mode Buttons */}
+                    <div className={cn(
+                      "absolute left-4 z-[70]",
+                      inpaintPanelPosition === 'top' ? 'top-4' : 'bottom-4'
+                    )}>
+                      <div className="flex items-center space-x-2">
+                        {!isSpecialEditMode && (
+                        <>
+                          {/* Unified Edit Button */}
+                          {!isVideo && !readOnly && selectedProjectId && isCloudMode && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={handleEnterMagicEditMode}
+                                  className="bg-black/50 hover:bg-black/70 text-white"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Edit image</TooltipContent>
+                            </Tooltip>
+                          )}
 
-                      {/* Inpaint Button - Desktop Task Details View (hidden in readOnly, only shown in cloud mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleEnterInpaintMode}
-                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                            >
-                              <Paintbrush className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Inpaint image</TooltipContent>
-                        </Tooltip>
-                      )}
-
-                      {/* Upscale Button - Desktop Task Details View (hidden in readOnly, only shown in cloud mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
+                          {/* Upscale Button */}
+                          {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span>
@@ -1011,32 +1138,141 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
                           </TooltipContent>
                         </Tooltip>
+                          )}
+                        </>
+                      )}
+                      </div>
+                      
+                      {/* Compact Edit Controls - Always shown in special edit mode */}
+                      {isSpecialEditMode && !isMobile && (
+                        <div className={cn(
+                          "relative",
+                          inpaintPanelPosition === 'top' ? 'mt-2' : 'mb-2'
+                        )}>
+                          {/* Position Toggle Button - at top when panel is at bottom */}
+                          {inpaintPanelPosition === 'bottom' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => setInpaintPanelPosition('top')}
+                                  className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-t-md flex items-center justify-center transition-colors"
+                                >
+                                  <ArrowUp className="h-3 w-3 mt-0.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Move controls to top</TooltipContent>
+                            </Tooltip>
+                          )}
+                          
+                          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-40">
+                            {/* Brush Size Slider */}
+                            <div className="space-y-0.5">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-white">Size</label>
+                                <span className="text-xs text-white/70">{brushSize}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={5}
+                                max={100}
+                                value={brushSize}
+                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                            </div>
+                            
+                            {/* Erase Toggle */}
+                            <Button
+                              variant={isEraseMode ? "default" : "secondary"}
+                              size="sm"
+                              onClick={() => setIsEraseMode(!isEraseMode)}
+                              className={cn(
+                                "w-full text-xs h-7",
+                                isEraseMode ? "bg-purple-600 hover:bg-purple-700" : "bg-white/20 hover:bg-white/30 text-white"
+                              )}
+                            >
+                              <Eraser className="h-3 w-3 mr-1" />
+                              {isEraseMode ? 'Erase' : 'Paint'}
+                            </Button>
+                            
+                            {/* Undo | Clear */}
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleUndo}
+                                disabled={brushStrokes.length === 0}
+                                className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
+                              >
+                                <Undo2 className="h-3 w-3" />
+                              </Button>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleClearMask}
+                                disabled={brushStrokes.length === 0}
+                                className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {/* Position Toggle Button - at bottom when panel is at top */}
+                          {inpaintPanelPosition === 'top' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => setInpaintPanelPosition('bottom')}
+                                  className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-b-md flex items-center justify-center transition-colors"
+                                >
+                                  <ArrowDown className="h-3 w-3 -mt-0.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">Move controls to bottom</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
                       )}
                     </div>
 
-                    {/* Bottom Left Controls - Flip Horizontally */}
+                    {/* Bottom Left Controls - Image Edit Tools */}
                     <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
-                      {!isVideo && showImageEditTools && !readOnly && !isInpaintMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
+                      {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={handleFlip}
+                                className="bg-black/50 hover:bg-black/70 text-white"
+                              >
+                                <FlipHorizontal className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
+                          </Tooltip>
+                          {hasChanges && (
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={handleFlip}
-                              className="bg-black/50 hover:bg-black/70 text-white"
+                              onClick={() => handleSave(effectiveImageUrl)}
+                              disabled={isSaving}
+                              className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
                             >
-                              <FlipHorizontal className="h-4 w-4" />
+                              <Save className="h-4 w-4" />
                             </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-                        </Tooltip>
+                          )}
+                        </>
                       )}
                     </div>
 
                     {/* Bottom Right Controls - Star, Add to References */}
                     <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
-                      {/* Star Button (hidden in readOnly and inpaint mode) */}
-                      {!readOnly && !isInpaintMode && (
+                      {/* Star Button (hidden in readOnly and special edit modes) */}
+                      {!readOnly && !isSpecialEditMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -1048,8 +1284,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       )}
 
-                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly and inpaint mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
+                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly and special edit modes) */}
+                      {!readOnly && !isVideo && selectedProjectId && !isSpecialEditMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -1079,10 +1315,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                     </div>
 
-                    {/* Top Right Controls - Save, Download */}
-                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
+                    {/* Top Right Controls - Close (in special mode), Save, Download */}
+                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
+                      
+                      {/* Close Button - Only shown in special edit modes */}
+                      {isSpecialEditMode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={onClose}
+                              className="bg-black/50 hover:bg-black/70 text-white"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Close</TooltipContent>
+                        </Tooltip>
+                      )}
 
-                      {!isVideo && showImageEditTools && !readOnly && !isInpaintMode && (
+                      {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
                         <>
                           {hasChanges && (
                             <Tooltip>
@@ -1103,7 +1356,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </>
                       )}
 
-                      {showDownload && !readOnly && !isInpaintMode && (
+                      {showDownload && !readOnly && !isSpecialEditMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -1118,8 +1371,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                     </div>
 
-                    {/* Bottom Workflow Controls */}
-                    {(onAddToShot || onDelete || onApplySettings) && !isInpaintMode && (
+                    {/* Bottom Workflow Controls (hidden in special edit modes) */}
+                    {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
                       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
@@ -1243,106 +1496,41 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       variant="secondary"
                       size="lg"
                       onClick={onNext}
-                      className="bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10 sm:h-12 sm:w-12 absolute right-4 top-1/2 -translate-y-1/2"
+                      className="bg-black/50 hover:bg-black/70 text-white z-[80] h-10 w-10 sm:h-12 sm:w-12 absolute right-4 top-1/2 -translate-y-1/2"
                     >
                       <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                     </Button>
                   )}
                 </div>
 
-                {/* Task Details / Inpaint Panel - Right side (40% width) */}
+                {/* Task Details / Inpaint / Magic Edit Panel - Right side (40% width) */}
                 <div 
                   data-task-details-panel
                   className={cn(
                     "bg-background border-l border-border overflow-y-auto",
-                    isInpaintMode && "flex items-center justify-center" // Only center in inpaint mode
+                    isSpecialEditMode && "flex items-center justify-center" // Center in special edit modes
                   )}
                   style={{ width: '40%' }}
                 >
-                  {isInpaintMode ? (
+                  {isSpecialEditMode ? (
                     // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
                     <div className="p-6 space-y-4 w-full">
                       <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-2xl font-light">Inpaint Settings</h2>
+                        <h2 className="text-2xl font-light">Edit Image</h2>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={handleExitInpaintMode}
+                          onClick={handleExitMagicEditMode}
                           className="hover:bg-accent"
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
                       
-                      {/* Paint/Erase Toggle and Undo */}
-                      <div className="flex items-center gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant={isEraseMode ? "default" : "secondary"}
-                              size="sm"
-                              onClick={() => setIsEraseMode(!isEraseMode)}
-                              className={cn(
-                                "flex-1",
-                                isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
-                              )}
-                            >
-                              <Eraser className="h-4 w-4 mr-2" />
-                              {isEraseMode ? 'Remove Paint Mode' : 'Paint Mode'}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                            {isEraseMode ? 'Switch to paint mode' : 'Switch to remove paint mode'}
-                          </TooltipContent>
-                        </Tooltip>
-                        
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleUndo}
-                              disabled={brushStrokes.length === 0}
-                            >
-                              <Undo2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Undo last stroke</TooltipContent>
-                        </Tooltip>
-                      </div>
-
-                      {/* Clear Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleClearMask}
-                        disabled={brushStrokes.length === 0}
-                        className="w-full"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Clear All Strokes
-                      </Button>
-                      
-                      <div className="border-t border-border pt-4 space-y-4">
-                        {/* Brush Size Slider */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">Brush Size</label>
-                            <span className="text-sm text-muted-foreground">{brushSize}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min={5}
-                            max={100}
-                            value={brushSize}
-                            onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                          />
-                        </div>
-                      
+                      <div className="space-y-4">
                         {/* Prompt Field */}
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Inpaint Prompt</label>
+                          <label className="text-sm font-medium">Prompt</label>
                           <textarea
                             value={inpaintPrompt}
                             onChange={(e) => setInpaintPrompt(e.target.value)}
@@ -1369,34 +1557,49 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <p className="text-xs text-muted-foreground">Generate 1-16 variations</p>
                         </div>
                         
-                        {/* Generate Button */}
+                        {/* Generate Button - Unified */}
                         <Button
                           variant="default"
                           size="default"
-                          onClick={handleGenerateInpaint}
-                          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
+                          onClick={handleUnifiedGenerate}
+                          disabled={!inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess || isCreatingMagicEditTasks || magicEditTasksCreated}
                           className={cn(
                             "w-full",
-                            inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
+                            (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
                           )}
                         >
-                          {isGeneratingInpaint ? (
+                          {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                               Generating...
                             </>
-                          ) : inpaintGenerateSuccess ? (
+                          ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
                             <>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Success!
                             </>
-                          ) : (
+                          ) : brushStrokes.length > 0 ? (
                             <>
                               <Paintbrush className="h-4 w-4 mr-2" />
-                              Generate Inpaint
+                              Generate inpainted image
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Generate text edit
                             </>
                           )}
                         </Button>
+                        
+                        {/* Clear Inpainting Mask CTA */}
+                        {brushStrokes.length > 0 && (
+                          <button
+                            onClick={handleClearMask}
+                            className="text-sm text-muted-foreground hover:text-foreground underline cursor-pointer text-center w-full"
+                          >
+                            Clear inpainting mask
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : taskDetailsData ? (
@@ -1555,8 +1758,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
                 </div>
               </div>
-            ) : showTaskDetails && isMobile ? (
-              // Mobile layout with task details - stacked
+            ) : (showTaskDetails || isSpecialEditMode) && isMobile ? (
+              // Mobile layout with task details or special edit modes - stacked
               <div className="w-full h-full flex flex-col bg-black/90">
                 {/* Media section - Top (60% height) */}
                 <div 
@@ -1577,7 +1780,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         className="max-w-full max-h-full shadow-wes border border-border/20"
                       />
                     ) : (
-                      <div className="relative">
+                      <div 
+                        ref={imageContainerRef} 
+                        className="relative"
+                        style={{ touchAction: 'none' }}
+                        onTouchMove={(e) => {
+                          if (isInpaintMode) {
+                            e.preventDefault();
+                          }
+                        }}
+                      >
                         <img 
                           src={effectiveImageUrl} 
                           alt="Media content"
@@ -1585,6 +1797,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             isFlippedHorizontally ? 'scale-x-[-1]' : ''
                           } ${
                             isSaving ? 'opacity-30' : 'opacity-100'
+                          } ${
+                            isInpaintMode ? 'pointer-events-none' : ''
                           }`}
                           style={{ 
                             maxHeight: '50vh',
@@ -1613,48 +1827,237 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           ref={canvasRef}
                           className="hidden"
                         />
+                        
+                        {/* Canvas overlay for inpainting */}
+                        {(() => {
+                          console.log('[MobilePaintDebug] 🖼️ Canvas render check - Mobile Stacked Layout', {
+                            isInpaintMode,
+                            isMagicEditMode,
+                            isSpecialEditMode,
+                            hasDisplayCanvasRef: !!displayCanvasRef,
+                            hasDisplayCanvas: !!displayCanvasRef?.current,
+                            shouldRenderCanvas: isInpaintMode
+                          });
+                          return isInpaintMode;
+                        })() && (
+                          <>
+                            <canvas
+                              ref={displayCanvasRef}
+                              className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
+                              style={{
+                                touchAction: 'none',
+                                zIndex: 50,
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none'
+                              }}
+                              onPointerDown={(e) => {
+                                console.log('[MobilePaintDebug] 🎨 Canvas onPointerDown - Stacked', {
+                                  clientX: e.clientX,
+                                  clientY: e.clientY,
+                                  canvasWidth: displayCanvasRef.current?.width,
+                                  canvasHeight: displayCanvasRef.current?.height,
+                                  isInpaintMode
+                                });
+                                handlePointerDown(e);
+                              }}
+                              onPointerMove={(e) => {
+                                console.log('[MobilePaintDebug] 🖌️ Canvas onPointerMove - Stacked');
+                                handlePointerMove(e);
+                              }}
+                              onPointerUp={(e) => {
+                                console.log('[MobilePaintDebug] 🛑 Canvas onPointerUp - Stacked');
+                                handlePointerUp(e);
+                              }}
+                              onTouchStart={(e) => {
+                                console.log('[MobilePaintDebug] 🎨 Canvas onTouchStart (fallback) - Stacked');
+                                e.preventDefault();
+                                // Convert touch to pointer-like event
+                                if (e.touches.length > 0) {
+                                  const touch = e.touches[0];
+                                  const canvas = displayCanvasRef.current;
+                                  if (canvas) {
+                                    const rect = canvas.getBoundingClientRect();
+                                    const syntheticEvent = {
+                                      clientX: touch.clientX,
+                                      clientY: touch.clientY,
+                                      pointerId: touch.identifier,
+                                      pointerType: 'touch',
+                                      target: canvas,
+                                      preventDefault: () => {},
+                                      stopPropagation: () => {}
+                                    } as any;
+                                    handlePointerDown(syntheticEvent);
+                                  }
+                                }
+                              }}
+                              onTouchMove={(e) => {
+                                console.log('[MobilePaintDebug] 🖌️ Canvas onTouchMove (fallback) - Stacked');
+                                e.preventDefault();
+                                if (e.touches.length > 0) {
+                                  const touch = e.touches[0];
+                                  const canvas = displayCanvasRef.current;
+                                  if (canvas) {
+                                    const syntheticEvent = {
+                                      clientX: touch.clientX,
+                                      clientY: touch.clientY,
+                                      pointerId: touch.identifier,
+                                      pointerType: 'touch',
+                                      target: canvas,
+                                      preventDefault: () => {},
+                                      stopPropagation: () => {}
+                                    } as any;
+                                    handlePointerMove(syntheticEvent);
+                                  }
+                                }
+                              }}
+                              onTouchEnd={(e) => {
+                                console.log('[MobilePaintDebug] 🛑 Canvas onTouchEnd (fallback) - Stacked');
+                                e.preventDefault();
+                                handlePointerUp();
+                              }}
+                            />
+                            <canvas
+                              ref={maskCanvasRef}
+                              className="hidden"
+                            />
+                          </>
+                        )}
                       </div>
                     )}
 
-                    {/* Mobile controls - same as existing mobile controls */}
-                    <div className="absolute top-2 right-2 flex items-center space-x-1 z-10">
-                      {!readOnly && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={wrappedHandleToggleStar}
-                          disabled={toggleStarMutation.isPending}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                        </Button>
-                      )}
+                    {/* Mobile Inpaint Controls - Top/Bottom positioned (shown in special edit modes) */}
+                    {isSpecialEditMode && (
+                      <div className={cn(
+                        "absolute left-2 z-[70]",
+                        inpaintPanelPosition === 'top' ? 'top-2' : 'bottom-2'
+                      )}>
+                        {/* Position Toggle Button - at top when panel is at bottom */}
+                        {inpaintPanelPosition === 'bottom' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => setInpaintPanelPosition('top')}
+                                className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-t-md flex items-center justify-center transition-colors"
+                              >
+                                <ArrowUp className="h-3 w-3 mt-0.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="z-[100001]">Move controls to top</TooltipContent>
+                          </Tooltip>
+                        )}
+                        
+                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-32">
+                          {/* Brush Size Slider */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-medium text-white">Size</label>
+                              <span className="text-xs text-white/70">{brushSize}px</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={5}
+                              max={100}
+                              value={brushSize}
+                              onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                              className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                          </div>
+                          
+                          {/* Erase Toggle */}
+                          <Button
+                            variant={isEraseMode ? "default" : "secondary"}
+                            size="sm"
+                            onClick={() => setIsEraseMode(!isEraseMode)}
+                            className={cn(
+                              "w-full text-xs h-6",
+                              isEraseMode ? "bg-purple-600 hover:bg-purple-700" : "bg-white/20 hover:bg-white/30 text-white"
+                            )}
+                          >
+                            <Eraser className="h-3 w-3 mr-1" />
+                            {isEraseMode ? 'Erase' : 'Paint'}
+                          </Button>
+                          
+                          {/* Undo | Clear */}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleUndo}
+                              disabled={brushStrokes.length === 0}
+                              className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-6"
+                            >
+                              <Undo2 className="h-3 w-3" />
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleClearMask}
+                              disabled={brushStrokes.length === 0}
+                              className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-6"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {/* Position Toggle Button - at bottom when panel is at top */}
+                        {inpaintPanelPosition === 'top' && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => setInpaintPanelPosition('bottom')}
+                                className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-b-md flex items-center justify-center transition-colors"
+                              >
+                                <ArrowDown className="h-3 w-3 -mt-0.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="z-[100001]">Move controls to bottom</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    )}
 
-                      {/* Add to References Button - Mobile Task Details View (hidden in readOnly and inpaint mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleAddToReferences}
-                          disabled={isAddingToReferences || addToReferencesSuccess}
-                          className={`transition-colors ${
-                            addToReferencesSuccess 
-                              ? 'bg-green-600/80 hover:bg-green-600 text-white' 
-                              : 'bg-black/50 hover:bg-black/70 text-white'
-                          }`}
-                        >
-                          {isAddingToReferences ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : addToReferencesSuccess ? (
-                            <CheckCircle className="h-4 w-4" />
-                          ) : (
-                            <ImagePlus className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
+                    {/* Mobile controls - same as existing mobile controls (hidden in special edit modes) */}
+                    {!isSpecialEditMode && (
+                      <div className="absolute top-2 right-2 flex items-center space-x-1 z-10">
+                        {!readOnly && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={wrappedHandleToggleStar}
+                            disabled={toggleStarMutation.isPending}
+                            className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                          >
+                            <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+                          </Button>
+                        )}
 
-                      {/* Upscale Button - Mobile Task Details View (hidden in readOnly, only shown in cloud mode) */}
-                      {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
+                        {/* Add to References Button - Mobile Task Details View (hidden in readOnly and special edit modes) */}
+                        {!readOnly && !isVideo && selectedProjectId && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleAddToReferences}
+                            disabled={isAddingToReferences || addToReferencesSuccess}
+                            className={`transition-colors ${
+                              addToReferencesSuccess 
+                                ? 'bg-green-600/80 hover:bg-green-600 text-white' 
+                                : 'bg-black/50 hover:bg-black/70 text-white'
+                            }`}
+                          >
+                            {isAddingToReferences ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : addToReferencesSuccess ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <ImagePlus className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Upscale Button - Mobile Task Details View (hidden in readOnly, only shown in cloud mode) */}
+                        {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span>
@@ -1684,8 +2087,26 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
                           </TooltipContent>
                         </Tooltip>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Special Edit Mode Controls - Mobile */}
+                    {isSpecialEditMode && !readOnly && (
+                      <>
+                        {/* Top Right - Close Button */}
+                        <div className="absolute top-2 right-2 z-10">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={onClose}
+                            className="bg-black/50 hover:bg-black/70 text-white"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
 
                     {/* Mobile navigation */}
                     {showNavigation && !readOnly && onPrevious && hasPrevious && (
@@ -1693,7 +2114,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         variant="secondary"
                         size="lg"
                         onClick={onPrevious}
-                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
                       >
                         <ChevronLeft className="h-6 w-6" />
                       </Button>
@@ -1704,7 +2125,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         variant="secondary"
                         size="lg"
                         onClick={onNext}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
                       >
                         <ChevronRight className="h-6 w-6" />
                       </Button>
@@ -1712,92 +2133,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   </div>
                 </div>
 
-                {/* Task Details Panel - Bottom (40% height) */}
+                {/* Task Details / Inpaint / Magic Edit Panel - Bottom (40% height) */}
                 <div 
                   data-task-details-panel
                   className={cn(
                     "bg-background border-t border-border overflow-y-auto",
-                    isInpaintMode && "flex items-center justify-center" // Only center in inpaint mode
+                    isSpecialEditMode && "flex items-center justify-center" // Center in special edit modes
                   )}
                   style={{ height: '40%' }}
                 >
-                  {isInpaintMode ? (
-                    // Inpaint Controls Panel - Mobile
+                  {isSpecialEditMode ? (
+                    // Inpaint Prompt & Generate - Mobile
                     <div className="p-4 space-y-3 w-full">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-lg font-light">Inpaint Settings</h2>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleExitInpaintMode}
-                          className="hover:bg-accent"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      
-                      {/* Paint/Erase Toggle and Undo */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant={isEraseMode ? "default" : "secondary"}
-                          size="sm"
-                          onClick={() => setIsEraseMode(!isEraseMode)}
-                          className={cn(
-                            "flex-1",
-                            isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
-                          )}
-                        >
-                          <Eraser className="h-3 w-3 mr-1" />
-                          {isEraseMode ? 'Remove Paint Mode' : 'Paint Mode'}
-                        </Button>
-                        
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleUndo}
-                          disabled={brushStrokes.length === 0}
-                        >
-                          <Undo2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-
-                      {/* Clear Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleClearMask}
-                        disabled={brushStrokes.length === 0}
-                        className="w-full"
-                      >
-                        <X className="h-3 w-3 mr-1" />
-                        Clear All
-                      </Button>
-                      
-                      <div className="border-t border-border pt-3 space-y-3">
-                        {/* Brush Size Slider - Mobile */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-medium">Brush Size</label>
-                            <span className="text-xs text-muted-foreground">{brushSize}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min={5}
-                            max={100}
-                            value={brushSize}
-                            onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                          />
-                        </div>
-                      
+                      <div className="space-y-3">
                         {/* Prompt Field */}
                         <div className="space-y-1">
-                          <label className="text-xs font-medium">Inpaint Prompt</label>
+                          <label className="text-xs font-medium">Prompt</label>
                           <textarea
                             value={inpaintPrompt}
                             onChange={(e) => setInpaintPrompt(e.target.value)}
                             placeholder="Describe what to generate..."
-                            className="w-full min-h-[60px] bg-background border border-input rounded-md px-2 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                            className="w-full min-h-[60px] bg-background border border-input rounded-md px-2 py-1.5 text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                             rows={3}
                           />
                         </div>
@@ -1819,31 +2175,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <p className="text-xs text-muted-foreground">1-16 variations</p>
                         </div>
                         
-                        {/* Generate Button */}
+                        {/* Generate Button - Unified */}
                         <Button
                           variant="default"
                           size="sm"
-                          onClick={handleGenerateInpaint}
-                          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
+                          onClick={handleUnifiedGenerate}
+                          disabled={!inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess || isCreatingMagicEditTasks || magicEditTasksCreated}
                           className={cn(
                             "w-full",
-                            inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
+                            (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
                           )}
                         >
-                          {isGeneratingInpaint ? (
+                          {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
                             <>
                               <Loader2 className="h-3 w-3 mr-2 animate-spin" />
                               Generating...
                             </>
-                          ) : inpaintGenerateSuccess ? (
+                          ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
                             <>
                               <CheckCircle className="h-3 w-3 mr-2" />
                               Success!
                             </>
-                          ) : (
+                          ) : brushStrokes.length > 0 ? (
                             <>
                               <Paintbrush className="h-3 w-3 mr-2" />
-                              Generate
+                              Generate inpainted image
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-3 w-3 mr-2" />
+                              Generate text edit
                             </>
                           )}
                         </Button>
@@ -2006,7 +2367,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls */}
-                <MediaWrapper onClick={(e) => e.stopPropagation()}>
+                <MediaWrapper 
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(isMobile && isInpaintMode && "pointer-events-auto")}
+                >
                   {/* Media Display - The wrapper now handles centering */}
                 {isVideo ? (
                   <StyledVideoPlayer
@@ -2017,10 +2381,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     autoPlay
                     playsInline
                     preload="auto"
-                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
+                    className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
                   />
                 ) : (
-                  <div ref={imageContainerRef} className="relative flex items-center justify-center w-full h-full">
+                  <div 
+                    ref={imageContainerRef} 
+                    className="relative flex items-center justify-center w-full h-full" 
+                    style={{ touchAction: 'none' }}
+                    onTouchMove={(e) => {
+                      if (isInpaintMode) {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
                     <img 
                       src={effectiveImageUrl} 
                       alt="Media content"
@@ -2028,6 +2401,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         isFlippedHorizontally ? 'scale-x-[-1]' : ''
                       } ${
                         isSaving ? 'opacity-30' : 'opacity-100'
+                      } ${
+                        isInpaintMode ? 'pointer-events-none' : ''
                       }`}
                       style={{ 
                         transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
@@ -2052,33 +2427,97 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <canvas ref={canvasRef} className="hidden" />
                       
                       {/* Canvas overlay for inpainting */}
-                      {isInpaintMode && (
+                      {(() => {
+                        console.log('[MobilePaintDebug] 🖼️ Canvas render check - Mobile', {
+                          isInpaintMode,
+                          isMagicEditMode,
+                          isSpecialEditMode,
+                          hasDisplayCanvasRef: !!displayCanvasRef,
+                          hasDisplayCanvas: !!displayCanvasRef?.current,
+                          shouldRenderCanvas: isInpaintMode
+                        });
+                        return isInpaintMode;
+                      })() && (
                         <>
                           <canvas
                             ref={displayCanvasRef}
-                            className="absolute pointer-events-auto cursor-crosshair"
+                            className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
                             style={{
                               touchAction: 'none',
-                              zIndex: 50
+                              zIndex: 50,
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none'
                             }}
                             onPointerDown={(e) => {
-                              console.log('[InpaintPaint] 🎨 Mobile Canvas onPointerDown', {
+                              console.log('[MobilePaintDebug] 🎨 Canvas onPointerDown', {
                                 clientX: e.clientX,
                                 clientY: e.clientY,
                                 canvasWidth: displayCanvasRef.current?.width,
                                 canvasHeight: displayCanvasRef.current?.height,
-                                isInpaintMode,
-                                hasHandler: !!handlePointerDown
+                                isInpaintMode
                               });
                               handlePointerDown(e);
                             }}
                             onPointerMove={(e) => {
-                              console.log('[InpaintPaint] 🖌️ Mobile Canvas onPointerMove');
+                              console.log('[MobilePaintDebug] 🖌️ Canvas onPointerMove');
                               handlePointerMove(e);
                             }}
                             onPointerUp={(e) => {
-                              console.log('[InpaintPaint] 🛑 Mobile Canvas onPointerUp');
+                              console.log('[MobilePaintDebug] 🛑 Canvas onPointerUp');
                               handlePointerUp(e);
+                            }}
+                            onTouchStart={(e) => {
+                              console.log('[MobilePaintDebug] 🎨 Canvas onTouchStart (fallback)');
+                              e.preventDefault();
+                              // Convert touch to pointer-like event
+                              if (e.touches.length > 0) {
+                                const touch = e.touches[0];
+                                const canvas = displayCanvasRef.current;
+                                if (canvas) {
+                                  const rect = canvas.getBoundingClientRect();
+                                  const syntheticEvent = {
+                                    clientX: touch.clientX,
+                                    clientY: touch.clientY,
+                                    pointerId: touch.identifier,
+                                    pointerType: 'touch',
+                                    target: canvas,
+                                    preventDefault: () => {},
+                                    stopPropagation: () => {}
+                                  } as any;
+                                  handlePointerDown(syntheticEvent);
+                                }
+                              }
+                            }}
+                            onTouchMove={(e) => {
+                              console.log('[MobilePaintDebug] 🖌️ Canvas onTouchMove (fallback)');
+                              e.preventDefault();
+                              if (e.touches.length > 0) {
+                                const touch = e.touches[0];
+                                const canvas = displayCanvasRef.current;
+                                if (canvas) {
+                                  const syntheticEvent = {
+                                    clientX: touch.clientX,
+                                    clientY: touch.clientY,
+                                    pointerId: touch.identifier,
+                                    pointerType: 'touch',
+                                    target: canvas,
+                                    preventDefault: () => {},
+                                    stopPropagation: () => {}
+                                  } as any;
+                                  handlePointerMove(syntheticEvent);
+                                }
+                              }
+                            }}
+                            onTouchEnd={(e) => {
+                              console.log('[MobilePaintDebug] 🛑 Canvas onTouchEnd (fallback)');
+                              e.preventDefault();
+                              const syntheticEvent = {
+                                target: displayCanvasRef.current,
+                                pointerId: 0,
+                                preventDefault: () => {},
+                                stopPropagation: () => {}
+                              } as any;
+                              handlePointerUp(syntheticEvent);
                             }}
                           />
                           <canvas
@@ -2090,39 +2529,116 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   </div>
                 )}
 
-                  {/* Bottom Left Controls - Inpaint and Magic Edit on mobile */}
-                  {!readOnly && !isInpaintMode && (
-                    <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
-                      {/* Inpaint Button */}
-                      {!isVideo && selectedProjectId && isCloudMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleEnterInpaintMode}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Paintbrush className="h-4 w-4" />
-                        </Button>
+                  {/* Bottom Left Controls - Mode Entry Buttons */}
+                  {!readOnly && (
+                    <div className="absolute bottom-4 left-4 z-[70]">
+                      <div className="flex items-center space-x-2">
+                        {(() => {
+                          console.log('[MobilePaintDebug] Edit button visibility check', {
+                            isSpecialEditMode,
+                            isVideo,
+                            selectedProjectId: !!selectedProjectId,
+                            isCloudMode,
+                            shouldShowButton: !isVideo && selectedProjectId && isCloudMode
+                          });
+                          return null;
+                        })()}
+                        {!isSpecialEditMode && (
+                        <>
+                          {/* Unified Edit Button */}
+                          {!isVideo && selectedProjectId && isCloudMode && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleEnterMagicEditMode}
+                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+                              title="Edit image"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
                       )}
+                      </div>
                       
-                      {/* Magic Edit Launcher */}
-                      {!isVideo && showMagicEdit && (
-                        <MagicEditLauncher
-                          imageUrl={effectiveImageUrl}
-                      imageDimensions={imageDimensions}
-                          toolTypeOverride={toolTypeOverride}
-                          zIndexOverride={100100}
-                          shotGenerationId={media.shotImageEntryId}
-                        />
+                      {/* Compact Edit Controls - Above the bottom buttons */}
+                      {isSpecialEditMode && (
+                        <div className="mb-2 bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-40">
+                          {/* Brush Size Slider */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-medium text-white">Size</label>
+                              <span className="text-xs text-white/70">{brushSize}px</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={5}
+                              max={100}
+                              value={brushSize}
+                              onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                              className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            />
+                          </div>
+                          
+                          {/* Erase Toggle */}
+                          <Button
+                            variant={isEraseMode ? "default" : "secondary"}
+                            size="sm"
+                            onClick={() => setIsEraseMode(!isEraseMode)}
+                            className={cn(
+                              "w-full text-xs h-7",
+                              isEraseMode ? "bg-purple-600 hover:bg-purple-700" : "bg-white/20 hover:bg-white/30 text-white"
+                            )}
+                          >
+                            <Eraser className="h-3 w-3 mr-1" />
+                            {isEraseMode ? 'Erase' : 'Paint'}
+                          </Button>
+                          
+                          {/* Undo | Clear */}
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleUndo}
+                              disabled={brushStrokes.length === 0}
+                              className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
+                            >
+                              <Undo2 className="h-3 w-3" />
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleClearMask}
+                              disabled={brushStrokes.length === 0}
+                              className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
 
-                  {/* Top Right Controls - Star, Flip, Save, Download, Delete */}
+                  {/* Top Right Controls - Close (in special mode), Star, Flip, Save, Download, Delete */}
                   {!readOnly && (
-                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
-                      {/* Star Button (hidden in inpaint mode) */}
-                      {!isInpaintMode && (
+                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
+                      
+                      {/* Close Button - Only shown in special edit modes (mobile) */}
+                      {isSpecialEditMode && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={onClose}
+                          className="bg-black/50 hover:bg-black/70 text-white"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {/* Star Button (hidden in special modes) */}
+                      {!isSpecialEditMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -2134,7 +2650,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                       
                       {/* Image Edit Tools: Flip and Save */}
-                      {!isVideo && showImageEditTools && !isInpaintMode && (
+                      {!isVideo && showImageEditTools && !isSpecialEditMode && (
                         <>
                           <Button
                             variant="secondary"
@@ -2160,7 +2676,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
 
                       {/* Download Button */}
-                      {showDownload && !isInpaintMode && (
+                      {showDownload && !isSpecialEditMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -2175,7 +2691,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                       
                       {/* Delete Button */}
-                      {onDelete && !isVideo && !isInpaintMode && (
+                      {onDelete && !isVideo && !isSpecialEditMode && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -2197,7 +2713,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       variant="secondary"
                       size="lg"
                       onClick={onPrevious}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
                     >
                       <ChevronLeft className="h-6 w-6" />
                     </Button>
@@ -2207,7 +2723,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       variant="secondary"
                       size="lg"
                       onClick={onNext}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-12 w-12"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
                     >
                       <ChevronRight className="h-6 w-6" />
                     </Button>
@@ -2216,8 +2732,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
                 </MediaWrapper>
 
-                {/* Workflow Controls - Below Media */}
-                {!readOnly && (
+                {/* Workflow Controls - Below Media (hidden in special edit modes) */}
+                {!readOnly && !isSpecialEditMode && (
                   <div className="w-full" onClick={(e) => e.stopPropagation()}>
                     <WorkflowControls
                       mediaId={media.id}
@@ -2250,39 +2766,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
               </div>
                 )}
-
-                {/* Inpaint Controls */}
-                {isInpaintMode && (
-                  <div className="w-full" onClick={(e) => e.stopPropagation()}>
-                    <InpaintControlsPanel
-                      variant="mobile"
-                      isEraseMode={isEraseMode}
-                      brushStrokes={brushStrokes}
-                      inpaintPrompt={inpaintPrompt}
-                      inpaintNumGenerations={inpaintNumGenerations}
-                      brushSize={brushSize}
-                      isGeneratingInpaint={isGeneratingInpaint}
-                      inpaintGenerateSuccess={inpaintGenerateSuccess}
-                      onSetIsEraseMode={setIsEraseMode}
-                      onUndo={handleUndo}
-                      onClearMask={handleClearMask}
-                      onSetInpaintPrompt={setInpaintPrompt}
-                      onSetInpaintNumGenerations={setInpaintNumGenerations}
-                      onSetBrushSize={setBrushSize}
-                      onGenerateInpaint={handleGenerateInpaint}
-                      onExitInpaintMode={handleExitInpaintMode}
-                    />
-                </div>
-              )}
               </FlexContainer>
             )}
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
-
-      {/* Magic Edit Modal handled by MagicEditLauncher */}
-
-
     </TooltipProvider>
   );
 };

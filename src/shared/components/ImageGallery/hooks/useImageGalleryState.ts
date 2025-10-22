@@ -15,6 +15,8 @@ export interface UseImageGalleryStateReturn {
   // Lightbox state
   activeLightboxMedia: GenerationRow | null;
   setActiveLightboxMedia: (media: GenerationRow | null) => void;
+  autoEnterEditMode: boolean;
+  setAutoEnterEditMode: (value: boolean) => void;
   
   // Task details state
   selectedImageForDetails: GenerationRow | null;
@@ -86,6 +88,7 @@ export const useImageGalleryState = ({
   
   // Lightbox state
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<GenerationRow | null>(null);
+  const [autoEnterEditMode, setAutoEnterEditMode] = useState<boolean>(false);
   
   // Debug logging for lightbox state changes
   useEffect(() => {
@@ -93,9 +96,10 @@ export const useImageGalleryState = ({
       hasMedia: !!activeLightboxMedia,
       mediaId: activeLightboxMedia?.id?.substring(0, 8),
       mediaType: activeLightboxMedia?.type,
+      autoEnterEditMode,
       timestamp: Date.now()
     });
-  }, [activeLightboxMedia]);
+  }, [activeLightboxMedia, autoEnterEditMode]);
   
   // Task details state for mobile modal
   const [selectedImageForDetails, setSelectedImageForDetails] = useState<GenerationRow | null>(null);
@@ -309,6 +313,8 @@ export const useImageGalleryState = ({
     // Lightbox state
     activeLightboxMedia,
     setActiveLightboxMedia,
+    autoEnterEditMode,
+    setAutoEnterEditMode,
     
     // Task details state
     selectedImageForDetails,

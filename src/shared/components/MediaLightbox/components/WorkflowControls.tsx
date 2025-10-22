@@ -8,6 +8,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import ShotSelector from '@/shared/components/ShotSelector';
+import { useState } from 'react';
 
 export interface ShotOption {
   id: string;
@@ -19,8 +20,8 @@ export interface WorkflowControlsProps {
   mediaId: string;
   isVideo: boolean;
   
-  // Mode state
-  isInpaintMode: boolean;
+  // Mode state  
+  isInpaintMode?: boolean; // Optional - for defensive rendering (parent already checks)
   
   // Shot selection
   allShots: ShotOption[];
@@ -28,7 +29,7 @@ export interface WorkflowControlsProps {
   onShotChange?: (shotId: string) => void;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
   isSelectOpen: boolean;
-  setIsSelectOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsSelectOpen: (isOpen: boolean) => void;
   contentRef: React.RefObject<HTMLDivElement>;
   
   // Shot positioning
@@ -95,8 +96,8 @@ export const WorkflowControls: React.FC<WorkflowControlsProps> = ({
   handleDelete,
   isDeleting,
 }) => {
-  // Don't render if no workflow actions available or in inpaint mode
-  if ((! onAddToShot && !onDelete && !onApplySettings) || isInpaintMode) {
+  // Don't render if no workflow actions available, in inpaint mode, or video
+  if ((! onAddToShot && !onDelete && !onApplySettings) || isVideo || isInpaintMode) {
     return null;
   }
 

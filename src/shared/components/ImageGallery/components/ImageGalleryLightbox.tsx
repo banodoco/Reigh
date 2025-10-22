@@ -2,12 +2,13 @@ import React, { useMemo, useEffect } from "react";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { GenerationRow, Shot } from "@/types/shots";
-import { GeneratedImageWithMetadata } from '../ImageGallery';
+import { GeneratedImageWithMetadata } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
 
 export interface ImageGalleryLightboxProps {
   // Lightbox state
   activeLightboxMedia: GenerationRow | null;
+  autoEnterEditMode?: boolean;
   onClose: () => void;
   
   // Navigation
@@ -29,7 +30,7 @@ export interface ImageGalleryLightboxProps {
   simplifiedShotOptions: { id: string; name: string }[];
   selectedShotIdLocal: string;
   onShotChange: (shotId: string) => void;
-  onAddToShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   
   // UI state
@@ -71,6 +72,7 @@ export interface ImageGalleryLightboxProps {
 
 export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   activeLightboxMedia,
+  autoEnterEditMode = false,
   onClose,
   filteredImages,
   isServerPagination,
@@ -113,6 +115,36 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   toolTypeOverride,
   setActiveLightboxIndex,
 }) => {
+  
+  // Extract autoEnterEditMode from media metadata (more reliable than separate state)
+  const effectiveAutoEnterEditMode = React.useMemo(() => {
+    const fromMetadata = activeLightboxMedia?.metadata?.__autoEnterEditMode as boolean | undefined;
+    const result = fromMetadata ?? autoEnterEditMode ?? false;
+    
+    console.log('[EditModeDebug] ImageGalleryLightbox computing effective autoEnterEditMode:', {
+      fromProps: autoEnterEditMode,
+      fromMetadata,
+      effectiveValue: result,
+      activeLightboxMediaId: activeLightboxMedia?.id,
+      timestamp: Date.now()
+    });
+    
+    return result;
+  }, [activeLightboxMedia?.metadata?.__autoEnterEditMode, autoEnterEditMode, activeLightboxMedia?.id]);
+  
+  // Detect tablet/iPad size (768px+) for side-by-side task details layout
+  const [isTabletOrLarger, setIsTabletOrLarger] = React.useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+  );
+  
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsTabletOrLarger(window.innerWidth >= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // [ShotNavDebug] confirm plumbing into Lightbox
   React.useEffect(() => {
@@ -251,9 +283,13 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       cacheVersion
     });
     
+    // Clean up internal flags from metadata before passing to MediaLightbox
+    const { __autoEnterEditMode, ...cleanMetadata } = activeLightboxMedia.metadata || {};
+    
     return {
       ...activeLightboxMedia,
-      starred
+      starred,
+      metadata: cleanMetadata
     };
   }, [activeLightboxMedia, filteredImages, queryClient, cacheVersion]);
 
@@ -409,6 +445,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       {enhancedMedia && (
         <MediaLightbox
           media={enhancedMedia}
+          autoEnterInpaint={effectiveAutoEnterEditMode}
           onClose={onClose}
           onNext={onNext}
           onPrevious={onPrevious}
@@ -441,15 +478,15 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
             // TODO: Implement magic edit generation
             console.log('Magic Edit:', { imageUrl, prompt, numImages });
           }}
-          // Task details functionality - same pattern as VideoGallery
-          showTaskDetails={!isMobile}
+          // Task details functionality - show on tablet+ (768px+), hide on mobile
+          showTaskDetails={isTabletOrLarger}
           taskDetailsData={{
             task,
             isLoading: isLoadingTask,
             error: taskError,
             inputImages,
             taskId: lightboxTaskMapping?.taskId || null,
-            onApplyTaskSettings: onApplySettings,
+            onApplySettingsFromTask: onApplySettings,
             onClose: onClose
           }}
           onShowTaskDetails={isMobile ? onShowTaskDetails : undefined}

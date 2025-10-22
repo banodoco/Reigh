@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Sparkles, Star, Eye, Link, Plus, Paintbrush, Wand2 } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
   Tooltip, 
@@ -38,7 +38,7 @@ interface ImageGalleryItemProps {
   isDeleting: boolean;
   onDelete?: (id: string) => void;
   onApplySettings?: (metadata: DisplayableMetadata) => void;
-  onOpenLightbox: (image: GeneratedImageWithMetadata) => void;
+  onOpenLightbox: (image: GeneratedImageWithMetadata, autoEnterEditMode?: boolean) => void;
   onAddToLastShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onDownloadImage: (rawUrl: string, filename: string, imageId?: string, isVideo?: boolean, originalContentType?: string) => void;
@@ -829,7 +829,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       >
         <div style={{ paddingBottom: aspectRatioPadding }} className="relative">
           <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="h-12 w-12 text-muted-foreground opacity-30" />
+            <Eye className="h-12 w-12 text-muted-foreground opacity-30" />
           </div>
         </div>
       </div>
@@ -1710,14 +1710,35 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
           </div>
 
-          {/* Delete button - Desktop Bottom Right */}
-              {!isMobile && onDelete && (
-              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          {/* Edit and Delete buttons - Desktop Bottom Right */}
+              {!isMobile && (
+              <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                  {/* Edit button - Desktop */}
+                  {!image.isVideo && (
+                      <Button 
+                          variant="secondary" 
+                          size="icon" 
+                          className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenLightbox(image, true); // Pass true to auto-enter edit mode
+                          }}
+                          title="Edit image"
+                      >
+                          <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                  )}
+                  
+                  {/* Delete button - Desktop */}
+                  {onDelete && (
                       <Button 
                           variant="destructive" 
                           size="icon" 
                           className="h-7 w-7 p-0 rounded-full"
-                          onClick={() => onDelete(image.id!)}
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(image.id!);
+                          }}
                           disabled={isCurrentDeleting}
                       >
                           {isCurrentDeleting ? (
@@ -1726,14 +1747,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                               <Trash2 className="h-3.5 w-3.5" />
                           )}
                       </Button>
+                  )}
               </div>
           )}
 
-          {/* Bottom Left Buttons - Star, Inpaint, Magic Edit */}
+          {/* Bottom Left Buttons - Star, Edit Image */}
           <div className={`absolute bottom-2 left-2 flex items-center gap-1.5 transition-opacity z-20 ${
             image.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}>
-              {/* Inpaint Button - Mobile only, images only */}
+              {/* Edit Image Button - Mobile only, images only */}
               {isMobile && !image.isVideo && (
                 <Button
                     variant="secondary"
@@ -1741,27 +1763,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                     onClick={(e) => {
                         e.stopPropagation();
-                        onOpenLightbox(image);
-                        // User can enter inpaint mode from the lightbox
+                        onOpenLightbox(image, true); // Pass true to auto-enter edit mode
                     }}
+                    title="Edit image"
                 >
-                    <Paintbrush className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              
-              {/* Magic Edit Button - Mobile only, images only */}
-              {isMobile && !image.isVideo && (
-                <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenLightbox(image);
-                        // User can access magic edit from the lightbox
-                    }}
-                >
-                    <Wand2 className="h-3.5 w-3.5" />
+                    <Pencil className="h-3.5 w-3.5" />
                 </Button>
               )}
               

@@ -97,7 +97,7 @@ export interface ImageGalleryProps {
   allShots: Shot[];
   lastShotId?: string;
   lastShotNameForTooltip?: string;
-  onAddToLastShot: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToLastShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToLastShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   currentToolType?: string;
   initialFilterState?: boolean;
@@ -373,6 +373,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     onImageSaved,
     activeLightboxMedia: stateHook.activeLightboxMedia,
     setActiveLightboxMedia: stateHook.setActiveLightboxMedia,
+    setAutoEnterEditMode: stateHook.setAutoEnterEditMode,
     markOptimisticDeleted: stateHook.markOptimisticDeleted,
     removeOptimisticDeleted: stateHook.removeOptimisticDeleted,
     setDownloadingImageId: stateHook.setDownloadingImageId,
@@ -408,7 +409,22 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
   // Task details functionality
   const lightboxImageId = stateHook.activeLightboxMedia?.id || null;
   const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxImageId || '');
-  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(lightboxTaskMapping?.taskId || '');
+  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask((lightboxTaskMapping?.taskId as string) || '');
+  
+  // Debug task details loading
+  React.useEffect(() => {
+    if (lightboxImageId) {
+      console.log('[TaskDetailsSidebar] Task details fetch state:', {
+        lightboxImageId,
+        lightboxTaskMapping,
+        taskId: lightboxTaskMapping?.taskId,
+        hasTask: !!task,
+        isLoadingTask,
+        taskError,
+        taskKeys: task ? Object.keys(task) : [],
+      });
+    }
+  }, [lightboxImageId, lightboxTaskMapping, task, isLoadingTask, taskError]);
   
   // Derive input images from multiple possible locations within task params
   const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
@@ -845,6 +861,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
       {/* Lightbox and Task Details */}
       <ImageGalleryLightbox
         activeLightboxMedia={stateHook.activeLightboxMedia}
+        autoEnterEditMode={stateHook.autoEnterEditMode}
         onClose={actionsHook.handleCloseLightbox}
         filteredImages={filtersHook.filteredImages}
         isServerPagination={paginationHook.isServerPagination}

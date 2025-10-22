@@ -214,7 +214,8 @@ export const useInpainting = ({
       const strokeBrushSize = stroke.brushSize || 20;
       
       // Draw on display canvas (semi-transparent red for paint, erase for erasing)
-      ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'source-over';
+      // Use 'lighten' mode to prevent overlapping strokes from getting darker
+      ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'lighten';
       ctx.strokeStyle = stroke.isErasing ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
       ctx.lineWidth = strokeBrushSize;
       ctx.lineCap = 'round';
@@ -247,7 +248,7 @@ export const useInpainting = ({
 
   // Handle mouse/touch drawing
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    console.log('[InpaintPaint] 🔧 handlePointerDown called', {
+    console.log('[MobilePaintDebug] 🔧 handlePointerDown called', {
       isInpaintMode,
       hasCanvas: !!displayCanvasRef.current,
       eventType: e.type,
@@ -255,7 +256,7 @@ export const useInpainting = ({
     });
     
     if (!isInpaintMode) {
-      console.log('[InpaintPaint] ❌ Not in inpaint mode, returning');
+      console.log('[MobilePaintDebug] ❌ Not in inpaint mode, returning');
       return;
     }
     
@@ -264,7 +265,7 @@ export const useInpainting = ({
     
     const canvas = displayCanvasRef.current;
     if (!canvas) {
-      console.log('[InpaintPaint] ❌ No canvas ref, returning');
+      console.log('[MobilePaintDebug] ❌ No canvas ref, returning');
       return;
     }
     
@@ -277,7 +278,7 @@ export const useInpainting = ({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    console.log('[InpaintPaint] ✅ Starting stroke', {
+    console.log('[MobilePaintDebug] ✅ Starting stroke', {
       x,
       y,
       canvasRect: { width: rect.width, height: rect.height, left: rect.left, top: rect.top }
@@ -285,6 +286,19 @@ export const useInpainting = ({
     
     setCurrentStroke([{ x, y }]);
   }, [isInpaintMode]);
+
+  // Prevent browser scroll/zoom gestures while actively drawing (iOS Safari)
+  useEffect(() => {
+    if (!isDrawing) return;
+    const preventTouchMove = (e: TouchEvent) => {
+      // Only prevent if drawing to avoid breaking normal scroll elsewhere
+      e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventTouchMove, { passive: false });
+    return () => {
+      document.removeEventListener('touchmove', preventTouchMove);
+    };
+  }, [isDrawing]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isInpaintMode || !isDrawing) return;
@@ -324,7 +338,7 @@ export const useInpainting = ({
   const handlePointerUp = useCallback((e?: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isInpaintMode || !isDrawing) return;
     
-    console.log('[InpaintPaint] 🛑 Finishing stroke');
+    console.log('[MobilePaintDebug] 🛑 Finishing stroke');
     
     // Release pointer capture if event is provided
     if (e && e.target) {
@@ -332,7 +346,7 @@ export const useInpainting = ({
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
       } catch (err) {
         // Ignore errors if pointer capture wasn't active
-        console.log('[InpaintPaint] ⚠️ Could not release pointer capture', err);
+        console.log('[MobilePaintDebug] ⚠️ Could not release pointer capture', err);
       }
     }
     
@@ -347,7 +361,7 @@ export const useInpainting = ({
       };
       
       setBrushStrokes(prev => [...prev, newStroke]);
-      console.log('[InpaintPaint] ✅ Stroke added', { strokeId: newStroke.id, pointCount: currentStroke.length, brushSize });
+      console.log('[MobilePaintDebug] ✅ Stroke added', { strokeId: newStroke.id, pointCount: currentStroke.length, brushSize });
     }
     
     setCurrentStroke([]);
@@ -380,9 +394,10 @@ export const useInpainting = ({
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
-    console.log('[InpaintPaint] 🚀 Entering inpaint mode');
+    console.log('[MobilePaintDebug] 🚀 handleEnterInpaintMode called');
+    console.log('[MobilePaintDebug] Before setIsInpaintMode - isInpaintMode:', isInpaintMode);
     setIsInpaintMode(true);
-    console.log('[InpaintPaint] ✅ Inpaint mode state set to true');
+    console.log('[MobilePaintDebug] ✅ Called setIsInpaintMode(true)');
   }, []);
 
   // Generate inpaint

@@ -15,7 +15,6 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import MagicEditLauncher from '@/shared/components/MagicEditLauncher';
 
 export interface MediaControlsProps {
   // Media info
@@ -35,7 +34,7 @@ export interface MediaControlsProps {
   sourceUrlForTasks: string;
   
   // Mode states
-  isInpaintMode: boolean;
+  isSpecialEditMode?: boolean;
   
   // Star functionality
   localStarred: boolean;
@@ -85,7 +84,7 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
   toolTypeOverride,
   imageDimensions,
   sourceUrlForTasks,
-  isInpaintMode,
+  isSpecialEditMode,
   localStarred,
   handleToggleStar,
   isAddingToReferences,
@@ -106,8 +105,8 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
 }) => {
   return (
     <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
-      {/* Star Button (hidden in readOnly and inpaint mode) */}
-      {!readOnly && !isInpaintMode && (
+      {/* Star Button (hidden in readOnly and special edit modes) */}
+      {!readOnly && !isSpecialEditMode && (
         <Button
           variant="secondary"
           size="sm"
@@ -118,8 +117,8 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
         </Button>
       )}
 
-      {/* Add to References Button (hidden in readOnly and inpaint mode) */}
-      {!readOnly && !isVideo && selectedProjectId && !isInpaintMode && (
+      {/* Add to References Button (hidden in readOnly and special edit modes) */}
+      {!readOnly && !isVideo && selectedProjectId && !isSpecialEditMode && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -149,7 +148,7 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
       )}
 
       {/* Inpaint Button (hidden in readOnly, only shown in cloud mode) */}
-      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
+      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isSpecialEditMode && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -166,7 +165,7 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
       )}
 
       {/* Upscale Button (hidden in readOnly, only shown in cloud mode) */}
-      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isInpaintMode && (
+      {!readOnly && !isVideo && selectedProjectId && isCloudMode && !isSpecialEditMode && (
         <Tooltip>
           <TooltipTrigger asChild>
             <span>
@@ -198,19 +197,8 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
         </Tooltip>
       )}
 
-      {/* Magic Edit Launcher */}
-      {!isVideo && showMagicEdit && !readOnly && !isInpaintMode && (
-        <MagicEditLauncher
-          imageUrl={sourceUrlForTasks}
-          imageDimensions={imageDimensions}
-          toolTypeOverride={toolTypeOverride}
-          zIndexOverride={100100}
-          shotGenerationId={shotImageEntryId}
-        />
-      )}
-
       {/* Image Edit Tools: Flip and Save */}
-      {!isVideo && showImageEditTools && !readOnly && !isInpaintMode && (
+      {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
         <>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -246,7 +234,7 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
       )}
 
       {/* Download Button */}
-      {showDownload && !readOnly && !isInpaintMode && (
+      {showDownload && !readOnly && !isSpecialEditMode && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

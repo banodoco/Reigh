@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Sparkles, Paintbrush } from 'lucide-react';
+import { Trash2, Copy, Check, Pencil } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,6 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import MagicEditModal from '@/shared/components/MagicEditModal';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { framesToSeconds } from './Timeline/utils/time-utils';
@@ -127,7 +126,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(skipConfirmation);
   const currentDialogSkipChoiceRef = useRef(skipConfirmation);
   const isMobile = useIsMobile();
-  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
 
   // Track touch position to detect scrolling vs tapping
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -323,38 +321,12 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
       
       {(!isMobile || !isDragDisabled) && (
         <>
-          {/* Magic Edit trigger */}
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute bottom-1 left-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-              setIsMagicEditOpen(true);
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-            }}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-            }}
-            title="Magic Edit"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-          </Button>
-          
-          {/* Inpaint trigger - next to Magic Edit */}
+          {/* Edit Image trigger */}
           {onInpaintClick && (
             <Button
               variant="secondary"
               size="icon"
-              className="absolute bottom-1 left-10 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              className="absolute bottom-1 left-1 h-7 w-7 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -371,9 +343,9 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
                 e.stopPropagation();
                 e.nativeEvent.stopImmediatePropagation();
               }}
-              title="Inpaint"
+              title="Edit image"
             >
-              <Paintbrush className="h-3.5 w-3.5" />
+              <Pencil className="h-3.5 w-3.5" />
             </Button>
           )}
           
@@ -426,13 +398,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
           </Button>
         </>
       )}
-      {/* Magic Edit Modal */}
-      <MagicEditModal
-        isOpen={isMagicEditOpen}
-        onClose={() => setIsMagicEditOpen(false)}
-        imageUrl={displayUrl}
-        shotGenerationId={image.shotImageEntryId}
-      />
       <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
         <AlertDialogOverlay
           onPointerDown={(e) => {

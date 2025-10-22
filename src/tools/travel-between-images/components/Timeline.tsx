@@ -50,6 +50,9 @@ import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
 import { transformForTimeline, type RawShotGeneration } from "@/shared/lib/generationTransformers";
+import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
+import { useGetTask } from "@/shared/hooks/useTasks";
+import { deriveInputImages } from "@/shared/components/ImageGallery/utils";
 
 // Clear legacy timeline cache on import
 import "@/utils/clearTimelineCache";
@@ -299,6 +302,42 @@ const Timeline: React.FC<TimelineProps> = ({
     hasPrevious,
     showNavigation
   } = useLightbox({ images, shotId, isMobile });
+
+  // Detect tablet/iPad size (768px+) for side-by-side task details layout
+  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+  );
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsTabletOrLarger(window.innerWidth >= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Fetch task ID mapping from unified cache
+  const { data: taskMapping } = useTaskFromUnifiedCache(
+    currentLightboxImage?.id || null
+  );
+
+  // Extract taskId and convert from Json to string
+  const taskId = React.useMemo(() => {
+    if (!taskMapping?.taskId) return undefined;
+    return String(taskMapping.taskId);
+  }, [taskMapping]);
+
+  // Fetch full task details using the task ID (only enabled when we have a taskId)
+  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(
+    taskId || ''  // Pass empty string if no taskId, hook will be disabled via enabled: !!taskId
+  );
+
+  // Derive input images from task metadata
+  const inputImages = React.useMemo(() => {
+    if (!task) return [];
+    return deriveInputImages(task);
+  }, [task]);
 
   // Preload next/previous images when lightbox is open for faster navigation
   useEffect(() => {
@@ -752,6 +791,16 @@ const Timeline: React.FC<TimelineProps> = ({
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation
             timelineDebugger.logEvent('Magic edit requested', { shotId, imageUrl, prompt, numImages });
+          }}
+          // Task details functionality - show on tablet+ (768px+), hide on mobile
+          showTaskDetails={isTabletOrLarger}
+          taskDetailsData={{
+            task,
+            isLoading: isLoadingTask,
+            error: taskError,
+            inputImages,
+            taskId: task?.id || null,
+            onClose: closeLightbox
           }}
         />
       )}

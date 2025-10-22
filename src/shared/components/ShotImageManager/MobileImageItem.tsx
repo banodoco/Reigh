@@ -5,11 +5,10 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Sparkles, Paintbrush } from 'lucide-react';
+import { Trash2, Copy, Check, Pencil } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
-import MagicEditModal from '@/shared/components/MagicEditModal';
 import { MobileImageItemProps } from './types';
 
 export const MobileImageItem: React.FC<MobileImageItemProps> = ({
@@ -29,8 +28,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   frameNumber,
   readOnly = false,
 }) => {
-  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
-  
   // Progressive loading setup
   const progressiveEnabled = isProgressiveLoadingEnabled();
   const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
@@ -131,9 +128,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
 
         {/* Selection overlay - removed blue tick */}
 
-        {/* Bottom left - Inpaint and Magic Edit buttons */}
+        {/* Bottom left - Edit Image button */}
         <div className="absolute bottom-2 left-2 flex gap-2 items-start opacity-100 transition-opacity">
-          {/* Inpaint button (hidden in readOnly) */}
+          {/* Edit Image button (hidden in readOnly) */}
           {!readOnly && onInpaintClick && (
             <Button
               size="icon"
@@ -141,27 +138,12 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               className="h-8 w-8 bg-white/75 hover:bg-white/90"
               onClick={(e) => {
                 e.stopPropagation();
-                // Open lightbox in inpaint mode
+                // Open lightbox in unified edit mode
                 onInpaintClick();
               }}
-              title="Inpaint"
+              title="Edit image"
             >
-              <Paintbrush className="h-3 w-3" />
-            </Button>
-          )}
-          {/* Magic Edit button (hidden in readOnly) */}
-          {!readOnly && (
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 bg-white/75 hover:bg-white/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMagicEditOpen(true);
-              }}
-              title="Magic Edit"
-            >
-              <Sparkles className="h-3 w-3" />
+              <Pencil className="h-3 w-3" />
             </Button>
           )}
         </div>
@@ -210,15 +192,6 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           )}
         </div>
       </div>
-
-      {/* Magic Edit Modal */}
-      <MagicEditModal
-        isOpen={isMagicEditOpen}
-        onClose={() => setIsMagicEditOpen(false)}
-        imageUrl={displayImageUrl}
-        shotGenerationId={(image as any).shotImageEntryId}
-        zIndexOverride={100100}
-      />
     </>
   );
 };

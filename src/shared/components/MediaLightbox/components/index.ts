@@ -4,6 +4,9 @@ export type { NavigationButtonsProps } from './NavigationButtons';
 export { InpaintControlsPanel } from './InpaintControlsPanel';
 export type { InpaintControlsPanelProps } from './InpaintControlsPanel';
 
+export { MagicEditControlsPanel } from './MagicEditControlsPanel';
+export type { MagicEditControlsPanelProps } from './MagicEditControlsPanel';
+
 export { MediaDisplay } from './MediaDisplay';
 export type { MediaDisplayProps } from './MediaDisplay';
 

@@ -1454,8 +1454,9 @@ const VideoTravelToolPage: React.FC = () => {
                   <ImageGallery
                     images={(videosData as any)?.items || []}
                     allShots={shots || []}
-                    onAddToLastShot={async () => false} // No-op for video gallery
-                    onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                    // Don't pass onAddToLastShot or onAddToLastShotWithoutPosition to hide workflow controls
+                    // These bottom buttons (Add to Shot, etc.) shouldn't show for video gallery
+                    // Omitting these props completely hides the workflow controls in the lightbox
                     currentToolType="travel-between-images"
                     initialMediaTypeFilter="video"
                     initialToolTypeFilter={true}

@@ -39,6 +39,9 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import MagicEditModal from '@/shared/components/MagicEditModal';
 import { ShotImageManagerMobile } from './ShotImageManager/ShotImageManagerMobile';
+import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
+import { useGetTask } from '@/shared/hooks/useTasks';
+import { deriveInputImages } from '@/shared/components/ImageGallery/utils';
 
 // Removed legacy sessionStorage key constant now that setting is persisted in DB
 
@@ -171,6 +174,20 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // State for range selection (Command+click)
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
+
+  // Detect tablet/iPad size (768px+) for side-by-side task details layout
+  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+  );
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsTabletOrLarger(window.innerWidth >= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Debug lightbox state changes (must be after isMobile is declared)
   React.useEffect(() => {
@@ -292,6 +309,31 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     }
     return optimisticOrder;
   }, [optimisticOrder, images]);
+  
+  // Fetch task details for the current lightbox image (must be after currentImages is defined)
+  const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
+  
+  const { data: taskMapping } = useTaskFromUnifiedCache(
+    currentLightboxImage?.id || null
+  );
+
+  // Extract taskId and convert from Json to string
+  const taskId = React.useMemo(() => {
+    if (!taskMapping?.taskId) return undefined;
+    return String(taskMapping.taskId);
+  }, [taskMapping]);
+
+  // Fetch full task details using the task ID
+  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(
+    taskId || ''
+  );
+
+  // Derive input images from task metadata
+  const inputImages = React.useMemo(() => {
+    if (!task) return [];
+    return deriveInputImages(task);
+  }, [task]);
+  
   // Progressive loading page context (single page view inside manager)
   const progressivePage = 0;
 
@@ -1163,6 +1205,19 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             hasPrevious={lightboxIndex > 0}
             starred={(currentImages[lightboxIndex] as any).starred || false}
             onMagicEdit={onMagicEdit}
+            // Task details functionality - show on tablet+ (768px+), hide on mobile
+            showTaskDetails={isTabletOrLarger}
+            taskDetailsData={{
+              task: task,
+              isLoading: isLoadingTask,
+              error: taskError,
+              inputImages: inputImages,
+              taskId: task?.id || null,
+              onClose: () => {
+                setLightboxIndex(null);
+                setShouldAutoEnterInpaint(false);
+              }
+            }}
           />
         )}
       </>
@@ -1406,6 +1461,19 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           hasPrevious={lightboxIndex > 0}
           starred={(currentImages[lightboxIndex] as any).starred || false}
           onMagicEdit={onMagicEdit}
+          // Task details functionality - show on tablet+ (768px+), hide on mobile
+          showTaskDetails={isTabletOrLarger}
+          taskDetailsData={{
+            task: task,
+            isLoading: isLoadingTask,
+            error: taskError,
+            inputImages: inputImages,
+            taskId: task?.id || null,
+            onClose: () => {
+              setLightboxIndex(null);
+              setShouldAutoEnterInpaint(false);
+            }
+          }}
         />
       )}
 
