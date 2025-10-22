@@ -1428,25 +1428,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                     </div>
 
-                    {/* Top Right Controls - Close (in special mode), Save, Download */}
+                    {/* Top Right Controls - Save, Download */}
                     <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
-                      
-                      {/* Close Button - Only shown in special edit modes */}
-                      {isSpecialEditMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={onClose}
-                              className="bg-black/50 hover:bg-black/70 text-white"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Close</TooltipContent>
-                        </Tooltip>
-                      )}
 
                       {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
                         <>
@@ -1628,8 +1611,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {isSpecialEditMode ? (
                     // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
                     <div className="p-6 space-y-4 w-full">
-                      <div className="mb-4">
+                      <div className="mb-4 flex items-center justify-between">
                         <h2 className="text-2xl font-light">Edit Image</h2>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={onClose}
+                          className="h-8 w-8 p-0 hover:bg-muted"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                       
                       <div className="space-y-4">
@@ -2215,22 +2206,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     )}
 
-                    {/* Special Edit Mode Controls - Mobile */}
-                    {isSpecialEditMode && !readOnly && (
-                      <>
-                        {/* Top Right - Close Button */}
-                        <div className="absolute top-2 right-2 z-10">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={onClose}
-                            className="bg-black/50 hover:bg-black/70 text-white"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </>
-                    )}
 
                     {/* Mobile navigation */}
                     {showNavigation && !readOnly && onPrevious && hasPrevious && (
@@ -2269,6 +2244,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {isSpecialEditMode ? (
                     // Inpaint Prompt & Generate - Mobile
                     <div className="p-4 space-y-3 w-full">
+                      {/* Header with close button */}
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-light">Edit Image</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={onClose}
+                          className="h-8 w-8 p-0 hover:bg-muted"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
                       <div className="space-y-3">
                         {/* Prompt Field */}
                         <div className="space-y-1">
@@ -2764,21 +2752,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   )}
 
-                  {/* Top Right Controls - Close (in special mode), Star, Flip, Save, Download, Delete */}
+                  {/* Top Right Controls - Star, Flip, Save, Download, Delete */}
                   {!readOnly && (
                     <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
-                      
-                      {/* Close Button - Only shown in special edit modes (mobile) */}
-                      {isSpecialEditMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={onClose}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
                       
                       {/* Star Button (hidden in special modes) */}
                       {!isSpecialEditMode && (
