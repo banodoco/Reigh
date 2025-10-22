@@ -1218,6 +1218,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                           
                           <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-40">
+                            {/* Close Edit Mode Button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleExitMagicEditMode}
+                              className="w-full text-xs h-7 text-white hover:bg-white/20"
+                            >
+                              <X className="h-3 w-3 mr-1" />
+                              Close edit mode
+                            </Button>
+                            
                             {/* Brush Size Slider */}
                             <div className="space-y-0.5">
                               <div className="flex items-center justify-between">
