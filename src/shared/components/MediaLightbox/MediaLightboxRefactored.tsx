@@ -2072,47 +2072,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
-                      basedOnSection={(() => {
-                        console.log('[BasedOnDebug] Desktop render check - Based On section', {
-                          hasSourceGeneration: !!sourceGeneration,
-                          sourceGeneration: sourceGeneration ? {
-                            id: sourceGeneration.id,
-                            prompt: (sourceGeneration as any).prompt?.slice(0, 50)
-                          } : null
-                        });
-                        
-                        if (!sourceGeneration) return null;
-                        
-                        return (
-                          <div className="border-t border-border p-4">
-                              <button
-                                onClick={() => {
-                                  if (onNavigateToGeneration) {
-                                    onNavigateToGeneration(sourceGeneration.id);
-                                  } else {
-                                    toast.info('Navigation requires parent support');
-                                  }
-                                }}
-                              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                              >
-                              <span>Based on:</span>
-                              <div className="relative w-10 h-10 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                                <img
-                                  src={sourceGeneration.thumbUrl}
-                                  alt="Source generation"
-                                  className="w-full h-full object-cover"
-                                />
-                                {(sourceGeneration as any).starred && (
-                                  <div className="absolute top-1 right-1">
-                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="group-hover:underline">Click to view</span>
-                              </button>
-                          </div>
-                        );
-                      })()}
                       derivedSection={(() => {
                         console.log('[BasedOnDebug] Desktop render check - Derived Generations section', {
                           hasDerivedGenerations: !!derivedGenerations,
@@ -2798,47 +2757,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
-                      basedOnSection={(() => {
-                        console.log('[BasedOnDebug] Mobile render check - Based On section', {
-                          hasSourceGeneration: !!sourceGeneration,
-                          sourceGeneration: sourceGeneration ? {
-                            id: sourceGeneration.id,
-                            prompt: (sourceGeneration as any).prompt?.slice(0, 50)
-                          } : null
-                        });
-                        
-                        if (!sourceGeneration) return null;
-                        
-                        return (
-                          <div className="border-t border-border p-3">
-                              <button
-                                onClick={() => {
-                                  if (onNavigateToGeneration) {
-                                    onNavigateToGeneration(sourceGeneration.id);
-                                  } else {
-                                    toast.info('Navigation requires parent support');
-                                  }
-                                }}
-                              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                              >
-                              <span>Based on:</span>
-                              <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                                <img
-                                  src={sourceGeneration.thumbUrl}
-                                  alt="Source generation"
-                                  className="w-full h-full object-cover"
-                                />
-                                {(sourceGeneration as any).starred && (
-                                  <div className="absolute top-0.5 right-0.5">
-                                    <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="group-hover:underline">Click to view</span>
-                              </button>
-                          </div>
-                        );
-                      })()}
                       derivedSection={(() => {
                         console.log('[BasedOnDebug] Mobile render check - Derived Generations section', {
                           hasDerivedGenerations: !!derivedGenerations,

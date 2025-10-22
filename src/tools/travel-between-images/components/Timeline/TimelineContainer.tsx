@@ -670,7 +670,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           ref={containerRef}
           id="timeline-container"
           className={`relative h-36 mb-10`}
-          onDoubleClick={(e) => handleTimelineDoubleClick(e, containerRef)}
+          onDoubleClick={(e) => {
+            // Don't zoom if double-clicking on an item or button
+            const target = e.target as HTMLElement;
+            const isClickingItem = target.closest('[data-item-id]');
+            const isClickingButton = target.closest('button');
+            
+            if (!isClickingItem && !isClickingButton) {
+              handleTimelineDoubleClick(e, containerRef);
+            }
+          }}
           onClick={(e) => {
             // On tablets, handle tap-to-place for selected items
             if (enableTapToMove && tapToMove.selectedItemId) {
