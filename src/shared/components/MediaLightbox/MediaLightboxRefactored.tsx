@@ -1245,19 +1245,33 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               />
                             </div>
                             
-                            {/* Erase Toggle */}
-                            <Button
-                              variant={isEraseMode ? "default" : "secondary"}
-                              size="sm"
-                              onClick={() => setIsEraseMode(!isEraseMode)}
-                              className={cn(
-                                "w-full text-xs h-7",
-                                isEraseMode ? "bg-purple-600 hover:bg-purple-700" : "bg-white/20 hover:bg-white/30 text-white"
-                              )}
-                            >
-                              <Eraser className="h-3 w-3 mr-1" />
-                              {isEraseMode ? 'Erase' : 'Paint'}
-                            </Button>
+                            {/* Paint/Erase Toggle */}
+                            <div className="flex items-center gap-0.5 bg-white/10 rounded-md p-0.5">
+                              <button
+                                onClick={() => setIsEraseMode(false)}
+                                className={cn(
+                                  "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
+                                  !isEraseMode 
+                                    ? "bg-blue-600 text-white shadow-sm" 
+                                    : "text-white/60 hover:text-white/80"
+                                )}
+                              >
+                                <Paintbrush className="h-3 w-3" />
+                                Paint
+                              </button>
+                              <button
+                                onClick={() => setIsEraseMode(true)}
+                                className={cn(
+                                  "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
+                                  isEraseMode 
+                                    ? "bg-purple-600 text-white shadow-sm" 
+                                    : "text-white/60 hover:text-white/80"
+                                )}
+                              >
+                                <Eraser className="h-3 w-3" />
+                                Erase
+                              </button>
+                            </div>
                             
                             {/* Undo | Clear */}
                             <div className="flex items-center gap-1">
