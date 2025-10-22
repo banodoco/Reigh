@@ -558,10 +558,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Enhanced empty state check - show immediately if cache says 0 OR local hint says 0, 
   // otherwise show after loading completes with 0 results.
   // IMPORTANT: If cachedCount suggests videos exist, trust it over localZeroHint during loading!
+  // NOTE: We intentionally ignore isFetchingGenerations to prevent flickering during background refetches
   const effectiveZero = (cachedCount === 0) || (Boolean(localZeroHint) && cachedCount === null);
   const shouldShowEmpty = (
     (sortedVideoOutputs.length === 0 && effectiveZero) ||
-    (!isLoadingGenerations && !isFetchingGenerations && sortedVideoOutputs.length === 0)
+    (!isLoadingGenerations && sortedVideoOutputs.length === 0)
   );
   
   // Log empty state decision
@@ -571,8 +572,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     isFetchingGenerations,
     sortedVideoOutputsLength: sortedVideoOutputs.length,
     cachedCount,
-    emptyLogic: `((!${isLoadingGenerations} && !${isFetchingGenerations} && ${sortedVideoOutputs.length} === 0) || (${cachedCount} === 0 && ${isLoadingGenerations} && ${videoOutputs.length} === 0)) = ${shouldShowEmpty}`,
+    effectiveZero,
+    emptyLogic: `((${sortedVideoOutputs.length} === 0 && effectiveZero=${effectiveZero}) || (!${isLoadingGenerations} && ${sortedVideoOutputs.length} === 0)) = ${shouldShowEmpty}`,
     finalRenderDecision: shouldShowEmpty ? 'RENDER_EMPTY_STATE' : showSkeletons ? 'RENDER_SKELETONS' : 'RENDER_VIDEOS',
+    note: 'isFetchingGenerations ignored to prevent flickering during background refetches',
     timestamp: Date.now()
   });
 
