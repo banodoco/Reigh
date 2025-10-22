@@ -242,6 +242,7 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     onImageSaved,
     activeLightboxMedia: stateHook.state.activeLightboxMedia,
     setActiveLightboxMedia: stateHook.setActiveLightboxMedia,
+    setAutoEnterEditMode: stateHook.setAutoEnterEditMode,
     markOptimisticDeleted: stateHook.markOptimisticDeleted,
     removeOptimisticDeleted: stateHook.removeOptimisticDeleted,
     setDownloadingImageId: stateHook.setDownloadingImageId,
@@ -714,6 +715,7 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
       {/* Lightbox and Task Details */}
       <ImageGalleryLightbox
         activeLightboxMedia={stateHook.state.activeLightboxMedia}
+        autoEnterEditMode={stateHook.state.autoEnterEditMode}
         onClose={actionsHook.handleCloseLightbox}
         filteredImages={filtersHook.filteredImages}
         isServerPagination={paginationHook.isServerPagination}

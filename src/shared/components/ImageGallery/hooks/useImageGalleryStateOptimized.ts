@@ -6,6 +6,7 @@ import { GeneratedImageWithMetadata } from '../index';
 export interface ImageGalleryState {
   // Lightbox state
   activeLightboxMedia: GenerationRow | null;
+  autoEnterEditMode: boolean;
   selectedImageForDetails: GenerationRow | null;
   showTaskDetailsModal: boolean;
   pendingLightboxTarget: 'first' | 'last' | null;
@@ -38,6 +39,7 @@ export interface ImageGalleryState {
 // Action types for the reducer
 export type ImageGalleryStateAction =
   | { type: 'SET_LIGHTBOX_MEDIA'; payload: GenerationRow | null }
+  | { type: 'SET_AUTO_ENTER_EDIT_MODE'; payload: boolean }
   | { type: 'SET_SELECTED_IMAGE_FOR_DETAILS'; payload: GenerationRow | null }
   | { type: 'SET_SHOW_TASK_DETAILS_MODAL'; payload: boolean }
   | { type: 'SET_PENDING_LIGHTBOX_TARGET'; payload: 'first' | 'last' | null }
@@ -68,6 +70,7 @@ const createInitialState = (
 ): ImageGalleryState => ({
   // Lightbox state
   activeLightboxMedia: null,
+  autoEnterEditMode: false,
   selectedImageForDetails: null,
   showTaskDetailsModal: false,
   pendingLightboxTarget: null,
@@ -105,6 +108,9 @@ const imageGalleryStateReducer = (
   switch (action.type) {
     case 'SET_LIGHTBOX_MEDIA':
       return { ...state, activeLightboxMedia: action.payload };
+      
+    case 'SET_AUTO_ENTER_EDIT_MODE':
+      return { ...state, autoEnterEditMode: action.payload };
       
     case 'SET_SELECTED_IMAGE_FOR_DETAILS':
       return { ...state, selectedImageForDetails: action.payload };
@@ -253,6 +259,7 @@ export interface UseImageGalleryStateOptimizedReturn {
   
   // Actions
   setActiveLightboxMedia: (media: GenerationRow | null) => void;
+  setAutoEnterEditMode: (value: boolean) => void;
   setSelectedImageForDetails: (image: GenerationRow | null) => void;
   setShowTaskDetailsModal: (show: boolean) => void;
   setPendingLightboxTarget: (target: 'first' | 'last' | null) => void;
@@ -322,6 +329,8 @@ export const useImageGalleryStateOptimized = ({
   const actions = useMemo(() => ({
     setActiveLightboxMedia: (media: GenerationRow | null) => 
       dispatch({ type: 'SET_LIGHTBOX_MEDIA', payload: media }),
+    setAutoEnterEditMode: (value: boolean) => 
+      dispatch({ type: 'SET_AUTO_ENTER_EDIT_MODE', payload: value }),
     setSelectedImageForDetails: (image: GenerationRow | null) => 
       dispatch({ type: 'SET_SELECTED_IMAGE_FOR_DETAILS', payload: image }),
     setShowTaskDetailsModal: (show: boolean) => 
