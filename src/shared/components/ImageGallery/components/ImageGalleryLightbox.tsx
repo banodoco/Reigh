@@ -247,25 +247,26 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return unsubscribe;
   }, [queryClient]);
   
-  // Enhance media object with starred field - subscribe to React Query cache for real-time updates
+  // Enhance media object with starred and upscaled_url fields - subscribe to React Query cache for real-time updates
   const enhancedMedia = useMemo(() => {
     if (!activeLightboxMedia) return null;
     
     // First, try to find in filteredImages (normal case)
     let foundImage = filteredImages.find(img => img.id === activeLightboxMedia.id);
     
-    // If not found or starred is undefined, check React Query cache directly
-    // This ensures we get the latest optimistically-updated value
-    if (!foundImage || foundImage.starred === undefined) {
+    // If not found or starred/upscaled_url is undefined, check React Query cache directly
+    // This ensures we get the latest optimistically-updated values
+    if (!foundImage || foundImage.starred === undefined || !foundImage.upscaled_url) {
       const queries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
       for (const [, data] of queries) {
         if (data && typeof data === 'object' && 'items' in data) {
           const cacheItem = (data as any).items.find((g: any) => g.id === activeLightboxMedia.id);
           if (cacheItem) {
             foundImage = cacheItem;
-            console.log('[StarPersist] 📦 Found starred value in React Query cache:', {
+            console.log('[StarPersist] 📦 Found values in React Query cache:', {
               mediaId: activeLightboxMedia.id,
               starred: cacheItem.starred,
+              hasUpscaledUrl: !!cacheItem.upscaled_url,
               source: 'queryCache'
             });
             break;
@@ -275,9 +276,12 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     }
     
     const starred = foundImage?.starred || false;
+    const upscaled_url = foundImage?.upscaled_url || activeLightboxMedia.upscaled_url || null;
+    
     console.log('[StarPersist] 🎨 Enhanced media created:', {
       mediaId: activeLightboxMedia.id,
       starred,
+      hasUpscaledUrl: !!upscaled_url,
       foundInFilteredImages: !!filteredImages.find(img => img.id === activeLightboxMedia.id),
       source: foundImage ? 'found' : 'default',
       cacheVersion
@@ -289,6 +293,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return {
       ...activeLightboxMedia,
       starred,
+      upscaled_url,
       metadata: cleanMetadata
     };
   }, [activeLightboxMedia, filteredImages, queryClient, cacheVersion]);

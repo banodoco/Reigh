@@ -227,6 +227,7 @@ export const useImageGalleryActions = ({
       isVideo: image.isVideo,
       autoEnterEditMode,
       willSetAutoEnterEditMode: autoEnterEditMode,
+      hasUpscaledUrl: !!image.upscaled_url,
       timestamp: Date.now()
     });
     
@@ -242,6 +243,7 @@ export const useImageGalleryActions = ({
         __autoEnterEditMode: autoEnterEditMode, // Store the flag in metadata
       },
       thumbUrl: image.isVideo ? image.url : undefined, // simple fallback
+      upscaled_url: image.upscaled_url, // Pass through upscaled version URL if available
     };
     
     console.log('[EditModeDebug] Setting activeLightboxMedia with embedded autoEnterEditMode:', {
@@ -250,6 +252,7 @@ export const useImageGalleryActions = ({
       hasMetadata: !!mediaRow.metadata,
       autoEnterEditMode,
       embeddedInMetadata: mediaRow.metadata?.__autoEnterEditMode,
+      hasUpscaledUrl: !!mediaRow.upscaled_url,
       timestamp: Date.now()
     });
     
