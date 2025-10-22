@@ -236,6 +236,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [previewGenerationData, setPreviewGenerationData] = useState<GenerationRow | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number>(0);
+  const [previewImageDimensions, setPreviewImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const previousPreviewDataRef = useRef<GenerationRow | null>(null);
   
   // Source generation state (based_on) to show where this image came from
   const [sourceGenerationData, setSourceGenerationData] = useState<GenerationRow | null>(null);
@@ -272,10 +274,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     if (!previewGenerationId) {
       setPreviewGenerationData(null);
       setIsLoadingPreview(false);
+      previousPreviewDataRef.current = null;
+      setPreviewImageDimensions(null);
       return;
     }
     
     const fetchPreviewData = async () => {
+      // Store current data as previous before loading new one
+      if (previewGenerationData) {
+        previousPreviewDataRef.current = previewGenerationData;
+      }
+      
       setIsLoadingPreview(true);
       console.log('[PreviewOverlay] 📥 Fetching preview generation', {
         generationId: previewGenerationId.substring(0, 8)
@@ -309,40 +318,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     
     fetchPreviewData();
   }, [previewGenerationId]);
-  
-  // Keyboard navigation for preview overlay (ESC, Arrow keys)
-  useEffect(() => {
-    if (!previewGenerationId || !derivedGenerations) return;
-    
-    const handleKeyNavigation = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        console.log('[PreviewOverlay] ⌨️ ESC key pressed, closing preview');
-        setPreviewGenerationId(null);
-        setPreviewIndex(0);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        // Navigate to previous
-        const newIndex = Math.max(0, previewIndex - 1);
-        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
-          console.log('[PreviewOverlay] ⌨️ Left arrow pressed, going to previous', { newIndex });
-          setPreviewIndex(newIndex);
-          setPreviewGenerationId(derivedGenerations[newIndex].id);
-        }
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        // Navigate to next
-        const newIndex = Math.min(derivedGenerations.length - 1, previewIndex + 1);
-        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
-          console.log('[PreviewOverlay] ⌨️ Right arrow pressed, going to next', { newIndex });
-          setPreviewIndex(newIndex);
-          setPreviewGenerationId(derivedGenerations[newIndex].id);
-        }
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyNavigation);
-    return () => window.removeEventListener('keydown', handleKeyNavigation);
-  }, [previewGenerationId, previewIndex, derivedGenerations]);
   
   // Fetch source generation (based_on) to show origin
   useEffect(() => {
@@ -878,6 +853,40 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleAddToShot,
     handleAddToShotWithoutPosition,
   } = shotPositioningHook;
+
+  // Keyboard navigation for preview overlay (ESC, Arrow keys)
+  useEffect(() => {
+    if (!previewGenerationId || !derivedGenerations) return;
+    
+    const handleKeyNavigation = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        console.log('[PreviewOverlay] ⌨️ ESC key pressed, closing preview');
+        setPreviewGenerationId(null);
+        setPreviewIndex(0);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        // Navigate to previous
+        const newIndex = Math.max(0, previewIndex - 1);
+        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
+          console.log('[PreviewOverlay] ⌨️ Left arrow pressed, going to previous', { newIndex });
+          setPreviewIndex(newIndex);
+          setPreviewGenerationId(derivedGenerations[newIndex].id);
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        // Navigate to next
+        const newIndex = Math.min(derivedGenerations.length - 1, previewIndex + 1);
+        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
+          console.log('[PreviewOverlay] ⌨️ Right arrow pressed, going to next', { newIndex });
+          setPreviewIndex(newIndex);
+          setPreviewGenerationId(derivedGenerations[newIndex].id);
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyNavigation);
+    return () => window.removeEventListener('keydown', handleKeyNavigation);
+  }, [previewGenerationId, previewIndex, derivedGenerations]);
 
   // ========================================
   // SIMPLE HANDLERS - Just call props
@@ -3442,39 +3451,79 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   </>
                 )}
                 
-                {/* Loading State */}
-                {isLoadingPreview && (
-                  <div className="flex flex-col items-center justify-center gap-4 text-white">
-                    <Loader2 className="h-12 w-12 animate-spin" />
-                    <p className="text-sm text-white/70">Loading preview...</p>
-                  </div>
-                )}
-                
-                {/* Preview Image */}
-                {!isLoadingPreview && previewGenerationData && (
-                  <div className="relative">
-                    <img
-                      src={previewGenerationData.location}
-                      alt="Generation preview"
-                      className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10"
-                      onLoad={() => console.log('[PreviewOverlay] 🖼️ Image loaded')}
-                      onError={() => {
-                        console.error('[PreviewOverlay] ❌ Image failed to load');
-                        toast.error('Failed to load preview image');
-                        setPreviewGenerationId(null);
-                      }}
-                    />
-                    
-                    {/* Optional: Image metadata overlay */}
-                    {previewGenerationData.name && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
-                        <p className="text-white text-sm font-medium">
-                          {previewGenerationData.name}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Image Container - maintains dimensions during loading */}
+                <div 
+                  className="relative flex items-center justify-center"
+                  style={previewImageDimensions ? {
+                    width: `${previewImageDimensions.width}px`,
+                    height: `${previewImageDimensions.height}px`,
+                    minWidth: `${previewImageDimensions.width}px`,
+                    minHeight: `${previewImageDimensions.height}px`,
+                  } : {
+                    // Default size for initial load to prevent layout shift
+                    minWidth: '400px',
+                    minHeight: '400px',
+                    width: '80vw',
+                    height: '80vh',
+                    maxWidth: '90vw',
+                    maxHeight: '90vh',
+                  }}
+                >
+                  {/* Previous Image - stays visible during loading with reduced opacity */}
+                  {isLoadingPreview && previousPreviewDataRef.current && (
+                    <div className="relative opacity-50 transition-opacity">
+                      <img
+                        src={previousPreviewDataRef.current.location}
+                        alt="Previous preview"
+                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Loading Spinner Overlay */}
+                  {isLoadingPreview && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white">
+                      <Loader2 className="h-12 w-12 animate-spin" />
+                      <p className="text-sm text-white/70">Loading preview...</p>
+                    </div>
+                  )}
+                  
+                  {/* Current Preview Image */}
+                  {previewGenerationData && (
+                    <div className={cn(
+                      "relative transition-opacity duration-200",
+                      isLoadingPreview ? "opacity-0 absolute inset-0" : "opacity-100"
+                    )}>
+                      <img
+                        src={previewGenerationData.location}
+                        alt="Generation preview"
+                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10"
+                        onLoad={(e) => {
+                          console.log('[PreviewOverlay] 🖼️ Image loaded');
+                          const img = e.currentTarget;
+                          setPreviewImageDimensions({
+                            width: img.offsetWidth,
+                            height: img.offsetHeight
+                          });
+                        }}
+                        onError={() => {
+                          console.error('[PreviewOverlay] ❌ Image failed to load');
+                          toast.error('Failed to load preview image');
+                          setPreviewGenerationId(null);
+                        }}
+                      />
+                      
+                      {/* Optional: Image metadata overlay */}
+                      {previewGenerationData.name && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+                          <p className="text-white text-sm font-medium">
+                            {previewGenerationData.name}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </DialogPrimitive.Portal>

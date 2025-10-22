@@ -124,6 +124,23 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
 
   return (
     <div className={`space-y-3 p-3 bg-muted/30 rounded-lg border ${variant === 'panel' ? '' : 'w-[360px]'}`}>
+      {/* Qwen Image Edit Source Image */}
+      {showUserImage && isQwenImageEdit && qwenSourceImage && (
+        <div className="space-y-2">
+          <p className={`${config.textSize} font-medium text-muted-foreground`}>
+            Source Image
+          </p>
+          <div>
+            <img 
+              src={qwenSourceImage} 
+              alt="Source image for edit"
+              className="h-auto max-h-24 object-contain object-left rounded-sm border"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
+
       {/* User Provided Image */}
       {showUserImage && metadata.userProvidedImageUrl && !isQwenImageEdit && (
         <div className="space-y-2">
