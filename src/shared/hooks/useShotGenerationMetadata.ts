@@ -70,7 +70,7 @@ export function useShotGenerationMetadata({
           .from('shot_generations')
           .select('metadata')
           .eq('id', shotGenerationId)
-          .single();
+          .maybeSingle();
 
         if (error) {
           console.error('[MagicEditPromptPersist] ❌ DB LOAD ERROR:', {
