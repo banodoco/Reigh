@@ -467,7 +467,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // Transform to GenerationRow format (matching ShotImageManager's expected interface)
         const transformedData: GenerationRow = {
           id: data.id,
-          shotImageEntryId: shotGenerations.length > 0 ? shotGenerations[0].id : data.id, // Use shot_generation id if available
+          // Use generation id for external items; we didn't fetch shot_generation.id
+          // and this is sufficient for lightbox navigation and UI needs
+          shotImageEntryId: data.id,
           imageUrl: data.location,
           thumbUrl: data.thumbnail_url || data.location,
           location: data.location,
@@ -507,12 +509,21 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         
         // Add to external generations and get the new index immediately
         setExternalGenerations(prev => {
+          // Prevent duplicates (navigate instead)
+          const existingIdx = prev.findIndex(g => g.id === transformedData.id);
+          if (existingIdx !== -1) {
+            const newIndex = baseImages.length + existingIdx;
+            console.log('[ShotImageManager] 🔁 External generation already present, navigating to index', newIndex);
+            requestAnimationFrame(() => setLightboxIndex(newIndex));
+            return prev;
+          }
+
           const updated = [...prev, transformedData];
           // Calculate index using the updated array length
           const newIndex = baseImages.length + updated.length - 1;
           console.log('[ShotImageManager] 📍 Opening external generation at index', newIndex);
-          // Use setTimeout to ensure state has updated before setting lightbox
-          setTimeout(() => setLightboxIndex(newIndex), 0);
+          // Use RAF to ensure DOM/state is committed before switching
+          requestAnimationFrame(() => setLightboxIndex(newIndex));
           return updated;
         });
       }
