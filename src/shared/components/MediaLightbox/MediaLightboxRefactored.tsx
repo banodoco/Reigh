@@ -1601,16 +1601,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {isSpecialEditMode ? (
                     // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
                     <div className="p-6 space-y-4 w-full">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <h2 className="text-2xl font-light">Edit Image</h2>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleExitMagicEditMode}
-                          className="hover:bg-accent"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
                       </div>
                       
                       <div className="space-y-4">
