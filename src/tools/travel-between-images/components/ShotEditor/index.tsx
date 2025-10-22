@@ -678,7 +678,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
     
     // Mobile needs smaller margins due to smaller viewport
-    const galleryMargin = isMobile ? '-200px 0px 0px 0px' : '-600px 0px 0px 0px';
+    const galleryMargin = isMobile ? '-100px 0px 0px 0px' : '-300px 0px 0px 0px';
     const ctaMargin = isMobile ? '0px 0px -100px 0px' : '0px 0px -150px 0px';
     
     // Track video gallery - show floating CTA when it's scrolled out of view (top is above viewport)
