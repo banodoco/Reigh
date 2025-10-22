@@ -718,8 +718,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Unified special mode check - both inpaint and magic edit use the same layout
   const isUnifiedEditMode = isInpaintMode || isMagicEditMode;
-  // Show sidebar on tablet/larger for: task details (with valid task), special edit modes, OR videos (always on iPad)
-  const shouldShowSidePanel = (showTaskDetails && taskDetailsData?.taskId && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
+  // Show sidebar on tablet/larger for: task details (even if loading), special edit modes, OR videos (always on iPad)
+  // Note: We show sidebar immediately for showTaskDetails to prevent layout jump while task loads
+  const shouldShowSidePanel = (showTaskDetails && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
   
   // Debug layout
   React.useEffect(() => {
@@ -2027,7 +2028,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       )}
                     </div>
-                  ) : taskDetailsData && taskDetailsData.taskId ? (
+                  ) : taskDetailsData ? (
                     <div className="w-full">
                       {/* Based On display - Show source image this was derived from (ABOVE task details) */}
                       {sourceGenerationData && onOpenExternalGeneration && (
@@ -2712,7 +2713,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       </div>
                     </div>
-                  ) : taskDetailsData && taskDetailsData.taskId && (
+                  ) : taskDetailsData && (
                     <div className="w-full">
                       {/* Based On display - Show source image this was derived from (ABOVE task details) - MOBILE */}
                       {sourceGenerationData && onOpenExternalGeneration && (
