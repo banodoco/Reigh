@@ -37,7 +37,6 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePanes } from '@/shared/contexts/PanesContext';
-import MagicEditModal from '@/shared/components/MagicEditModal';
 import { ShotImageManagerMobile } from './ShotImageManager/ShotImageManagerMobile';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';

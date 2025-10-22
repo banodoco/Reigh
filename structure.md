@@ -353,7 +353,7 @@ See [README.md](README.md) for:
 - **Universal Upscale URL Prioritization**: 
   - New `src/shared/lib/imageUrlResolver.ts` utility for consistent URL resolution across codebase
   - VideoTravelToolPage now sends upscaled images (when available) for video generation tasks
-  - MagicEditModal automatically uses upscaled images as source for higher quality edits
+  - MediaLightbox edit mode automatically uses upscaled images as source for higher quality edits
   - All task creation now queries `upscaled_url` from database and prioritizes it
 
 **Usage**: Click upscale button on any image in MediaLightbox → task created → upscaled image appears when complete → toggle between versions with eye icon. Upscaled images are automatically used as high-quality inputs for subsequent video generation and editing tasks.

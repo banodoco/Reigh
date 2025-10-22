@@ -23,6 +23,7 @@ export interface UseInpaintingProps {
   maskCanvasRef: React.RefObject<HTMLCanvasElement>;
   imageContainerRef: React.RefObject<HTMLDivElement>;
   handleExitInpaintMode: () => void;
+  loras?: Array<{ url: string; strength: number }>;
 }
 
 export interface UseInpaintingReturn {
@@ -66,6 +67,7 @@ export const useInpainting = ({
   maskCanvasRef,
   imageContainerRef,
   handleExitInpaintMode,
+  loras,
 }: UseInpaintingProps): UseInpaintingReturn => {
   console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
     shotId: shotId?.substring(0, 8),
@@ -455,6 +457,7 @@ export const useInpainting = ({
         generation_id: media.id,
         shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
         tool_type: toolTypeOverride, // Override tool_type if provided (e.g., 'image-generation' when used in different contexts)
+        loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
       });
 
       console.log('[Inpaint] ✅ Inpaint tasks created successfully');

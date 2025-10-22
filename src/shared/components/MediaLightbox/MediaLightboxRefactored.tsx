@@ -40,6 +40,7 @@ import ShotSelector from '@/shared/components/ShotSelector';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 import { createBatchMagicEditTasks } from '@/shared/lib/tasks/magicEdit';
+import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
 
 // Import all extracted hooks
 import {
@@ -322,12 +323,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     canvasRef,
   } = imageFlipHook;
 
+  // In-Scene Boost state (used by both inpainting and magic edit)
+  const [isInSceneBoostEnabled, setIsInSceneBoostEnabled] = React.useState(true);
+
+  // Build loras array for inpainting if In-Scene boost is enabled
+  const inpaintLoras = React.useMemo(() => {
+    if (isInSceneBoostEnabled) {
+      return [{
+        url: 'https://huggingface.co/peteromallet/ad_motion_loras/resolve/main/in_scene_different_perspective_000019000.safetensors',
+        strength: 1.0
+      }];
+    }
+    return undefined;
+  }, [isInSceneBoostEnabled]);
+
   // Inpainting hook
   console.log('[InpaintDebug] 🔍 Passing to useInpainting hook:', {
     shotId: shotId?.substring(0, 8),
     toolTypeOverride,
     selectedProjectId: selectedProjectId?.substring(0, 8),
-    mediaId: media.id.substring(0, 8)
+    mediaId: media.id.substring(0, 8),
+    hasLoras: !!inpaintLoras,
+    lorasCount: inpaintLoras?.length || 0
   });
   
   const inpaintingHook = useInpainting({
@@ -345,6 +362,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       // The hook will handle the state reset
       // We just need to provide this callback for when the hook needs to exit
     },
+    loras: inpaintLoras,
   });
   const {
     isInpaintMode,
@@ -385,6 +403,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   const { currentShotId } = useCurrentShot();
   
+  // Prompt persistence for magic edit mode
+  const {
+    addMagicEditPrompt,
+    getLastMagicEditPrompt,
+    getLastSettings,
+    isLoading: isLoadingMetadata
+  } = useShotGenerationMetadata({
+    shotId: currentShotId || '',
+    shotGenerationId: media.id,
+    enabled: !!(currentShotId && media.id)
+  });
+  
   const handleEnterMagicEditMode = React.useCallback(() => {
     console.log('[MobilePaintDebug] ✨ Entering unified edit mode - START');
     
@@ -419,6 +449,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       handleEnterMagicEditMode();
     }
   }, [autoEnterInpaint, isInpaintMode, isMagicEditMode, isVideo, selectedProjectId, handleEnterMagicEditMode]);
+
+  // Load saved prompt and settings when entering magic edit mode (without brush strokes)
+  React.useEffect(() => {
+    if (isMagicEditMode && !isLoadingMetadata && currentShotId && brushStrokes.length === 0) {
+      const lastPrompt = getLastMagicEditPrompt();
+      const lastSettings = getLastSettings();
+      
+      if (lastPrompt && !inpaintPrompt) {
+        console.log('[MediaLightbox] Restoring saved magic edit prompt', {
+          promptLength: lastPrompt.length,
+          settings: lastSettings
+        });
+        setInpaintPrompt(lastPrompt);
+        setInpaintNumGenerations(lastSettings.numImages);
+        setIsInSceneBoostEnabled(lastSettings.isInSceneBoostEnabled);
+      }
+    }
+  }, [isMagicEditMode, isLoadingMetadata, currentShotId, brushStrokes.length, getLastMagicEditPrompt, getLastSettings, inpaintPrompt]);
 
   // Unified edit mode - merging inpaint and magic edit
   const isSpecialEditMode = isInpaintMode || isMagicEditMode;
@@ -457,6 +505,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       setMagicEditTasksCreated(false);
       
       try {
+        // Build loras array if In-Scene boost is enabled
+        const loras = [];
+        if (isInSceneBoostEnabled) {
+          loras.push({
+            url: 'https://huggingface.co/peteromallet/ad_motion_loras/resolve/main/in_scene_different_perspective_000019000.safetensors',
+            strength: 1.0
+          });
+        }
+        
         const batchParams = {
           project_id: selectedProjectId,
           prompt,
@@ -467,12 +524,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
           seed: 11111,
           shot_id: currentShotId || undefined,
           tool_type: toolTypeOverride,
-          loras: [],
+          loras: loras.length > 0 ? loras : undefined,
         };
         
-        console.log('[MediaLightbox] Creating magic edit tasks:', batchParams);
+        console.log('[MediaLightbox] Creating magic edit tasks with loras:', {
+          ...batchParams,
+          lorasEnabled: isInSceneBoostEnabled,
+          lorasCount: loras.length
+        });
         const results = await createBatchMagicEditTasks(batchParams);
         console.log(`[MediaLightbox] Created ${results.length} magic edit tasks`);
+        
+        // Save the prompt to shot generation metadata
+        if (currentShotId && media.id) {
+          try {
+            await addMagicEditPrompt(
+              prompt,
+              inpaintNumGenerations,
+              false, // Legacy parameter
+              isInSceneBoostEnabled
+            );
+            console.log('[MediaLightbox] Saved magic edit prompt to metadata');
+          } catch (error) {
+            console.error('[MediaLightbox] Failed to save prompt to metadata:', error);
+            // Don't fail the entire operation if metadata save fails
+          }
+        }
         
         setMagicEditTasksCreated(true);
         setTimeout(() => setMagicEditTasksCreated(false), 2000);
@@ -683,7 +760,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
               const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
                 const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
-                // MediaLightbox uses z-[100000], MagicEditModal uses z-[100100]
+                // MediaLightbox uses z-[100000], check if any higher z-index dialogs are open
                 return zIndex > 100000;
               });
               
@@ -1557,6 +1634,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <p className="text-xs text-muted-foreground">Generate 1-16 variations</p>
                         </div>
                         
+                        {/* In-Scene Boost Checkbox */}
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="in-scene-boost-desktop"
+                              checked={isInSceneBoostEnabled}
+                              onChange={(e) => setIsInSceneBoostEnabled(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            />
+                            <label
+                              htmlFor="in-scene-boost-desktop"
+                              className="text-sm font-medium leading-none cursor-pointer select-none"
+                            >
+                              In-Scene Boost
+                            </label>
+                          </div>
+                        </div>
+                        
                         {/* Generate Button - Unified */}
                         <Button
                           variant="default"
@@ -2173,6 +2269,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                           />
                           <p className="text-xs text-muted-foreground">1-16 variations</p>
+                        </div>
+                        
+                        {/* In-Scene Boost Checkbox */}
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id="in-scene-boost-mobile"
+                              checked={isInSceneBoostEnabled}
+                              onChange={(e) => setIsInSceneBoostEnabled(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            />
+                            <label
+                              htmlFor="in-scene-boost-mobile"
+                              className="text-xs font-medium leading-none cursor-pointer select-none"
+                            >
+                              In-Scene Boost
+                            </label>
+                          </div>
                         </div>
                         
                         {/* Generate Button - Unified */}

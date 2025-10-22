@@ -13,7 +13,6 @@ import PairRegion from './PairRegion';
 import TimelineItem from './TimelineItem';
 import { GuidanceVideoStrip } from './GuidanceVideoStrip';
 import { GuidanceVideoUploader } from './GuidanceVideoUploader';
-import { MagicEditModal } from '@/shared/components/MagicEditModal';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
@@ -130,11 +129,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const [resetGap, setResetGap] = useState<number>(50);
   const maxGap = Math.max(1, 81 - contextFrames);
   
-  // Magic Edit Modal state - lifted from TimelineItem to avoid z-index and event handling issues
-  const [isMagicEditOpen, setIsMagicEditOpen] = useState(false);
-  const [magicEditImageUrl, setMagicEditImageUrl] = useState<string>('');
-  const [magicEditShotGenerationId, setMagicEditShotGenerationId] = useState<string>('');
-  
   // File input ref for Add Images button
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -148,17 +142,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Handle reset button click
   const handleReset = () => {
     onResetFrames(resetGap, contextFrames);
-  };
-  
-  // Handle opening magic edit modal - called from TimelineItem
-  const handleOpenMagicEdit = (imageUrl: string, shotGenerationId: string) => {
-    console.log('[MagicEditModal] Opening modal at TimelineContainer level:', {
-      imageUrl: imageUrl.substring(0, 50),
-      shotGenerationId: shotGenerationId.substring(0, 8)
-    });
-    setMagicEditImageUrl(imageUrl);
-    setMagicEditShotGenerationId(shotGenerationId);
-    setIsMagicEditOpen(true);
   };
   
   // Refs
@@ -909,7 +892,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
                 onDelete={onImageDelete}
                 onDuplicate={onImageDuplicate}
-                onMagicEdit={handleOpenMagicEdit}
                 onInpaintClick={handleInpaintClick ? () => handleInpaintClick(idx) : undefined}
                 duplicatingImageId={duplicatingImageId}
                 duplicateSuccessImageId={duplicateSuccessImageId}
@@ -1057,19 +1039,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           )}
         </div>
       </div>
-      
-      {/* Magic Edit Modal - rendered at TimelineContainer level to avoid event handling conflicts */}
-      <MagicEditModal
-        isOpen={isMagicEditOpen}
-        imageUrl={magicEditImageUrl}
-        onClose={() => {
-          console.log('[MagicEditModal] Closing modal at TimelineContainer level');
-          setIsMagicEditOpen(false);
-          setMagicEditImageUrl('');
-          setMagicEditShotGenerationId('');
-        }}
-        shotGenerationId={magicEditShotGenerationId}
-      />
     </div>
   );
 };

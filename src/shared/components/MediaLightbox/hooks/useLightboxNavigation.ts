@@ -75,7 +75,7 @@ export const useLightboxNavigation = ({
    * reaches our onKeyDown handler. Capturing the event at
    * the window level avoids that issue entirely.
    * 
-   * IMPORTANT: Don't handle keys if another dialog is open on top (e.g., MagicEditModal)
+   * IMPORTANT: Don't handle keys if another dialog is open on top
    */
   useEffect(() => {
     const handleWindowKeyDown = (e: KeyboardEvent) => {
@@ -83,7 +83,7 @@ export const useLightboxNavigation = ({
       const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
       const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
         const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
-        // MediaLightbox uses z-[100000], MagicEditModal uses z-[100100]
+        // MediaLightbox uses z-[100000], check if any higher z-index dialogs are open
         return zIndex > 100000;
       });
 
