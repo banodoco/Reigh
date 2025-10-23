@@ -665,7 +665,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }, [lightboxIndex, displaySortedVideoOutputs.length]);
 
   // Add derived navigation mode support (navigates only through "Based on this" items when active)
-  const { wrappedGoNext: handleNext, wrappedGoPrev: handlePrevious } = useDerivedNavigation({
+  const { wrappedGoNext: handleNext, wrappedGoPrev: handlePrevious, hasNext: derivedHasNext, hasPrevious: derivedHasPrevious } = useDerivedNavigation({
     derivedNavContext: externalGens.derivedNavContext,
     lightboxIndex,
     currentImages: displaySortedVideoOutputs,
@@ -929,8 +929,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             showNavigation={true}
             showImageEditTools={false}
             showDownload={true}
-            hasNext={lightboxIndex < displaySortedVideoOutputs.length - 1}
-            hasPrevious={lightboxIndex > 0}
+            hasNext={derivedHasNext}
+            hasPrevious={derivedHasPrevious}
             starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
             shotId={shotId || undefined}
             showTaskDetails={!isTouchLikeDevice}

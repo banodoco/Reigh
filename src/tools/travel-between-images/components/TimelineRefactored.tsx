@@ -259,7 +259,7 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [hookCloseLightbox, externalGens]);
   
   // Add derived navigation mode support (navigates only through "Based on this" items when active)
-  const { wrappedGoNext, wrappedGoPrev } = useDerivedNavigation({
+  const { wrappedGoNext, wrappedGoPrev, hasNext: derivedHasNext, hasPrevious: derivedHasPrevious } = useDerivedNavigation({
     derivedNavContext: externalGens.derivedNavContext,
     lightboxIndex,
     currentImages,
@@ -271,8 +271,8 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Use combined images for current image and navigation
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
-  const hasNext = lightboxIndex !== null ? lightboxIndex < currentImages.length - 1 : hookHasNext;
-  const hasPrevious = lightboxIndex !== null ? lightboxIndex > 0 : hookHasPrevious;
+  const hasNext = derivedHasNext;
+  const hasPrevious = derivedHasPrevious;
 
   // Note: Removed auto-adjustment useEffect - context frames now only applied via Reset button
 

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { DerivedNavContext } from '@/shared/components/ShotImageManager/types';
 
@@ -17,10 +17,11 @@ interface UseDerivedNavigationProps {
  * 
  * When derivedNavContext is set (user clicked "Based on this" thumbnail),
  * navigation will only cycle through those specific derived generations
- * instead of all images in the view.
+ * instead of all images in the view. Also calculates hasNext/hasPrevious
+ * correctly based on the context mode.
  * 
  * @example
- * const { wrappedGoNext, wrappedGoPrev } = useDerivedNavigation({
+ * const { wrappedGoNext, wrappedGoPrev, hasNext, hasPrevious } = useDerivedNavigation({
  *   derivedNavContext: externalGens.derivedNavContext,
  *   lightboxIndex,
  *   currentImages,
@@ -86,9 +87,35 @@ export function useDerivedNavigation({
     }
   }, [derivedNavContext, lightboxIndex, currentImages, handleOpenExternalGeneration, goPrev, logPrefix]);
   
+  // Calculate hasNext/hasPrevious based on whether we're in derived navigation mode
+  const { hasNext, hasPrevious } = useMemo(() => {
+    if (lightboxIndex === null) {
+      return { hasNext: false, hasPrevious: false };
+    }
+    
+    if (derivedNavContext) {
+      // In derived navigation mode, check against derived generation IDs
+      const currentId = currentImages[lightboxIndex]?.id;
+      const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      return {
+        hasNext: currentDerivedIndex !== -1 && currentDerivedIndex < derivedNavContext.derivedGenerationIds.length - 1,
+        hasPrevious: currentDerivedIndex !== -1 && currentDerivedIndex > 0
+      };
+    } else {
+      // Normal mode, check against all current images
+      return {
+        hasNext: lightboxIndex < currentImages.length - 1,
+        hasPrevious: lightboxIndex > 0
+      };
+    }
+  }, [derivedNavContext, lightboxIndex, currentImages]);
+  
   return {
     wrappedGoNext,
-    wrappedGoPrev
+    wrappedGoPrev,
+    hasNext,
+    hasPrevious
   };
 }
 
