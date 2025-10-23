@@ -836,27 +836,35 @@ const Timeline: React.FC<TimelineProps> = ({
               return;
             }
             
-            // Not in timeline, check if it exists in database
-            console.log('[Timeline:DerivedNav] 📥 Generation not in timeline, checking database');
+            // Not in timeline - this is a derived/edited generation
+            console.log('[Timeline:DerivedNav] 📥 Derived generation not in timeline, fetching from database');
             try {
               const { data, error } = await supabase
                 .from('generations')
-                .select('id')
+                .select('*')
                 .eq('id', generationId)
                 .single();
               
               if (error) throw error;
               
               if (data) {
-                console.log('[Timeline:DerivedNav] ✅ Generation exists in database but not in timeline');
-                toast.info('This generation is not in the current timeline. It may be unpositioned or in a different shot.');
+                console.log('[Timeline:DerivedNav] ✅ Found derived generation', {
+                  generationId: data.id.substring(0, 8),
+                  type: data.type
+                });
+                
+                // For now, show a helpful message
+                // TODO: Implement external generation viewing in Timeline (like ShotImageManager)
+                toast.info('This is a derived generation. Switch to Shot Editor to view all edits of this image.', {
+                  duration: 4000
+                });
               } else {
                 console.log('[Timeline:DerivedNav] ⚠️ Generation not found');
                 toast.error('This generation could not be found.');
               }
             } catch (error) {
-              console.error('[Timeline:DerivedNav] ❌ Error checking generation:', error);
-              toast.info('This generation is not in the current timeline view.');
+              console.error('[Timeline:DerivedNav] ❌ Error fetching generation:', error);
+              toast.error('Failed to load this generation.');
             }
           }}
           onMagicEdit={(imageUrl, prompt, numImages) => {
