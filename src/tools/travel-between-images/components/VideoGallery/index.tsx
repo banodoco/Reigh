@@ -21,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Import our extracted hooks and components
 import { useGalleryPagination, useVideoHover } from './hooks';
+import { useExternalGenerations } from '@/shared/components/ShotImageManager/hooks/useExternalGenerations';
 import {
   VideoItem,
   VideoHoverPreview,
@@ -155,6 +156,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<Set<string>>(new Set());
+  
+  // Ref for lightbox index setter (needed for external generations)
+  const setLightboxIndexRef = useRef<(index: number) => void>(() => {});
+  useEffect(() => {
+    setLightboxIndexRef.current = setLightboxIndex;
+  }, [setLightboxIndex]);
   
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
@@ -398,11 +405,22 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return sorted;
   }, [videoOutputs]);
 
-  // Apply optimistic deletions to the displayed list
+  // External generations hook (same as ShotImageManager and Timeline)
+  const externalGens = useExternalGenerations({
+    selectedShotId: shotId,
+    optimisticOrder: sortedVideoOutputs,
+    images: sortedVideoOutputs,
+    setLightboxIndexRef
+  });
+
+  // Apply optimistic deletions to the displayed list and combine with external generations
   const displaySortedVideoOutputs = useMemo(() => {
-    if (optimisticallyRemovedIds.size === 0) return sortedVideoOutputs;
-    return sortedVideoOutputs.filter(v => !optimisticallyRemovedIds.has(v.id));
-  }, [sortedVideoOutputs, optimisticallyRemovedIds]);
+    const filtered = optimisticallyRemovedIds.size === 0 
+      ? sortedVideoOutputs 
+      : sortedVideoOutputs.filter(v => !optimisticallyRemovedIds.has(v.id));
+    // Combine with external generations for "Based on" navigation
+    return [...filtered, ...externalGens.externalGenerations, ...externalGens.tempDerivedGenerations];
+  }, [sortedVideoOutputs, optimisticallyRemovedIds, externalGens.externalGenerations, externalGens.tempDerivedGenerations]);
 
   // Use pagination hook
   const paginationHook = useGalleryPagination(displaySortedVideoOutputs, itemsPerPage);
@@ -899,33 +917,22 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             onNavigateToGeneration={(generationId: string) => {
               console.log('[VideoGallery:DerivedNav] 📍 Navigate to generation', {
                 generationId: generationId.substring(0, 8),
-                videoOutputsCount: displaySortedVideoOutputs.length
+                sortedVideoOutputsCount: sortedVideoOutputs.length,
+                externalGenerationsCount: externalGens.externalGenerations.length,
+                tempDerivedCount: externalGens.tempDerivedGenerations.length,
+                totalCount: displaySortedVideoOutputs.length
               });
-              // Try to find in current video outputs
+              // Search in combined videos (sorted + external + derived)
               const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
               if (index !== -1) {
-                console.log('[VideoGallery:DerivedNav] ✅ Found in video outputs at index', index);
+                console.log('[VideoGallery:DerivedNav] ✅ Found at index', index);
                 setLightboxIndex(index);
               } else {
-                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current video outputs');
-                toast.info('This generation is not in the current video gallery view');
+                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current videos');
+                toast.info('This generation is not currently loaded');
               }
             }}
-            onOpenExternalGeneration={async (generationId: string, derivedContext?: string[]) => {
-              console.log('[VideoGallery:DerivedNav] 🌐 Open external generation', {
-                generationId: generationId.substring(0, 8),
-                hasDerivedContext: !!derivedContext
-              });
-              // Try to find in current video outputs first
-              const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
-              if (index !== -1) {
-                console.log('[VideoGallery:DerivedNav] ✅ Found in video outputs at index', index);
-                setLightboxIndex(index);
-              } else {
-                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current video outputs');
-                toast.info('This video is not in the current gallery view');
-              }
-            }}
+            onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
             taskDetailsData={{
               task,
               isLoading: isLoadingTask,

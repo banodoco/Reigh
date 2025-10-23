@@ -40,13 +40,12 @@
  * 📊 SIZE REDUCTION: 1,287 lines → 347 lines (73% reduction)
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
@@ -65,6 +64,7 @@ import { useLightbox } from "./Timeline/hooks/useLightbox";
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { timelineDebugger } from "./Timeline/utils/timeline-debug";
 import { calculateMaxGap, validateGaps } from "./Timeline/utils/timeline-utils";
+import { useExternalGenerations } from "@/shared/components/ShotImageManager/hooks/useExternalGenerations";
 
 // Import components
 import TimelineControls from "./Timeline/TimelineControls";
@@ -287,23 +287,57 @@ const Timeline: React.FC<TimelineProps> = ({
     isDragInProgress
   });
 
-  // Lightbox hook
+  // Ref for lightbox index setter (needed for external generations)
+  const setLightboxIndexRef = useRef<(index: number) => void>(() => {});
+  
+  // External generations hook (same as ShotImageManager)
+  const externalGens = useExternalGenerations({
+    selectedShotId: shotId,
+    optimisticOrder: images,
+    images: images,
+    setLightboxIndexRef
+  });
+  
+  // Combine timeline images with external generations for navigation
+  const currentImages = useMemo(() => {
+    return [...images, ...externalGens.externalGenerations, ...externalGens.tempDerivedGenerations];
+  }, [images, externalGens.externalGenerations, externalGens.tempDerivedGenerations]);
+
+  // Lightbox hook  
   const isMobile = useIsMobile();
   const {
     lightboxIndex,
-    currentLightboxImage,
+    currentLightboxImage: hookLightboxImage,
     autoEnterInpaint,
     goNext,
     goPrev,
-    closeLightbox,
+    closeLightbox: hookCloseLightbox,
     openLightbox,
     openLightboxWithInpaint,
     handleDesktopDoubleClick,
     handleMobileTap,
-    hasNext,
-    hasPrevious,
+    hasNext: hookHasNext,
+    hasPrevious: hookHasPrevious,
     showNavigation
-  } = useLightbox({ images, shotId, isMobile });
+  } = useLightbox({ images: currentImages, shotId, isMobile });
+  
+  // Update the ref with the actual setter
+  useEffect(() => {
+    setLightboxIndexRef.current = openLightbox;
+  }, [openLightbox]);
+  
+  // Wrap closeLightbox to clear external generations
+  const closeLightbox = useCallback(() => {
+    externalGens.setExternalGenerations([]);
+    externalGens.setTempDerivedGenerations([]);
+    externalGens.setDerivedNavContext(null);
+    hookCloseLightbox();
+  }, [hookCloseLightbox, externalGens]);
+  
+  // Use combined images for current image and navigation
+  const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
+  const hasNext = lightboxIndex !== null ? lightboxIndex < currentImages.length - 1 : hookHasNext;
+  const hasPrevious = lightboxIndex !== null ? lightboxIndex > 0 : hookHasPrevious;
 
   // Detect tablet/iPad size (768px+) for side-by-side task details layout
   const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
@@ -809,64 +843,22 @@ const Timeline: React.FC<TimelineProps> = ({
           onNavigateToGeneration={(generationId: string) => {
             console.log('[Timeline:DerivedNav] 📍 Navigate to generation', {
               generationId: generationId.substring(0, 8),
-              imagesCount: images.length
+              timelineImagesCount: images.length,
+              externalGenerationsCount: externalGens.externalGenerations.length,
+              tempDerivedCount: externalGens.tempDerivedGenerations.length,
+              totalImagesCount: currentImages.length
             });
-            // Try to find in current timeline images
-            const index = images.findIndex((img: any) => img.id === generationId);
+            // Search in combined images (timeline + external + derived)
+            const index = currentImages.findIndex((img: any) => img.id === generationId);
             if (index !== -1) {
-              console.log('[Timeline:DerivedNav] ✅ Found in timeline at index', index);
+              console.log('[Timeline:DerivedNav] ✅ Found at index', index);
               openLightbox(index);
             } else {
-              console.log('[Timeline:DerivedNav] ⚠️ Not found in current timeline images');
-              toast.info('This generation is not in the current timeline view');
+              console.log('[Timeline:DerivedNav] ⚠️ Not found in current images');
+              toast.info('This generation is not currently loaded');
             }
           }}
-          onOpenExternalGeneration={async (generationId: string, derivedContext?: string[]) => {
-            console.log('[Timeline:DerivedNav] 🌐 Open external generation', {
-              generationId: generationId.substring(0, 8),
-              hasDerivedContext: !!derivedContext,
-              currentTimelineImagesCount: images.length
-            });
-            
-            // Try to find in current timeline images first
-            const index = images.findIndex((img: any) => img.id === generationId);
-            if (index !== -1) {
-              console.log('[Timeline:DerivedNav] ✅ Found in timeline at index', index);
-              openLightbox(index);
-              return;
-            }
-            
-            // Not in timeline - this is a derived/edited generation
-            console.log('[Timeline:DerivedNav] 📥 Derived generation not in timeline, fetching from database');
-            try {
-              const { data, error } = await supabase
-                .from('generations')
-                .select('*')
-                .eq('id', generationId)
-                .single();
-              
-              if (error) throw error;
-              
-              if (data) {
-                console.log('[Timeline:DerivedNav] ✅ Found derived generation', {
-                  generationId: data.id.substring(0, 8),
-                  type: data.type
-                });
-                
-                // For now, show a helpful message
-                // TODO: Implement external generation viewing in Timeline (like ShotImageManager)
-                toast.info('This is a derived generation. Switch to Shot Editor to view all edits of this image.', {
-                  duration: 4000
-                });
-              } else {
-                console.log('[Timeline:DerivedNav] ⚠️ Generation not found');
-                toast.error('This generation could not be found.');
-              }
-            } catch (error) {
-              console.error('[Timeline:DerivedNav] ❌ Error fetching generation:', error);
-              toast.error('Failed to load this generation.');
-            }
-          }}
+          onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation
             timelineDebugger.logEvent('Magic edit requested', { shotId, imageUrl, prompt, numImages });
