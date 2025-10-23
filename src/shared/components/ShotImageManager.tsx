@@ -497,7 +497,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           '\n  shotAssociationsCount:', (data as any).shot_generations?.length || 0,
           '\n  dataKeysCount:', dataKeys.length,
           '\n  allDataKeys:', dataKeys.join(', '),
-          '\n  hasBasedOnInKeys:', dataKeys.includes('based_on')
+          '\n  hasBasedOnInKeys:', dataKeys.includes('based_on'),
+          '\n  hasUpscaledUrl:', !!data.upscaled_url,
+          '\n  upscaledUrlValue:', data.upscaled_url,
+          '\n  location:', data.location?.substring(0, 50)
         );
         
         // Build all_shot_associations array from shot_generations relation
@@ -549,6 +552,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           '\n  basedOnValue:', data.based_on?.substring(0, 8) || null,
           '\n  hasImageUrl:', !!transformedData.imageUrl,
           '\n  hasThumbUrl:', !!transformedData.thumbUrl,
+          '\n  hasUpscaledUrl:', !!transformedData.upscaled_url,
+          '\n  upscaledUrlValue:', transformedData.upscaled_url,
           '\n  inDerivedNavMode:', !!derivedContext
         );
         
