@@ -652,16 +652,64 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Lightbox navigation - memoized for stable reference
   const handleNext = useCallback(() => {
-    if (lightboxIndex !== null) {
+    if (lightboxIndex === null) return;
+    
+    // Check if we're in derived navigation mode
+    if (externalGens.derivedNavContext) {
+      const currentId = displaySortedVideoOutputs[lightboxIndex]?.id;
+      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      console.log('[VideoGallery:DerivedNav] ➡️ Next in derived context', {
+        currentId: currentId?.substring(0, 8),
+        currentDerivedIndex,
+        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
+      });
+      
+      if (currentDerivedIndex !== -1 && currentDerivedIndex < externalGens.derivedNavContext.derivedGenerationIds.length - 1) {
+        const nextId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex + 1];
+        console.log('[VideoGallery:DerivedNav] 🎯 Navigating to next derived generation', {
+          nextId: nextId.substring(0, 8)
+        });
+        externalGens.handleOpenExternalGeneration(nextId, externalGens.derivedNavContext.derivedGenerationIds);
+      }
+    } else {
       setLightboxIndex((lightboxIndex + 1) % displaySortedVideoOutputs.length);
     }
-  }, [lightboxIndex, displaySortedVideoOutputs.length]);
+  }, [lightboxIndex, displaySortedVideoOutputs, externalGens]);
 
   const handlePrevious = useCallback(() => {
-    if (lightboxIndex !== null) {
+    if (lightboxIndex === null) return;
+    
+    // Check if we're in derived navigation mode
+    if (externalGens.derivedNavContext) {
+      const currentId = displaySortedVideoOutputs[lightboxIndex]?.id;
+      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      console.log('[VideoGallery:DerivedNav] ⬅️ Previous in derived context', {
+        currentId: currentId?.substring(0, 8),
+        currentDerivedIndex,
+        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
+      });
+      
+      if (currentDerivedIndex !== -1 && currentDerivedIndex > 0) {
+        const prevId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex - 1];
+        console.log('[VideoGallery:DerivedNav] 🎯 Navigating to previous derived generation', {
+          prevId: prevId.substring(0, 8)
+        });
+        externalGens.handleOpenExternalGeneration(prevId, externalGens.derivedNavContext.derivedGenerationIds);
+      }
+    } else {
       setLightboxIndex((lightboxIndex - 1 + displaySortedVideoOutputs.length) % displaySortedVideoOutputs.length);
     }
-  }, [lightboxIndex, displaySortedVideoOutputs.length]);
+  }, [lightboxIndex, displaySortedVideoOutputs, externalGens]);
+
+  // Lightbox close handler - clear external generations
+  const handleCloseLightbox = useCallback(() => {
+    externalGens.setExternalGenerations([]);
+    externalGens.setTempDerivedGenerations([]);
+    externalGens.setDerivedNavContext(null);
+    setLightboxIndex(null);
+  }, [externalGens]);
 
   // Optimistic delete handler: hide immediately, then delegate to parent
   const handleDeleteOptimistic = useCallback((generationId: string) => {
@@ -902,7 +950,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
               });
               return media;
             })()}
-            onClose={() => setLightboxIndex(null)}
+            onClose={handleCloseLightbox}
             onNext={handleNext}
             onPrevious={handlePrevious}
             onImageSaved={onImageSaved}

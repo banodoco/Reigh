@@ -334,6 +334,53 @@ const Timeline: React.FC<TimelineProps> = ({
     hookCloseLightbox();
   }, [hookCloseLightbox, externalGens]);
   
+  // Override navigation when in derived navigation mode (navigating through "Based on this" items)
+  const wrappedGoNext = useCallback(() => {
+    if (externalGens.derivedNavContext && lightboxIndex !== null) {
+      const currentId = currentImages[lightboxIndex]?.id;
+      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      console.log('[Timeline:DerivedNav] ➡️ Next in derived context', {
+        currentId: currentId?.substring(0, 8),
+        currentDerivedIndex,
+        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
+      });
+      
+      if (currentDerivedIndex !== -1 && currentDerivedIndex < externalGens.derivedNavContext.derivedGenerationIds.length - 1) {
+        const nextId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex + 1];
+        console.log('[Timeline:DerivedNav] 🎯 Navigating to next derived generation', {
+          nextId: nextId.substring(0, 8)
+        });
+        externalGens.handleOpenExternalGeneration(nextId, externalGens.derivedNavContext.derivedGenerationIds);
+      }
+    } else {
+      goNext();
+    }
+  }, [externalGens, lightboxIndex, currentImages, goNext]);
+  
+  const wrappedGoPrev = useCallback(() => {
+    if (externalGens.derivedNavContext && lightboxIndex !== null) {
+      const currentId = currentImages[lightboxIndex]?.id;
+      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      console.log('[Timeline:DerivedNav] ⬅️ Previous in derived context', {
+        currentId: currentId?.substring(0, 8),
+        currentDerivedIndex,
+        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
+      });
+      
+      if (currentDerivedIndex !== -1 && currentDerivedIndex > 0) {
+        const prevId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex - 1];
+        console.log('[Timeline:DerivedNav] 🎯 Navigating to previous derived generation', {
+          prevId: prevId.substring(0, 8)
+        });
+        externalGens.handleOpenExternalGeneration(prevId, externalGens.derivedNavContext.derivedGenerationIds);
+      }
+    } else {
+      goPrev();
+    }
+  }, [externalGens, lightboxIndex, currentImages, goPrev]);
+  
   // Use combined images for current image and navigation
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
   const hasNext = lightboxIndex !== null ? lightboxIndex < currentImages.length - 1 : hookHasNext;
@@ -803,8 +850,8 @@ const Timeline: React.FC<TimelineProps> = ({
           autoEnterInpaint={autoEnterInpaint}
           toolTypeOverride="travel-between-images"
           onClose={closeLightbox}
-          onNext={images.length > 1 ? goNext : undefined}
-          onPrevious={images.length > 1 ? goPrev : undefined}
+          onNext={images.length > 1 ? wrappedGoNext : undefined}
+          onPrevious={images.length > 1 ? wrappedGoPrev : undefined}
           readOnly={readOnly}
           onDelete={!readOnly ? (mediaId: string) => {
             console.log('[Timeline] Delete from lightbox', {
