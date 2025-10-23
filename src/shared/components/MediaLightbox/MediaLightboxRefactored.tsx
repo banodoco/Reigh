@@ -1253,7 +1253,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       );
                       return shouldShowWorkflowControls;
                     })() && (
-                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                      <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
                           {(() => {
@@ -2048,7 +2048,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       );
                       return shouldShowWorkflowControls;
                     })() && (
-                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                      <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
                           {(() => {
@@ -2229,6 +2229,46 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         >
                           Close edit mode
                         </Button>
+                      </div>
+                      
+                      {/* Three-way toggle: Text | Inpaint | Annotate - Mobile */}
+                      <div className="mb-3 flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                        <button
+                          onClick={() => setEditMode('text')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs transition-all",
+                            editMode === 'text'
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <Type className="h-3 w-3" />
+                          Text
+                        </button>
+                        <button
+                          onClick={() => setEditMode('inpaint')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs transition-all",
+                            editMode === 'inpaint'
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <Paintbrush className="h-3 w-3" />
+                          Inpaint
+                        </button>
+                        <button
+                          onClick={() => setEditMode('annotate')}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs transition-all",
+                            editMode === 'annotate'
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Annotate
+                        </button>
                       </div>
                       
                       <div className="space-y-3">
@@ -2846,7 +2886,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     );
                     return shouldShowWorkflowControls;
                   })() && (
-                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                    <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                       <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                         {/* Shot Selection and Add to Shot */}
                         {(() => {
