@@ -43,7 +43,10 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   duplicateSuccessImageId,
   projectAspectRatio,
   batchVideoFrames = DEFAULT_BATCH_VIDEO_FRAMES,
-  onGridDoubleClick
+  onGridDoubleClick,
+  onImageUpload,
+  isUploadingImage,
+  readOnly = false
 }) => {
   return (
     <div
@@ -84,6 +87,15 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
           </div>
         );
       })}
+      
+      {/* Add Images card - appears as next item in grid */}
+      {onImageUpload && !readOnly && (
+        <AddImagesCard
+          projectAspectRatio={projectAspectRatio}
+          onImageUpload={onImageUpload}
+          isUploadingImage={isUploadingImage}
+        />
+      )}
     </div>
   );
 };

@@ -11,7 +11,6 @@ import {
 import { ShotImageManagerProps } from './types';
 import { GRID_COLS_CLASSES } from './constants';
 import { ImageGrid } from './components/ImageGrid';
-import { AddImagesCard } from './components/AddImagesCard';
 import { SelectionActionBar } from './components/SelectionActionBar';
 import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog';
 import { MultiImagePreview, SingleImagePreview } from '../ImageDragPreview';
@@ -99,15 +98,10 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               selection.setSelectedIds([]);
               selection.setLastSelectedIndex(null);
             }}
+            onImageUpload={props.onImageUpload}
+            isUploadingImage={props.isUploadingImage}
+            readOnly={props.readOnly}
           />
-          
-          {props.onImageUpload && !props.readOnly && (
-            <AddImagesCard
-              projectAspectRatio={props.projectAspectRatio}
-              onImageUpload={props.onImageUpload}
-              isUploadingImage={props.isUploadingImage}
-            />
-          )}
         </SortableContext>
         
         <DragOverlay>

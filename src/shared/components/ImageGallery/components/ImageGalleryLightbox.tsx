@@ -4,6 +4,8 @@ import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetai
 import { GenerationRow, Shot } from "@/types/shots";
 import { GeneratedImageWithMetadata } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface ImageGalleryLightboxProps {
   // Lightbox state
@@ -466,16 +468,69 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     }
   }, [filteredImages, setActiveLightboxIndex, activeLightboxMedia?.id]);
 
+  // Handle opening external generation (not in current filtered list)
+  const handleOpenExternalGeneration = React.useCallback(async (generationId: string, derivedContext?: string[]) => {
+    console.log('[DerivedNav:Gallery] 🌐 handleOpenExternalGeneration called', {
+      generationId: generationId.substring(0, 8),
+      hasDerivedContext: !!derivedContext,
+      derivedContextLength: derivedContext?.length || 0
+    });
+
+    // First try to find in current filtered images
+    const index = filteredImages.findIndex(img => img.id === generationId);
+    if (index !== -1 && setActiveLightboxIndex) {
+      console.log('[DerivedNav:Gallery] ✅ Found in filtered images, navigating locally', {
+        index,
+        generationId: generationId.substring(0, 8)
+      });
+      setActiveLightboxIndex(index);
+      return;
+    }
+
+    // Not in filtered images, fetch from Supabase
+    console.log('[DerivedNav:Gallery] 📥 Fetching external generation from database', {
+      generationId: generationId.substring(0, 8)
+    });
+
+    try {
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', generationId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        console.log('[DerivedNav:Gallery] ✅ Fetched external generation, updating lightbox', {
+          generationId: data.id.substring(0, 8),
+          type: data.type
+        });
+
+        // For ImageGallery, we don't have a mechanism to add to filtered images temporarily
+        // So we'll just show a message that the image is external
+        toast.info('This generation is not in the current filter. Please adjust filters to view it.');
+      } else {
+        console.log('[DerivedNav:Gallery] ⚠️ No data returned from query');
+        toast.error('Generation not found');
+      }
+    } catch (error) {
+      console.error('[DerivedNav:Gallery] ❌ Failed to fetch external generation:', error);
+      toast.error('Failed to load generation');
+    }
+  }, [filteredImages, setActiveLightboxIndex]);
+
   // Debug: Log when navigation handler is created
   React.useEffect(() => {
     console.log('[DerivedNav:Gallery] 🔧 Navigation handler state', {
       hasHandleNavigateToGeneration: !!handleNavigateToGeneration,
+      hasHandleOpenExternalGeneration: !!handleOpenExternalGeneration,
       hasSetActiveLightboxIndex: !!setActiveLightboxIndex,
       filteredImagesCount: filteredImages.length,
       handlerType: typeof handleNavigateToGeneration,
       timestamp: Date.now()
     });
-  }, [handleNavigateToGeneration, setActiveLightboxIndex, filteredImages.length]);
+  }, [handleNavigateToGeneration, handleOpenExternalGeneration, setActiveLightboxIndex, filteredImages.length]);
 
   return (
     <>
@@ -542,6 +597,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
             });
             return handleNavigateToGeneration;
           })()}
+          onOpenExternalGeneration={handleOpenExternalGeneration}
         />
       )}
 
