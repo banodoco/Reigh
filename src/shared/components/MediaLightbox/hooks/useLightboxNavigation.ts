@@ -92,6 +92,20 @@ export const useLightboxNavigation = ({
         return;
       }
 
+      // Check if user is currently typing in a text input field
+      const activeElement = document.activeElement;
+      const isTyping = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        (activeElement as HTMLElement).contentEditable === 'true' ||
+        (activeElement as HTMLElement).isContentEditable
+      );
+
+      // Don't handle arrow keys if user is typing (but still handle Escape)
+      if (isTyping && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        return;
+      }
+
       if (e.key === 'ArrowLeft' && onPrevious) {
         e.preventDefault();
         onPrevious();

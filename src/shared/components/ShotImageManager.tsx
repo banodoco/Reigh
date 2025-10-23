@@ -192,6 +192,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // This allows the user to select any shot when viewing an external generation
   const [externalGenLightboxSelectedShot, setExternalGenLightboxSelectedShot] = useState<string | undefined>(selectedShotId);
   
+  // State for tracking navigation context when browsing through "Based On" derived generations
+  // When set, chevron navigation is limited to these specific generation IDs
+  const [derivedNavContext, setDerivedNavContext] = useState<{
+    sourceGenerationId: string;
+    derivedGenerationIds: string[];
+  } | null>(null);
+  
   // Get project ID from context
   const { selectedProjectId } = useProject();
   
@@ -404,12 +411,35 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   }, [externalGenLightboxSelectedShot, selectedProjectId, addToShotWithoutPositionMutation]);
   
   // Handler to fetch and open an external generation (not in current shot)
-  const handleOpenExternalGeneration = useCallback(async (generationId: string) => {
+  // derivedContext: Optional array of generation IDs to enable "Based On" navigation mode
+  const handleOpenExternalGeneration = useCallback(async (
+    generationId: string, 
+    derivedContext?: string[]
+  ) => {
     console.log('[BasedOnLineage] 🌐 Opening external generation:',
       '\n  targetGenerationId:', generationId.substring(0, 8),
       '\n  currentExternalCount:', externalGenerations.length,
-      '\n  currentImagesCount:', optimisticOrder.length || images.length
+      '\n  currentImagesCount:', optimisticOrder.length || images.length,
+      '\n  hasDerivedContext:', !!derivedContext,
+      '\n  derivedContextCount:', derivedContext?.length || 0
     );
+    
+    // If derived context is provided, set up derived navigation mode
+    // If not provided, clear any existing context (exits derived nav mode)
+    if (derivedContext && derivedContext.length > 0) {
+      console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
+        targetId: generationId.substring(0, 8),
+        totalDerived: derivedContext.length,
+        derivedIds: derivedContext.map(id => id.substring(0, 8))
+      });
+      setDerivedNavContext({
+        sourceGenerationId: generationId, // We'll update this to the actual source later if needed
+        derivedGenerationIds: derivedContext
+      });
+    } else if (derivedNavContext !== null) {
+      console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
+      setDerivedNavContext(null);
+    }
     
     // First, check if generation already exists in current images
     const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
@@ -545,6 +575,18 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Fetch task details for the current lightbox image (must be after currentImages is defined)
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
+  
+  // Close lightbox if current image no longer exists (e.g., deleted)
+  useEffect(() => {
+    if (lightboxIndex !== null && lightboxIndex >= currentImages.length) {
+      console.log('[ShotImageManager] Current lightbox index out of bounds, closing lightbox', {
+        lightboxIndex,
+        imagesLength: currentImages.length
+      });
+      setLightboxIndex(null);
+      setShouldAutoEnterInpaint(false);
+    }
+  }, [lightboxIndex, currentImages.length]);
   
   const { data: taskMapping } = useTaskFromUnifiedCache(
     currentLightboxImage?.id || null
@@ -1208,17 +1250,65 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     }
   };
 
-  const handleNext = () => {
-    if (lightboxIndex !== null && lightboxIndex < currentImages.length - 1) {
-      setLightboxIndex(lightboxIndex + 1);
+  const handleNext = useCallback(() => {
+    if (lightboxIndex === null) return;
+    
+    // Check if we're in derived navigation mode
+    if (derivedNavContext) {
+      const currentId = currentImages[lightboxIndex]?.id;
+      const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      console.log('[DerivedNav] ➡️ Next in derived context', {
+        currentId: currentId?.substring(0, 8),
+        currentDerivedIndex,
+        totalDerived: derivedNavContext.derivedGenerationIds.length
+      });
+      
+      if (currentDerivedIndex !== -1 && currentDerivedIndex < derivedNavContext.derivedGenerationIds.length - 1) {
+        const nextId = derivedNavContext.derivedGenerationIds[currentDerivedIndex + 1];
+        console.log('[DerivedNav] 🎯 Navigating to next derived generation', {
+          nextId: nextId.substring(0, 8)
+        });
+        // Open next derived generation (maintains context)
+        handleOpenExternalGeneration(nextId, derivedNavContext.derivedGenerationIds);
+      }
+    } else {
+      // Normal navigation through currentImages
+      if (lightboxIndex < currentImages.length - 1) {
+        setLightboxIndex(lightboxIndex + 1);
+      }
     }
-  };
+  }, [lightboxIndex, currentImages, derivedNavContext, handleOpenExternalGeneration]);
 
-  const handlePrevious = () => {
-    if (lightboxIndex !== null && lightboxIndex > 0) {
-      setLightboxIndex(lightboxIndex - 1);
+  const handlePrevious = useCallback(() => {
+    if (lightboxIndex === null) return;
+    
+    // Check if we're in derived navigation mode
+    if (derivedNavContext) {
+      const currentId = currentImages[lightboxIndex]?.id;
+      const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
+      
+      console.log('[DerivedNav] ⬅️ Previous in derived context', {
+        currentId: currentId?.substring(0, 8),
+        currentDerivedIndex,
+        totalDerived: derivedNavContext.derivedGenerationIds.length
+      });
+      
+      if (currentDerivedIndex !== -1 && currentDerivedIndex > 0) {
+        const prevId = derivedNavContext.derivedGenerationIds[currentDerivedIndex - 1];
+        console.log('[DerivedNav] 🎯 Navigating to previous derived generation', {
+          prevId: prevId.substring(0, 8)
+        });
+        // Open previous derived generation (maintains context)
+        handleOpenExternalGeneration(prevId, derivedNavContext.derivedGenerationIds);
+      }
+    } else {
+      // Normal navigation through currentImages
+      if (lightboxIndex > 0) {
+        setLightboxIndex(lightboxIndex - 1);
+      }
     }
-  };
+  }, [lightboxIndex, currentImages, derivedNavContext, handleOpenExternalGeneration]);
 
   const activeImage = activeId ? currentImages.find((img) => img.shotImageEntryId === activeId) : null;
 
@@ -1421,11 +1511,36 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           const baseImagesCount = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder.length : (images || []).length;
           const isExternalGen = lightboxIndex >= baseImagesCount;
           
-          console.log('[ShotImageManager:Mobile] Rendering lightbox', {
+          // Calculate hasNext/hasPrevious based on derived navigation context or normal navigation
+          let hasNext: boolean;
+          let hasPrevious: boolean;
+          
+          if (derivedNavContext) {
+            // In derived navigation mode - check position within derived list
+            const currentId = currentImages[lightboxIndex]?.id;
+            const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
+            hasNext = currentDerivedIndex !== -1 && currentDerivedIndex < derivedNavContext.derivedGenerationIds.length - 1;
+            hasPrevious = currentDerivedIndex !== -1 && currentDerivedIndex > 0;
+          } else {
+            // Normal navigation mode - check position in currentImages
+            hasNext = lightboxIndex < currentImages.length - 1;
+            hasPrevious = lightboxIndex > 0;
+          }
+          
+          console.log('[ShotImageManager:Mobile] 🎬 Rendering lightbox', {
             lightboxIndex,
             baseImagesCount,
             isExternalGen,
-            currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId
+            currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId,
+            mediaId: currentImages[lightboxIndex]?.id?.substring(0, 8),
+            mediaType: currentImages[lightboxIndex]?.type,
+            allShots: allShots?.length || 0,
+            onAddToShot: isExternalGen ? '✅ handleExternalGenAddToShot' : (onAddToShot ? '✅ onAddToShot' : '❌ None'),
+            onShotChange: isExternalGen ? '✅ externalGenShotChange' : (onShotChange ? '✅ onShotChange' : '❌ None'),
+            onCreateShot: onCreateShot ? '✅ Yes' : '❌ None',
+            inDerivedNavMode: !!derivedNavContext,
+            hasNext,
+            hasPrevious
           });
           
           return (
@@ -1438,6 +1553,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
                 setLightboxIndex(null);
                 setShouldAutoEnterInpaint(false);
+                // Clear derived navigation context when closing
+                setDerivedNavContext(null);
                 // Reset external gen shot selector when closing
                 if (isExternalGen) {
                   setExternalGenLightboxSelectedShot(selectedShotId);
@@ -1450,8 +1567,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               showImageEditTools={true}
               showDownload={true}
               showMagicEdit={true}
-              hasNext={lightboxIndex < currentImages.length - 1}
-              hasPrevious={lightboxIndex > 0}
+              hasNext={hasNext}
+              hasPrevious={hasPrevious}
               starred={(currentImages[lightboxIndex] as any).starred || false}
               onMagicEdit={onMagicEdit}
               // Task details functionality - show on tablet+ (768px+), hide on mobile
@@ -1722,11 +1839,36 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         const baseImagesCount = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder.length : (images || []).length;
         const isExternalGen = lightboxIndex >= baseImagesCount;
         
-        console.log('[ShotImageManager:Desktop] Rendering lightbox', {
+        // Calculate hasNext/hasPrevious based on derived navigation context or normal navigation
+        let hasNext: boolean;
+        let hasPrevious: boolean;
+        
+        if (derivedNavContext) {
+          // In derived navigation mode - check position within derived list
+          const currentId = currentImages[lightboxIndex]?.id;
+          const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
+          hasNext = currentDerivedIndex !== -1 && currentDerivedIndex < derivedNavContext.derivedGenerationIds.length - 1;
+          hasPrevious = currentDerivedIndex !== -1 && currentDerivedIndex > 0;
+        } else {
+          // Normal navigation mode - check position in currentImages
+          hasNext = lightboxIndex < currentImages.length - 1;
+          hasPrevious = lightboxIndex > 0;
+        }
+        
+        console.log('[ShotImageManager:Desktop] 🎬 Rendering lightbox', {
           lightboxIndex,
           baseImagesCount,
           isExternalGen,
-          currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId
+          currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId,
+          mediaId: currentImages[lightboxIndex]?.id?.substring(0, 8),
+          mediaType: currentImages[lightboxIndex]?.type,
+          allShots: allShots?.length || 0,
+          onAddToShot: isExternalGen ? '✅ handleExternalGenAddToShot' : (onAddToShot ? '✅ onAddToShot' : '❌ None'),
+          onShotChange: isExternalGen ? '✅ externalGenShotChange' : (onShotChange ? '✅ onShotChange' : '❌ None'),
+          onCreateShot: onCreateShot ? '✅ Yes' : '❌ None',
+          inDerivedNavMode: !!derivedNavContext,
+          hasNext,
+          hasPrevious
         });
         
         return (
@@ -1738,6 +1880,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             onClose={() => {
               setLightboxIndex(null);
               setShouldAutoEnterInpaint(false);
+              // Clear derived navigation context when closing
+              setDerivedNavContext(null);
               // Reset external gen shot selector when closing
               if (isExternalGen) {
                 setExternalGenLightboxSelectedShot(selectedShotId);
@@ -1745,15 +1889,26 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             }}
             onNext={handleNext}
             onPrevious={handlePrevious}
+            onDelete={!readOnly ? (mediaId: string) => {
+              const currentImage = currentImages[lightboxIndex];
+              console.log('[ShotImageManager] Delete from lightbox', {
+                mediaId,
+                shotImageEntryId: currentImage.shotImageEntryId,
+                isExternalGen
+              });
+              // Use shotImageEntryId for deletion to target the specific shot_generations entry
+              onImageDelete(currentImage.shotImageEntryId);
+            } : undefined}
             onImageSaved={onImageSaved ? async (newImageUrl: string, createNew?: boolean) => await onImageSaved(currentImages[lightboxIndex].id, newImageUrl, createNew) : undefined}
             showNavigation={true}
             showImageEditTools={true}
             showDownload={true}
             showMagicEdit={true}
-            hasNext={lightboxIndex < currentImages.length - 1}
-            hasPrevious={lightboxIndex > 0}
+            hasNext={hasNext}
+            hasPrevious={hasPrevious}
             starred={(currentImages[lightboxIndex] as any).starred || false}
             onMagicEdit={onMagicEdit}
+            readOnly={readOnly}
             // Task details functionality - show on tablet+ (768px+), hide on mobile
             showTaskDetails={isTabletOrLarger}
             taskDetailsData={{

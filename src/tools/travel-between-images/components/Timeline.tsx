@@ -362,6 +362,14 @@ const Timeline: React.FC<TimelineProps> = ({
     }
   }, [currentLightboxImage, lightboxIndex, images, hasNext, hasPrevious]);
 
+  // Close lightbox if current image no longer exists (e.g., deleted)
+  useEffect(() => {
+    if (lightboxIndex !== null && !currentLightboxImage) {
+      console.log('[Timeline] Current lightbox image no longer exists, closing lightbox');
+      closeLightbox();
+    }
+  }, [lightboxIndex, currentLightboxImage, closeLightbox]);
+
   // Listen for star updates and refetch shot data
   useEffect(() => {
     const handleStarUpdated = (event: Event) => {
@@ -762,6 +770,14 @@ const Timeline: React.FC<TimelineProps> = ({
           onNext={images.length > 1 ? goNext : undefined}
           onPrevious={images.length > 1 ? goPrev : undefined}
           readOnly={readOnly}
+          onDelete={!readOnly ? (mediaId: string) => {
+            console.log('[Timeline] Delete from lightbox', {
+              mediaId,
+              shotImageEntryId: currentLightboxImage.shotImageEntryId
+            });
+            // Use shotImageEntryId for deletion to target the specific shot_generations entry
+            onImageDelete(currentLightboxImage.shotImageEntryId);
+          } : undefined}
           onImageSaved={async (newUrl: string, createNew?: boolean) => {
             console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
               imageId: currentLightboxImage.id,

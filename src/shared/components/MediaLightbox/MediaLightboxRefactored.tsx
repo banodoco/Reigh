@@ -141,7 +141,8 @@ interface MediaLightboxProps {
   // Navigation to specific generation
   onNavigateToGeneration?: (generationId: string) => void;
   // Open external generation (fetch from DB if not in current context)
-  onOpenExternalGeneration?: (generationId: string) => Promise<void>;
+  // Optional derivedContext array enables "Based On" navigation mode
+  onOpenExternalGeneration?: (generationId: string, derivedContext?: string[]) => Promise<void>;
   // Shot ID for star persistence
   shotId?: string;
 }
@@ -220,6 +221,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     '\n  mediaKeys:', mediaKeys.join(', '),
     '\n  hasBasedOnInKeys:', mediaKeys.includes('based_on')
   );
+  
+  // DEBUG: Log props for shot selector visibility
+  console.log('[ShotSelectorDebug] 📍 MediaLightbox props for shot controls:', 
+    '\n  onAddToShot:', !!onAddToShot,
+    '\n  onDelete:', !!onDelete,
+    '\n  onApplySettings:', !!onApplySettings,
+    '\n  allShots:', allShots,
+    '\n  allShots.length:', allShots?.length || 0,
+    '\n  selectedShotId:', selectedShotId,
+    '\n  onShotChange:', !!onShotChange,
+    '\n  onCreateShot:', !!onCreateShot,
+    '\n  onNavigateToShot:', !!onNavigateToShot,
+    '\n  mediaType:', media.type,
+    '\n  readOnly:', readOnly
+  );
 
   // Refs
   const contentRef = useRef<HTMLDivElement>(null);
@@ -230,12 +246,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Basic state - only UI state remains here
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
-  
-  // Preview overlay state for quick preview of derived generations
-  const [previewGenerationId, setPreviewGenerationId] = useState<string | null>(null);
-  const [previewGenerationData, setPreviewGenerationData] = useState<GenerationRow | null>(null);
-  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState<number>(0);
   const [previewImageDimensions, setPreviewImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const previousPreviewDataRef = useRef<GenerationRow | null>(null);
   
@@ -268,56 +278,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
-  // Fetch preview generation data when preview is requested
-  useEffect(() => {
-    if (!previewGenerationId) {
-      setPreviewGenerationData(null);
-      setIsLoadingPreview(false);
-      previousPreviewDataRef.current = null;
-      setPreviewImageDimensions(null);
-      return;
-    }
-    
-    const fetchPreviewData = async () => {
-      // Store current data as previous before loading new one
-      if (previewGenerationData) {
-        previousPreviewDataRef.current = previewGenerationData;
-      }
-      
-      setIsLoadingPreview(true);
-      console.log('[PreviewOverlay] 📥 Fetching preview generation', {
-        generationId: previewGenerationId.substring(0, 8)
-      });
-      
-      try {
-        const { data, error } = await supabase
-          .from('generations')
-          .select('*')
-          .eq('id', previewGenerationId)
-          .single();
-        
-        if (error) throw error;
-        
-        if (data) {
-          console.log('[PreviewOverlay] ✅ Fetched preview data', {
-            id: data.id.substring(0, 8),
-            type: data.type,
-            location: data.location?.substring(0, 50)
-          });
-          setPreviewGenerationData(data);
-        }
-      } catch (error) {
-        console.error('[PreviewOverlay] ❌ Failed to fetch preview:', error);
-        toast.error('Failed to load preview');
-        setPreviewGenerationId(null);
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    };
-    
-    fetchPreviewData();
-  }, [previewGenerationId]);
   
   // Fetch source generation (based_on) to show origin
   useEffect(() => {
@@ -701,8 +661,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }
         
         setMagicEditTasksCreated(true);
-        setTimeout(() => setMagicEditTasksCreated(false), 2000);
-        toast.success(`Created ${results.length} magic edit tasks`);
+        setTimeout(() => setMagicEditTasksCreated(false), 3000);
       } catch (error) {
         console.error('[MediaLightbox] Error creating magic edit tasks:', error);
         toast.error('Failed to create magic edit tasks');
@@ -854,40 +813,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleAddToShotWithoutPosition,
   } = shotPositioningHook;
 
-  // Keyboard navigation for preview overlay (ESC, Arrow keys)
-  useEffect(() => {
-    if (!previewGenerationId || !derivedGenerations) return;
-    
-    const handleKeyNavigation = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        console.log('[PreviewOverlay] ⌨️ ESC key pressed, closing preview');
-        setPreviewGenerationId(null);
-        setPreviewIndex(0);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        // Navigate to previous
-        const newIndex = Math.max(0, previewIndex - 1);
-        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
-          console.log('[PreviewOverlay] ⌨️ Left arrow pressed, going to previous', { newIndex });
-          setPreviewIndex(newIndex);
-          setPreviewGenerationId(derivedGenerations[newIndex].id);
-        }
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        // Navigate to next
-        const newIndex = Math.min(derivedGenerations.length - 1, previewIndex + 1);
-        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
-          console.log('[PreviewOverlay] ⌨️ Right arrow pressed, going to next', { newIndex });
-          setPreviewIndex(newIndex);
-          setPreviewGenerationId(derivedGenerations[newIndex].id);
-        }
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyNavigation);
-    return () => window.removeEventListener('keydown', handleKeyNavigation);
-  }, [previewGenerationId, previewIndex, derivedGenerations]);
-
   // ========================================
   // SIMPLE HANDLERS - Just call props
   // ========================================
@@ -898,7 +823,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   const handleDelete = () => {
     if (onDelete) {
+      console.log('[MediaLightbox] Delete button clicked', {
+        mediaId: media.id,
+        hasNext: onNext && hasNext,
+        hasPrevious: onPrevious && hasPrevious
+      });
+      
+      // Delete the item - the parent will handle navigation automatically
+      // When the array shrinks, the current index will:
+      // - Show the next item if we're in the middle (natural array shift)
+      // - Show the previous item if we were at the end
+      // - Close the lightbox if this was the last item
       onDelete(media.id);
+      
+      // IMPORTANT: Don't call onNext/onPrevious here!
+      // The parent component's state will update and handle the transition naturally.
+      // If we call navigation functions here, we'll skip an item because:
+      // 1. Delete shrinks array and index already points to next item
+      // 2. Then calling onNext() advances index again, skipping an item
     }
   };
 
@@ -1612,7 +1554,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                     </div>
 
-                    {/* Top Right Controls - Save, Download */}
+                    {/* Top Right Controls - Save, Download, Delete */}
                     <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
 
                       {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
@@ -1637,26 +1579,78 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
 
                       {showDownload && !readOnly && !isSpecialEditMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload();
-                          }}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownload();
+                              }}
+                              className="bg-black/50 hover:bg-black/70 text-white"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
+                        </Tooltip>
+                      )}
+                      
+                      {/* Delete Button */}
+                      {onDelete && !readOnly && !isVideo && !isSpecialEditMode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete();
+                              }}
+                              disabled={isDeleting === media.id}
+                              className="bg-red-600/80 hover:bg-red-600 text-white"
+                            >
+                              {isDeleting === media.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">Delete from timeline</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
+                    {(() => {
+                      const shouldShowWorkflowControls = (onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode;
+                      console.log('[ShotSelectorDebug] 🎯 Bottom Workflow Controls render check:', 
+                        '\n  shouldShowWorkflowControls:', shouldShowWorkflowControls,
+                        '\n  onAddToShot:', !!onAddToShot,
+                        '\n  onDelete:', !!onDelete,
+                        '\n  onApplySettings:', !!onApplySettings,
+                        '\n  isSpecialEditMode:', isSpecialEditMode,
+                        '\n  isInpaintMode:', isInpaintMode,
+                        '\n  isMagicEditMode:', isMagicEditMode
+                      );
+                      return shouldShowWorkflowControls;
+                    })() && (
                       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
-                          {onAddToShot && allShots.length > 0 && !isVideo && (
+                          {(() => {
+                            const shouldShowShotSelector = onAddToShot && allShots.length > 0 && !isVideo;
+                            console.log('[ShotSelectorDebug] 🎯 ShotSelector render check:', 
+                              '\n  shouldShowShotSelector:', shouldShowShotSelector,
+                              '\n  onAddToShot:', !!onAddToShot,
+                              '\n  allShots.length:', allShots?.length || 0,
+                              '\n  isVideo:', isVideo,
+                              '\n  mediaType:', media.type
+                            );
+                            return shouldShowShotSelector;
+                          })() && (
                             <>
                               <ShotSelector
                                 value={selectedShotId || ''}
@@ -1809,8 +1803,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             <button
                               onClick={async () => {
                                 console.log('[BasedOn] 🖼️ Navigating to source generation', {
-                                  sourceId: sourceGenerationData.id.substring(0, 8)
+                                  sourceId: sourceGenerationData.id.substring(0, 8),
+                                  clearingDerivedContext: true
                                 });
+                                // Clear derived context by not passing it - exits derived nav mode
                                 await onOpenExternalGeneration(sourceGenerationData.id);
                               }}
                               className="mb-3 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
@@ -1910,7 +1906,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
                             <>
                               <CheckCircle className="h-4 w-4 mr-2" />
-                              Success!
+                              {brushStrokes.length > 0 ? 'Success!' : 'Submitted, results will appear below'}
                             </>
                           ) : brushStrokes.length > 0 ? (
                             <>
@@ -1978,83 +1974,52 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               return (
                               <div
                                 key={derived.id}
-                                className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
+                                className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
+                                onClick={async () => {
+                                  console.log('[DerivedNav] 🖼️ Thumbnail clicked', {
+                                    derivedId: derived.id.substring(0, 8),
+                                    derivedUrl: derived.location,
+                                    currentMediaId: media.id.substring(0, 8),
+                                    hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                    hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                    timestamp: Date.now()
+                                  });
+                                  
+                                  // Prefer onOpenExternalGeneration (handles both in-context and external)
+                                  if (onOpenExternalGeneration) {
+                                    console.log('[DerivedNav] 🌐 Using onOpenExternalGeneration (universal handler)', {
+                                      derivedId: derived.id.substring(0, 8),
+                                      sourceId: media.id.substring(0, 8),
+                                      passingDerivedContext: true,
+                                      derivedCount: derivedGenerations?.length || 0
+                                    });
+                                    // Pass the full derived context for navigation
+                                    await onOpenExternalGeneration(
+                                      derived.id, 
+                                      derivedGenerations?.map(d => d.id) || []
+                                    );
+                                  } else if (onNavigateToGeneration) {
+                                    // Fallback to navigate-only mode (ImageGallery context)
+                                    console.log('[DerivedNav] 🎯 Falling back to onNavigateToGeneration', {
+                                      derivedId: derived.id.substring(0, 8)
+                                    });
+                                    onNavigateToGeneration(derived.id);
+                                  } else {
+                                    console.error('[DerivedNav] ❌ No navigation handlers available!');
+                                  }
+                                }}
                               >
                                 <img
                                   src={derived.thumbUrl}
                                   alt="Derived generation"
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-contain bg-black/20"
                                 />
                                 
-                                {/* Hover overlay with action buttons */}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          console.log('[DerivedNav] 🔍 Eye button clicked (preview overlay)', {
-                                            derivedId: derived.id.substring(0, 8),
-                                            derivedUrl: derived.location,
-                                            currentMediaId: media.id.substring(0, 8),
-                                            actualIndex,
-                                            timestamp: Date.now()
-                                          });
-                                          
-                                          // Show floating preview overlay with index
-                                          setPreviewIndex(actualIndex);
-                                          setPreviewGenerationId(derived.id);
-                                        }}
-                                        className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="z-[100002]">Quick preview</TooltipContent>
-                                  </Tooltip>
-                                  
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          console.log('[DerivedNav] 🚀 Gallery jump button clicked', {
-                                            derivedId: derived.id.substring(0, 8),
-                                            derivedUrl: derived.location,
-                                            currentMediaId: media.id.substring(0, 8),
-                                            hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                            hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                            timestamp: Date.now()
-                                          });
-                                          
-                                          // Prefer onOpenExternalGeneration (handles both in-context and external)
-                                          if (onOpenExternalGeneration) {
-                                            console.log('[DerivedNav] 🌐 Using onOpenExternalGeneration (universal handler)', {
-                                              derivedId: derived.id.substring(0, 8),
-                                              sourceId: media.id.substring(0, 8)
-                                            });
-                                            await onOpenExternalGeneration(derived.id);
-                                          } else if (onNavigateToGeneration) {
-                                            // Fallback to navigate-only mode (ImageGallery context)
-                                            console.log('[DerivedNav] 🎯 Falling back to onNavigateToGeneration', {
-                                              derivedId: derived.id.substring(0, 8)
-                                            });
-                                            onNavigateToGeneration(derived.id);
-                                          } else {
-                                            console.error('[DerivedNav] ❌ No navigation handlers available!');
-                                          }
-                                        }}
-                                        className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
-                                      >
-                                        <Maximize2 className="h-4 w-4" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="z-[100002]">Open fully</TooltipContent>
-                                  </Tooltip>
-                                </div>
+                                {/* Simple hover overlay - no buttons */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
                                 
                                 {derived.starred && (
-                                  <div className="absolute top-1 right-1 z-10">
+                                  <div className="absolute top-1 right-1 z-10 pointer-events-none">
                                     <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                   </div>
                                 )}
@@ -2073,8 +2038,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <button
                             onClick={async () => {
                               console.log('[BasedOn:NonEditTaskDetails] 🖼️ Navigating to source generation', {
-                                sourceId: sourceGenerationData.id.substring(0, 8)
+                                sourceId: sourceGenerationData.id.substring(0, 8),
+                                clearingDerivedContext: true
                               });
+                              // Clear derived context by not passing it - exits derived nav mode
                               await onOpenExternalGeneration(sourceGenerationData.id);
                             }}
                             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
@@ -2170,72 +2137,39 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   return (
                                   <div
                                     key={derived.id}
-                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
+                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
+                                    onClick={async () => {
+                                      console.log('[DerivedNav:TaskPanel] 🖼️ Thumbnail clicked', {
+                                        derivedId: derived.id.substring(0, 8),
+                                        derivedUrl: derived.location,
+                                        currentMediaId: media.id.substring(0, 8),
+                                        hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                        hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                        timestamp: Date.now()
+                                      });
+                                      
+                                      if (onOpenExternalGeneration) {
+                                        // Pass the full derived context for navigation
+                                        await onOpenExternalGeneration(
+                                          derived.id,
+                                          derivedGenerations?.map(d => d.id) || []
+                                        );
+                                      } else if (onNavigateToGeneration) {
+                                        onNavigateToGeneration(derived.id);
+                                      }
+                                    }}
                                   >
                                     <img
                                       src={derived.thumbUrl}
                                       alt="Derived generation"
-                                      className="w-full h-full object-cover"
+                                      className="w-full h-full object-contain bg-black/20"
                                     />
                                     
-                                    {/* Hover overlay with action buttons */}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              console.log('[DerivedNav:TaskPanel] 🔍 Eye button clicked (preview overlay)', {
-                                                derivedId: derived.id.substring(0, 8),
-                                                derivedUrl: derived.location,
-                                                currentMediaId: media.id.substring(0, 8),
-                                                actualIndex,
-                                                timestamp: Date.now()
-                                              });
-                                              
-                                              // Show floating preview overlay with index
-                                              setPreviewIndex(actualIndex);
-                                              setPreviewGenerationId(derived.id);
-                                            }}
-                                            className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="z-[100002]">Quick preview</TooltipContent>
-                                      </Tooltip>
-                                      
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            onClick={async (e) => {
-                                              e.stopPropagation();
-                                              console.log('[DerivedNav:TaskPanel] 🚀 Gallery jump button clicked', {
-                                                derivedId: derived.id.substring(0, 8),
-                                                derivedUrl: derived.location,
-                                                currentMediaId: media.id.substring(0, 8),
-                                                hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                                hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                                timestamp: Date.now()
-                                              });
-                                              
-                                              if (onOpenExternalGeneration) {
-                                                await onOpenExternalGeneration(derived.id);
-                                              } else if (onNavigateToGeneration) {
-                                                onNavigateToGeneration(derived.id);
-                                              }
-                                            }}
-                                            className="h-8 w-8 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
-                                          >
-                                            <Maximize2 className="h-4 w-4" />
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="z-[100002]">Open fully</TooltipContent>
-                                      </Tooltip>
-                                    </div>
+                                    {/* Simple hover overlay - no buttons */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
                                     
                                     {(derived as any).starred && (
-                                      <div className="absolute top-1 right-1 z-10">
+                                      <div className="absolute top-1 right-1 z-10 pointer-events-none">
                                         <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                       </div>
                                     )}
@@ -2643,8 +2577,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <button
                           onClick={async () => {
                             console.log('[BasedOn:Mobile] 🖼️ Navigating to source generation', {
-                              sourceId: sourceGenerationData.id.substring(0, 8)
+                              sourceId: sourceGenerationData.id.substring(0, 8),
+                              clearingDerivedContext: true
                             });
+                            // Clear derived context by not passing it - exits derived nav mode
                             await onOpenExternalGeneration(sourceGenerationData.id);
                           }}
                           className="mb-2 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
@@ -2742,7 +2678,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
                             <>
                               <CheckCircle className="h-3 w-3 mr-2" />
-                              Success!
+                              {brushStrokes.length > 0 ? 'Success!' : 'Submitted, results will appear below'}
                             </>
                           ) : brushStrokes.length > 0 ? (
                             <>
@@ -2766,8 +2702,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <button
                             onClick={async () => {
                               console.log('[BasedOn:Mobile:NonEditTaskDetails] 🖼️ Navigating to source generation', {
-                                sourceId: sourceGenerationData.id.substring(0, 8)
+                                sourceId: sourceGenerationData.id.substring(0, 8),
+                                clearingDerivedContext: true
                               });
+                              // Clear derived context by not passing it - exits derived nav mode
                               await onOpenExternalGeneration(sourceGenerationData.id);
                             }}
                             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
@@ -2863,72 +2801,39 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   return (
                                   <div
                                     key={derived.id}
-                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors"
+                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
+                                    onClick={async () => {
+                                      console.log('[DerivedNav:Mobile] 🖼️ Thumbnail clicked', {
+                                        derivedId: derived.id.substring(0, 8),
+                                        derivedUrl: derived.location,
+                                        currentMediaId: media.id.substring(0, 8),
+                                        hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                        hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                        timestamp: Date.now()
+                                      });
+                                      
+                                      if (onOpenExternalGeneration) {
+                                        // Pass the full derived context for navigation
+                                        await onOpenExternalGeneration(
+                                          derived.id,
+                                          derivedGenerations?.map(d => d.id) || []
+                                        );
+                                      } else if (onNavigateToGeneration) {
+                                        onNavigateToGeneration(derived.id);
+                                      }
+                                    }}
                                   >
                                     <img
                                       src={derived.thumbUrl}
                                       alt="Derived generation"
-                                      className="w-full h-full object-cover"
+                                      className="w-full h-full object-contain bg-black/20"
                                     />
                                     
-                                    {/* Hover overlay with action buttons */}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              console.log('[DerivedNav:Mobile] 🔍 Eye button clicked (preview overlay)', {
-                                                derivedId: derived.id.substring(0, 8),
-                                                derivedUrl: derived.location,
-                                                currentMediaId: media.id.substring(0, 8),
-                                                actualIndex,
-                                                timestamp: Date.now()
-                                              });
-                                              
-                                              // Show floating preview overlay with index
-                                              setPreviewIndex(actualIndex);
-                                              setPreviewGenerationId(derived.id);
-                                            }}
-                                            className="h-7 w-7 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
-                                          >
-                                            <Eye className="h-3.5 w-3.5" />
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="z-[100002]">Quick preview</TooltipContent>
-                                      </Tooltip>
-                                      
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            onClick={async (e) => {
-                                              e.stopPropagation();
-                                              console.log('[DerivedNav:Mobile] 🚀 Gallery jump button clicked', {
-                                                derivedId: derived.id.substring(0, 8),
-                                                derivedUrl: derived.location,
-                                                currentMediaId: media.id.substring(0, 8),
-                                                hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                                hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                                timestamp: Date.now()
-                                              });
-                                              
-                                              if (onOpenExternalGeneration) {
-                                                await onOpenExternalGeneration(derived.id);
-                                              } else if (onNavigateToGeneration) {
-                                                onNavigateToGeneration(derived.id);
-                                              }
-                                            }}
-                                            className="h-7 w-7 rounded bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
-                                          >
-                                            <Maximize2 className="h-3.5 w-3.5" />
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="z-[100002]">Open fully</TooltipContent>
-                                      </Tooltip>
-                                    </div>
+                                    {/* Simple hover overlay - no buttons */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
                                     
                                     {(derived as any).starred && (
-                                      <div className="absolute top-0.5 right-0.5 z-10">
+                                      <div className="absolute top-0.5 right-0.5 z-10 pointer-events-none">
                                         <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
                                       </div>
                                     )}
@@ -3354,180 +3259,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             )}
           </DialogPrimitive.Content>
         
-        {/* Preview Overlay - Floating preview for derived generations - Must be in Portal inside Dialog */}
-        {previewGenerationId && (
-          <DialogPrimitive.Portal>
-            <div
-              className="fixed inset-0 z-[100003] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer"
-              style={{ pointerEvents: 'auto' }}
-              onMouseDown={(e) => {
-                // Only close if clicking directly on backdrop, not on children
-                if (e.target === e.currentTarget) {
-                  console.log('[PreviewOverlay] 🚪 Backdrop mousedown, closing preview');
-                  setPreviewGenerationId(null);
-                  setPreviewIndex(0);
-                }
-              }}
-              onClick={(e) => {
-                // Backup: also handle click
-                if (e.target === e.currentTarget) {
-                  console.log('[PreviewOverlay] 🚪 Backdrop clicked, closing preview');
-                  setPreviewGenerationId(null);
-                  setPreviewIndex(0);
-                }
-              }}
-            >
-              {/* Preview Container */}
-              <div
-                className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center cursor-default"
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                {/* Close Button */}
-                <button
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('[PreviewOverlay] ✖️ Close button mousedown');
-                    setPreviewGenerationId(null);
-                    setPreviewIndex(0);
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('[PreviewOverlay] ✖️ Close button clicked');
-                    setPreviewGenerationId(null);
-                    setPreviewIndex(0);
-                  }}
-                  className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer"
-                  style={{ pointerEvents: 'auto' }}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-                
-                {/* Navigation Buttons */}
-                {derivedGenerations && derivedGenerations.length > 1 && (
-                  <>
-                    {/* Previous Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const newIndex = Math.max(0, previewIndex - 1);
-                        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
-                          console.log('[PreviewOverlay] ◀ Previous button clicked', { newIndex });
-                          setPreviewIndex(newIndex);
-                          setPreviewGenerationId(derivedGenerations[newIndex].id);
-                        }
-                      }}
-                      disabled={previewIndex === 0}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                      style={{ pointerEvents: 'auto' }}
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </button>
-                    
-                    {/* Next Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const newIndex = Math.min(derivedGenerations.length - 1, previewIndex + 1);
-                        if (newIndex !== previewIndex && derivedGenerations[newIndex]) {
-                          console.log('[PreviewOverlay] ▶ Next button clicked', { newIndex });
-                          setPreviewIndex(newIndex);
-                          setPreviewGenerationId(derivedGenerations[newIndex].id);
-                        }
-                      }}
-                      disabled={previewIndex === derivedGenerations.length - 1}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                      style={{ pointerEvents: 'auto' }}
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </button>
-                    
-                    {/* Counter Display */}
-                    <div className="absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full bg-black/70 text-white text-sm font-medium">
-                      {previewIndex + 1} / {derivedGenerations.length}
-                    </div>
-                  </>
-                )}
-                
-                {/* Image Container - maintains dimensions during loading */}
-                <div 
-                  className="relative flex items-center justify-center"
-                  style={previewImageDimensions ? {
-                    width: `${previewImageDimensions.width}px`,
-                    height: `${previewImageDimensions.height}px`,
-                    minWidth: `${previewImageDimensions.width}px`,
-                    minHeight: `${previewImageDimensions.height}px`,
-                  } : {
-                    // Default size for initial load to prevent layout shift
-                    minWidth: '400px',
-                    minHeight: '400px',
-                    width: '80vw',
-                    height: '80vh',
-                    maxWidth: '90vw',
-                    maxHeight: '90vh',
-                  }}
-                >
-                  {/* Previous Image - stays visible during loading with reduced opacity */}
-                  {isLoadingPreview && previousPreviewDataRef.current && (
-                    <div className="relative opacity-50 transition-opacity">
-                      <img
-                        src={previousPreviewDataRef.current.location}
-                        alt="Previous preview"
-                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10"
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Loading Spinner Overlay */}
-                  {isLoadingPreview && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-white">
-                      <Loader2 className="h-12 w-12 animate-spin" />
-                      <p className="text-sm text-white/70">Loading preview...</p>
-                    </div>
-                  )}
-                  
-                  {/* Current Preview Image */}
-                  {previewGenerationData && (
-                    <div className={cn(
-                      "relative transition-opacity duration-200",
-                      isLoadingPreview ? "opacity-0 absolute inset-0" : "opacity-100"
-                    )}>
-                      <img
-                        src={previewGenerationData.location}
-                        alt="Generation preview"
-                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl border border-white/10"
-                        onLoad={(e) => {
-                          console.log('[PreviewOverlay] 🖼️ Image loaded');
-                          const img = e.currentTarget;
-                          setPreviewImageDimensions({
-                            width: img.offsetWidth,
-                            height: img.offsetHeight
-                          });
-                        }}
-                        onError={() => {
-                          console.error('[PreviewOverlay] ❌ Image failed to load');
-                          toast.error('Failed to load preview image');
-                          setPreviewGenerationId(null);
-                        }}
-                      />
-                      
-                      {/* Optional: Image metadata overlay */}
-                      {previewGenerationData.name && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
-                          <p className="text-white text-sm font-medium">
-                            {previewGenerationData.name}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </DialogPrimitive.Portal>
-        )}
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     </TooltipProvider>

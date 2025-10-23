@@ -13,6 +13,7 @@ import {
   ArrowUpCircle,
   Eye,
   EyeOff,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
@@ -64,6 +65,11 @@ export interface MediaControlsProps {
   
   // Download functionality
   handleDownload: () => Promise<void>;
+  
+  // Delete functionality
+  onDelete?: (id: string) => void;
+  handleDelete?: () => void;
+  isDeleting?: boolean;
 }
 
 /**
@@ -102,6 +108,9 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
   handleFlip,
   handleSave,
   handleDownload,
+  onDelete,
+  handleDelete,
+  isDeleting,
 }) => {
   return (
     <div className="absolute top-4 right-4 flex items-center space-x-2 z-10">
@@ -250,6 +259,31 @@ export const MediaControls: React.FC<MediaControlsProps> = ({
             </Button>
           </TooltipTrigger>
           <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
+        </Tooltip>
+      )}
+      
+      {/* Delete Button */}
+      {onDelete && handleDelete && !readOnly && !isVideo && !isSpecialEditMode && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-red-600/80 hover:bg-red-600 text-white"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="z-[100001]">Delete from timeline</TooltipContent>
         </Tooltip>
       )}
     </div>

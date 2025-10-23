@@ -654,7 +654,7 @@ export function useTaskFromUnifiedCache(generationId: string) {
       const cachedMapping = queryClient.getQueryData(['tasks', 'taskId', generationId]) as { taskId: string } | undefined;
       
       if (cachedMapping?.taskId) {
-        console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: found in cache', {
+        console.log('[gem] useTaskFromUnifiedCache: found in cache', {
           generationId,
           taskId: cachedMapping.taskId
         });
