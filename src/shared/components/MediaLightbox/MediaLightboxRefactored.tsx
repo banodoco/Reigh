@@ -2030,7 +2030,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       )}
                     </div>
-                  ) : taskDetailsData ? (
+                  ) : (
                     <div className="w-full">
                       {/* Based On display - Show source image this was derived from (ABOVE task details) */}
                       {sourceGenerationData && onOpenExternalGeneration && (
@@ -2060,18 +2060,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                     
                     <TaskDetailsPanel
-                      task={taskDetailsData.task}
-                      isLoading={taskDetailsData.isLoading}
-                      error={taskDetailsData.error}
-                      inputImages={taskDetailsData.inputImages}
-                      taskId={taskDetailsData.taskId}
+                      task={taskDetailsData?.task}
+                      isLoading={taskDetailsData?.isLoading || false}
+                      error={taskDetailsData?.error}
+                      inputImages={taskDetailsData?.inputImages || []}
+                      taskId={taskDetailsData?.taskId || null}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
+                      onApplySettingsFromTask={taskDetailsData?.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
                       } : undefined}
-                      onClose={taskDetailsData.onClose || onClose}
+                      onClose={taskDetailsData?.onClose || onClose}
                       className=""
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
@@ -2182,11 +2182,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         );
                       })()}
                     />
-                    </div>
-                  ) : (
-                    // Fallback: sidebar is open but no content (shouldn't happen in normal flow)
-                    <div className="p-6 text-center text-muted-foreground">
-                      <p className="text-sm">No details available</p>
                     </div>
                   )}
                 </div>
@@ -2694,7 +2689,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Button>
                       </div>
                     </div>
-                  ) : taskDetailsData && (
+                  ) : (
                     <div className="w-full">
                       {/* Based On display - Show source image this was derived from (ABOVE task details) - MOBILE */}
                       {sourceGenerationData && onOpenExternalGeneration && (
@@ -2724,18 +2719,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       )}
                     
                     <TaskDetailsPanel
-                      task={taskDetailsData.task}
-                      isLoading={taskDetailsData.isLoading}
-                      error={taskDetailsData.error}
-                      inputImages={taskDetailsData.inputImages}
-                      taskId={taskDetailsData.taskId}
+                      task={taskDetailsData?.task}
+                      isLoading={taskDetailsData?.isLoading || false}
+                      error={taskDetailsData?.error}
+                      inputImages={taskDetailsData?.inputImages || []}
+                      taskId={taskDetailsData?.taskId || null}
                       replaceImages={replaceImages}
                       onReplaceImagesChange={setReplaceImages}
-                      onApplySettingsFromTask={taskDetailsData.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
+                      onApplySettingsFromTask={taskDetailsData?.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
                         taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
                         onClose(); // Close lightbox after applying settings
                       } : undefined}
-                      onClose={taskDetailsData.onClose || onClose}
+                      onClose={taskDetailsData?.onClose || onClose}
                       className=""
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
