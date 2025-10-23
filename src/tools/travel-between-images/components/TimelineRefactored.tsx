@@ -15,6 +15,7 @@ import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPosition
 import { timelineDebugger } from "./Timeline/utils/timeline-debug";
 import { calculateMaxGap } from "./Timeline/utils/timeline-utils";
 import { useExternalGenerations } from "@/shared/components/ShotImageManager/hooks/useExternalGenerations";
+import { useDerivedNavigation } from "@/shared/hooks/useDerivedNavigation";
 
 // Import components
 import TimelineControls from "./Timeline/TimelineControls";
@@ -240,13 +241,14 @@ const Timeline: React.FC<TimelineProps> = ({
     openLightbox,
     hasNext: hookHasNext,
     hasPrevious: hookHasPrevious,
-    showNavigation
+    showNavigation,
+    setLightboxIndex // Get the raw state setter
   } = useLightbox({ images: currentImages, shotId, isMobile });
   
-  // Update the ref with the actual setter
+  // Update the ref with the actual setter, using the raw state setter to avoid stale closures
   useEffect(() => {
-    setLightboxIndexRef.current = openLightbox;
-  }, [openLightbox]);
+    setLightboxIndexRef.current = setLightboxIndex;
+  }, [setLightboxIndex]);
   
   // Wrap closeLightbox to clear external generations
   const closeLightbox = useCallback(() => {
@@ -256,52 +258,16 @@ const Timeline: React.FC<TimelineProps> = ({
     hookCloseLightbox();
   }, [hookCloseLightbox, externalGens]);
   
-  // Override navigation when in derived navigation mode (navigating through "Based on this" items)
-  const wrappedGoNext = useCallback(() => {
-    if (externalGens.derivedNavContext && lightboxIndex !== null) {
-      const currentId = currentImages[lightboxIndex]?.id;
-      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
-      
-      console.log('[TimelineRefactored:DerivedNav] ➡️ Next in derived context', {
-        currentId: currentId?.substring(0, 8),
-        currentDerivedIndex,
-        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
-      });
-      
-      if (currentDerivedIndex !== -1 && currentDerivedIndex < externalGens.derivedNavContext.derivedGenerationIds.length - 1) {
-        const nextId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex + 1];
-        console.log('[TimelineRefactored:DerivedNav] 🎯 Navigating to next derived generation', {
-          nextId: nextId.substring(0, 8)
-        });
-        externalGens.handleOpenExternalGeneration(nextId, externalGens.derivedNavContext.derivedGenerationIds);
-      }
-    } else {
-      goNext();
-    }
-  }, [externalGens, lightboxIndex, currentImages, goNext]);
-  
-  const wrappedGoPrev = useCallback(() => {
-    if (externalGens.derivedNavContext && lightboxIndex !== null) {
-      const currentId = currentImages[lightboxIndex]?.id;
-      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
-      
-      console.log('[TimelineRefactored:DerivedNav] ⬅️ Previous in derived context', {
-        currentId: currentId?.substring(0, 8),
-        currentDerivedIndex,
-        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
-      });
-      
-      if (currentDerivedIndex !== -1 && currentDerivedIndex > 0) {
-        const prevId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex - 1];
-        console.log('[TimelineRefactored:DerivedNav] 🎯 Navigating to previous derived generation', {
-          prevId: prevId.substring(0, 8)
-        });
-        externalGens.handleOpenExternalGeneration(prevId, externalGens.derivedNavContext.derivedGenerationIds);
-      }
-    } else {
-      goPrev();
-    }
-  }, [externalGens, lightboxIndex, currentImages, goPrev]);
+  // Add derived navigation mode support (navigates only through "Based on this" items when active)
+  const { wrappedGoNext, wrappedGoPrev } = useDerivedNavigation({
+    derivedNavContext: externalGens.derivedNavContext,
+    lightboxIndex,
+    currentImages,
+    handleOpenExternalGeneration: externalGens.handleOpenExternalGeneration,
+    goNext,
+    goPrev,
+    logPrefix: '[TimelineRefactored:DerivedNav]'
+  });
   
   // Use combined images for current image and navigation
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;

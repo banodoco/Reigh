@@ -156,6 +156,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
   return {
     // State
     lightboxIndex,
+    setLightboxIndex, // Expose raw setter for external hooks
     currentLightboxImage,
     autoEnterInpaint,
     

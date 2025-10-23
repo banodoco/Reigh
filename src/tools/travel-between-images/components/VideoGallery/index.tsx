@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 // Import our extracted hooks and components
 import { useGalleryPagination, useVideoHover } from './hooks';
 import { useExternalGenerations } from '@/shared/components/ShotImageManager/hooks/useExternalGenerations';
+import { useDerivedNavigation } from '@/shared/hooks/useDerivedNavigation';
 import {
   VideoItem,
   VideoHoverPreview,
@@ -650,58 +651,29 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       setLightboxIndex
     )(), [lightboxIndex, displaySortedVideoOutputs]);
 
-  // Lightbox navigation - memoized for stable reference
-  const handleNext = useCallback(() => {
-    if (lightboxIndex === null) return;
-    
-    // Check if we're in derived navigation mode
-    if (externalGens.derivedNavContext) {
-      const currentId = displaySortedVideoOutputs[lightboxIndex]?.id;
-      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
-      
-      console.log('[VideoGallery:DerivedNav] ➡️ Next in derived context', {
-        currentId: currentId?.substring(0, 8),
-        currentDerivedIndex,
-        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
-      });
-      
-      if (currentDerivedIndex !== -1 && currentDerivedIndex < externalGens.derivedNavContext.derivedGenerationIds.length - 1) {
-        const nextId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex + 1];
-        console.log('[VideoGallery:DerivedNav] 🎯 Navigating to next derived generation', {
-          nextId: nextId.substring(0, 8)
-        });
-        externalGens.handleOpenExternalGeneration(nextId, externalGens.derivedNavContext.derivedGenerationIds);
-      }
-    } else {
+  // Base lightbox navigation (without derived mode)
+  const baseGoNext = useCallback(() => {
+    if (lightboxIndex !== null) {
       setLightboxIndex((lightboxIndex + 1) % displaySortedVideoOutputs.length);
     }
-  }, [lightboxIndex, displaySortedVideoOutputs, externalGens]);
+  }, [lightboxIndex, displaySortedVideoOutputs.length]);
 
-  const handlePrevious = useCallback(() => {
-    if (lightboxIndex === null) return;
-    
-    // Check if we're in derived navigation mode
-    if (externalGens.derivedNavContext) {
-      const currentId = displaySortedVideoOutputs[lightboxIndex]?.id;
-      const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
-      
-      console.log('[VideoGallery:DerivedNav] ⬅️ Previous in derived context', {
-        currentId: currentId?.substring(0, 8),
-        currentDerivedIndex,
-        totalDerived: externalGens.derivedNavContext.derivedGenerationIds.length
-      });
-      
-      if (currentDerivedIndex !== -1 && currentDerivedIndex > 0) {
-        const prevId = externalGens.derivedNavContext.derivedGenerationIds[currentDerivedIndex - 1];
-        console.log('[VideoGallery:DerivedNav] 🎯 Navigating to previous derived generation', {
-          prevId: prevId.substring(0, 8)
-        });
-        externalGens.handleOpenExternalGeneration(prevId, externalGens.derivedNavContext.derivedGenerationIds);
-      }
-    } else {
+  const baseGoPrev = useCallback(() => {
+    if (lightboxIndex !== null) {
       setLightboxIndex((lightboxIndex - 1 + displaySortedVideoOutputs.length) % displaySortedVideoOutputs.length);
     }
-  }, [lightboxIndex, displaySortedVideoOutputs, externalGens]);
+  }, [lightboxIndex, displaySortedVideoOutputs.length]);
+
+  // Add derived navigation mode support (navigates only through "Based on this" items when active)
+  const { wrappedGoNext: handleNext, wrappedGoPrev: handlePrevious } = useDerivedNavigation({
+    derivedNavContext: externalGens.derivedNavContext,
+    lightboxIndex,
+    currentImages: displaySortedVideoOutputs,
+    handleOpenExternalGeneration: externalGens.handleOpenExternalGeneration,
+    goNext: baseGoNext,
+    goPrev: baseGoPrev,
+    logPrefix: '[VideoGallery:DerivedNav]'
+  });
 
   // Lightbox close handler - clear external generations
   const handleCloseLightbox = useCallback(() => {
