@@ -199,6 +199,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     derivedGenerationIds: string[];
   } | null>(null);
   
+  // State for temporarily viewed derived generations (in derived nav mode)
+  // These are NOT added to the main gallery, only used for lightbox viewing
+  const [tempDerivedGenerations, setTempDerivedGenerations] = useState<GenerationRow[]>([]);
+  
   // Get project ID from context
   const { selectedProjectId } = useProject();
   
@@ -439,6 +443,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     } else if (derivedNavContext !== null) {
       console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
       setDerivedNavContext(null);
+      // Clear temp derived generations when exiting mode
+      setTempDerivedGenerations([]);
     }
     
     // First, check if generation already exists in current images
@@ -456,6 +462,14 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     if (externalIndex !== -1) {
       console.log('[ShotImageManager] ✅ Generation already in external list');
       setLightboxIndex(baseImages.length + externalIndex);
+      return;
+    }
+    
+    // Check if it's in temp derived generations
+    const tempDerivedIndex = tempDerivedGenerations.findIndex(img => img.id === generationId);
+    if (tempDerivedIndex !== -1) {
+      console.log('[ShotImageManager] ✅ Generation already in temp derived list');
+      setLightboxIndex(baseImages.length + externalGenerations.length + tempDerivedIndex);
       return;
     }
     
@@ -534,34 +548,57 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           '\n  hasBasedOn:', !!data.based_on,
           '\n  basedOnValue:', data.based_on?.substring(0, 8) || null,
           '\n  hasImageUrl:', !!transformedData.imageUrl,
-          '\n  hasThumbUrl:', !!transformedData.thumbUrl
+          '\n  hasThumbUrl:', !!transformedData.thumbUrl,
+          '\n  inDerivedNavMode:', !!derivedContext
         );
         
-        // Add to external generations and get the new index immediately
-        setExternalGenerations(prev => {
-          // Prevent duplicates (navigate instead)
-          const existingIdx = prev.findIndex(g => g.id === transformedData.id);
-          if (existingIdx !== -1) {
-            const newIndex = baseImages.length + existingIdx;
-            console.log('[ShotImageManager] 🔁 External generation already present, navigating to index', newIndex);
-            requestAnimationFrame(() => setLightboxIndex(newIndex));
-            return prev;
-          }
+        // If in derived navigation mode, add to temp list (not permanent gallery)
+        // Otherwise, add to external generations (shows in gallery)
+        if (derivedContext && derivedContext.length > 0) {
+          console.log('[DerivedNav] 📦 Adding to TEMP derived generations (not added to gallery)');
+          setTempDerivedGenerations(prev => {
+            const existingIdx = prev.findIndex(g => g.id === transformedData.id);
+            if (existingIdx !== -1) {
+              const newIndex = baseImages.length + externalGenerations.length + existingIdx;
+              console.log('[ShotImageManager] 🔁 Derived generation already in temp list, navigating to index', newIndex);
+              requestAnimationFrame(() => setLightboxIndex(newIndex));
+              return prev;
+            }
 
-          const updated = [...prev, transformedData];
-          // Calculate index using the updated array length
-          const newIndex = baseImages.length + updated.length - 1;
-          console.log('[ShotImageManager] 📍 Opening external generation at index', newIndex);
-          // Use RAF to ensure DOM/state is committed before switching
-          requestAnimationFrame(() => setLightboxIndex(newIndex));
-          return updated;
-        });
+            const updated = [...prev, transformedData];
+            const newIndex = baseImages.length + externalGenerations.length + updated.length - 1;
+            console.log('[ShotImageManager] 📍 Opening derived generation at temp index', newIndex);
+            requestAnimationFrame(() => setLightboxIndex(newIndex));
+            return updated;
+          });
+        } else {
+          console.log('[DerivedNav] 📦 Adding to PERMANENT external generations (shows in gallery)');
+          // Add to external generations and get the new index immediately
+          setExternalGenerations(prev => {
+            // Prevent duplicates (navigate instead)
+            const existingIdx = prev.findIndex(g => g.id === transformedData.id);
+            if (existingIdx !== -1) {
+              const newIndex = baseImages.length + existingIdx;
+              console.log('[ShotImageManager] 🔁 External generation already present, navigating to index', newIndex);
+              requestAnimationFrame(() => setLightboxIndex(newIndex));
+              return prev;
+            }
+
+            const updated = [...prev, transformedData];
+            // Calculate index using the updated array length
+            const newIndex = baseImages.length + updated.length - 1;
+            console.log('[ShotImageManager] 📍 Opening external generation at index', newIndex);
+            // Use RAF to ensure DOM/state is committed before switching
+            requestAnimationFrame(() => setLightboxIndex(newIndex));
+            return updated;
+          });
+        }
       }
     } catch (error) {
       console.error('[ShotImageManager] ❌ Failed to fetch external generation:', error);
       toast.error('Failed to load generation');
     }
-  }, [optimisticOrder, images, externalGenerations]);
+  }, [optimisticOrder, images, externalGenerations, tempDerivedGenerations, derivedNavContext]);
 
   // Use optimistic order everywhere instead of the parent `images` prop
   // Memoize to prevent unstable references during re-renders
@@ -569,9 +606,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Safety check: ensure we have valid images during component re-renders
     const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
     
-    // Append external generations at the end
-    return [...baseImages, ...externalGenerations];
-  }, [optimisticOrder, images, externalGenerations]);
+    // Append external generations, then temp derived generations (for derived nav mode)
+    // Temp derived are kept separate so they don't show in the gallery permanently
+    return [...baseImages, ...externalGenerations, ...tempDerivedGenerations];
+  }, [optimisticOrder, images, externalGenerations, tempDerivedGenerations]);
   
   // Fetch task details for the current lightbox image (must be after currentImages is defined)
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
@@ -1555,6 +1593,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 setShouldAutoEnterInpaint(false);
                 // Clear derived navigation context when closing
                 setDerivedNavContext(null);
+                // Clear temp derived generations when closing
+                setTempDerivedGenerations([]);
                 // Reset external gen shot selector when closing
                 if (isExternalGen) {
                   setExternalGenLightboxSelectedShot(selectedShotId);
@@ -1882,6 +1922,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               setShouldAutoEnterInpaint(false);
               // Clear derived navigation context when closing
               setDerivedNavContext(null);
+              // Clear temp derived generations when closing
+              setTempDerivedGenerations([]);
               // Reset external gen shot selector when closing
               if (isExternalGen) {
                 setExternalGenLightboxSelectedShot(selectedShotId);
