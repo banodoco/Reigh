@@ -243,6 +243,113 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     });
   }, [lightboxIndex, isMobile, generationMode]);
   
+  // Listen for realtime generation updates (e.g. when upscale completes)
+  // and refetch any external/temp derived generations that were updated
+  useEffect(() => {
+    const handleGenerationUpdate = async (event: any) => {
+      const { payloads = [] } = event.detail || {};
+      console.log('[BasedOnLineage] 🔄 Generation update batch received:', {
+        payloadCount: payloads.length,
+        timestamp: Date.now()
+      });
+      
+      for (const payload of payloads) {
+        const { generationId, upscaleCompleted } = payload;
+        
+        if (!generationId) continue;
+        
+        console.log('[BasedOnLineage] 🔍 Checking generation update:', {
+          generationId: generationId.substring(0, 8),
+          upscaleCompleted,
+          hasExternalGenerations: externalGenerations.length > 0,
+          hasTempDerivedGenerations: tempDerivedGenerations.length > 0
+        });
+        
+        // Check if this generation is in our external or temp derived lists
+        const isInExternal = externalGenerations.some(gen => gen.id === generationId);
+        const isInTempDerived = tempDerivedGenerations.some(gen => gen.id === generationId);
+        
+        if (upscaleCompleted && (isInExternal || isInTempDerived)) {
+          console.log('[BasedOnLineage] ✅ Upscale completed for external/temp generation, refetching:', {
+            generationId: generationId.substring(0, 8),
+            isInExternal,
+            isInTempDerived
+          });
+          
+          try {
+            // Refetch the updated generation from database
+            const { data, error } = await supabase
+              .from('generations')
+              .select(`
+                *,
+                shot_generations(shot_id, timeline_frame)
+              `)
+              .eq('id', generationId)
+              .single();
+            
+            if (error) throw error;
+            
+            if (data) {
+              console.log('[BasedOnLineage] ✅ Refetched updated generation:', {
+                generationId: data.id.substring(0, 8),
+                hasUpscaledUrl: !!data.upscaled_url,
+                upscaledUrl: data.upscaled_url?.substring(0, 60)
+              });
+              
+              // Build transformed data (same as in handleOpenExternalGeneration)
+              const shotGenerations = (data as any).shot_generations || [];
+              const allAssociations = shotGenerations.map((sg: any) => ({
+                shot_id: sg.shot_id,
+                timeline_frame: sg.timeline_frame,
+                position: sg.timeline_frame,
+              }));
+              
+              const transformedData: GenerationRow = {
+                id: data.id,
+                shotImageEntryId: data.id,
+                imageUrl: data.location,
+                thumbUrl: data.thumbnail_url || data.location,
+                location: data.location,
+                type: data.type,
+                createdAt: data.created_at,
+                timeline_frame: shotGenerations.length > 0 ? shotGenerations[0].timeline_frame : undefined,
+                metadata: (typeof data.params === 'object' && data.params !== null && !Array.isArray(data.params)) ? data.params as Record<string, unknown> : {},
+                upscaled_url: data.upscaled_url,
+                starred: data.starred ?? false,
+                all_shot_associations: allAssociations,
+                ...(shotGenerations.length > 0 ? {
+                  shot_id: shotGenerations[0].shot_id,
+                  position: shotGenerations[0].timeline_frame,
+                } : {})
+              } as any;
+              
+              (transformedData as any).based_on = data.based_on;
+              
+              // Update the appropriate list
+              if (isInExternal) {
+                setExternalGenerations(prev => 
+                  prev.map(gen => gen.id === generationId ? transformedData : gen)
+                );
+              }
+              if (isInTempDerived) {
+                setTempDerivedGenerations(prev => 
+                  prev.map(gen => gen.id === generationId ? transformedData : gen)
+                );
+              }
+            }
+          } catch (err) {
+            console.error('[BasedOnLineage] ❌ Error refetching updated generation:', err);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('realtime:generation-update-batch' as any, handleGenerationUpdate as any);
+    return () => {
+      window.removeEventListener('realtime:generation-update-batch' as any, handleGenerationUpdate as any);
+    };
+  }, [externalGenerations, tempDerivedGenerations]);
+  
   // console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
   const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
