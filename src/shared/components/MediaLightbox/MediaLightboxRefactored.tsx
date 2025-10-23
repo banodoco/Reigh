@@ -1781,8 +1781,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   data-task-details-panel
                   className={cn(
-                    "bg-background border-l border-border overflow-y-auto",
-                    isSpecialEditMode && "flex items-center justify-center" // Center in special edit modes
+                    "bg-background border-l border-border overflow-y-auto"
+                    // Removed flex centering to prevent top clipping with long content
                   )}
                   style={{ width: '40%' }}
                 >
@@ -2559,8 +2559,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   data-task-details-panel
                   className={cn(
-                    "bg-background border-t border-border overflow-y-auto",
-                    isSpecialEditMode && "flex items-center justify-center" // Center in special edit modes
+                    "bg-background border-t border-border overflow-y-auto"
+                    // Removed flex centering to prevent top clipping with long content
                   )}
                   style={{ height: '40%' }}
                 >
