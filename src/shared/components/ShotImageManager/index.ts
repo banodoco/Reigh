@@ -1,8 +1,6 @@
-/**
- * ShotImageManager module exports
- */
+// Main export
+export { ShotImageManagerContainer as default } from './ShotImageManagerContainer';
+export { ShotImageManagerContainer } from './ShotImageManagerContainer';
 
-export { default as ShotImageManager } from '../ShotImageManager';
-export { ShotImageManagerMobile } from './ShotImageManagerMobile';
-export { MobileImageItem } from './MobileImageItem';
-export type { BaseShotImageManagerProps, MobileImageItemProps } from './types';
+// Export types
+export type { ShotImageManagerProps } from './types';

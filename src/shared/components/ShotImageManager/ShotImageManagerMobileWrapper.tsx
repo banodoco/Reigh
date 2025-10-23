@@ -1,0 +1,144 @@
+import React, { useState, useEffect } from 'react';
+import { ShotImageManagerProps } from './types';
+import { ShotImageManagerMobile } from '../ShotImageManager/ShotImageManagerMobile';
+import MediaLightbox from '../MediaLightbox';
+
+interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
+  selection: any;
+  lightbox: any;
+  batchOps: any;
+  mobileGestures: any;
+  optimistic: any;
+  externalGens: any;
+}
+
+export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapperProps> = ({
+  selection,
+  lightbox,
+  batchOps,
+  mobileGestures,
+  optimistic,
+  externalGens,
+  ...props
+}) => {
+  // Detect tablet/iPad size for task details
+  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+  );
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsTabletOrLarger(window.innerWidth >= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  return (
+    <>
+      <ShotImageManagerMobile
+        images={props.images}
+        onImageDelete={props.onImageDelete}
+        onBatchImageDelete={props.onBatchImageDelete}
+        onImageDuplicate={props.onImageDuplicate}
+        onImageReorder={props.onImageReorder}
+        onOpenLightbox={props.onOpenLightbox || lightbox.setLightboxIndex}
+        onInpaintClick={(index) => {
+          lightbox.setShouldAutoEnterInpaint(true);
+          lightbox.setLightboxIndex(index);
+        }}
+        columns={props.columns}
+        generationMode={props.generationMode}
+        onImageSaved={props.onImageSaved}
+        onMagicEdit={props.onMagicEdit}
+        duplicatingImageId={props.duplicatingImageId}
+        duplicateSuccessImageId={props.duplicateSuccessImageId}
+        projectAspectRatio={props.projectAspectRatio}
+        batchVideoFrames={props.batchVideoFrames}
+        onImageUpload={props.onImageUpload}
+        readOnly={props.readOnly}
+        isUploadingImage={props.isUploadingImage}
+        onSelectionChange={props.onSelectionChange}
+      />
+      
+      {lightbox.lightboxIndex !== null && lightbox.currentImages[lightbox.lightboxIndex] && (() => {
+        const baseImagesCount = (optimistic.optimisticOrder && optimistic.optimisticOrder.length > 0) ? optimistic.optimisticOrder.length : (props.images || []).length;
+        const isExternalGen = lightbox.lightboxIndex >= baseImagesCount;
+        
+        let hasNext: boolean;
+        let hasPrevious: boolean;
+        
+        if (externalGens.derivedNavContext) {
+          const currentId = lightbox.currentImages[lightbox.lightboxIndex]?.id;
+          const currentDerivedIndex = externalGens.derivedNavContext.derivedGenerationIds.indexOf(currentId);
+          hasNext = currentDerivedIndex !== -1 && currentDerivedIndex < externalGens.derivedNavContext.derivedGenerationIds.length - 1;
+          hasPrevious = currentDerivedIndex !== -1 && currentDerivedIndex > 0;
+        } else {
+          hasNext = lightbox.lightboxIndex < lightbox.currentImages.length - 1;
+          hasPrevious = lightbox.lightboxIndex > 0;
+        }
+        
+        return (
+          <MediaLightbox
+            media={lightbox.currentImages[lightbox.lightboxIndex]}
+            shotId={props.shotId}
+            toolTypeOverride={props.toolTypeOverride}
+            autoEnterInpaint={lightbox.shouldAutoEnterInpaint}
+            onClose={() => {
+              console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
+              lightbox.setLightboxIndex(null);
+              lightbox.setShouldAutoEnterInpaint(false);
+              externalGens.setDerivedNavContext(null);
+              externalGens.setTempDerivedGenerations([]);
+              if (isExternalGen) {
+                externalGens.setExternalGenLightboxSelectedShot(props.selectedShotId);
+              }
+            }}
+            onNext={lightbox.handleNext}
+            onPrevious={lightbox.handlePrevious}
+            onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
+              await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}
+            showNavigation={true}
+            showImageEditTools={true}
+            showDownload={true}
+            showMagicEdit={true}
+            hasNext={hasNext}
+            hasPrevious={hasPrevious}
+            starred={(lightbox.currentImages[lightbox.lightboxIndex] as any).starred || false}
+            onMagicEdit={props.onMagicEdit}
+            showTaskDetails={isTabletOrLarger}
+            onNavigateToGeneration={(generationId: string) => {
+              console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
+                generationId: generationId.substring(0, 8),
+                currentImagesCount: lightbox.currentImages.length,
+                currentIndex: lightbox.lightboxIndex
+              });
+              const index = lightbox.currentImages.findIndex((img: any) => img.id === generationId);
+              if (index !== -1) {
+                console.log('[ShotImageManager:Mobile] ✅ Found generation at index', index);
+                lightbox.setLightboxIndex(index);
+              } else {
+                console.error('[ShotImageManager:Mobile] ❌ Generation not found in current images', {
+                  searchedId: generationId.substring(0, 8),
+                  availableIds: lightbox.currentImages.map((img: any) => img.id.substring(0, 8))
+                });
+              }
+            }}
+            onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
+            allShots={props.allShots}
+            selectedShotId={isExternalGen ? externalGens.externalGenLightboxSelectedShot : props.selectedShotId}
+            onShotChange={isExternalGen ? (shotId) => {
+              console.log('[ShotImageManager:Mobile] External gen shot changed', { shotId: shotId?.substring(0, 8) });
+              externalGens.setExternalGenLightboxSelectedShot(shotId);
+            } : props.onShotChange}
+            onAddToShot={isExternalGen ? externalGens.handleExternalGenAddToShot : props.onAddToShot}
+            onAddToShotWithoutPosition={isExternalGen ? externalGens.handleExternalGenAddToShotWithoutPosition : props.onAddToShotWithoutPosition}
+            onCreateShot={props.onCreateShot}
+          />
+        );
+      })()}
+    </>
+  );
+};
+
