@@ -46,6 +46,7 @@ import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
@@ -295,6 +296,7 @@ const Timeline: React.FC<TimelineProps> = ({
     goNext,
     goPrev,
     closeLightbox,
+    openLightbox,
     openLightboxWithInpaint,
     handleDesktopDoubleClick,
     handleMobileTap,
@@ -804,6 +806,59 @@ const Timeline: React.FC<TimelineProps> = ({
           showMagicEdit={true}
           hasNext={hasNext}
           hasPrevious={hasPrevious}
+          onNavigateToGeneration={(generationId: string) => {
+            console.log('[Timeline:DerivedNav] 📍 Navigate to generation', {
+              generationId: generationId.substring(0, 8),
+              imagesCount: images.length
+            });
+            // Try to find in current timeline images
+            const index = images.findIndex((img: any) => img.id === generationId);
+            if (index !== -1) {
+              console.log('[Timeline:DerivedNav] ✅ Found in timeline at index', index);
+              openLightbox(index);
+            } else {
+              console.log('[Timeline:DerivedNav] ⚠️ Not found in current timeline images');
+              toast.info('This generation is not in the current timeline view');
+            }
+          }}
+          onOpenExternalGeneration={async (generationId: string, derivedContext?: string[]) => {
+            console.log('[Timeline:DerivedNav] 🌐 Open external generation', {
+              generationId: generationId.substring(0, 8),
+              hasDerivedContext: !!derivedContext,
+              currentTimelineImagesCount: images.length
+            });
+            
+            // Try to find in current timeline images first
+            const index = images.findIndex((img: any) => img.id === generationId);
+            if (index !== -1) {
+              console.log('[Timeline:DerivedNav] ✅ Found in timeline at index', index);
+              openLightbox(index);
+              return;
+            }
+            
+            // Not in timeline, check if it exists in database
+            console.log('[Timeline:DerivedNav] 📥 Generation not in timeline, checking database');
+            try {
+              const { data, error } = await supabase
+                .from('generations')
+                .select('id')
+                .eq('id', generationId)
+                .single();
+              
+              if (error) throw error;
+              
+              if (data) {
+                console.log('[Timeline:DerivedNav] ✅ Generation exists in database but not in timeline');
+                toast.info('This generation is not in the current timeline. It may be unpositioned or in a different shot.');
+              } else {
+                console.log('[Timeline:DerivedNav] ⚠️ Generation not found');
+                toast.error('This generation could not be found.');
+              }
+            } catch (error) {
+              console.error('[Timeline:DerivedNav] ❌ Error checking generation:', error);
+              toast.info('This generation is not in the current timeline view.');
+            }
+          }}
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation
             timelineDebugger.logEvent('Magic edit requested', { shotId, imageUrl, prompt, numImages });

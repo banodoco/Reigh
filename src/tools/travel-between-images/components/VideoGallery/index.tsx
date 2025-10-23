@@ -896,6 +896,36 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
             shotId={shotId || undefined}
             showTaskDetails={!isTouchLikeDevice}
+            onNavigateToGeneration={(generationId: string) => {
+              console.log('[VideoGallery:DerivedNav] 📍 Navigate to generation', {
+                generationId: generationId.substring(0, 8),
+                videoOutputsCount: displaySortedVideoOutputs.length
+              });
+              // Try to find in current video outputs
+              const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
+              if (index !== -1) {
+                console.log('[VideoGallery:DerivedNav] ✅ Found in video outputs at index', index);
+                setLightboxIndex(index);
+              } else {
+                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current video outputs');
+                toast.info('This generation is not in the current video gallery view');
+              }
+            }}
+            onOpenExternalGeneration={async (generationId: string, derivedContext?: string[]) => {
+              console.log('[VideoGallery:DerivedNav] 🌐 Open external generation', {
+                generationId: generationId.substring(0, 8),
+                hasDerivedContext: !!derivedContext
+              });
+              // Try to find in current video outputs first
+              const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
+              if (index !== -1) {
+                console.log('[VideoGallery:DerivedNav] ✅ Found in video outputs at index', index);
+                setLightboxIndex(index);
+              } else {
+                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current video outputs');
+                toast.info('This video is not in the current gallery view');
+              }
+            }}
             taskDetailsData={{
               task,
               isLoading: isLoadingTask,
