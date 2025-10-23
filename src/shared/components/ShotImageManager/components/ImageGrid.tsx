@@ -3,6 +3,7 @@ import { GenerationRow } from '@/types/shots';
 import { SortableImageItem } from '@/tools/travel-between-images/components/SortableImageItem';
 import { cn } from '@/shared/lib/utils';
 import { DEFAULT_BATCH_VIDEO_FRAMES } from '../constants';
+import { AddImagesCard } from './AddImagesCard';
 
 interface ImageGridProps {
   images: GenerationRow[];
@@ -20,6 +21,10 @@ interface ImageGridProps {
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
   batchVideoFrames?: number;
+  onGridDoubleClick?: () => void;
+  onImageUpload?: (files: File[]) => Promise<void>;
+  isUploadingImage?: boolean;
+  readOnly?: boolean;
 }
 
 export const ImageGrid: React.FC<ImageGridProps> = ({
@@ -37,7 +42,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
-  batchVideoFrames = DEFAULT_BATCH_VIDEO_FRAMES
+  batchVideoFrames = DEFAULT_BATCH_VIDEO_FRAMES,
+  onGridDoubleClick
 }) => {
   return (
     <div
@@ -45,7 +51,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
       onDoubleClick={(e) => {
         // Only deselect if double-clicking on the grid itself, not on an image
         if (e.target === e.currentTarget) {
-          // Grid double-click handler (if needed)
+          onGridDoubleClick?.();
         }
       }}
     >

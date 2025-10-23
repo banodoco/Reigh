@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { DerivedNavContext } from '../types';
 import { transformExternalGeneration } from '../utils/external-generation-utils';
@@ -11,14 +11,14 @@ interface UseExternalGenerationsProps {
   selectedShotId?: string;
   optimisticOrder: GenerationRow[];
   images: GenerationRow[];
-  setLightboxIndex: (index: number | null) => void;
+  setLightboxIndexRef: React.MutableRefObject<(index: number) => void>;
 }
 
 export function useExternalGenerations({
   selectedShotId,
   optimisticOrder,
   images,
-  setLightboxIndex
+  setLightboxIndexRef
 }: UseExternalGenerationsProps) {
   const [externalGenerations, setExternalGenerations] = useState<GenerationRow[]>([]);
   const [tempDerivedGenerations, setTempDerivedGenerations] = useState<GenerationRow[]>([]);
@@ -164,19 +164,19 @@ export function useExternalGenerations({
     const existingIndex = baseImages.findIndex(img => img.id === generationId);
     
     if (existingIndex !== -1) {
-      setLightboxIndex(existingIndex);
+      setLightboxIndexRef.current(existingIndex);
       return;
     }
     
     const externalIndex = externalGenerations.findIndex(img => img.id === generationId);
     if (externalIndex !== -1) {
-      setLightboxIndex(baseImages.length + externalIndex);
+      setLightboxIndexRef.current(baseImages.length + externalIndex);
       return;
     }
     
     const tempDerivedIndex = tempDerivedGenerations.findIndex(img => img.id === generationId);
     if (tempDerivedIndex !== -1) {
-      setLightboxIndex(baseImages.length + externalGenerations.length + tempDerivedIndex);
+      setLightboxIndexRef.current(baseImages.length + externalGenerations.length + tempDerivedIndex);
       return;
     }
     
@@ -201,13 +201,13 @@ export function useExternalGenerations({
             const existingIdx = prev.findIndex(g => g.id === transformedData.id);
             if (existingIdx !== -1) {
               const newIndex = baseImages.length + externalGenerations.length + existingIdx;
-              requestAnimationFrame(() => setLightboxIndex(newIndex));
+              requestAnimationFrame(() => setLightboxIndexRef.current(newIndex));
               return prev;
             }
             
             const updated = [...prev, transformedData];
             const newIndex = baseImages.length + externalGenerations.length + updated.length - 1;
-            requestAnimationFrame(() => setLightboxIndex(newIndex));
+            requestAnimationFrame(() => setLightboxIndexRef.current(newIndex));
             return updated;
           });
         } else {
@@ -215,13 +215,13 @@ export function useExternalGenerations({
             const existingIdx = prev.findIndex(g => g.id === transformedData.id);
             if (existingIdx !== -1) {
               const newIndex = baseImages.length + existingIdx;
-              requestAnimationFrame(() => setLightboxIndex(newIndex));
+              requestAnimationFrame(() => setLightboxIndexRef.current(newIndex));
               return prev;
             }
             
             const updated = [...prev, transformedData];
             const newIndex = baseImages.length + updated.length - 1;
-            requestAnimationFrame(() => setLightboxIndex(newIndex));
+            requestAnimationFrame(() => setLightboxIndexRef.current(newIndex));
             return updated;
           });
         }
@@ -230,7 +230,7 @@ export function useExternalGenerations({
       console.error('[ShotImageManager] ❌ Failed to fetch external generation:', error);
       toast.error('Failed to load generation');
     }
-  }, [optimisticOrder, images, externalGenerations, tempDerivedGenerations, derivedNavContext, setLightboxIndex]);
+  }, [optimisticOrder, images, externalGenerations, tempDerivedGenerations, derivedNavContext, setLightboxIndexRef]);
   
   return {
     externalGenerations,

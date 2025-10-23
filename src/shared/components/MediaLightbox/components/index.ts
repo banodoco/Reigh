@@ -19,3 +19,5 @@ export type { MediaControlsProps } from './MediaControls';
 export { WorkflowControls } from './WorkflowControls';
 export type { WorkflowControlsProps } from './WorkflowControls';
 
+export { MediaDisplayWithCanvas } from './MediaDisplayWithCanvas';
+export { SourceGenerationDisplay } from './SourceGenerationDisplay';

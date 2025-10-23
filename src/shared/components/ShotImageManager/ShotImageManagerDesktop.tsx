@@ -95,6 +95,10 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             duplicateSuccessImageId={props.duplicateSuccessImageId}
             projectAspectRatio={props.projectAspectRatio}
             batchVideoFrames={props.batchVideoFrames}
+            onGridDoubleClick={() => {
+              selection.setSelectedIds([]);
+              selection.setLastSelectedIndex(null);
+            }}
           />
           
           {props.onImageUpload && !props.readOnly && (

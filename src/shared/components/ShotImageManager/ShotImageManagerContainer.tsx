@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { ShotImageManagerProps } from './types';
 import { useSelection } from './hooks/useSelection';
@@ -30,12 +30,15 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   // Optimistic order management
   const optimistic = useOptimisticOrder({ images: props.images });
   
+  // Ref indirection to avoid hook ordering issues when external gens want to set lightbox index
+  const setLightboxIndexRef = useRef<(index: number) => void>(() => {});
+  
   // External generations management
   const externalGens = useExternalGenerations({
     selectedShotId: props.selectedShotId,
     optimisticOrder: optimistic.optimisticOrder,
     images: props.images,
-    setLightboxIndex: () => {} // Placeholder, will be set by lightbox hook
+    setLightboxIndexRef
   });
   
   // Selection management
@@ -56,8 +59,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   });
   
   // Update externalGens setLightboxIndex with the real one from lightbox
-  React.useEffect(() => {
-    (externalGens as any).setLightboxIndex = lightbox.setLightboxIndex;
+  useEffect(() => {
+    setLightboxIndexRef.current = lightbox.setLightboxIndex;
   }, [lightbox.setLightboxIndex]);
   
   // Drag and drop management

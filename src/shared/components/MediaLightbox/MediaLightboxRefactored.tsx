@@ -56,6 +56,10 @@ import {
   useLightboxNavigation,
   useStarToggle,
   useShotPositioning,
+  useInSceneBoost,
+  useSourceGeneration,
+  useLayoutMode,
+  useMagicEditMode,
 } from './hooks';
 
 // Import all extracted components
@@ -67,6 +71,8 @@ import {
   TaskDetailsSection,
   MediaControls,
   WorkflowControls,
+  MediaDisplayWithCanvas,
+  SourceGenerationDisplay,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -248,94 +254,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const [replaceImages, setReplaceImages] = useState(true);
   const [previewImageDimensions, setPreviewImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const previousPreviewDataRef = useRef<GenerationRow | null>(null);
-  
-  // Source generation state (based_on) to show where this image came from
-  const [sourceGenerationData, setSourceGenerationData] = useState<GenerationRow | null>(null);
 
   // Track where pointer/click started to prevent accidental modal closure on drag
   const pointerDownTargetRef = useRef<EventTarget | null>(null);
 
   // Basic hooks
   const isMobile = useIsMobile();
-  
-  // ========================================
-  // LAYOUT DETERMINATION
-  // ========================================
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
-  
-  // Detect iPad/tablet size (768px+) for inpaint side-by-side layout
-  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
-  );
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsTabletOrLarger(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  // Fetch source generation (based_on) to show origin
-  useEffect(() => {
-    const basedOnId = (media as any).based_on;
-    const effectMediaKeys = Object.keys(media);
-    
-    console.log('[BasedOnLineage] 🔍 useEffect checking for based_on:',
-      '\n  mediaId:', media.id.substring(0, 8),
-      '\n  hasBasedOn:', !!basedOnId,
-      '\n  basedOnId:', basedOnId ? basedOnId.substring(0, 8) : null,
-      '\n  fullBasedOnId:', basedOnId,
-      '\n  hasOnOpenExternalGeneration:', !!onOpenExternalGeneration,
-      '\n  mediaType:', media.type,
-      '\n  mediaKeysCount:', effectMediaKeys.length,
-      '\n  mediaKeys:', effectMediaKeys.join(', '),
-      '\n  hasBasedOnInKeys:', effectMediaKeys.includes('based_on')
-    );
-    
-    if (!basedOnId) {
-      setSourceGenerationData(null);
-      return;
-    }
-    
-    const fetchSourceGeneration = async () => {
-      console.log('[BasedOnLineage] 📥 Fetching source generation:',
-        '\n  currentMediaId:', media.id.substring(0, 8),
-        '\n  basedOnId:', basedOnId.substring(0, 8)
-      );
-      
-      try {
-        const { data, error } = await supabase
-          .from('generations')
-          .select('*')
-          .eq('id', basedOnId)
-          .single();
-        
-        if (error) throw error;
-        
-        if (data) {
-          console.log('[BasedOnLineage] ✅ Fetched source generation:',
-            '\n  sourceId:', data.id.substring(0, 8),
-            '\n  type:', data.type,
-            '\n  location:', data.location?.substring(0, 50)
-          );
-          setSourceGenerationData(data);
-        } else {
-          console.log('[BasedOnLineage] ⚠️ No data returned from query');
-          setSourceGenerationData(null);
-        }
-      } catch (error) {
-        console.error('[BasedOnLineage] ❌ Failed to fetch source generation:', error);
-        // Don't show toast - this is a non-critical feature
-        setSourceGenerationData(null);
-      }
-    };
-    
-    fetchSourceGeneration();
-  }, [media.id, (media as any).based_on, onOpenExternalGeneration]);
 
   // Safety check
   if (!media) {
@@ -373,20 +300,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Derived values
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
   
-  const isTouchLikeDevice = useMemo(() => {
-    if (typeof window === 'undefined') return !!isMobile;
-    try {
-      const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      const ua = (navigator as any)?.userAgent || '';
-      const tabletUA = /iPad|Tablet|Android(?!.*Mobile)|Silk|Kindle|PlayBook/i.test(ua);
-      const maxTouchPoints = (navigator as any)?.maxTouchPoints || 0;
-      const isIpadOsLike = (navigator as any)?.platform === 'MacIntel' && maxTouchPoints > 1;
-      return Boolean(isMobile || coarsePointer || tabletUA || isIpadOsLike);
-    } catch {
-      return !!isMobile;
-    }
-  }, [isMobile]);
-  
   // ========================================
   // ALL HOOKS - Business logic extracted
   // ========================================
@@ -421,19 +334,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     canvasRef,
   } = imageFlipHook;
 
-  // In-Scene Boost state (used by both inpainting and magic edit)
-  const [isInSceneBoostEnabled, setIsInSceneBoostEnabled] = React.useState(true);
-
-  // Build loras array for inpainting if In-Scene boost is enabled
-  const inpaintLoras = React.useMemo(() => {
-    if (isInSceneBoostEnabled) {
-      return [{
-        url: 'https://huggingface.co/peteromallet/ad_motion_loras/resolve/main/in_scene_different_perspective_000019000.safetensors',
-        strength: 1.0
-      }];
-    }
-    return undefined;
-  }, [isInSceneBoostEnabled]);
+  // In-Scene Boost hook
+  const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, inpaintLoras } = useInSceneBoost();
 
   // Inpainting hook
   console.log('[InpaintDebug] 🔍 Passing to useInpainting hook:', {
@@ -491,205 +393,65 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setIsInpaintMode(false);
   };
 
-  // Magic Edit mode state - now merged with inpaint mode
-  const [isMagicEditMode, setIsMagicEditMode] = React.useState(false);
-  const [magicEditPrompt, setMagicEditPrompt] = React.useState('');
-  const [magicEditNumImages, setMagicEditNumImages] = React.useState(4);
-  const [isCreatingMagicEditTasks, setIsCreatingMagicEditTasks] = React.useState(false);
-  const [magicEditTasksCreated, setMagicEditTasksCreated] = React.useState(false);
-  const [inpaintPanelPosition, setInpaintPanelPosition] = React.useState<'top' | 'bottom'>('top');
-  
-  const { currentShotId } = useCurrentShot();
-  
-  // Prompt persistence for magic edit mode
-  const {
-    addMagicEditPrompt,
-    getLastMagicEditPrompt,
-    getLastSettings,
-    isLoading: isLoadingMetadata
-  } = useShotGenerationMetadata({
-    shotId: currentShotId || '',
-    shotGenerationId: media.id,
-    enabled: !!(currentShotId && media.id)
-  });
-  
-  const handleEnterMagicEditMode = React.useCallback(() => {
-    console.log('[MobilePaintDebug] ✨ Entering unified edit mode - START');
-    
-    setIsMagicEditMode(true);
-    console.log('[MobilePaintDebug] ✨ Called setIsMagicEditMode(true)');
-    
-    console.log('[MobilePaintDebug] About to call handleEnterInpaintMode, ref exists:', !!handleEnterInpaintMode);
-    handleEnterInpaintMode();
-    console.log('[MobilePaintDebug] ✨ Called handleEnterInpaintMode()');
-  }, [handleEnterInpaintMode]);
-  
-  // Track if user has manually exited edit mode to prevent auto-re-enter
-  const hasManuallyExitedRef = React.useRef(false);
-  
-  // Reset manual exit flag when media changes
-  React.useEffect(() => {
-    hasManuallyExitedRef.current = false;
-  }, [media.id]);
-  
-  const handleExitMagicEditMode = () => {
-    console.log('[MediaLightbox] ✨ Exiting unified edit mode');
-    hasManuallyExitedRef.current = true;
-    setIsMagicEditMode(false);
-    setIsInpaintMode(false);
-  };
-  
-  // Auto-enter unified edit mode if requested (only once, not after manual exit)
-  React.useEffect(() => {
-    console.log('[EditModeDebug] Auto-enter effect check:', {
+  // Magic Edit mode hook
+  const magicEditHook = useMagicEditMode({
+    media,
+    selectedProjectId,
       autoEnterInpaint,
-      isInpaintMode,
-      isMagicEditMode,
       isVideo,
-      selectedProjectId,
-      hasManuallyExited: hasManuallyExitedRef.current,
-      willEnter: autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && !!selectedProjectId && !hasManuallyExitedRef.current,
-      timestamp: Date.now()
-    });
-    
-    if (autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && selectedProjectId && !hasManuallyExitedRef.current) {
-      console.log('[EditModeDebug] 🎨 Auto-entering unified edit mode NOW');
-      handleEnterMagicEditMode();
-    }
-  }, [autoEnterInpaint, isInpaintMode, isMagicEditMode, isVideo, selectedProjectId, handleEnterMagicEditMode]);
-
-  // Load saved prompt and settings when entering magic edit mode (without brush strokes)
-  React.useEffect(() => {
-    if (isMagicEditMode && !isLoadingMetadata && currentShotId && brushStrokes.length === 0) {
-      const lastPrompt = getLastMagicEditPrompt();
-      const lastSettings = getLastSettings();
-      
-      if (lastPrompt && !inpaintPrompt) {
-        console.log('[MediaLightbox] Restoring saved magic edit prompt', {
-          promptLength: lastPrompt.length,
-          settings: lastSettings
-        });
-        setInpaintPrompt(lastPrompt);
-        setInpaintNumGenerations(lastSettings.numImages);
-        setIsInSceneBoostEnabled(lastSettings.isInSceneBoostEnabled);
-      }
-    }
-  }, [isMagicEditMode, isLoadingMetadata, currentShotId, brushStrokes.length, getLastMagicEditPrompt, getLastSettings, inpaintPrompt]);
-
-  // Unified edit mode - merging inpaint and magic edit
-  const isSpecialEditMode = isInpaintMode || isMagicEditMode;
-  
-  // Debug logging for state changes
-  React.useEffect(() => {
-    console.log('[MediaLightbox] 🔄 State changed');
-    console.log('  - isInpaintMode:', isInpaintMode);
-    console.log('  - isMagicEditMode:', isMagicEditMode);
-    console.log('  - isSpecialEditMode:', isSpecialEditMode);
-    console.log('  - brushStrokesCount:', brushStrokes.length);
-  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, brushStrokes.length]);
-  
-  // Unified generate handler - routes based on brush strokes
-  const handleUnifiedGenerate = async () => {
-    if (!selectedProjectId) {
-      toast.error('No project selected');
-      return;
-    }
-    
-    const prompt = inpaintPrompt.trim();
-    if (!prompt) {
-      toast.error('Please enter a prompt');
-      return;
-    }
-    
-    // Route based on whether there are brush strokes
-    if (brushStrokes.length > 0) {
-      // Has brush strokes -> inpaint
-      console.log('[MediaLightbox] Routing to inpaint (has brush strokes)');
-      await handleGenerateInpaint();
-    } else {
-      // No brush strokes -> magic edit
-      console.log('[MediaLightbox] Routing to magic edit (no brush strokes)');
-      setIsCreatingMagicEditTasks(true);
-      setMagicEditTasksCreated(false);
-      
-      try {
-        // Build loras array if In-Scene boost is enabled
-        const loras = [];
-        if (isInSceneBoostEnabled) {
-          loras.push({
-            url: 'https://huggingface.co/peteromallet/ad_motion_loras/resolve/main/in_scene_different_perspective_000019000.safetensors',
-            strength: 1.0
-          });
-        }
-        
-        const batchParams = {
-          project_id: selectedProjectId,
-          prompt,
-          image_url: sourceUrlForTasks,
-          numImages: inpaintNumGenerations,
-          negative_prompt: "",
-          resolution: imageDimensions ? `${imageDimensions.width}x${imageDimensions.height}` : undefined,
-          seed: 11111,
-          shot_id: currentShotId || undefined,
-          tool_type: toolTypeOverride,
-          loras: loras.length > 0 ? loras : undefined,
-          based_on: media.id, // Track source generation for lineage
-        };
-        
-        console.log('[MediaLightbox] Creating magic edit tasks with loras:', {
-          ...batchParams,
-          lorasEnabled: isInSceneBoostEnabled,
-          lorasCount: loras.length
-        });
-        const results = await createBatchMagicEditTasks(batchParams);
-        console.log(`[MediaLightbox] Created ${results.length} magic edit tasks`);
-        
-        // Save the prompt to shot generation metadata
-        if (currentShotId && media.id) {
-          try {
-            await addMagicEditPrompt(
-              prompt,
-              inpaintNumGenerations,
-              false, // Legacy parameter
-              isInSceneBoostEnabled
-            );
-            console.log('[MediaLightbox] Saved magic edit prompt to metadata');
-          } catch (error) {
-            console.error('[MediaLightbox] Failed to save prompt to metadata:', error);
-            // Don't fail the entire operation if metadata save fails
-          }
-        }
-        
-        setMagicEditTasksCreated(true);
-        setTimeout(() => setMagicEditTasksCreated(false), 3000);
-      } catch (error) {
-        console.error('[MediaLightbox] Error creating magic edit tasks:', error);
-        toast.error('Failed to create magic edit tasks');
-      } finally {
-        setIsCreatingMagicEditTasks(false);
-      }
-    }
-  };
-
-  // Unified special mode check - both inpaint and magic edit use the same layout
-  const isUnifiedEditMode = isInpaintMode || isMagicEditMode;
-  // Show sidebar on tablet/larger for: task details (even if loading), special edit modes, OR videos (always on iPad)
-  // Note: We show sidebar immediately for showTaskDetails to prevent layout jump while task loads
-  const shouldShowSidePanel = (showTaskDetails && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
-  
-  // Debug layout
-  React.useEffect(() => {
-    if (isSpecialEditMode) {
-      console.log('[TaskDetailsSidebar] 🎨 Special edit mode layout:', {
         isInpaintMode,
+    setIsInpaintMode,
+    handleEnterInpaintMode,
+    handleGenerateInpaint,
+    brushStrokes,
+    inpaintPrompt,
+    setInpaintPrompt,
+    inpaintNumGenerations,
+    setInpaintNumGenerations,
+    isInSceneBoostEnabled,
+    setIsInSceneBoostEnabled,
+    sourceUrlForTasks,
+    imageDimensions,
+    toolTypeOverride
+  });
+  const {
         isMagicEditMode,
+    setIsMagicEditMode,
+    magicEditPrompt,
+    setMagicEditPrompt,
+    magicEditNumImages,
+    setMagicEditNumImages,
+    isCreatingMagicEditTasks,
+    magicEditTasksCreated,
+    inpaintPanelPosition,
+    setInpaintPanelPosition,
+    handleEnterMagicEditMode,
+    handleExitMagicEditMode,
+    handleUnifiedGenerate,
+    isSpecialEditMode
+  } = magicEditHook;
+
+  // Layout mode hook
+  const layoutHook = useLayoutMode({
+    isMobile,
+    showTaskDetails,
         isSpecialEditMode,
+    isVideo,
+    isInpaintMode,
+    isMagicEditMode
+  });
+  const {
         isTabletOrLarger,
+    isTouchLikeDevice,
         shouldShowSidePanel,
-        windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'unknown'
-      });
-    }
-  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, isTabletOrLarger, shouldShowSidePanel]);
+    isUnifiedEditMode
+  } = layoutHook;
+
+  // Source generation hook
+  const { sourceGenerationData } = useSourceGeneration({
+    media,
+    onOpenExternalGeneration
+  });
 
   // Generation name hook
   const generationNameHook = useGenerationName({ media, selectedProjectId });
@@ -1170,120 +932,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
 
                   {/* Media Content */}
-                  <div ref={imageContainerRef} className="relative max-w-full max-h-full flex items-center justify-center">
-                    {isVideo ? (
-                      <StyledVideoPlayer
-                        src={effectiveImageUrl}
-                        poster={media.thumbUrl}
-                        loop
-                        muted
-                        autoPlay
-                        playsInline
-                        preload="auto"
-                        className="shadow-wes border border-border/20"
-                        style={{ maxWidth: '55vw', maxHeight: '98vh' }}
-                      />
-                    ) : (
-                      <div className="relative">
-                        <img 
-                          src={effectiveImageUrl} 
-                          alt="Media content"
-                          draggable={false}
-                          className={`object-contain transition-opacity duration-300 select-none ${
-                            isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                          } ${
-                            isSaving ? 'opacity-30' : 'opacity-100'
-                          }`}
-                          style={{ 
-                            maxHeight: '98vh',
-                            maxWidth: '55vw',
-                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none',
-                            pointerEvents: isInpaintMode ? 'none' : 'auto'
-                          }}
-                          onLoad={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            setImageDimensions({
-                              width: img.naturalWidth,
-                              height: img.naturalHeight
-                            });
-                          }}
-                        />
-                        {isSaving && (
-                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm">
-                            <div className="text-center text-white bg-black/80 rounded-lg p-6 backdrop-blur-sm border border-white/20">
-                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-3"></div>
-                              <p className="text-lg font-medium">Saving flipped image...</p>
-                              <p className="text-sm text-white/70 mt-1">Please wait</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Hidden canvas for image processing */}
-                        <canvas 
-                          ref={canvasRef}
-                          className="hidden"
-                        />
-                        
-                        {/* Canvas overlay for inpainting */}
-                        {(() => {
-                          console.log('[MediaLightbox] 🖼️ Canvas render check - Desktop');
-                          console.log('  - isInpaintMode:', isInpaintMode);
-                          console.log('  - isMagicEditMode:', isMagicEditMode);
-                          console.log('  - isSpecialEditMode:', isSpecialEditMode);
-                          console.log('  - hasDisplayCanvasRef:', !!displayCanvasRef);
-                          console.log('  - hasDisplayCanvas:', !!displayCanvasRef?.current);
-                          console.log('  - WILL RENDER CANVAS:', isInpaintMode);
-                          return isInpaintMode;
-                        })() && (
-                          <>
-                            <canvas
-                              ref={displayCanvasRef}
-                              className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
-                              style={{
-                                touchAction: 'none',
-                                zIndex: 50,
-                                userSelect: 'none'
-                              }}
-                              onPointerDown={(e) => {
-                                console.log('[InpaintPaint] 🎨 Canvas onPointerDown', {
-                                  clientX: e.clientX,
-                                  clientY: e.clientY,
-                                  canvasWidth: displayCanvasRef.current?.width,
-                                  canvasHeight: displayCanvasRef.current?.height,
-                                  isInpaintMode,
-                                  hasHandler: !!handlePointerDown
-                                });
-                                handlePointerDown(e);
-                              }}
-                              onPointerMove={(e) => {
-                                console.log('[InpaintPaint] 🖌️ Canvas onPointerMove', {
-                                  clientX: e.clientX,
-                                  clientY: e.clientY
-                                });
-                                handlePointerMove(e);
-                              }}
-                              onPointerUp={(e) => {
-                                console.log('[InpaintPaint] 🛑 Canvas onPointerUp');
-                                handlePointerUp(e);
-                              }}
-                              onPointerCancel={(e) => {
-                                console.log('[InpaintPaint] ⚠️ Canvas onPointerCancel');
-                                handlePointerUp(e);
-                              }}
-                              onDragStart={(e) => {
-                                console.log('[InpaintPaint] 🚫 Preventing drag');
-                                e.preventDefault();
-                              }}
-                            />
-                            <canvas
-                              ref={maskCanvasRef}
-                              className="hidden"
-                            />
-                          </>
-                        )}
-                      </div>
-                    )}
-
+                  <MediaDisplayWithCanvas
+                    effectiveImageUrl={effectiveImageUrl}
+                    thumbUrl={media.thumbUrl}
+                    isVideo={isVideo}
+                    isFlippedHorizontally={isFlippedHorizontally}
+                    isSaving={isSaving}
+                    isInpaintMode={isInpaintMode}
+                    imageContainerRef={imageContainerRef}
+                    canvasRef={canvasRef}
+                    displayCanvasRef={displayCanvasRef}
+                    maskCanvasRef={maskCanvasRef}
+                    onImageLoad={setImageDimensions}
+                    handlePointerDown={handlePointerDown}
+                    handlePointerMove={handlePointerMove}
+                    handlePointerUp={handlePointerUp}
+                    variant="desktop-side-panel"
+                    containerClassName="max-w-full max-h-full"
+                    debugContext="Desktop"
+                  />
 
                     {/* Top Left Controls - Flip Button */}
                     <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
@@ -1775,7 +1442,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                     </Button>
                   )}
-                </div>
 
                 {/* Task Details / Inpaint / Magic Edit Panel - Right side (40% width) */}
                 <div 
@@ -1800,27 +1466,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         
                         if (sourceGenerationData && onOpenExternalGeneration) {
                           return (
-                            <button
-                              onClick={async () => {
-                                console.log('[BasedOn] 🖼️ Navigating to source generation', {
-                                  sourceId: sourceGenerationData.id.substring(0, 8),
-                                  clearingDerivedContext: true
-                                });
-                                // Clear derived context by not passing it - exits derived nav mode
-                                await onOpenExternalGeneration(sourceGenerationData.id);
-                              }}
-                              className="mb-3 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                            >
-                              <span>Based on:</span>
-                              <div className="relative w-10 h-10 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                                <img
-                                  src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
-                                  alt="Source generation"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <span className="group-hover:underline">Click to view</span>
-                            </button>
+                            <SourceGenerationDisplay
+                              sourceGeneration={sourceGenerationData}
+                              onNavigate={onOpenExternalGeneration}
+                              variant="full"
+                              className="mb-3"
+                            />
                           );
                         }
                         return null;
@@ -2035,27 +1686,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {/* Based On display - Show source image this was derived from (ABOVE task details) */}
                       {sourceGenerationData && onOpenExternalGeneration && (
                         <div className="border-b border-border p-4">
-                          <button
-                            onClick={async () => {
-                              console.log('[BasedOn:NonEditTaskDetails] 🖼️ Navigating to source generation', {
-                                sourceId: sourceGenerationData.id.substring(0, 8),
-                                clearingDerivedContext: true
-                              });
-                              // Clear derived context by not passing it - exits derived nav mode
-                              await onOpenExternalGeneration(sourceGenerationData.id);
-                            }}
-                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                          >
-                            <span>Based on:</span>
-                            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                              <img
-                                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
-                                alt="Source generation"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <span className="group-hover:underline">Click to view</span>
-                          </button>
+                          <SourceGenerationDisplay
+                            sourceGeneration={sourceGenerationData}
+                            onNavigate={onOpenExternalGeneration}
+                            variant="compact"
+                          />
                         </div>
                       )}
                     
@@ -2195,7 +1830,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   style={{ height: '60%' }}
                 >
                   {/* Media Content - same as above but adapted for mobile */}
-                  <div className="relative w-full h-full flex items-center justify-center">
                     {isVideo ? (
                       <StyledVideoPlayer
                         src={effectiveImageUrl}
@@ -2208,149 +1842,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         className="max-w-full max-h-full shadow-wes border border-border/20"
                       />
                     ) : (
-                      <div 
-                        ref={imageContainerRef} 
-                        className="relative"
-                        style={{ touchAction: 'none' }}
-                        onTouchMove={(e) => {
-                          if (isInpaintMode) {
-                            e.preventDefault();
-                          }
-                        }}
-                      >
-                        <img 
-                          src={effectiveImageUrl} 
-                          alt="Media content"
-                          className={`object-contain transition-opacity duration-300 ${
-                            isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                          } ${
-                            isSaving ? 'opacity-30' : 'opacity-100'
-                          } ${
-                            isInpaintMode ? 'pointer-events-none' : ''
-                          }`}
-                          style={{ 
-                            maxHeight: '58vh',
-                            maxWidth: '95vw',
-                            transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                          }}
-                          onLoad={(e) => {
-                            const img = e.target as HTMLImageElement;
-                            setImageDimensions({
-                              width: img.naturalWidth,
-                              height: img.naturalHeight
-                            });
-                          }}
-                        />
-                        {isSaving && (
-                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm">
-                            <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
-                              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
-                              <p className="text-base font-medium">Saving flipped image...</p>
-                              <p className="text-xs text-white/70 mt-1">Please wait</p>
-                            </div>
-                          </div>
-                        )}
-                        {/* Hidden canvas for image processing */}
-                        <canvas 
-                          ref={canvasRef}
-                          className="hidden"
-                        />
-                        
-                        {/* Canvas overlay for inpainting */}
-                        {(() => {
-                          console.log('[MobilePaintDebug] 🖼️ Canvas render check - Mobile Stacked Layout', {
-                            isInpaintMode,
-                            isMagicEditMode,
-                            isSpecialEditMode,
-                            hasDisplayCanvasRef: !!displayCanvasRef,
-                            hasDisplayCanvas: !!displayCanvasRef?.current,
-                            shouldRenderCanvas: isInpaintMode
-                          });
-                          return isInpaintMode;
-                        })() && (
-                          <>
-                            <canvas
-                              ref={displayCanvasRef}
-                              className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
-                              style={{
-                                touchAction: 'none',
-                                zIndex: 50,
-                                userSelect: 'none',
-                                WebkitUserSelect: 'none'
-                              }}
-                              onPointerDown={(e) => {
-                                console.log('[MobilePaintDebug] 🎨 Canvas onPointerDown - Stacked', {
-                                  clientX: e.clientX,
-                                  clientY: e.clientY,
-                                  canvasWidth: displayCanvasRef.current?.width,
-                                  canvasHeight: displayCanvasRef.current?.height,
-                                  isInpaintMode
-                                });
-                                handlePointerDown(e);
-                              }}
-                              onPointerMove={(e) => {
-                                console.log('[MobilePaintDebug] 🖌️ Canvas onPointerMove - Stacked');
-                                handlePointerMove(e);
-                              }}
-                              onPointerUp={(e) => {
-                                console.log('[MobilePaintDebug] 🛑 Canvas onPointerUp - Stacked');
-                                handlePointerUp(e);
-                              }}
-                              onTouchStart={(e) => {
-                                console.log('[MobilePaintDebug] 🎨 Canvas onTouchStart (fallback) - Stacked');
-                                e.preventDefault();
-                                // Convert touch to pointer-like event
-                                if (e.touches.length > 0) {
-                                  const touch = e.touches[0];
-                                  const canvas = displayCanvasRef.current;
-                                  if (canvas) {
-                                    const rect = canvas.getBoundingClientRect();
-                                    const syntheticEvent = {
-                                      clientX: touch.clientX,
-                                      clientY: touch.clientY,
-                                      pointerId: touch.identifier,
-                                      pointerType: 'touch',
-                                      target: canvas,
-                                      preventDefault: () => {},
-                                      stopPropagation: () => {}
-                                    } as any;
-                                    handlePointerDown(syntheticEvent);
-                                  }
-                                }
-                              }}
-                              onTouchMove={(e) => {
-                                console.log('[MobilePaintDebug] 🖌️ Canvas onTouchMove (fallback) - Stacked');
-                                e.preventDefault();
-                                if (e.touches.length > 0) {
-                                  const touch = e.touches[0];
-                                  const canvas = displayCanvasRef.current;
-                                  if (canvas) {
-                                    const syntheticEvent = {
-                                      clientX: touch.clientX,
-                                      clientY: touch.clientY,
-                                      pointerId: touch.identifier,
-                                      pointerType: 'touch',
-                                      target: canvas,
-                                      preventDefault: () => {},
-                                      stopPropagation: () => {}
-                                    } as any;
-                                    handlePointerMove(syntheticEvent);
-                                  }
-                                }
-                              }}
-                              onTouchEnd={(e) => {
-                                console.log('[MobilePaintDebug] 🛑 Canvas onTouchEnd (fallback) - Stacked');
-                                e.preventDefault();
-                                handlePointerUp();
-                              }}
-                            />
-                            <canvas
-                              ref={maskCanvasRef}
-                              className="hidden"
-                            />
-                          </>
-                        )}
-                      </div>
+                    <MediaDisplayWithCanvas
+                      effectiveImageUrl={effectiveImageUrl}
+                      thumbUrl={media.thumbUrl}
+                      isVideo={false}
+                      isFlippedHorizontally={isFlippedHorizontally}
+                      isSaving={isSaving}
+                      isInpaintMode={isInpaintMode}
+                      imageContainerRef={imageContainerRef}
+                      canvasRef={canvasRef}
+                      displayCanvasRef={displayCanvasRef}
+                      maskCanvasRef={maskCanvasRef}
+                      onImageLoad={setImageDimensions}
+                      handlePointerDown={handlePointerDown}
+                      handlePointerMove={handlePointerMove}
+                      handlePointerUp={handlePointerUp}
+                      variant="mobile-stacked"
+                      containerClassName="w-full h-full"
+                      debugContext="Mobile Stacked"
+                    />
                     )}
 
                     {/* Mobile Inpaint Controls - Top/Bottom positioned (shown in special edit modes) */}
@@ -2552,7 +2062,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <ChevronRight className="h-6 w-6" />
                       </Button>
                     )}
-                  </div>
                 </div>
 
                 {/* Task Details / Inpaint / Magic Edit Panel - Bottom (40% height) */}
@@ -2870,149 +2379,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
                   />
                 ) : (
-                  <div 
-                    ref={imageContainerRef} 
-                    className="relative flex items-center justify-center w-full h-full" 
-                    style={{ touchAction: 'none' }}
-                    onTouchMove={(e) => {
-                      if (isInpaintMode) {
-                        e.preventDefault();
-                      }
-                    }}
-                  >
-                    <img 
-                      src={effectiveImageUrl} 
-                      alt="Media content"
-                        className={`max-w-full max-h-full object-contain transition-opacity duration-300 rounded ${
-                        isFlippedHorizontally ? 'scale-x-[-1]' : ''
-                      } ${
-                        isSaving ? 'opacity-30' : 'opacity-100'
-                      } ${
-                        isInpaintMode ? 'pointer-events-none' : ''
-                      }`}
-                      style={{ 
-                        transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
-                      }}
-                      onLoad={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        setImageDimensions({
-                          width: img.naturalWidth,
-                          height: img.naturalHeight
-                        });
-                      }}
-                    />
-                    {isSaving && (
-                        <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/50 backdrop-blur-sm rounded">
-                          <div className="text-center text-white bg-black/80 rounded-lg p-4 backdrop-blur-sm border border-white/20">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white mx-auto mb-2"></div>
-                            <p className="text-base font-medium">Saving flipped image...</p>
-                            <p className="text-xs text-white/70 mt-1">Please wait</p>
-                        </div>
-                      </div>
-                    )}
-                      <canvas ref={canvasRef} className="hidden" />
-                      
-                      {/* Canvas overlay for inpainting */}
-                      {(() => {
-                        console.log('[MobilePaintDebug] 🖼️ Canvas render check - Mobile', {
-                          isInpaintMode,
-                          isMagicEditMode,
-                          isSpecialEditMode,
-                          hasDisplayCanvasRef: !!displayCanvasRef,
-                          hasDisplayCanvas: !!displayCanvasRef?.current,
-                          shouldRenderCanvas: isInpaintMode
-                        });
-                        return isInpaintMode;
-                      })() && (
-                        <>
-                          <canvas
-                            ref={displayCanvasRef}
-                            className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
-                            style={{
-                              touchAction: 'none',
-                              zIndex: 50,
-                              userSelect: 'none',
-                              WebkitUserSelect: 'none'
-                            }}
-                            onPointerDown={(e) => {
-                              console.log('[MobilePaintDebug] 🎨 Canvas onPointerDown', {
-                                clientX: e.clientX,
-                                clientY: e.clientY,
-                                canvasWidth: displayCanvasRef.current?.width,
-                                canvasHeight: displayCanvasRef.current?.height,
-                                isInpaintMode
-                              });
-                              handlePointerDown(e);
-                            }}
-                            onPointerMove={(e) => {
-                              console.log('[MobilePaintDebug] 🖌️ Canvas onPointerMove');
-                              handlePointerMove(e);
-                            }}
-                            onPointerUp={(e) => {
-                              console.log('[MobilePaintDebug] 🛑 Canvas onPointerUp');
-                              handlePointerUp(e);
-                            }}
-                            onTouchStart={(e) => {
-                              console.log('[MobilePaintDebug] 🎨 Canvas onTouchStart (fallback)');
-                              e.preventDefault();
-                              // Convert touch to pointer-like event
-                              if (e.touches.length > 0) {
-                                const touch = e.touches[0];
-                                const canvas = displayCanvasRef.current;
-                                if (canvas) {
-                                  const rect = canvas.getBoundingClientRect();
-                                  const syntheticEvent = {
-                                    clientX: touch.clientX,
-                                    clientY: touch.clientY,
-                                    pointerId: touch.identifier,
-                                    pointerType: 'touch',
-                                    target: canvas,
-                                    preventDefault: () => {},
-                                    stopPropagation: () => {}
-                                  } as any;
-                                  handlePointerDown(syntheticEvent);
-                                }
-                              }
-                            }}
-                            onTouchMove={(e) => {
-                              console.log('[MobilePaintDebug] 🖌️ Canvas onTouchMove (fallback)');
-                              e.preventDefault();
-                              if (e.touches.length > 0) {
-                                const touch = e.touches[0];
-                                const canvas = displayCanvasRef.current;
-                                if (canvas) {
-                                  const syntheticEvent = {
-                                    clientX: touch.clientX,
-                                    clientY: touch.clientY,
-                                    pointerId: touch.identifier,
-                                    pointerType: 'touch',
-                                    target: canvas,
-                                    preventDefault: () => {},
-                                    stopPropagation: () => {}
-                                  } as any;
-                                  handlePointerMove(syntheticEvent);
-                                }
-                              }
-                            }}
-                            onTouchEnd={(e) => {
-                              console.log('[MobilePaintDebug] 🛑 Canvas onTouchEnd (fallback)');
-                              e.preventDefault();
-                              const syntheticEvent = {
-                                target: displayCanvasRef.current,
-                                pointerId: 0,
-                                preventDefault: () => {},
-                                stopPropagation: () => {}
-                              } as any;
-                              handlePointerUp(syntheticEvent);
-                            }}
-                          />
-                          <canvas
-                            ref={maskCanvasRef}
-                            className="hidden"
-                          />
-                        </>
-                      )}
-                  </div>
+                  <MediaDisplayWithCanvas
+                    effectiveImageUrl={effectiveImageUrl}
+                    thumbUrl={media.thumbUrl}
+                    isVideo={false}
+                    isFlippedHorizontally={isFlippedHorizontally}
+                    isSaving={isSaving}
+                    isInpaintMode={isInpaintMode}
+                    imageContainerRef={imageContainerRef}
+                    canvasRef={canvasRef}
+                    displayCanvasRef={displayCanvasRef}
+                    maskCanvasRef={maskCanvasRef}
+                    onImageLoad={setImageDimensions}
+                    handlePointerDown={handlePointerDown}
+                    handlePointerMove={handlePointerMove}
+                    handlePointerUp={handlePointerUp}
+                    variant="regular-centered"
+                    containerClassName="w-full h-full"
+                    debugContext="Regular Centered"
+                  />
                 )}
 
                   {/* Bottom Left Controls - Mode Entry Buttons */}

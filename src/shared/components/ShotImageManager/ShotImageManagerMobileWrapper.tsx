@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShotImageManagerProps } from './types';
-import { ShotImageManagerMobile } from '../ShotImageManager/ShotImageManagerMobile';
+import { ShotImageManagerMobile } from './ShotImageManagerMobile';
 import MediaLightbox from '../MediaLightbox';
 
 interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {

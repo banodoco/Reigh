@@ -39,3 +39,41 @@ export interface DerivedNavContext {
 export interface ExternalGeneration extends GenerationRow {
   based_on?: string;
 }
+
+// Props used by the mobile variant (existing component)
+export interface BaseShotImageManagerProps {
+  images: GenerationRow[];
+  onImageDelete: (shotImageEntryId: string) => void;
+  onBatchImageDelete?: (shotImageEntryIds: string[]) => void;
+  onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
+  onImageReorder: (orderedShotGenerationIds: string[]) => void;
+  onOpenLightbox?: (index: number) => void;
+  onInpaintClick?: (index: number) => void;
+  columns?: 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
+  projectAspectRatio?: string;
+  batchVideoFrames?: number;
+  onImageUpload?: (files: File[]) => Promise<void>;
+  isUploadingImage?: boolean;
+  onSelectionChange?: (hasSelection: boolean) => void;
+  readOnly?: boolean;
+}
+
+export interface MobileImageItemProps {
+  image: GenerationRow;
+  isSelected: boolean;
+  index: number;
+  onMobileTap: () => void;
+  onDelete: () => void;
+  onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
+  onOpenLightbox?: () => void;
+  onInpaintClick?: () => void;
+  hideDeleteButton?: boolean;
+  duplicatingImageId?: string | null;
+  duplicateSuccessImageId?: string | null;
+  shouldLoad?: boolean;
+  projectAspectRatio?: string;
+  frameNumber?: number;
+  readOnly?: boolean;
+}
