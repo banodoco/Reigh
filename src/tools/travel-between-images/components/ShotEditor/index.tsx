@@ -2258,26 +2258,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       />
       </div>
 
-      {/* Output Videos Section - Now at the top */}
-      <div ref={videoGalleryRef} className="">
-        <VideoOutputsGallery 
-          projectId={projectId}
-          shotId={selectedShotId}
-          onDelete={generationActions.handleDeleteVideoOutput}
-          deletingVideoId={state.deletingVideoId}
-          onApplySettingsFromTask={applySettingsFromTask}
-          shotKey={selectedShotId}
-          getShotVideoCount={getShotVideoCount}
-          invalidateVideoCountsCache={invalidateVideoCountsCache}
-          projectAspectRatio={effectiveAspectRatio}
-          localZeroHint={videoOutputs.length === 0}
-        />
+      {/* On desktop: videos at top, timeline below. On mobile: timeline at top, videos below */}
+      <div className={`flex flex-col ${isPhone ? 'order-1' : ''} gap-4`}>
+        {/* Output Videos Section - Top on desktop, below timeline on mobile */}
+        {!isPhone && (
+          <div ref={videoGalleryRef} className="">
+            <VideoOutputsGallery 
+              projectId={projectId}
+              shotId={selectedShotId}
+              onDelete={generationActions.handleDeleteVideoOutput}
+              deletingVideoId={state.deletingVideoId}
+              onApplySettingsFromTask={applySettingsFromTask}
+              shotKey={selectedShotId}
+              getShotVideoCount={getShotVideoCount}
+              invalidateVideoCountsCache={invalidateVideoCountsCache}
+              projectAspectRatio={effectiveAspectRatio}
+              localZeroHint={videoOutputs.length === 0}
+            />
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-col gap-4">
+      <div className={`flex flex-col gap-4 ${isPhone ? 'order-0' : ''}`}>
         
-        {/* Image Manager */}
+        {/* Image Manager / Timeline */}
         <div className="flex flex-col w-full gap-4">
             <ShotImagesEditor
             isModeReady={state.isModeReady}
@@ -2582,6 +2587,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           </Card>
         </div>
       </div>
+      
+      {/* Mobile: Output Videos Section - Below timeline on mobile devices */}
+      {isPhone && (
+        <div ref={videoGalleryRef} className="">
+          <VideoOutputsGallery 
+            projectId={projectId}
+            shotId={selectedShotId}
+            onDelete={generationActions.handleDeleteVideoOutput}
+            deletingVideoId={state.deletingVideoId}
+            onApplySettingsFromTask={applySettingsFromTask}
+            shotKey={selectedShotId}
+            getShotVideoCount={getShotVideoCount}
+            invalidateVideoCountsCache={invalidateVideoCountsCache}
+            projectAspectRatio={effectiveAspectRatio}
+            localZeroHint={videoOutputs.length === 0}
+          />
+        </div>
+      )}
       
       {/* Sticky shot header - appears when original header is out of view */}
       {(!state.isEditingName) && isSticky && (() => {
