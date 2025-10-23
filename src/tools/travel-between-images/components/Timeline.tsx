@@ -876,8 +876,8 @@ const Timeline: React.FC<TimelineProps> = ({
             // TODO: Implement magic edit generation
             timelineDebugger.logEvent('Magic edit requested', { shotId, imageUrl, prompt, numImages });
           }}
-          // Task details functionality - show on tablet+ (768px+), hide on mobile
-          showTaskDetails={isTabletOrLarger}
+          // Task details functionality - now shown on all devices including mobile
+          showTaskDetails={true}
           taskDetailsData={{
             task,
             isLoading: isLoadingTask,

@@ -477,7 +477,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         thumbUrl,
         project_id: selectedProjectId,
       });
-      toast.success('Added to shot');
       return true;
     } catch (error) {
       console.error('[ShotImageManager] Error adding to shot:', error);
@@ -512,7 +511,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         thumbUrl,
         project_id: selectedProjectId,
       });
-      toast.success('Added to shot without position');
       return true;
     } catch (error) {
       console.error('[ShotImageManager] Error adding to shot without position:', error);
@@ -1777,8 +1775,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               hasPrevious={hasPrevious}
               starred={(currentImages[lightboxIndex] as any).starred || false}
               onMagicEdit={onMagicEdit}
-              // Task details functionality - show on tablet+ (768px+), hide on mobile
-              showTaskDetails={isTabletOrLarger}
+              // Task details functionality - now shown on all devices including mobile
+              showTaskDetails={true}
               taskDetailsData={{
                 task: task,
                 isLoading: isLoadingTask,
@@ -2064,8 +2062,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             starred={(currentImages[lightboxIndex] as any).starred || false}
             onMagicEdit={onMagicEdit}
             readOnly={readOnly}
-            // Task details functionality - show on tablet+ (768px+), hide on mobile
-            showTaskDetails={isTabletOrLarger}
+            // Task details functionality - now shown on all devices including mobile
+            showTaskDetails={true}
             taskDetailsData={{
               task: task,
               isLoading: isLoadingTask,

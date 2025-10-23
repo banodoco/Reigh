@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Eraser, Undo2, Paintbrush, Loader2, CheckCircle } from 'lucide-react';
+import { X, Eraser, Undo2, Paintbrush, Loader2, CheckCircle, Circle, ArrowRight } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { cn } from '@/shared/lib/utils';
@@ -22,6 +22,10 @@ export interface InpaintControlsPanelProps {
   onSetBrushSize: (size: number) => void;
   onGenerateInpaint: () => void;
   onExitInpaintMode: () => void;
+  isAnnotateMode: boolean;
+  annotationMode: 'circle' | 'arrow' | null;
+  onSetIsAnnotateMode: (isAnnotate: boolean) => void;
+  onSetAnnotationMode: (mode: 'circle' | 'arrow' | null) => void;
 }
 
 /**
@@ -45,6 +49,10 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
   onSetBrushSize,
   onGenerateInpaint,
   onExitInpaintMode,
+  isAnnotateMode,
+  annotationMode,
+  onSetIsAnnotateMode,
+  onSetAnnotationMode,
 }) => {
   const isDesktop = variant === 'desktop';
   const isMobile = variant === 'mobile';
@@ -75,22 +83,74 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
         </Button>
       </div>
       
-      {/* Paint/Erase Toggle, Clear, and Undo */}
+      {/* Inpaint vs Annotate Toggle */}
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant={!isAnnotateMode ? "default" : "secondary"}
+          size="sm"
+          onClick={() => onSetIsAnnotateMode(false)}
+          className="flex-1"
+        >
+          <Paintbrush className="h-3.5 w-3.5 mr-1.5" />
+          Inpaint
+        </Button>
+        <Button
+          variant={isAnnotateMode ? "default" : "secondary"}
+          size="sm"
+          onClick={() => {
+            onSetIsAnnotateMode(true);
+            onSetAnnotationMode('circle');
+          }}
+          className="flex-1"
+        >
+          <Circle className="h-3.5 w-3.5 mr-1.5" />
+          Annotate
+        </Button>
+      </div>
+      
+      {/* Paint/Erase or Circle/Arrow Toggle, Clear, and Undo */}
       {isMobile ? (
         // Mobile: All 3 buttons on one line
         <div className="flex items-center gap-2">
-          <Button
-            variant={isEraseMode ? "default" : "secondary"}
-            size="sm"
-            onClick={() => onSetIsEraseMode(!isEraseMode)}
-            className={cn(
-              "flex-1",
-              isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
-            )}
-          >
-            <Eraser className="h-3 w-3 mr-1" />
-            {isEraseMode ? 'Erase' : 'Paint'}
-          </Button>
+          {!isAnnotateMode ? (
+            // Inpaint mode: Paint/Erase
+            <>
+              <Button
+                variant={isEraseMode ? "default" : "secondary"}
+                size="sm"
+                onClick={() => onSetIsEraseMode(!isEraseMode)}
+                className={cn(
+                  "flex-1",
+                  isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
+                )}
+              >
+                <Eraser className="h-3 w-3 mr-1" />
+                {isEraseMode ? 'Erase' : 'Paint'}
+              </Button>
+            </>
+          ) : (
+            // Annotate mode: Circle/Arrow
+            <>
+              <Button
+                variant={annotationMode === 'circle' ? "default" : "secondary"}
+                size="sm"
+                onClick={() => onSetAnnotationMode('circle')}
+                className="flex-1"
+              >
+                <Circle className="h-3 w-3 mr-1" />
+                Circle
+              </Button>
+              <Button
+                variant={annotationMode === 'arrow' ? "default" : "secondary"}
+                size="sm"
+                onClick={() => onSetAnnotationMode('arrow')}
+                className="flex-1"
+              >
+                <ArrowRight className="h-3 w-3 mr-1" />
+                Arrow
+              </Button>
+            </>
+          )}
           
           <Button
             variant="outline"
@@ -116,27 +176,68 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
         // Desktop/Floating: Original layout
         <>
           <div className="flex items-center gap-2">
-            {isFloating || isDesktop ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={isEraseMode ? "default" : "secondary"}
-                    size="sm"
-                    onClick={() => onSetIsEraseMode(!isEraseMode)}
-                    className={cn(
-                      "flex-1",
-                      isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
-                    )}
-                  >
-                    <Eraser className="h-4 w-4 mr-2" />
-                    {isEraseMode ? 'Erasing' : 'Erase'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="z-[100001]">
-                  {isEraseMode ? 'Switch to paint mode' : 'Switch to erase mode'}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
+            {!isAnnotateMode ? (
+              // Inpaint mode: Paint/Erase toggle
+              <>
+                {isFloating || isDesktop ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isEraseMode ? "default" : "secondary"}
+                        size="sm"
+                        onClick={() => onSetIsEraseMode(!isEraseMode)}
+                        className={cn(
+                          "flex-1",
+                          isEraseMode ? "bg-purple-600 hover:bg-purple-700" : ""
+                        )}
+                      >
+                        <Eraser className="h-4 w-4 mr-2" />
+                        {isEraseMode ? 'Erasing' : 'Erase'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100001]">
+                      {isEraseMode ? 'Switch to paint mode' : 'Switch to erase mode'}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </>
+            ) : (
+              // Annotate mode: Circle/Arrow toggle
+              <>
+                {isFloating || isDesktop ? (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={annotationMode === 'circle' ? "default" : "secondary"}
+                          size="sm"
+                          onClick={() => onSetAnnotationMode('circle')}
+                          className="flex-1"
+                        >
+                          <Circle className="h-4 w-4 mr-2" />
+                          Circle
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">Draw circles</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={annotationMode === 'arrow' ? "default" : "secondary"}
+                          size="sm"
+                          onClick={() => onSetAnnotationMode('arrow')}
+                          className="flex-1"
+                        >
+                          <ArrowRight className="h-4 w-4 mr-2" />
+                          Arrow
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="z-[100001]">Draw arrows</TooltipContent>
+                    </Tooltip>
+                  </>
+                ) : null}
+              </>
+            )}
             
             {isFloating || isDesktop ? (
               <Tooltip>
@@ -175,84 +276,95 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
       )}
       
       <div className={borderTopClass}>
-        {/* Brush Size Slider */}
-        <div className={isMobile ? "space-y-1" : "space-y-2"}>
-          <div className="flex items-center justify-between">
-            <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>Brush Size</label>
-            <span className={isMobile ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{brushSize}px</span>
-          </div>
-          <input
-            type="range"
-            min={5}
-            max={100}
-            value={brushSize}
-            onChange={(e) => onSetBrushSize(parseInt(e.target.value))}
-            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-          />
-        </div>
+        {/* Only show these controls in Inpaint mode */}
+        {!isAnnotateMode && (
+          <>
+            {/* Brush Size Slider */}
+            <div className={isMobile ? "space-y-1" : "space-y-2"}>
+              <div className="flex items-center justify-between">
+                <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>Brush Size</label>
+                <span className={isMobile ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{brushSize}px</span>
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={100}
+                value={brushSize}
+                onChange={(e) => onSetBrushSize(parseInt(e.target.value))}
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+              />
+            </div>
+          </>
+        )}
       
-        {/* Prompt Field */}
-        <div className={isMobile ? "space-y-1" : "space-y-2"}>
-          <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>Inpaint Prompt</label>
-          <textarea
-            value={inpaintPrompt}
-            onChange={(e) => onSetInpaintPrompt(e.target.value)}
-            placeholder={isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area..."}
-            className={cn(
-              "w-full bg-background border border-input rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring",
-              isMobile ? "min-h-[60px] px-2 py-1.5" : "min-h-[100px] px-3 py-2"
-            )}
-            rows={isMobile ? 3 : 4}
-          />
-        </div>
+        {/* Prompt Field - Only in Inpaint mode */}
+        {!isAnnotateMode && (
+          <div className={isMobile ? "space-y-1" : "space-y-2"}>
+            <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>Inpaint Prompt</label>
+            <textarea
+              value={inpaintPrompt}
+              onChange={(e) => onSetInpaintPrompt(e.target.value)}
+              placeholder={isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area..."}
+              className={cn(
+                "w-full bg-background border border-input rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring",
+                isMobile ? "min-h-[60px] px-2 py-1.5" : "min-h-[100px] px-3 py-2"
+              )}
+              rows={isMobile ? 3 : 4}
+            />
+          </div>
+        )}
         
-        {/* Number of Generations */}
-        <div className={isMobile ? "space-y-1" : "space-y-2"}>
-          <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>
-            {isMobile ? 'Generations (1-4)' : 'Number of Generations'}
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={4}
-            value={inpaintNumGenerations}
-            onChange={(e) => onSetInpaintNumGenerations(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
-            className={cn(
-              "w-full bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring",
-              isMobile ? "px-2 py-1.5" : "px-3 py-2"
-            )}
-          />
-          {!isMobile && <p className="text-xs text-muted-foreground">Generate 1-4 variations</p>}
-        </div>
+        {/* Number of Generations - Only in Inpaint mode */}
+        {!isAnnotateMode && (
+          <div className={isMobile ? "space-y-1" : "space-y-2"}>
+            <label className={isMobile ? "text-xs font-medium" : "text-sm font-medium"}>
+              {isMobile ? 'Generations (1-4)' : 'Number of Generations'}
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={4}
+              value={inpaintNumGenerations}
+              onChange={(e) => onSetInpaintNumGenerations(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
+              className={cn(
+                "w-full bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring",
+                isMobile ? "px-2 py-1.5" : "px-3 py-2"
+              )}
+            />
+            {!isMobile && <p className="text-xs text-muted-foreground">Generate 1-4 variations</p>}
+          </div>
+        )}
         
-        {/* Generate Button */}
-        <Button
-          variant="default"
-          size={isMobile ? "sm" : "default"}
-          onClick={onGenerateInpaint}
-          disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
-          className={cn(
-            "w-full",
-            inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
-          )}
-        >
-          {isGeneratingInpaint ? (
-            <>
-              <Loader2 className={isMobile ? "h-3 w-3 mr-2 animate-spin" : "h-4 w-4 mr-2 animate-spin"} />
-              Generating...
-            </>
-          ) : inpaintGenerateSuccess ? (
-            <>
-              <CheckCircle className={isMobile ? "h-3 w-3 mr-2" : "h-4 w-4 mr-2"} />
-              Success!
-            </>
-          ) : (
-            <>
-              <Paintbrush className={isMobile ? "h-3 w-3 mr-2" : "h-4 w-4 mr-2"} />
-              {isMobile ? 'Generate' : 'Generate Inpaint'}
-            </>
-          )}
-        </Button>
+        {/* Generate Button - Only in Inpaint mode */}
+        {!isAnnotateMode && (
+          <Button
+            variant="default"
+            size={isMobile ? "sm" : "default"}
+            onClick={onGenerateInpaint}
+            disabled={brushStrokes.length === 0 || !inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess}
+            className={cn(
+              "w-full",
+              inpaintGenerateSuccess && "bg-green-600 hover:bg-green-600"
+            )}
+          >
+            {isGeneratingInpaint ? (
+              <>
+                <Loader2 className={isMobile ? "h-3 w-3 mr-2 animate-spin" : "h-4 w-4 mr-2 animate-spin"} />
+                Generating...
+              </>
+            ) : inpaintGenerateSuccess ? (
+              <>
+                <CheckCircle className={isMobile ? "h-3 w-3 mr-2" : "h-4 w-4 mr-2"} />
+                Success!
+              </>
+            ) : (
+              <>
+                <Paintbrush className={isMobile ? "h-3 w-3 mr-2" : "h-4 w-4 mr-2"} />
+                {isMobile ? 'Generate' : 'Generate Inpaint'}
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

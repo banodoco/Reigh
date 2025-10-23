@@ -21,3 +21,5 @@ export type { WorkflowControlsProps } from './WorkflowControls';
 
 export { MediaDisplayWithCanvas } from './MediaDisplayWithCanvas';
 export { SourceGenerationDisplay } from './SourceGenerationDisplay';
+
+export { TopLeftControls, TopRightControls, BottomLeftControls, BottomRightControls } from './ButtonGroups';

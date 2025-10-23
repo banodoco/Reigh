@@ -107,7 +107,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             hasPrevious={hasPrevious}
             starred={(lightbox.currentImages[lightbox.lightboxIndex] as any).starred || false}
             onMagicEdit={props.onMagicEdit}
-            showTaskDetails={isTabletOrLarger}
+            showTaskDetails={true}
             onNavigateToGeneration={(generationId: string) => {
               console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
                 generationId: generationId.substring(0, 8),

@@ -933,7 +933,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             hasPrevious={derivedHasPrevious}
             starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
             shotId={shotId || undefined}
-            showTaskDetails={!isTouchLikeDevice}
+            showTaskDetails={true}
             onNavigateToGeneration={(generationId: string) => {
               console.log('[VideoGallery:DerivedNav] 📍 Navigate to generation', {
                 generationId: generationId.substring(0, 8),

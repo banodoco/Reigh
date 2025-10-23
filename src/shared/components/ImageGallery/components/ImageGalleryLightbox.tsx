@@ -571,8 +571,8 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
             // TODO: Implement magic edit generation
             console.log('Magic Edit:', { imageUrl, prompt, numImages });
           }}
-          // Task details functionality - show on tablet+ (768px+), hide on mobile
-          showTaskDetails={isTabletOrLarger}
+          // Task details functionality - now shown on all devices including mobile
+          showTaskDetails={true}
           taskDetailsData={{
             task,
             isLoading: isLoadingTask,

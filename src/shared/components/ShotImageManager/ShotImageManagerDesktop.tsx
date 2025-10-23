@@ -163,7 +163,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               starred={(lightbox.currentImages[lightbox.lightboxIndex] as any).starred || false}
               onMagicEdit={props.onMagicEdit}
               readOnly={props.readOnly}
-              showTaskDetails={isTabletOrLarger}
+              showTaskDetails={true}
               onNavigateToGeneration={(generationId: string) => {
                 const index = lightbox.currentImages.findIndex((img: any) => img.id === generationId);
                 if (index !== -1) {

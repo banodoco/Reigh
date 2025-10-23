@@ -106,7 +106,6 @@ export function useExternalGenerations({
         thumbUrl,
         project_id: selectedProjectId,
       });
-      toast.success('Added to shot');
       return true;
     } catch (error) {
       console.error('[ShotImageManager] Error adding to shot:', error);
@@ -129,7 +128,6 @@ export function useExternalGenerations({
         thumbUrl,
         project_id: selectedProjectId,
       });
-      toast.success('Added to shot without position');
       return true;
     } catch (error) {
       console.error('[ShotImageManager] Error adding to shot without position:', error);

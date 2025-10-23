@@ -349,6 +349,40 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [userId, fetchUserPreferences]);
 
+  const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
+    console.info('[TabReactivation] 🔥 SELECTED PROJECT ID CHANGING', {
+      from: selectedProjectId,
+      to: projectId,
+      visibilityState: document.visibilityState,
+      timestamp: Date.now(),
+      stack: new Error().stack?.split('\n').slice(1, 4)
+    });
+    
+    setSelectedProjectIdState(projectId);
+    
+    // FAST RESUME: Save to localStorage immediately for fast tab resume
+    if (projectId) {
+      try {
+        localStorage.setItem('lastSelectedProjectId', projectId);
+        console.log(`[ProjectContext:FastResume] Saved selectedProjectId to localStorage: ${projectId}`);
+        console.log(`[ProjectContext:FastResume] Verification - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
+      } catch (e) {
+        console.error(`[ProjectContext:FastResume] Failed to save to localStorage:`, e);
+      }
+      // Also save to user preferences (slower but persistent across devices)
+      updateUserPreferences('user', { lastOpenedProjectId: projectId });
+    } else {
+      try {
+        console.warn(`[ProjectContext:FastResume] REMOVING selectedProjectId from localStorage (projectId is null)`);
+        localStorage.removeItem('lastSelectedProjectId');
+        console.log(`[ProjectContext:FastResume] Verification after removal - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
+      } catch (e) {
+        console.error(`[ProjectContext:FastResume] Failed to remove from localStorage:`, e);
+      }
+      updateUserPreferences('user', { lastOpenedProjectId: undefined });
+    }
+  }, [updateUserPreferences, selectedProjectId]);
+
   const fetchProjects = useCallback(async () => {
     console.log(`[ProjectContext:MobileDebug] Starting projects fetch`);
     try {
@@ -409,13 +443,17 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         const mappedProjects = projectsData.map(mapDbProjectToProject);
         setProjects(mappedProjects);
         
-        // Use the last opened project from user settings instead of localStorage
+        // Prefer the currently selected project if it's still present; otherwise fall back to user prefs, else newest
         const lastOpenedProjectId = userPreferencesRef.current?.lastOpenedProjectId;
-        const projectIdToSelect = determineProjectIdToSelect(mappedProjects, null, lastOpenedProjectId);
+        const projectIdToSelect = determineProjectIdToSelect(mappedProjects, selectedProjectId, lastOpenedProjectId);
         
-        // FIXED: Use handleSetSelectedProjectId to ensure localStorage is saved
-        console.log(`[ProjectContext:FastResume] Setting selected project from preferences: ${projectIdToSelect}`);
-        handleSetSelectedProjectId(projectIdToSelect);
+        // Only update if it actually changes to avoid clobbering a valid selection and redundant writes
+        if (projectIdToSelect !== selectedProjectId) {
+          console.log(`[ProjectContext:FastResume] Setting selected project (resolved): ${projectIdToSelect}`);
+          handleSetSelectedProjectId(projectIdToSelect);
+        } else {
+          console.log(`[ProjectContext:FastResume] Preserving current selected project: ${selectedProjectId}`);
+        }
       }
       console.log(`[ProjectContext:MobileDebug] Projects loaded successfully`);
     } catch (error: any) {
@@ -443,7 +481,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsLoadingProjects(false);
     }
-  }, [updateUserPreferences]);
+  }, [updateUserPreferences, selectedProjectId, handleSetSelectedProjectId]);
 
   const addNewProject = useCallback(async (projectData: { name: string; aspectRatio: string }) => {
     if (!projectData.name.trim()) {
@@ -568,9 +606,10 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       const mappedProject = mapDbProjectToProject(newProject);
       setProjects(prevProjects => sortProjectsByCreatedAt([...prevProjects, mappedProject]));
-      setSelectedProjectIdState(mappedProject.id);
+      // Use centralized setter to persist to localStorage and preferences
+      handleSetSelectedProjectId(mappedProject.id);
       
-      // Save the new project as last opened in user settings
+      // Save the new project as last opened in user settings (kept for redundancy)
       updateUserPreferences('user', { lastOpenedProjectId: mappedProject.id });
 
             
@@ -582,7 +621,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsCreatingProject(false);
     }
-  }, [updateUserPreferences, selectedProjectId]);
+  }, [updateUserPreferences, selectedProjectId, handleSetSelectedProjectId]);
 
   const updateProject = useCallback(async (projectId: string, updates: ProjectUpdate): Promise<boolean> => {
     if (!updates.name?.trim() && !updates.aspectRatio) {
@@ -712,40 +751,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       return () => clearTimeout(emergencyTimer);
     }
   }, [userId, isLoadingPreferences, fetchProjects, isLoadingProjects]); // Refetch when user changes or preferences finish loading
-
-  const handleSetSelectedProjectId = useCallback((projectId: string | null) => {
-    console.info('[TabReactivation] 🔥 SELECTED PROJECT ID CHANGING', {
-      from: selectedProjectId,
-      to: projectId,
-      visibilityState: document.visibilityState,
-      timestamp: Date.now(),
-      stack: new Error().stack?.split('\n').slice(1, 4)
-    });
-    
-    setSelectedProjectIdState(projectId);
-    
-    // FAST RESUME: Save to localStorage immediately for fast tab resume
-    if (projectId) {
-      try {
-        localStorage.setItem('lastSelectedProjectId', projectId);
-        console.log(`[ProjectContext:FastResume] Saved selectedProjectId to localStorage: ${projectId}`);
-        console.log(`[ProjectContext:FastResume] Verification - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
-      } catch (e) {
-        console.error(`[ProjectContext:FastResume] Failed to save to localStorage:`, e);
-      }
-      // Also save to user preferences (slower but persistent across devices)
-      updateUserPreferences('user', { lastOpenedProjectId: projectId });
-    } else {
-      try {
-        console.warn(`[ProjectContext:FastResume] REMOVING selectedProjectId from localStorage (projectId is null)`);
-        localStorage.removeItem('lastSelectedProjectId');
-        console.log(`[ProjectContext:FastResume] Verification after removal - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
-      } catch (e) {
-        console.error(`[ProjectContext:FastResume] Failed to remove from localStorage:`, e);
-      }
-      updateUserPreferences('user', { lastOpenedProjectId: undefined });
-    }
-  }, [updateUserPreferences, selectedProjectId]);
 
   const contextValue = useMemo(
     () => ({ 

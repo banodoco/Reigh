@@ -29,7 +29,12 @@ import {
   Pencil,
   ArrowDown,
   ArrowUp,
-  Maximize2
+  Maximize2,
+  Circle,
+  ArrowRight,
+  Move,
+  Edit3,
+  Type
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { toast } from 'sonner';
@@ -73,6 +78,10 @@ import {
   WorkflowControls,
   MediaDisplayWithCanvas,
   SourceGenerationDisplay,
+  TopLeftControls,
+  TopRightControls,
+  BottomLeftControls,
+  BottomRightControls,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -373,11 +382,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     brushSize,
     isGeneratingInpaint,
     inpaintGenerateSuccess,
+    isAnnotateMode,
+    editMode,
+    annotationMode,
+    selectedShapeId,
+    shapeEditMode,
     setIsInpaintMode,
     setIsEraseMode,
     setInpaintPrompt,
     setInpaintNumGenerations,
     setBrushSize,
+    setIsAnnotateMode,
+    setEditMode,
+    setAnnotationMode,
+    setShapeEditMode,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -385,6 +403,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleClearMask,
     handleEnterInpaintMode,
     handleGenerateInpaint,
+    handleDeleteSelected,
+    getDeleteButtonPosition,
   } = inpaintingHook;
   
   // Handle exiting inpaint mode from UI buttons
@@ -952,40 +972,74 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     debugContext="Desktop"
                   />
 
-                    {/* Top Left Controls - Flip Button */}
-                    <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
-                      {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
-                        <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={handleFlip}
-                                className="bg-black/50 hover:bg-black/70 text-white"
-                              >
-                                <FlipHorizontal className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">Flip horizontally</TooltipContent>
-                          </Tooltip>
-                          {hasChanges && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleSave(effectiveImageUrl)}
-                              disabled={isSaving}
-                              className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
+                    {/* Edit Controls for Selected Annotation */}
+                    {selectedShapeId && isAnnotateMode && (() => {
+                      const buttonPos = getDeleteButtonPosition();
+                      if (!buttonPos) return null;
+                      
+                      return (
+                        <div className="fixed z-[100] flex gap-2" style={{
+                          left: `${buttonPos.x}px`,
+                          top: `${buttonPos.y}px`,
+                          transform: 'translate(-50%, -50%)'
+                        }}>
+                          {/* Toggle: Adjust / Move Mode */}
+                          <div className="flex bg-gray-800 rounded-lg p-1 shadow-lg">
+                            <button
+                              onClick={() => setShapeEditMode('adjust')}
+                              className={cn(
+                                "p-2 rounded-md transition-colors",
+                                shapeEditMode === 'adjust'
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-300 hover:text-white"
+                              )}
+                              title="Adjust mode (drag to resize)"
                             >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setShapeEditMode('move')}
+                              className={cn(
+                                "p-2 rounded-md transition-colors",
+                                shapeEditMode === 'move'
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-300 hover:text-white"
+                              )}
+                              title="Move mode (drag to reposition)"
+                            >
+                              <Move className="h-4 w-4" />
+                            </button>
+                          </div>
+                          
+                          {/* Delete Button */}
+                          <button
+                            onClick={handleDeleteSelected}
+                            className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors"
+                            title="Delete annotation (or press DELETE key)"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Top Left Controls - Flip & Save */}
+                    <TopLeftControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      showImageEditTools={showImageEditTools}
+                      hasChanges={hasChanges}
+                      isSaving={isSaving}
+                      handleFlip={handleFlip}
+                      handleSave={handleSave}
+                      effectiveImageUrl={effectiveImageUrl}
+                    />
 
                     {/* Floating Inpaint Controls - Separate from other buttons */}
-                    {isSpecialEditMode && shouldShowSidePanel && (
+                    {isSpecialEditMode && shouldShowSidePanel && editMode !== 'text' && (
                       <div className={cn(
                         "absolute left-4 z-[70]",
                         inpaintPanelPosition === 'top' ? 'top-4' : 'bottom-4'
@@ -1001,7 +1055,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               <TooltipTrigger asChild>
                                 <button
                                   onClick={() => setInpaintPanelPosition('top')}
-                                  className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-t-md flex items-center justify-center transition-colors"
+                                  className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-t-md flex items-center justify-center transition-colors border border-border border-b-0 shadow-lg"
                                 >
                                   <ArrowUp className="h-3 w-3 mt-0.5" />
                                 </button>
@@ -1010,61 +1064,81 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             </Tooltip>
                           )}
                           
-                          <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-40">
-                            {/* Close Edit Mode Button */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={handleExitMagicEditMode}
-                              className="w-full text-xs h-7 text-white hover:bg-white/20"
-                            >
-                              <X className="h-3 w-3 mr-1" />
-                              Close edit mode
-                            </Button>
-                            
+                          <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
                             {/* Brush Size Slider */}
-                            <div className="space-y-0.5">
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-white">Size</label>
-                                <span className="text-xs text-white/70">{brushSize}px</span>
+                            {editMode === 'inpaint' && (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs font-medium text-foreground">Size</label>
+                                  <span className="text-xs text-muted-foreground">{brushSize}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={5}
+                                  max={100}
+                                  value={brushSize}
+                                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                                  className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                />
                               </div>
-                              <input
-                                type="range"
-                                min={5}
-                                max={100}
-                                value={brushSize}
-                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-                              />
-                            </div>
+                            )}
                             
-                            {/* Paint/Erase Toggle */}
-                            <div className="flex items-center gap-0.5 bg-white/10 rounded-md p-0.5">
-                              <button
-                                onClick={() => setIsEraseMode(false)}
-                                className={cn(
-                                  "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
-                                  !isEraseMode 
-                                    ? "bg-blue-600 text-white shadow-sm" 
-                                    : "text-white/60 hover:text-white/80"
-                                )}
-                              >
-                                <Paintbrush className="h-3 w-3" />
-                                Paint
-                              </button>
-                              <button
-                                onClick={() => setIsEraseMode(true)}
-                                className={cn(
-                                  "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
-                                  isEraseMode 
-                                    ? "bg-purple-600 text-white shadow-sm" 
-                                    : "text-white/60 hover:text-white/80"
-                                )}
-                              >
-                                <Eraser className="h-3 w-3" />
-                                Erase
-                              </button>
-                            </div>
+                            {/* Paint/Erase or Circle/Arrow Toggle */}
+                            {editMode === 'inpaint' && (
+                              <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                                <button
+                                  onClick={() => setIsEraseMode(false)}
+                                  className={cn(
+                                    "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
+                                    !isEraseMode 
+                                      ? "bg-primary text-primary-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  <Paintbrush className="h-3 w-3" />
+                                  Paint
+                                </button>
+                                <button
+                                  onClick={() => setIsEraseMode(true)}
+                                  className={cn(
+                                    "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
+                                    isEraseMode 
+                                      ? "bg-purple-600 text-white shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  <Eraser className="h-3 w-3" />
+                                  Erase
+                                </button>
+                              </div>
+                            )}
+                            
+                            {editMode === 'annotate' && (
+                              <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                                <button
+                                  onClick={() => setAnnotationMode('circle')}
+                                  className={cn(
+                                    "flex-1 flex items-center justify-center px-2 py-1 rounded text-xs transition-all",
+                                    annotationMode === 'circle' 
+                                      ? "bg-primary text-primary-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  <Circle className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => setAnnotationMode('arrow')}
+                                  className={cn(
+                                    "flex-1 flex items-center justify-center px-2 py-1 rounded text-xs transition-all",
+                                    annotationMode === 'arrow' 
+                                      ? "bg-primary text-primary-foreground shadow-sm" 
+                                      : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  <ArrowRight className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                             
                             {/* Undo | Clear */}
                             <div className="flex items-center gap-1">
@@ -1075,7 +1149,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                     size="sm"
                                     onClick={handleUndo}
                                     disabled={brushStrokes.length === 0}
-                                    className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
+                                    className="flex-1 text-xs h-7"
                                   >
                                     <Undo2 className="h-3 w-3" />
                                   </Button>
@@ -1090,7 +1164,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                     size="sm"
                                     onClick={handleClearMask}
                                     disabled={brushStrokes.length === 0}
-                                    className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
+                                    className="flex-1 text-xs h-7"
                                   >
                                     <X className="h-3 w-3" />
                                   </Button>
@@ -1106,7 +1180,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               <TooltipTrigger asChild>
                                 <button
                                   onClick={() => setInpaintPanelPosition('bottom')}
-                                  className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-b-md flex items-center justify-center transition-colors"
+                                  className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-b-md flex items-center justify-center transition-colors border border-border border-t-0 shadow-lg relative z-10"
                                 >
                                   <ArrowDown className="h-3 w-3 -mt-0.5" />
                                 </button>
@@ -1118,177 +1192,52 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     )}
 
-                    {/* Bottom Left Controls - Edit and Upscale Buttons */}
-                    <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
-                      {!isSpecialEditMode && (
-                        <>
-                          {/* Unified Edit Button */}
-                          {!isVideo && !readOnly && selectedProjectId && isCloudMode && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={handleEnterMagicEditMode}
-                                  className="bg-black/50 hover:bg-black/70 text-white"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Edit image</TooltipContent>
-                            </Tooltip>
-                          )}
+                    {/* Bottom Left Controls - Edit & Upscale */}
+                    <BottomLeftControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      handleEnterMagicEditMode={handleEnterMagicEditMode}
+                      isUpscaling={isUpscaling}
+                      isPendingUpscale={isPendingUpscale}
+                      hasUpscaledVersion={hasUpscaledVersion}
+                      showingUpscaled={showingUpscaled}
+                      handleUpscale={handleUpscale}
+                      handleToggleUpscaled={handleToggleUpscaled}
+                    />
 
-                          {/* Upscale Button */}
-                          {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                                    disabled={isUpscaling || isPendingUpscale}
-                                    className={cn(
-                                      "transition-colors text-white",
-                                      isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                                    )}
-                                  >
-                                    {isUpscaling ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : isPendingUpscale ? (
-                                      <CheckCircle className="h-4 w-4" />
-                                    ) : hasUpscaledVersion ? (
-                                      showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                                    ) : (
-                                      <ArrowUpCircle className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">
-                                {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </>
-                      )}
-                    </div>
+                    {/* Bottom Right Controls - Star & Add to References */}
+                    <BottomRightControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      localStarred={localStarred}
+                      handleToggleStar={wrappedHandleToggleStar}
+                      toggleStarPending={toggleStarMutation.isPending}
+                      isAddingToReferences={isAddingToReferences}
+                      addToReferencesSuccess={addToReferencesSuccess}
+                      handleAddToReferences={handleAddToReferences}
+                    />
 
-                    {/* Bottom Right Controls - Star, Add to References */}
-                    <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
-                      {/* Star Button (hidden in readOnly and special edit modes) */}
-                      {!readOnly && !isSpecialEditMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={wrappedHandleToggleStar}
-                          disabled={toggleStarMutation.isPending}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                        </Button>
-                      )}
-
-                      {/* Add to References Button - Desktop Task Details View (hidden in readOnly and special edit modes) */}
-                      {!readOnly && !isVideo && selectedProjectId && !isSpecialEditMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleAddToReferences}
-                              disabled={isAddingToReferences || addToReferencesSuccess}
-                              className={`transition-colors ${
-                                addToReferencesSuccess 
-                                  ? 'bg-green-600/80 hover:bg-green-600 text-white' 
-                                  : 'bg-black/50 hover:bg-black/70 text-white'
-                              }`}
-                            >
-                              {isAddingToReferences ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : addToReferencesSuccess ? (
-                                <CheckCircle className="h-4 w-4" />
-                              ) : (
-                                <ImagePlus className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                            {isAddingToReferences ? 'Adding...' : addToReferencesSuccess ? 'Added!' : 'Add to references'}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-
-                    {/* Top Right Controls - Save, Download, Delete */}
-                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
-
-                      {!isVideo && showImageEditTools && !readOnly && !isSpecialEditMode && (
-                        <>
-                          {hasChanges && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => handleSave(effectiveImageUrl)}
-                                  disabled={isSaving}
-                                  className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
-                                >
-                                  <Save className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">{isSaving ? 'Saving...' : 'Save changes'}</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </>
-                      )}
-
-                      {showDownload && !readOnly && !isSpecialEditMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownload();
-                              }}
-                              className="bg-black/50 hover:bg-black/70 text-white"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Download {isVideo ? 'video' : 'image'}</TooltipContent>
-                        </Tooltip>
-                      )}
-                      
-                      {/* Delete Button */}
-                      {onDelete && !readOnly && !isVideo && !isSpecialEditMode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete();
-                              }}
-                              disabled={isDeleting === media.id}
-                              className="bg-red-600/80 hover:bg-red-600 text-white"
-                            >
-                              {isDeleting === media.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Delete from timeline</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
+                    {/* Top Right Controls - Download, Delete & Close */}
+                    <TopRightControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      showDownload={showDownload}
+                      handleDownload={handleDownload}
+                      onDelete={onDelete}
+                      handleDelete={handleDelete}
+                      isDeleting={isDeleting}
+                      mediaId={media.id}
+                      onClose={onClose}
+                    />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
                     {(() => {
@@ -1409,27 +1358,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </Tooltip>
                       )}
 
-                      {/* Delete */}
-                      {onDelete && !isVideo && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleDelete}
-                              disabled={isDeleting === media.id}
-                              className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Delete image</TooltipContent>
-                        </Tooltip>
-                      )}
                         </div>
                       </div>
                     )}
-                  </div>
 
                   {/* Navigation Controls - Right Arrow */}
                   {showNavigation && !readOnly && onNext && hasNext && (
@@ -1442,6 +1373,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
                     </Button>
                   )}
+                  </div>
 
                 {/* Task Details / Inpaint / Magic Edit Panel - Right side (40% width) */}
                 <div 
@@ -1478,14 +1410,57 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       })()}
                       
                       <div className="mb-4 flex items-center justify-between">
-                        <h2 className="text-2xl font-light">Edit Image</h2>
+                        <div className="flex items-center gap-3">
+                          <h2 className="text-2xl font-light">Edit Image</h2>
+                          
+                          {/* Three-way toggle: Text | Inpaint | Annotate */}
+                          <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                            <button
+                              onClick={() => setEditMode('text')}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all",
+                                editMode === 'text'
+                                  ? "bg-background text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Type className="h-3.5 w-3.5" />
+                              Text
+                            </button>
+                            <button
+                              onClick={() => setEditMode('inpaint')}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all",
+                                editMode === 'inpaint'
+                                  ? "bg-background text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Paintbrush className="h-3.5 w-3.5" />
+                              Inpaint
+                            </button>
+                            <button
+                              onClick={() => setEditMode('annotate')}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all",
+                                editMode === 'annotate'
+                                  ? "bg-background text-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Annotate
+                            </button>
+                          </div>
+                        </div>
+                        
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={onClose}
-                          className="h-8 w-8 p-0 hover:bg-muted"
+                          onClick={handleExitMagicEditMode}
+                          className="text-sm hover:bg-muted px-3 py-1"
                         >
-                          <X className="h-4 w-4" />
+                          Close edit mode
                         </Button>
                       </div>
                       
@@ -1542,8 +1517,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <Button
                           variant="default"
                           size="default"
-                          onClick={handleUnifiedGenerate}
-                          disabled={!inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess || isCreatingMagicEditTasks || magicEditTasksCreated}
+                          onClick={editMode === 'annotate' ? () => {
+                            // TODO: Implement annotation-based generation
+                            toast.info('Generate image based on annotations - Coming soon!');
+                          } : handleUnifiedGenerate}
+                          disabled={
+                            (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
+                            (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
+                            (editMode === 'inpaint' && brushStrokes.length === 0) ||
+                            isGeneratingInpaint || 
+                            inpaintGenerateSuccess || 
+                            isCreatingMagicEditTasks || 
+                            magicEditTasksCreated
+                          }
                           className={cn(
                             "w-full",
                             (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
@@ -1557,12 +1543,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
                             <>
                               <CheckCircle className="h-4 w-4 mr-2" />
-                              {brushStrokes.length > 0 ? 'Success!' : 'Submitted, results will appear below'}
+                              {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
                             </>
-                          ) : brushStrokes.length > 0 ? (
+                          ) : editMode === 'inpaint' ? (
                             <>
                               <Paintbrush className="h-4 w-4 mr-2" />
                               Generate inpainted image
+                            </>
+                          ) : editMode === 'annotate' ? (
+                            <>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Generate based on annotations
                             </>
                           ) : (
                             <>
@@ -1572,15 +1563,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                         </Button>
                         
-                        {/* Clear Inpainting Mask CTA */}
-                        {brushStrokes.length > 0 && (
-                          <button
-                            onClick={handleClearMask}
-                            className="text-sm text-muted-foreground hover:text-foreground underline cursor-pointer text-center w-full"
-                          >
-                            Clear inpainting mask
-                          </button>
-                        )}
                       </div>
                       
                       {/* Derived Generations Section - Show images based on this one */}
@@ -1683,6 +1665,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   ) : (
                     <div className="w-full">
+                      {/* Open Edit Mode Button - shown when not in special edit mode */}
+                      {!readOnly && showImageEditTools && (
+                        <div className="p-6 pb-4 border-b border-border flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsInpaintMode(true);
+                              setEditMode('inpaint');
+                            }}
+                            className="text-sm hover:bg-muted px-3 py-1"
+                          >
+                            Open edit mode
+                          </Button>
+                        </div>
+                      )}
+                      
                       {/* Based On display - Show source image this was derived from (ABOVE task details) */}
                       {sourceGenerationData && onOpenExternalGeneration && (
                         <div className="border-b border-border p-4">
@@ -1828,6 +1827,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   className="flex-1 flex items-center justify-center relative"
                   style={{ height: '60%' }}
+                  onClick={(e) => {
+                    // Close if clicking on the black space (not on the media or controls)
+                    if (e.target === e.currentTarget) {
+                      onClose();
+                    }
+                  }}
                 >
                   {/* Media Content - same as above but adapted for mobile */}
                     {isVideo ? (
@@ -1875,7 +1880,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             <TooltipTrigger asChild>
                               <button
                                 onClick={() => setInpaintPanelPosition('top')}
-                                className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-t-md flex items-center justify-center transition-colors"
+                                className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-t-md flex items-center justify-center transition-colors border border-border border-b-0 shadow-lg"
                               >
                                 <ArrowUp className="h-3 w-3 mt-0.5" />
                               </button>
@@ -1884,12 +1889,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           </Tooltip>
                         )}
                         
-                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-32">
+                        <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-32 border border-border shadow-xl">
                           {/* Brush Size Slider */}
                           <div className="space-y-0.5">
                             <div className="flex items-center justify-between">
-                              <label className="text-xs font-medium text-white">Size</label>
-                              <span className="text-xs text-white/70">{brushSize}px</span>
+                              <label className="text-xs font-medium text-foreground">Size</label>
+                              <span className="text-xs text-muted-foreground">{brushSize}px</span>
                             </div>
                             <input
                               type="range"
@@ -1908,7 +1913,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             onClick={() => setIsEraseMode(!isEraseMode)}
                             className={cn(
                               "w-full text-xs h-6",
-                              isEraseMode ? "bg-purple-600 hover:bg-purple-700" : "bg-white/20 hover:bg-white/30 text-white"
+                              isEraseMode && "bg-purple-600 hover:bg-purple-700"
                             )}
                           >
                             <Eraser className="h-3 w-3 mr-1" />
@@ -1924,7 +1929,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   size="sm"
                                   onClick={handleUndo}
                                   disabled={brushStrokes.length === 0}
-                                  className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-6"
+                                  className="flex-1 text-xs h-6"
                                 >
                                   <Undo2 className="h-3 w-3" />
                                 </Button>
@@ -1939,7 +1944,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   size="sm"
                                   onClick={handleClearMask}
                                   disabled={brushStrokes.length === 0}
-                                  className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-6"
+                                  className="flex-1 text-xs h-6"
                                 >
                                   <X className="h-3 w-3" />
                                 </Button>
@@ -1955,7 +1960,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             <TooltipTrigger asChild>
                               <button
                                 onClick={() => setInpaintPanelPosition('bottom')}
-                                className="mx-auto w-fit px-2 py-1 bg-black/60 hover:bg-black/80 text-white/70 hover:text-white rounded-b-md flex items-center justify-center transition-colors"
+                                className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-b-md flex items-center justify-center transition-colors border border-border border-t-0 shadow-lg relative z-10"
                               >
                                 <ArrowDown className="h-3 w-3 -mt-0.5" />
                               </button>
@@ -1966,79 +1971,191 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     )}
 
-                    {/* Mobile controls - same as existing mobile controls (hidden in special edit modes) */}
-                    {!isSpecialEditMode && (
-                      <div className="absolute top-2 right-2 flex items-center space-x-1 z-10">
-                        {!readOnly && (
+                    {/* Mobile Stacked Layout - All button groups (matching desktop) */}
+                    {/* Top Left Controls - Flip & Save */}
+                    <TopLeftControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      showImageEditTools={showImageEditTools}
+                      hasChanges={hasChanges}
+                      isSaving={isSaving}
+                      handleFlip={handleFlip}
+                      handleSave={handleSave}
+                      effectiveImageUrl={effectiveImageUrl}
+                    />
+
+                    {/* Top Right Controls - Download, Delete & Close */}
+                    <TopRightControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      showDownload={showDownload}
+                      handleDownload={handleDownload}
+                      onDelete={onDelete}
+                      handleDelete={handleDelete}
+                      isDeleting={isDeleting}
+                      mediaId={media.id}
+                      onClose={onClose}
+                    />
+
+                    {/* Bottom Left Controls - Edit & Upscale */}
+                    <BottomLeftControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      handleEnterMagicEditMode={handleEnterMagicEditMode}
+                      isUpscaling={isUpscaling}
+                      isPendingUpscale={isPendingUpscale}
+                      hasUpscaledVersion={hasUpscaledVersion}
+                      showingUpscaled={showingUpscaled}
+                      handleUpscale={handleUpscale}
+                      handleToggleUpscaled={handleToggleUpscaled}
+                    />
+
+                    {/* Bottom Right Controls - Star & Add to References */}
+                    <BottomRightControls
+                      isVideo={isVideo}
+                      readOnly={readOnly}
+                      isSpecialEditMode={isSpecialEditMode}
+                      selectedProjectId={selectedProjectId}
+                      isCloudMode={isCloudMode}
+                      localStarred={localStarred}
+                      handleToggleStar={wrappedHandleToggleStar}
+                      toggleStarPending={toggleStarMutation.isPending}
+                      isAddingToReferences={isAddingToReferences}
+                      addToReferencesSuccess={addToReferencesSuccess}
+                      handleAddToReferences={handleAddToReferences}
+                    />
+
+                    {/* Bottom Workflow Controls (hidden in special edit modes) */}
+                    {(() => {
+                      const shouldShowWorkflowControls = (onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode;
+                      console.log('[ShotSelectorDebug] 🎯 Mobile Stacked - Bottom Workflow Controls render check:', 
+                        '\n  shouldShowWorkflowControls:', shouldShowWorkflowControls,
+                        '\n  onAddToShot:', !!onAddToShot,
+                        '\n  onDelete:', !!onDelete,
+                        '\n  onApplySettings:', !!onApplySettings,
+                        '\n  isSpecialEditMode:', isSpecialEditMode,
+                        '\n  isInpaintMode:', isInpaintMode,
+                        '\n  isMagicEditMode:', isMagicEditMode
+                      );
+                      return shouldShowWorkflowControls;
+                    })() && (
+                      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
+                          {/* Shot Selection and Add to Shot */}
+                          {(() => {
+                            const shouldShowShotSelector = onAddToShot && allShots.length > 0 && !isVideo;
+                            console.log('[ShotSelectorDebug] 🎯 Mobile Stacked - ShotSelector render check:', 
+                              '\n  shouldShowShotSelector:', shouldShowShotSelector,
+                              '\n  onAddToShot:', !!onAddToShot,
+                              '\n  allShots.length:', allShots?.length || 0,
+                              '\n  isVideo:', isVideo,
+                              '\n  mediaType:', media.type
+                            );
+                            return shouldShowShotSelector;
+                          })() && (
+                            <>
+                              <ShotSelector
+                                value={selectedShotId || ''}
+                                onValueChange={onShotChange || (() => {})}
+                                shots={allShots}
+                                placeholder="Select shot"
+                                triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
+                                onOpenChange={setIsSelectOpen}
+                                showAddShot={!!onCreateShot}
+                                onCreateShot={handleQuickCreateAndAdd}
+                                isCreatingShot={isCreatingShot}
+                                quickCreateSuccess={quickCreateSuccess}
+                                onQuickCreateSuccess={handleQuickCreateSuccess}
+                                container={contentRef.current}
+                              />
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={wrappedHandleToggleStar}
-                            disabled={toggleStarMutation.isPending}
-                            className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                          >
-                            <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                          </Button>
-                        )}
+                                    onClick={handleAddToShot}
+                                    disabled={!selectedShotId}
+                                    className={`h-8 px-3 text-white ${
+                                      isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                                        ? 'bg-green-600/80 hover:bg-green-600'
+                                        : 'bg-blue-600/80 hover:bg-blue-600'
+                                    }`}
+                                  >
+                                    {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <PlusCircle className="h-4 w-4" />
+                                    )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="z-[100001]">
+                              {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                                ? 'Added with position. Jump to shot.'
+                                : 'Add to shot with position'}
+                            </TooltipContent>
+                          </Tooltip>
 
-                        {/* Add to References Button - Mobile Task Details View (hidden in readOnly and special edit modes) */}
-                        {!readOnly && !isVideo && selectedProjectId && (
+                              {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={handleAddToReferences}
-                            disabled={isAddingToReferences || addToReferencesSuccess}
-                            className={`transition-colors ${
-                              addToReferencesSuccess 
-                                ? 'bg-green-600/80 hover:bg-green-600 text-white' 
-                                : 'bg-black/50 hover:bg-black/70 text-white'
-                            }`}
-                          >
-                            {isAddingToReferences ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : addToReferencesSuccess ? (
-                              <CheckCircle className="h-4 w-4" />
-                            ) : (
-                              <ImagePlus className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
+                                      onClick={handleAddToShotWithoutPosition}
+                                      disabled={!selectedShotId}
+                                      className={`h-8 px-3 text-white ${
+                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                          ? 'bg-green-600/80 hover:bg-green-600'
+                                          : 'bg-purple-600/80 hover:bg-purple-600'
+                                      }`}
+                                    >
+                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
+                                        <CheckCircle className="h-4 w-4" />
+                                      ) : (
+                                        <PlusCircle className="h-4 w-4" />
+                                      )}
+                            </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="z-[100001]">
+                                  {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                    ? 'Added without position. Jump to shot.'
+                                    : 'Add to shot without position'}
+                                </TooltipContent>
+                              </Tooltip>
+                          )}
+                        </>
+                      )}
 
-                        {/* Upscale Button - Mobile Task Details View (hidden in readOnly, only shown in cloud mode) */}
-                        {!readOnly && !isVideo && selectedProjectId && isCloudMode && (
+                      {/* Apply Settings */}
+                      {onApplySettings && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span>
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={hasUpscaledVersion ? handleToggleUpscaled : handleUpscale}
-                                disabled={isUpscaling || isPendingUpscale}
-                                className={cn(
-                                  "transition-colors text-white",
-                                  isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-                                )}
-                              >
-                                {isUpscaling ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : isPendingUpscale ? (
-                                  <CheckCircle className="h-4 w-4" />
-                                ) : hasUpscaledVersion ? (
-                                  showingUpscaled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />
-                                ) : (
-                                  <ArrowUpCircle className="h-4 w-4" />
-                                )}
+                              onClick={handleApplySettings}
+                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                            >
+                              <Settings className="h-4 w-4" />
                               </Button>
-                            </span>
                           </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                            {isUpscaling ? 'Creating upscale...' : isPendingUpscale ? 'Upscaling in process' : hasUpscaledVersion ? (showingUpscaled ? 'Upscaled version. Show original.' : 'Original version. Show upscaled.') : 'Upscale image'}
-                          </TooltipContent>
+                          <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
                         </Tooltip>
                         )}
+
+                        </div>
                       </div>
                     )}
-
 
                     {/* Mobile navigation */}
                     {showNavigation && !readOnly && onPrevious && hasPrevious && (
@@ -2068,7 +2185,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   data-task-details-panel
                   className={cn(
-                    "bg-background border-t border-border overflow-y-auto"
+                    "bg-background border-t border-border overflow-y-auto relative"
                     // Removed flex centering to prevent top clipping with long content
                   )}
                   style={{ height: '40%' }}
@@ -2101,16 +2218,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </button>
                       )}
                       
-                      {/* Header with close button */}
-                      <div className="flex items-center justify-between mb-2">
+                      {/* Header */}
+                      <div className="mb-2 flex items-center justify-between">
                         <h3 className="text-lg font-light">Edit Image</h3>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={onClose}
-                          className="h-8 w-8 p-0 hover:bg-muted"
+                          onClick={handleExitMagicEditMode}
+                          className="text-xs hover:bg-muted px-2 py-1"
                         >
-                          <X className="h-4 w-4" />
+                          Close edit mode
                         </Button>
                       </div>
                       
@@ -2167,8 +2284,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <Button
                           variant="default"
                           size="sm"
-                          onClick={handleUnifiedGenerate}
-                          disabled={!inpaintPrompt.trim() || isGeneratingInpaint || inpaintGenerateSuccess || isCreatingMagicEditTasks || magicEditTasksCreated}
+                          onClick={editMode === 'annotate' ? () => {
+                            // TODO: Implement annotation-based generation
+                            toast.info('Generate image based on annotations - Coming soon!');
+                          } : handleUnifiedGenerate}
+                          disabled={
+                            (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
+                            (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
+                            (editMode === 'inpaint' && brushStrokes.length === 0) ||
+                            isGeneratingInpaint || 
+                            inpaintGenerateSuccess || 
+                            isCreatingMagicEditTasks || 
+                            magicEditTasksCreated
+                          }
                           className={cn(
                             "w-full",
                             (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
@@ -2182,12 +2310,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
                             <>
                               <CheckCircle className="h-3 w-3 mr-2" />
-                              {brushStrokes.length > 0 ? 'Success!' : 'Submitted, results will appear below'}
+                              {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
                             </>
-                          ) : brushStrokes.length > 0 ? (
+                          ) : editMode === 'inpaint' ? (
                             <>
                               <Paintbrush className="h-3 w-3 mr-2" />
                               Generate inpainted image
+                            </>
+                          ) : editMode === 'annotate' ? (
+                            <>
+                              <Pencil className="h-3 w-3 mr-2" />
+                              Generate based on annotations
                             </>
                           ) : (
                             <>
@@ -2196,10 +2329,117 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             </>
                           )}
                         </Button>
+                        
                       </div>
+                      
+                      {/* Derived Generations Section - Show images based on this one (MOBILE) */}
+                      {derivedGenerations && derivedGenerations.length > 0 && (
+                        <div className="border-t border-border pt-3 mt-3">
+                          <div className="mb-2 flex items-start justify-between">
+                            <div>
+                              <h3 className="text-sm font-medium">
+                                Edits of this image ({derivedGenerations.length})
+                              </h3>
+                            </div>
+                            
+                            {/* Pagination controls - top right */}
+                            {derivedTotalPages > 1 && (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
+                                  disabled={derivedPage === 1}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <ChevronLeft className="h-3 w-3" />
+                                </Button>
+                                <span className="text-xs text-muted-foreground">
+                                  {derivedPage}/{derivedTotalPages}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
+                                  disabled={derivedPage === derivedTotalPages}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <ChevronRight className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {paginatedDerived.map((derived, derivedIdx) => {
+                              // Calculate actual index in full derivedGenerations array
+                              const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
+                              
+                              return (
+                              <div
+                                key={derived.id}
+                                className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
+                                onClick={async () => {
+                                  console.log('[DerivedNav:MobileEdit] 🖼️ Thumbnail clicked', {
+                                    derivedId: derived.id.substring(0, 8),
+                                    derivedUrl: derived.location,
+                                    currentMediaId: media.id.substring(0, 8),
+                                    hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+                                    hasOnNavigateToGeneration: !!onNavigateToGeneration,
+                                    timestamp: Date.now()
+                                  });
+                                  
+                                  if (onOpenExternalGeneration) {
+                                    // Pass the full derived context for navigation
+                                    await onOpenExternalGeneration(
+                                      derived.id,
+                                      derivedGenerations?.map(d => d.id) || []
+                                    );
+                                  } else if (onNavigateToGeneration) {
+                                    onNavigateToGeneration(derived.id);
+                                  }
+                                }}
+                              >
+                                <img
+                                  src={derived.thumbUrl}
+                                  alt="Derived generation"
+                                  className="w-full h-full object-contain bg-black/20"
+                                />
+                                
+                                {/* Simple hover overlay - no buttons */}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
+                                
+                                {derived.starred && (
+                                  <div className="absolute top-0.5 right-0.5 z-10 pointer-events-none">
+                                    <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="w-full">
+                      {/* Open Edit Mode Button - shown when not in special edit mode (MOBILE) */}
+                      {!readOnly && showImageEditTools && (
+                        <div className="p-4 pb-3 border-b border-border flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsInpaintMode(true);
+                              setEditMode('inpaint');
+                            }}
+                            className="text-xs hover:bg-muted px-2 py-1"
+                          >
+                            Open edit mode
+                          </Button>
+                        </div>
+                      )}
+                      
                       {/* Based On display - Show source image this was derived from (ABOVE task details) - MOBILE */}
                       {sourceGenerationData && onOpenExternalGeneration && (
                         <div className="border-b border-border p-4">
@@ -2433,37 +2673,64 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                       
                       {/* Compact Edit Controls - Above the bottom buttons */}
-                      {isSpecialEditMode && (
-                        <div className="mb-2 bg-black/80 backdrop-blur-sm rounded-lg p-2 space-y-1.5 w-40">
-                          {/* Brush Size Slider */}
-                          <div className="space-y-0.5">
-                            <div className="flex items-center justify-between">
-                              <label className="text-xs font-medium text-white">Size</label>
-                              <span className="text-xs text-white/70">{brushSize}px</span>
+                      {isSpecialEditMode && editMode !== 'text' && (
+                        <div className="mb-2 bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
+                          {/* Brush Size Slider - Only in Inpaint mode */}
+                          {editMode === 'inpaint' && (
+                            <div className="space-y-0.5">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-foreground">Size</label>
+                                <span className="text-xs text-muted-foreground">{brushSize}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={5}
+                                max={100}
+                                value={brushSize}
+                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
                             </div>
-                            <input
-                              type="range"
-                              min={5}
-                              max={100}
-                              value={brushSize}
-                              onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                              className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-                            />
-                          </div>
+                          )}
                           
-                          {/* Erase Toggle */}
-                          <Button
-                            variant={isEraseMode ? "default" : "secondary"}
-                            size="sm"
-                            onClick={() => setIsEraseMode(!isEraseMode)}
-                            className={cn(
-                              "w-full text-xs h-7",
-                              isEraseMode ? "bg-purple-600 hover:bg-purple-700" : "bg-white/20 hover:bg-white/30 text-white"
-                            )}
-                          >
-                            <Eraser className="h-3 w-3 mr-1" />
-                            {isEraseMode ? 'Erase' : 'Paint'}
-                          </Button>
+                          {/* Paint/Erase or Circle/Arrow Toggle */}
+                          {editMode === 'inpaint' && (
+                            // Inpaint mode: Paint/Erase
+                            <Button
+                              variant={isEraseMode ? "default" : "secondary"}
+                              size="sm"
+                              onClick={() => setIsEraseMode(!isEraseMode)}
+                              className={cn(
+                                "w-full text-xs h-7",
+                                isEraseMode && "bg-purple-600 hover:bg-purple-700"
+                              )}
+                            >
+                              <Eraser className="h-3 w-3 mr-1" />
+                              {isEraseMode ? 'Erase' : 'Paint'}
+                            </Button>
+                          )}
+                          
+                          {editMode === 'annotate' && (
+                            // Annotate mode: Circle/Arrow toggle
+                            <div className="flex gap-1">
+                              <Button
+                                variant={annotationMode === 'circle' ? "default" : "secondary"}
+                                size="sm"
+                                onClick={() => setAnnotationMode('circle')}
+                                className="flex-1 text-xs h-7"
+                              >
+                                <Circle className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant={annotationMode === 'arrow' ? "default" : "secondary"}
+                                size="sm"
+                                onClick={() => setAnnotationMode('arrow')}
+                                className="flex-1 text-xs h-7"
+                              >
+                                <ArrowRight className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                           
                           {/* Undo | Clear */}
                           <div className="flex items-center gap-1">
@@ -2474,7 +2741,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   size="sm"
                                   onClick={handleUndo}
                                   disabled={brushStrokes.length === 0}
-                                  className="flex-1 bg-white/20 hover:bg-white/30 text-white text-xs h-7"
+                                  className="flex-1 text-xs h-7"
                                 >
                                   <Undo2 className="h-3 w-3" />
                                 </Button>
@@ -2489,7 +2756,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                   size="sm"
                                   onClick={handleClearMask}
                                   disabled={brushStrokes.length === 0}
-                                  className="flex-1 text-xs bg-white/10 hover:bg-white/20 text-white border-white/20 h-7"
+                                  className="flex-1 text-xs h-7"
                                 >
                                   <X className="h-3 w-3" />
                                 </Button>
@@ -2502,75 +2769,189 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     </div>
                   )}
 
-                  {/* Top Right Controls - Star, Flip, Save, Download, Delete */}
-                  {!readOnly && (
-                    <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
-                      
-                      {/* Star Button (hidden in special modes) */}
-                      {!isSpecialEditMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleToggleStar}
-                          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-                        </Button>
-                      )}
-                      
-                      {/* Image Edit Tools: Flip and Save */}
-                      {!isVideo && showImageEditTools && !isSpecialEditMode && (
-                        <>
+                  {/* Regular Mobile Layout - All button groups (matching desktop) */}
+                  {/* Top Left Controls - Flip & Save */}
+                  <TopLeftControls
+                    isVideo={isVideo}
+                    readOnly={readOnly}
+                    isSpecialEditMode={isSpecialEditMode}
+                    selectedProjectId={selectedProjectId}
+                    isCloudMode={isCloudMode}
+                    showImageEditTools={showImageEditTools}
+                    hasChanges={hasChanges}
+                    isSaving={isSaving}
+                    handleFlip={handleFlip}
+                    handleSave={handleSave}
+                    effectiveImageUrl={effectiveImageUrl}
+                  />
+
+                  {/* Top Right Controls - Download, Delete & Close */}
+                  <TopRightControls
+                    isVideo={isVideo}
+                    readOnly={readOnly}
+                    isSpecialEditMode={isSpecialEditMode}
+                    selectedProjectId={selectedProjectId}
+                    isCloudMode={isCloudMode}
+                    showDownload={showDownload}
+                    handleDownload={handleDownload}
+                    onDelete={onDelete}
+                    handleDelete={handleDelete}
+                    isDeleting={isDeleting}
+                    mediaId={media.id}
+                    onClose={onClose}
+                  />
+
+                    {/* Bottom Left Controls - Edit & Upscale */}
+                  <BottomLeftControls
+                    isVideo={isVideo}
+                    readOnly={readOnly}
+                    isSpecialEditMode={isSpecialEditMode}
+                    selectedProjectId={selectedProjectId}
+                    isCloudMode={isCloudMode}
+                    handleEnterMagicEditMode={handleEnterMagicEditMode}
+                    isUpscaling={isUpscaling}
+                    isPendingUpscale={isPendingUpscale}
+                    hasUpscaledVersion={hasUpscaledVersion}
+                    showingUpscaled={showingUpscaled}
+                    handleUpscale={handleUpscale}
+                    handleToggleUpscaled={handleToggleUpscaled}
+                  />
+
+                  {/* Bottom Right Controls - Star & Add to References */}
+                  <BottomRightControls
+                    isVideo={isVideo}
+                    readOnly={readOnly}
+                    isSpecialEditMode={isSpecialEditMode}
+                    selectedProjectId={selectedProjectId}
+                    isCloudMode={isCloudMode}
+                    localStarred={localStarred}
+                    handleToggleStar={handleToggleStar}
+                    toggleStarPending={toggleStarMutation.isPending}
+                    isAddingToReferences={isAddingToReferences}
+                    addToReferencesSuccess={addToReferencesSuccess}
+                    handleAddToReferences={handleAddToReferences}
+                  />
+
+                  {/* Bottom Workflow Controls (hidden in special edit modes) */}
+                  {(() => {
+                    const shouldShowWorkflowControls = (onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode;
+                    console.log('[ShotSelectorDebug] 🎯 Mobile Regular - Bottom Workflow Controls render check:', 
+                      '\n  shouldShowWorkflowControls:', shouldShowWorkflowControls,
+                      '\n  onAddToShot:', !!onAddToShot,
+                      '\n  onDelete:', !!onDelete,
+                      '\n  onApplySettings:', !!onApplySettings,
+                      '\n  isSpecialEditMode:', isSpecialEditMode,
+                      '\n  isInpaintMode:', isInpaintMode,
+                      '\n  isMagicEditMode:', isMagicEditMode
+                    );
+                    return shouldShowWorkflowControls;
+                  })() && (
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
+                      <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
+                        {/* Shot Selection and Add to Shot */}
+                        {(() => {
+                          const shouldShowShotSelector = onAddToShot && allShots.length > 0 && !isVideo;
+                          console.log('[ShotSelectorDebug] 🎯 Mobile Regular - ShotSelector render check:', 
+                            '\n  shouldShowShotSelector:', shouldShowShotSelector,
+                            '\n  onAddToShot:', !!onAddToShot,
+                            '\n  allShots.length:', allShots?.length || 0,
+                            '\n  isVideo:', isVideo,
+                            '\n  mediaType:', media.type
+                          );
+                          return shouldShowShotSelector;
+                        })() && (
+                          <>
+                            <ShotSelector
+                              value={selectedShotId || ''}
+                              onValueChange={onShotChange || (() => {})}
+                              shots={allShots}
+                              placeholder="Select shot"
+                              triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
+                              onOpenChange={setIsSelectOpen}
+                              showAddShot={!!onCreateShot}
+                              onCreateShot={handleQuickCreateAndAdd}
+                              isCreatingShot={isCreatingShot}
+                              quickCreateSuccess={quickCreateSuccess}
+                              onQuickCreateSuccess={handleQuickCreateSuccess}
+                              container={contentRef.current}
+                            />
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={handleFlip}
-                            className="bg-black/50 hover:bg-black/70 text-white"
-                          >
-                            <FlipHorizontal className="h-4 w-4" />
+                                  onClick={handleAddToShot}
+                                  disabled={!selectedShotId}
+                                  className={`h-8 px-3 text-white ${
+                                    isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                                      ? 'bg-green-600/80 hover:bg-green-600'
+                                      : 'bg-blue-600/80 hover:bg-blue-600'
+                                  }`}
+                                >
+                                  {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
+                                    <CheckCircle className="h-4 w-4" />
+                                  ) : (
+                                    <PlusCircle className="h-4 w-4" />
+                                  )}
                           </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="z-[100001]">
+                            {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
+                              ? 'Added with position. Jump to shot.'
+                              : 'Add to shot with position'}
+                          </TooltipContent>
+                        </Tooltip>
 
-                          {hasChanges && (
+                            {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={() => handleSave(effectiveImageUrl)}
-                              disabled={isSaving}
-                              className="bg-green-600/80 hover:bg-green-600 text-white disabled:opacity-50"
-                            >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                          )}
+                                    onClick={handleAddToShotWithoutPosition}
+                                    disabled={!selectedShotId}
+                                    className={`h-8 px-3 text-white ${
+                                      isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                        ? 'bg-green-600/80 hover:bg-green-600'
+                                        : 'bg-purple-600/80 hover:bg-purple-600'
+                                    }`}
+                                  >
+                                    {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <PlusCircle className="h-4 w-4" />
+                                    )}
+                              </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="z-[100001]">
+                                {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                  ? 'Added without position. Jump to shot.'
+                                  : 'Add to shot without position'}
+                              </TooltipContent>
+                            </Tooltip>
+                        )}
                         </>
                       )}
 
-                      {/* Download Button */}
-                      {showDownload && !isSpecialEditMode && (
+                    {/* Apply Settings */}
+                    {onApplySettings && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownload();
-                          }}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                        >
-                          <Download className="h-4 w-4" />
+                            onClick={handleApplySettings}
+                            className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
+                          >
+                            <Settings className="h-4 w-4" />
                         </Button>
-                      )}
-                      
-                      {/* Delete Button */}
-                      {onDelete && !isVideo && !isSpecialEditMode && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleDelete}
-                          disabled={isDeleting === media.id}
-                          className="bg-red-600/80 hover:bg-red-600 text-white"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                        </TooltipTrigger>
+                        <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
+                      </Tooltip>
+                    )}
+
+                      </div>
                     </div>
                   )}
 

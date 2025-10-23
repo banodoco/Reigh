@@ -197,23 +197,6 @@ export const WorkflowControls: React.FC<WorkflowControlsProps> = ({
           </Tooltip>
         )}
 
-        {/* Delete */}
-        {onDelete && !isVideo && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleDelete}
-                disabled={isDeleting === mediaId}
-                className="bg-red-600/80 hover:bg-red-600 text-white h-8 px-3"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="z-[100001]">Delete image</TooltipContent>
-          </Tooltip>
-        )}
       </div>
     </div>
   );
