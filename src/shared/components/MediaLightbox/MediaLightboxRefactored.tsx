@@ -1181,7 +1181,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         playsInline
                         preload="auto"
                         className="shadow-wes border border-border/20"
-                        style={{ maxWidth: '55vw', maxHeight: '90vh' }}
+                        style={{ maxWidth: '55vw', maxHeight: '98vh' }}
                       />
                     ) : (
                       <div className="relative">
@@ -1195,7 +1195,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             isSaving ? 'opacity-30' : 'opacity-100'
                           }`}
                           style={{ 
-                            maxHeight: '90vh',
+                            maxHeight: '98vh',
                             maxWidth: '55vw',
                             transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none',
                             pointerEvents: isInpaintMode ? 'none' : 'auto'
@@ -2229,7 +2229,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             isInpaintMode ? 'pointer-events-none' : ''
                           }`}
                           style={{ 
-                            maxHeight: '50vh',
+                            maxHeight: '58vh',
                             maxWidth: '95vw',
                             transform: isFlippedHorizontally ? 'scaleX(-1)' : 'none'
                           }}
