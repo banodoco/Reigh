@@ -83,6 +83,9 @@ import {
   TopRightControls,
   BottomLeftControls,
   BottomRightControls,
+  DerivedGenerationsGrid,
+  EditModePanel,
+  ShotSelectorControls,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -223,35 +226,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // ========================================
   // REFACTORED: All logic extracted to hooks
   // ========================================
-  
-  // DEBUG: Log raw media object on mount/update
-  const mediaKeys = Object.keys(media);
-  console.log('[BasedOnLineage] 🎬 MediaLightbox received media:', 
-    '\n  mediaId:', media.id.substring(0, 8),
-    '\n  fullMediaId:', media.id,
-    '\n  hasBasedOn:', !!(media as any).based_on,
-    '\n  basedOnValue:', (media as any).based_on?.substring(0, 8) || null,
-    '\n  fullBasedOnValue:', (media as any).based_on,
-    '\n  mediaType:', media.type,
-    '\n  mediaKeysCount:', mediaKeys.length,
-    '\n  mediaKeys:', mediaKeys.join(', '),
-    '\n  hasBasedOnInKeys:', mediaKeys.includes('based_on')
-  );
-  
-  // DEBUG: Log props for shot selector visibility
-  console.log('[ShotSelectorDebug] 📍 MediaLightbox props for shot controls:', 
-    '\n  onAddToShot:', !!onAddToShot,
-    '\n  onDelete:', !!onDelete,
-    '\n  onApplySettings:', !!onApplySettings,
-    '\n  allShots:', allShots,
-    '\n  allShots.length:', allShots?.length || 0,
-    '\n  selectedShotId:', selectedShotId,
-    '\n  onShotChange:', !!onShotChange,
-    '\n  onCreateShot:', !!onCreateShot,
-    '\n  onNavigateToShot:', !!onNavigateToShot,
-    '\n  mediaType:', media.type,
-    '\n  readOnly:', readOnly
-  );
 
   // Refs
   const contentRef = useRef<HTMLDivElement>(null);
@@ -278,34 +252,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   if (!media) {
     return null;
   }
-
-  // ========================================
-  // TOP-LEVEL DIAGNOSTIC LOGS
-  // ========================================
-  console.log('[StarPersist] 🎬 MediaLightbox opened with media:', {
-      mediaId: media.id,
-    mediaType: media.type,
-    location: media.location,
-    starredProp: starred,
-    hasStarredProp: typeof starred === 'boolean',
-    // Check all possible star-related fields
-    mediaStarred: (media as any).starred,
-    hasMediaStarred: 'starred' in media,
-    mediaStarredType: typeof (media as any).starred,
-    // Check shot-related IDs
-    shotImageEntryId: (media as any).shotImageEntryId,
-    shot_generation_id: (media as any).shot_generation_id,
-    hasShotImageEntryId: 'shotImageEntryId' in media,
-    hasShot_generation_id: 'shot_generation_id' in media,
-    // Show all keys on media object
-    allMediaKeys: Object.keys(media),
-    // Show full media object
-    fullMediaObject: JSON.parse(JSON.stringify(media)),
-    // Context
-    selectedShotId,
-    readOnly,
-    timestamp: Date.now(),
-  });
 
   // Derived values
   const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
@@ -348,15 +294,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, inpaintLoras } = useInSceneBoost();
 
   // Inpainting hook
-  console.log('[InpaintDebug] 🔍 Passing to useInpainting hook:', {
-    shotId: shotId?.substring(0, 8),
-    toolTypeOverride,
-    selectedProjectId: selectedProjectId?.substring(0, 8),
-    mediaId: media.id.substring(0, 8),
-    hasLoras: !!inpaintLoras,
-    lorasCount: inpaintLoras?.length || 0
-  });
-  
   const inpaintingHook = useInpainting({
     media,
     selectedProjectId,
@@ -368,9 +305,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     imageContainerRef,
     imageDimensions,
     handleExitInpaintMode: () => {
-      console.log('[InpaintPaint] 🚪 Exiting inpaint mode from component');
       // The hook will handle the state reset
-      // We just need to provide this callback for when the hook needs to exit
     },
     loras: inpaintLoras,
   });
@@ -411,7 +346,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Handle exiting inpaint mode from UI buttons
   const handleExitInpaintMode = () => {
-    console.log('[InpaintPaint] 🚪 Exit button clicked');
     setIsInpaintMode(false);
   };
 
@@ -531,47 +465,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const starToggleHook = useStarToggle({ media, starred, shotId });
   const { localStarred, setLocalStarred, toggleStarMutation, handleToggleStar } = starToggleHook;
 
-  // Log star toggle state initialization
-  console.log('[StarPersist] ⭐ Star toggle hook initialized:', {
-      mediaId: media.id,
-    initialLocalStarred: localStarred,
-    starredProp: starred,
-    mediaStarred: (media as any).starred,
-    shotImageEntryId: (media as any).shotImageEntryId,
-    shot_generation_id: (media as any).shot_generation_id,
-    note: 'This is the state that will be displayed in the UI',
-    timestamp: Date.now(),
-  });
-
-  // WRAPPED STAR TOGGLE - Add top-level logging
-  const wrappedHandleToggleStar = () => {
-    console.log('[StarPersist] 🎯 TOP-LEVEL: Star button CLICKED in MediaLightbox', {
-          mediaId: media.id,
-      currentLocalStarred: localStarred,
-      willToggleTo: !localStarred,
-      starredProp: starred,
-      mediaStarred: (media as any).starred,
-      shotImageEntryId: (media as any).shotImageEntryId,
-      shot_generation_id: (media as any).shot_generation_id,
-      selectedShotId,
-      // Show what ID will be used for mutation
-      willMutateWithId: media.id,
-      mutationIsPending: toggleStarMutation.isPending,
-      // Context
-      callStack: new Error().stack?.split('\n').slice(1, 4).join(' | '),
-      timestamp: Date.now(),
-    });
-    
-    // Call the actual handler
-    handleToggleStar();
-    
-    console.log('[StarPersist] 🎯 TOP-LEVEL: Called handleToggleStar(), optimistic update should be active', {
-        mediaId: media.id,
-      expectedNewLocalStarred: !localStarred,
-      timestamp: Date.now(),
-    });
-  };
-
   // Shot positioning hook
   const shotPositioningHook = useShotPositioning({
     media,
@@ -607,24 +500,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   const handleDelete = () => {
     if (onDelete) {
-      console.log('[MediaLightbox] Delete button clicked', {
-        mediaId: media.id,
-        hasNext: onNext && hasNext,
-        hasPrevious: onPrevious && hasPrevious
-      });
-      
       // Delete the item - the parent will handle navigation automatically
-      // When the array shrinks, the current index will:
-      // - Show the next item if we're in the middle (natural array shift)
-      // - Show the previous item if we were at the end
-      // - Close the lightbox if this was the last item
       onDelete(media.id);
-      
-      // IMPORTANT: Don't call onNext/onPrevious here!
-      // The parent component's state will update and handle the transition naturally.
-      // If we call navigation functions here, we'll skip an item because:
-      // 1. Delete shrinks array and index already points to next item
-      // 2. Then calling onNext() advances index again, skipping an item
     }
   };
 
@@ -1169,7 +1046,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       selectedProjectId={selectedProjectId}
                       isCloudMode={isCloudMode}
                       localStarred={localStarred}
-                      handleToggleStar={wrappedHandleToggleStar}
+                      handleToggleStar={handleToggleStar}
                       toggleStarPending={toggleStarMutation.isPending}
                       isAddingToReferences={isAddingToReferences}
                       addToReferencesSuccess={addToReferencesSuccess}
@@ -1193,106 +1070,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    {(() => {
-                      const shouldShowWorkflowControls = (onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode;
-                      console.log('[ShotSelectorDebug] 🎯 Bottom Workflow Controls render check:', 
-                        '\n  shouldShowWorkflowControls:', shouldShowWorkflowControls,
-                        '\n  onAddToShot:', !!onAddToShot,
-                        '\n  onDelete:', !!onDelete,
-                        '\n  onApplySettings:', !!onApplySettings,
-                        '\n  isSpecialEditMode:', isSpecialEditMode,
-                        '\n  isInpaintMode:', isInpaintMode,
-                        '\n  isMagicEditMode:', isMagicEditMode
-                      );
-                      return shouldShowWorkflowControls;
-                    })() && (
+                    {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
                       <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
-                          {(() => {
-                            const shouldShowShotSelector = onAddToShot && allShots.length > 0 && !isVideo;
-                            console.log('[ShotSelectorDebug] 🎯 ShotSelector render check:', 
-                              '\n  shouldShowShotSelector:', shouldShowShotSelector,
-                              '\n  onAddToShot:', !!onAddToShot,
-                              '\n  allShots.length:', allShots?.length || 0,
-                              '\n  isVideo:', isVideo,
-                              '\n  mediaType:', media.type
-                            );
-                            return shouldShowShotSelector;
-                          })() && (
-                            <>
-                              <ShotSelector
-                                value={selectedShotId || ''}
-                                onValueChange={onShotChange || (() => {})}
-                                shots={allShots}
-                                placeholder="Select shot"
-                                triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
-                                onOpenChange={setIsSelectOpen}
-                                showAddShot={!!onCreateShot}
-                                onCreateShot={handleQuickCreateAndAdd}
-                                isCreatingShot={isCreatingShot}
-                                quickCreateSuccess={quickCreateSuccess}
-                                onQuickCreateSuccess={handleQuickCreateSuccess}
-                                container={contentRef.current}
-                              />
-
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleAddToShot}
-                                    disabled={!selectedShotId}
-                                    className={`h-8 px-3 text-white ${
-                                      isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                                        ? 'bg-green-600/80 hover:bg-green-600'
-                                        : 'bg-blue-600/80 hover:bg-blue-600'
-                                    }`}
-                                  >
-                                    {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
-                                      <CheckCircle className="h-4 w-4" />
-                                    ) : (
-                                      <PlusCircle className="h-4 w-4" />
-                                    )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">
-                              {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                                ? 'Added with position. Jump to shot.'
-                                : 'Add to shot with position'}
-                            </TooltipContent>
-                          </Tooltip>
-
-                              {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={handleAddToShotWithoutPosition}
-                                      disabled={!selectedShotId}
-                                      className={`h-8 px-3 text-white ${
-                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                          ? 'bg-green-600/80 hover:bg-green-600'
-                                          : 'bg-purple-600/80 hover:bg-purple-600'
-                                      }`}
-                                    >
-                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
-                                        <CheckCircle className="h-4 w-4" />
-                                      ) : (
-                                        <PlusCircle className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="z-[100001]">
-                                    {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                      ? 'Added without position. Jump to shot.'
-                                      : 'Add to shot without position'}
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                        </>
-                      )}
+                          {onAddToShot && allShots.length > 0 && !isVideo && (
+                            <ShotSelectorControls
+                              allShots={allShots}
+                              selectedShotId={selectedShotId}
+                              onShotChange={onShotChange}
+                              onCreateShot={onCreateShot}
+                              isCreatingShot={isCreatingShot}
+                              quickCreateSuccess={quickCreateSuccess}
+                              handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                              handleQuickCreateSuccess={handleQuickCreateSuccess}
+                              isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                              isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                              showTickForImageId={showTickForImageId}
+                              showTickForSecondaryImageId={showTickForSecondaryImageId}
+                              mediaId={media.id}
+                              onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                              handleAddToShot={handleAddToShot}
+                              handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                              setIsSelectOpen={setIsSelectOpen}
+                              contentRef={contentRef}
+                            />
+                          )}
 
                       {/* Apply Settings */}
                       {onApplySettings && (
@@ -1338,273 +1141,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   style={{ width: '40%' }}
                 >
                   {isSpecialEditMode ? (
-                    // Inpaint Controls Panel - Always shown in sidebar when in inpaint mode
-                    <div className="p-6 space-y-4 w-full">
-                      {/* Based On display - Show source image this was derived from */}
-                      {(() => {
-                        console.log('[BasedOn:EditMode] 🎨 Render check', {
-                          hasSourceData: !!sourceGenerationData,
-                          hasHandler: !!onOpenExternalGeneration,
-                          willShow: !!(sourceGenerationData && onOpenExternalGeneration),
-                          sourceId: sourceGenerationData?.id?.substring(0, 8)
-                        });
-                        
-                        if (sourceGenerationData && onOpenExternalGeneration) {
-                          return (
-                            <SourceGenerationDisplay
-                              sourceGeneration={sourceGenerationData}
-                              onNavigate={onOpenExternalGeneration}
-                              variant="full"
-                              className="mb-3"
-                            />
-                          );
-                        }
-                        return null;
-                      })()}
-                      
-                      <div className="mb-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <h2 className="text-2xl font-light">Edit Image</h2>
-                          
-                          {/* Three-way toggle: Text | Inpaint | Annotate */}
-                          <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                            <button
-                              onClick={() => {
-                                setIsInpaintMode(true); // Ensure canvas mode is active
-                                setEditMode('text');
-                              }}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all",
-                                editMode === 'text'
-                                  ? "bg-background text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Type className="h-3.5 w-3.5" />
-                              Text
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsInpaintMode(true); // Ensure canvas stays visible
-                                setEditMode('inpaint');
-                              }}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all",
-                                editMode === 'inpaint'
-                                  ? "bg-background text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Paintbrush className="h-3.5 w-3.5" />
-                              Inpaint
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsInpaintMode(true); // Ensure canvas stays visible
-                                setEditMode('annotate');
-                              }}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all",
-                                editMode === 'annotate'
-                                  ? "bg-background text-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Annotate
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleExitMagicEditMode}
-                          className="text-sm px-3 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
-                        >
-                          <span className="md:hidden">Close edit mode</span>
-                          <span className="hidden md:block">Close</span>
-                          <span className="hidden md:block">Edit Mode</span>
-                        </Button>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        {/* Prompt Field */}
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Prompt</label>
-                          <textarea
-                            value={inpaintPrompt}
-                            onChange={(e) => setInpaintPrompt(e.target.value)}
-                            placeholder="Describe what to generate in the masked area..."
-                            className="w-full min-h-[100px] bg-background border border-input rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                            rows={4}
-                          />
-                        </div>
-                        
-                        {/* Number of Generations Slider */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium">Number of Generations</label>
-                            <span className="text-sm text-muted-foreground">{inpaintNumGenerations}</span>
-                          </div>
-                          <input
-                            type="range"
-                            min={1}
-                            max={16}
-                            value={inpaintNumGenerations}
-                            onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                          />
-                          <p className="text-xs text-muted-foreground">Generate 1-16 variations</p>
-                        </div>
-                        
-                        {/* Generate Button - Unified */}
-                        <Button
-                          variant="default"
-                          size="default"
-                          onClick={editMode === 'annotate' ? handleGenerateAnnotatedEdit : handleUnifiedGenerate}
-                          disabled={
-                            (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
-                            (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
-                            (editMode === 'inpaint' && brushStrokes.length === 0) ||
-                            isGeneratingInpaint || 
-                            inpaintGenerateSuccess || 
-                            isCreatingMagicEditTasks || 
-                            magicEditTasksCreated
-                          }
-                          className={cn(
-                            "w-full",
-                            (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
-                          )}
-                        >
-                          {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
-                            <>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
-                            </>
-                          ) : editMode === 'inpaint' ? (
-                            <>
-                              <Paintbrush className="h-4 w-4 mr-2" />
-                              Generate inpainted image
-                            </>
-                          ) : editMode === 'annotate' ? (
-                            <>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Generate based on annotations
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              Generate text edit
-                            </>
-                          )}
-                        </Button>
-                        
-                      </div>
-                      
-                      {/* Derived Generations Section - Show images based on this one */}
-                      {derivedGenerations && derivedGenerations.length > 0 && (
-                        <div className="border-t border-border pt-4 mt-4">
-                          <div className="mb-3 flex items-start justify-between">
-                            <div>
-                              <h3 className="text-sm font-medium">
-                                Edits of this image ({derivedGenerations.length})
-                              </h3>
-                    </div>
-                            
-                            {/* Pagination controls - top right */}
-                            {derivedTotalPages > 1 && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
-                                  disabled={derivedPage === 1}
-                                  className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <ChevronLeft className="h-3 w-3" />
-                                </button>
-                                <span className="text-xs text-muted-foreground">
-                                  {derivedPage}/{derivedTotalPages}
-                                </span>
-                                <button
-                                  onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
-                                  disabled={derivedPage === derivedTotalPages}
-                                  className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <ChevronRight className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-2">
-                            {paginatedDerived.map((derived, derivedIdx) => {
-                              // Calculate actual index in full derivedGenerations array
-                              const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
-                              
-                              return (
-                              <div
-                                key={derived.id}
-                                className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
-                                onClick={async () => {
-                                  console.log('[DerivedNav] 🖼️ Thumbnail clicked', {
-                                    derivedId: derived.id.substring(0, 8),
-                                    derivedUrl: derived.location,
-                                    currentMediaId: media.id.substring(0, 8),
-                                    hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                    hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                    timestamp: Date.now()
-                                  });
-                                  
-                                  // Prefer onOpenExternalGeneration (handles both in-context and external)
-                                  if (onOpenExternalGeneration) {
-                                    console.log('[DerivedNav] 🌐 Using onOpenExternalGeneration (universal handler)', {
-                                      derivedId: derived.id.substring(0, 8),
-                                      sourceId: media.id.substring(0, 8),
-                                      passingDerivedContext: true,
-                                      derivedCount: derivedGenerations?.length || 0
-                                    });
-                                    // Pass the full derived context for navigation
-                                    await onOpenExternalGeneration(
-                                      derived.id, 
-                                      derivedGenerations?.map(d => d.id) || []
-                                    );
-                                  } else if (onNavigateToGeneration) {
-                                    // Fallback to navigate-only mode (ImageGallery context)
-                                    console.log('[DerivedNav] 🎯 Falling back to onNavigateToGeneration', {
-                                      derivedId: derived.id.substring(0, 8)
-                                    });
-                                    onNavigateToGeneration(derived.id);
-                                  } else {
-                                    console.error('[DerivedNav] ❌ No navigation handlers available!');
-                                  }
-                                }}
-                              >
-                                <img
-                                  src={derived.thumbUrl}
-                                  alt="Derived generation"
-                                  className="w-full h-full object-contain bg-black/20"
-                                />
-                                
-                                {/* Simple hover overlay - no buttons */}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
-                                
-                                {derived.starred && (
-                                  <div className="absolute top-1 right-1 z-10 pointer-events-none">
-                                    <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <EditModePanel
+                      sourceGenerationData={sourceGenerationData}
+                      onOpenExternalGeneration={onOpenExternalGeneration}
+                      editMode={editMode}
+                      setEditMode={setEditMode}
+                      setIsInpaintMode={setIsInpaintMode}
+                      inpaintPrompt={inpaintPrompt}
+                      setInpaintPrompt={setInpaintPrompt}
+                      inpaintNumGenerations={inpaintNumGenerations}
+                      setInpaintNumGenerations={setInpaintNumGenerations}
+                      isGeneratingInpaint={isGeneratingInpaint}
+                      inpaintGenerateSuccess={inpaintGenerateSuccess}
+                      isCreatingMagicEditTasks={isCreatingMagicEditTasks}
+                      magicEditTasksCreated={magicEditTasksCreated}
+                      brushStrokes={brushStrokes}
+                      handleExitMagicEditMode={handleExitMagicEditMode}
+                      handleUnifiedGenerate={handleUnifiedGenerate}
+                      handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+                      derivedGenerations={derivedGenerations}
+                      paginatedDerived={paginatedDerived}
+                      derivedPage={derivedPage}
+                      derivedTotalPages={derivedTotalPages}
+                      setDerivedPage={setDerivedPage}
+                      currentMediaId={media.id}
+                      variant="desktop"
+                    />
                   ) : (
                     <div className="w-full">
                       {/* Open Edit Mode Button - shown when not in special edit mode */}
@@ -1656,109 +1218,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
                       showUserImage={false}
-                      derivedSection={(() => {
-                        console.log('[BasedOnDebug] Desktop render check - Derived Generations section', {
-                          hasDerivedGenerations: !!derivedGenerations,
-                          derivedCount: derivedGenerations?.length || 0,
-                          paginatedDerivedCount: paginatedDerived.length,
-                          willRender: !!derivedGenerations && derivedGenerations.length > 0
-                        });
-                        
-                        if (!derivedGenerations || derivedGenerations.length === 0) return null;
-                        
-                        console.log('[BasedOnDebug] Inside Derived Generations section render', {
-                          derivedGenerationsLength: derivedGenerations.length,
-                          paginatedDerivedLength: paginatedDerived.length,
-                          derivedTotalPages,
-                          derivedPage
-                        });
-                        
-                        return (
+                      derivedSection={
+                        derivedGenerations && derivedGenerations.length > 0 && onOpenExternalGeneration ? (
                           <div className="space-y-3 mb-6">
-                            <div className="border-t border-border p-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-light">
-                                  Based on this ({derivedGenerations.length})
-                                </h3>
-                                {derivedTotalPages > 1 && (
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
-                                      disabled={derivedPage === 1}
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-                                    <span className="text-xs text-muted-foreground">
-                                      {derivedPage} / {derivedTotalPages}
-                                    </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
-                                      disabled={derivedPage === derivedTotalPages}
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <ChevronRight className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="grid grid-cols-3 gap-2">
-                                {paginatedDerived.map((derived, derivedIdx) => {
-                                  // Calculate actual index in full derivedGenerations array
-                                  const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
-                                  
-                                  return (
-                                  <div
-                                    key={derived.id}
-                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
-                                    onClick={async () => {
-                                      console.log('[DerivedNav:TaskPanel] 🖼️ Thumbnail clicked', {
-                                        derivedId: derived.id.substring(0, 8),
-                                        derivedUrl: derived.location,
-                                        currentMediaId: media.id.substring(0, 8),
-                                        hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                        hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                        timestamp: Date.now()
-                                      });
-                                      
-                                      if (onOpenExternalGeneration) {
-                                        // Pass the full derived context for navigation
-                                        await onOpenExternalGeneration(
-                                          derived.id,
-                                          derivedGenerations?.map(d => d.id) || []
-                                        );
-                                      } else if (onNavigateToGeneration) {
-                                        onNavigateToGeneration(derived.id);
-                                      }
-                                    }}
-                                  >
-                                    <img
-                                      src={derived.thumbUrl}
-                                      alt="Derived generation"
-                                      className="w-full h-full object-contain bg-black/20"
-                                    />
-                                    
-                                    {/* Simple hover overlay - no buttons */}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
-                                    
-                                    {(derived as any).starred && (
-                                      <div className="absolute top-1 right-1 z-10 pointer-events-none">
-                                        <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                                })}
-                              </div>
+                            <div className="p-4">
+                              <DerivedGenerationsGrid
+                                derivedGenerations={derivedGenerations}
+                                paginatedDerived={paginatedDerived}
+                                derivedPage={derivedPage}
+                                derivedTotalPages={derivedTotalPages}
+                                onSetDerivedPage={setDerivedPage}
+                                onNavigate={onOpenExternalGeneration}
+                                currentMediaId={media.id}
+                                variant="desktop"
+                                title={`Based on this (${derivedGenerations.length})`}
+                              />
                             </div>
                           </div>
-                        );
-                      })()}
+                        ) : null
+                      }
                     />
                     </div>
                   )}
@@ -1887,7 +1365,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       selectedProjectId={selectedProjectId}
                       isCloudMode={isCloudMode}
                       localStarred={localStarred}
-                      handleToggleStar={wrappedHandleToggleStar}
+                      handleToggleStar={handleToggleStar}
                       toggleStarPending={toggleStarMutation.isPending}
                       isAddingToReferences={isAddingToReferences}
                       addToReferencesSuccess={addToReferencesSuccess}
@@ -1895,106 +1373,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    {(() => {
-                      const shouldShowWorkflowControls = (onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode;
-                      console.log('[ShotSelectorDebug] 🎯 Mobile Stacked - Bottom Workflow Controls render check:', 
-                        '\n  shouldShowWorkflowControls:', shouldShowWorkflowControls,
-                        '\n  onAddToShot:', !!onAddToShot,
-                        '\n  onDelete:', !!onDelete,
-                        '\n  onApplySettings:', !!onApplySettings,
-                        '\n  isSpecialEditMode:', isSpecialEditMode,
-                        '\n  isInpaintMode:', isInpaintMode,
-                        '\n  isMagicEditMode:', isMagicEditMode
-                      );
-                      return shouldShowWorkflowControls;
-                    })() && (
+                    {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
                       <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                         <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                           {/* Shot Selection and Add to Shot */}
-                          {(() => {
-                            const shouldShowShotSelector = onAddToShot && allShots.length > 0 && !isVideo;
-                            console.log('[ShotSelectorDebug] 🎯 Mobile Stacked - ShotSelector render check:', 
-                              '\n  shouldShowShotSelector:', shouldShowShotSelector,
-                              '\n  onAddToShot:', !!onAddToShot,
-                              '\n  allShots.length:', allShots?.length || 0,
-                              '\n  isVideo:', isVideo,
-                              '\n  mediaType:', media.type
-                            );
-                            return shouldShowShotSelector;
-                          })() && (
-                            <>
-                              <ShotSelector
-                                value={selectedShotId || ''}
-                                onValueChange={onShotChange || (() => {})}
-                                shots={allShots}
-                                placeholder="Select shot"
-                                triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
-                                onOpenChange={setIsSelectOpen}
-                                showAddShot={!!onCreateShot}
-                                onCreateShot={handleQuickCreateAndAdd}
-                                isCreatingShot={isCreatingShot}
-                                quickCreateSuccess={quickCreateSuccess}
-                                onQuickCreateSuccess={handleQuickCreateSuccess}
-                                container={contentRef.current}
-                              />
-
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                                    onClick={handleAddToShot}
-                                    disabled={!selectedShotId}
-                                    className={`h-8 px-3 text-white ${
-                                      isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                                        ? 'bg-green-600/80 hover:bg-green-600'
-                                        : 'bg-blue-600/80 hover:bg-blue-600'
-                                    }`}
-                                  >
-                                    {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
-                                      <CheckCircle className="h-4 w-4" />
-                                    ) : (
-                                      <PlusCircle className="h-4 w-4" />
-                                    )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">
-                              {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                                ? 'Added with position. Jump to shot.'
-                                : 'Add to shot with position'}
-                            </TooltipContent>
-                          </Tooltip>
-
-                              {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                                      onClick={handleAddToShotWithoutPosition}
-                                      disabled={!selectedShotId}
-                                      className={`h-8 px-3 text-white ${
-                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                          ? 'bg-green-600/80 hover:bg-green-600'
-                                          : 'bg-purple-600/80 hover:bg-purple-600'
-                                      }`}
-                                    >
-                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
-                                        <CheckCircle className="h-4 w-4" />
-                                      ) : (
-                                        <PlusCircle className="h-4 w-4" />
-                                      )}
-                            </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="z-[100001]">
-                                  {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                    ? 'Added without position. Jump to shot.'
-                                    : 'Add to shot without position'}
-                                </TooltipContent>
-                              </Tooltip>
+                          {onAddToShot && allShots.length > 0 && !isVideo && (
+                            <ShotSelectorControls
+                              allShots={allShots}
+                              selectedShotId={selectedShotId}
+                              onShotChange={onShotChange}
+                              onCreateShot={onCreateShot}
+                              isCreatingShot={isCreatingShot}
+                              quickCreateSuccess={quickCreateSuccess}
+                              handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                              handleQuickCreateSuccess={handleQuickCreateSuccess}
+                              isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                              isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                              showTickForImageId={showTickForImageId}
+                              showTickForSecondaryImageId={showTickForSecondaryImageId}
+                              mediaId={media.id}
+                              onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                              handleAddToShot={handleAddToShot}
+                              handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                              setIsSelectOpen={setIsSelectOpen}
+                              contentRef={contentRef}
+                            />
                           )}
-                        </>
-                      )}
 
                       {/* Apply Settings */}
                       {onApplySettings && (
@@ -2051,265 +1455,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   style={{ height: '40%' }}
                 >
                   {isSpecialEditMode ? (
-                    // Inpaint Prompt & Generate - Mobile
-                    <div className="p-4 space-y-3 w-full">
-                      {/* Based On display - Show source image this was derived from */}
-                      {sourceGenerationData && onOpenExternalGeneration && (
-                        <button
-                          onClick={async () => {
-                            console.log('[BasedOn:Mobile] 🖼️ Navigating to source generation', {
-                              sourceId: sourceGenerationData.id.substring(0, 8),
-                              clearingDerivedContext: true
-                            });
-                            // Clear derived context by not passing it - exits derived nav mode
-                            await onOpenExternalGeneration(sourceGenerationData.id);
-                          }}
-                          className="mb-2 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                        >
-                          <span>Based on:</span>
-                          <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                            <img
-                              src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
-                              alt="Source generation"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <span className="group-hover:underline">Click to view</span>
-                        </button>
-                      )}
-                      
-                      {/* Header */}
-                      <div className="mb-2 flex items-center justify-between">
-                        <h3 className="text-lg font-light">Edit Image</h3>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleExitMagicEditMode}
-                          className="text-xs px-2 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
-                        >
-                          <span className="md:hidden">Close edit mode</span>
-                          <span className="hidden md:block">Close</span>
-                          <span className="hidden md:block">Edit Mode</span>
-                        </Button>
-                      </div>
-                      
-                      {/* Three-way toggle: Text | Inpaint | Annotate - Mobile */}
-                      <div className="mb-3 flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                        <button
-                          onClick={() => {
-                            setIsInpaintMode(true); // Ensure canvas mode is active
-                            setEditMode('text');
-                          }}
-                          className={cn(
-                            "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs transition-all",
-                            editMode === 'text'
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          <Type className="h-3 w-3" />
-                          Text
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsInpaintMode(true); // Ensure canvas stays visible
-                            setEditMode('inpaint');
-                          }}
-                          className={cn(
-                            "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs transition-all",
-                            editMode === 'inpaint'
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          <Paintbrush className="h-3 w-3" />
-                          Inpaint
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsInpaintMode(true); // Ensure canvas stays visible
-                            setEditMode('annotate');
-                          }}
-                          className={cn(
-                            "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs transition-all",
-                            editMode === 'annotate'
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Annotate
-                        </button>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        {/* Prompt Field */}
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium">Prompt</label>
-                          <textarea
-                            value={inpaintPrompt}
-                            onChange={(e) => setInpaintPrompt(e.target.value)}
-                            placeholder="Describe what to generate..."
-                            className="w-full min-h-[60px] bg-background border border-input rounded-md px-2 py-1.5 text-base resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                            rows={3}
-                          />
-                        </div>
-                        
-                        {/* Number of Generations Slider - Mobile */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-medium">Generations</label>
-                            <span className="text-xs text-muted-foreground">{inpaintNumGenerations}</span>
-                          </div>
-                          <input
-                            type="range"
-                            min={1}
-                            max={16}
-                            value={inpaintNumGenerations}
-                            onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
-                            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                          />
-                          <p className="text-xs text-muted-foreground">1-16 variations</p>
-                        </div>
-                        
-                        {/* Generate Button - Unified */}
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={editMode === 'annotate' ? handleGenerateAnnotatedEdit : handleUnifiedGenerate}
-                          disabled={
-                            (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
-                            (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
-                            (editMode === 'inpaint' && brushStrokes.length === 0) ||
-                            isGeneratingInpaint || 
-                            inpaintGenerateSuccess || 
-                            isCreatingMagicEditTasks || 
-                            magicEditTasksCreated
-                          }
-                          className={cn(
-                            "w-full",
-                            (inpaintGenerateSuccess || magicEditTasksCreated) && "bg-green-600 hover:bg-green-600"
-                          )}
-                        >
-                          {(isGeneratingInpaint || isCreatingMagicEditTasks) ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (inpaintGenerateSuccess || magicEditTasksCreated) ? (
-                            <>
-                              <CheckCircle className="h-3 w-3 mr-2" />
-                              {editMode === 'inpaint' ? 'Success!' : 'Submitted, results will appear below'}
-                            </>
-                          ) : editMode === 'inpaint' ? (
-                            <>
-                              <Paintbrush className="h-3 w-3 mr-2" />
-                              Generate inpainted image
-                            </>
-                          ) : editMode === 'annotate' ? (
-                            <>
-                              <Pencil className="h-3 w-3 mr-2" />
-                              Generate based on annotations
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-3 w-3 mr-2" />
-                              Generate text edit
-                            </>
-                          )}
-                        </Button>
-                        
-                      </div>
-                      
-                      {/* Derived Generations Section - Show images based on this one (MOBILE) */}
-                      {derivedGenerations && derivedGenerations.length > 0 && (
-                        <div className="border-t border-border pt-3 mt-3">
-                          <div className="mb-2 flex items-start justify-between">
-                            <div>
-                              <h3 className="text-sm font-medium">
-                                Edits of this image ({derivedGenerations.length})
-                              </h3>
-                            </div>
-                            
-                            {/* Pagination controls - top right */}
-                            {derivedTotalPages > 1 && (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
-                                  disabled={derivedPage === 1}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <ChevronLeft className="h-3 w-3" />
-                                </Button>
-                                <span className="text-xs text-muted-foreground">
-                                  {derivedPage}/{derivedTotalPages}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
-                                  disabled={derivedPage === derivedTotalPages}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <ChevronRight className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {paginatedDerived.map((derived, derivedIdx) => {
-                              // Calculate actual index in full derivedGenerations array
-                              const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
-                              
-                              return (
-                              <div
-                                key={derived.id}
-                                className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
-                                onClick={async () => {
-                                  console.log('[DerivedNav:MobileEdit] 🖼️ Thumbnail clicked', {
-                                    derivedId: derived.id.substring(0, 8),
-                                    derivedUrl: derived.location,
-                                    currentMediaId: media.id.substring(0, 8),
-                                    hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                    hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                    timestamp: Date.now()
-                                  });
-                                  
-                                  if (onOpenExternalGeneration) {
-                                    // Pass the full derived context for navigation
-                                    await onOpenExternalGeneration(
-                                      derived.id,
-                                      derivedGenerations?.map(d => d.id) || []
-                                    );
-                                  } else if (onNavigateToGeneration) {
-                                    onNavigateToGeneration(derived.id);
-                                  }
-                                }}
-                              >
-                                <img
-                                  src={derived.thumbUrl}
-                                  alt="Derived generation"
-                                  className="w-full h-full object-contain bg-black/20"
-                                />
-                                
-                                {/* Simple hover overlay - no buttons */}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
-                                
-                                {derived.starred && (
-                                  <div className="absolute top-0.5 right-0.5 z-10 pointer-events-none">
-                                    <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <EditModePanel
+                      sourceGenerationData={sourceGenerationData}
+                      onOpenExternalGeneration={onOpenExternalGeneration}
+                      editMode={editMode}
+                      setEditMode={setEditMode}
+                      setIsInpaintMode={setIsInpaintMode}
+                      inpaintPrompt={inpaintPrompt}
+                      setInpaintPrompt={setInpaintPrompt}
+                      inpaintNumGenerations={inpaintNumGenerations}
+                      setInpaintNumGenerations={setInpaintNumGenerations}
+                      isGeneratingInpaint={isGeneratingInpaint}
+                      inpaintGenerateSuccess={inpaintGenerateSuccess}
+                      isCreatingMagicEditTasks={isCreatingMagicEditTasks}
+                      magicEditTasksCreated={magicEditTasksCreated}
+                      brushStrokes={brushStrokes}
+                      handleExitMagicEditMode={handleExitMagicEditMode}
+                      handleUnifiedGenerate={handleUnifiedGenerate}
+                      handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
+                      derivedGenerations={derivedGenerations}
+                      paginatedDerived={paginatedDerived}
+                      derivedPage={derivedPage}
+                      derivedTotalPages={derivedTotalPages}
+                      setDerivedPage={setDerivedPage}
+                      currentMediaId={media.id}
+                      variant="mobile"
+                    />
                   ) : (
                     <div className="w-full">
                       {/* Open Edit Mode Button - shown when not in special edit mode (MOBILE) */}
@@ -2336,11 +1507,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         <div className="border-b border-border p-4">
                           <button
                             onClick={async () => {
-                              console.log('[BasedOn:Mobile:NonEditTaskDetails] 🖼️ Navigating to source generation', {
-                                sourceId: sourceGenerationData.id.substring(0, 8),
-                                clearingDerivedContext: true
-                              });
-                              // Clear derived context by not passing it - exits derived nav mode
                               await onOpenExternalGeneration(sourceGenerationData.id);
                             }}
                             className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
@@ -2377,109 +1543,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
                       showUserImage={false}
-                      derivedSection={(() => {
-                        console.log('[BasedOnDebug] Mobile render check - Derived Generations section', {
-                          hasDerivedGenerations: !!derivedGenerations,
-                          derivedCount: derivedGenerations?.length || 0,
-                          paginatedDerivedCount: paginatedDerived.length,
-                          willRender: !!derivedGenerations && derivedGenerations.length > 0
-                        });
-                        
-                        if (!derivedGenerations || derivedGenerations.length === 0) return null;
-                        
-                        console.log('[BasedOnDebug] Inside Mobile Derived Generations section render', {
-                          derivedGenerationsLength: derivedGenerations.length,
-                          paginatedDerivedLength: paginatedDerived.length,
-                          derivedTotalPages,
-                          derivedPage
-                        });
-                        
-                        return (
+                      derivedSection={
+                        derivedGenerations && derivedGenerations.length > 0 && onOpenExternalGeneration ? (
                           <div className="space-y-3 mb-6">
-                            <div className="border-t border-border p-3 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-light">
-                                  Based on this ({derivedGenerations.length})
-                                </h3>
-                                {derivedTotalPages > 1 && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setDerivedPage(p => Math.max(1, p - 1))}
-                                      disabled={derivedPage === 1}
-                                      className="h-6 w-6 p-0"
-                                    >
-                                      <ChevronLeft className="h-3 w-3" />
-                                    </Button>
-                                    <span className="text-xs text-muted-foreground">
-                                      {derivedPage} / {derivedTotalPages}
-                                    </span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setDerivedPage(p => Math.min(derivedTotalPages, p + 1))}
-                                      disabled={derivedPage === derivedTotalPages}
-                                      className="h-6 w-6 p-0"
-                                    >
-                                      <ChevronRight className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="grid grid-cols-3 gap-1.5">
-                                {paginatedDerived.map((derived, derivedIdx) => {
-                                  // Calculate actual index in full derivedGenerations array
-                                  const actualIndex = derivedGenerations?.findIndex(d => d.id === derived.id) ?? derivedIdx;
-                                  
-                                  return (
-                                  <div
-                                    key={derived.id}
-                                    className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
-                                    onClick={async () => {
-                                      console.log('[DerivedNav:Mobile] 🖼️ Thumbnail clicked', {
-                                        derivedId: derived.id.substring(0, 8),
-                                        derivedUrl: derived.location,
-                                        currentMediaId: media.id.substring(0, 8),
-                                        hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
-                                        hasOnNavigateToGeneration: !!onNavigateToGeneration,
-                                        timestamp: Date.now()
-                                      });
-                                      
-                                      if (onOpenExternalGeneration) {
-                                        // Pass the full derived context for navigation
-                                        await onOpenExternalGeneration(
-                                          derived.id,
-                                          derivedGenerations?.map(d => d.id) || []
-                                        );
-                                      } else if (onNavigateToGeneration) {
-                                        onNavigateToGeneration(derived.id);
-                                      }
-                                    }}
-                                  >
-                                    <img
-                                      src={derived.thumbUrl}
-                                      alt="Derived generation"
-                                      className="w-full h-full object-contain bg-black/20"
-                                    />
-                                    
-                                    {/* Simple hover overlay - no buttons */}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
-                                    
-                                    {(derived as any).starred && (
-                                      <div className="absolute top-0.5 right-0.5 z-10 pointer-events-none">
-                                        <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                                })}
-                              </div>
+                            <div className="p-3">
+                              <DerivedGenerationsGrid
+                                derivedGenerations={derivedGenerations}
+                                paginatedDerived={paginatedDerived}
+                                derivedPage={derivedPage}
+                                derivedTotalPages={derivedTotalPages}
+                                onSetDerivedPage={setDerivedPage}
+                                onNavigate={onOpenExternalGeneration}
+                                currentMediaId={media.id}
+                                variant="mobile"
+                                title={`Based on this (${derivedGenerations.length})`}
+                              />
                             </div>
                           </div>
-                        );
-                      })()}
+                        ) : null
+                      }
                     />
                     </div>
                   )}
@@ -2535,16 +1617,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {!readOnly && (
                     <div className="absolute bottom-4 left-4 z-[70]">
                       <div className="flex items-center space-x-2">
-                        {(() => {
-                          console.log('[MobilePaintDebug] Edit button visibility check', {
-                            isSpecialEditMode,
-                            isVideo,
-                            selectedProjectId: !!selectedProjectId,
-                            isCloudMode,
-                            shouldShowButton: !isVideo && selectedProjectId && isCloudMode
-                          });
-                          return null;
-                        })()}
                         {!isSpecialEditMode && (
                         <>
                           {/* Unified Edit Button */}
@@ -2724,106 +1796,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
 
                   {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                  {(() => {
-                    const shouldShowWorkflowControls = (onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode;
-                    console.log('[ShotSelectorDebug] 🎯 Mobile Regular - Bottom Workflow Controls render check:', 
-                      '\n  shouldShowWorkflowControls:', shouldShowWorkflowControls,
-                      '\n  onAddToShot:', !!onAddToShot,
-                      '\n  onDelete:', !!onDelete,
-                      '\n  onApplySettings:', !!onApplySettings,
-                      '\n  isSpecialEditMode:', isSpecialEditMode,
-                      '\n  isInpaintMode:', isInpaintMode,
-                      '\n  isMagicEditMode:', isMagicEditMode
-                    );
-                    return shouldShowWorkflowControls;
-                  })() && (
+                  {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
                     <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
                       <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
                         {/* Shot Selection and Add to Shot */}
-                        {(() => {
-                          const shouldShowShotSelector = onAddToShot && allShots.length > 0 && !isVideo;
-                          console.log('[ShotSelectorDebug] 🎯 Mobile Regular - ShotSelector render check:', 
-                            '\n  shouldShowShotSelector:', shouldShowShotSelector,
-                            '\n  onAddToShot:', !!onAddToShot,
-                            '\n  allShots.length:', allShots?.length || 0,
-                            '\n  isVideo:', isVideo,
-                            '\n  mediaType:', media.type
-                          );
-                          return shouldShowShotSelector;
-                        })() && (
-                          <>
-                            <ShotSelector
-                              value={selectedShotId || ''}
-                              onValueChange={onShotChange || (() => {})}
-                              shots={allShots}
-                              placeholder="Select shot"
-                              triggerClassName="w-32 h-8 bg-black/50 border-white/20 text-white text-xs"
-                              onOpenChange={setIsSelectOpen}
-                              showAddShot={!!onCreateShot}
-                              onCreateShot={handleQuickCreateAndAdd}
-                              isCreatingShot={isCreatingShot}
-                              quickCreateSuccess={quickCreateSuccess}
-                              onQuickCreateSuccess={handleQuickCreateSuccess}
-                              container={contentRef.current}
-                            />
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                                  onClick={handleAddToShot}
-                                  disabled={!selectedShotId}
-                                  className={`h-8 px-3 text-white ${
-                                    isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                                      ? 'bg-green-600/80 hover:bg-green-600'
-                                      : 'bg-blue-600/80 hover:bg-blue-600'
-                                  }`}
-                                >
-                                  {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id ? (
-                                    <CheckCircle className="h-4 w-4" />
-                                  ) : (
-                                    <PlusCircle className="h-4 w-4" />
-                                  )}
-                          </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">
-                            {isAlreadyPositionedInSelectedShot || showTickForImageId === media.id
-                              ? 'Added with position. Jump to shot.'
-                              : 'Add to shot with position'}
-                          </TooltipContent>
-                        </Tooltip>
-
-                            {onAddToShotWithoutPosition && !isAlreadyPositionedInSelectedShot && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                                      onClick={handleAddToShotWithoutPosition}
-                                      disabled={!selectedShotId}
-                                      className={`h-8 px-3 text-white ${
-                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                          ? 'bg-green-600/80 hover:bg-green-600'
-                                          : 'bg-purple-600/80 hover:bg-purple-600'
-                                      }`}
-                                    >
-                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
-                                        <CheckCircle className="h-4 w-4" />
-                                      ) : (
-                                        <PlusCircle className="h-4 w-4" />
-                                      )}
-                            </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="z-[100001]">
-                                  {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                    ? 'Added without position. Jump to shot.'
-                                    : 'Add to shot without position'}
-                                </TooltipContent>
-                              </Tooltip>
-                          )}
-                        </>
-                      )}
+                        {onAddToShot && allShots.length > 0 && !isVideo && (
+                          <ShotSelectorControls
+                            allShots={allShots}
+                            selectedShotId={selectedShotId}
+                            onShotChange={onShotChange}
+                            onCreateShot={onCreateShot}
+                            isCreatingShot={isCreatingShot}
+                            quickCreateSuccess={quickCreateSuccess}
+                            handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                            handleQuickCreateSuccess={handleQuickCreateSuccess}
+                            isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                            isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                            showTickForImageId={showTickForImageId}
+                            showTickForSecondaryImageId={showTickForSecondaryImageId}
+                            mediaId={media.id}
+                            onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                            handleAddToShot={handleAddToShot}
+                            handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                            setIsSelectOpen={setIsSelectOpen}
+                            contentRef={contentRef}
+                          />
+                        )}
 
                     {/* Apply Settings */}
                     {onApplySettings && (

@@ -635,6 +635,22 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
 
+  // Delay pointer events until animation completes to prevent tap bleed-through on mobile
+  const [isPointerEventsEnabled, setIsPointerEventsEnabled] = useState(false);
+  
+  useEffect(() => {
+    if (isOpen) {
+      // Delay enabling pointer events by 300ms (matching the transition duration)
+      const timeoutId = setTimeout(() => {
+        setIsPointerEventsEnabled(true);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Disable immediately when closing
+      setIsPointerEventsEnabled(false);
+    }
+  }, [isOpen]);
+
   // Calculate pagination info - use paginated data total for perfect consistency with badge
   const totalTasks = (displayPaginatedData as any)?.total || 0;
   const totalPages = Math.ceil(totalTasks / ITEMS_PER_PAGE);
@@ -674,11 +690,17 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           className={cn(
             'absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col',
             transformClass,
-            // Only enable pointer events when pane is fully open to prevent accidental clicks during slide transition
-            isOpen ? 'pointer-events-auto' : 'pointer-events-none'
+            'pointer-events-auto' // Always allow hover detection for pane visibility
           )}
         >
-          <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
+          {/* Inner wrapper with delayed pointer events to prevent tap bleed-through */}
+          <div 
+            className={cn(
+              'flex flex-col h-full',
+              isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
+            )}
+          >
+            <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
               <h2 className="text-xl font-light text-zinc-200 ml-2">Tasks</h2>
               <div className="flex gap-2">
                 <Button
@@ -815,6 +837,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
               currentPage={currentPage}
             />
           </div>
+          </div> {/* Close inner wrapper with delayed pointer events */}
         </div>
       </div>
     </>

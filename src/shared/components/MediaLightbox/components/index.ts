@@ -26,3 +26,12 @@ export { FloatingToolControls } from './FloatingToolControls';
 export type { FloatingToolControlsProps } from './FloatingToolControls';
 
 export { TopLeftControls, TopRightControls, BottomLeftControls, BottomRightControls } from './ButtonGroups';
+
+export { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
+export type { DerivedGenerationsGridProps } from './DerivedGenerationsGrid';
+
+export { EditModePanel } from './EditModePanel';
+export type { EditModePanelProps } from './EditModePanel';
+
+export { ShotSelectorControls } from './ShotSelectorControls';
+export type { ShotSelectorControlsProps } from './ShotSelectorControls';
