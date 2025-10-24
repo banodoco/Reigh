@@ -22,4 +22,7 @@ export type { WorkflowControlsProps } from './WorkflowControls';
 export { MediaDisplayWithCanvas } from './MediaDisplayWithCanvas';
 export { SourceGenerationDisplay } from './SourceGenerationDisplay';
 
+export { FloatingToolControls } from './FloatingToolControls';
+export type { FloatingToolControlsProps } from './FloatingToolControls';
+
 export { TopLeftControls, TopRightControls, BottomLeftControls, BottomRightControls } from './ButtonGroups';

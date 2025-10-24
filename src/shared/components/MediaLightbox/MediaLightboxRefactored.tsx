@@ -78,6 +78,7 @@ import {
   WorkflowControls,
   MediaDisplayWithCanvas,
   SourceGenerationDisplay,
+  FloatingToolControls,
   TopLeftControls,
   TopRightControls,
   BottomLeftControls,
@@ -1125,158 +1126,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       effectiveImageUrl={effectiveImageUrl}
                     />
 
-                    {/* Floating Inpaint Controls - Separate from other buttons */}
+                    {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
                     {isSpecialEditMode && shouldShowSidePanel && editMode !== 'text' && (
-                      <div className={cn(
-                        "absolute left-4 z-[70]",
-                        inpaintPanelPosition === 'top' ? 'top-4' : 'bottom-4'
-                      )}>
-                      {/* Compact Edit Controls - Always shown in special edit mode */}
-                        <div className={cn(
-                          "relative",
-                          inpaintPanelPosition === 'top' ? 'mt-2' : 'mb-2'
-                        )}>
-                          {/* Position Toggle Button - at top when panel is at bottom */}
-                          {inpaintPanelPosition === 'bottom' && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => setInpaintPanelPosition('top')}
-                                  className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-t-md flex items-center justify-center transition-colors border border-border border-b-0 shadow-lg"
-                                >
-                                  <ArrowUp className="h-3 w-3 mt-0.5" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Move controls to top</TooltipContent>
-                            </Tooltip>
-                          )}
-                          
-                          <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
-                            {/* Brush Size Slider */}
-                            {editMode === 'inpaint' && (
-                              <div className="space-y-0.5">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-xs font-medium text-foreground">Size</label>
-                                  <span className="text-xs text-muted-foreground">{brushSize}px</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={5}
-                                  max={100}
-                                  value={brushSize}
-                                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                                  className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-                                />
-                              </div>
-                            )}
-                            
-                            {/* Paint/Erase or Circle/Arrow Toggle */}
-                            {editMode === 'inpaint' && (
-                              <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                                <button
-                                  onClick={() => setIsEraseMode(false)}
-                                  className={cn(
-                                    "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
-                                    !isEraseMode 
-                                      ? "bg-primary text-primary-foreground shadow-sm" 
-                                      : "text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  <Paintbrush className="h-3 w-3" />
-                                  Paint
-                                </button>
-                                <button
-                                  onClick={() => setIsEraseMode(true)}
-                                  className={cn(
-                                    "flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-xs transition-all",
-                                    isEraseMode 
-                                      ? "bg-purple-600 text-white shadow-sm" 
-                                      : "text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  <Eraser className="h-3 w-3" />
-                                  Erase
-                                </button>
-                              </div>
-                            )}
-                            
-                            {editMode === 'annotate' && (
-                              <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                                <button
-                                  onClick={() => setAnnotationMode('circle')}
-                                  className={cn(
-                                    "flex-1 flex items-center justify-center px-2 py-1 rounded text-xs transition-all",
-                                    annotationMode === 'circle' 
-                                      ? "bg-primary text-primary-foreground shadow-sm" 
-                                      : "text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  <Circle className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={() => setAnnotationMode('arrow')}
-                                  className={cn(
-                                    "flex-1 flex items-center justify-center px-2 py-1 rounded text-xs transition-all",
-                                    annotationMode === 'arrow' 
-                                      ? "bg-primary text-primary-foreground shadow-sm" 
-                                      : "text-muted-foreground hover:text-foreground"
-                                  )}
-                                >
-                                  <ArrowRight className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
-                            
-                            {/* Undo | Clear */}
-                            <div className="flex items-center gap-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={handleUndo}
-                                    disabled={brushStrokes.length === 0}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    <Undo2 className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="z-[100001]">Undo</TooltipContent>
-                              </Tooltip>
-                              
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleClearMask}
-                                    disabled={brushStrokes.length === 0}
-                                    className="flex-1 text-xs h-7"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="z-[100001]">Clear all</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </div>
-                          
-                          {/* Position Toggle Button - at bottom when panel is at top */}
-                          {inpaintPanelPosition === 'top' && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => setInpaintPanelPosition('bottom')}
-                                  className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-b-md flex items-center justify-center transition-colors border border-border border-t-0 shadow-lg relative z-10"
-                                >
-                                  <ArrowDown className="h-3 w-3 -mt-0.5" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Move controls to bottom</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      </div>
+                      <FloatingToolControls
+                        variant="tablet"
+                        editMode={editMode}
+                        brushSize={brushSize}
+                        isEraseMode={isEraseMode}
+                        onSetBrushSize={setBrushSize}
+                        onSetIsEraseMode={setIsEraseMode}
+                        annotationMode={annotationMode}
+                        onSetAnnotationMode={setAnnotationMode}
+                        brushStrokes={brushStrokes}
+                        onUndo={handleUndo}
+                        onClearMask={handleClearMask}
+                        panelPosition={inpaintPanelPosition}
+                        onSetPanelPosition={setInpaintPanelPosition}
+                      />
                     )}
 
                     {/* Bottom Left Controls - Edit & Upscale */}
@@ -1946,139 +1812,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                     )}
 
-                    {/* Mobile Inpaint Controls - Top/Bottom positioned (shown in special edit modes) */}
+                    {/* Floating Tool Controls - Mobile (portrait, no sidebar) */}
                     {isSpecialEditMode && (
-                      <div className={cn(
-                        "absolute left-2 z-[70]",
-                        inpaintPanelPosition === 'top' ? 'top-2' : 'bottom-2'
-                      )}>
-                        {/* Position Toggle Button - at top when panel is at bottom */}
-                        {inpaintPanelPosition === 'bottom' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => setInpaintPanelPosition('top')}
-                                className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-t-md flex items-center justify-center transition-colors border border-border border-b-0 shadow-lg"
-                              >
-                                <ArrowUp className="h-3 w-3 mt-0.5" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">Move controls to top</TooltipContent>
-                          </Tooltip>
-                        )}
-                        
-                        <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-32 border border-border shadow-xl">
-                          {/* Brush Size Slider - Only for inpaint mode */}
-                          {editMode === 'inpaint' && (
-                            <div className="space-y-0.5">
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-foreground">Size</label>
-                                <span className="text-xs text-muted-foreground">{brushSize}px</span>
-                              </div>
-                              <input
-                                type="range"
-                                min={5}
-                                max={100}
-                                value={brushSize}
-                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-                              />
-                            </div>
-                          )}
-                          
-                          {/* Paint/Erase Toggle - Only for inpaint mode */}
-                          {editMode === 'inpaint' && (
-                            <Button
-                              variant={isEraseMode ? "default" : "secondary"}
-                              size="sm"
-                              onClick={() => setIsEraseMode(!isEraseMode)}
-                              className={cn(
-                                "w-full text-xs h-6",
-                                isEraseMode && "bg-purple-600 hover:bg-purple-700"
-                              )}
-                            >
-                              <Eraser className="h-3 w-3 mr-1" />
-                              {isEraseMode ? 'Erase' : 'Paint'}
-                            </Button>
-                          )}
-                          
-                          {/* Circle/Arrow Toggle - Only for annotate mode */}
-                          {editMode === 'annotate' && (
-                            <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
-                              <button
-                                onClick={() => setAnnotationMode('circle')}
-                                className={cn(
-                                  "flex-1 flex items-center justify-center py-1 rounded text-xs transition-all",
-                                  annotationMode === 'circle'
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                                )}
-                              >
-                                <Circle className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={() => setAnnotationMode('arrow')}
-                                className={cn(
-                                  "flex-1 flex items-center justify-center py-1 rounded text-xs transition-all",
-                                  annotationMode === 'arrow'
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                                )}
-                              >
-                                <ArrowRight className="h-3 w-3" />
-                              </button>
-                            </div>
-                          )}
-                          
-                          {/* Undo | Clear */}
-                          <div className="flex items-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={handleUndo}
-                                  disabled={brushStrokes.length === 0}
-                                  className="flex-1 text-xs h-6"
-                                >
-                                  <Undo2 className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Undo</TooltipContent>
-                            </Tooltip>
-                            
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleClearMask}
-                                  disabled={brushStrokes.length === 0}
-                                  className="flex-1 text-xs h-6"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Clear all</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                        
-                        {/* Position Toggle Button - at bottom when panel is at top */}
-                        {inpaintPanelPosition === 'top' && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={() => setInpaintPanelPosition('bottom')}
-                                className="mx-auto w-fit px-2 py-1 bg-background hover:bg-muted text-muted-foreground hover:text-foreground rounded-b-md flex items-center justify-center transition-colors border border-border border-t-0 shadow-lg relative z-10"
-                              >
-                                <ArrowDown className="h-3 w-3 -mt-0.5" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="z-[100001]">Move controls to bottom</TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
+                      <FloatingToolControls
+                        variant="mobile"
+                        editMode={editMode}
+                        brushSize={brushSize}
+                        isEraseMode={isEraseMode}
+                        onSetBrushSize={setBrushSize}
+                        onSetIsEraseMode={setIsEraseMode}
+                        annotationMode={annotationMode}
+                        onSetAnnotationMode={setAnnotationMode}
+                        brushStrokes={brushStrokes}
+                        onUndo={handleUndo}
+                        onClearMask={handleClearMask}
+                        panelPosition={inpaintPanelPosition}
+                        onSetPanelPosition={setInpaintPanelPosition}
+                      />
                     )}
 
                     {/* Mobile Stacked Layout - All button groups (matching desktop) */}
