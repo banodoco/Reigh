@@ -41,3 +41,9 @@ export type { WorkflowControlsBarProps } from './WorkflowControlsBar';
 
 export { NavigationArrows } from './NavigationArrows';
 export type { NavigationArrowsProps } from './NavigationArrows';
+
+export { OpenEditModeButton } from './OpenEditModeButton';
+export type { OpenEditModeButtonProps } from './OpenEditModeButton';
+
+export { TaskDetailsPanelWrapper } from './TaskDetailsPanelWrapper';
+export type { TaskDetailsPanelWrapperProps } from './TaskDetailsPanelWrapper';

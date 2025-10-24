@@ -21,7 +21,6 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
-import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
 
 // Import all extracted hooks
 import {
@@ -62,6 +61,8 @@ import {
   ShotSelectorControls,
   WorkflowControlsBar,
   NavigationArrows,
+  OpenEditModeButton,
+  TaskDetailsPanelWrapper,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -1111,24 +1112,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Open Edit Mode Button - shown when not in special edit mode */}
-                      {!readOnly && showImageEditTools && (
-                        <div className="p-6 pb-4 border-b border-border flex justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setIsInpaintMode(true);
-                              setEditMode('inpaint');
-                            }}
-                            className="text-sm px-3 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
-                          >
-                            <span className="md:hidden">Open edit mode</span>
-                            <span className="hidden md:block">Open</span>
-                            <span className="hidden md:block">Edit Mode</span>
-                          </Button>
-                        </div>
-                      )}
+                      {/* Open Edit Mode Button */}
+                      <OpenEditModeButton
+                        readOnly={readOnly}
+                        showImageEditTools={showImageEditTools}
+                        onOpenEditMode={() => {
+                          setIsInpaintMode(true);
+                          setEditMode('inpaint');
+                        }}
+                        variant="desktop"
+                      />
                       
                       {/* Based On display - Show source image this was derived from (ABOVE task details) */}
                       {sourceGenerationData && onOpenExternalGeneration && (
@@ -1141,44 +1134,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         </div>
                       )}
                     
-                    <TaskDetailsPanel
-                      task={taskDetailsData?.task}
-                      isLoading={taskDetailsData?.isLoading || false}
-                      error={taskDetailsData?.error}
-                      inputImages={taskDetailsData?.inputImages || []}
-                      taskId={taskDetailsData?.taskId || null}
-                      replaceImages={replaceImages}
-                      onReplaceImagesChange={setReplaceImages}
-                      onApplySettingsFromTask={taskDetailsData?.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
-                        taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
-                        onClose(); // Close lightbox after applying settings
-                      } : undefined}
-                      onClose={taskDetailsData?.onClose || onClose}
-                      className=""
+                    <TaskDetailsPanelWrapper
+                      taskDetailsData={taskDetailsData}
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
-                      showUserImage={false}
-                      derivedSection={
-                        derivedGenerations && derivedGenerations.length > 0 && onOpenExternalGeneration ? (
-                          <div className="space-y-3 mb-6">
-                            <div className="p-4">
-                              <DerivedGenerationsGrid
-                                derivedGenerations={derivedGenerations}
-                                paginatedDerived={paginatedDerived}
-                                derivedPage={derivedPage}
-                                derivedTotalPages={derivedTotalPages}
-                                onSetDerivedPage={setDerivedPage}
-                                onNavigate={onOpenExternalGeneration}
-                                currentMediaId={media.id}
-                                variant="desktop"
-                                title={`Based on this (${derivedGenerations.length})`}
-                              />
-                                  </div>
-                              </div>
-                        ) : null
-                      }
+                      derivedGenerations={derivedGenerations}
+                      paginatedDerived={paginatedDerived}
+                      derivedPage={derivedPage}
+                      derivedTotalPages={derivedTotalPages}
+                      onSetDerivedPage={setDerivedPage}
+                      onNavigateToGeneration={onOpenExternalGeneration}
+                      currentMediaId={media.id}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
+                      onClose={onClose}
+                      variant="desktop"
                     />
                     </div>
                   )}
@@ -1392,85 +1364,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Open Edit Mode Button - shown when not in special edit mode (MOBILE) */}
-                      {!readOnly && showImageEditTools && (
-                        <div className="p-4 pb-3 border-b border-border flex justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setIsInpaintMode(true);
-                              setEditMode('inpaint');
-                            }}
-                            className="text-xs px-2 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
-                          >
-                            <span className="md:hidden">Open edit mode</span>
-                            <span className="hidden md:block">Open</span>
-                            <span className="hidden md:block">Edit Mode</span>
-                          </Button>
-                        </div>
-                      )}
+                      {/* Open Edit Mode Button */}
+                      <OpenEditModeButton
+                        readOnly={readOnly}
+                        showImageEditTools={showImageEditTools}
+                        onOpenEditMode={() => {
+                          setIsInpaintMode(true);
+                          setEditMode('inpaint');
+                        }}
+                        variant="mobile"
+                      />
                       
-                      {/* Based On display - Show source image this was derived from (ABOVE task details) - MOBILE */}
+                      {/* Based On display - Show source image this was derived from (ABOVE task details) */}
                       {sourceGenerationData && onOpenExternalGeneration && (
                         <div className="border-b border-border p-4">
-                          <button
-                            onClick={async () => {
-                              await onOpenExternalGeneration(sourceGenerationData.id);
-                            }}
-                            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-                          >
-                            <span>Based on:</span>
-                            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-                              <img
-                                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
-                                alt="Source generation"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <span className="group-hover:underline">Click to view</span>
-                          </button>
+                          <SourceGenerationDisplay
+                            sourceGeneration={sourceGenerationData}
+                            onNavigate={onOpenExternalGeneration}
+                            variant="compact"
+                          />
                         </div>
                       )}
                     
-                    <TaskDetailsPanel
-                      task={taskDetailsData?.task}
-                      isLoading={taskDetailsData?.isLoading || false}
-                      error={taskDetailsData?.error}
-                      inputImages={taskDetailsData?.inputImages || []}
-                      taskId={taskDetailsData?.taskId || null}
-                      replaceImages={replaceImages}
-                      onReplaceImagesChange={setReplaceImages}
-                      onApplySettingsFromTask={taskDetailsData?.onApplySettingsFromTask ? (taskId, replaceImages, inputImages) => {
-                        taskDetailsData.onApplySettingsFromTask?.(taskId, replaceImages, inputImages);
-                        onClose(); // Close lightbox after applying settings
-                      } : undefined}
-                      onClose={taskDetailsData?.onClose || onClose}
-                      className=""
+                    <TaskDetailsPanelWrapper
+                      taskDetailsData={taskDetailsData}
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
                       onEditingGenerationNameChange={setIsEditingGenerationName}
-                      showUserImage={false}
-                      derivedSection={
-                        derivedGenerations && derivedGenerations.length > 0 && onOpenExternalGeneration ? (
-                          <div className="space-y-3 mb-6">
-                            <div className="p-3">
-                              <DerivedGenerationsGrid
-                                derivedGenerations={derivedGenerations}
-                                paginatedDerived={paginatedDerived}
-                                derivedPage={derivedPage}
-                                derivedTotalPages={derivedTotalPages}
-                                onSetDerivedPage={setDerivedPage}
-                                onNavigate={onOpenExternalGeneration}
-                                currentMediaId={media.id}
-                                variant="mobile"
-                                title={`Based on this (${derivedGenerations.length})`}
-                              />
-                                  </div>
-                              </div>
-                        ) : null
-                      }
+                      derivedGenerations={derivedGenerations}
+                      paginatedDerived={paginatedDerived}
+                      derivedPage={derivedPage}
+                      derivedTotalPages={derivedTotalPages}
+                      onSetDerivedPage={setDerivedPage}
+                      onNavigateToGeneration={onOpenExternalGeneration}
+                      currentMediaId={media.id}
+                      replaceImages={replaceImages}
+                      onReplaceImagesChange={setReplaceImages}
+                      onClose={onClose}
+                      variant="mobile"
                     />
                     </div>
                   )}
