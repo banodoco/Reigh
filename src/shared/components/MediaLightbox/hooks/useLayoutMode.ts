@@ -29,13 +29,19 @@ export const useLayoutMode = ({
   isMagicEditMode
 }: UseLayoutModeParams): UseLayoutModeReturn => {
   // Detect iPad/tablet size (768px+) for inpaint side-by-side layout
+  // Also detect orientation - treat portrait tablets as mobile for better UX
   const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
     typeof window !== 'undefined' ? window.innerWidth >= 768 : false
+  );
+  
+  const [isPortrait, setIsPortrait] = useState(() =>
+    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
   );
   
   useEffect(() => {
     const handleResize = () => {
       setIsTabletOrLarger(window.innerWidth >= 768);
+      setIsPortrait(window.innerHeight > window.innerWidth);
     };
     
     window.addEventListener('resize', handleResize);
@@ -62,7 +68,8 @@ export const useLayoutMode = ({
 
   // Show sidebar on tablet/larger for: task details (even if loading), special edit modes, OR videos (always on iPad)
   // Note: We show sidebar immediately for showTaskDetails to prevent layout jump while task loads
-  const shouldShowSidePanel = (showTaskDetails && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger);
+  // Exception: On portrait tablets (like vertical iPad), use mobile layout for better UX
+  const shouldShowSidePanel = !isPortrait && ((showTaskDetails && isTabletOrLarger) || (isSpecialEditMode && isTabletOrLarger) || (isVideo && isTabletOrLarger));
 
   // Debug layout
   useEffect(() => {
@@ -72,11 +79,13 @@ export const useLayoutMode = ({
         isMagicEditMode,
         isSpecialEditMode,
         isTabletOrLarger,
+        isPortrait,
         shouldShowSidePanel,
-        windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'unknown'
+        windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'unknown',
+        windowHeight: typeof window !== 'undefined' ? window.innerHeight : 'unknown'
       });
     }
-  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, isTabletOrLarger, shouldShowSidePanel]);
+  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, isTabletOrLarger, isPortrait, shouldShowSidePanel]);
 
   return {
     isTabletOrLarger,
