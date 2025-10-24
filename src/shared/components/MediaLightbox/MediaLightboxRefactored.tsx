@@ -2002,35 +2002,101 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         )}
                         
                         <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-32 border border-border shadow-xl">
-                          {/* Brush Size Slider */}
-                          <div className="space-y-0.5">
-                            <div className="flex items-center justify-between">
-                              <label className="text-xs font-medium text-foreground">Size</label>
-                              <span className="text-xs text-muted-foreground">{brushSize}px</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={5}
-                              max={100}
-                              value={brushSize}
-                              onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                              className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-                            />
+                          {/* Mode Toggle: Inpaint / Annotate */}
+                          <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5 mb-1">
+                            <button
+                              onClick={() => {
+                                setIsInpaintMode(true);
+                                setEditMode('inpaint');
+                              }}
+                              className={cn(
+                                "flex-1 flex items-center justify-center px-1 py-0.5 rounded text-[9px] transition-all",
+                                editMode === 'inpaint'
+                                  ? "bg-primary text-primary-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Paintbrush className="h-2 w-2 mr-0.5" />
+                              Paint
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsInpaintMode(true);
+                                setEditMode('annotate');
+                              }}
+                              className={cn(
+                                "flex-1 flex items-center justify-center px-1 py-0.5 rounded text-[9px] transition-all",
+                                editMode === 'annotate'
+                                  ? "bg-primary text-primary-foreground shadow-sm"
+                                  : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Pencil className="h-2 w-2 mr-0.5" />
+                              Note
+                            </button>
                           </div>
                           
-                          {/* Erase Toggle */}
-                          <Button
-                            variant={isEraseMode ? "default" : "secondary"}
-                            size="sm"
-                            onClick={() => setIsEraseMode(!isEraseMode)}
-                            className={cn(
-                              "w-full text-xs h-6",
-                              isEraseMode && "bg-purple-600 hover:bg-purple-700"
-                            )}
-                          >
-                            <Eraser className="h-3 w-3 mr-1" />
-                            {isEraseMode ? 'Erase' : 'Paint'}
-                          </Button>
+                          {/* Brush Size Slider - Only for inpaint mode */}
+                          {editMode === 'inpaint' && (
+                            <div className="space-y-0.5">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-foreground">Size</label>
+                                <span className="text-xs text-muted-foreground">{brushSize}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={5}
+                                max={100}
+                                value={brushSize}
+                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Paint/Erase Toggle - Only for inpaint mode */}
+                          {editMode === 'inpaint' && (
+                            <Button
+                              variant={isEraseMode ? "default" : "secondary"}
+                              size="sm"
+                              onClick={() => setIsEraseMode(!isEraseMode)}
+                              className={cn(
+                                "w-full text-xs h-6",
+                                isEraseMode && "bg-purple-600 hover:bg-purple-700"
+                              )}
+                            >
+                              <Eraser className="h-3 w-3 mr-1" />
+                              {isEraseMode ? 'Erase' : 'Paint'}
+                            </Button>
+                          )}
+                          
+                          {/* Circle/Arrow Toggle - Only for annotate mode */}
+                          {editMode === 'annotate' && (
+                            <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+                              <button
+                                onClick={() => setAnnotationMode('circle')}
+                                className={cn(
+                                  "flex-1 flex items-center justify-center py-1 rounded text-xs transition-all",
+                                  annotationMode === 'circle'
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                <Circle className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => setAnnotationMode('arrow')}
+                                className={cn(
+                                  "flex-1 flex items-center justify-center py-1 rounded text-xs transition-all",
+                                  annotationMode === 'arrow'
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                <ArrowRight className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
                           
                           {/* Undo | Clear */}
                           <div className="flex items-center gap-1">
