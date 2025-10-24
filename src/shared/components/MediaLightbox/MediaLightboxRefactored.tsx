@@ -1460,7 +1460,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           onClick={handleExitMagicEditMode}
                           className="text-sm px-3 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
                         >
-                          <span className="md:block">Close</span>
+                          <span className="md:block">Close</span>{' '}
                           <span className="md:block">Edit Mode</span>
                         </Button>
                       </div>
@@ -1678,7 +1678,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             }}
                             className="text-sm px-3 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
                           >
-                            <span className="md:block">Open</span>
+                            <span className="md:block">Open</span>{' '}
                             <span className="md:block">Edit Mode</span>
                           </Button>
                         </div>
@@ -2229,7 +2229,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           onClick={handleExitMagicEditMode}
                           className="text-xs px-2 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
                         >
-                          <span className="md:block">Close</span>
+                          <span className="md:block">Close</span>{' '}
                           <span className="md:block">Edit Mode</span>
                         </Button>
                       </div>
@@ -2478,7 +2478,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             }}
                             className="text-xs px-2 py-1 md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent"
                           >
-                            <span className="md:block">Open</span>
+                            <span className="md:block">Open</span>{' '}
                             <span className="md:block">Edit Mode</span>
                           </Button>
                         </div>

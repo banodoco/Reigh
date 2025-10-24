@@ -1460,8 +1460,8 @@ const VideoTravelToolPage: React.FC = () => {
                     currentToolType="travel-between-images"
                     initialMediaTypeFilter="video"
                     initialToolTypeFilter={true}
-                    currentToolTypeName="Travel Between Images"
-                    showShotFilter={true}
+                    // Hide currentToolTypeName to remove redundant tool type filter in videos view
+                    showShotFilter={false}  // Hide shot filter in videos view to reduce header height on mobile
                     initialShotFilter="all"
                     columnsPerRow={3}
                     itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)

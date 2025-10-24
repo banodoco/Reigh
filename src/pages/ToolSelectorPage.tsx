@@ -369,7 +369,7 @@ const ToolSelectorPage: React.FC = () => {
           {/* Content-Responsive Layout */}
           <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
             {/* Process Column */}
-            <div className="w-full c-lg:w-2/3">
+            <div className="w-full c-lg:w-1/2">
               <div className={`flex flex-col ${itemGap} ${topMargin} px-4 py-4`}>
                 {processTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
@@ -388,8 +388,8 @@ const ToolSelectorPage: React.FC = () => {
             </div>
 
             {/* Assistant Tools Column */}
-            <div className="w-full c-lg:w-1/3">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-1`}>
+            <div className="w-full c-lg:w-1/2">
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-4`}>
                 {assistantTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
                   
