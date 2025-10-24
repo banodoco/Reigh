@@ -1458,7 +1458,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="ghost"
                           size="sm"
                           onClick={handleExitMagicEditMode}
-                          className="text-sm hover:bg-muted px-3 py-1 md:flex md:flex-col md:items-center md:leading-tight"
+                          className="text-sm hover:bg-muted px-3 py-1 md:py-2 md:flex md:flex-col md:items-center md:leading-tight"
                         >
                           <span className="md:block">Close</span>
                           <span className="md:block">Edit Mode</span>
@@ -1676,7 +1676,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               setIsInpaintMode(true);
                               setEditMode('inpaint');
                             }}
-                            className="text-sm hover:bg-muted px-3 py-1 md:flex md:flex-col md:items-center md:leading-tight"
+                            className="text-sm hover:bg-muted px-3 py-1 md:py-2 md:flex md:flex-col md:items-center md:leading-tight"
                           >
                             <span className="md:block">Open</span>
                             <span className="md:block">Edit Mode</span>
@@ -2227,7 +2227,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           variant="ghost"
                           size="sm"
                           onClick={handleExitMagicEditMode}
-                          className="text-xs hover:bg-muted px-2 py-1 md:flex md:flex-col md:items-center md:leading-tight"
+                          className="text-xs hover:bg-muted px-2 py-1 md:py-2 md:flex md:flex-col md:items-center md:leading-tight"
                         >
                           <span className="md:block">Close</span>
                           <span className="md:block">Edit Mode</span>
@@ -2476,7 +2476,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               setIsInpaintMode(true);
                               setEditMode('inpaint');
                             }}
-                            className="text-xs hover:bg-muted px-2 py-1 md:flex md:flex-col md:items-center md:leading-tight"
+                            className="text-xs hover:bg-muted px-2 py-1 md:py-2 md:flex md:flex-col md:items-center md:leading-tight"
                           >
                             <span className="md:block">Open</span>
                             <span className="md:block">Edit Mode</span>
