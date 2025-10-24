@@ -5,6 +5,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Trash2, Copy, Check, Pencil } from "lucide-react";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
+import { useDoubleTapWithSelection } from "@/shared/hooks/useDoubleTapWithSelection";
 import { framesToSeconds } from "./utils/time-utils";
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_IMAGE_HALF_WIDTH, TIMELINE_PADDING_OFFSET } from "./constants";
 
@@ -72,14 +73,36 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   isSelectedForMove = false,
   onTapToMove,
 }) => {
-  // Track touch position to detect scrolling vs tapping
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-
   // Track hover state
   const [isHovered, setIsHovered] = useState(false);
   
   // Track if we just clicked a button to prevent drag from starting
   const buttonClickedRef = useRef(false);
+
+  // ===== MOBILE TAP HANDLING =====
+  // Use generalized double-tap hook for iPad/mobile interaction
+  // Single tap → toggles selection, Double tap → opens lightbox
+  const { handleTouchStart, handleTouchEnd } = useDoubleTapWithSelection({
+    onSingleTap: () => {
+      console.log('[TimelineTap] Single tap detected on item:', image.shotImageEntryId.substring(0, 8));
+      // Prefer tap-to-move on tablets, fall back to lightbox on phones
+      if (onTapToMove) {
+        onTapToMove();
+      } else if (onMobileTap) {
+        // On phones without tap-to-move, single tap opens lightbox
+        onMobileTap();
+      }
+    },
+    onDoubleTap: () => {
+      console.log('[TimelineTap] Double tap detected on item:', image.shotImageEntryId.substring(0, 8));
+      // Double-tap always opens lightbox if available
+      if (onMobileTap) {
+        onMobileTap();
+      }
+    },
+    itemId: image.shotImageEntryId,
+    disabled: readOnly,
+  });
 
   // Calculate aspect ratio for consistent sizing
   const getAspectRatioStyle = () => {
@@ -136,34 +159,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   // Use progressive src if available, otherwise fallback to display URL
   const displayImageUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(image.thumbUrl || image.imageUrl);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-
-    const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-    
-    // Only trigger tap if movement is minimal (< 10px in any direction)
-    // This prevents accidental selection during scrolling
-    if (deltaX < 10 && deltaY < 10) {
-      e.preventDefault();
-      
-      // If tap-to-move is available (tablet mode), use it. Otherwise fall back to onMobileTap
-      if (onTapToMove) {
-        onTapToMove();
-      } else if (onMobileTap) {
-        onMobileTap();
-      }
-    }
-    
-    touchStartRef.current = null;
-  };
-  
   // Action handlers
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
