@@ -2,52 +2,19 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
-import { Label } from '@/shared/components/ui/label';
-import { Textarea } from '@/shared/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  X, 
-  FlipHorizontal, 
-  Save, 
-  Download, 
   Trash2, 
-  Settings, 
-  PlusCircle, 
-  CheckCircle, 
-  Star, 
-  ImagePlus, 
-  Loader2, 
-  ArrowUpCircle, 
-  Eye, 
-  EyeOff, 
-  Paintbrush, 
-  Eraser, 
-  Undo2,
-  Sparkles,
-  Pencil,
-  ArrowDown,
-  ArrowUp,
-  Maximize2,
-  Circle,
-  ArrowRight,
   Move,
   Edit3,
-  Type
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
-import { toast } from 'sonner';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
-import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
-import ShotSelector from '@/shared/components/ShotSelector';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import TaskDetailsPanel from '@/tools/travel-between-images/components/TaskDetailsPanel';
-import { createBatchMagicEditTasks } from '@/shared/lib/tasks/magicEdit';
-import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
-import { supabase } from '@/integrations/supabase/client';
 
 // Import all extracted hooks
 import {
@@ -86,6 +53,7 @@ import {
   DerivedGenerationsGrid,
   EditModePanel,
   ShotSelectorControls,
+  WorkflowControlsBar,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -1070,53 +1038,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
-                      <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
-                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
-                          {/* Shot Selection and Add to Shot */}
-                          {onAddToShot && allShots.length > 0 && !isVideo && (
-                            <ShotSelectorControls
-                              allShots={allShots}
-                              selectedShotId={selectedShotId}
-                              onShotChange={onShotChange}
-                              onCreateShot={onCreateShot}
-                              isCreatingShot={isCreatingShot}
-                              quickCreateSuccess={quickCreateSuccess}
-                              handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                              handleQuickCreateSuccess={handleQuickCreateSuccess}
-                              isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                              isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                              showTickForImageId={showTickForImageId}
-                              showTickForSecondaryImageId={showTickForSecondaryImageId}
-                              mediaId={media.id}
-                              onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                              handleAddToShot={handleAddToShot}
-                              handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
-                              setIsSelectOpen={setIsSelectOpen}
-                              contentRef={contentRef}
-                            />
-                          )}
-
-                      {/* Apply Settings */}
-                      {onApplySettings && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleApplySettings}
-                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
-                        </Tooltip>
-                      )}
-
-                        </div>
-                      </div>
-                    )}
+                    <WorkflowControlsBar
+                      onAddToShot={onAddToShot}
+                      onDelete={onDelete}
+                      onApplySettings={onApplySettings}
+                      isSpecialEditMode={isSpecialEditMode}
+                      isVideo={isVideo}
+                      allShots={allShots}
+                      selectedShotId={selectedShotId}
+                      onShotChange={onShotChange}
+                      onCreateShot={onCreateShot}
+                      isCreatingShot={isCreatingShot}
+                      quickCreateSuccess={quickCreateSuccess}
+                      handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                      handleQuickCreateSuccess={handleQuickCreateSuccess}
+                      isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                      isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                      showTickForImageId={showTickForImageId}
+                      showTickForSecondaryImageId={showTickForSecondaryImageId}
+                      mediaId={media.id}
+                      onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                      handleAddToShot={handleAddToShot}
+                      handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                      setIsSelectOpen={setIsSelectOpen}
+                      contentRef={contentRef}
+                      handleApplySettings={handleApplySettings}
+                    />
 
                   {/* Navigation Controls - Right Arrow */}
                   {showNavigation && !readOnly && onNext && hasNext && (
@@ -1373,53 +1320,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
 
                     {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
-                      <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
-                        <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
-                          {/* Shot Selection and Add to Shot */}
-                          {onAddToShot && allShots.length > 0 && !isVideo && (
-                            <ShotSelectorControls
-                              allShots={allShots}
-                              selectedShotId={selectedShotId}
-                              onShotChange={onShotChange}
-                              onCreateShot={onCreateShot}
-                              isCreatingShot={isCreatingShot}
-                              quickCreateSuccess={quickCreateSuccess}
-                              handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                              handleQuickCreateSuccess={handleQuickCreateSuccess}
-                              isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                              isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                              showTickForImageId={showTickForImageId}
-                              showTickForSecondaryImageId={showTickForSecondaryImageId}
-                              mediaId={media.id}
-                              onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                              handleAddToShot={handleAddToShot}
-                              handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
-                              setIsSelectOpen={setIsSelectOpen}
-                              contentRef={contentRef}
-                            />
-                          )}
-
-                      {/* Apply Settings */}
-                      {onApplySettings && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                              onClick={handleApplySettings}
-                              className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
-                            >
-                              <Settings className="h-4 w-4" />
-                              </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
-                        </Tooltip>
-                        )}
-
-                        </div>
-                      </div>
-                    )}
+                    <WorkflowControlsBar
+                      onAddToShot={onAddToShot}
+                      onDelete={onDelete}
+                      onApplySettings={onApplySettings}
+                      isSpecialEditMode={isSpecialEditMode}
+                      isVideo={isVideo}
+                      allShots={allShots}
+                      selectedShotId={selectedShotId}
+                      onShotChange={onShotChange}
+                      onCreateShot={onCreateShot}
+                      isCreatingShot={isCreatingShot}
+                      quickCreateSuccess={quickCreateSuccess}
+                      handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                      handleQuickCreateSuccess={handleQuickCreateSuccess}
+                      isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                      isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                      showTickForImageId={showTickForImageId}
+                      showTickForSecondaryImageId={showTickForSecondaryImageId}
+                      mediaId={media.id}
+                      onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                      handleAddToShot={handleAddToShot}
+                      handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                      setIsSelectOpen={setIsSelectOpen}
+                      contentRef={contentRef}
+                      handleApplySettings={handleApplySettings}
+                    />
 
                     {/* Mobile navigation */}
                     {showNavigation && !readOnly && onPrevious && hasPrevious && (
@@ -1796,53 +1722,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
 
                   {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                  {(onAddToShot || onDelete || onApplySettings) && !isSpecialEditMode && (
-                    <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex items-center space-x-2 z-10">
-                      <div className="bg-black/80 backdrop-blur-sm rounded-lg p-2 flex items-center space-x-2">
-                        {/* Shot Selection and Add to Shot */}
-                        {onAddToShot && allShots.length > 0 && !isVideo && (
-                          <ShotSelectorControls
-                            allShots={allShots}
-                            selectedShotId={selectedShotId}
-                            onShotChange={onShotChange}
-                            onCreateShot={onCreateShot}
-                            isCreatingShot={isCreatingShot}
-                            quickCreateSuccess={quickCreateSuccess}
-                            handleQuickCreateAndAdd={handleQuickCreateAndAdd}
-                            handleQuickCreateSuccess={handleQuickCreateSuccess}
-                            isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                            isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                            showTickForImageId={showTickForImageId}
-                            showTickForSecondaryImageId={showTickForSecondaryImageId}
-                            mediaId={media.id}
-                            onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                            handleAddToShot={handleAddToShot}
-                            handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
-                            setIsSelectOpen={setIsSelectOpen}
-                            contentRef={contentRef}
-                          />
-                        )}
-
-                    {/* Apply Settings */}
-                    {onApplySettings && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                            onClick={handleApplySettings}
-                            className="bg-purple-600/80 hover:bg-purple-600 text-white h-8 px-3"
-                          >
-                            <Settings className="h-4 w-4" />
-                        </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="z-[100001]">Apply settings</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                      </div>
-                    </div>
-                  )}
+                  <WorkflowControlsBar
+                    onAddToShot={onAddToShot}
+                    onDelete={onDelete}
+                    onApplySettings={onApplySettings}
+                    isSpecialEditMode={isSpecialEditMode}
+                    isVideo={isVideo}
+                    allShots={allShots}
+                    selectedShotId={selectedShotId}
+                    onShotChange={onShotChange}
+                    onCreateShot={onCreateShot}
+                    isCreatingShot={isCreatingShot}
+                    quickCreateSuccess={quickCreateSuccess}
+                    handleQuickCreateAndAdd={handleQuickCreateAndAdd}
+                    handleQuickCreateSuccess={handleQuickCreateSuccess}
+                    isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
+                    isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
+                    showTickForImageId={showTickForImageId}
+                    showTickForSecondaryImageId={showTickForSecondaryImageId}
+                    mediaId={media.id}
+                    onAddToShotWithoutPosition={onAddToShotWithoutPosition}
+                    handleAddToShot={handleAddToShot}
+                    handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+                    setIsSelectOpen={setIsSelectOpen}
+                    contentRef={contentRef}
+                    handleApplySettings={handleApplySettings}
+                  />
 
                   {/* Navigation Buttons */}
                   {showNavigation && !readOnly && (

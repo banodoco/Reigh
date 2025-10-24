@@ -259,6 +259,22 @@ const GenerationsPaneComponent: React.FC = () => {
     additionalRefs: [shotFilterContentRef, mediaTypeContentRef],
   });
 
+  // Delay pointer events until animation completes to prevent tap bleed-through on mobile
+  const [isPointerEventsEnabled, setIsPointerEventsEnabled] = useState(false);
+  
+  useEffect(() => {
+    if (isOpen) {
+      // Delay enabling pointer events by 300ms (matching the transition duration)
+      const timeoutId = setTimeout(() => {
+        setIsPointerEventsEnabled(true);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Disable immediately when closing
+      setIsPointerEventsEnabled(false);
+    }
+  }, [isOpen]);
+
   // Debug: Log GenerationsPane state when it opens/changes
   useEffect(() => {
     console.log('[GenerationsPane] State changed:', {
@@ -343,11 +359,18 @@ const GenerationsPaneComponent: React.FC = () => {
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
         }}
         className={cn(
-          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-smooth flex flex-col`,
+          `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-smooth flex flex-col pointer-events-auto`,
           transformClass
         )}
       >
-        <div className="p-2 border-b border-zinc-800">
+        {/* Inner wrapper with delayed pointer events to prevent tap bleed-through */}
+        <div 
+          className={cn(
+            'flex flex-col h-full',
+            isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
+          )}
+        >
+          <div className="p-2 border-b border-zinc-800">
             <div className="flex items-center justify-between">
                 <h2 className="text-xl font-light text-zinc-200 ml-2">Generations</h2>
                 <div className="flex items-center space-x-4 mr-2">
@@ -566,6 +589,7 @@ const GenerationsPaneComponent: React.FC = () => {
                 </div>
             )}
         </div>
+        </div> {/* Close inner wrapper with delayed pointer events */}
       </div>
     </>
   );

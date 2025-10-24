@@ -229,6 +229,22 @@ const ShotsPaneComponent: React.FC = () => {
     onToggleLock: () => setIsShotsPaneLocked(!isShotsPaneLocked),
   });
 
+  // Delay pointer events until animation completes to prevent tap bleed-through on mobile
+  const [isPointerEventsEnabled, setIsPointerEventsEnabled] = useState(false);
+  
+  useEffect(() => {
+    if (isOpen) {
+      // Delay enabling pointer events by 300ms (matching the transition duration)
+      const timeoutId = setTimeout(() => {
+        setIsPointerEventsEnabled(true);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Disable immediately when closing
+      setIsPointerEventsEnabled(false);
+    }
+  }, [isOpen]);
+
   const handleCreateShot = async (shotName: string, files: File[], aspectRatio: string | null) => {
     if (!selectedProjectId) {
       alert("Please select a project first.");
@@ -324,7 +340,14 @@ const ShotsPaneComponent: React.FC = () => {
             transformClass
           )}
         >
-          <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
+          {/* Inner wrapper with delayed pointer events to prevent tap bleed-through */}
+          <div 
+            className={cn(
+              'flex flex-col h-full',
+              isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
+            )}
+          >
+            <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-light text-zinc-200 ml-2">Shots</h2>
               <Button
@@ -427,6 +450,7 @@ const ShotsPaneComponent: React.FC = () => {
             initialAspectRatio={null}
             projectId={selectedProjectId}
           />
+          </div> {/* Close inner wrapper with delayed pointer events */}
         </div>
       </div>
     </>

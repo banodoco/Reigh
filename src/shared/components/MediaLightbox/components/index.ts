@@ -35,3 +35,6 @@ export type { EditModePanelProps } from './EditModePanel';
 
 export { ShotSelectorControls } from './ShotSelectorControls';
 export type { ShotSelectorControlsProps } from './ShotSelectorControls';
+
+export { WorkflowControlsBar } from './WorkflowControlsBar';
+export type { WorkflowControlsBarProps } from './WorkflowControlsBar';
