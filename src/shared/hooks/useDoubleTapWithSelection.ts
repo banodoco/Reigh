@@ -37,10 +37,10 @@ interface UseDoubleTapWithSelectionProps {
   /** Disable all tap handling (e.g., for read-only mode) */
   disabled?: boolean;
   
-  /** Threshold in ms for double-tap detection (default: 300) */
+  /** Threshold in ms for double-tap detection (default: 500 for tablets, more forgiving than mobile) */
   doubleTapThreshold?: number;
   
-  /** Delay in ms before executing single-tap (default: 250) */
+  /** Delay in ms before executing single-tap (default: 300, should be less than doubleTapThreshold) */
   singleTapDelay?: number;
   
   /** Movement threshold in px to distinguish tap from scroll (default: 10) */
@@ -52,15 +52,14 @@ export function useDoubleTapWithSelection({
   onDoubleTap,
   itemId,
   disabled = false,
-  doubleTapThreshold = 300,
-  singleTapDelay = 250,
+  doubleTapThreshold = 800, // Very forgiving for tablet/touch interactions with potential lag
+  // singleTapDelay no longer needed - kept for backward compatibility
   scrollThreshold = 10,
 }: UseDoubleTapWithSelectionProps) {
   
   // Track touch timing and position
   const lastTapTimeRef = useRef<number>(0);
   const lastTappedIdRef = useRef<string | null>(null);
-  const singleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -68,33 +67,71 @@ export function useDoubleTapWithSelection({
     
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-  }, [disabled]);
+    
+    console.log('[DoubleTapFlow] 👆 Touch START:', {
+      itemId: itemId.substring(0, 8),
+      position: { x: touch.clientX, y: touch.clientY },
+      disabled,
+      timestamp: Date.now()
+    });
+  }, [disabled, itemId]);
   
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (disabled || !touchStartPosRef.current) return;
+    if (disabled || !touchStartPosRef.current) {
+      console.log('[DoubleTapFlow] ⚠️ Touch END ignored:', {
+        reason: disabled ? 'disabled' : 'no_touch_start',
+        itemId: itemId.substring(0, 8)
+      });
+      return;
+    }
     
     const touch = e.changedTouches[0];
     const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
     
+    console.log('[DoubleTapFlow] 👆 Touch END:', {
+      itemId: itemId.substring(0, 8),
+      movement: { deltaX, deltaY },
+      scrollThreshold,
+      position: { x: touch.clientX, y: touch.clientY }
+    });
+    
     // Scroll detection: Ignore tap if user scrolled
     if (deltaX > scrollThreshold || deltaY > scrollThreshold) {
+      console.log('[DoubleTapFlow] 📜 SCROLL DETECTED - Ignoring tap:', {
+        itemId: itemId.substring(0, 8),
+        deltaX,
+        deltaY,
+        threshold: scrollThreshold
+      });
       touchStartPosRef.current = null;
       return;
     }
     
-    // Clear any pending single-tap action (if a double-tap occurs)
-    if (singleTapTimeoutRef.current) {
-      clearTimeout(singleTapTimeoutRef.current);
-      singleTapTimeoutRef.current = null;
-    }
     
     const now = Date.now();
-    const timeDiff = now - lastTapTimeRef.current;
+    const lastTapTime = lastTapTimeRef.current;
+    const timeDiff = lastTapTime === 0 ? Infinity : now - lastTapTime; // Handle initial state
     const isSameItem = lastTappedIdRef.current === itemId;
+    
+    console.log('[DoubleTapFlow] 🔍 Tap analysis:', {
+      itemId: itemId.substring(0, 8),
+      timeSinceLastTap: timeDiff === Infinity ? 'FIRST_TAP' : timeDiff,
+      isSameItem,
+      lastTappedId: lastTappedIdRef.current?.substring(0, 8),
+      lastTapTime: lastTapTime === 0 ? 'never' : lastTapTime,
+      doubleTapThreshold,
+      isDoubleTap: timeDiff > 10 && timeDiff < doubleTapThreshold && isSameItem
+    });
     
     // Double-tap detection: < 300ms between taps on same item
     if (timeDiff > 10 && timeDiff < doubleTapThreshold && isSameItem) {
+      console.log('[DoubleTapFlow] 👆👆 DOUBLE-TAP DETECTED!', {
+        itemId: itemId.substring(0, 8),
+        timeDiff,
+        threshold: doubleTapThreshold
+      });
+      
       // Prevent default to avoid any unwanted behaviors
       e.preventDefault();
       
@@ -105,29 +142,26 @@ export function useDoubleTapWithSelection({
       lastTapTimeRef.current = 0;
       lastTappedIdRef.current = null;
       touchStartPosRef.current = null;
+      
+      console.log('[DoubleTapFlow] ✅ Double-tap handler executed, refs reset');
       return;
     }
     
-    // Single tap: Schedule action after delay to allow time for potential double-tap
+    
+    // Single tap: Execute IMMEDIATELY for instant visual feedback
+    console.log('[DoubleTapFlow] ✅ Executing single-tap action IMMEDIATELY', {
+      itemId: itemId.substring(0, 8)
+    });
+    
+    onSingleTap();
+    
+    // Still track timing for potential double-tap detection
     lastTapTimeRef.current = now;
     lastTappedIdRef.current = itemId;
     
-    singleTapTimeoutRef.current = setTimeout(() => {
-      onSingleTap();
-      singleTapTimeoutRef.current = null;
-    }, singleTapDelay);
-    
     touchStartPosRef.current = null;
-  }, [disabled, itemId, doubleTapThreshold, singleTapDelay, scrollThreshold, onSingleTap, onDoubleTap]);
+  }, [disabled, itemId, doubleTapThreshold, scrollThreshold, onSingleTap, onDoubleTap]);
   
-  // Cleanup on unmount
-  useRef(() => {
-    return () => {
-      if (singleTapTimeoutRef.current) {
-        clearTimeout(singleTapTimeoutRef.current);
-      }
-    };
-  });
   
   return {
     handleTouchStart,

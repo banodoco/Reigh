@@ -61,7 +61,21 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
   }, [images.length, shotId]);
 
   const openLightbox = useCallback((index: number) => {
+    console.log('[DoubleTapFlow] 🎭 openLightbox called:', {
+      shotId: shotId.substring(0, 8),
+      requestedIndex: index,
+      totalImages: images.length,
+      isValidIndex: index >= 0 && index < images.length,
+      imageId: images[index]?.shotImageEntryId?.substring(0, 8)
+    });
+    
     if (index >= 0 && index < images.length) {
+      console.log('[DoubleTapFlow] ✅ LIGHTBOX OPENING:', {
+        shotId: shotId.substring(0, 8),
+        index,
+        imageId: images[index]?.shotImageEntryId?.substring(0, 8)
+      });
+      
       timelineDebugger.logEvent('Lightbox opened', {
         shotId,
         imageIndex: index,
@@ -69,6 +83,11 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
         totalImages: images.length
       });
       setLightboxIndex(index);
+    } else {
+      console.log('[DoubleTapFlow] ❌ INVALID INDEX - Cannot open lightbox:', {
+        index,
+        totalImages: images.length
+      });
     }
   }, [images, shotId]);
 
@@ -94,44 +113,25 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
     setAutoEnterInpaint(false); // Reset auto-enter flag when closing
   }, [shotId, lightboxIndex]);
 
-  // Handle mobile double-tap detection
+  // Handle mobile tap - now called by useDoubleTapWithSelection hook
   const handleMobileTap = useCallback((idx: number) => {
-    if (!isMobile) return;
-
-    const currentTime = Date.now();
-    const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
+    console.log('[DoubleTapFlow] 🎭 useLightbox handleMobileTap called:', {
+      shotId: shotId.substring(0, 8),
+      imageIndex: idx,
+      isMobile,
+      imagesCount: images.length
+    });
     
-    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-      // This is a double-tap, clear any pending timeout and open lightbox
-      if (doubleTapTimeoutRef.current) {
-        clearTimeout(doubleTapTimeoutRef.current);
-        doubleTapTimeoutRef.current = null;
-      }
-      
-      timelineDebugger.logEvent('Mobile double-tap detected', {
-        shotId,
-        imageIndex: idx,
-        timeSinceLastTap
-      });
-      
-      openLightbox(idx);
-    } else {
-      // This is a single tap, set a timeout to handle it if no second tap comes
-      if (doubleTapTimeoutRef.current) {
-        clearTimeout(doubleTapTimeoutRef.current);
-      }
-      
-      doubleTapTimeoutRef.current = setTimeout(() => {
-        timelineDebugger.logEvent('Mobile single-tap timeout', {
-          shotId,
-          imageIndex: idx
-        });
-        doubleTapTimeoutRef.current = null;
-      }, 300);
+    if (!isMobile) {
+      console.log('[DoubleTapFlow] ⚠️ Not mobile - ignoring tap');
+      return;
     }
-    
-    lastTouchTimeRef.current = currentTime;
-  }, [isMobile, shotId, openLightbox]);
+
+    // Since this is now called by useDoubleTapWithSelection, we don't need
+    // double-tap detection here anymore - just open the lightbox
+    console.log('[DoubleTapFlow] ✅ Opening lightbox at index:', idx);
+    openLightbox(idx);
+  }, [isMobile, shotId, openLightbox, images.length]);
 
   // Desktop double-click handler
   const handleDesktopDoubleClick = useCallback((idx: number) => {

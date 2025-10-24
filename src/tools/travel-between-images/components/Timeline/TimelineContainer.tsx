@@ -890,7 +890,15 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 dragOffset={isDragging ? dragOffset : null}
                 onMouseDown={readOnly ? undefined : (e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
                 onDoubleClick={isMobile && !isTablet ? undefined : () => handleDesktopDoubleClick(idx)}
-                onMobileTap={isMobile && !isTablet ? () => handleMobileTap(idx) : undefined}
+                onMobileTap={isMobile ? () => {
+                  console.log('[DoubleTapFlow] 📲 TimelineContainer handleMobileTap called:', {
+                    itemId: image.shotImageEntryId.substring(0, 8),
+                    index: idx,
+                    isMobile,
+                    isTablet
+                  });
+                  handleMobileTap(idx);
+                } : undefined}
                 zoomLevel={zoomLevel}
                 timelineWidth={containerWidth}
                 fullMinFrames={fullMin}

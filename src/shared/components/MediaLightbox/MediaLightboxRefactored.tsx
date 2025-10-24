@@ -403,6 +403,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleClearMask,
     handleEnterInpaintMode,
     handleGenerateInpaint,
+    handleGenerateAnnotatedEdit,
     handleDeleteSelected,
     getDeleteButtonPosition,
   } = inpaintingHook;
@@ -1496,33 +1497,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <p className="text-xs text-muted-foreground">Generate 1-16 variations</p>
                         </div>
                         
-                        {/* In-Scene Boost Checkbox */}
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id="in-scene-boost-desktop"
-                              checked={isInSceneBoostEnabled}
-                              onChange={(e) => setIsInSceneBoostEnabled(e.target.checked)}
-                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                            />
-                            <label
-                              htmlFor="in-scene-boost-desktop"
-                              className="text-sm font-medium leading-none cursor-pointer select-none"
-                            >
-                              In-Scene Boost
-                            </label>
-                          </div>
-                        </div>
-                        
                         {/* Generate Button - Unified */}
                         <Button
                           variant="default"
                           size="default"
-                          onClick={editMode === 'annotate' ? () => {
-                            // TODO: Implement annotation-based generation
-                            toast.info('Generate image based on annotations - Coming soon!');
-                          } : handleUnifiedGenerate}
+                          onClick={editMode === 'annotate' ? handleGenerateAnnotatedEdit : handleUnifiedGenerate}
                           disabled={
                             (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
                             (editMode !== 'annotate' && !inpaintPrompt.trim()) || 
@@ -2307,33 +2286,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <p className="text-xs text-muted-foreground">1-16 variations</p>
                         </div>
                         
-                        {/* In-Scene Boost Checkbox */}
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id="in-scene-boost-mobile"
-                              checked={isInSceneBoostEnabled}
-                              onChange={(e) => setIsInSceneBoostEnabled(e.target.checked)}
-                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                            />
-                            <label
-                              htmlFor="in-scene-boost-mobile"
-                              className="text-xs font-medium leading-none cursor-pointer select-none"
-                            >
-                              In-Scene Boost
-                            </label>
-                          </div>
-                        </div>
-                        
                         {/* Generate Button - Unified */}
                         <Button
                           variant="default"
                           size="sm"
-                          onClick={editMode === 'annotate' ? () => {
-                            // TODO: Implement annotation-based generation
-                            toast.info('Generate image based on annotations - Coming soon!');
-                          } : handleUnifiedGenerate}
+                          onClick={editMode === 'annotate' ? handleGenerateAnnotatedEdit : handleUnifiedGenerate}
                           disabled={
                             (editMode === 'annotate' && (brushStrokes.length === 0 || !inpaintPrompt.trim())) ||
                             (editMode !== 'annotate' && !inpaintPrompt.trim()) || 

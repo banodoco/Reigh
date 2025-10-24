@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { GenerationRow } from '@/types/shots';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
+import { createAnnotatedImageEditTask } from '@/shared/lib/tasks/annotatedImageEdit';
 
 export interface BrushStroke {
   id: string;
@@ -60,6 +61,7 @@ export interface UseInpaintingReturn {
   handleUndo: () => void;
   handleClearMask: () => void;
   handleGenerateInpaint: () => Promise<void>;
+  handleGenerateAnnotatedEdit: () => Promise<void>;
   handleDeleteSelected: () => void;
   getDeleteButtonPosition: () => { x: number; y: number } | null;
   redrawStrokes: (strokes: BrushStroke[]) => void;
@@ -1103,6 +1105,83 @@ export const useInpainting = ({
     }
   }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode]);
 
+  // Generate annotated edit
+  const handleGenerateAnnotatedEdit = useCallback(async () => {
+    if (!selectedProjectId || isVideo || annotationStrokes.length === 0 || !inpaintPrompt.trim()) {
+      toast.error('Please add annotations and enter a prompt');
+      return;
+    }
+
+    setIsGeneratingInpaint(true);
+    try {
+      const canvas = displayCanvasRef.current;
+      const maskCanvas = maskCanvasRef.current;
+      
+      if (!canvas || !maskCanvas) {
+        throw new Error('Canvas not initialized');
+      }
+
+      console.log('[AnnotatedEdit] Starting annotated edit generation...', {
+        mediaId: media.id,
+        prompt: inpaintPrompt,
+        numGenerations: inpaintNumGenerations,
+        annotationCount: annotationStrokes.length
+      });
+
+      // Create mask image from mask canvas
+      const maskImageData = maskCanvas.toDataURL('image/png');
+      
+      // Upload mask to storage
+      const maskFile = await fetch(maskImageData)
+        .then(res => res.blob())
+        .then(blob => new File([blob], `annotated_edit_mask_${media.id}_${Date.now()}.png`, { type: 'image/png' }));
+      
+      const maskUrl = await uploadImageToStorage(maskFile);
+      console.log('[AnnotatedEdit] Mask uploaded:', maskUrl);
+
+      // Get source image URL (prefer upscaled if available)
+      const sourceUrl = (media as any).upscaled_url || media.location || media.imageUrl;
+
+      // Create annotated image edit task
+      console.log('[AnnotatedEdit] 📤 About to call createAnnotatedImageEditTask with:', {
+        project_id: selectedProjectId?.substring(0, 8),
+        shot_id: shotId?.substring(0, 8),
+        tool_type: toolTypeOverride,
+        generation_id: media.id.substring(0, 8),
+        prompt: inpaintPrompt.substring(0, 30)
+      });
+      
+      await createAnnotatedImageEditTask({
+        project_id: selectedProjectId,
+        image_url: sourceUrl,
+        mask_url: maskUrl,
+        prompt: inpaintPrompt,
+        num_generations: inpaintNumGenerations,
+        generation_id: media.id,
+        shot_id: shotId, // Pass shot_id so complete_task can link results to the shot
+        tool_type: toolTypeOverride, // Override tool_type if provided
+        loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
+      });
+
+      console.log('[AnnotatedEdit] ✅ Annotated edit tasks created successfully');
+      
+      // Show success state
+      setInpaintGenerateSuccess(true);
+      
+      // Wait 1 second to show success, then exit
+      setTimeout(() => {
+        setInpaintGenerateSuccess(false);
+        handleExitInpaintMode();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('[AnnotatedEdit] Error creating annotated edit task:', error);
+      toast.error('Failed to create annotated edit task');
+    } finally {
+      setIsGeneratingInpaint(false);
+    }
+  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, displayCanvasRef, maskCanvasRef]);
+
   // Get delete button position for selected shape
   const getDeleteButtonPosition = useCallback((): { x: number; y: number } | null => {
     if (!selectedShapeId || !displayCanvasRef.current) return null;
@@ -1188,6 +1267,7 @@ export const useInpainting = ({
     handleUndo,
     handleClearMask,
     handleGenerateInpaint,
+    handleGenerateAnnotatedEdit,
     handleDeleteSelected,
     getDeleteButtonPosition,
     redrawStrokes,

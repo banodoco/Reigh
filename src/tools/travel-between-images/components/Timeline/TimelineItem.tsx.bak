@@ -306,8 +306,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         e.stopPropagation();
         onDoubleClick?.();
       }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
       className={isSwapTarget ? "ring-4 ring-primary/60" : ""}
     >
       <div className="flex flex-col items-center relative group">
@@ -361,13 +359,15 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
               progressiveEnabled && isFullLoaded && "opacity-100"
             )}
             draggable={false}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             loading="lazy"
           />
 
           {/* Selected for move indicator (tablet tap-to-move) */}
           {isSelectedForMove && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <div className="bg-blue-500 text-white px-2 py-0.5 rounded text-[10px] font-medium shadow-md">
+            <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-[1px] flex items-center justify-center z-30 pointer-events-none">
+              <div className="bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg animate-pulse">
                 Tap timeline to place
               </div>
             </div>
