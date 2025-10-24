@@ -1152,40 +1152,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                           
                           <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
-                            {/* Mode Toggle: Inpaint / Annotate */}
-                            <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5 mb-1">
-                              <button
-                                onClick={() => {
-                                  setIsInpaintMode(true); // Ensure canvas stays visible
-                                  setEditMode('inpaint');
-                                }}
-                                className={cn(
-                                  "flex-1 flex items-center justify-center px-1.5 py-1 rounded text-[10px] transition-all",
-                                  editMode === 'inpaint'
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                                )}
-                              >
-                                <Paintbrush className="h-2.5 w-2.5 mr-0.5" />
-                                Paint
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setIsInpaintMode(true); // Ensure canvas stays visible
-                                  setEditMode('annotate');
-                                }}
-                                className={cn(
-                                  "flex-1 flex items-center justify-center px-1.5 py-1 rounded text-[10px] transition-all",
-                                  editMode === 'annotate'
-                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
-                                )}
-                              >
-                                <Pencil className="h-2.5 w-2.5 mr-0.5" />
-                                Annotate
-                              </button>
-                            </div>
-                            
                             {/* Brush Size Slider */}
                             {editMode === 'inpaint' && (
                               <div className="space-y-0.5">
@@ -2002,40 +1968,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         )}
                         
                         <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-32 border border-border shadow-xl">
-                          {/* Mode Toggle: Inpaint / Annotate */}
-                          <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5 mb-1">
-                            <button
-                              onClick={() => {
-                                setIsInpaintMode(true);
-                                setEditMode('inpaint');
-                              }}
-                              className={cn(
-                                "flex-1 flex items-center justify-center px-1 py-0.5 rounded text-[9px] transition-all",
-                                editMode === 'inpaint'
-                                  ? "bg-primary text-primary-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Paintbrush className="h-2 w-2 mr-0.5" />
-                              Paint
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsInpaintMode(true);
-                                setEditMode('annotate');
-                              }}
-                              className={cn(
-                                "flex-1 flex items-center justify-center px-1 py-0.5 rounded text-[9px] transition-all",
-                                editMode === 'annotate'
-                                  ? "bg-primary text-primary-foreground shadow-sm"
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Pencil className="h-2 w-2 mr-0.5" />
-                              Note
-                            </button>
-                          </div>
-                          
                           {/* Brush Size Slider - Only for inpaint mode */}
                           {editMode === 'inpaint' && (
                             <div className="space-y-0.5">
