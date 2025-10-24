@@ -3052,28 +3052,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             <Button
                               variant="secondary"
                               size="sm"
-                                    onClick={handleAddToShotWithoutPosition}
-                                    disabled={!selectedShotId}
-                                    className={`h-8 px-3 text-white ${
-                                      isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                        ? 'bg-green-600/80 hover:bg-green-600'
-                                        : 'bg-purple-600/80 hover:bg-purple-600'
-                                    }`}
-                                  >
-                                    {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
-                                      <CheckCircle className="h-4 w-4" />
-                                    ) : (
-                                      <PlusCircle className="h-4 w-4" />
-                                    )}
-                              </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">
-                                {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
-                                  ? 'Added without position. Jump to shot.'
-                                  : 'Add to shot without position'}
-                              </TooltipContent>
-                            </Tooltip>
-                        )}
+                                      onClick={handleAddToShotWithoutPosition}
+                                      disabled={!selectedShotId}
+                                      className={`h-8 px-3 text-white ${
+                                        isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                          ? 'bg-green-600/80 hover:bg-green-600'
+                                          : 'bg-purple-600/80 hover:bg-purple-600'
+                                      }`}
+                                    >
+                                      {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id ? (
+                                        <CheckCircle className="h-4 w-4" />
+                                      ) : (
+                                        <PlusCircle className="h-4 w-4" />
+                                      )}
+                            </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="z-[100001]">
+                                  {isAlreadyAssociatedWithoutPosition || showTickForSecondaryImageId === media.id
+                                    ? 'Added without position. Jump to shot.'
+                                    : 'Add to shot without position'}
+                                </TooltipContent>
+                              </Tooltip>
+                          )}
                         </>
                       )}
 
