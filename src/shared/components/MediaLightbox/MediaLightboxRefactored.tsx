@@ -740,6 +740,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 console.log('[InpaintPaint] 🎨 Allowing touch on canvas');
                 return; // Don't stop propagation for canvas
               }
+              
+              // Allow touch events on interactive elements (buttons, inputs, etc.)
+              const isInteractive = target.tagName === 'BUTTON' || 
+                                   target.tagName === 'INPUT' || 
+                                   target.tagName === 'TEXTAREA' || 
+                                   target.tagName === 'SELECT' || 
+                                   target.tagName === 'A' ||
+                                   target.closest('button') !== null ||
+                                   target.closest('a') !== null;
+              
+              if (isInteractive) {
+                console.log('[TouchDebug] 🎯 Allowing touch on interactive element:', target.tagName);
+                return; // Allow propagation for interactive elements
+              }
+              
               // Block touch events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
@@ -750,6 +765,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 console.log('[InpaintPaint] 🖌️ Allowing touch move on canvas');
                 return; // Don't stop propagation for canvas
               }
+              
+              // Allow touch events on interactive elements (buttons, inputs, etc.)
+              const isInteractive = target.tagName === 'BUTTON' || 
+                                   target.tagName === 'INPUT' || 
+                                   target.tagName === 'TEXTAREA' || 
+                                   target.tagName === 'SELECT' || 
+                                   target.tagName === 'A' ||
+                                   target.closest('button') !== null ||
+                                   target.closest('a') !== null;
+              
+              if (isInteractive) {
+                return; // Allow propagation for interactive elements
+              }
+              
               // Block touch move events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
@@ -760,6 +789,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 console.log('[InpaintPaint] 🛑 Allowing touch end on canvas');
                 return; // Don't stop propagation for canvas
               }
+              
+              // Allow touch events on interactive elements (buttons, inputs, etc.)
+              const isInteractive = target.tagName === 'BUTTON' || 
+                                   target.tagName === 'INPUT' || 
+                                   target.tagName === 'TEXTAREA' || 
+                                   target.tagName === 'SELECT' || 
+                                   target.tagName === 'A' ||
+                                   target.closest('button') !== null ||
+                                   target.closest('a') !== null;
+              
+              if (isInteractive) {
+                return; // Allow propagation for interactive elements
+              }
+              
               // Block touch end events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
@@ -826,6 +869,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 console.log('[InpaintPaint] 🎨 Allowing touch on canvas');
                 return; // Don't stop propagation for canvas
               }
+              
+              // Allow touch events on interactive elements (buttons, inputs, etc.)
+              const isInteractive = target.tagName === 'BUTTON' || 
+                                   target.tagName === 'INPUT' || 
+                                   target.tagName === 'TEXTAREA' || 
+                                   target.tagName === 'SELECT' || 
+                                   target.tagName === 'A' ||
+                                   target.closest('button') !== null ||
+                                   target.closest('a') !== null;
+              
+              if (isInteractive) {
+                console.log('[TouchDebug] 🎯 Allowing touch on interactive element:', target.tagName);
+                return; // Allow propagation for interactive elements
+              }
+              
               // Block touch events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
@@ -836,6 +894,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 console.log('[InpaintPaint] 🖌️ Allowing touch move on canvas');
                 return; // Don't stop propagation for canvas
               }
+              
+              // Allow touch events on interactive elements (buttons, inputs, etc.)
+              const isInteractive = target.tagName === 'BUTTON' || 
+                                   target.tagName === 'INPUT' || 
+                                   target.tagName === 'TEXTAREA' || 
+                                   target.tagName === 'SELECT' || 
+                                   target.tagName === 'A' ||
+                                   target.closest('button') !== null ||
+                                   target.closest('a') !== null;
+              
+              if (isInteractive) {
+                return; // Allow propagation for interactive elements
+              }
+              
               // Block touch move events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
@@ -846,6 +918,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 console.log('[InpaintPaint] 🛑 Allowing touch end on canvas');
                 return; // Don't stop propagation for canvas
               }
+              
+              // Allow touch events on interactive elements (buttons, inputs, etc.)
+              const isInteractive = target.tagName === 'BUTTON' || 
+                                   target.tagName === 'INPUT' || 
+                                   target.tagName === 'TEXTAREA' || 
+                                   target.tagName === 'SELECT' || 
+                                   target.tagName === 'A' ||
+                                   target.closest('button') !== null ||
+                                   target.closest('a') !== null;
+              
+              if (isInteractive) {
+                return; // Allow propagation for interactive elements
+              }
+              
               // Block touch end events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
@@ -1066,6 +1152,34 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                           
                           <div className="bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
+                            {/* Mode Toggle: Inpaint / Annotate */}
+                            <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5 mb-1">
+                              <button
+                                onClick={() => setEditMode('inpaint')}
+                                className={cn(
+                                  "flex-1 flex items-center justify-center px-1.5 py-1 rounded text-[10px] transition-all",
+                                  editMode === 'inpaint'
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                <Paintbrush className="h-2.5 w-2.5 mr-0.5" />
+                                Paint
+                              </button>
+                              <button
+                                onClick={() => setEditMode('annotate')}
+                                className={cn(
+                                  "flex-1 flex items-center justify-center px-1.5 py-1 rounded text-[10px] transition-all",
+                                  editMode === 'annotate'
+                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                <Pencil className="h-2.5 w-2.5 mr-0.5" />
+                                Annotate
+                              </button>
+                            </div>
+                            
                             {/* Brush Size Slider */}
                             {editMode === 'inpaint' && (
                               <div className="space-y-0.5">
