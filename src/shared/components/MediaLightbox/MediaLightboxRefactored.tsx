@@ -2,12 +2,19 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { 
   ChevronLeft, 
   ChevronRight, 
   Trash2, 
   Move,
   Edit3,
+  Pencil,
+  Eraser,
+  Circle,
+  ArrowRight,
+  Undo2,
+  X,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -54,6 +61,7 @@ import {
   EditModePanel,
   ShotSelectorControls,
   WorkflowControlsBar,
+  NavigationArrows,
 } from './components';
 import { FlexContainer, MediaWrapper } from './components/layouts';
 
@@ -872,17 +880,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     }
                   }}
                 >
-                  {/* Navigation Controls - Left Arrow */}
-                  {showNavigation && !readOnly && onPrevious && hasPrevious && (
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={onPrevious}
-                      className="bg-black/50 hover:bg-black/70 text-white z-[80] h-10 w-10 sm:h-12 sm:w-12 absolute left-4 top-1/2 -translate-y-1/2"
-                    >
-                      <ChevronLeft className="h-6 w-6 sm:h-8 sm:w-8" />
-                    </Button>
-                  )}
+                  {/* Navigation Arrows */}
+                  <NavigationArrows
+                    showNavigation={showNavigation}
+                    readOnly={readOnly}
+                    onPrevious={onPrevious}
+                    onNext={onNext}
+                    hasPrevious={hasPrevious}
+                    hasNext={hasNext}
+                    variant="desktop"
+                  />
 
                   {/* Media Content */}
                   <MediaDisplayWithCanvas
@@ -1064,18 +1071,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
                     />
-
-                  {/* Navigation Controls - Right Arrow */}
-                  {showNavigation && !readOnly && onNext && hasNext && (
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={onNext}
-                      className="bg-black/50 hover:bg-black/70 text-white z-[80] h-10 w-10 sm:h-12 sm:w-12 absolute right-4 top-1/2 -translate-y-1/2"
-                    >
-                      <ChevronRight className="h-6 w-6 sm:h-8 sm:w-8" />
-                    </Button>
-                  )}
                   </div>
 
                 {/* Task Details / Inpaint / Magic Edit Panel - Right side (40% width) */}
@@ -1180,8 +1175,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 variant="desktop"
                                 title={`Based on this (${derivedGenerations.length})`}
                               />
-                            </div>
-                          </div>
+                                  </div>
+                              </div>
                         ) : null
                       }
                     />
@@ -1330,8 +1325,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       selectedShotId={selectedShotId}
                       onShotChange={onShotChange}
                       onCreateShot={onCreateShot}
-                      isCreatingShot={isCreatingShot}
-                      quickCreateSuccess={quickCreateSuccess}
+                                isCreatingShot={isCreatingShot}
+                                quickCreateSuccess={quickCreateSuccess}
                       handleQuickCreateAndAdd={handleQuickCreateAndAdd}
                       handleQuickCreateSuccess={handleQuickCreateSuccess}
                       isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
@@ -1347,28 +1342,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       handleApplySettings={handleApplySettings}
                     />
 
-                    {/* Mobile navigation */}
-                    {showNavigation && !readOnly && onPrevious && hasPrevious && (
-                      <Button
-                        variant="secondary"
-                        size="lg"
-                        onClick={onPrevious}
-                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </Button>
-                    )}
-                    
-                    {showNavigation && !readOnly && onNext && hasNext && (
-                      <Button
-                        variant="secondary"
-                        size="lg"
-                        onClick={onNext}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </Button>
-                    )}
+                    {/* Navigation Arrows */}
+                    <NavigationArrows
+                      showNavigation={showNavigation}
+                      readOnly={readOnly}
+                      onPrevious={onPrevious}
+                      onNext={onNext}
+                      hasPrevious={hasPrevious}
+                      hasNext={hasNext}
+                      variant="mobile"
+                    />
                 </div>
 
                 {/* Task Details / Inpaint / Magic Edit Panel - Bottom (40% height) */}
@@ -1484,8 +1467,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                 variant="mobile"
                                 title={`Based on this (${derivedGenerations.length})`}
                               />
-                            </div>
-                          </div>
+                                  </div>
+                              </div>
                         ) : null
                       }
                     />
@@ -1732,8 +1715,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     selectedShotId={selectedShotId}
                     onShotChange={onShotChange}
                     onCreateShot={onCreateShot}
-                    isCreatingShot={isCreatingShot}
-                    quickCreateSuccess={quickCreateSuccess}
+                              isCreatingShot={isCreatingShot}
+                              quickCreateSuccess={quickCreateSuccess}
                     handleQuickCreateAndAdd={handleQuickCreateAndAdd}
                     handleQuickCreateSuccess={handleQuickCreateSuccess}
                     isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
@@ -1749,31 +1732,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handleApplySettings={handleApplySettings}
                   />
 
-                  {/* Navigation Buttons */}
-                  {showNavigation && !readOnly && (
-                    <>
-                      {onPrevious && hasPrevious && (
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={onPrevious}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                  )}
-                      {onNext && hasNext && (
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={onNext}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-[80] h-12 w-12"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </Button>
-                  )}
-                    </>
-                  )}
+                  {/* Navigation Arrows */}
+                  <NavigationArrows
+                    showNavigation={showNavigation}
+                    readOnly={readOnly}
+                    onPrevious={onPrevious}
+                    onNext={onNext}
+                    hasPrevious={hasPrevious}
+                    hasNext={hasNext}
+                    variant="mobile"
+                  />
                 </MediaWrapper>
 
                 {/* Workflow Controls - Below Media (hidden in special edit modes) */}

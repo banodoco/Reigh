@@ -38,3 +38,6 @@ export type { ShotSelectorControlsProps } from './ShotSelectorControls';
 
 export { WorkflowControlsBar } from './WorkflowControlsBar';
 export type { WorkflowControlsBarProps } from './WorkflowControlsBar';
+
+export { NavigationArrows } from './NavigationArrows';
+export type { NavigationArrowsProps } from './NavigationArrows';
