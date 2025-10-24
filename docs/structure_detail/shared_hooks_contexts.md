@@ -53,6 +53,7 @@
 | **`useMobile`** | Mobile detection | `const isMobile = useMobile()` |
 | **`useLastAffectedShot`** | Shot tracking | Recently modified shot reference |
 | **`useClickRipple`** | Click ripple effect | Reusable golden circle expand animation on click |
+| **`useDoubleTapWithSelection`** | Double-tap detection | Instant selection + double-tap to open (iPad/tablets) |
 
 ### 🔄 Real-time & Resources
 
