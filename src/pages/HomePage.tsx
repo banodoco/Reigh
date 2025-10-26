@@ -740,7 +740,7 @@ export default function HomePage() {
                   {/* GitHub and Discord icons side by side */}
                   <div className="flex items-center space-x-3">
                     <a
-                      href="https://github.com/your-repo"
+                      href="http://github.com/peteromallet/reigh"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"

@@ -4,7 +4,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { Upload, Film, Play } from 'lucide-react';
+import { Upload, Film, Play, X } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -47,7 +47,8 @@ const CharacterAnimatePage: React.FC = () => {
   const [characterImage, setCharacterImage] = useState<{ url: string; file?: File } | null>(null);
   const [motionVideo, setMotionVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [localMode, setLocalMode] = useState<'animate' | 'replace'>('animate');
   
   // Loading states for smooth transitions
@@ -63,7 +64,9 @@ const CharacterAnimatePage: React.FC = () => {
   // Video ref for forcefully pausing
   const motionVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Track scroll state to prevent layout shifts
+  // Track drag state and scroll state separately to prevent mobile scroll conflicts
+  const [isDraggingOverImage, setIsDraggingOverImage] = useState(false);
+  const [isDraggingOverVideo, setIsDraggingOverVideo] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
 
   // Track when we've just triggered a generation to prevent empty state flash
@@ -235,7 +238,7 @@ const CharacterAnimatePage: React.FC = () => {
       return;
     }
     
-    setIsUploading(true);
+    setIsUploadingImage(true);
     try {
       // Upload to Supabase storage
       const uploadedUrl = await uploadImageToStorage(file);
@@ -256,7 +259,7 @@ const CharacterAnimatePage: React.FC = () => {
         variant: 'destructive',
       });
     } finally {
-      setIsUploading(false);
+      setIsUploadingImage(false);
     }
   };
   
@@ -274,7 +277,7 @@ const CharacterAnimatePage: React.FC = () => {
       return;
     }
     
-    setIsUploading(true);
+    setIsUploadingVideo(true);
     try {
       // Extract poster frame
       const posterBlob = await extractVideoPosterFrame(file);
@@ -337,7 +340,7 @@ const CharacterAnimatePage: React.FC = () => {
         variant: 'destructive',
       });
     } finally {
-      setIsUploading(false);
+      setIsUploadingVideo(false);
     }
   };
   
@@ -411,6 +414,195 @@ const CharacterAnimatePage: React.FC = () => {
     generateAnimationMutation.mutate();
   };
   
+  // Drag and drop handlers for character image
+  const handleImageDragOver = (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleImageDragEnter = (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if dragged item is an image
+    const items = Array.from(e.dataTransfer.items);
+    const hasValidImage = items.some(item => 
+      item.kind === 'file' && ['image/png', 'image/jpeg', 'image/jpg'].includes(item.type)
+    );
+    
+    if (hasValidImage) {
+      setIsDraggingOverImage(true);
+    }
+  };
+  
+  const handleImageDragLeave = (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if we're actually leaving the drop zone (not just entering a child element)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      setIsDraggingOverImage(false);
+    }
+  };
+  
+  const handleImageDrop = async (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverImage(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload a PNG or JPG image (avoid WEBP)',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsUploadingImage(true);
+    try {
+      const uploadedUrl = await uploadImageToStorage(file);
+      setCharacterImageLoaded(false);
+      setCharacterImage({ url: uploadedUrl, file });
+      
+      if (selectedProjectId) {
+        updateSettings('project', { ...settings, inputImageUrl: uploadedUrl });
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload image',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+  
+  // Drag and drop handlers for motion video
+  const handleVideoDragOver = (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  const handleVideoDragEnter = (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if dragged item is a video
+    const items = Array.from(e.dataTransfer.items);
+    const hasValidVideo = items.some(item => 
+      item.kind === 'file' && item.type.startsWith('video/')
+    );
+    
+    if (hasValidVideo) {
+      setIsDraggingOverVideo(true);
+    }
+  };
+  
+  const handleVideoDragLeave = (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if we're actually leaving the drop zone (not just entering a child element)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      setIsDraggingOverVideo(false);
+    }
+  };
+  
+  const handleVideoDrop = async (e: React.DragEvent) => {
+    if (isScrolling) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOverVideo(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('video/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload a video file',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsUploadingVideo(true);
+    try {
+      const posterBlob = await extractVideoPosterFrame(file);
+      
+      const fileExt = file.name.split('.').pop() || 'mp4';
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const fileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}.${fileExt}`;
+      const posterFileName = `character-animate/${selectedProjectId}/${timestamp}-${randomId}-poster.jpg`;
+      
+      const { data: videoData, error: videoError } = await supabase.storage
+        .from('image_uploads')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (videoError) throw videoError;
+      
+      const { data: posterData, error: posterError } = await supabase.storage
+        .from('image_uploads')
+        .upload(posterFileName, posterBlob, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'image/jpeg'
+        });
+      
+      if (posterError) throw posterError;
+      
+      const { data: { publicUrl: videoUrl } } = supabase.storage
+        .from('image_uploads')
+        .getPublicUrl(fileName);
+        
+      const { data: { publicUrl: posterUrl } } = supabase.storage
+        .from('image_uploads')
+        .getPublicUrl(posterFileName);
+      
+      setMotionVideoLoaded(false);
+      setMotionVideoPlaying(false);
+      setMotionVideo({ url: videoUrl, posterUrl, file });
+      
+      if (selectedProjectId) {
+        updateSettings('project', { 
+          ...settings, 
+          inputVideoUrl: videoUrl,
+          inputVideoPosterUrl: posterUrl
+        });
+      }
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload video',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingVideo(false);
+    }
+  };
+  
   if (!selectedProjectId) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -463,8 +655,19 @@ const CharacterAnimatePage: React.FC = () => {
                 : '✨ Character to insert'
               }
             </Label>
-            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden relative">
-              {isUploading ? (
+            <div 
+              className={`aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative ${
+                isDraggingOverImage 
+                  ? 'border-primary bg-primary/10' 
+                  : 'border-border hover:border-primary/50'
+              } ${!characterImage && !isUploadingImage ? 'cursor-pointer' : ''}`}
+              onDragOver={handleImageDragOver}
+              onDragEnter={handleImageDragEnter}
+              onDragLeave={handleImageDragLeave}
+              onDrop={handleImageDrop}
+              onClick={() => !characterImage && !isUploadingImage && characterImageInputRef.current?.click()}
+            >
+              {isUploadingImage ? (
                 <UploadingMediaState type="image" />
               ) : characterImage ? (
                 <>
@@ -479,22 +682,44 @@ const CharacterAnimatePage: React.FC = () => {
                     onLoad={() => setCharacterImageLoaded(true)}
                     onLoadStart={() => setCharacterImageLoaded(true)}
                   />
+                  {/* Delete button */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCharacterImage(null);
+                      setCharacterImageLoaded(false);
+                      if (selectedProjectId) {
+                        updateSettings('project', { 
+                          ...settings, 
+                          inputImageUrl: undefined
+                        });
+                      }
+                    }}
+                    disabled={isUploadingImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  {isDraggingOverImage && !isScrolling && (
+                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none z-20">
+                      <p className="text-lg font-medium text-foreground">Drop to replace</p>
+                    </div>
+                  )}
                 </>
               ) : !settingsLoaded ? (
                 // Show skeleton while settings are loading
                 <MediaContainerSkeleton />
               ) : (
-                <div className="text-center p-6">
+                <div className="text-center p-6 pointer-events-none">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-4">No input image</p>
-                  <Button
-                    onClick={() => characterImageInputRef.current?.click()}
-                    disabled={isUploading}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Image
-                  </Button>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {isDraggingOverImage ? 'Drop image here' : 'Drag & drop or click to upload'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isDraggingOverImage ? '' : 'PNG, JPG supported'}
+                  </p>
                 </div>
               )}
             </div>
@@ -510,7 +735,7 @@ const CharacterAnimatePage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => characterImageInputRef.current?.click()}
-                disabled={isUploading}
+                disabled={isUploadingImage}
                 className="w-full"
               >
                 <Upload className="h-4 w-4 mr-2" />
@@ -527,8 +752,19 @@ const CharacterAnimatePage: React.FC = () => {
                 : '🎬 Video to replace character in'
               }
             </Label>
-            <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden relative">
-              {isUploading ? (
+            <div 
+              className={`aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative ${
+                isDraggingOverVideo 
+                  ? 'border-primary bg-primary/10' 
+                  : 'border-border hover:border-primary/50'
+              } ${!motionVideo && !isUploadingVideo ? 'cursor-pointer' : ''}`}
+              onDragOver={handleVideoDragOver}
+              onDragEnter={handleVideoDragEnter}
+              onDragLeave={handleVideoDragLeave}
+              onDrop={handleVideoDrop}
+              onClick={() => !motionVideo && !isUploadingVideo && motionVideoInputRef.current?.click()}
+            >
+              {isUploadingVideo ? (
                 <UploadingMediaState type="video" />
               ) : motionVideo ? (
                 <>
@@ -540,14 +776,14 @@ const CharacterAnimatePage: React.FC = () => {
                         src={motionVideo.posterUrl}
                         alt="Video poster"
                         className={cn(
-                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                           motionVideoLoaded ? 'opacity-100' : 'opacity-0'
                         )}
                         onLoad={() => setMotionVideoLoaded(true)}
                       />
                       {/* Play button overlay */}
                       <div 
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
                         onClick={() => setMotionVideoPlaying(true)}
                       >
                         <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
@@ -565,7 +801,7 @@ const CharacterAnimatePage: React.FC = () => {
                       playsInline
                       muted
                       className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                         motionVideoLoaded ? 'opacity-100' : 'opacity-0'
                       )}
                       onLoadedData={() => {
@@ -573,21 +809,46 @@ const CharacterAnimatePage: React.FC = () => {
                       }}
                     />
                   )}
+                  {/* Delete button */}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMotionVideo(null);
+                      setMotionVideoLoaded(false);
+                      setMotionVideoPlaying(false);
+                      if (selectedProjectId) {
+                        updateSettings('project', { 
+                          ...settings, 
+                          inputVideoUrl: undefined,
+                          inputVideoPosterUrl: undefined
+                        });
+                      }
+                    }}
+                    disabled={isUploadingVideo}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  {isDraggingOverVideo && !isScrolling && (
+                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none z-20">
+                      <p className="text-lg font-medium text-foreground">Drop to replace</p>
+                    </div>
+                  )}
                 </>
               ) : !settingsLoaded ? (
                 // Show skeleton while settings are loading
                 <MediaContainerSkeleton />
               ) : (
-                <div className="text-center p-6">
+                <div className="text-center p-6 pointer-events-none">
                   <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-4">No input video</p>
-                  <Button
-                    onClick={() => motionVideoInputRef.current?.click()}
-                    size="sm"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Video
-                  </Button>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {isDraggingOverVideo ? 'Drop video here' : 'Drag & drop or click to upload'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isDraggingOverVideo ? '' : 'MP4, WebM, MOV supported'}
+                  </p>
                 </div>
               )}
             </div>
@@ -603,6 +864,7 @@ const CharacterAnimatePage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => motionVideoInputRef.current?.click()}
+                disabled={isUploadingVideo}
                 className="w-full"
               >
                 <Upload className="h-4 w-4 mr-2" />

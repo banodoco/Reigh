@@ -379,15 +379,27 @@ const JoinClipsPage: React.FC = () => {
     if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
-    setIsDraggingOverStarting(true);
+    
+    // Check if dragged item is a video
+    const items = Array.from(e.dataTransfer.items);
+    const hasValidVideo = items.some(item => 
+      item.kind === 'file' && item.type.startsWith('video/')
+    );
+    
+    if (hasValidVideo) {
+      setIsDraggingOverStarting(true);
+    }
   };
   
   const handleStartingDragLeave = (e: React.DragEvent) => {
     if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
-    // Only set to false if we're leaving the drop zone itself
-    if (e.currentTarget === e.target) {
+    // Check if we're actually leaving the drop zone (not just entering a child element)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
       setIsDraggingOverStarting(false);
     }
   };
@@ -430,15 +442,27 @@ const JoinClipsPage: React.FC = () => {
     if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
-    setIsDraggingOverEnding(true);
+    
+    // Check if dragged item is a video
+    const items = Array.from(e.dataTransfer.items);
+    const hasValidVideo = items.some(item => 
+      item.kind === 'file' && item.type.startsWith('video/')
+    );
+    
+    if (hasValidVideo) {
+      setIsDraggingOverEnding(true);
+    }
   };
   
   const handleEndingDragLeave = (e: React.DragEvent) => {
     if (isScrolling) return; // Prevent drag during scroll
     e.preventDefault();
     e.stopPropagation();
-    // Only set to false if we're leaving the drop zone itself
-    if (e.currentTarget === e.target) {
+    // Check if we're actually leaving the drop zone (not just entering a child element)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
       setIsDraggingOverEnding(false);
     }
   };
@@ -612,14 +636,14 @@ const JoinClipsPage: React.FC = () => {
                         src={startingVideo.posterUrl}
                         alt="Video poster"
                         className={cn(
-                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                           startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                         )}
                         onLoad={() => setStartingVideoLoaded(true)}
                       />
                       {/* Play button overlay */}
                       <div 
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
                         onClick={() => setStartingVideoPlaying(true)}
                       >
                         <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
@@ -637,7 +661,7 @@ const JoinClipsPage: React.FC = () => {
                       playsInline
                       muted
                       className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                         startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                       )}
                       onLoadedData={() => {
@@ -786,14 +810,14 @@ const JoinClipsPage: React.FC = () => {
                         src={endingVideo.posterUrl}
                         alt="Video poster"
                         className={cn(
-                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                           endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                         )}
                         onLoad={() => setEndingVideoLoaded(true)}
                       />
                       {/* Play button overlay */}
                       <div 
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors"
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
                         onClick={() => setEndingVideoPlaying(true)}
                       >
                         <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
@@ -811,7 +835,7 @@ const JoinClipsPage: React.FC = () => {
                       playsInline
                       muted
                       className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300',
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                         endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                       )}
                       onLoadedData={() => {
