@@ -564,17 +564,14 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                   <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Key className="h-5 w-5 text-blue-600" />
-                      <h4 className="font-light text-blue-900">To process locally, you need an API Key</h4>
+                      <h4 className="font-light text-blue-900">To generate locally, you need an API key.</h4>
                     </div>
-                    <p className="text-sm text-blue-700 mb-4">
-                      You'll need an API key to authenticate your local worker with our servers.
-                    </p>
                     <Button 
                       onClick={handleGenerateToken} 
                       disabled={isGenerating}
                       className="w-full"
                     >
-                      {isGenerating ? "Generating..." : "Generate API Key"}
+                      {isGenerating ? "Generating..." : "Generate Key & Show Instructions"}
                     </Button>
                   </div>
                 </div>
