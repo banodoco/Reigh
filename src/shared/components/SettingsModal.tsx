@@ -98,6 +98,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Computer type preference (persistent)
   const [computerType, setComputerType] = usePersistentState<string>("computer-type", "linux");
   
+  // GPU type preference (persistent)
+  const [gpuType, setGpuType] = usePersistentState<string>("gpu-type", "nvidia-30-40");
+  
   // Debug logs preference (persistent)
   const [showDebugLogs, setShowDebugLogs] = usePersistentState<boolean>("show-debug-logs", false);
   
@@ -388,12 +391,20 @@ Please be very specific with file paths, command syntax, and verification steps 
     const debugFlag = showDebugLogs ? ' --debug' : '';
     const profileFlag = ` --wgp-profile ${memoryProfile}`;
     
+    // Determine PyTorch version based on GPU type
+    const pytorchVersion = gpuType === "nvidia-50" ? "2.7.0" : "2.6.0";
+    const pytorchIndexUrl = "https://download.pytorch.org/whl/cu124";
+    
     if (computerType === "windows") {
+      const torchInstall = gpuType === "nvidia-50" 
+        ? `pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio --index-url ${pytorchIndexUrl}`
+        : `pip install --no-cache-dir torch torchvision torchaudio --index-url ${pytorchIndexUrl}`;
+        
       return `git clone https://github.com/peteromallet/Headless-Wan2GP.git
 cd Headless-Wan2GP
 python -m venv venv
 venv\\Scripts\\activate.bat
-pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+${torchInstall}
 pip install --no-cache-dir -r Wan2GP/requirements.txt
 pip install --no-cache-dir -r requirements.txt
 echo Checking CUDA availability...
@@ -406,7 +417,7 @@ cd Headless-Wan2GP && \\
 apt-get update && apt-get install -y python3.10-venv ffmpeg && \\
 python3.10 -m venv venv && \\
 source venv/bin/activate && \\
-pip install --no-cache-dir torch==2.6.0 torchvision torchaudio -f https://download.pytorch.org/whl/cu124 && \\
+pip install --no-cache-dir torch==${pytorchVersion} torchvision torchaudio -f ${pytorchIndexUrl} && \\
 pip install --no-cache-dir -r Wan2GP/requirements.txt && \\
 pip install --no-cache-dir -r requirements.txt && \\
 python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
@@ -574,58 +585,80 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                   {/* Installation section */}
                   <div className="space-y-4">
                     {/* Computer Type Selection and API Token Display */}
-                    <div className={`grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'} items-start`}>
-                      {/* Left: Computer Type Selection */}
-                      <div className="space-y-2 sm:space-y-3">
-                        <p className="text-sm font-light">What kind of computer do you have?</p>
-                        <div className={`flex ${isMobile ? 'flex-col gap-2' : 'gap-4 flex-wrap'}`}>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="linux"
-                              name="computer-type"
-                              value="linux"
-                              checked={computerType === "linux"}
-                              onChange={(e) => setComputerType(e.target.value)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                            />
-                            <label htmlFor="linux" className="text-sm font-light">
-                              Linux
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="windows"
-                              name="computer-type"
-                              value="windows"
-                              checked={computerType === "windows"}
-                              onChange={(e) => setComputerType(e.target.value)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                            />
-                            <label htmlFor="windows" className="text-sm font-light">
-                              Windows
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              id="mac"
-                              name="computer-type"
-                              value="mac"
-                              checked={computerType === "mac"}
-                              onChange={(e) => setComputerType(e.target.value)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                            />
-                            <label htmlFor="mac" className="text-sm font-light">
-                              Mac
-                            </label>
+                    <div className={`grid ${isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'} items-start`}>
+                      {/* Left Column: Computer and GPU Selection */}
+                      <div className="space-y-4">
+                        {/* Computer Type Selection */}
+                        <div className="space-y-2 sm:space-y-3">
+                          <p className="text-sm font-light">What kind of computer do you have?</p>
+                          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'gap-4 flex-wrap'}`}>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id="linux"
+                                name="computer-type"
+                                value="linux"
+                                checked={computerType === "linux"}
+                                onChange={(e) => setComputerType(e.target.value)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                              />
+                              <label htmlFor="linux" className="text-sm font-light">
+                                Linux
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id="windows"
+                                name="computer-type"
+                                value="windows"
+                                checked={computerType === "windows"}
+                                onChange={(e) => setComputerType(e.target.value)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                              />
+                              <label htmlFor="windows" className="text-sm font-light">
+                                Windows
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="radio"
+                                id="mac"
+                                name="computer-type"
+                                value="mac"
+                                checked={computerType === "mac"}
+                                onChange={(e) => setComputerType(e.target.value)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                              />
+                              <label htmlFor="mac" className="text-sm font-light">
+                                Mac
+                              </label>
+                            </div>
                           </div>
                         </div>
-                      </div>
+
+                         {/* GPU Type Selection - Only show for Windows/Linux */}
+                         {(computerType === "windows" || computerType === "linux") && (
+                           <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                             <Label className="text-sm font-light mb-2 block text-gray-700">
+                               What GPU do you have?
+                             </Label>
+                             <Select value={gpuType} onValueChange={setGpuType}>
+                               <SelectTrigger className="w-full bg-white">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="nvidia-30-40">NVIDIA RTX 40-series or older</SelectItem>
+                                 <SelectItem value="nvidia-50">NVIDIA RTX 50-series</SelectItem>
+                                 <SelectItem value="non-nvidia">Non-NVIDIA (AMD, Intel, etc.)</SelectItem>
+                               </SelectContent>
+                             </Select>
+                         </div>
+                       )}
+                     </div>
 
                       {/* Right: API Token Display */}
-                      <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg mb-2">
+                      <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
                         <div className={`${isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
                           <div className={isMobile ? 'text-center' : ''}>
                             <p className="text-sm text-gray-600">
@@ -678,8 +711,31 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
                       </div>
                     )}
                     
+                    {/* Non-NVIDIA GPU Notice - Full Width */}
+                    {(computerType === "windows" || computerType === "linux") && gpuType === "non-nvidia" && (
+                      <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm">
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0">
+                            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm text-amber-800 leading-relaxed">
+                              Non-NVIDIA GPUs are not supported for local AI processing.{" "}
+                              <button
+                                className="text-blue-600 hover:text-blue-700 underline font-light transition-colors duration-200 hover:bg-blue-50 px-1 py-0.5 rounded"
+                                onClick={() => {
+                                  updateGenerationMethodsWithNotification({ onComputer: false, inCloud: true });
+                                }}
+                              >
+                                Process in the cloud instead
+                              </button>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                    {computerType !== "mac" && (
+                    {computerType !== "mac" && gpuType !== "non-nvidia" && (
                       <Tabs value={activeInstallTab} onValueChange={setActiveInstallTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-gray-100 border border-gray-200 mb-4">
                           <TabsTrigger 
