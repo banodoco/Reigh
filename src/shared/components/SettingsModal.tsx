@@ -584,107 +584,75 @@ python worker.py --supabase-url https://wczysqzxlwdndgxitrvc.supabase.co \\
 
                   {/* Installation section */}
                   <div className="space-y-4">
-                    {/* Computer Type Selection and API Token Display */}
+                    {/* Computer Type Selection and GPU Selection */}
                     <div className={`grid ${isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-1 md:grid-cols-2 gap-4 md:gap-6'} items-start`}>
-                      {/* Left Column: Computer and GPU Selection */}
-                      <div className="space-y-4">
-                        {/* Computer Type Selection */}
-                        <div className="space-y-2 sm:space-y-3">
-                          <p className="text-sm font-light">What kind of computer do you have?</p>
-                          <div className={`flex ${isMobile ? 'flex-col gap-2' : 'gap-4 flex-wrap'}`}>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="linux"
-                                name="computer-type"
-                                value="linux"
-                                checked={computerType === "linux"}
-                                onChange={(e) => setComputerType(e.target.value)}
-                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                              />
-                              <label htmlFor="linux" className="text-sm font-light">
-                                Linux
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="windows"
-                                name="computer-type"
-                                value="windows"
-                                checked={computerType === "windows"}
-                                onChange={(e) => setComputerType(e.target.value)}
-                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                              />
-                              <label htmlFor="windows" className="text-sm font-light">
-                                Windows
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="radio"
-                                id="mac"
-                                name="computer-type"
-                                value="mac"
-                                checked={computerType === "mac"}
-                                onChange={(e) => setComputerType(e.target.value)}
-                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
-                              />
-                              <label htmlFor="mac" className="text-sm font-light">
-                                Mac
-                              </label>
-                            </div>
+                      {/* Left Column: Computer Type Selection */}
+                      <div className="space-y-2 sm:space-y-3">
+                        <p className="text-sm font-light">What kind of computer do you have?</p>
+                        <div className={`flex ${isMobile ? 'flex-col gap-2' : 'gap-4 flex-wrap'}`}>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="linux"
+                              name="computer-type"
+                              value="linux"
+                              checked={computerType === "linux"}
+                              onChange={(e) => setComputerType(e.target.value)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                            />
+                            <label htmlFor="linux" className="text-sm font-light">
+                              Linux
+                            </label>
                           </div>
-                        </div>
-
-                         {/* GPU Type Selection - Only show for Windows/Linux */}
-                         {(computerType === "windows" || computerType === "linux") && (
-                           <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                             <Label className="text-sm font-light mb-2 block text-gray-700">
-                               What GPU do you have?
-                             </Label>
-                             <Select value={gpuType} onValueChange={setGpuType}>
-                               <SelectTrigger className="w-full bg-white">
-                                 <SelectValue />
-                               </SelectTrigger>
-                               <SelectContent>
-                                 <SelectItem value="nvidia-30-40">NVIDIA RTX 40-series or older</SelectItem>
-                                 <SelectItem value="nvidia-50">NVIDIA RTX 50-series</SelectItem>
-                                 <SelectItem value="non-nvidia">Non-NVIDIA (AMD, Intel, etc.)</SelectItem>
-                               </SelectContent>
-                             </Select>
-                         </div>
-                       )}
-                     </div>
-
-                      {/* Right: API Token Display */}
-                      <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div className={`${isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}`}>
-                          <div className={isMobile ? 'text-center' : ''}>
-                            <p className="text-sm text-gray-600">
-                              {formatTokenAge(getActiveToken()?.created_at || 0)}
-                            </p>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="windows"
+                              name="computer-type"
+                              value="windows"
+                              checked={computerType === "windows"}
+                              onChange={(e) => setComputerType(e.target.value)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                            />
+                            <label htmlFor="windows" className="text-sm font-light">
+                              Windows
+                            </label>
                           </div>
-                          <div className="flex flex-col gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => refreshToken(getActiveToken()!)}
-                              disabled={isRefreshing || isRevoking || !getActiveToken()}
-                            >
-                              {isRefreshing ? "Refreshing..." : "Refresh"}
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => revokeToken(getActiveToken()!.id)}
-                              disabled={isRevoking || isRefreshing || !getActiveToken()}
-                            >
-                              {isRevoking ? "Revoking..." : "Revoke"}
-                            </Button>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="radio"
+                              id="mac"
+                              name="computer-type"
+                              value="mac"
+                              checked={computerType === "mac"}
+                              onChange={(e) => setComputerType(e.target.value)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                            />
+                            <label htmlFor="mac" className="text-sm font-light">
+                              Mac
+                            </label>
                           </div>
                         </div>
                       </div>
+
+                      {/* Right Column: GPU Type Selection (Windows/Linux only) or API Token Display */}
+                      {(computerType === "windows" || computerType === "linux") && (
+                        <div className="p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                          <Label className="text-sm font-light mb-2 block text-gray-700">
+                            What GPU do you have?
+                          </Label>
+                          <Select value={gpuType} onValueChange={setGpuType}>
+                            <SelectTrigger className="w-full bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="nvidia-30-40">NVIDIA RTX 40-series or older</SelectItem>
+                              <SelectItem value="nvidia-50">NVIDIA RTX 50-series</SelectItem>
+                              <SelectItem value="non-nvidia">Non-NVIDIA (AMD, Intel, etc.)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Mac Notice - Full Width */}
