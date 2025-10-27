@@ -20,8 +20,8 @@ export interface FloatingToolControlsProps {
   onSetIsEraseMode: (isErasing: boolean) => void;
   
   // Annotate props
-  annotationMode: 'circle' | 'arrow' | null;
-  onSetAnnotationMode: (mode: 'circle' | 'arrow' | null) => void;
+  annotationMode: 'rectangle' | null;
+  onSetAnnotationMode: (mode: 'rectangle' | null) => void;
   
   // Common props
   brushStrokes: BrushStroke[];

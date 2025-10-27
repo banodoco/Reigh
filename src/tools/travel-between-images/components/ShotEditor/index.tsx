@@ -1284,7 +1284,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const orchestrator: any = params.full_orchestrator_payload || {};
 
       // Extract settings with sensible fallbacks
-      const newPrompt: string | undefined = orchestrator.base_prompts_expanded?.[0] ?? params.prompt;
+      const newPrompt: string | undefined = orchestrator.base_prompts_expanded?.[0] ?? orchestrator.base_prompt ?? params.prompt;
       const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? params.negative_prompt;
       const newSteps: number | undefined = orchestrator.steps ?? params.num_inference_steps;
       const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded;

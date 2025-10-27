@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Eraser, Undo2, Paintbrush, Loader2, CheckCircle, Circle, ArrowRight } from 'lucide-react';
+import { X, Eraser, Undo2, Paintbrush, Loader2, CheckCircle, Square } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { cn } from '@/shared/lib/utils';
@@ -23,9 +23,9 @@ export interface InpaintControlsPanelProps {
   onGenerateInpaint: () => void;
   onExitInpaintMode: () => void;
   isAnnotateMode: boolean;
-  annotationMode: 'circle' | 'arrow' | null;
+  annotationMode: 'rectangle' | null;
   onSetIsAnnotateMode: (isAnnotate: boolean) => void;
-  onSetAnnotationMode: (mode: 'circle' | 'arrow' | null) => void;
+  onSetAnnotationMode: (mode: 'rectangle' | null) => void;
 }
 
 /**
@@ -99,11 +99,11 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
           size="sm"
           onClick={() => {
             onSetIsAnnotateMode(true);
-            onSetAnnotationMode('circle');
+            onSetAnnotationMode('rectangle');
           }}
           className="flex-1"
         >
-          <Circle className="h-3.5 w-3.5 mr-1.5" />
+          <Square className="h-3.5 w-3.5 mr-1.5" />
           Annotate
         </Button>
       </div>
@@ -129,25 +129,16 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
               </Button>
             </>
           ) : (
-            // Annotate mode: Circle/Arrow
+            // Annotate mode: Rectangle tool (always active)
             <>
               <Button
-                variant={annotationMode === 'circle' ? "default" : "secondary"}
+                variant="default"
                 size="sm"
-                onClick={() => onSetAnnotationMode('circle')}
                 className="flex-1"
+                disabled
               >
-                <Circle className="h-3 w-3 mr-1" />
-                Circle
-              </Button>
-              <Button
-                variant={annotationMode === 'arrow' ? "default" : "secondary"}
-                size="sm"
-                onClick={() => onSetAnnotationMode('arrow')}
-                className="flex-1"
-              >
-                <ArrowRight className="h-3 w-3 mr-1" />
-                Arrow
+                <Square className="h-3 w-3 mr-1" />
+                Rectangle
               </Button>
             </>
           )}
@@ -202,39 +193,23 @@ export const InpaintControlsPanel: React.FC<InpaintControlsPanelProps> = ({
                 ) : null}
               </>
             ) : (
-              // Annotate mode: Circle/Arrow toggle
+              // Annotate mode: Rectangle tool (always active)
               <>
                 {isFloating || isDesktop ? (
-                  <>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={annotationMode === 'circle' ? "default" : "secondary"}
-                          size="sm"
-                          onClick={() => onSetAnnotationMode('circle')}
-                          className="flex-1"
-                        >
-                          <Circle className="h-4 w-4 mr-2" />
-                          Circle
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Draw circles</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={annotationMode === 'arrow' ? "default" : "secondary"}
-                          size="sm"
-                          onClick={() => onSetAnnotationMode('arrow')}
-                          className="flex-1"
-                        >
-                          <ArrowRight className="h-4 w-4 mr-2" />
-                          Arrow
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="z-[100001]">Draw arrows</TooltipContent>
-                    </Tooltip>
-                  </>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="flex-1"
+                        disabled
+                      >
+                        <Square className="h-4 w-4 mr-2" />
+                        Rectangle
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100001]">Draw rectangles to annotate</TooltipContent>
+                  </Tooltip>
                 ) : null}
               </>
             )}

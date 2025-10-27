@@ -145,6 +145,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [lastSubjectDescriptionFromParent, setLastSubjectDescriptionFromParent] = useState<string>('');
   const [inThisScene, setInThisScene] = useState<boolean>(false);
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('custom');
+  const [styleBoostTerms, setStyleBoostTerms] = useState<string>('');
   const pendingReferenceModeUpdate = useRef<ReferenceMode | null>(null);
   const [isUploadingStyleReference, setIsUploadingStyleReference] = useState<boolean>(false);
   // Optimistic local override for style reference image so UI updates immediately
@@ -218,6 +219,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           setSubjectStrength(newSelectedRef.subjectStrength);
           setSubjectDescription(newSelectedRef.subjectDescription);
           setInThisScene(newSelectedRef.inThisScene);
+          setStyleBoostTerms(newSelectedRef.styleBoostTerms || '');
         } else {
           console.warn('[RefSettings] ⚠️ Could not find reference with ID:', selectedReferenceId, 'in references:', references.map(r => r.id));
         }
@@ -254,6 +256,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const effectiveSubjectDescription = currentSubjectDescription.trim() || 'this character';
   const currentInThisScene = selectedReference?.inThisScene ?? projectImageSettings?.inThisScene ?? false;
   const currentReferenceMode = (selectedReference?.referenceMode ?? 'custom') as ReferenceMode;
+  const currentStyleBoostTerms = selectedReference?.styleBoostTerms ?? '';
   
   // Display image (use original if available, fallback to processed)
   const styleReferenceImageDisplay = useMemo(() => {
@@ -1218,6 +1221,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     await handleUpdateReference(selectedReferenceId, { inThisScene: value });
   }, [selectedReferenceId, handleUpdateReference]);
 
+  const handleStyleBoostTermsChange = useCallback(async (value: string) => {
+    if (!selectedReferenceId) return;
+    
+    // Update local state immediately for responsive UI
+    setStyleBoostTerms(value);
+    
+    // Save changes to database (optimistic + debounced 300ms)
+    await handleUpdateReference(selectedReferenceId, { styleBoostTerms: value });
+  }, [selectedReferenceId, handleUpdateReference]);
+
   const handleReferenceModeChange = useCallback(async (mode: ReferenceMode) => {
     if (!selectedReferenceId) return;
     console.log('[RefSettings] 🎯 User changed mode to:', mode);
@@ -1368,10 +1381,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     
     // Build the unified task creation parameters
+    // Append styleBoostTerms to afterEachPromptText if present
+    const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
+      ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+      : afterEachPromptText;
+    
     const batchTaskParams: BatchImageGenerationTaskParams = {
       project_id: selectedProjectId!,
       prompts: activePrompts.map(p => {
-        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${afterEachPromptText ? `, ${afterEachPromptText.trim()}` : ''}`.trim();
+        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
         return {
           id: p.id,
           fullPrompt: combinedFull,
@@ -1462,10 +1480,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     
     // Build the unified task creation parameters
+    // Append styleBoostTerms to afterEachPromptText if present
+    const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
+      ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+      : afterEachPromptText;
+    
     const batchTaskParams: BatchImageGenerationTaskParams = {
       project_id: selectedProjectId!, // We know it's not null due to validation
       prompts: activePrompts.map(p => {
-        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${afterEachPromptText ? `, ${afterEachPromptText.trim()}` : ''}`.trim();
+        const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
         return {
           id: p.id,
           fullPrompt: combinedFull,
@@ -1737,6 +1760,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onInThisSceneChange={handleInThisSceneChange}
             referenceMode={referenceMode}
             onReferenceModeChange={handleReferenceModeChange}
+            styleBoostTerms={styleBoostTerms}
+            onStyleBoostTermsChange={handleStyleBoostTermsChange}
             // New multiple references props
             references={references}
             selectedReferenceId={selectedReferenceId}

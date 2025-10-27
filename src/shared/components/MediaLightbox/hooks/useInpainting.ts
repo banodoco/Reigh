@@ -8,11 +8,11 @@ import { createAnnotatedImageEditTask } from '@/shared/lib/tasks/annotatedImageE
 
 export interface BrushStroke {
   id: string;
-  points: Array<{ x: number; y: number }>;
+  points: Array<{ x: number; y: number }>; // 2 points for rectangle, 4 points for free-form quad
   isErasing: boolean;
   brushSize: number;
-  shapeType?: 'line' | 'circle' | 'arrow';
-  controlPoint?: { x: number; y: number }; // For curved arrows
+  shapeType?: 'line' | 'rectangle';
+  isFreeForm?: boolean; // True if corners have been independently dragged
 }
 
 export interface UseInpaintingProps {
@@ -42,9 +42,8 @@ export interface UseInpaintingReturn {
   currentStroke: Array<{ x: number; y: number }>;
   isAnnotateMode: boolean;
   editMode: 'text' | 'inpaint' | 'annotate';
-  annotationMode: 'circle' | 'arrow' | null;
+  annotationMode: 'rectangle' | null;
   selectedShapeId: string | null;
-  shapeEditMode: 'adjust' | 'move';
   setIsInpaintMode: React.Dispatch<React.SetStateAction<boolean>>;
   setInpaintPrompt: (prompt: string) => void;
   setInpaintNumGenerations: (num: number) => void;
@@ -52,8 +51,7 @@ export interface UseInpaintingReturn {
   setIsEraseMode: (isErasing: boolean) => void;
   setIsAnnotateMode: (isAnnotate: boolean | ((prev: boolean) => boolean)) => void;
   setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | ((prev: 'text' | 'inpaint' | 'annotate') => 'text' | 'inpaint' | 'annotate')) => void;
-  setAnnotationMode: (mode: 'circle' | 'arrow' | null | ((prev: 'circle' | 'arrow' | null) => 'circle' | 'arrow' | null)) => void;
-  setShapeEditMode: (mode: 'adjust' | 'move') => void;
+  setAnnotationMode: (mode: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => void;
   handleEnterInpaintMode: () => void;
   handlePointerDown: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   handlePointerMove: (e: React.PointerEvent<HTMLCanvasElement>) => void;
@@ -63,6 +61,7 @@ export interface UseInpaintingReturn {
   handleGenerateInpaint: () => Promise<void>;
   handleGenerateAnnotatedEdit: () => Promise<void>;
   handleDeleteSelected: () => void;
+  handleToggleFreeForm: () => void;
   getDeleteButtonPosition: () => { x: number; y: number } | null;
   redrawStrokes: (strokes: BrushStroke[]) => void;
 }
@@ -94,7 +93,7 @@ export const useInpainting = ({
   // Per-media state storage (persists across media switches)
   const mediaStateRef = useRef<Map<string, {
     editMode: 'text' | 'inpaint' | 'annotate';
-    annotationMode: 'circle' | 'arrow' | null;
+    annotationMode: 'rectangle' | null;
   }>>(new Map());
 
   const [isInpaintMode, setIsInpaintMode] = useState(false);
@@ -109,7 +108,7 @@ export const useInpainting = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
   const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate'>('inpaint');
-  const [annotationMode, setAnnotationModeInternal] = useState<'circle' | 'arrow' | null>(null);
+  const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
   
   // Computed: backwards compatibility
   const isAnnotateMode = editMode === 'annotate';
@@ -121,7 +120,10 @@ export const useInpainting = ({
   const [isDraggingShape, setIsDraggingShape] = useState(false);
   const [isDraggingControlPoint, setIsDraggingControlPoint] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
-  const [shapeEditMode, setShapeEditMode] = useState<'adjust' | 'move'>('adjust'); // Default to adjust
+  const [dragMode, setDragMode] = useState<'move' | 'resize'>('resize'); // Auto-set based on edge/corner click
+  const [draggingCornerIndex, setDraggingCornerIndex] = useState<number | null>(null); // For free-form corner dragging
+  const lastClickTimeRef = useRef<number>(0);
+  const lastClickPositionRef = useRef<{ x: number; y: number } | null>(null); // Default to adjust
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const selectedShapeRef = useRef<BrushStroke | null>(null);
   const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('inpaint');
@@ -136,7 +138,7 @@ export const useInpainting = ({
     });
   }, [media.id]);
 
-  const setAnnotationMode = useCallback((value: 'circle' | 'arrow' | null | ((prev: 'circle' | 'arrow' | null) => 'circle' | 'arrow' | null)) => {
+  const setAnnotationMode = useCallback((value: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => {
     setAnnotationModeInternal(prev => {
       const newValue = typeof value === 'function' ? value(prev) : value;
       const currentState = mediaStateRef.current.get(media.id) || { editMode: 'inpaint', annotationMode: null };
@@ -292,75 +294,91 @@ export const useInpainting = ({
     const startPoint = stroke.points[0];
     const endPoint = stroke.points[stroke.points.length - 1];
     
-    if (stroke.shapeType === 'circle') {
-      // Check if point is on the circle's edge (within threshold)
-      const radius = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
-      const distFromCenter = Math.hypot(x - startPoint.x, y - startPoint.y);
-      return Math.abs(distFromCenter - radius) < threshold;
-    } else if (stroke.shapeType === 'arrow') {
-      // Check if point is near the arrow line
-      // Simple approach: check distance to line segment
-      const dx = endPoint.x - startPoint.x;
-      const dy = endPoint.y - startPoint.y;
-      const lineLength = Math.hypot(dx, dy);
+    if (stroke.shapeType === 'rectangle') {
+      // Check if point is inside or on the rectangle border
+      const minX = Math.min(startPoint.x, endPoint.x);
+      const maxX = Math.max(startPoint.x, endPoint.x);
+      const minY = Math.min(startPoint.y, endPoint.y);
+      const maxY = Math.max(startPoint.y, endPoint.y);
       
-      if (lineLength === 0) return false;
-      
-      // Calculate perpendicular distance from point to line
-      const t = Math.max(0, Math.min(1, ((x - startPoint.x) * dx + (y - startPoint.y) * dy) / (lineLength * lineLength)));
-      const projX = startPoint.x + t * dx;
-      const projY = startPoint.y + t * dy;
-      const distance = Math.hypot(x - projX, y - projY);
-      
-      return distance < threshold;
+      // Check if point is inside the rectangle (with threshold for easier selection)
+      return x >= minX - threshold && x <= maxX + threshold && 
+             y >= minY - threshold && y <= maxY + threshold;
     }
     
     return false;
   };
 
-  // Helper function to draw an arrow (straight or curved)
-  const drawArrow = (
-    ctx: CanvasRenderingContext2D, 
-    fromX: number, 
-    fromY: number, 
-    toX: number, 
-    toY: number, 
-    headlen: number,
-    controlPoint?: { x: number; y: number }
-  ) => {
-    // Draw line (curved if control point exists)
-    ctx.beginPath();
-    ctx.moveTo(fromX, fromY);
+  // Helper function to get which corner is clicked (returns index 0-3 or null)
+  const getClickedCornerIndex = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): number | null => {
+    if (stroke.shapeType !== 'rectangle') return null;
     
-    if (controlPoint) {
-      // Draw curved line using quadratic bezier
-      ctx.quadraticCurveTo(controlPoint.x, controlPoint.y, toX, toY);
-    } else {
-      // Draw straight line
-      ctx.lineTo(toX, toY);
-    }
-    ctx.stroke();
+    const corners = getRectangleCorners(stroke);
     
-    // Calculate angle for arrow head (tangent at end point)
-    let angle: number;
-    if (controlPoint) {
-      // For curved arrows, calculate tangent at end point
-      const dx = toX - controlPoint.x;
-      const dy = toY - controlPoint.y;
-      angle = Math.atan2(dy, dx);
-    } else {
-      // For straight arrows, use direct angle
-      angle = Math.atan2(toY - fromY, toX - fromX);
+    for (let i = 0; i < corners.length; i++) {
+      const dist = Math.hypot(x - corners[i].x, y - corners[i].y);
+      if (dist <= threshold) {
+        return i;
+      }
     }
     
-    // Draw arrow head
-    ctx.beginPath();
-    ctx.moveTo(toX, toY);
-    ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
-    ctx.moveTo(toX, toY);
-    ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
-    ctx.stroke();
+    return null;
   };
+  
+  // Helper function to get the 4 corners of a rectangle (handles both 2-point and 4-point forms)
+  const getRectangleCorners = (stroke: BrushStroke): Array<{ x: number; y: number }> => {
+    if (stroke.isFreeForm && stroke.points.length === 4) {
+      // Free-form quadrilateral - return points as-is
+      return stroke.points;
+    }
+    
+    // Standard rectangle - calculate 4 corners from 2 points
+    const startPoint = stroke.points[0];
+    const endPoint = stroke.points[stroke.points.length - 1];
+    
+    const minX = Math.min(startPoint.x, endPoint.x);
+    const maxX = Math.max(startPoint.x, endPoint.x);
+    const minY = Math.min(startPoint.y, endPoint.y);
+    const maxY = Math.max(startPoint.y, endPoint.y);
+    
+    return [
+      { x: minX, y: minY }, // top-left (0)
+      { x: maxX, y: minY }, // top-right (1)
+      { x: maxX, y: maxY }, // bottom-right (2)
+      { x: minX, y: maxY }  // bottom-left (3)
+    ];
+  };
+
+  // Helper function to detect if click is on edge or corner of rectangle
+  // Returns 'corner' if on a corner (for resizing), 'edge' if on an edge (for moving), null if neither
+  const getRectangleClickType = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): 'corner' | 'edge' | null => {
+    if (stroke.shapeType !== 'rectangle') return null;
+    
+    // Check corners first
+    if (getClickedCornerIndex(x, y, stroke, threshold) !== null) {
+      return 'corner';
+    }
+    
+    // Check edges
+    const corners = getRectangleCorners(stroke);
+    const minX = Math.min(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
+    const minY = Math.min(...corners.map(c => c.y));
+    const maxY = Math.max(...corners.map(c => c.y));
+    
+    const onLeftEdge = Math.abs(x - minX) <= threshold && y >= minY - threshold && y <= maxY + threshold;
+    const onRightEdge = Math.abs(x - maxX) <= threshold && y >= minY - threshold && y <= maxY + threshold;
+    const onTopEdge = Math.abs(y - minY) <= threshold && x >= minX - threshold && x <= maxX + threshold;
+    const onBottomEdge = Math.abs(y - maxY) <= threshold && x >= minX - threshold && x <= maxX + threshold;
+    
+    if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
+      return 'edge';
+    }
+    
+    return null;
+  };
+
+  // drawArrow helper function removed (not needed for rectangles)
 
   // Redraw all strokes on canvas
   const redrawStrokes = useCallback((strokes: BrushStroke[]) => {
@@ -390,8 +408,8 @@ export const useInpainting = ({
       // Set up context for display canvas
       ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'lighten';
       
-      // Highlight selected shapes with blue/green
-      if (isSelected && (shapeType === 'circle' || shapeType === 'arrow')) {
+      // Highlight selected shapes with green
+      if (isSelected && shapeType === 'rectangle') {
         ctx.strokeStyle = 'rgba(0, 255, 100, 0.9)';
         ctx.fillStyle = 'rgba(0, 255, 100, 0.2)';
       } else {
@@ -414,30 +432,38 @@ export const useInpainting = ({
       const startPoint = stroke.points[0];
       const endPoint = stroke.points[stroke.points.length - 1];
       
-      if (shapeType === 'circle') {
-        // Draw circle - thin outline only
-        const radius = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
-        
-        // Use 8px line for annotations
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        maskCtx.lineWidth = 8;
-        maskCtx.beginPath();
-        maskCtx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
-        maskCtx.stroke();
-      } else if (shapeType === 'arrow') {
-        // Draw arrow - 8px line (straight or curved)
-        const arrowHeadLen = 20;
-        
+      if (shapeType === 'rectangle') {
         // Use 8px line for annotations
         ctx.lineWidth = 8;
         maskCtx.lineWidth = 8;
         
-        drawArrow(ctx, startPoint.x, startPoint.y, endPoint.x, endPoint.y, arrowHeadLen, stroke.controlPoint);
-        drawArrow(maskCtx, startPoint.x, startPoint.y, endPoint.x, endPoint.y, arrowHeadLen, stroke.controlPoint);
+        if (stroke.isFreeForm && stroke.points.length === 4) {
+          // Draw free-form quadrilateral (4 independent corners)
+          ctx.beginPath();
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < 4; i++) {
+            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+          
+          maskCtx.beginPath();
+          maskCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < 4; i++) {
+            maskCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          }
+          maskCtx.closePath();
+          maskCtx.stroke();
+        } else {
+          // Draw standard rectangle from 2 points
+          const x = Math.min(startPoint.x, endPoint.x);
+          const y = Math.min(startPoint.y, endPoint.y);
+          const width = Math.abs(endPoint.x - startPoint.x);
+          const height = Math.abs(endPoint.y - startPoint.y);
+          
+          ctx.strokeRect(x, y, width, height);
+          maskCtx.strokeRect(x, y, width, height);
+        }
       } else {
         // Default: draw line (original behavior)
         ctx.beginPath();
@@ -459,65 +485,21 @@ export const useInpainting = ({
     console.log('[Inpaint] Redrawn strokes', { count: strokes.length, selectedId: selectedShapeId });
   }, [selectedShapeId]);
 
-  // Draw control point handle for selected arrow (separate effect to overlay on top)
-  useEffect(() => {
-    if (!selectedShapeId || !displayCanvasRef.current || !isAnnotateMode) return;
-    
-    let selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
-    if (!selectedShape || selectedShape.shapeType !== 'arrow') return;
-    
-    // If arrow doesn't have a control point, create one at the midpoint
-    if (!selectedShape.controlPoint) {
-      const startPoint = selectedShape.points[0];
-      const endPoint = selectedShape.points[selectedShape.points.length - 1];
-      const midPoint = {
-        x: (startPoint.x + endPoint.x) / 2,
-        y: (startPoint.y + endPoint.y) / 2
-      };
-      
-      const updatedShape = {
-        ...selectedShape,
-        controlPoint: midPoint
-      };
-      
-      const newStrokes = brushStrokes.map(s => 
-        s.id === selectedShapeId ? updatedShape : s
-      );
-      setBrushStrokes(newStrokes);
-      selectedShape = updatedShape;
-    }
-    
-    const canvas = displayCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // First redraw all strokes
-    redrawStrokes(brushStrokes);
-    
-    // Then draw control point handle on top
-    if (selectedShape.controlPoint) {
-      ctx.fillStyle = 'rgba(0, 255, 100, 0.8)';
-      ctx.beginPath();
-      ctx.arc(selectedShape.controlPoint.x, selectedShape.controlPoint.y, 8, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      // Draw lines from start/end to control point (visual guide)
-      ctx.strokeStyle = 'rgba(0, 255, 100, 0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 5]);
-      
-      const startPoint = selectedShape.points[0];
-      const endPoint = selectedShape.points[selectedShape.points.length - 1];
-      
-      ctx.beginPath();
-      ctx.moveTo(startPoint.x, startPoint.y);
-      ctx.lineTo(selectedShape.controlPoint.x, selectedShape.controlPoint.y);
-      ctx.lineTo(endPoint.x, endPoint.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }, [selectedShapeId, brushStrokes, displayCanvasRef, isAnnotateMode, redrawStrokes]);
+  // Rectangles don't need control points (arrow control point logic removed)
 
+  // Prevent cross-over between modes: Clear opposite mode's strokes when switching
+  useEffect(() => {
+    if (!isInpaintMode) return;
+    
+    if (editMode === 'annotate' && inpaintStrokes.length > 0) {
+      console.log('[ModeSeparation] Switched to annotate mode - clearing inpaint strokes');
+      setInpaintStrokes([]);
+    } else if (editMode === 'inpaint' && annotationStrokes.length > 0) {
+      console.log('[ModeSeparation] Switched to inpaint mode - clearing annotation strokes');
+      setAnnotationStrokes([]);
+    }
+  }, [editMode, isInpaintMode, inpaintStrokes.length, annotationStrokes.length, setInpaintStrokes, setAnnotationStrokes]);
+  
   // Redraw when switching between annotate and inpaint modes
   useEffect(() => {
     if (isInpaintMode) {
@@ -539,8 +521,8 @@ export const useInpainting = ({
     // Only trigger when editMode actually changes
     if (prevEditModeRef.current !== editMode) {
       if (editMode === 'annotate' && annotationMode === null) {
-        console.log('[InpaintMode] Switching to annotate mode, auto-selecting arrow');
-        setAnnotationMode('arrow');
+        console.log('[InpaintMode] Switching to annotate mode, auto-selecting rectangle');
+        setAnnotationMode('rectangle');
       } else if (editMode === 'inpaint') {
         console.log('[InpaintMode] Switching to inpaint mode, auto-selecting paint');
         setIsEraseMode(false);
@@ -580,46 +562,77 @@ export const useInpainting = ({
     // Store drag start position for tap detection
     dragStartPosRef.current = { x, y };
     
-    // In annotate mode, check if clicking on control point or existing shape
-    if (isAnnotateMode && (annotationMode === 'circle' || annotationMode === 'arrow')) {
-      // First, check if clicking on control point of selected arrow
-      if (selectedShapeId) {
-        const selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
-        if (selectedShape && selectedShape.shapeType === 'arrow' && selectedShape.controlPoint) {
-          const cp = selectedShape.controlPoint;
-          const distToControlPoint = Math.hypot(x - cp.x, y - cp.y);
+    // In annotate mode, check if clicking on existing shape
+    if (isAnnotateMode && annotationMode === 'rectangle') {
+      // Check if we clicked on an existing rectangle shape
+      for (let i = brushStrokes.length - 1; i >= 0; i--) {
+        const stroke = brushStrokes[i];
+        if (stroke.shapeType === 'rectangle' && isPointOnShape(x, y, stroke)) {
+          console.log('[DirectAction] Clicked on rectangle:', stroke.id);
           
-          if (distToControlPoint <= 15) {
-            console.log('[ControlPoint] Starting to drag control point');
-            setIsDraggingControlPoint(true);
-            selectedShapeRef.current = selectedShape;
+          // Select it
+          setSelectedShapeId(stroke.id);
+          
+          // Check for double-click on corner (enables free-form dragging)
+          const now = Date.now();
+          const cornerIndex = getClickedCornerIndex(x, y, stroke);
+          const lastClickPos = lastClickPositionRef.current;
+          const isDoubleClick = cornerIndex !== null && 
+                               now - lastClickTimeRef.current < 300 &&
+                               lastClickPos &&
+                               Math.hypot(x - lastClickPos.x, y - lastClickPos.y) < 10;
+          
+          lastClickTimeRef.current = now;
+          lastClickPositionRef.current = { x, y };
+          
+          if (isDoubleClick && cornerIndex !== null) {
+            console.log('[Drag] DOUBLE-CLICK on corner - enabling FREE-FORM dragging');
+            
+            // Convert to 4-point free-form if not already
+            if (!stroke.isFreeForm || stroke.points.length !== 4) {
+              const corners = getRectangleCorners(stroke);
+              const updatedStroke: BrushStroke = {
+                ...stroke,
+                points: corners,
+                isFreeForm: true
+              };
+              const newStrokes = brushStrokes.map(s => s.id === stroke.id ? updatedStroke : s);
+              setBrushStrokes(newStrokes);
+              selectedShapeRef.current = updatedStroke;
+              redrawStrokes(newStrokes);
+            }
+            
+            setDraggingCornerIndex(cornerIndex);
+            setIsDraggingShape(true);
+            selectedShapeRef.current = stroke.isFreeForm ? stroke : { ...stroke, points: getRectangleCorners(stroke), isFreeForm: true };
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
             return;
           }
-        }
-      }
-      
-      // Check if we clicked on an existing annotation shape
-      for (let i = brushStrokes.length - 1; i >= 0; i--) {
-        const stroke = brushStrokes[i];
-        if ((stroke.shapeType === 'circle' || stroke.shapeType === 'arrow') && isPointOnShape(x, y, stroke)) {
-          console.log('[Selection] Clicked on shape:', stroke.id);
           
-          // If already selected, start dragging it
-          if (selectedShapeId === stroke.id) {
-            console.log('[Drag] Starting to drag selected shape');
+          // Determine if clicking edge (move) or corner (resize) and START IMMEDIATELY
+          const clickType = getRectangleClickType(x, y, stroke);
+          
+          if (clickType === 'edge') {
+            console.log('[Drag] IMMEDIATELY starting to MOVE rectangle (clicked edge)');
+            setDragMode('move');
             setIsDraggingShape(true);
             selectedShapeRef.current = stroke;
             const startPoint = stroke.points[0];
             setDragOffset({ x: x - startPoint.x, y: y - startPoint.y });
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
             return;
-          } else {
-            // Select this shape
-            setSelectedShapeId(stroke.id);
+          } else if (clickType === 'corner') {
+            console.log('[Drag] IMMEDIATELY starting to RESIZE rectangle (clicked corner)');
+            setDragMode('resize');
+            setIsDraggingShape(true);
+            selectedShapeRef.current = stroke;
+            const startPoint = stroke.points[0];
+            setDragOffset({ x: x - startPoint.x, y: y - startPoint.y });
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            return;
           }
           
-          // Don't start drawing
+          // If clicked in the middle (not edge or corner), just keep it selected but don't drag
           return;
         }
       }
@@ -627,6 +640,13 @@ export const useInpainting = ({
       // Clicked on empty space, deselect any selected shape
       if (selectedShapeId) {
         setSelectedShapeId(null);
+      }
+      
+      // LIMIT TO ONE RECTANGLE: Clear existing rectangles when starting a new one
+      if (annotationStrokes.length > 0) {
+        console.log('[Annotate] Clearing existing rectangle to allow only one');
+        setAnnotationStrokes([]);
+        redrawStrokes([]);
       }
     }
     
@@ -642,7 +662,7 @@ export const useInpainting = ({
     });
     
     setCurrentStroke([{ x, y }]);
-  }, [isInpaintMode, isAnnotateMode, annotationMode, brushStrokes, selectedShapeId, isPointOnShape]);
+  }, [isInpaintMode, isAnnotateMode, annotationMode, brushStrokes, annotationStrokes, selectedShapeId, isPointOnShape, getRectangleClickType, getClickedCornerIndex, getRectangleCorners, redrawStrokes, setBrushStrokes]);
 
   // Prevent browser scroll/zoom gestures while actively drawing (iOS Safari)
   useEffect(() => {
@@ -671,32 +691,35 @@ export const useInpainting = ({
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
     
-    // Handle dragging control point
-    if (isDraggingControlPoint && selectedShapeRef.current) {
-      const shape = selectedShapeRef.current;
-      
-      // Update control point position
-      const updatedShape: BrushStroke = {
-        ...shape,
-        controlPoint: { x, y }
-      };
-      
-      const newStrokes = brushStrokes.map(s => 
-        s.id === shape.id ? updatedShape : s
-      );
-      setBrushStrokes(newStrokes);
-      selectedShapeRef.current = updatedShape;
-      redrawStrokes(newStrokes);
-      
-      return;
-    }
+    // Control point dragging removed (rectangles don't have control points)
     
     // Handle dragging selected shape
-    if (isDraggingShape && selectedShapeRef.current && dragOffset) {
+    if (isDraggingShape && selectedShapeRef.current) {
       const shape = selectedShapeRef.current;
       
-      if (shapeEditMode === 'move') {
-        // MOVE MODE: Move the entire shape
+      // FREE-FORM CORNER DRAGGING: Move individual corner
+      if (draggingCornerIndex !== null && shape.isFreeForm && shape.points.length === 4) {
+        console.log(`[FreeFormDrag] Dragging corner ${draggingCornerIndex}`);
+        const newPoints = [...shape.points];
+        newPoints[draggingCornerIndex] = { x, y };
+        
+        const updatedShape: BrushStroke = {
+          ...shape,
+          points: newPoints,
+          isFreeForm: true
+        };
+        
+        const newStrokes = brushStrokes.map(s => 
+          s.id === shape.id ? updatedShape : s
+        );
+        setBrushStrokes(newStrokes);
+        selectedShapeRef.current = updatedShape;
+        redrawStrokes(newStrokes);
+        return;
+      }
+      
+      // MOVE MODE: Move the entire shape (clicked on edge)
+      if (dragMode === 'move' && dragOffset) {
         const newStartX = x - dragOffset.x;
         const newStartY = y - dragOffset.y;
         
@@ -714,10 +737,7 @@ export const useInpainting = ({
         const updatedShape: BrushStroke = {
           ...shape,
           points: updatedPoints,
-          controlPoint: shape.controlPoint ? {
-            x: shape.controlPoint.x + deltaX,
-            y: shape.controlPoint.y + deltaY
-          } : undefined
+          isFreeForm: shape.isFreeForm
         };
         
         // Update the shape in the strokes array
@@ -727,49 +747,16 @@ export const useInpainting = ({
         setBrushStrokes(newStrokes);
         selectedShapeRef.current = updatedShape;
         redrawStrokes(newStrokes);
-      } else {
-        // ADJUST MODE: Change the shape itself
+      } else if (dragMode === 'resize' && dragOffset) {
+        // RESIZE MODE: Change the shape itself (clicked on corner)
         const startPoint = shape.points[0];
         
-        if (shape.shapeType === 'circle') {
-          // For circles: adjust radius by changing the end point
-          const updatedShape: BrushStroke = {
-            ...shape,
-            points: [startPoint, { x, y }]
-          };
-          
-          const newStrokes = brushStrokes.map(s => 
-            s.id === shape.id ? updatedShape : s
-          );
-          setBrushStrokes(newStrokes);
-          selectedShapeRef.current = updatedShape;
-          redrawStrokes(newStrokes);
-        } else if (shape.shapeType === 'arrow') {
-          // For arrows: adjust end point and update control point proportionally
-          const oldEndPoint = shape.points[shape.points.length - 1];
-          
-          // If there was a control point, adjust it proportionally
-          let newControlPoint: { x: number; y: number } | undefined = undefined;
-          if (shape.controlPoint) {
-            // Keep the control point at the same relative position
-            const oldMidX = (startPoint.x + oldEndPoint.x) / 2;
-            const oldMidY = (startPoint.y + oldEndPoint.y) / 2;
-            const newMidX = (startPoint.x + x) / 2;
-            const newMidY = (startPoint.y + y) / 2;
-            
-            const controlOffsetX = shape.controlPoint.x - oldMidX;
-            const controlOffsetY = shape.controlPoint.y - oldMidY;
-            
-            newControlPoint = {
-              x: newMidX + controlOffsetX,
-              y: newMidY + controlOffsetY
-            };
-          }
-          
+        if (shape.shapeType === 'rectangle') {
+          // For rectangles: adjust size by changing the end point
           const updatedShape: BrushStroke = {
             ...shape,
             points: [startPoint, { x, y }],
-            controlPoint: newControlPoint
+            isFreeForm: false // Reset to regular rectangle
           };
           
           const newStrokes = brushStrokes.map(s => 
@@ -806,35 +793,11 @@ export const useInpainting = ({
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
-        if (annotationMode === 'circle') {
-          const radius = Math.hypot(x - startPoint.x, y - startPoint.y);
-          ctx.beginPath();
-          ctx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
-          ctx.stroke();
-        } else if (annotationMode === 'arrow') {
-          const arrowHeadLen = 20;
-          const endPoint = { x, y };
-          
-          // Calculate control point from the path taken (use middle point if path has multiple points)
-          let controlPoint: { x: number; y: number } | undefined;
-          if (currentStroke.length > 2) {
-            // Use the middle point of the stroke path as control point for curve
-            const midIndex = Math.floor(currentStroke.length / 2);
-            controlPoint = currentStroke[midIndex];
-            
-            // Only use control point if it creates a noticeable curve
-            const straightLineDist = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
-            const controlDist = Math.hypot(controlPoint.x - startPoint.x, controlPoint.y - startPoint.y) +
-                               Math.hypot(endPoint.x - controlPoint.x, endPoint.y - controlPoint.y);
-            const curveDifference = controlDist - straightLineDist;
-            
-            // If the path is nearly straight, don't use control point
-            if (curveDifference < straightLineDist * 0.1) {
-              controlPoint = undefined;
-            }
-          }
-          
-          drawArrow(ctx, startPoint.x, startPoint.y, endPoint.x, endPoint.y, arrowHeadLen, controlPoint);
+        if (annotationMode === 'rectangle') {
+          // Draw rectangle preview
+          const width = x - startPoint.x;
+          const height = y - startPoint.y;
+          ctx.strokeRect(startPoint.x, startPoint.y, width, height);
         }
       }
     } else {
@@ -853,31 +816,17 @@ export const useInpainting = ({
         ctx.stroke();
       }
     }
-  }, [isInpaintMode, isDrawing, isEraseMode, currentStroke, brushSize, isAnnotateMode, annotationMode, brushStrokes, redrawStrokes, isDraggingShape, isDraggingControlPoint, dragOffset, shapeEditMode]);
+  }, [isInpaintMode, isDrawing, isEraseMode, currentStroke, brushSize, isAnnotateMode, annotationMode, brushStrokes, redrawStrokes, isDraggingShape, isDraggingControlPoint, dragOffset, dragMode, draggingCornerIndex, displayCanvasRef, maskCanvasRef, setBrushStrokes]);
 
   const handlePointerUp = useCallback((e?: React.PointerEvent<HTMLCanvasElement>) => {
-    // Handle finishing control point drag
-    if (isDraggingControlPoint) {
-      console.log('[ControlPoint] Finished dragging control point');
-      setIsDraggingControlPoint(false);
-      selectedShapeRef.current = null;
-      
-      // Release pointer capture
-      if (e && e.target) {
-        try {
-          (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-        } catch (err) {
-          console.log('[ControlPoint] Could not release pointer capture', err);
-        }
-      }
-      return;
-    }
+    // Control point drag handling removed (rectangles don't have control points)
     
     // Handle finishing drag operation
     if (isDraggingShape) {
       console.log('[Drag] Finished dragging shape');
       setIsDraggingShape(false);
       setDragOffset(null);
+      setDraggingCornerIndex(null); // Reset free-form corner dragging
       selectedShapeRef.current = null;
       
       // Release pointer capture
@@ -910,23 +859,17 @@ export const useInpainting = ({
     if (currentStroke.length > 1) {
       const shapeType = isAnnotateMode && annotationMode ? annotationMode : 'line';
       
-      // Calculate control point for arrows if the path was curved
-      let controlPoint: { x: number; y: number } | undefined;
-      if (shapeType === 'arrow' && currentStroke.length > 2) {
+      // For rectangles, require minimum drag distance (prevent accidental clicks from creating shapes)
+      if (shapeType === 'rectangle') {
         const startPoint = currentStroke[0];
         const endPoint = currentStroke[currentStroke.length - 1];
-        const midIndex = Math.floor(currentStroke.length / 2);
-        const midPoint = currentStroke[midIndex];
+        const dragDistance = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
+        const MIN_DRAG_DISTANCE = 10; // pixels
         
-        // Check if the path has enough curve to warrant using a control point
-        const straightLineDist = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
-        const controlDist = Math.hypot(midPoint.x - startPoint.x, midPoint.y - startPoint.y) +
-                           Math.hypot(endPoint.x - midPoint.x, endPoint.y - midPoint.y);
-        const curveDifference = controlDist - straightLineDist;
-        
-        // If path is curved enough, save the control point
-        if (curveDifference >= straightLineDist * 0.1) {
-          controlPoint = midPoint;
+        if (dragDistance < MIN_DRAG_DISTANCE) {
+          console.log('[Rectangle] Drag too short, not creating rectangle', { dragDistance });
+          setCurrentStroke([]);
+          return;
         }
       }
       
@@ -935,22 +878,27 @@ export const useInpainting = ({
         points: currentStroke,
         isErasing: isEraseMode,
         brushSize: brushSize,
-        shapeType,
-        controlPoint
+        shapeType
       };
       
       setBrushStrokes(prev => [...prev, newStroke]);
+      
+      // Auto-select rectangle after drawing (shows delete button immediately)
+      if (isAnnotateMode && shapeType === 'rectangle') {
+        setSelectedShapeId(newStroke.id);
+        console.log('[Selection] Auto-selecting newly drawn rectangle:', newStroke.id);
+      }
+      
       console.log('[MobilePaintDebug] ✅ Stroke added', { 
         strokeId: newStroke.id, 
         pointCount: currentStroke.length, 
         brushSize, 
-        shapeType: newStroke.shapeType,
-        hasCurve: !!controlPoint
+        shapeType: newStroke.shapeType
       });
     }
     
     setCurrentStroke([]);
-  }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, isDraggingControlPoint]);
+  }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, isDraggingControlPoint, setBrushStrokes]);
 
   // Undo last stroke
   const handleUndo = useCallback(() => {
@@ -997,6 +945,51 @@ export const useInpainting = ({
     
     console.log('[Inpaint] Deleted selected shape', { shapeId: selectedShapeId, mode: isAnnotateMode ? 'annotate' : 'inpaint' });
   }, [selectedShapeId, brushStrokes, redrawStrokes, isAnnotateMode]);
+
+  // Toggle free-form mode for selected rectangle
+  const handleToggleFreeForm = useCallback(() => {
+    if (!selectedShapeId) return;
+    
+    const selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
+    if (!selectedShape || selectedShape.shapeType !== 'rectangle') return;
+    
+    let updatedShape: BrushStroke;
+    
+    if (selectedShape.isFreeForm) {
+      // Convert back to regular rectangle (use bounding box)
+      const corners = getRectangleCorners(selectedShape);
+      const minX = Math.min(...corners.map(c => c.x));
+      const maxX = Math.max(...corners.map(c => c.x));
+      const minY = Math.min(...corners.map(c => c.y));
+      const maxY = Math.max(...corners.map(c => c.y));
+      
+      updatedShape = {
+        ...selectedShape,
+        points: [{ x: minX, y: minY }, { x: maxX, y: maxY }],
+        isFreeForm: false
+      };
+      console.log('[FreeForm] Converted to regular rectangle');
+    } else {
+      // Convert to free-form (4 independent corners)
+      const corners = getRectangleCorners(selectedShape);
+      updatedShape = {
+        ...selectedShape,
+        points: corners,
+        isFreeForm: true
+      };
+      console.log('[FreeForm] Converted to free-form quadrilateral');
+    }
+    
+    const newStrokes = brushStrokes.map(s => s.id === selectedShapeId ? updatedShape : s);
+    
+    if (isAnnotateMode) {
+      setAnnotationStrokes(newStrokes);
+    } else {
+      setInpaintStrokes(newStrokes);
+    }
+    
+    redrawStrokes(newStrokes);
+  }, [selectedShapeId, brushStrokes, isAnnotateMode, getRectangleCorners, redrawStrokes]);
 
   // Keyboard handler for DELETE key
   useEffect(() => {
@@ -1192,36 +1185,22 @@ export const useInpainting = ({
     const canvas = displayCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
     
-    const startPoint = selectedShape.points[0];
-    const endPoint = selectedShape.points[selectedShape.points.length - 1];
+    const corners = getRectangleCorners(selectedShape);
+    const minY = Math.min(...corners.map(c => c.y));
+    const maxY = Math.max(...corners.map(c => c.y));
+    const minX = Math.min(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
     
-    const buttonHeight = 60; // Approximate height of the button group
-    const buttonWidth = 200; // Approximate width of the button group
-    const padding = 10; // Padding from canvas edges
+    const buttonWidth = 80; // Approximate width of delete button
+    const padding = 10;
     
-    let buttonX: number, buttonY: number;
+    // Place button at top center of rectangle
+    let buttonX = (minX + maxX) / 2;
+    let buttonY = minY - 50; // 50px above rectangle
     
-    if (selectedShape.shapeType === 'circle') {
-      // Place button at top of circle
-      const radius = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y);
-      buttonX = startPoint.x;
-      buttonY = startPoint.y - radius - 50; // 50px above circle
-      
-      // If button would be above canvas, place it below
-      if (buttonY < padding) {
-        buttonY = startPoint.y + radius + 50;
-      }
-    } else if (selectedShape.shapeType === 'arrow') {
-      // Place button at midpoint of arrow
-      buttonX = (startPoint.x + endPoint.x) / 2;
-      buttonY = Math.min(startPoint.y, endPoint.y) - 50; // 50px above arrow
-      
-      // If button would be above canvas, place it below
-      if (buttonY < padding) {
-        buttonY = Math.max(startPoint.y, endPoint.y) + 50;
-      }
-    } else {
-      return null;
+    // If button would be above canvas, place it below
+    if (buttonY < padding) {
+      buttonY = maxY + 50;
     }
     
     // Clamp to canvas boundaries
@@ -1233,7 +1212,7 @@ export const useInpainting = ({
       x: rect.left + buttonX,
       y: rect.top + buttonY
     };
-  }, [selectedShapeId, brushStrokes, displayCanvasRef]);
+  }, [selectedShapeId, brushStrokes, displayCanvasRef, getRectangleCorners]);
 
   return {
     isInpaintMode,
@@ -1250,7 +1229,6 @@ export const useInpainting = ({
     editMode,
     annotationMode,
     selectedShapeId,
-    shapeEditMode,
     setIsInpaintMode,
     setInpaintPrompt,
     setInpaintNumGenerations,
@@ -1259,7 +1237,6 @@ export const useInpainting = ({
     setIsAnnotateMode,
     setEditMode,
     setAnnotationMode,
-    setShapeEditMode,
     handleEnterInpaintMode,
     handlePointerDown,
     handlePointerMove,
@@ -1269,6 +1246,7 @@ export const useInpainting = ({
     handleGenerateInpaint,
     handleGenerateAnnotatedEdit,
     handleDeleteSelected,
+    handleToggleFreeForm,
     getDeleteButtonPosition,
     redrawStrokes,
   };

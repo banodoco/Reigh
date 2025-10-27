@@ -14,6 +14,7 @@ export interface ReferenceImage {
   subjectDescription: string;
   inThisScene: boolean;
   referenceMode?: 'style' | 'subject' | 'style-character' | 'scene-imprecise' | 'custom';
+  styleBoostTerms?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -11,8 +11,8 @@ import {
   Edit3,
   Pencil,
   Eraser,
-  Circle,
-  ArrowRight,
+  Square,
+  Diamond,
   Undo2,
   X,
 } from 'lucide-react';
@@ -299,7 +299,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     editMode,
     annotationMode,
     selectedShapeId,
-    shapeEditMode,
     setIsInpaintMode,
     setIsEraseMode,
     setInpaintPrompt,
@@ -308,7 +307,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setIsAnnotateMode,
     setEditMode,
     setAnnotationMode,
-    setShapeEditMode,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
@@ -318,6 +316,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleGenerateInpaint,
     handleGenerateAnnotatedEdit,
     handleDeleteSelected,
+    handleToggleFreeForm,
     getDeleteButtonPosition,
   } = inpaintingHook;
   
@@ -913,56 +912,48 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     debugContext="Desktop"
                   />
 
-                    {/* Edit Controls for Selected Annotation */}
-                    {selectedShapeId && isAnnotateMode && (() => {
-                      const buttonPos = getDeleteButtonPosition();
-                      if (!buttonPos) return null;
-                      
-                      return (
-                        <div className="fixed z-[100] flex gap-2" style={{
-                          left: `${buttonPos.x}px`,
-                          top: `${buttonPos.y}px`,
-                          transform: 'translate(-50%, -50%)'
-                        }}>
-                          {/* Toggle: Adjust / Move Mode */}
-                          <div className="flex bg-gray-800 rounded-lg p-1 shadow-lg">
-                            <button
-                              onClick={() => setShapeEditMode('adjust')}
-                              className={cn(
-                                "p-2 rounded-md transition-colors",
-                                shapeEditMode === 'adjust'
-                                  ? "bg-blue-600 text-white"
-                                  : "text-gray-300 hover:text-white"
-                              )}
-                              title="Adjust mode (drag to resize)"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => setShapeEditMode('move')}
-                              className={cn(
-                                "p-2 rounded-md transition-colors",
-                                shapeEditMode === 'move'
-                                  ? "bg-blue-600 text-white"
-                                  : "text-gray-300 hover:text-white"
-                              )}
-                              title="Move mode (drag to reposition)"
-                            >
-                              <Move className="h-4 w-4" />
-                            </button>
-                          </div>
-                          
-                          {/* Delete Button */}
-                          <button
-                            onClick={handleDeleteSelected}
-                            className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors"
-                            title="Delete annotation (or press DELETE key)"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      );
-                    })()}
+                  {/* Delete button and mode toggle for selected annotation */}
+                  {selectedShapeId && isAnnotateMode && (() => {
+                    const buttonPos = getDeleteButtonPosition();
+                    if (!buttonPos) return null;
+                    
+                    // Get selected shape info
+                    const selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
+                    const isFreeForm = selectedShape?.isFreeForm || false;
+                    
+                    return (
+                      <div className="fixed z-[100] flex gap-2" style={{
+                        left: `${buttonPos.x}px`,
+                        top: `${buttonPos.y}px`,
+                        transform: 'translate(-50%, -50%)'
+                      }}>
+                        {/* Mode toggle button */}
+                        <button
+                          onClick={handleToggleFreeForm}
+                          className={cn(
+                            "rounded-full p-2 shadow-lg transition-colors",
+                            isFreeForm 
+                              ? "bg-purple-600 hover:bg-purple-700 text-white" 
+                              : "bg-gray-700 hover:bg-gray-600 text-white"
+                          )}
+                          title={isFreeForm 
+                            ? "Switch to rectangle mode (edges move linearly)" 
+                            : "Switch to free-form mode (rhombus/non-orthogonal angles)"}
+                        >
+                          {isFreeForm ? <Diamond className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                        </button>
+                        
+                        {/* Delete button */}
+                        <button
+                          onClick={handleDeleteSelected}
+                          className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors"
+                          title="Delete annotation (or press DELETE key)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })()}
 
                     {/* Top Left Controls - Flip & Save */}
                     <TopLeftControls
@@ -1515,23 +1506,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           )}
                           
                           {editMode === 'annotate' && (
-                            // Annotate mode: Circle/Arrow toggle
+                            // Annotate mode: Rectangle tool (always active)
                             <div className="flex gap-1">
                               <Button
-                                variant={annotationMode === 'circle' ? "default" : "secondary"}
+                                variant="default"
                                 size="sm"
-                                onClick={() => setAnnotationMode('circle')}
                                 className="flex-1 text-xs h-7"
+                                disabled
                               >
-                                <Circle className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant={annotationMode === 'arrow' ? "default" : "secondary"}
-                                size="sm"
-                                onClick={() => setAnnotationMode('arrow')}
-                                className="flex-1 text-xs h-7"
-                              >
-                                <ArrowRight className="h-3 w-3" />
+                                <Square className="h-3 w-3" />
                               </Button>
                             </div>
                           )}

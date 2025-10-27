@@ -285,6 +285,8 @@ const StyleReferenceSection: React.FC<{
   onInThisSceneChange: (value: boolean) => void;
   referenceMode?: ReferenceMode;
   onReferenceModeChange?: (mode: ReferenceMode) => void;
+  styleBoostTerms?: string;
+  onStyleBoostTermsChange?: (value: string) => void;
   // New multiple references props
   references?: ReferenceImage[];
   selectedReferenceId?: string | null;
@@ -309,6 +311,8 @@ const StyleReferenceSection: React.FC<{
   onInThisSceneChange,
   referenceMode = 'custom',
   onReferenceModeChange,
+  styleBoostTerms = '',
+  onStyleBoostTermsChange,
   references = [],
   selectedReferenceId = null,
   onSelectReference,
@@ -464,23 +468,46 @@ const StyleReferenceSection: React.FC<{
               </div>
             )}
             
-            {/* Show subject description when subject strength > 0 OR in scene-imprecise mode */}
-            {(subjectStrength > 0 || referenceMode === 'scene-imprecise') && styleReferenceImage && (
-              <div className="space-y-2">
-                <Label htmlFor="subject-description" className="text-sm font-medium">
-                  Which subject from this image?
-                </Label>
-                <Input
-                  id="subject-description"
-                  type="text"
-                  value={subjectDescription}
-                  onChange={(e) => onSubjectDescriptionChange(e.target.value)}
-                  onFocus={onSubjectDescriptionFocus}
-                  onBlur={onSubjectDescriptionBlur}
-                  placeholder="man, woman, cactus"
-                  disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                  className="flex-1"
-                />
+            {/* Show subject description and/or style-boost terms based on mode */}
+            {(subjectStrength > 0 || referenceMode === 'scene-imprecise' || referenceMode === 'style' || referenceMode === 'style-character') && styleReferenceImage && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Show subject description when subject strength > 0 OR in scene-imprecise mode */}
+                {(subjectStrength > 0 || referenceMode === 'scene-imprecise') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="subject-description" className="text-sm font-medium">
+                      Which subject from this image?
+                    </Label>
+                    <Input
+                      id="subject-description"
+                      type="text"
+                      value={subjectDescription}
+                      onChange={(e) => onSubjectDescriptionChange(e.target.value)}
+                      onFocus={onSubjectDescriptionFocus}
+                      onBlur={onSubjectDescriptionBlur}
+                      placeholder="man, woman, cactus"
+                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                      className="flex-1"
+                    />
+                  </div>
+                )}
+                
+                {/* Show style-boost terms field when in style or style+subject mode */}
+                {(referenceMode === 'style' || referenceMode === 'style-character') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="style-boost-terms" className="text-sm font-medium">
+                      Include any style-boost terms here
+                    </Label>
+                    <Input
+                      id="style-boost-terms"
+                      type="text"
+                      value={styleBoostTerms}
+                      onChange={(e) => onStyleBoostTermsChange?.(e.target.value)}
+                      placeholder="oil painting, impressionist"
+                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                      className="flex-1"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -670,6 +697,8 @@ const StyleReferenceSection: React.FC<{
 export const ModelSection: React.FC<ModelSectionProps & {
   referenceMode?: ReferenceMode;
   onReferenceModeChange?: (mode: ReferenceMode) => void;
+  styleBoostTerms?: string;
+  onStyleBoostTermsChange?: (value: string) => void;
 }> = ({
   isGenerating,
   styleReferenceImage,
@@ -686,6 +715,8 @@ export const ModelSection: React.FC<ModelSectionProps & {
   onInThisSceneChange,
   referenceMode,
   onReferenceModeChange,
+  styleBoostTerms,
+  onStyleBoostTermsChange,
   references,
   selectedReferenceId,
   onSelectReference,
@@ -711,6 +742,8 @@ export const ModelSection: React.FC<ModelSectionProps & {
         onInThisSceneChange={onInThisSceneChange}
         referenceMode={referenceMode}
         onReferenceModeChange={onReferenceModeChange}
+        styleBoostTerms={styleBoostTerms}
+        onStyleBoostTermsChange={onStyleBoostTermsChange}
         references={references}
         selectedReferenceId={selectedReferenceId}
         onSelectReference={onSelectReference}

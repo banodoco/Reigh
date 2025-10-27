@@ -61,6 +61,7 @@ export interface ReferenceImage {
   subjectDescription: string; // Text description
   inThisScene: boolean; // Boolean flag
   referenceMode?: ReferenceMode; // How to use this reference
+  styleBoostTerms?: string; // Style-boost terms to append to prompts
   createdAt: string; // ISO timestamp
   updatedAt: string; // ISO timestamp
 }
