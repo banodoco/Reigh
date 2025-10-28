@@ -582,7 +582,7 @@ export const useInpainting = ({
           // Select it
           setSelectedShapeId(stroke.id);
           
-          // Check for double-click on corner (enables free-form dragging)
+          // Check for corner click (single click if already free-form, double-click to enable)
           const now = Date.now();
           const cornerIndex = getClickedCornerIndex(x, y, stroke);
           const lastClickPos = lastClickPositionRef.current;
@@ -594,31 +594,40 @@ export const useInpainting = ({
           lastClickTimeRef.current = now;
           lastClickPositionRef.current = { x, y };
           
-          if (isDoubleClick && cornerIndex !== null) {
+          // If already in free-form mode, single click on corner starts free-form dragging
+          if (stroke.isFreeForm && cornerIndex !== null) {
+            console.log('[Drag] Single-click on FREE-FORM corner - starting corner dragging');
+            setDraggingCornerIndex(cornerIndex);
+            setIsDraggingShape(true);
+            selectedShapeRef.current = stroke;
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            return;
+          }
+          
+          // If NOT in free-form mode, double-click on corner enables free-form mode
+          if (isDoubleClick && cornerIndex !== null && !stroke.isFreeForm) {
             console.log('[Drag] DOUBLE-CLICK on corner - enabling FREE-FORM dragging');
             
-            // Convert to 4-point free-form if not already
-            if (!stroke.isFreeForm || stroke.points.length !== 4) {
-              const corners = getRectangleCorners(stroke);
-              const updatedStroke: BrushStroke = {
-                ...stroke,
-                points: corners,
-                isFreeForm: true
-              };
-              const newStrokes = brushStrokes.map(s => s.id === stroke.id ? updatedStroke : s);
-              setBrushStrokes(newStrokes);
-              selectedShapeRef.current = updatedStroke;
-              redrawStrokes(newStrokes);
-            }
+            // Convert to 4-point free-form
+            const corners = getRectangleCorners(stroke);
+            const updatedStroke: BrushStroke = {
+              ...stroke,
+              points: corners,
+              isFreeForm: true
+            };
+            const newStrokes = brushStrokes.map(s => s.id === stroke.id ? updatedStroke : s);
+            setBrushStrokes(newStrokes);
+            selectedShapeRef.current = updatedStroke;
+            redrawStrokes(newStrokes);
             
             setDraggingCornerIndex(cornerIndex);
             setIsDraggingShape(true);
-            selectedShapeRef.current = stroke.isFreeForm ? stroke : { ...stroke, points: getRectangleCorners(stroke), isFreeForm: true };
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
             return;
           }
           
           // Determine if clicking edge (move) or corner (resize) and START IMMEDIATELY
+          // Note: For free-form shapes, corner clicks are handled above
           const clickType = getRectangleClickType(x, y, stroke);
           
           if (clickType === 'edge') {
@@ -630,7 +639,8 @@ export const useInpainting = ({
             setDragOffset({ x: x - startPoint.x, y: y - startPoint.y });
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
             return;
-          } else if (clickType === 'corner') {
+          } else if (clickType === 'corner' && !stroke.isFreeForm) {
+            // Standard rectangle resize (only for non-free-form rectangles)
             console.log('[Drag] IMMEDIATELY starting to RESIZE rectangle (clicked corner)');
             setDragMode('resize');
             setIsDraggingShape(true);
