@@ -297,11 +297,21 @@ export const useInpainting = ({
   const isPointOnShape = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): boolean => {
     if (!stroke.shapeType || stroke.shapeType === 'line') return false;
     
-    const startPoint = stroke.points[0];
-    const endPoint = stroke.points[stroke.points.length - 1];
-    
     if (stroke.shapeType === 'rectangle') {
-      // Check if point is inside or on the rectangle border
+      // For free-form rectangles, calculate bounding box from all corners
+      if (stroke.isFreeForm && stroke.points.length === 4) {
+        const minX = Math.min(...stroke.points.map(p => p.x));
+        const maxX = Math.max(...stroke.points.map(p => p.x));
+        const minY = Math.min(...stroke.points.map(p => p.y));
+        const maxY = Math.max(...stroke.points.map(p => p.y));
+        
+        return x >= minX - threshold && x <= maxX + threshold && 
+               y >= minY - threshold && y <= maxY + threshold;
+      }
+      
+      // Standard rectangle - use first and last points
+      const startPoint = stroke.points[0];
+      const endPoint = stroke.points[stroke.points.length - 1];
       const minX = Math.min(startPoint.x, endPoint.x);
       const maxX = Math.max(startPoint.x, endPoint.x);
       const minY = Math.min(startPoint.y, endPoint.y);
