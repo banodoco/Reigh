@@ -180,7 +180,7 @@ export const useInpainting = ({
     hasImageContainer: !!imageContainerRef?.current
   });
 
-  // Load saved settings from localStorage when entering inpaint mode
+  // Load saved settings from localStorage when entering inpaint mode or changing media
   useEffect(() => {
     if (isInpaintMode) {
       try {
@@ -202,22 +202,13 @@ export const useInpainting = ({
             brushSize: parsed.brushSize
           });
           
-          // Redraw loaded strokes on next tick (based on current mode)
-          // Note: redrawStrokes will be called after it's defined
-          setTimeout(() => {
-            const canvas = displayCanvasRef.current;
-            if (canvas && canvas.getContext('2d')) {
-              const strokesToDraw = isAnnotateMode ? (parsed.annotationStrokes || []) : (parsed.inpaintStrokes || parsed.strokes || []);
-              // redrawStrokes will be available in the setTimeout callback
-              console.log('[Inpaint] Scheduling redraw of loaded strokes', { count: strokesToDraw.length });
-            }
-          }, 100);
+          // Redraw will happen automatically via the redraw effect
         }
       } catch (e) {
         console.error('[Inpaint] Error loading saved data:', e);
       }
     }
-  }, [isInpaintMode, media.id, isAnnotateMode, displayCanvasRef]);
+  }, [isInpaintMode, media.id]); // Removed isAnnotateMode and displayCanvasRef - only load on mode entry or media change
 
   // Save all settings to localStorage when they change
   useEffect(() => {
@@ -487,18 +478,8 @@ export const useInpainting = ({
 
   // Rectangles don't need control points (arrow control point logic removed)
 
-  // Prevent cross-over between modes: Clear opposite mode's strokes when switching
-  useEffect(() => {
-    if (!isInpaintMode) return;
-    
-    if (editMode === 'annotate' && inpaintStrokes.length > 0) {
-      console.log('[ModeSeparation] Switched to annotate mode - clearing inpaint strokes');
-      setInpaintStrokes([]);
-    } else if (editMode === 'inpaint' && annotationStrokes.length > 0) {
-      console.log('[ModeSeparation] Switched to inpaint mode - clearing annotation strokes');
-      setAnnotationStrokes([]);
-    }
-  }, [editMode, isInpaintMode, inpaintStrokes.length, annotationStrokes.length, setInpaintStrokes, setAnnotationStrokes]);
+  // Note: Mode separation (preventing cross-over) is now handled during drawing
+  // This allows both stroke types to persist in localStorage while only showing the current mode's strokes
   
   // Redraw when switching between annotate and inpaint modes
   useEffect(() => {
@@ -511,10 +492,21 @@ export const useInpainting = ({
     }
   }, [isAnnotateMode, isInpaintMode, brushStrokes, redrawStrokes]);
   
-  // Clear selection when switching modes (separate effect to avoid clearing on every redraw)
+  // Track previous mode to detect actual mode changes
+  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode);
+  
+  // Clear selection only when actually switching modes (not on re-renders)
   useEffect(() => {
-    setSelectedShapeId(null);
-  }, [isAnnotateMode, editMode]);
+    const prevMode = prevModeForSelectionRef.current;
+    
+    // Only clear if we're actually switching to a different mode
+    if (prevMode !== editMode && prevMode === 'annotate') {
+      console.log('[Selection] Clearing selection due to mode switch from annotate');
+      setSelectedShapeId(null);
+    }
+    
+    prevModeForSelectionRef.current = editMode;
+  }, [editMode]);
 
   // Auto-select default tools when switching modes
   useEffect(() => {
@@ -881,6 +873,15 @@ export const useInpainting = ({
         shapeType
       };
       
+      // Clear opposite mode's strokes when starting to draw (prevents cross-over)
+      if (isAnnotateMode && inpaintStrokes.length > 0) {
+        console.log('[ModeSeparation] Drawing in annotate mode - clearing inpaint strokes');
+        setInpaintStrokes([]);
+      } else if (!isAnnotateMode && annotationStrokes.length > 0) {
+        console.log('[ModeSeparation] Drawing in inpaint mode - clearing annotation strokes');
+        setAnnotationStrokes([]);
+      }
+      
       setBrushStrokes(prev => [...prev, newStroke]);
       
       // Auto-select rectangle after drawing (shows delete button immediately)
@@ -898,7 +899,7 @@ export const useInpainting = ({
     }
     
     setCurrentStroke([]);
-  }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, isDraggingControlPoint, setBrushStrokes]);
+  }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, isDraggingControlPoint, setBrushStrokes, inpaintStrokes.length, annotationStrokes.length, setInpaintStrokes, setAnnotationStrokes]);
 
   // Undo last stroke
   const handleUndo = useCallback(() => {
