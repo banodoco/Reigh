@@ -127,6 +127,8 @@ export const useInpainting = ({
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const selectedShapeRef = useRef<BrushStroke | null>(null);
   const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('inpaint');
+  const prevMediaIdRef = useRef(media.id); // Track media ID changes
+  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode); // Track mode changes for selection
 
   // Wrapper setters that persist to mediaStateRef
   const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | ((prev: 'text' | 'inpaint' | 'annotate') => 'text' | 'inpaint' | 'annotate')) => {
@@ -155,6 +157,18 @@ export const useInpainting = ({
 
   // Restore state when media changes
   useEffect(() => {
+    // Only run if media.id actually changed
+    if (prevMediaIdRef.current === media.id) {
+      return;
+    }
+    
+    console.log('[Media] 🔄 Media changed', { 
+      from: prevMediaIdRef.current.substring(0, 8), 
+      to: media.id.substring(0, 8) 
+    });
+    
+    prevMediaIdRef.current = media.id;
+    
     const savedState = mediaStateRef.current.get(media.id);
     if (savedState) {
       console.log('[InpaintState] Restoring state for media', { mediaId: media.id.substring(0, 8), savedState });
@@ -168,6 +182,7 @@ export const useInpainting = ({
     }
     
     // Clear selection when switching media
+    console.log('[Selection] ❌ Clearing selection - switched media');
     setSelectedShapeId(null);
   }, [media.id]);
   
@@ -492,21 +507,23 @@ export const useInpainting = ({
     }
   }, [isAnnotateMode, isInpaintMode, brushStrokes, redrawStrokes]);
   
-  // Track previous mode to detect actual mode changes
-  const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode);
-  
   // Clear selection only when actually switching modes (not on re-renders)
   useEffect(() => {
     const prevMode = prevModeForSelectionRef.current;
     
     // Only clear if we're actually switching to a different mode
     if (prevMode !== editMode && prevMode === 'annotate') {
-      console.log('[Selection] Clearing selection due to mode switch from annotate');
+      console.log('[Selection] ❌ Clearing selection due to mode switch from annotate', { prevMode, newMode: editMode });
       setSelectedShapeId(null);
     }
     
     prevModeForSelectionRef.current = editMode;
   }, [editMode]);
+  
+  // Debug: Log whenever selectedShapeId changes
+  useEffect(() => {
+    console.log('[Selection] 🔍 selectedShapeId changed:', selectedShapeId);
+  }, [selectedShapeId]);
 
   // Auto-select default tools when switching modes
   useEffect(() => {
@@ -631,6 +648,7 @@ export const useInpainting = ({
       
       // Clicked on empty space, deselect any selected shape
       if (selectedShapeId) {
+        console.log('[Selection] ❌ Clearing selection - clicked on empty space');
         setSelectedShapeId(null);
       }
       
