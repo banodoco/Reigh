@@ -1035,6 +1035,17 @@ export const useInpainting = ({
     if (!isInpaintMode || !isAnnotateMode) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle keyboard shortcuts if user is typing in an input field
+      const target = e.target as HTMLElement;
+      const isTyping = target && (
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.contentEditable === 'true' ||
+        target.isContentEditable
+      );
+      
+      if (isTyping) return;
+      
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeId) {
         e.preventDefault();
         handleDeleteSelected();
