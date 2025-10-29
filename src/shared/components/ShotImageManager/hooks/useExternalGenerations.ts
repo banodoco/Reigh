@@ -146,36 +146,72 @@ export function useExternalGenerations({
       hasDerivedContext: !!derivedContext
     });
     
-    // Set up derived navigation mode
-    if (derivedContext && derivedContext.length > 0) {
-      setDerivedNavContext({
-        sourceGenerationId: generationId,
-        derivedGenerationIds: derivedContext
-      });
-    } else if (derivedNavContext !== null) {
-      setDerivedNavContext(null);
-      setTempDerivedGenerations([]);
-    }
-    
-    // Check if generation already exists
+    // Check if generation already exists BEFORE modifying state
     const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
     const existingIndex = baseImages.findIndex(img => img.id === generationId);
     
     if (existingIndex !== -1) {
+      // Set up derived navigation mode
+      if (derivedContext && derivedContext.length > 0) {
+        setDerivedNavContext({
+          sourceGenerationId: generationId,
+          derivedGenerationIds: derivedContext
+        });
+      } else if (derivedNavContext !== null) {
+        setDerivedNavContext(null);
+        setTempDerivedGenerations([]);
+      }
       setLightboxIndexRef.current(existingIndex);
       return;
     }
     
     const externalIndex = externalGenerations.findIndex(img => img.id === generationId);
     if (externalIndex !== -1) {
+      // Set up derived navigation mode
+      if (derivedContext && derivedContext.length > 0) {
+        setDerivedNavContext({
+          sourceGenerationId: generationId,
+          derivedGenerationIds: derivedContext
+        });
+      } else if (derivedNavContext !== null) {
+        setDerivedNavContext(null);
+        setTempDerivedGenerations([]);
+      }
       setLightboxIndexRef.current(baseImages.length + externalIndex);
       return;
     }
     
     const tempDerivedIndex = tempDerivedGenerations.findIndex(img => img.id === generationId);
     if (tempDerivedIndex !== -1) {
+      // Set up derived navigation mode
+      if (derivedContext && derivedContext.length > 0) {
+        setDerivedNavContext({
+          sourceGenerationId: generationId,
+          derivedGenerationIds: derivedContext
+        });
+      } else if (derivedNavContext !== null) {
+        setDerivedNavContext(null);
+        setTempDerivedGenerations([]);
+      }
       setLightboxIndexRef.current(baseImages.length + externalGenerations.length + tempDerivedIndex);
       return;
+    }
+    
+    // Not found in any existing arrays - need to fetch
+    // Set up derived navigation mode BEFORE clearing temp state
+    if (derivedContext && derivedContext.length > 0) {
+      setDerivedNavContext({
+        sourceGenerationId: generationId,
+        derivedGenerationIds: derivedContext
+      });
+    } else if (derivedNavContext !== null) {
+      // Update lightbox index to a safe position BEFORE clearing temp derived
+      // Point to end of externalGenerations (where new item will be added)
+      const newIndex = baseImages.length + externalGenerations.length;
+      setLightboxIndexRef.current(newIndex);
+      // Now safe to clear without invalidating the index
+      setDerivedNavContext(null);
+      setTempDerivedGenerations([]);
     }
     
     try {

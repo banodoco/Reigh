@@ -533,31 +533,28 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       '\n  derivedContextCount:', derivedContext?.length || 0
     );
     
-    // If derived context is provided, set up derived navigation mode
-    // If not provided, clear any existing context (exits derived nav mode)
-    if (derivedContext && derivedContext.length > 0) {
-      console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
-        targetId: generationId.substring(0, 8),
-        totalDerived: derivedContext.length,
-        derivedIds: derivedContext.map(id => id.substring(0, 8))
-      });
-      setDerivedNavContext({
-        sourceGenerationId: generationId, // We'll update this to the actual source later if needed
-        derivedGenerationIds: derivedContext
-      });
-    } else if (derivedNavContext !== null) {
-      console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
-      setDerivedNavContext(null);
-      // Clear temp derived generations when exiting mode
-      setTempDerivedGenerations([]);
-    }
-    
-    // First, check if generation already exists in current images
+    // Check if generation already exists BEFORE modifying state
     const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
     const existingIndex = baseImages.findIndex(img => img.id === generationId);
     
     if (existingIndex !== -1) {
       console.log('[ShotImageManager] ✅ Generation already in current images at index', existingIndex);
+      // Set up derived navigation mode
+      if (derivedContext && derivedContext.length > 0) {
+        console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
+          targetId: generationId.substring(0, 8),
+          totalDerived: derivedContext.length,
+          derivedIds: derivedContext.map(id => id.substring(0, 8))
+        });
+        setDerivedNavContext({
+          sourceGenerationId: generationId,
+          derivedGenerationIds: derivedContext
+        });
+      } else if (derivedNavContext !== null) {
+        console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
+        setDerivedNavContext(null);
+        setTempDerivedGenerations([]);
+      }
       setLightboxIndex(existingIndex);
       return;
     }
@@ -566,6 +563,22 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const externalIndex = externalGenerations.findIndex(img => img.id === generationId);
     if (externalIndex !== -1) {
       console.log('[ShotImageManager] ✅ Generation already in external list');
+      // Set up derived navigation mode
+      if (derivedContext && derivedContext.length > 0) {
+        console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
+          targetId: generationId.substring(0, 8),
+          totalDerived: derivedContext.length,
+          derivedIds: derivedContext.map(id => id.substring(0, 8))
+        });
+        setDerivedNavContext({
+          sourceGenerationId: generationId,
+          derivedGenerationIds: derivedContext
+        });
+      } else if (derivedNavContext !== null) {
+        console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
+        setDerivedNavContext(null);
+        setTempDerivedGenerations([]);
+      }
       setLightboxIndex(baseImages.length + externalIndex);
       return;
     }
@@ -574,8 +587,47 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const tempDerivedIndex = tempDerivedGenerations.findIndex(img => img.id === generationId);
     if (tempDerivedIndex !== -1) {
       console.log('[ShotImageManager] ✅ Generation already in temp derived list');
+      // Set up derived navigation mode
+      if (derivedContext && derivedContext.length > 0) {
+        console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
+          targetId: generationId.substring(0, 8),
+          totalDerived: derivedContext.length,
+          derivedIds: derivedContext.map(id => id.substring(0, 8))
+        });
+        setDerivedNavContext({
+          sourceGenerationId: generationId,
+          derivedGenerationIds: derivedContext
+        });
+      } else if (derivedNavContext !== null) {
+        console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
+        setDerivedNavContext(null);
+        setTempDerivedGenerations([]);
+      }
       setLightboxIndex(baseImages.length + externalGenerations.length + tempDerivedIndex);
       return;
+    }
+    
+    // Not found in any existing arrays - need to fetch
+    // Set up derived navigation mode BEFORE clearing temp state
+    if (derivedContext && derivedContext.length > 0) {
+      console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
+        targetId: generationId.substring(0, 8),
+        totalDerived: derivedContext.length,
+        derivedIds: derivedContext.map(id => id.substring(0, 8))
+      });
+      setDerivedNavContext({
+        sourceGenerationId: generationId,
+        derivedGenerationIds: derivedContext
+      });
+    } else if (derivedNavContext !== null) {
+      console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
+      // Update lightbox index to a safe position BEFORE clearing temp derived
+      // Point to end of externalGenerations (where new item will be added)
+      const newIndex = baseImages.length + externalGenerations.length;
+      setLightboxIndex(newIndex);
+      // Now safe to clear without invalidating the index
+      setDerivedNavContext(null);
+      setTempDerivedGenerations([]);
     }
     
     try {
