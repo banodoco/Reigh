@@ -9,6 +9,7 @@ import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
 import { RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { FilterGroup } from './TasksPane';
+import { GenerationRow } from '@/types/shots';
 
 interface TaskListProps {
   filterStatuses: TaskStatus[];
@@ -21,6 +22,9 @@ interface TaskListProps {
   paginatedData?: PaginatedTasksResponse;
   isLoading?: boolean;
   currentPage?: number; // Add current page to track pagination changes
+  activeTaskId?: string | null; // Currently active/viewed task ID
+  onOpenImageLightbox?: (task: Task, media: GenerationRow) => void; // NEW
+  onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void; // NEW
 }
 
 const TaskList: React.FC<TaskListProps> = ({ 
@@ -29,7 +33,10 @@ const TaskList: React.FC<TaskListProps> = ({
   statusCounts,
   paginatedData,
   isLoading = false,
-  currentPage = 1
+  currentPage = 1,
+  activeTaskId,
+  onOpenImageLightbox,
+  onOpenVideoLightbox
 }) => {
   const { selectedProjectId } = useProject();
 
@@ -175,7 +182,13 @@ const TaskList: React.FC<TaskListProps> = ({
           <ScrollArea className="h-full pr-4">
               {filteredTasks.map((task: Task, idx: number) => (
                   <React.Fragment key={task.id}>
-                    <TaskItem task={task} isNew={newTaskIds.has(task.id)} />
+                    <TaskItem 
+                      task={task} 
+                      isNew={newTaskIds.has(task.id)} 
+                      isActive={task.id === activeTaskId}
+                      onOpenImageLightbox={onOpenImageLightbox}
+                      onOpenVideoLightbox={onOpenVideoLightbox}
+                    />
                     {idx < filteredTasks.length - 1 && (
                       <div className="h-0 border-b border-zinc-700/40 my-1" />
                     )}

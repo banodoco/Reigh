@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Settings, Key, Copy, Trash2, AlertCircle, Terminal, Coins, Monitor, LogOut, HelpCircle, MoreHorizontal } from "lucide-react";
 import {
   Tooltip,
@@ -10,6 +11,7 @@ import { Task, TASK_STATUS } from '@/types/tasks';
 import { getTaskDisplayName, taskSupportsProgress } from '@/shared/lib/taskConfig';
 import { useCancelTask } from '@/shared/hooks/useTasks';
 import { useProject } from '@/shared/contexts/ProjectContext';
+import { usePanes } from '@/shared/contexts/PanesContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib/utils';
@@ -29,6 +31,7 @@ import { SharedTaskDetails } from '@/tools/travel-between-images/components/Shar
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useTaskType } from '@/shared/hooks/useTaskType';
+import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
 
 // Function to create abbreviated task names for tight spaces
 const getAbbreviatedTaskName = (fullName: string): string => {
@@ -48,11 +51,14 @@ const getAbbreviatedTaskName = (fullName: string): string => {
 interface TaskItemProps {
   task: Task;
   isNew?: boolean;
+  isActive?: boolean;
+  onOpenImageLightbox?: (task: Task, media: GenerationRow) => void;
+  onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number) => void;
 }
 
 // Timestamp formatting now handled by useTaskTimestamp hook
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = false, onOpenImageLightbox, onOpenVideoLightbox }) => {
   const { toast } = useToast();
   
   // Mobile detection hook - declare early for use throughout component
@@ -60,6 +66,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
   // Access project context early so it can be used in other hooks
   const { selectedProjectId } = useProject();
+  
+  // Access pane controls for setting active task
+  const { setActiveTaskId, setIsTasksPaneOpen, tasksPaneWidth } = usePanes();
   
   // Get live-updating timestamp
   const createdTimeAgo = useTaskTimestamp(task.createdAt || (task as any).created_at);
@@ -89,19 +98,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
   const addImageToShotMutation = useAddImageToShot();
 
-  // State for MediaLightbox
-  const [showLightbox, setShowLightbox] = useState(false);
+  // No longer need local lightbox state - hoisted to TasksPane
   const [selectedShotId, setSelectedShotId] = useState<string>('');
   const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
 
-  // Create simplified shot options for MediaLightbox
-  const simplifiedShotOptions = React.useMemo(() => shots?.map(s => ({ id: s.id, name: s.name })) || [], [shots]);
-
   // Set initial selected shot
   useEffect(() => {
-    const newSelectedShotId = currentShotId || lastAffectedShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
+    const newSelectedShotId = currentShotId || lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : "");
     setSelectedShotId(newSelectedShotId);
-  }, [currentShotId, lastAffectedShotId, simplifiedShotOptions]);
+  }, [currentShotId, lastAffectedShotId, shots]);
 
   // Handler for adding image to shot
   const handleAddToShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
@@ -396,11 +401,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   }, [isHoveringTaskItem, taskInfo.isCompletedVideoTask, shouldFetchVideo]);
   
   // State for video lightbox
-  const [showVideoLightbox, setShowVideoLightbox] = useState<boolean>(false);
-  const [videoLightboxIndex, setVideoLightboxIndex] = useState<number>(0);
+  // No longer need video lightbox state - hoisted to TasksPane
   
   // State for ID copy indicator
   const [idCopied, setIdCopied] = useState<boolean>(false);
+  
+  // Task details no longer needed here - handled by TasksPane
   
   // Fetch the actual error message if this is a cascaded failure
   const cascadedTaskIdMatch = task.errorMessage?.match(/Cascaded failed from related task ([a-f0-9-]+)/i);
@@ -435,12 +441,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     enabled: !!cascadedTaskId && task.status === 'Failed',
   });
   
-  // Reset hover state when lightboxes open to prevent persistent hover state
-  useEffect(() => {
-    if (showLightbox || showVideoLightbox) {
-      setIsHoveringTaskItem(false);
-    }
-  }, [showLightbox, showVideoLightbox]);
+  // Lightbox state no longer tracked here
 
   // Local state to show progress percentage temporarily
   const [progressPercent, setProgressPercent] = useState<number | null>(null);
@@ -602,11 +603,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     // Reset hover state immediately
     setIsHoveringTaskItem(false);
     
-    // If video data is already loaded, open immediately
-    if (travelData.videoOutputs && travelData.videoOutputs.length > 0) {
-      setVideoLightboxIndex(0);
-      setShowVideoLightbox(true);
-    } else {
+    // Use callback if provided, otherwise do nothing (old behavior)
+    if (onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+    } else if (!onOpenVideoLightbox) {
+      // Fallback: if no callback, maintain old behavior
+      // Set this task as active and open tasks pane (desktop only)
+      if (!isMobile) {
+        setActiveTaskId(task.id);
+        setIsTasksPaneOpen(true);
+      }
       // If not loaded yet, trigger fetch and mark that we're waiting to open
       setShouldFetchVideo(true);
       setWaitingForVideoToOpen(true);
@@ -616,11 +622,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
   // Auto-open lightbox when video data becomes available after clicking (not just hovering)
   useEffect(() => {
     if (waitingForVideoToOpen && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
-      setVideoLightboxIndex(0);
-      setShowVideoLightbox(true);
+      if (onOpenVideoLightbox) {
+        onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+      }
       setWaitingForVideoToOpen(false); // Reset the flag
     }
-  }, [travelData.videoOutputs, waitingForVideoToOpen]);
+  }, [travelData.videoOutputs, waitingForVideoToOpen, onOpenVideoLightbox, task]);
 
   // Handler for opening image lightbox
   const handleViewImage = (e: React.MouseEvent) => {
@@ -631,13 +638,25 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     setIsHoveringTaskItem(false);
     
     if (generationData) {
-      setShowLightbox(true);
+      // Use callback if provided
+      if (onOpenImageLightbox) {
+        onOpenImageLightbox(task, generationData);
+      } else {
+        // Fallback: maintain old behavior if no callback
+        if (!isMobile) {
+          setActiveTaskId(task.id);
+          setIsTasksPaneOpen(true);
+        }
+        // (No local state to set since it's been removed)
+      }
     }
   };
 
   const containerClass = cn(
     "relative p-3 mb-2 bg-zinc-800/95 rounded-md shadow border transition-colors overflow-hidden",
-    isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : "border-zinc-600 hover:border-zinc-400"
+    isNew ? "border-teal-400 animate-[flash_3s_ease-in-out]" : 
+    isActive ? "border-blue-500 bg-blue-900/20 ring-2 ring-blue-400/50" :
+    "border-zinc-600 hover:border-zinc-400"
   );
 
 
@@ -662,8 +681,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
     }
     
     // For image generation tasks - open image if available
-    if (taskInfo.isImageTask && generationData) {
-      setShowLightbox(true);
+    if (taskInfo.isImageTask && generationData && onOpenImageLightbox) {
+      onOpenImageLightbox(task, generationData);
       return;
     }
   };
@@ -774,7 +793,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
             {/* Tiny thumbnail for successful Image Generation tasks */}
             {generationData && (
               <button
-                onClick={() => setShowLightbox(true)}
+                onClick={() => onOpenImageLightbox && onOpenImageLightbox(task, generationData)}
                 className="w-8 h-8 rounded border border-zinc-500 overflow-hidden hover:border-zinc-400 transition-colors flex-shrink-0"
               >
                 <img
@@ -887,47 +906,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       {/* Add more task details as needed, e.g., from task.params */}
       {/* <pre className="text-xs text-zinc-500 whitespace-pre-wrap break-all">{JSON.stringify(task.params, null, 2)}</pre> */}
       
-      {/* MediaLightbox for viewing generated images */}
-      {showLightbox && generationData && (
-        <MediaLightbox
-          media={generationData}
-          onClose={() => setShowLightbox(false)}
-          showNavigation={false}
-          showImageEditTools={true}
-          showDownload={true}
-          showMagicEdit={false}
-          allShots={simplifiedShotOptions}
-          selectedShotId={selectedShotId}
-          onShotChange={handleShotChange}
-          onAddToShot={handleAddToShot}
-          showTickForImageId={showTickForImageId}
-          onShowTick={handleShowTick}
-        />
-      )}
-
-      {/* MediaLightbox for viewing travel videos */}
-      {showVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0 && (
-        <MediaLightbox
-          media={travelData.videoOutputs[videoLightboxIndex]}
-          onClose={() => setShowVideoLightbox(false)}
-          onNext={() => {
-            if (videoLightboxIndex < travelData.videoOutputs!.length - 1) {
-              setVideoLightboxIndex(videoLightboxIndex + 1);
-            }
-          }}
-          onPrevious={() => {
-            if (videoLightboxIndex > 0) {
-              setVideoLightboxIndex(videoLightboxIndex - 1);
-            }
-          }}
-          showNavigation={travelData.videoOutputs!.length > 1}
-          showImageEditTools={false}
-          showDownload={true}
-          showMagicEdit={false}
-          hasNext={videoLightboxIndex < travelData.videoOutputs!.length - 1}
-          hasPrevious={videoLightboxIndex > 0}
-        />
-      )}
 
       {/* Action button overlay for image generation tasks on hover - desktop only */}
       {isHoveringTaskItem && taskInfo.isImageTask && generationData && !isMobile && (
@@ -986,7 +964,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
 
   // Unified tooltip wrapper for both travel and image tasks
   // Don't show tooltips on mobile to improve performance and UX
-  if (taskInfo.showsTooltip && !isMobile) {
+  const mainContent = taskInfo.showsTooltip && !isMobile ? (() => {
     const isTravel = taskInfo.isVideoTask;
     const hasClickableContent = taskInfo.isVideoTask ? 
       (taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0) : 
@@ -998,11 +976,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
       // Reset hover state immediately when clicking tooltip
       setIsHoveringTaskItem(false);
       
-      if (taskInfo.isVideoTask && hasClickableContent) {
-        setVideoLightboxIndex(0);
-        setShowVideoLightbox(true);
-      } else if (!taskInfo.isVideoTask && hasClickableContent) {
-        setShowLightbox(true);
+      if (taskInfo.isVideoTask && hasClickableContent && onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+        onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+      } else if (!taskInfo.isVideoTask && hasClickableContent && onOpenImageLightbox && generationData) {
+        onOpenImageLightbox(task, generationData);
       }
     };
 
@@ -1058,11 +1035,15 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false }) => {
         </TooltipContent>
       </Tooltip>
     );
-  }
+  })() : taskItemContent;
 
-
-
-  return taskItemContent;
+  return (
+    <>
+      {mainContent}
+      
+      {/* MediaLightbox now rendered centrally in TasksPane to persist across pagination */}
+    </>
+  );
 };
 
 export default TaskItem; 

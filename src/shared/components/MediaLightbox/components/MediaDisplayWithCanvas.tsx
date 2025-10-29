@@ -29,6 +29,9 @@ interface MediaDisplayWithCanvasProps {
   className?: string;
   containerClassName?: string;
   
+  // Layout adjustments
+  tasksPaneWidth?: number; // Width of tasks pane to adjust for (desktop only)
+  
   // Debug
   debugContext?: string;
 }
@@ -51,13 +54,18 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   variant = 'regular-centered',
   className = '',
   containerClassName = '',
+  tasksPaneWidth = 0,
   debugContext = 'MediaDisplay'
 }) => {
   // Variant-specific styling
   const getMediaStyle = () => {
     switch (variant) {
       case 'desktop-side-panel':
-        return { maxWidth: '55vw', maxHeight: '98vh' };
+        // Adjust max-width to account for tasks pane if present
+        const adjustedMaxWidth = tasksPaneWidth > 0 
+          ? `calc(55vw - ${tasksPaneWidth * 0.55}px)` // 55% of remaining space after tasks pane
+          : '55vw';
+        return { maxWidth: adjustedMaxWidth, maxHeight: '98vh' };
       case 'mobile-stacked':
         return { maxWidth: '95vw', maxHeight: '58vh' };
       case 'regular-centered':

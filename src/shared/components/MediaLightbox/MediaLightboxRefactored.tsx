@@ -141,6 +141,9 @@ interface MediaLightboxProps {
   onOpenExternalGeneration?: (generationId: string, derivedContext?: string[]) => Promise<void>;
   // Shot ID for star persistence
   shotId?: string;
+  // Tasks pane integration (desktop only)
+  tasksPaneOpen?: boolean;
+  tasksPaneWidth?: number;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -199,6 +202,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onOpenExternalGeneration,
   // Shot ID for star persistence
   shotId,
+  tasksPaneOpen = false,
+  tasksPaneWidth = 320,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -497,6 +502,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     <TooltipProvider delayDuration={500}>
       <DialogPrimitive.Root 
         open={true} 
+        // Allow scrolling/interactions outside when tasks pane is open on desktop
+        modal={!(tasksPaneOpen && !isMobile)}
         onOpenChange={() => {
           // Prevent automatic closing - we handle all closing manually
         }}
@@ -689,8 +696,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               position: 'fixed',
               top: 0,
               left: 0,
-              right: 0,
-              bottom: 0
+              // Adjust for tasks pane on desktop
+              right: tasksPaneOpen && !isMobile ? `${tasksPaneWidth}px` : 0,
+              bottom: 0,
+              // Adjust width for tasks pane on desktop
+              ...(tasksPaneOpen && !isMobile ? {
+                width: `calc(100vw - ${tasksPaneWidth}px)`
+              } : {})
             }}
           />
           <DialogPrimitive.Content
@@ -796,11 +808,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               "p-0 border-none bg-transparent shadow-none",
               // Layout: Full screen for special modes on tablet+, otherwise centered
               shouldShowSidePanel
-                ? "left-0 top-0 w-full h-full" // Full screen layout for side panel modes
+                ? "left-0 top-0 h-full" // Full screen layout for side panel modes (width handled inline)
                 : isMobile 
                   ? "inset-0 w-full h-full" // Mobile: full screen
                   : "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-auto h-auto data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
             )}
+            style={shouldShowSidePanel && tasksPaneOpen && !isMobile ? {
+              width: `calc(100vw - ${tasksPaneWidth}px)`
+            } : shouldShowSidePanel ? {
+              width: '100vw'
+            } : undefined}
             onPointerDownOutside={(event) => {
               if (isInpaintMode) {
                 // 🚀 MOBILE FIX: Prevent underlying click-throughs and then close manually
@@ -909,6 +926,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     handlePointerUp={handlePointerUp}
                     variant="desktop-side-panel"
                     containerClassName="max-w-full max-h-full"
+                    tasksPaneWidth={tasksPaneOpen && !isMobile ? tasksPaneWidth : 0}
                     debugContext="Desktop"
                   />
 

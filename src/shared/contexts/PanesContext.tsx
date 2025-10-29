@@ -21,6 +21,14 @@ interface PanesContextType {
   setIsTasksPaneLocked: (isLocked: boolean) => void;
   tasksPaneWidth: number;
   setTasksPaneWidth: (width: number) => void;
+  
+  // Active task tracking for highlighting
+  activeTaskId: string | null;
+  setActiveTaskId: (taskId: string | null) => void;
+  
+  // Programmatic tasks pane control (desktop only)
+  isTasksPaneOpen: boolean;
+  setIsTasksPaneOpen: (isOpen: boolean) => void;
 }
 
 const PanesContext = createContext<PanesContextType | undefined>(undefined);
@@ -40,11 +48,15 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   // Pane open states (not persisted, runtime only)
   const [isGenerationsPaneOpenState, setIsGenerationsPaneOpenState] = useState(false);
+  const [isTasksPaneOpenState, setIsTasksPaneOpenState] = useState(false);
 
   // Pane dimensions (not persisted)
   const [generationsPaneHeight, setGenerationsPaneHeightState] = useState<number>(PANE_CONFIG.dimensions.DEFAULT_HEIGHT);
   const [shotsPaneWidth, setShotsPaneWidthState] = useState<number>(PANE_CONFIG.dimensions.DEFAULT_WIDTH);
   const [tasksPaneWidth, setTasksPaneWidthState] = useState<number>(PANE_CONFIG.dimensions.DEFAULT_WIDTH);
+  
+  // Active task tracking (not persisted)
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   // Hydrate local state once when settings load (desktop only)
   useEffect(() => {
@@ -128,6 +140,13 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const setIsGenerationsPaneOpen = useCallback((isOpen: boolean) => {
     setIsGenerationsPaneOpenState(isOpen);
   }, []);
+  
+  const setIsTasksPaneOpen = useCallback((isOpen: boolean) => {
+    // Only works on desktop - mobile uses hover/tap behavior
+    if (!isMobile) {
+      setIsTasksPaneOpenState(isOpen);
+    }
+  }, [isMobile]);
 
   // Dimension setters
   const setGenerationsPaneHeight = useCallback((height: number) => {
@@ -159,6 +178,10 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setIsTasksPaneLocked,
       tasksPaneWidth,
       setTasksPaneWidth,
+      activeTaskId,
+      setActiveTaskId,
+      isTasksPaneOpen: isTasksPaneOpenState,
+      setIsTasksPaneOpen,
     }),
     [
       isMobile,
@@ -176,6 +199,10 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setShotsPaneWidth,
       tasksPaneWidth,
       setTasksPaneWidth,
+      activeTaskId,
+      setActiveTaskId,
+      isTasksPaneOpenState,
+      setIsTasksPaneOpen,
     ]
   );
 

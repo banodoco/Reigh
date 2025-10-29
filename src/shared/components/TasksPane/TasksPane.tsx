@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
 import TaskList from './TaskList';
@@ -16,6 +17,13 @@ import { TASK_STATUS, TaskStatus } from '@/types/database';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { filterVisibleTasks, isTaskVisible } from '@/shared/lib/taskConfig';
 import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
+import MediaLightbox from '@/shared/components/MediaLightbox';
+import { GenerationRow } from '@/types/shots';
+import { Task } from '@/types/tasks';
+import { useListShots } from '@/shared/hooks/useShots';
+import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
+import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
+import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -153,6 +161,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     isTasksPaneLocked,
     setIsTasksPaneLocked,
     tasksPaneWidth,
+    activeTaskId,
+    setActiveTaskId,
+    isTasksPaneOpen: isTasksPaneOpenProgrammatic,
+    setIsTasksPaneOpen: setIsTasksPaneOpenProgrammatic,
   } = usePanes();
 
   // Status filter state - default to Processing
@@ -161,9 +173,36 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Lightbox state - hoisted here so pagination doesn't close it
+  const [lightboxData, setLightboxData] = useState<{
+    type: 'image' | 'video';
+    task: Task;
+    media: GenerationRow | GenerationRow[];
+    videoIndex?: number;
+  } | null>(null);
+
   // Project context & task helpers
   const { selectedProjectId } = useProject();
   const shouldLoadTasks = !!selectedProjectId;
+  
+  // Shots data for lightbox
+  const { data: shots } = useListShots(selectedProjectId);
+  const { currentShotId } = useCurrentShot();
+  const { lastAffectedShotId } = useLastAffectedShot();
+  
+  // Simplified shot options for MediaLightbox
+  const simplifiedShotOptions = React.useMemo(() => shots?.map(s => ({ id: s.id, name: s.name })) || [], [shots]);
+  
+  // Task details for current lightbox media
+  const currentLightboxImageId = lightboxData?.type === 'image' && !Array.isArray(lightboxData.media) 
+    ? lightboxData.media.id 
+    : null;
+  const currentVideoGenerationId = lightboxData?.type === 'video' && Array.isArray(lightboxData.media) && lightboxData.videoIndex !== undefined
+    ? lightboxData.media[lightboxData.videoIndex]?.id 
+    : null;
+  const { taskDetailsData } = useTaskDetails({ 
+    generationId: currentLightboxImageId || currentVideoGenerationId 
+  });
   
   // Realtime connection status
   const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError, lastTaskUpdate, lastNewTask } = useSimpleRealtime();
@@ -548,6 +587,24 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     setCurrentPage(page);
   };
 
+  // Lightbox handlers - passed down to TaskItems
+  const handleOpenImageLightbox = (task: Task, media: GenerationRow) => {
+    setLightboxData({ type: 'image', task, media });
+    setActiveTaskId(task.id);
+    setIsTasksPaneOpenProgrammatic(true);
+  };
+
+  const handleOpenVideoLightbox = (task: Task, media: GenerationRow[], videoIndex: number) => {
+    setLightboxData({ type: 'video', task, media, videoIndex });
+    setActiveTaskId(task.id);
+    setIsTasksPaneOpenProgrammatic(true);
+  };
+
+  const handleCloseLightbox = () => {
+    setLightboxData(null);
+    setActiveTaskId(null);
+  };
+
   // Handler for status indicator clicks
   const handleStatusIndicatorClick = (type: FilterGroup, count: number) => {
     setSelectedFilter(type);
@@ -629,11 +686,14 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     });
   };
 
-  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave } = useSlidingPane({
+  const { isLocked, isOpen, toggleLock, openPane, paneProps, transformClass, handlePaneEnter, handlePaneLeave, isMobile } = useSlidingPane({
     side: 'right',
     isLocked: isTasksPaneLocked,
     onToggleLock: () => setIsTasksPaneLocked(!isTasksPaneLocked),
   });
+  
+  // On desktop, override isOpen with programmatic state when set
+  const effectiveIsOpen = !isMobile && isTasksPaneOpenProgrammatic ? true : isOpen;
 
   // Delay pointer events until animation completes to prevent tap bleed-through on mobile
   const [isPointerEventsEnabled, setIsPointerEventsEnabled] = useState(false);
@@ -689,7 +749,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           {...paneProps}
           className={cn(
             'absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col',
-            transformClass,
+            !isMobile && effectiveIsOpen ? 'translate-x-0' : transformClass,
             'pointer-events-auto' // Always allow hover detection for pane visibility
           )}
         >
@@ -697,7 +757,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           <div 
             className={cn(
               'flex flex-col h-full',
-              isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
+              (isPointerEventsEnabled || effectiveIsOpen) ? 'pointer-events-auto' : 'pointer-events-none'
             )}
           >
             <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
@@ -828,18 +888,77 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
           <TasksPaneProcessingWarning onOpenSettings={onOpenSettings} />
           <div className="flex-grow overflow-y-auto">
-            <TaskList
-              filterStatuses={STATUS_GROUPS[selectedFilter]}
-              activeFilter={selectedFilter}
-              statusCounts={displayStatusCounts}
-              paginatedData={displayPaginatedData as any}
-              isLoading={isPaginatedLoading}
-              currentPage={currentPage}
-            />
+          <TaskList
+            filterStatuses={STATUS_GROUPS[selectedFilter]}
+            activeFilter={selectedFilter}
+            statusCounts={displayStatusCounts}
+            paginatedData={displayPaginatedData as any}
+            isLoading={isPaginatedLoading}
+            currentPage={currentPage}
+            activeTaskId={activeTaskId}
+            onOpenImageLightbox={handleOpenImageLightbox}
+            onOpenVideoLightbox={handleOpenVideoLightbox}
+          />
           </div>
           </div> {/* Close inner wrapper with delayed pointer events */}
         </div>
       </div>
+
+      {/* Centralized MediaLightbox - rendered via portal */}
+      {lightboxData && (() => {
+        // For videos, extract the specific video from the array
+        const actualMedia = lightboxData.type === 'video' && Array.isArray(lightboxData.media)
+          ? lightboxData.media[lightboxData.videoIndex ?? 0]
+          : lightboxData.media;
+        
+        // Handle navigation for video arrays
+        const handleNext = lightboxData.type === 'video' && Array.isArray(lightboxData.media) 
+          ? () => {
+              const currentIndex = lightboxData.videoIndex ?? 0;
+              if (currentIndex < lightboxData.media.length - 1) {
+                setLightboxData({ ...lightboxData, videoIndex: currentIndex + 1 });
+              }
+            }
+          : undefined;
+        
+        const handlePrevious = lightboxData.type === 'video' && Array.isArray(lightboxData.media)
+          ? () => {
+              const currentIndex = lightboxData.videoIndex ?? 0;
+              if (currentIndex > 0) {
+                setLightboxData({ ...lightboxData, videoIndex: currentIndex - 1 });
+              }
+            }
+          : undefined;
+        
+        const currentIndex = lightboxData.videoIndex ?? 0;
+        const totalVideos = Array.isArray(lightboxData.media) ? lightboxData.media.length : 1;
+        
+        return createPortal(
+          <MediaLightbox
+            media={actualMedia as GenerationRow}
+            onClose={handleCloseLightbox}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            showNavigation={lightboxData.type === 'video' && totalVideos > 1}
+            hasNext={lightboxData.type === 'video' && currentIndex < totalVideos - 1}
+            hasPrevious={lightboxData.type === 'video' && currentIndex > 0}
+            showImageEditTools={lightboxData.type === 'image'}
+            showDownload={true}
+            showMagicEdit={lightboxData.type === 'image'}
+            showTaskDetails={true}
+            taskDetailsData={taskDetailsData}
+            allShots={simplifiedShotOptions}
+            selectedShotId={currentShotId || lastAffectedShotId || undefined}
+            onShotChange={() => {}}
+            onAddToShot={async () => {}}
+            showTickForImageId={undefined}
+            onShowTick={async () => {}}
+            tasksPaneOpen={true}
+            tasksPaneWidth={tasksPaneWidth}
+          />,
+          document.body
+        );
+      })()}
     </>
   );
 };
