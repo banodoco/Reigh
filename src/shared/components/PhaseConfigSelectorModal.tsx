@@ -633,6 +633,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   const [addForm, setAddForm] = useState({
     name: '',
     description: '',
+    presetPromptPrefix: '',
     created_by_is_you: true,
     created_by_username: '',
     is_public: true,
@@ -653,6 +654,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       setAddForm({
         name: metadata.name || '',
         description: metadata.description || '',
+        presetPromptPrefix: metadata.presetPromptPrefix || '',
         created_by_is_you: metadata.created_by?.is_you ?? true,
         created_by_username: metadata.created_by?.username || '',
         is_public: metadata.is_public ?? true,
@@ -780,6 +782,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         main_generation: mainGeneration,
         use_count: isEditMode ? (editingPreset?.metadata.use_count || 0) : 0,
         created_at: isEditMode ? (editingPreset?.metadata.created_at || new Date().toISOString()) : new Date().toISOString(),
+        presetPromptPrefix: addForm.presetPromptPrefix || undefined,
       };
 
       if (isEditMode && editingPreset) {
@@ -797,6 +800,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       setAddForm({
         name: '',
         description: '',
+        presetPromptPrefix: '',
         created_by_is_you: true,
         created_by_username: '',
         is_public: true,
@@ -876,6 +880,20 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               onChange={e => handleFormChange('description', e.target.value)} 
               rows={3}
             />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="preset-prompt-prefix">Text to prepend to prompts (optional)</Label>
+            <Input 
+              id="preset-prompt-prefix" 
+              placeholder="e.g., cinematic, 4k, " 
+              value={addForm.presetPromptPrefix} 
+              onChange={e => handleFormChange('presetPromptPrefix', e.target.value)} 
+              maxLength={200}
+            />
+            <p className="text-xs text-muted-foreground">
+              This text will be automatically added before the "Before each prompt" field when this preset is selected.
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -23,60 +23,71 @@ export const useSourceGeneration = ({
 
   useEffect(() => {
     const basedOnId = (media as any).based_on;
+    const basedOnFromMetadata = (media.metadata as any)?.based_on;
     const effectMediaKeys = Object.keys(media);
     
-    console.log('[BasedOnLineage] 🔍 useEffect checking for based_on:',
-      '\n  mediaId:', media.id.substring(0, 8),
-      '\n  hasBasedOn:', !!basedOnId,
-      '\n  basedOnId:', basedOnId ? basedOnId.substring(0, 8) : null,
-      '\n  fullBasedOnId:', basedOnId,
-      '\n  hasOnOpenExternalGeneration:', !!onOpenExternalGeneration,
-      '\n  mediaType:', media.type,
-      '\n  mediaKeysCount:', effectMediaKeys.length,
-      '\n  mediaKeys:', effectMediaKeys.join(', '),
-      '\n  hasBasedOnInKeys:', effectMediaKeys.includes('based_on')
-    );
+    console.log('[TasksPane:BasedOn] 🔍 useSourceGeneration hook checking media:', {
+      mediaId: media.id.substring(0, 8),
+      hasBasedOnField: !!basedOnId,
+      basedOnId: basedOnId?.substring(0, 8) || 'null',
+      fullBasedOnId: basedOnId || 'null',
+      hasBasedOnInMetadata: !!basedOnFromMetadata,
+      basedOnFromMetadata: basedOnFromMetadata?.substring(0, 8) || 'null',
+      hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+      mediaType: media.type,
+      mediaKeysCount: effectMediaKeys.length,
+      mediaKeys: effectMediaKeys.slice(0, 10).join(', ') + (effectMediaKeys.length > 10 ? '...' : ''),
+      hasBasedOnInKeys: effectMediaKeys.includes('based_on'),
+      willFetchSource: !!basedOnId || !!basedOnFromMetadata,
+      timestamp: Date.now()
+    });
     
-    if (!basedOnId) {
+    // Check both direct field and metadata
+    const effectiveBasedOnId = basedOnId || basedOnFromMetadata;
+    
+    if (!effectiveBasedOnId) {
+      console.log('[TasksPane:BasedOn] ⚠️ No based_on ID found, setting sourceGenerationData to null');
       setSourceGenerationData(null);
       return;
     }
     
     const fetchSourceGeneration = async () => {
-      console.log('[BasedOnLineage] 📥 Fetching source generation:',
-        '\n  currentMediaId:', media.id.substring(0, 8),
-        '\n  basedOnId:', basedOnId.substring(0, 8)
-      );
+      console.log('[TasksPane:BasedOn] 📥 Fetching source generation:', {
+        currentMediaId: media.id.substring(0, 8),
+        basedOnId: effectiveBasedOnId.substring(0, 8),
+        timestamp: Date.now()
+      });
       
       try {
         const { data, error } = await supabase
           .from('generations')
           .select('*')
-          .eq('id', basedOnId)
+          .eq('id', effectiveBasedOnId)
           .single();
         
         if (error) throw error;
         
         if (data) {
-          console.log('[BasedOnLineage] ✅ Fetched source generation:',
-            '\n  sourceId:', data.id.substring(0, 8),
-            '\n  type:', data.type,
-            '\n  location:', data.location?.substring(0, 50)
-          );
+          console.log('[TasksPane:BasedOn] ✅ Fetched source generation:', {
+            sourceId: data.id.substring(0, 8),
+            type: data.type,
+            location: data.location?.substring(0, 50),
+            timestamp: Date.now()
+          });
           setSourceGenerationData(data);
         } else {
-          console.log('[BasedOnLineage] ⚠️ No data returned from query');
+          console.log('[TasksPane:BasedOn] ⚠️ No data returned from query');
           setSourceGenerationData(null);
         }
       } catch (error) {
-        console.error('[BasedOnLineage] ❌ Failed to fetch source generation:', error);
+        console.error('[TasksPane:BasedOn] ❌ Failed to fetch source generation:', error);
         // Don't show toast - this is a non-critical feature
         setSourceGenerationData(null);
       }
     };
     
     fetchSourceGeneration();
-  }, [media.id, (media as any).based_on, onOpenExternalGeneration]);
+  }, [media.id, (media as any).based_on, (media.metadata as any)?.based_on, onOpenExternalGeneration]);
 
   return {
     sourceGenerationData

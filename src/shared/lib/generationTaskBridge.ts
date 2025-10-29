@@ -72,7 +72,8 @@ export async function getTaskIdsForGenerations(generationIds: string[]): Promise
 
   const mappings = new Map<string, string | null>();
   data?.forEach(mapping => {
-    const taskId = Array.isArray(mapping.tasks) && mapping.tasks.length > 0 ? mapping.tasks[0] : null;
+    const tasksArray = mapping.tasks as string[] | null;
+    const taskId = Array.isArray(tasksArray) && tasksArray.length > 0 ? tasksArray[0] : null;
     mappings.set(mapping.id, taskId);
   });
 
@@ -81,13 +82,17 @@ export async function getTaskIdsForGenerations(generationIds: string[]): Promise
 
 /**
  * Get generation for a task by output location
+ * Includes shot associations for proper UI state
  */
 export async function getGenerationForTask(taskId: string, outputLocation: string, projectId: string): Promise<GenerationRow | null> {
   if (!outputLocation) return null;
 
   const { data, error } = await supabase
     .from('generations')
-    .select('*')
+    .select(`
+      *,
+      shot_generations(shot_id, timeline_frame)
+    `)
     .eq('location', outputLocation)
     .eq('project_id', projectId)
     .maybeSingle();
@@ -256,8 +261,9 @@ export function extractTaskIds(generations: (GenerationRow | { tasks?: string[] 
   const taskIds: string[] = [];
   
   generations.forEach(gen => {
-    if (Array.isArray(gen.tasks) && gen.tasks.length > 0) {
-      taskIds.push(gen.tasks[0]); // First task ID
+    const tasks = (gen as any).tasks;
+    if (Array.isArray(tasks) && tasks.length > 0) {
+      taskIds.push(tasks[0]); // First task ID
     }
   });
   

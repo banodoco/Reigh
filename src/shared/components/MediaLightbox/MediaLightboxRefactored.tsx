@@ -417,6 +417,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     paginatedDerived,
     setDerivedPage,
   } = lineageHook;
+  
+  // Log lineage data for debugging "Based On" feature
+  useEffect(() => {
+    console.log('[MediaLightbox:BasedOn] 📊 Lineage hook results:', {
+      mediaId: media.id.substring(0, 8),
+      hasBasedOnField: !!(media as any).based_on,
+      basedOnValue: (media as any).based_on?.substring(0, 8) || 'null',
+      hasBasedOnInMetadata: !!(media.metadata as any)?.based_on,
+      metadataBasedOn: (media.metadata as any)?.based_on?.substring(0, 8) || 'null',
+      hasSourceGeneration: !!sourceGeneration,
+      sourceGenerationId: sourceGeneration?.id.substring(0, 8) || 'null',
+      hasDerivedGenerations: !!derivedGenerations && derivedGenerations.length > 0,
+      derivedCount: derivedGenerations?.length || 0,
+      hasOnOpenExternalGeneration: !!onOpenExternalGeneration,
+      timestamp: Date.now()
+    });
+  }, [media.id, sourceGeneration, derivedGenerations, onOpenExternalGeneration]);
 
   // Shot creation hook
   const shotCreationHook = useShotCreation({ 

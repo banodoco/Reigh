@@ -306,38 +306,36 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             )}
             
-            {/* Text Before/After Prompts - Show when enhancePrompt=true OR timeline mode */}
-            {(enhancePrompt || isTimelineMode) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="textBeforePrompts" className="text-sm font-light block mb-1.5">
-                    Before each prompt:
-                  </Label>
-                  <Input
-                    id="textBeforePrompts"
-                    value={textBeforePrompts}
-                    onChange={(e) => onTextBeforePromptsChange?.(e.target.value)}
-                    onBlur={() => onBlurSave?.()}
-                    placeholder="Text to prepend to each prompt..."
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="textAfterPrompts" className="text-sm font-light block mb-1.5">
-                    After each prompt:
-                  </Label>
-                  <Input
-                    id="textAfterPrompts"
-                    value={textAfterPrompts}
-                    onChange={(e) => onTextAfterPromptsChange?.(e.target.value)}
-                    onBlur={() => onBlurSave?.()}
-                    placeholder="Text to append to each prompt..."
-                    className="w-full"
-                  />
-                </div>
+            {/* Text Before/After Prompts - Always visible */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="textBeforePrompts" className="text-sm font-light block mb-1.5">
+                  Before each prompt:
+                </Label>
+                <Input
+                  id="textBeforePrompts"
+                  value={textBeforePrompts}
+                  onChange={(e) => onTextBeforePromptsChange?.(e.target.value)}
+                  onBlur={() => onBlurSave?.()}
+                  placeholder="Text to prepend to each prompt..."
+                  className="w-full"
+                />
               </div>
-            )}
+              
+              <div>
+                <Label htmlFor="textAfterPrompts" className="text-sm font-light block mb-1.5">
+                  After each prompt:
+                </Label>
+                <Input
+                  id="textAfterPrompts"
+                  value={textAfterPrompts}
+                  onChange={(e) => onTextAfterPromptsChange?.(e.target.value)}
+                  onBlur={() => onBlurSave?.()}
+                  placeholder="Text to append to each prompt..."
+                  className="w-full"
+                />
+              </div>
+            </div>
             
 
             {/* Turbo Mode Toggle - only show when cloud generation is enabled and 2 or fewer images */}

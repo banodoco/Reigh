@@ -77,6 +77,18 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
             </div>
           )}
           
+          {/* Preset Prompt Prefix */}
+          {metadata?.presetPromptPrefix && (
+            <div className="mb-3 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                Prompt Prefix:
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
+                {metadata.presetPromptPrefix}
+              </p>
+            </div>
+          )}
+          
           {/* Phase Info */}
           <div className="flex gap-2">
             <Badge variant="secondary" className="text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
@@ -108,7 +120,7 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
 
 interface PresetsSelectorProps {
   selectedPhasePresetId?: string | null;
-  onPhasePresetSelect: (presetId: string, config: PhaseConfig) => void;
+  onPhasePresetSelect: (presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => void;
   onPhasePresetRemove: () => void;
   phaseConfig?: PhaseConfig;
   onSwitchToAdvanced?: () => void;
@@ -172,7 +184,7 @@ export const PresetsSelector: React.FC<PresetsSelectorProps> = ({
         onClose={() => setIsModalOpen(false)}
         onSelectPreset={(preset) => {
           if (preset.metadata.phaseConfig) {
-            onPhasePresetSelect(preset.id, preset.metadata.phaseConfig);
+            onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata.presetPromptPrefix);
           }
           setIsModalOpen(false);
         }}

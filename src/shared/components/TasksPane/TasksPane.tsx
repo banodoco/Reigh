@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRenderLogger } from '@/shared/hooks/useRenderLogger';
@@ -20,10 +20,12 @@ import { useSimpleRealtime } from '@/shared/providers/SimpleRealtimeProvider';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { GenerationRow } from '@/types/shots';
 import { Task } from '@/types/tasks';
-import { useListShots } from '@/shared/hooks/useShots';
+import { useListShots, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast as sonnerToast } from 'sonner';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -180,6 +182,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     media: GenerationRow | GenerationRow[];
     videoIndex?: number;
   } | null>(null);
+  
+  // Optimistic updates for "Add to Shot" button states
+  const [optimisticPositionedIds, setOptimisticPositionedIds] = useState<Set<string>>(new Set());
+  const [optimisticUnpositionedIds, setOptimisticUnpositionedIds] = useState<Set<string>>(new Set());
 
   // Project context & task helpers
   const { selectedProjectId } = useProject();
@@ -573,6 +579,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
+  
+  // Shot management mutations
+  const addImageToShotMutation = useAddImageToShot();
+  const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
 
   useRenderLogger('TasksPane', { cancellableCount: cancellableTaskCount });
 
@@ -589,12 +599,36 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Lightbox handlers - passed down to TaskItems
   const handleOpenImageLightbox = (task: Task, media: GenerationRow) => {
+    console.log('[TasksPane:BasedOn] 🖼️ Opening image lightbox:', {
+      taskId: task.id.substring(0, 8),
+      mediaId: media.id.substring(0, 8),
+      hasBasedOn: !!(media as any).based_on,
+      basedOn: (media as any).based_on?.substring(0, 8) || 'null',
+      hasSourceGenerationId: !!media.sourceGenerationId,
+      sourceGenerationId: media.sourceGenerationId?.substring(0, 8) || 'null',
+      hasBasedOnInMetadata: !!(media.metadata as any)?.based_on,
+      metadataBasedOn: (media.metadata as any)?.based_on?.substring(0, 8) || 'null',
+      mediaKeys: Object.keys(media).join(', '),
+    });
+    
     setLightboxData({ type: 'image', task, media });
     setActiveTaskId(task.id);
     setIsTasksPaneOpenProgrammatic(true);
   };
 
   const handleOpenVideoLightbox = (task: Task, media: GenerationRow[], videoIndex: number) => {
+    const firstMedia = media[videoIndex];
+    console.log('[TasksPane:BasedOn] 🎥 Opening video lightbox:', {
+      taskId: task.id.substring(0, 8),
+      videoIndex,
+      totalVideos: media.length,
+      firstMediaId: firstMedia?.id.substring(0, 8),
+      hasBasedOn: !!(firstMedia as any)?.based_on,
+      basedOn: (firstMedia as any)?.based_on?.substring(0, 8) || 'null',
+      hasSourceGenerationId: !!firstMedia?.sourceGenerationId,
+      sourceGenerationId: firstMedia?.sourceGenerationId?.substring(0, 8) || 'null',
+    });
+    
     setLightboxData({ type: 'video', task, media, videoIndex });
     setActiveTaskId(task.id);
     setIsTasksPaneOpenProgrammatic(true);
@@ -604,6 +638,257 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     setLightboxData(null);
     setActiveTaskId(null);
   };
+
+  // Handler for opening external generation (for "Based On" navigation)
+  const handleOpenExternalGeneration = useCallback(async (
+    generationId: string,
+    derivedContext?: string[]
+  ) => {
+    console.log('[TasksPane:BasedOn] 🌐 Opening external generation:', {
+      generationId: generationId.substring(0, 8),
+      hasDerivedContext: !!derivedContext,
+      timestamp: Date.now()
+    });
+
+    try {
+      // Fetch the generation from the database with its shot associations
+      const { data, error } = await supabase
+        .from('generations')
+        .select(`
+          *,
+          shot_generations(shot_id, timeline_frame)
+        `)
+        .eq('id', generationId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        // The database field is 'based_on' at the top level
+        const basedOnValue = (data as any).based_on || (data.metadata as any)?.based_on || null;
+        
+        console.log('[TasksPane:BasedOn] 📦 Raw data from DB:', {
+          id: data.id.substring(0, 8),
+          hasBasedOnAtTopLevel: !!(data as any).based_on,
+          basedOnAtTopLevel: (data as any).based_on?.substring(0, 8) || 'null',
+          hasBasedOnInMetadata: !!(data.metadata as any)?.based_on,
+          metadataBasedOn: (data.metadata as any)?.based_on?.substring(0, 8) || 'null',
+          finalBasedOnValue: basedOnValue?.substring(0, 8) || 'null',
+          allKeys: Object.keys(data).join(', '),
+        });
+        
+        // Transform the data to match GenerationRow format
+        const shotGenerations = (data as any).shot_generations || [];
+        
+        // Database fields: location (full image), thumbnail_url (thumb)
+        const imageUrl = (data as any).location || (data as any).upscaled_url || (data as any).thumbnail_url;
+        const thumbUrl = (data as any).thumbnail_url || (data as any).location;
+        
+        console.log('[TasksPane:BasedOn] 🖼️ Image URL details:', {
+          id: data.id.substring(0, 8),
+          hasLocation: !!(data as any).location,
+          hasThumbnailUrl: !!(data as any).thumbnail_url,
+          hasUpscaledUrl: !!(data as any).upscaled_url,
+          locationPreview: ((data as any).location || '').substring(0, 80),
+          thumbnailUrlPreview: ((data as any).thumbnail_url || '').substring(0, 80),
+          finalImageUrl: imageUrl?.substring(0, 80) || 'null',
+          finalThumbUrl: thumbUrl?.substring(0, 80) || 'null',
+        });
+        
+        const transformedData: GenerationRow = {
+          id: data.id,
+          location: (data as any).location,
+          imageUrl,
+          thumbUrl,
+          videoUrl: (data as any).video_url || null,
+          createdAt: data.created_at,
+          taskId: data.task_id,
+          metadata: data.metadata,
+          starred: data.starred || false,
+          // CRITICAL: Include based_on at TOP LEVEL for MediaLightbox
+          based_on: basedOnValue,
+          // Also include as sourceGenerationId for compatibility
+          sourceGenerationId: basedOnValue,
+          // Add shot associations
+          shotIds: shotGenerations.map((sg: any) => sg.shot_id),
+          timelineFrames: shotGenerations.reduce((acc: any, sg: any) => {
+            acc[sg.shot_id] = sg.timeline_frame;
+            return acc;
+          }, {}),
+        } as any;
+        
+        console.log('[TasksPane:BasedOn] ✅ Transformed data:', {
+          id: transformedData.id.substring(0, 8),
+          based_on: (transformedData as any).based_on?.substring(0, 8) || 'null',
+          hasBasedOn: !!(transformedData as any).based_on,
+        });
+        
+        // Update lightbox to show this generation
+        // We don't have the original task, so we'll use a minimal task object
+        const minimalTask: Task = {
+          id: data.task_id || 'unknown',
+          status: 'Complete',
+          taskType: 'unknown',
+          createdAt: data.created_at,
+          updatedAt: data.created_at,
+          projectId: selectedProjectId || '',
+        } as Task;
+        
+        setLightboxData({
+          type: transformedData.videoUrl ? 'video' : 'image',
+          task: minimalTask,
+          media: transformedData,
+        });
+        
+        console.log('[TasksPane:BasedOn] 🎯 Lightbox data set with media:', {
+          mediaId: transformedData.id.substring(0, 8),
+          hasBasedOn: !!(transformedData as any).based_on,
+        });
+      }
+    } catch (error) {
+      console.error('[TasksPane:BasedOn] ❌ Failed to fetch external generation:', error);
+      sonnerToast.error('Failed to load generation');
+    }
+  }, [selectedProjectId]);
+
+  // Optimistic update handlers
+  const handleOptimisticPositioned = useCallback((mediaId: string) => {
+    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as positioned:', mediaId.substring(0, 8));
+    setOptimisticPositionedIds(prev => new Set(prev).add(mediaId));
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set(prev);
+      next.delete(mediaId);
+      return next;
+    });
+  }, []);
+  
+  const handleOptimisticUnpositioned = useCallback((mediaId: string) => {
+    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as unpositioned:', mediaId.substring(0, 8));
+    setOptimisticUnpositionedIds(prev => new Set(prev).add(mediaId));
+    setOptimisticPositionedIds(prev => {
+      const next = new Set(prev);
+      next.delete(mediaId);
+      return next;
+    });
+  }, []);
+
+  // Handler for adding generation to shot (with position)
+  const handleAddToShot = useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    const targetShotId = currentShotId || lastAffectedShotId;
+    
+    console.log('[TasksPane:AddToShot] 🎯 Add to shot requested:', {
+      generationId: generationId.substring(0, 8),
+      targetShotId: targetShotId?.substring(0, 8) || 'none',
+      hasCurrentShotId: !!currentShotId,
+      hasLastAffectedShotId: !!lastAffectedShotId,
+      hasImageUrl: !!imageUrl,
+      hasThumbUrl: !!thumbUrl,
+      selectedProjectId: selectedProjectId?.substring(0, 8) || 'none',
+      timestamp: Date.now()
+    });
+    
+    if (!targetShotId) {
+      console.error('[TasksPane:AddToShot] ❌ No shot selected');
+      sonnerToast.error('No shot selected. Please select a shot first.');
+      return false;
+    }
+    
+    if (!selectedProjectId) {
+      console.error('[TasksPane:AddToShot] ❌ No project selected');
+      sonnerToast.error('No project selected');
+      return false;
+    }
+    
+    // Optimistically update UI
+    handleOptimisticPositioned(generationId);
+    
+    try {
+      await addImageToShotMutation.mutateAsync({
+        shot_id: targetShotId,
+        generation_id: generationId,
+        imageUrl,
+        thumbUrl,
+        project_id: selectedProjectId,
+      });
+      
+      console.log('[TasksPane:AddToShot] ✅ Successfully added to shot');
+      // Toast removed per user request - button state change is sufficient feedback
+      return true;
+    } catch (error) {
+      console.error('[TasksPane:AddToShot] ❌ Failed to add to shot:', error);
+      // Revert optimistic update on error
+      setOptimisticPositionedIds(prev => {
+        const next = new Set(prev);
+        next.delete(generationId);
+        return next;
+      });
+      sonnerToast.error('Failed to add to shot');
+      return false;
+    }
+  }, [currentShotId, lastAffectedShotId, selectedProjectId, addImageToShotMutation, handleOptimisticPositioned]);
+  
+  // Handler for adding generation to shot (without position)
+  const handleAddToShotWithoutPosition = useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    const targetShotId = currentShotId || lastAffectedShotId;
+    
+    console.log('[TasksPane:AddToShot] 🎯 Add to shot without position requested:', {
+      generationId: generationId.substring(0, 8),
+      targetShotId: targetShotId?.substring(0, 8) || 'none',
+      hasCurrentShotId: !!currentShotId,
+      hasLastAffectedShotId: !!lastAffectedShotId,
+      hasImageUrl: !!imageUrl,
+      hasThumbUrl: !!thumbUrl,
+      selectedProjectId: selectedProjectId?.substring(0, 8) || 'none',
+      timestamp: Date.now()
+    });
+    
+    if (!targetShotId) {
+      console.error('[TasksPane:AddToShot] ❌ No shot selected');
+      sonnerToast.error('No shot selected. Please select a shot first.');
+      return false;
+    }
+    
+    if (!selectedProjectId) {
+      console.error('[TasksPane:AddToShot] ❌ No project selected');
+      sonnerToast.error('No project selected');
+      return false;
+    }
+    
+    // Optimistically update UI
+    handleOptimisticUnpositioned(generationId);
+    
+    try {
+      await addImageToShotWithoutPositionMutation.mutateAsync({
+        shot_id: targetShotId,
+        generation_id: generationId,
+        imageUrl,
+        thumbUrl,
+        project_id: selectedProjectId,
+      });
+      
+      console.log('[TasksPane:AddToShot] ✅ Successfully added to shot without position');
+      // Toast removed per user request - button state change is sufficient feedback
+      return true;
+    } catch (error) {
+      console.error('[TasksPane:AddToShot] ❌ Failed to add to shot without position:', error);
+      // Revert optimistic update on error
+      setOptimisticUnpositionedIds(prev => {
+        const next = new Set(prev);
+        next.delete(generationId);
+        return next;
+      });
+      sonnerToast.error('Failed to add to shot');
+      return false;
+    }
+  }, [currentShotId, lastAffectedShotId, selectedProjectId, addImageToShotWithoutPositionMutation, handleOptimisticUnpositioned]);
 
   // Handler for status indicator clicks
   const handleStatusIndicatorClick = (type: FilterGroup, count: number) => {
@@ -949,10 +1234,26 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             taskDetailsData={taskDetailsData}
             allShots={simplifiedShotOptions}
             selectedShotId={currentShotId || lastAffectedShotId || undefined}
-            onShotChange={() => {}}
-            onAddToShot={async () => {}}
+            onShotChange={(shotId) => {
+              console.log('[TasksPane:AddToShot] 📝 Shot change requested (not implemented in TasksPane):', {
+                newShotId: shotId.substring(0, 8),
+                timestamp: Date.now()
+              });
+            }}
+            onAddToShot={handleAddToShot}
+            onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+            optimisticPositionedIds={optimisticPositionedIds}
+            optimisticUnpositionedIds={optimisticUnpositionedIds}
+            onOptimisticPositioned={handleOptimisticPositioned}
+            onOptimisticUnpositioned={handleOptimisticUnpositioned}
             showTickForImageId={undefined}
-            onShowTick={async () => {}}
+            onShowTick={async (imageId) => {
+              console.log('[TasksPane:AddToShot] ✓ Show tick requested:', {
+                imageId: imageId.substring(0, 8),
+                timestamp: Date.now()
+              });
+            }}
+            onOpenExternalGeneration={handleOpenExternalGeneration}
             tasksPaneOpen={true}
             tasksPaneWidth={tasksPaneWidth}
           />,

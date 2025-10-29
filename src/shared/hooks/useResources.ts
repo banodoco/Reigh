@@ -22,6 +22,7 @@ export interface PhaseConfigMetadata {
         alt_text?: string;
     }[];
     main_generation?: string;
+    presetPromptPrefix?: string; // Text to prepend to prompts when this preset is selected
 }
 
 export type ResourceType = 'lora' | 'phase-config';

@@ -291,14 +291,68 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   const generationData: GenerationRow | null = React.useMemo(() => {
     if (!hasGeneratedImage || !actualGeneration) return null;
     
+    // The field in the database is 'based_on' - check for it at the top level
+    const basedOnValue = (actualGeneration as any).based_on || (actualGeneration.metadata as any)?.based_on || null;
+    
+    // Transform shot associations from shot_generations array
+    const shotGenerations = (actualGeneration as any).shot_generations || [];
+    const shotIds = shotGenerations.map((sg: any) => sg.shot_id);
+    const timelineFrames = shotGenerations.reduce((acc: any, sg: any) => {
+      acc[sg.shot_id] = sg.timeline_frame;
+      return acc;
+    }, {});
+    
+    // Also create all_shot_associations format for compatibility
+    const allShotAssociations = shotGenerations.map((sg: any) => ({
+      shot_id: sg.shot_id,
+      position: sg.timeline_frame,
+    }));
+    
+    // Log what's in actualGeneration to understand what data we have
+    console.log('[TasksPane:AddToShot] 📦 Creating generationData from actualGeneration:', {
+      taskId: task.id.substring(0, 8),
+      generationId: actualGeneration.id.substring(0, 8),
+      hasBasedOnAtTopLevel: !!(actualGeneration as any).based_on,
+      basedOnAtTopLevel: (actualGeneration as any).based_on?.substring(0, 8) || 'null',
+      hasBasedOnInMetadata: !!(actualGeneration.metadata as any)?.based_on,
+      basedOnInMetadata: (actualGeneration.metadata as any)?.based_on?.substring(0, 8) || 'null',
+      finalBasedOnValue: basedOnValue?.substring(0, 8) || 'null',
+      hasShotAssociations: shotGenerations.length > 0,
+      shotAssociationsCount: shotGenerations.length,
+      shotIds: shotIds.map((id: string) => id.substring(0, 8)),
+      hasLocation: !!actualGeneration.location,
+      hasThumbnailUrl: !!(actualGeneration as any).thumbnail_url,
+      hasUpscaledUrl: !!(actualGeneration as any).upscaled_url,
+      locationPreview: (actualGeneration.location || '').substring(0, 80),
+      thumbnailUrlPreview: ((actualGeneration as any).thumbnail_url || '').substring(0, 80),
+      upscaledUrlPreview: ((actualGeneration as any).upscaled_url || '').substring(0, 80),
+      finalImageUrl: (actualGeneration.location || (actualGeneration as any).upscaled_url || (actualGeneration as any).thumbnail_url || '').substring(0, 80),
+      finalThumbUrl: ((actualGeneration as any).thumbnail_url || actualGeneration.location || '').substring(0, 80),
+      actualGenerationKeys: Object.keys(actualGeneration).join(', '),
+      timestamp: Date.now()
+    });
+    
+    // Database fields: location (full image), thumbnail_url (thumb)
+    // Note: Sometimes location might be incomplete, check upscaled_url as fallback
+    const imageUrl = actualGeneration.location || (actualGeneration as any).upscaled_url || (actualGeneration as any).thumbnail_url;
+    const thumbUrl = (actualGeneration as any).thumbnail_url || actualGeneration.location;
+    
     return {
       id: actualGeneration.id, // Use the real generation ID
       location: actualGeneration.location,
-      imageUrl: actualGeneration.location,
-      thumbUrl: actualGeneration.location,
+      imageUrl,
+      thumbUrl,
       type: actualGeneration.type || 'image',
       createdAt: (actualGeneration as any).created_at || actualGeneration.createdAt, // Handle both snake_case and camelCase
       metadata: actualGeneration.metadata || {},
+      // CRITICAL: Include based_on field at TOP LEVEL for "Based On" feature in MediaLightbox
+      based_on: basedOnValue,
+      // Also include as sourceGenerationId for compatibility
+      sourceGenerationId: basedOnValue,
+      // Shot associations for "Add to Shot" button state
+      shotIds,
+      timelineFrames,
+      all_shot_associations: allShotAssociations,
     } as GenerationRow;
   }, [hasGeneratedImage, actualGeneration, task.id]);
 

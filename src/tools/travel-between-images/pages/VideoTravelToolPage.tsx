@@ -402,18 +402,37 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('phaseConfig', adjustedConfig);
   }, [shotSettings, selectedShot?.id]);
 
-  const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig) => {
+  const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => {
     console.log('[PhasePreset] User selected preset:', {
       presetId: presetId.substring(0, 8),
       shotId: selectedShot?.id?.substring(0, 8),
+      presetPromptPrefix: presetPromptPrefix || '(none)',
       timestamp: Date.now()
     });
     
-    // Save both the preset ID and apply its config
-    shotSettings.updateFields({
+    // Prepare fields to update
+    const fieldsToUpdate: Partial<VideoTravelSettings> = {
       selectedPhasePresetId: presetId,
       phaseConfig: config
-    });
+    };
+    
+    // If preset has a prompt prefix, prepend it to textBeforePrompts
+    if (presetPromptPrefix) {
+      const currentTextBefore = shotSettings.settings.textBeforePrompts || '';
+      const newTextBefore = currentTextBefore 
+        ? `${presetPromptPrefix} ${currentTextBefore}` 
+        : presetPromptPrefix;
+      fieldsToUpdate.textBeforePrompts = newTextBefore;
+      
+      console.log('[PhasePreset] Merging preset prompt prefix:', {
+        presetPrefix: presetPromptPrefix,
+        currentText: currentTextBefore || '(empty)',
+        newText: newTextBefore
+      });
+    }
+    
+    // Save all fields
+    shotSettings.updateFields(fieldsToUpdate);
   }, [shotSettings, selectedShot?.id]);
 
   const handlePhasePresetRemove = useCallback(() => {
