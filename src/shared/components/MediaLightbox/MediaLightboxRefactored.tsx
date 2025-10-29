@@ -273,7 +273,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = imageFlipHook;
 
   // In-Scene Boost hook
-  const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, inpaintLoras } = useInSceneBoost();
+  const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, inpaintLoras } = useInSceneBoost();
 
   // Inpainting hook
   const inpaintingHook = useInpainting({
@@ -1137,7 +1137,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   data-task-details-panel
                   className={cn(
-                    "bg-background border-l border-border overflow-y-auto"
+                    "bg-background border-l border-border overflow-y-auto relative z-[60]"
                     // Removed flex centering to prevent top clipping with long content
                   )}
                   style={{ width: '40%' }}
@@ -1153,6 +1153,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       setInpaintPrompt={setInpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
                       setInpaintNumGenerations={setInpaintNumGenerations}
+                      loraMode={loraMode}
+                      setLoraMode={setLoraMode}
+                      customLoraUrl={customLoraUrl}
+                      setCustomLoraUrl={setCustomLoraUrl}
                       isGeneratingInpaint={isGeneratingInpaint}
                       inpaintGenerateSuccess={inpaintGenerateSuccess}
                       isCreatingMagicEditTasks={isCreatingMagicEditTasks}
@@ -1415,7 +1419,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 <div 
                   data-task-details-panel
                   className={cn(
-                    "bg-background border-t border-border overflow-y-auto relative"
+                    "bg-background border-t border-border overflow-y-auto relative z-[60]"
                     // Removed flex centering to prevent top clipping with long content
                   )}
                   style={{ height: '40%' }}
@@ -1431,6 +1435,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       setInpaintPrompt={setInpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
                       setInpaintNumGenerations={setInpaintNumGenerations}
+                      loraMode={loraMode}
+                      setLoraMode={setLoraMode}
+                      customLoraUrl={customLoraUrl}
+                      setCustomLoraUrl={setCustomLoraUrl}
                       isGeneratingInpaint={isGeneratingInpaint}
                       inpaintGenerateSuccess={inpaintGenerateSuccess}
                       isCreatingMagicEditTasks={isCreatingMagicEditTasks}

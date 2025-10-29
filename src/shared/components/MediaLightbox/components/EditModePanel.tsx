@@ -1,10 +1,12 @@
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
 import { GenerationRow } from '@/types/shots';
+import type { LoraMode } from '../hooks/useInSceneBoost';
 
 export interface EditModePanelProps {
   // Source generation
@@ -23,6 +25,12 @@ export interface EditModePanelProps {
   // Generations state
   inpaintNumGenerations: number;
   setInpaintNumGenerations: (value: number) => void;
+  
+  // Lora Mode
+  loraMode: LoraMode;
+  setLoraMode: (mode: LoraMode) => void;
+  customLoraUrl: string;
+  setCustomLoraUrl: (url: string) => void;
   
   // Generation status
   isGeneratingInpaint: boolean;
@@ -68,6 +76,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   setInpaintPrompt,
   inpaintNumGenerations,
   setInpaintNumGenerations,
+  loraMode,
+  setLoraMode,
+  customLoraUrl,
+  setCustomLoraUrl,
   isGeneratingInpaint,
   inpaintGenerateSuccess,
   isCreatingMagicEditTasks,
@@ -224,21 +236,55 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           />
         </div>
         
-        {/* Number of Generations Slider */}
-        <div className={generationsSpacing}>
-          <div className="flex items-center justify-between">
-            <label className={`${labelSize} font-medium`}>{isMobile ? 'Generations' : 'Number of Generations'}</label>
-            <span className={`${sliderTextSize} text-muted-foreground`}>{inpaintNumGenerations}</span>
+        {/* Lora Mode & Number of Generations */}
+        <div className={`flex ${isMobile ? 'flex-col gap-3' : 'gap-4'}`}>
+          {/* Lora Mode Selector */}
+          <div className={cn(isMobile ? "" : "flex-1")}>
+            <div className="flex items-center gap-3">
+              <label className={`${labelSize} font-medium whitespace-nowrap`}>Lora Mode</label>
+              <Select value={loraMode} onValueChange={setLoraMode}>
+                <SelectTrigger className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[100001]">
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="in-scene">InScene</SelectItem>
+                  <SelectItem value="next-scene">Next Scene</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Custom URL Input - Show when Custom is selected */}
+            {loraMode === 'custom' && (
+              <input
+                type="text"
+                value={customLoraUrl}
+                onChange={(e) => setCustomLoraUrl(e.target.value)}
+                placeholder="https://huggingface.co/.../lora.safetensors"
+                className={cn(
+                  "w-full mt-2 bg-background border border-input rounded-md px-3 py-2 text-sm",
+                  "focus:outline-none focus:ring-2 focus:ring-ring"
+                )}
+              />
+            )}
           </div>
-          <input
-            type="range"
-            min={1}
-            max={16}
-            value={inpaintNumGenerations}
-            onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
-            className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-          />
-          <p className="text-xs text-muted-foreground">{isMobile ? '1-16 variations' : 'Generate 1-16 variations'}</p>
+
+          {/* Number of Generations Slider */}
+          <div className={cn(isMobile ? "" : "flex-1")}>
+            <div className="flex items-center justify-between">
+              <label className={`${labelSize} font-medium`}>{isMobile ? 'Generations' : 'Number of Generations'}</label>
+              <span className={`${sliderTextSize} text-muted-foreground`}>{inpaintNumGenerations}</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={16}
+              value={inpaintNumGenerations}
+              onChange={(e) => setInpaintNumGenerations(parseInt(e.target.value))}
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
         </div>
         
         {/* Generate Button - Unified */}
