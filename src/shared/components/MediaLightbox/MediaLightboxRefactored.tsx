@@ -1517,7 +1517,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               </div>
             ) : (
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
-              <FlexContainer onClick={onClose}>
+              <FlexContainer
+                onClick={(e) => {
+                  // Only allow background clicks to close when not in edit modes
+                  // and only if the click is on the container itself (not children)
+                  if (isInpaintMode) {
+                    e.stopPropagation();
+                    return;
+                  }
+                  if (e.target === e.currentTarget) {
+                    onClose();
+                  }
+                }}
+              >
                 {/* Close Button - REMOVED */}
 
                 {/* Media Container with Controls */}

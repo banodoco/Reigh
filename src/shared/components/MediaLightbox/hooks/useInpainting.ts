@@ -862,6 +862,13 @@ export const useInpainting = ({
         } catch (err) {
           console.log('[Drag] Could not release pointer capture', err);
         }
+        
+        // Prevent event from bubbling to overlay which might close the lightbox
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+          e.nativeEvent.stopImmediatePropagation();
+        }
       }
       return;
     }
@@ -877,6 +884,13 @@ export const useInpainting = ({
       } catch (err) {
         // Ignore errors if pointer capture wasn't active
         console.log('[MobilePaintDebug] ⚠️ Could not release pointer capture', err);
+      }
+      
+      // Prevent event from bubbling to overlay which might close the lightbox
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+        e.nativeEvent.stopImmediatePropagation();
       }
     }
     
