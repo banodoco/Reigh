@@ -1710,44 +1710,26 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
           </div>
 
-          {/* Edit and Delete buttons - Desktop Bottom Right */}
-              {!isMobile && (
+          {/* Delete button - Desktop Bottom Right */}
+              {!isMobile && onDelete && (
               <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                  {/* Edit button - Desktop */}
-                  {!image.isVideo && (
-                      <Button 
-                          variant="secondary" 
-                          size="icon" 
-                          className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                          onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenLightbox(image, true); // Pass true to auto-enter edit mode
-                          }}
-                          title="Edit image"
-                      >
-                          <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                  )}
-                  
                   {/* Delete button - Desktop */}
-                  {onDelete && (
-                      <Button 
-                          variant="destructive" 
-                          size="icon" 
-                          className="h-7 w-7 p-0 rounded-full"
-                          onClick={(e) => {
-                              e.stopPropagation();
-                              onDelete(image.id!);
-                          }}
-                          disabled={isCurrentDeleting}
-                      >
-                          {isCurrentDeleting ? (
-                              <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-                          ) : (
-                              <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                      </Button>
-                  )}
+                  <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      className="h-7 w-7 p-0 rounded-full"
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(image.id!);
+                      }}
+                      disabled={isCurrentDeleting}
+                  >
+                      {isCurrentDeleting ? (
+                          <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                      ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                  </Button>
               </div>
           )}
 
@@ -1755,22 +1737,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           <div className={`absolute bottom-2 left-2 flex items-center gap-1.5 transition-opacity z-20 ${
             image.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}>
-              {/* Edit Image Button - Mobile only, images only */}
-              {isMobile && !image.isVideo && (
-                <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenLightbox(image, true); // Pass true to auto-enter edit mode
-                    }}
-                    title="Edit image"
-                >
-                    <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              
               {/* Star Button */}
               <Button
                   variant="secondary"
@@ -1805,6 +1771,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
                   />
               </Button>
+              
+              {/* Edit Image Button - Desktop and Mobile, images only */}
+              {!image.isVideo && (
+                <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenLightbox(image, true); // Pass true to auto-enter edit mode
+                    }}
+                    title="Edit image"
+                >
+                    <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
           </div>
       </>)
       }
