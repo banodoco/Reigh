@@ -830,7 +830,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
                   disabled={isLoadingVideoGen}
                   className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all disabled:opacity-50"
                 >
-                  {isLoadingVideoGen ? 'Loading...' : 'Show Video'}
+                  {isLoadingVideoGen ? 'Loading...' : 'Open Video'}
                 </Button>
               )}
             </div>
@@ -973,7 +973,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
             onClick={handleViewImage}
             className="text-xs px-2 py-1 h-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/30 transition-all"
           >
-            View Image
+            Open Image
           </Button>
         </div>
       )}
