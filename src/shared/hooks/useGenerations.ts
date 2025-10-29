@@ -538,6 +538,26 @@ export async function fetchDerivedGenerations(
     data: data?.map(d => ({ id: d.id, based_on: (d as any).based_on }))
   });
   
+  // Fetch counts of generations based on each derived generation
+  const derivedIds = data?.map(d => d.id) || [];
+  let derivedCounts: Record<string, number> = {};
+  
+  if (derivedIds.length > 0) {
+    const { data: countsData, error: countsError } = await supabase
+      .from('generations')
+      .select('based_on')
+      .in('based_on', derivedIds);
+    
+    if (!countsError && countsData) {
+      // Count how many times each ID appears as based_on
+      derivedCounts = countsData.reduce((acc, item) => {
+        const basedOnId = item.based_on;
+        acc[basedOnId] = (acc[basedOnId] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+    }
+  }
+  
   const items = data?.map((item: any) => {
     const mainUrl = item.location;
     const thumbnailUrl = item.thumbnail_url || mainUrl;
@@ -559,6 +579,7 @@ export async function fetchDerivedGenerations(
       starred: item.starred || false,
       position: null,
       timeline_frame: null,
+      derivedCount: derivedCounts[item.id] || 0,
     };
     
     // Include shot association data

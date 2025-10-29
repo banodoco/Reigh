@@ -14,6 +14,7 @@ export interface GenerationRow {
   timeline_frame?: number; // Position in timeline (from shot_generations table)
   starred?: boolean; // Whether this generation is starred
   upscaled_url?: string | null; // URL of upscaled version if available
+  derivedCount?: number; // Number of generations based on this one
 }
 
 export interface Shot {

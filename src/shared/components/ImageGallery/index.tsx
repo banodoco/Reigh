@@ -88,6 +88,7 @@ export interface GeneratedImageWithMetadata {
   all_shot_associations?: Array<{ shot_id: string; position: number | null; timeline_frame?: number | null }>;
   based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
   upscaled_url?: string | null; // URL of upscaled version if available
+  derivedCount?: number; // Number of generations based on this one
 }
 
 export interface ImageGalleryProps {
