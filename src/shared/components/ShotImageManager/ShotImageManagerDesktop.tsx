@@ -18,6 +18,7 @@ import BatchDropZone from '../BatchDropZone';
 import MediaLightbox from '../MediaLightbox';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useState, useEffect } from 'react';
+import { useTaskDetails } from './hooks/useTaskDetails';
 
 interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   selection: any;
@@ -39,6 +40,11 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   getFramePosition,
   ...props
 }) => {
+  // Fetch task details for current lightbox image
+  const currentLightboxImageId = lightbox.lightboxIndex !== null 
+    ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
+    : null;
+  const { taskDetailsData } = useTaskDetails({ generationId: currentLightboxImageId });
   const gridColsClass = GRID_COLS_CLASSES[props.columns || 4] || 'grid-cols-4';
   const isMobile = useIsMobile();
   
@@ -131,6 +137,22 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             hasPrevious = lightbox.lightboxIndex > 0;
           }
           
+          console.log('[BasedOnNav] 📊 MediaLightbox props (Desktop):', {
+            mediaId: lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8),
+            showTaskDetails: true,
+            hasTaskDetailsData: !!taskDetailsData,
+            taskDetailsData: taskDetailsData ? {
+              hasTask: !!taskDetailsData.task,
+              isLoading: taskDetailsData.isLoading,
+              taskId: taskDetailsData.taskId,
+              inputImagesCount: taskDetailsData.inputImages?.length
+            } : null,
+            lightboxIndex: lightbox.lightboxIndex,
+            currentImagesLength: lightbox.currentImages.length,
+            isExternalGen,
+            isTempDerived: lightbox.lightboxIndex >= baseImagesCount + externalGens.externalGenerations.length
+          });
+          
           return (
             <MediaLightbox
               media={lightbox.currentImages[lightbox.lightboxIndex]}
@@ -138,6 +160,16 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               toolTypeOverride={props.toolTypeOverride}
               autoEnterInpaint={lightbox.shouldAutoEnterInpaint}
               onClose={() => {
+                console.log('[BasedOnNav] 🚪 MediaLightbox onClose called (Desktop)', {
+                  lightboxIndex: lightbox.lightboxIndex,
+                  currentImagesLength: lightbox.currentImages.length,
+                  hasDerivedNavContext: !!externalGens.derivedNavContext,
+                  derivedNavContext: externalGens.derivedNavContext ? {
+                    sourceId: externalGens.derivedNavContext.sourceGenerationId.substring(0, 8),
+                    derivedCount: externalGens.derivedNavContext.derivedGenerationIds.length
+                  } : null,
+                  tempDerivedCount: externalGens.tempDerivedGenerations.length
+                });
                 lightbox.setLightboxIndex(null);
                 lightbox.setShouldAutoEnterInpaint(false);
                 externalGens.setDerivedNavContext(null);
@@ -164,6 +196,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               onMagicEdit={props.onMagicEdit}
               readOnly={props.readOnly}
               showTaskDetails={true}
+              taskDetailsData={taskDetailsData}
               onNavigateToGeneration={(generationId: string) => {
                 const index = lightbox.currentImages.findIndex((img: any) => img.id === generationId);
                 if (index !== -1) {

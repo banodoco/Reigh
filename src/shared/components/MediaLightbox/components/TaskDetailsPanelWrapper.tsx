@@ -67,6 +67,20 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
   const isMobile = variant === 'mobile';
   const padding = isMobile ? 'p-3' : 'p-4';
 
+  console.log('[BasedOnNav] 📄 TaskDetailsPanelWrapper rendering:', {
+    hasTaskDetailsData: !!taskDetailsData,
+    taskDetailsData: taskDetailsData ? {
+      hasTask: !!taskDetailsData.task,
+      isLoading: taskDetailsData.isLoading,
+      hasError: !!taskDetailsData.error,
+      taskId: taskDetailsData.taskId,
+      inputImagesCount: taskDetailsData.inputImages?.length
+    } : null,
+    currentMediaId: currentMediaId.substring(0, 8),
+    derivedGenerationsCount: derivedGenerations?.length || 0,
+    variant
+  });
+
   return (
     <TaskDetailsPanel
       task={taskDetailsData?.task}
@@ -101,6 +115,7 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
                 currentMediaId={currentMediaId}
                 variant={variant}
                 title={`Based on this (${derivedGenerations.length})`}
+                showTopBorder={!!taskDetailsData?.task}
               />
             </div>
           </div>

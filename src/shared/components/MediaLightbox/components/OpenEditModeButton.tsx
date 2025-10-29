@@ -28,18 +28,16 @@ export const OpenEditModeButton: React.FC<OpenEditModeButtonProps> = ({
   const textSize = isMobile ? 'text-xs px-2 py-1' : 'text-sm px-3 py-1';
 
   return (
-    <div className={`${padding} border-b border-border flex justify-end`}>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onOpenEditMode}
-        className={`${textSize} md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent`}
-      >
-        <span className="md:hidden">Open edit mode</span>
-        <span className="hidden md:block">Open</span>
-        <span className="hidden md:block">Edit Mode</span>
-      </Button>
-    </div>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onOpenEditMode}
+      className={`${textSize} md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent`}
+    >
+      <span className="md:hidden">Open edit mode</span>
+      <span className="hidden md:block">Open</span>
+      <span className="hidden md:block">Edit Mode</span>
+    </Button>
   );
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShotImageManagerProps } from './types';
 import { ShotImageManagerMobile } from './ShotImageManagerMobile';
 import MediaLightbox from '../MediaLightbox';
+import { useTaskDetails } from './hooks/useTaskDetails';
 
 interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   selection: any;
@@ -21,6 +22,12 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   externalGens,
   ...props
 }) => {
+  // Fetch task details for current lightbox image
+  const currentLightboxImageId = lightbox.lightboxIndex !== null 
+    ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
+    : null;
+  const { taskDetailsData } = useTaskDetails({ generationId: currentLightboxImageId });
+  
   // Detect tablet/iPad size for task details
   const [isTabletOrLarger, setIsTabletOrLarger] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 768 : false
@@ -79,6 +86,22 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
           hasPrevious = lightbox.lightboxIndex > 0;
         }
         
+        console.log('[BasedOnNav] 📊 MediaLightbox props (Mobile):', {
+          mediaId: lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8),
+          showTaskDetails: true,
+          hasTaskDetailsData: !!taskDetailsData,
+          taskDetailsData: taskDetailsData ? {
+            hasTask: !!taskDetailsData.task,
+            isLoading: taskDetailsData.isLoading,
+            taskId: taskDetailsData.taskId,
+            inputImagesCount: taskDetailsData.inputImages?.length
+          } : null,
+          lightboxIndex: lightbox.lightboxIndex,
+          currentImagesLength: lightbox.currentImages.length,
+          isExternalGen,
+          isTempDerived: lightbox.lightboxIndex >= baseImagesCount + externalGens.externalGenerations.length
+        });
+        
         return (
           <MediaLightbox
             media={lightbox.currentImages[lightbox.lightboxIndex]}
@@ -86,7 +109,16 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             toolTypeOverride={props.toolTypeOverride}
             autoEnterInpaint={lightbox.shouldAutoEnterInpaint}
             onClose={() => {
-              console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
+              console.log('[BasedOnNav] 🚪 MediaLightbox onClose called (Mobile)', {
+                lightboxIndex: lightbox.lightboxIndex,
+                currentImagesLength: lightbox.currentImages.length,
+                hasDerivedNavContext: !!externalGens.derivedNavContext,
+                derivedNavContext: externalGens.derivedNavContext ? {
+                  sourceId: externalGens.derivedNavContext.sourceGenerationId.substring(0, 8),
+                  derivedCount: externalGens.derivedNavContext.derivedGenerationIds.length
+                } : null,
+                tempDerivedCount: externalGens.tempDerivedGenerations.length
+              });
               lightbox.setLightboxIndex(null);
               lightbox.setShouldAutoEnterInpaint(false);
               externalGens.setDerivedNavContext(null);
@@ -108,6 +140,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             starred={(lightbox.currentImages[lightbox.lightboxIndex] as any).starred || false}
             onMagicEdit={props.onMagicEdit}
             showTaskDetails={true}
+            taskDetailsData={taskDetailsData}
             onNavigateToGeneration={(generationId: string) => {
               console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
                 generationId: generationId.substring(0, 8),

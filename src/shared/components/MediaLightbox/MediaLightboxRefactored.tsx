@@ -1099,31 +1099,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedTotalPages={derivedTotalPages}
                       setDerivedPage={setDerivedPage}
                       currentMediaId={media.id}
+                      onClose={onClose}
                       variant="desktop"
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Open Edit Mode Button */}
-                      <OpenEditModeButton
-                        readOnly={readOnly}
-                        showImageEditTools={showImageEditTools}
-                        onOpenEditMode={() => {
-                          setIsInpaintMode(true);
-                          setEditMode('inpaint');
-                        }}
-                        variant="desktop"
-                      />
-                      
-                      {/* Based On display - Show source image this was derived from (ABOVE task details) */}
-                      {sourceGenerationData && onOpenExternalGeneration && (
-                        <div className="border-b border-border p-4">
+                      {/* Top bar with Based On (left) and Open Edit Mode (right) */}
+                      <div className="flex items-center justify-between border-b border-border p-4">
+                        {/* Based On display - Show source image this was derived from */}
+                        {sourceGenerationData && onOpenExternalGeneration ? (
                           <SourceGenerationDisplay
                             sourceGeneration={sourceGenerationData}
                             onNavigate={onOpenExternalGeneration}
                             variant="compact"
                           />
+                        ) : (
+                          <div></div>
+                        )}
+                        
+                        {/* Open Edit Mode Button */}
+                        <div className="flex items-center gap-3">
+                          <OpenEditModeButton
+                            readOnly={readOnly}
+                            showImageEditTools={showImageEditTools}
+                            onOpenEditMode={() => {
+                              setIsInpaintMode(true);
+                              setEditMode('inpaint');
+                            }}
+                            variant="desktop"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onClose}
+                            className="h-8 w-8 p-0 hover:bg-muted"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     
                     <TaskDetailsPanelWrapper
                       taskDetailsData={taskDetailsData}
@@ -1351,31 +1365,45 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedTotalPages={derivedTotalPages}
                       setDerivedPage={setDerivedPage}
                       currentMediaId={media.id}
+                      onClose={onClose}
                       variant="mobile"
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Open Edit Mode Button */}
-                      <OpenEditModeButton
-                        readOnly={readOnly}
-                        showImageEditTools={showImageEditTools}
-                        onOpenEditMode={() => {
-                          setIsInpaintMode(true);
-                          setEditMode('inpaint');
-                        }}
-                        variant="mobile"
-                      />
-                      
-                      {/* Based On display - Show source image this was derived from (ABOVE task details) */}
-                      {sourceGenerationData && onOpenExternalGeneration && (
-                        <div className="border-b border-border p-4">
+                      {/* Top bar with Based On (left) and Open Edit Mode (right) */}
+                      <div className="flex items-center justify-between border-b border-border p-4">
+                        {/* Based On display - Show source image this was derived from */}
+                        {sourceGenerationData && onOpenExternalGeneration ? (
                           <SourceGenerationDisplay
                             sourceGeneration={sourceGenerationData}
                             onNavigate={onOpenExternalGeneration}
                             variant="compact"
                           />
+                        ) : (
+                          <div></div>
+                        )}
+                        
+                        {/* Open Edit Mode Button */}
+                        <div className="flex items-center gap-3">
+                          <OpenEditModeButton
+                            readOnly={readOnly}
+                            showImageEditTools={showImageEditTools}
+                            onOpenEditMode={() => {
+                              setIsInpaintMode(true);
+                              setEditMode('inpaint');
+                            }}
+                            variant="mobile"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onClose}
+                            className="h-8 w-8 p-0 hover:bg-muted"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                      )}
+                      </div>
                     
                     <TaskDetailsPanelWrapper
                       taskDetailsData={taskDetailsData}

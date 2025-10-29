@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type } from 'lucide-react';
+import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
@@ -28,6 +28,9 @@ export interface EditModePanelProps {
   isGeneratingInpaint: boolean;
   inpaintGenerateSuccess: boolean;
   isCreatingMagicEditTasks: boolean;
+  
+  // Close lightbox
+  onClose: () => void;
   magicEditTasksCreated: boolean;
   
   // Brush strokes
@@ -79,6 +82,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   derivedTotalPages,
   setDerivedPage,
   currentMediaId,
+  onClose,
   variant,
 }) => {
   const isMobile = variant === 'mobile';
@@ -102,48 +106,53 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   const sliderTextSize = isMobile ? 'text-xs' : 'text-sm';
 
   return (
-    <div className={`${padding} ${spacing} w-full`}>
-      {/* Based On display - Show source image this was derived from */}
-      {sourceGenerationData && onOpenExternalGeneration && (
-        isMobile ? (
-          // Mobile: Compact button-like display
-          <button
-            onClick={async () => {
-              console.log('[BasedOn:Mobile] 🖼️ Navigating to source generation', {
-                sourceId: sourceGenerationData.id.substring(0, 8),
-                clearingDerivedContext: true
-              });
-              await onOpenExternalGeneration(sourceGenerationData.id);
-            }}
-            className="mb-2 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <span>Based on:</span>
-            <div className="relative w-8 h-8 rounded border border-border overflow-hidden group-hover:border-primary transition-colors">
-              <img
-                src={(sourceGenerationData as any).thumbUrl || sourceGenerationData.location}
-                alt="Source generation"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <span className="group-hover:underline">Click to view</span>
-          </button>
-        ) : (
-          // Desktop: Full display
+    <div className="w-full">
+      {/* Top bar with Based On (left) and Close Edit Mode (right) */}
+      <div className="flex items-center justify-between border-b border-border p-4">
+        {/* Based On display - Show source image this was derived from */}
+        {sourceGenerationData && onOpenExternalGeneration ? (
           <SourceGenerationDisplay
             sourceGeneration={sourceGenerationData}
             onNavigate={onOpenExternalGeneration}
-            variant="full"
-            className="mb-3"
+            variant="compact"
           />
-        )
-      )}
-      
-      <div className={`${isMobile ? 'mb-2' : 'mb-4'} flex items-center justify-between`}>
+        ) : (
+          <div></div>
+        )}
+        
+        {/* Close Edit Mode Button and Close Lightbox Button */}
         <div className="flex items-center gap-3">
-          <h2 className={`${headerSize} font-light`}>Edit Image</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExitMagicEditMode}
+            className={`${closeButtonSize} md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent`}
+          >
+            <span className="md:hidden">Close edit mode</span>
+            <span className="hidden md:block">Close</span>
+            <span className="hidden md:block">Edit Mode</span>
+          </Button>
           
-          {/* Three-way toggle: Text | Inpaint | Annotate */}
-          <div className="flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="h-8 w-8 p-0 hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      
+      <div className={`${padding} ${spacing}`}>
+      <div className={`${isMobile ? 'mb-2' : 'mb-4'} flex items-center gap-3`}>
+        <h2 className={`${headerSize} font-light`}>Edit Image</h2>
+        
+        {/* Three-way toggle: Text | Inpaint | Annotate */}
+        <div className="flex items-center gap-1 bg-muted rounded-md p-1">
             <button
               onClick={() => {
                 setIsInpaintMode(true);
@@ -192,26 +201,19 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           </div>
         </div>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleExitMagicEditMode}
-          className={`${closeButtonSize} md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent`}
-        >
-          <span className="md:hidden">Close edit mode</span>
-          <span className="hidden md:block">Close</span>
-          <span className="hidden md:block">Edit Mode</span>
-        </Button>
-      </div>
-      
-      <div className={spacing}>
         {/* Prompt Field */}
         <div className={generationsSpacing}>
           <label className={`${labelSize} font-medium`}>Prompt</label>
           <textarea
             value={inpaintPrompt}
             onChange={(e) => setInpaintPrompt(e.target.value)}
-            placeholder={isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area..."}
+            placeholder={
+              editMode === 'text' 
+                ? (isMobile ? "Describe the text edit..." : "Describe the text-based edit to make...")
+                : editMode === 'annotate'
+                  ? (isMobile ? "Describe what to generate..." : "Describe what to generate in the annotated regions...")
+                  : (isMobile ? "Describe what to generate..." : "Describe what to generate in the masked area...")
+            }
             className={`w-full ${textareaMinHeight} bg-background border border-input rounded-md ${textareaPadding} ${textareaTextSize} resize-none focus:outline-none focus:ring-2 focus:ring-ring`}
             rows={textareaRows}
           />
@@ -280,7 +282,6 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             </>
           )}
         </Button>
-      </div>
       
       {/* Derived Generations Section */}
       {derivedGenerations && derivedGenerations.length > 0 && onOpenExternalGeneration && (
@@ -294,8 +295,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           currentMediaId={currentMediaId}
           variant={variant}
           title={`Edits of this image (${derivedGenerations.length})`}
+          showTopBorder={true}
         />
       )}
+      </div>
     </div>
   );
 };

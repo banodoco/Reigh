@@ -15,12 +15,15 @@ export const SourceGenerationDisplay: React.FC<SourceGenerationDisplayProps> = (
   className = ''
 }) => {
   const handleClick = async () => {
-    console.log('[BasedOn] 🖼️ Navigating to source generation', {
+    console.log('[BasedOnNav] 🖼️ SourceGenerationDisplay clicked - Navigating to source generation', {
       sourceId: sourceGeneration.id.substring(0, 8),
-      clearingDerivedContext: true
+      clearingDerivedContext: true,
+      timestamp: Date.now()
     });
     // Clear derived context by not passing it - exits derived nav mode
+    console.log('[BasedOnNav] 🎯 Calling onNavigate WITHOUT derivedContext to exit derived mode');
     await onNavigate(sourceGeneration.id);
+    console.log('[BasedOnNav] ✅ onNavigate completed');
   };
 
   return (

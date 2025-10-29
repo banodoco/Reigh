@@ -31,15 +31,36 @@ export function useLightbox({
   
   // Close lightbox if current image no longer exists (e.g., deleted)
   useEffect(() => {
+    console.log('[BasedOnNav] 🔄 useLightbox effect checking bounds:', {
+      lightboxIndex,
+      currentImagesLength: currentImages.length,
+      isOutOfBounds: lightboxIndex !== null && lightboxIndex >= currentImages.length,
+      currentImagesBreakdown: {
+        baseImages: images.length,
+        externalGenerations: externalGenerations.length,
+        tempDerivedGenerations: tempDerivedGenerations.length
+      },
+      derivedNavContext: derivedNavContext ? {
+        sourceId: derivedNavContext.sourceGenerationId.substring(0, 8),
+        derivedCount: derivedNavContext.derivedGenerationIds.length
+      } : null
+    });
+    
     if (lightboxIndex !== null && lightboxIndex >= currentImages.length) {
-      console.log('[ShotImageManager] Current lightbox index out of bounds, closing lightbox', {
+      console.log('[BasedOnNav] 🚨 LIGHTBOX CLOSING - Index out of bounds!', {
         lightboxIndex,
-        imagesLength: currentImages.length
+        currentImagesLength: currentImages.length,
+        baseImages: images.length,
+        externalGenerations: externalGenerations.length,
+        tempDerivedGenerations: tempDerivedGenerations.length,
+        stackTrace: new Error().stack
       });
       setLightboxIndex(null);
       setShouldAutoEnterInpaint(false);
+    } else if (lightboxIndex !== null) {
+      console.log('[BasedOnNav] ✅ Lightbox index is valid, staying open at index', lightboxIndex);
     }
-  }, [lightboxIndex, currentImages.length]);
+  }, [lightboxIndex, currentImages.length, images.length, externalGenerations.length, tempDerivedGenerations.length, derivedNavContext]);
   
   // Handle next navigation
   const handleNext = useCallback(() => {

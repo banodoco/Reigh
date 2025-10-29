@@ -8,7 +8,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
-import { Check, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useTaskType } from '@/shared/hooks/useTaskType';
@@ -25,7 +25,6 @@ interface TaskDetailsPanelProps {
   onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   taskId: string | null;
   className?: string;
-  onClose?: () => void;
   basedOnSection?: ReactNode;
   derivedSection?: ReactNode;
   // Variant name editing
@@ -47,7 +46,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   onApplySettingsFromTask, 
   taskId,
   className = "",
-  onClose,
   basedOnSection,
   derivedSection,
   generationName,
@@ -118,19 +116,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       <div className="flex-shrink-0 p-4 border-b">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-light">Generation Task Details</h3>
-          {onClose && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0 hover:bg-muted"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        <h3 className="text-lg font-light">Generation Task Details</h3>
       </div>
       
       <ScrollArea className="flex-1 p-4 overflow-y-auto">
@@ -193,25 +179,20 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
             })()}
           </div>
           
-          {/* Based On Section */}
-          {basedOnSection}
-          
-          {/* Derived Generations Section */}
-          {derivedSection}
-          
+          {/* Detailed Parameters - Show ABOVE "Based on this" list */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <h3 className="text-lg font-light text-foreground">Detailed Task Parameters</h3>
+                <h4 className="text-sm font-medium text-muted-foreground">Detailed Task Parameters</h4>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDetailedParams(!showDetailedParams)}
-                className="h-8 px-3 flex items-center space-x-1"
+                className="h-7 px-2 flex items-center space-x-1 text-muted-foreground hover:text-foreground"
               >
                 <svg 
-                  className={`h-4 w-4 transition-transform ${showDetailedParams ? 'rotate-180' : ''}`}
+                  className={`h-3.5 w-3.5 transition-transform ${showDetailedParams ? 'rotate-180' : ''}`}
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -269,6 +250,12 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
               </div>
             )}
           </div>
+          
+          {/* Based On Section */}
+          {basedOnSection}
+          
+          {/* Derived Generations Section - Show AFTER detailed parameters */}
+          {derivedSection}
         </div>
       </ScrollArea>
       

@@ -141,65 +141,121 @@ export function useExternalGenerations({
     generationId: string,
     derivedContext?: string[]
   ) => {
-    console.log('[BasedOnLineage] 🌐 Opening external generation:', {
-      generationId: generationId.substring(0, 8),
-      hasDerivedContext: !!derivedContext
+    console.log('[BasedOnNav] 🌐 handleOpenExternalGeneration START:', {
+      targetGenerationId: generationId.substring(0, 8),
+      hasDerivedContext: !!derivedContext,
+      derivedContextLength: derivedContext?.length || 0,
+      currentDerivedNavContext: derivedNavContext ? {
+        sourceId: derivedNavContext.sourceGenerationId.substring(0, 8),
+        derivedIdsCount: derivedNavContext.derivedGenerationIds.length
+      } : null
     });
     
     // Check if generation already exists BEFORE modifying state
     const baseImages = (optimisticOrder && optimisticOrder.length > 0) ? optimisticOrder : (images || []);
     const existingIndex = baseImages.findIndex(img => img.id === generationId);
     
+    console.log('[BasedOnNav] 📊 Current array state:', {
+      baseImagesCount: baseImages.length,
+      externalGenerationsCount: externalGenerations.length,
+      tempDerivedGenerationsCount: tempDerivedGenerations.length,
+      totalCurrentImages: baseImages.length + externalGenerations.length + tempDerivedGenerations.length,
+      existingIndexInBase: existingIndex
+    });
+    
     if (existingIndex !== -1) {
+      console.log('[BasedOnNav] ✅ Found in BASE images at index', existingIndex);
       // Set up derived navigation mode
       if (derivedContext && derivedContext.length > 0) {
+        console.log('[BasedOnNav] 🔄 Setting derived nav context (entering derived mode)');
         setDerivedNavContext({
           sourceGenerationId: generationId,
           derivedGenerationIds: derivedContext
         });
       } else if (derivedNavContext !== null) {
+        console.log('[BasedOnNav] 🔄 Clearing derived nav context (exiting derived mode)');
         setDerivedNavContext(null);
         setTempDerivedGenerations([]);
       }
+      console.log('[BasedOnNav] 🎯 Setting lightbox index to', existingIndex);
       setLightboxIndexRef.current(existingIndex);
+      console.log('[BasedOnNav] ✅ handleOpenExternalGeneration COMPLETE (found in base)');
       return;
     }
     
     const externalIndex = externalGenerations.findIndex(img => img.id === generationId);
     if (externalIndex !== -1) {
+      const calculatedIndex = baseImages.length + externalIndex;
+      console.log('[BasedOnNav] ✅ Found in EXTERNAL images at index', externalIndex, '(absolute:', calculatedIndex, ')');
       // Set up derived navigation mode
       if (derivedContext && derivedContext.length > 0) {
+        console.log('[BasedOnNav] 🔄 Setting derived nav context (entering derived mode)');
         setDerivedNavContext({
           sourceGenerationId: generationId,
           derivedGenerationIds: derivedContext
         });
       } else if (derivedNavContext !== null) {
+        console.log('[BasedOnNav] 🔄 Clearing derived nav context (exiting derived mode)');
+        console.log('[BasedOnNav] ⚠️ CRITICAL: tempDerived being cleared, new currentImages length will be:', baseImages.length + externalGenerations.length);
         setDerivedNavContext(null);
         setTempDerivedGenerations([]);
       }
-      setLightboxIndexRef.current(baseImages.length + externalIndex);
+      console.log('[BasedOnNav] 🎯 Setting lightbox index to', calculatedIndex);
+      setLightboxIndexRef.current(calculatedIndex);
+      console.log('[BasedOnNav] ✅ handleOpenExternalGeneration COMPLETE (found in external)');
       return;
     }
     
     const tempDerivedIndex = tempDerivedGenerations.findIndex(img => img.id === generationId);
     if (tempDerivedIndex !== -1) {
+      const calculatedIndex = baseImages.length + externalGenerations.length + tempDerivedIndex;
+      console.log('[BasedOnNav] ✅ Found in TEMP DERIVED images at index', tempDerivedIndex, '(absolute:', calculatedIndex, ')');
       // Set up derived navigation mode
       if (derivedContext && derivedContext.length > 0) {
+        console.log('[BasedOnNav] 🔄 Setting derived nav context (entering derived mode - staying in temp)');
         setDerivedNavContext({
           sourceGenerationId: generationId,
           derivedGenerationIds: derivedContext
         });
+        console.log('[BasedOnNav] 🎯 Setting lightbox index to', calculatedIndex);
+        setLightboxIndexRef.current(calculatedIndex);
       } else if (derivedNavContext !== null) {
+        // CRITICAL: We're exiting derived mode and the target is IN tempDerived
+        // We need to move it to externalGenerations FIRST, then clear tempDerived
+        console.log('[BasedOnNav] 🔄 Clearing derived nav context (exiting derived mode FROM tempDerived)');
+        console.log('[BasedOnNav] 🔧 FIX: Moving target generation from tempDerived to externalGenerations before clearing');
+        
+        const targetGeneration = tempDerivedGenerations[tempDerivedIndex];
+        const newExternalIndex = externalGenerations.length;
+        const newAbsoluteIndex = baseImages.length + newExternalIndex;
+        
+        console.log('[BasedOnNav] 📦 Moving generation', generationId.substring(0, 8), 'from tempDerived[', tempDerivedIndex, '] to external[', newExternalIndex, '], new absolute index:', newAbsoluteIndex);
+        
+        // Add to externalGenerations
+        setExternalGenerations(prev => [...prev, targetGeneration]);
+        
+        // Set the new index BEFORE clearing tempDerived
+        console.log('[BasedOnNav] 🎯 Setting lightbox index to NEW position:', newAbsoluteIndex);
+        setLightboxIndexRef.current(newAbsoluteIndex);
+        
+        // Now safe to clear
+        console.log('[BasedOnNav] 🧹 Clearing derived nav context and tempDerived');
         setDerivedNavContext(null);
         setTempDerivedGenerations([]);
+      } else {
+        // No context change, just update index
+        console.log('[BasedOnNav] 🎯 Setting lightbox index to', calculatedIndex);
+        setLightboxIndexRef.current(calculatedIndex);
       }
-      setLightboxIndexRef.current(baseImages.length + externalGenerations.length + tempDerivedIndex);
+      console.log('[BasedOnNav] ✅ handleOpenExternalGeneration COMPLETE (found in tempDerived)');
       return;
     }
     
     // Not found in any existing arrays - need to fetch
+    console.log('[BasedOnNav] 🔍 Generation NOT FOUND in any array, will fetch from database');
     // Set up derived navigation mode BEFORE clearing temp state
     if (derivedContext && derivedContext.length > 0) {
+      console.log('[BasedOnNav] 🔄 Setting derived nav context (entering derived mode - will fetch)');
       setDerivedNavContext({
         sourceGenerationId: generationId,
         derivedGenerationIds: derivedContext
@@ -208,6 +264,9 @@ export function useExternalGenerations({
       // Update lightbox index to a safe position BEFORE clearing temp derived
       // Point to end of externalGenerations (where new item will be added)
       const newIndex = baseImages.length + externalGenerations.length;
+      console.log('[BasedOnNav] 🔄 Clearing derived nav context (exiting derived mode - will fetch)');
+      console.log('[BasedOnNav] ⚠️ CRITICAL: tempDerived being cleared, new currentImages length will be:', baseImages.length + externalGenerations.length);
+      console.log('[BasedOnNav] 🎯 Pre-emptively setting index to safe position:', newIndex);
       setLightboxIndexRef.current(newIndex);
       // Now safe to clear without invalidating the index
       setDerivedNavContext(null);
@@ -215,6 +274,7 @@ export function useExternalGenerations({
     }
     
     try {
+      console.log('[BasedOnNav] 🌐 Fetching generation from database...');
       const { data, error } = await supabase
         .from('generations')
         .select(`

@@ -14,6 +14,7 @@ export interface DerivedGenerationsGridProps {
   currentMediaId: string;
   variant?: 'desktop' | 'mobile';
   title?: string;
+  showTopBorder?: boolean; // Whether to show the top border (when task details are present above)
 }
 
 /**
@@ -30,6 +31,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   currentMediaId,
   variant = 'desktop',
   title,
+  showTopBorder = true,
 }) => {
   const isMobile = variant === 'mobile';
   const gridCols = 'grid-cols-3';
@@ -41,7 +43,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   const textSize = isMobile ? 'text-sm' : 'text-lg';
 
   return (
-    <div className="border-t border-border pt-4 mt-4">
+    <div className={showTopBorder ? "border-t border-border pt-4 mt-4" : "pt-4"}>
       <div className={`mb-${isMobile ? '2' : '3'} flex items-${isMobile ? 'center' : 'start'} justify-between`}>
         <div>
           <h3 className={`${textSize} font-${isMobile ? 'medium' : 'light'}`}>
@@ -83,16 +85,19 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             key={derived.id}
             className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
             onClick={async () => {
-              console.log('[DerivedNav] 🖼️ Thumbnail clicked', {
+              console.log('[BasedOnNav] 🖼️ DerivedGenerationsGrid thumbnail clicked', {
                 derivedId: derived.id.substring(0, 8),
                 currentMediaId: currentMediaId.substring(0, 8),
+                derivedGenerationsCount: derivedGenerations?.length,
                 timestamp: Date.now()
               });
               
+              console.log('[BasedOnNav] 🎯 Calling onNavigate WITH derivedContext to enter derived mode');
               await onNavigate(
                 derived.id,
                 derivedGenerations?.map(d => d.id) || []
               );
+              console.log('[BasedOnNav] ✅ onNavigate completed');
             }}
           >
             <img
