@@ -309,6 +309,40 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('amountOfMotion', motion);
   }, [shotSettings]);
 
+  const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
+    console.log('[MotionMode] User changing motion mode:', {
+      from: shotSettings.settings?.motionMode,
+      to: mode,
+      shotId: selectedShot?.id?.substring(0, 8),
+      timestamp: Date.now()
+    });
+    
+    // When switching to advanced mode, initialize phaseConfig if needed
+    if (mode === 'advanced' || mode === 'presets') {
+      const currentPhaseConfig = shotSettings.settings?.phaseConfig;
+      if (!currentPhaseConfig) {
+        console.log('[MotionMode] Initializing phaseConfig for advanced/presets mode');
+        shotSettings.updateFields({
+          motionMode: mode,
+          advancedMode: true,
+          phaseConfig: DEFAULT_PHASE_CONFIG
+        });
+      } else {
+        shotSettings.updateFields({
+          motionMode: mode,
+          advancedMode: true
+        });
+      }
+    } else {
+      // Basic mode - disable advanced mode
+      shotSettings.updateFields({
+        motionMode: mode,
+        advancedMode: false,
+        selectedPhasePresetId: null  // Clear preset when going to basic mode
+      });
+    }
+  }, [shotSettings, selectedShot?.id]);
+
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
     // Prevent enabling advanced mode when turbo mode is on
     if (advanced && shotSettings.settings?.turboMode) {
@@ -542,6 +576,7 @@ const VideoTravelToolPage: React.FC = () => {
     turboMode = false,
     amountOfMotion = 50,
     advancedMode = false,
+    motionMode = 'basic',
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
@@ -1531,6 +1566,8 @@ const VideoTravelToolPage: React.FC = () => {
               onTurboModeChange={handleTurboModeChange}
               amountOfMotion={amountOfMotion}
               onAmountOfMotionChange={handleAmountOfMotionChange}
+              motionMode={motionMode}
+              onMotionModeChange={handleMotionModeChange}
               advancedMode={advancedMode}
               onAdvancedModeChange={handleAdvancedModeChange}
               phaseConfig={phaseConfig}

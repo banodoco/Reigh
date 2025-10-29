@@ -31,6 +31,9 @@ src/tools/travel-between-images/
 │   │   └── utils/
 │   │       └── timeline-utils.ts      # Timeline calculations
 │   ├── BatchSettingsForm.tsx          # Video generation settings
+│   ├── MotionControl.tsx              # Main motion settings component (tabs: Basic/Presets/Advanced)
+│   ├── PresetsSelector.tsx            # Phase config preset browser and loader
+│   ├── PhaseConfigVertical.tsx        # Advanced phase configuration (vertical layout)
 │   ├── VideoOutputsGallery.tsx        # Generated video display
 │   ├── SimpleVideoPlayer.tsx          # Lightweight player
 │   ├── TaskDetailsModal.tsx           # Generation parameters
@@ -113,7 +116,35 @@ src/tools/travel-between-images/
 - **Inputs**:
   - Batch prompts
   - Frame count & duration
-  - Generation parameters
+  - Generation parameters (model, seed, turbo mode)
+
+### `MotionControl.tsx`
+**Unified motion settings component with three modes**
+- **Tabbed Interface**: Basic, Presets, and Advanced modes
+- **Basic Mode**: Shows "Amount of Motion" slider + active LoRAs display
+- **Presets Mode**: Browse and load saved phase configuration presets
+- **Advanced Mode**: Full phase configuration with Global Settings + per-phase controls
+- **Conditional Rendering**: Adapts UI based on selected mode and turbo mode state
+- **Props Integration**: Receives and passes motion-related props from ShotEditor
+
+### `PresetsSelector.tsx`
+**Phase configuration preset browser**
+- **Preset Loading**: Browse and load saved phase configurations from database
+- **Empty State**: Shows message when no preset selected
+- **Preset Info Card**: Displays name, description, phase count, and video preview when preset is active
+- **Edit Action**: Button to switch to Advanced mode for manual editing
+- **Modal Integration**: Opens `PhaseConfigSelectorModal` for preset selection
+
+### `PhaseConfigVertical.tsx`
+**Advanced phase configuration editor (vertical layout)**
+- **Two-Column Layout**: 
+  - Global Settings split between left (phases, solver) and right (flow shift, random seed)
+  - Phase cards split 1/3 (steps, guidance) and 2/3 (LoRAs)
+- **Action Buttons**: Load Preset (icon-only), Save As Preset, Restore Defaults
+- **Corner Labels**: Absolute-positioned title boxes in top-left corner
+- **Phase Management**: Configure 2-3 phases with per-phase steps, guidance scale, and LoRAs
+- **LoRA Integration**: Search and utility dropdowns for quick LoRA selection
+- **Preset Integration**: Can load/save configurations as reusable presets
 - **Features**:
   - *Enhance prompt* checkbox (requires OpenAI)
   - Mutually-exclusive LoRA toggles

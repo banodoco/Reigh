@@ -78,6 +78,7 @@ export interface VideoTravelSettings {
   selectedModel?: 'wan-2.1' | 'wan-2.2';
   turboMode: boolean;
   amountOfMotion: number; // 0-100 range for UI
+  motionMode?: 'basic' | 'presets' | 'advanced'; // Motion control mode
   advancedMode: boolean; // Toggle for showing phase_config settings
   phaseConfig?: PhaseConfig; // Advanced phase configuration
   selectedPhasePresetId?: string | null; // ID of the selected phase config preset (null if manually configured)
@@ -135,6 +136,7 @@ export const videoTravelSettings = {
     selectedModel: 'wan-2.1' as const,
     turboMode: false,
     amountOfMotion: 50,
+    motionMode: 'basic' as const,
     advancedMode: false,
     selectedMode: 'Zippy Supreme' as const,
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,

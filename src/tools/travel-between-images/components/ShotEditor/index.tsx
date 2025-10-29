@@ -13,6 +13,7 @@ import VideoOutputsGallery from "../VideoOutputsGallery";
 import BatchSettingsForm from "../BatchSettingsForm";
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
+import { MotionControl } from '../MotionControl';
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import ShotImagesEditor from '../ShotImagesEditor';
@@ -75,6 +76,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onTurboModeChange,
   amountOfMotion,
   onAmountOfMotionChange,
+  motionMode = 'basic',
+  onMotionModeChange,
   advancedMode,
   onAdvancedModeChange,
   phaseConfig,
@@ -1299,6 +1302,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const parsedResolution: string | undefined = params.parsed_resolution_wh;
       const newGenerationMode: 'batch' | 'timeline' | undefined = orchestrator.generation_mode ?? params.generation_mode;
       const newAdvancedMode: boolean | undefined = orchestrator.advanced_mode ?? params.advanced_mode;
+      const newMotionMode: 'basic' | 'presets' | 'advanced' | undefined = orchestrator.motion_mode ?? params.motion_mode;
       const newPhaseConfig: any = orchestrator.phase_config ?? params.phase_config;
       const newSelectedPhasePresetId: string | null | undefined = orchestrator.selected_phase_preset_id ?? params.selected_phase_preset_id;
       const newTurboMode: boolean | undefined = orchestrator.turbo_mode ?? params.turbo_mode;
@@ -1322,6 +1326,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         context: newContext,
         generationMode: newGenerationMode,
         advancedMode: newAdvancedMode,
+        motionMode: newMotionMode,
         turboMode: newTurboMode,
         enhancePrompt: newEnhancePrompt,
         amountOfMotion: newAmountOfMotion,
@@ -1427,6 +1432,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onAdvancedModeChange(newAdvancedMode);
       } else {
         console.log('[ApplySettings] ⏭️  Skipping advanced mode (undefined)');
+      }
+
+      // Apply motion mode
+      if (newMotionMode !== undefined && onMotionModeChange) {
+        console.log('[ApplySettings] 🎨 Applying motion mode:', {
+          from: motionMode,
+          to: newMotionMode,
+          source: orchestrator.motion_mode !== undefined ? 'orchestrator' : 'params'
+        });
+        onMotionModeChange(newMotionMode);
+      } else {
+        console.log('[ApplySettings] ⏭️  Skipping motion mode (undefined or no handler)');
       }
 
       if (newPhaseConfig) {
@@ -1703,6 +1720,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     generationMode,
     onAdvancedModeChange,
     advancedMode,
+    onMotionModeChange,
+    motionMode,
     onPhaseConfigChange,
     onPhasePresetSelect,
     onPhasePresetRemove,
@@ -1718,6 +1737,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     steerableMotionSettings.model_name,
     availableLoras,
     loraManager,
+    onTextBeforePromptsChange,
+    textBeforePrompts,
+    onTextAfterPromptsChange,
+    textAfterPrompts,
+    batchVideoSteps,
+    batchVideoFrames,
+    batchVideoContext,
   ]);
 
 
@@ -2202,6 +2228,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       ...(advancedMode ? {} : { amount_of_motion: amountOfMotion / 100.0 }),
       // Advanced mode flag and phase config
       advanced_mode: advancedMode,
+      motion_mode: motionMode, // Motion control mode (basic/presets/advanced)
       phase_config: advancedMode && phaseConfig ? phaseConfig : undefined,
       // Include selected phase preset ID for UI state restoration
       selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
@@ -2555,8 +2582,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Left Column: Main Settings - Full width when Advanced Mode is enabled */}
-                    <div className={advancedMode ? "w-full" : "lg:w-1/2 order-2 lg:order-1"}>
+                    {/* Left Column: Main Settings */}
+                    <div className="lg:w-1/2 order-2 lg:order-1">
                         <div className="mb-4">
                             <SectionHeader title="Settings" theme="orange" />
                         </div>
@@ -2611,62 +2638,38 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             textAfterPrompts={textAfterPrompts}
                             onTextAfterPromptsChange={onTextAfterPromptsChange}
                         />
-                        
-                        
-                        {/* LoRA Settings (Mobile) - Hidden when Advanced Mode is enabled */}
-                        {!advancedMode && (
-                          <div className="block lg:hidden mt-6">
-                              <div className="mb-4">
-                                  <SectionHeader title="LoRAs" theme="purple" />
-                              </div>
-                              <div className="space-y-4">
-                                  
-                                  <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
-                                      Add or Manage LoRAs
-                                  </Button>
-                                  
-                                  <ActiveLoRAsDisplay
-                                      selectedLoras={loraManager.selectedLoras}
-                                      onRemoveLora={loraManager.handleRemoveLora}
-                                      onLoraStrengthChange={loraManager.handleLoraStrengthChange}
-                                      availableLoras={availableLoras}
-                                      className="mt-4"
-                                      onAddTriggerWord={loraManager.handleAddTriggerWord}
-                                      renderHeaderActions={loraManager.renderHeaderActions}
-                                  />
-                              </div>
-                          </div>
-                        )}
-                        
-                        
                     </div>
 
-                    {/* Right Column: Model & LoRA Settings (Desktop) - Hidden when Advanced Mode is enabled */}
-                    {!advancedMode && (
-                      <div className="hidden lg:block lg:w-1/2 order-1 lg:order-2">
-                          
-                          {/* LoRA Settings */}
-                          <div className="mb-4">
-                              <SectionHeader title="LoRAs" theme="purple" />
-                          </div>
-                          <div className="space-y-4">
-                              
-                              <Button type="button" variant="outline" className="w-full" onClick={() => loraManager.setIsLoraModalOpen(true)}>
-                                  Add or Manage LoRAs
-                              </Button>
-                              
-                              <ActiveLoRAsDisplay
-                                  selectedLoras={loraManager.selectedLoras}
-                                  onRemoveLora={loraManager.handleRemoveLora}
-                                  onLoraStrengthChange={loraManager.handleLoraStrengthChange}
-                                  availableLoras={availableLoras}
-                                  className="mt-4"
-                                  onAddTriggerWord={loraManager.handleAddTriggerWord}
-                                  renderHeaderActions={loraManager.renderHeaderActions}
-                              />
-                          </div>
-                      </div>
-                    )}
+                    {/* Right Column: Motion Control */}
+                    <div className="lg:w-1/2 order-1 lg:order-2">
+                        <div className="mb-4">
+                            <SectionHeader title="Motion" theme="purple" />
+                        </div>
+                        <MotionControl
+                            motionMode={motionMode}
+                            onMotionModeChange={onMotionModeChange || (() => {})}
+                            amountOfMotion={amountOfMotion || 50}
+                            onAmountOfMotionChange={onAmountOfMotionChange || (() => {})}
+                            selectedLoras={loraManager.selectedLoras}
+                            availableLoras={availableLoras}
+                            onAddLoraClick={() => loraManager.setIsLoraModalOpen(true)}
+                            onRemoveLora={loraManager.handleRemoveLora}
+                            onLoraStrengthChange={loraManager.handleLoraStrengthChange}
+                            onAddTriggerWord={loraManager.handleAddTriggerWord}
+                            renderLoraHeaderActions={loraManager.renderHeaderActions}
+                            selectedPhasePresetId={selectedPhasePresetId}
+                            onPhasePresetSelect={onPhasePresetSelect || (() => {})}
+                            onPhasePresetRemove={onPhasePresetRemove || (() => {})}
+                            advancedMode={advancedMode || false}
+                            onAdvancedModeChange={onAdvancedModeChange || (() => {})}
+                            phaseConfig={phaseConfig}
+                            onPhaseConfigChange={onPhaseConfigChange || (() => {})}
+                            onBlurSave={onBlurSave}
+                            randomSeed={randomSeed}
+                            onRandomSeedChange={handleRandomSeedChange}
+                            turboMode={turboMode}
+                        />
+                    </div>
                 </div>
 
                 {/* Full-width divider and generate button - Original position with ref */}
