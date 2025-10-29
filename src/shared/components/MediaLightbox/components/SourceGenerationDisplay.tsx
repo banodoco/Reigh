@@ -1,5 +1,7 @@
 import React from 'react';
 import { GenerationRow } from '@/types/shots';
+import { formatDistanceToNow } from 'date-fns';
+import { Star } from 'lucide-react';
 
 interface SourceGenerationDisplayProps {
   sourceGeneration: GenerationRow;
@@ -35,6 +37,34 @@ export const SourceGenerationDisplay: React.FC<SourceGenerationDisplayProps> = (
           alt="Source generation"
           className="w-full h-full object-cover"
         />
+        
+        {/* Timestamp - top left */}
+        {sourceGeneration.createdAt && (
+          <div className="absolute top-0.5 left-0.5 z-10 pointer-events-none">
+            <span className="text-[8px] px-0.5 py-0.5 bg-black/70 text-white rounded">
+              {formatDistanceToNow(new Date(sourceGeneration.createdAt), { addSuffix: true })
+                .replace('about ', '')
+                .replace(' minutes', 'm')
+                .replace(' minute', 'm')
+                .replace(' hours', 'h')
+                .replace(' hour', 'h')
+                .replace(' days', 'd')
+                .replace(' day', 'd')
+                .replace(' months', 'mo')
+                .replace(' month', 'mo')
+                .replace(' ago', '')
+                .replace('less than a ', '<1')
+              }
+            </span>
+          </div>
+        )}
+        
+        {/* Star - top right */}
+        {sourceGeneration.starred && (
+          <div className="absolute top-0.5 right-0.5 z-10 pointer-events-none">
+            <Star className="h-2 w-2 fill-yellow-500 text-yellow-500" />
+          </div>
+        )}
       </div>
       <span className="group-hover:underline">Click to view</span>
     </button>
