@@ -391,6 +391,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     setBackfillSkeletonCount: stateHook.setBackfillSkeletonCount,
     filteredImages: filtersHook.filteredImages,
     setIsDownloadingStarred: stateHook.setIsDownloadingStarred,
+    setSelectedShotIdLocal: stateHook.setSelectedShotIdLocal,
   });
 
   // Mobile interactions hook

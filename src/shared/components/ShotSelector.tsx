@@ -132,18 +132,37 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
     return shot?.name || null;
   }, [value, shots]);
 
+  console.log('[ShotSelectorDebug] ShotSelector render:', {
+    value,
+    selectedShotName,
+    shotsCount: shots.length,
+    container: container ? 'provided' : 'none'
+  });
+
   return (
     <Select
       value={value}
-      onValueChange={onValueChange}
-      onOpenChange={onOpenChange}
+      onValueChange={(newValue) => {
+        console.log('[ShotSelectorDebug] 🎯 Shot selected:', newValue);
+        onValueChange(newValue);
+      }}
+      onOpenChange={(open) => {
+        console.log('[ShotSelectorDebug] Dropdown open state changed:', open);
+        onOpenChange?.(open);
+      }}
     >
       <SelectTrigger
         className={triggerClassName}
         aria-label="Select target shot"
         onMouseEnter={(e) => e.stopPropagation()}
         onMouseLeave={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          console.log('[ShotSelectorDebug] SelectTrigger onPointerDown');
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          console.log('[ShotSelectorDebug] SelectTrigger onClick');
+        }}
       >
         <SelectValue placeholder={placeholder}>
           {selectedShotName && selectedShotName.length > 10 
@@ -163,7 +182,17 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
         container={container}
       >
         {shots.map(shot => (
-          <SelectItem key={shot.id} value={shot.id} className="text-xs">
+          <SelectItem 
+            key={shot.id} 
+            value={shot.id} 
+            className="text-xs"
+            onPointerDown={(e) => {
+              console.log('[ShotSelectorDebug] SelectItem onPointerDown:', shot.name);
+            }}
+            onClick={(e) => {
+              console.log('[ShotSelectorDebug] SelectItem onClick:', shot.name);
+            }}
+          >
             {shot.name}
           </SelectItem>
         ))}

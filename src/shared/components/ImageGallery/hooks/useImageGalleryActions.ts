@@ -30,6 +30,7 @@ export interface UseImageGalleryActionsProps {
   setBackfillSkeletonCount: (count: number) => void;
   filteredImages: GeneratedImageWithMetadata[];
   setIsDownloadingStarred: (downloading: boolean) => void;
+  setSelectedShotIdLocal: (shotId: string) => void;
 }
 
 export interface UseImageGalleryActionsReturn {
@@ -70,6 +71,7 @@ export const useImageGalleryActions = ({
   setBackfillSkeletonCount,
   filteredImages,
   setIsDownloadingStarred,
+  setSelectedShotIdLocal,
 }: UseImageGalleryActionsProps): UseImageGalleryActionsReturn => {
   
   const { toast } = useToast();
@@ -374,8 +376,10 @@ export const useImageGalleryActions = ({
   }, [setShowTickForSecondaryImageId, secondaryTickTimeoutRef]);
 
   const handleShotChange = useCallback((shotId: string) => {
+    console.log('[ShotSelectorDebug] 🔄 handleShotChange called with:', shotId);
     setLastAffectedShotId(shotId);
-  }, [setLastAffectedShotId]);
+    setSelectedShotIdLocal(shotId);
+  }, [setLastAffectedShotId, setSelectedShotIdLocal]);
 
   // Handle skeleton cleared callback - reset deletion count
   const handleSkeletonCleared = useCallback(() => {

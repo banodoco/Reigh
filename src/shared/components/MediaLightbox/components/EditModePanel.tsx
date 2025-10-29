@@ -156,18 +156,18 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
       <div className={`${isMobile ? 'mb-2' : 'mb-4'} flex items-center gap-3`}>
         <h2 className={`${headerSize} font-light`}>Edit Image</h2>
         
-        {/* Three-way toggle: Text | Inpaint | Annotate */}
-        <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+        {/* Three-way toggle: Text | Inpaint | Annotate - Segmented control style */}
+        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30">
             <button
               onClick={() => {
                 setIsInpaintMode(true);
                 setEditMode('text');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} rounded ${toggleTextSize} transition-all`,
+                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
                 editMode === 'text'
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Type className={toggleIconSize} />
@@ -179,10 +179,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 setEditMode('inpaint');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} rounded ${toggleTextSize} transition-all`,
+                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
                 editMode === 'inpaint'
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Paintbrush className={toggleIconSize} />
@@ -194,10 +194,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 setEditMode('annotate');
               }}
               className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} rounded ${toggleTextSize} transition-all`,
+                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'annotate'
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Pencil className={toggleIconSize} />

@@ -717,12 +717,61 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             }}
             // Ensure clicks within the dialog never reach the app behind it
             onPointerDown={(e) => {
+              // Allow Radix Select/dropdown components to work properly
+              const target = e.target as HTMLElement;
+              const isRadixSelect = target.closest('[data-radix-select-trigger]') !== null || 
+                                    target.closest('[data-radix-select-content]') !== null ||
+                                    target.closest('[data-radix-select-item]') !== null ||
+                                    target.closest('[role="combobox"]') !== null ||
+                                    target.closest('[role="option"]') !== null;
+              
+              console.log('[ShotSelectorDebug] MediaLightbox onPointerDown:', {
+                targetTag: target.tagName,
+                targetClass: target.className,
+                isRadixSelect,
+                hasTrigger: target.closest('[data-radix-select-trigger]') !== null,
+                hasContent: target.closest('[data-radix-select-content]') !== null,
+                hasItem: target.closest('[data-radix-select-item]') !== null,
+                hasCombobox: target.closest('[role="combobox"]') !== null,
+                hasOption: target.closest('[role="option"]') !== null,
+                willStopPropagation: !isRadixSelect
+              });
+              
+              if (isRadixSelect) {
+                // Let Radix Select handle its own events
+                console.log('[ShotSelectorDebug] ✅ Allowing Radix Select event to propagate');
+                return;
+              }
+              
+              console.log('[ShotSelectorDebug] ❌ Stopping propagation for non-Radix element');
               e.stopPropagation();
               if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
                 e.nativeEvent.stopImmediatePropagation();
               }
             }}
             onClick={(e) => {
+              // Allow Radix Select/dropdown components to work properly
+              const target = e.target as HTMLElement;
+              const isRadixSelect = target.closest('[data-radix-select-trigger]') !== null || 
+                                    target.closest('[data-radix-select-content]') !== null ||
+                                    target.closest('[data-radix-select-item]') !== null ||
+                                    target.closest('[role="combobox"]') !== null ||
+                                    target.closest('[role="option"]') !== null;
+              
+              console.log('[ShotSelectorDebug] MediaLightbox onClick:', {
+                targetTag: target.tagName,
+                targetClass: target.className,
+                isRadixSelect,
+                willStopPropagation: !isRadixSelect
+              });
+              
+              if (isRadixSelect) {
+                // Let Radix Select handle its own events
+                console.log('[ShotSelectorDebug] ✅ Allowing Radix Select click to propagate');
+                return;
+              }
+              
+              console.log('[ShotSelectorDebug] ❌ Stopping click propagation for non-Radix element');
               e.stopPropagation();
               if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
                 e.nativeEvent.stopImmediatePropagation();

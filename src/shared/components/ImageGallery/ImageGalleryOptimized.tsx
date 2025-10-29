@@ -258,6 +258,7 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     setBackfillSkeletonCount: stateHook.setBackfillSkeletonCount,
     filteredImages: filtersHook.filteredImages,
     setIsDownloadingStarred: stateHook.setIsDownloadingStarred,
+    setSelectedShotIdLocal: stateHook.setSelectedShotIdLocal,
   });
 
   // Mobile interactions hook (updated to work with optimized state)
