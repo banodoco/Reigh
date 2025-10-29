@@ -84,8 +84,8 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   contentRef,
   handleApplySettings,
 }) => {
-  // Don't render if no workflow actions available or in special edit mode
-  if (!(onAddToShot || onDelete || onApplySettings) || isSpecialEditMode) {
+  // Don't render if no workflow actions available
+  if (!(onAddToShot || onDelete || onApplySettings)) {
     return null;
   }
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
 import { BrushStroke } from '../types';
+import { Type, Paintbrush, Pencil } from 'lucide-react';
 import {
   BrushSizeSlider,
   PaintEraseToggle,
@@ -12,6 +13,7 @@ import {
 export interface FloatingToolControlsProps {
   variant: 'tablet' | 'mobile';
   editMode: 'text' | 'inpaint' | 'annotate';
+  onSetEditMode: (mode: 'text' | 'inpaint' | 'annotate') => void;
   
   // Inpaint props
   brushSize: number;
@@ -36,14 +38,14 @@ export interface FloatingToolControlsProps {
 /**
  * Floating Tool Controls Component
  * 
- * Displays mode-specific canvas controls for inpaint and annotate modes.
+ * Displays mode selection toggle and mode-specific canvas controls.
+ * Now includes mode toggle (Text/Inpaint/Annotate) at the top.
  * Used on both tablet (landscape, with sidebar) and mobile (portrait, no sidebar).
- * 
- * Does NOT include mode selection (Text/Inpaint/Annotate) - that lives in the sidebar.
  */
 export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
   variant,
   editMode,
+  onSetEditMode,
   brushSize,
   isEraseMode,
   onSetBrushSize,
@@ -66,6 +68,8 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
     ? (panelPosition === 'top' ? 'top-4' : 'bottom-4')
     : (panelPosition === 'top' ? 'top-2' : 'bottom-2');
   
+  const iconSize = isTablet ? 'h-4 w-4' : 'h-3.5 w-3.5';
+  
   return (
     <div className={cn("absolute z-[70]", leftPosition, topBottomPosition)}>
       {/* Position Toggle Button - at top when panel is at bottom */}
@@ -80,6 +84,46 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
         "bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 border border-border shadow-xl",
         containerWidth
       )}>
+        {/* Mode Toggle - Text | Inpaint | Annotate */}
+        <div className="flex items-center gap-0.5 bg-muted rounded-md p-1">
+          <button
+            onClick={() => onSetEditMode('text')}
+            className={cn(
+              "flex-1 flex items-center justify-center p-2 rounded transition-all",
+              editMode === 'text'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+            title="Text mode"
+          >
+            <Type className={iconSize} />
+          </button>
+          <button
+            onClick={() => onSetEditMode('inpaint')}
+            className={cn(
+              "flex-1 flex items-center justify-center p-2 rounded transition-all",
+              editMode === 'inpaint'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+            title="Inpaint mode"
+          >
+            <Paintbrush className={iconSize} />
+          </button>
+          <button
+            onClick={() => onSetEditMode('annotate')}
+            className={cn(
+              "flex-1 flex items-center justify-center p-2 rounded transition-all",
+              editMode === 'annotate'
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            )}
+            title="Annotate mode"
+          >
+            <Pencil className={iconSize} />
+          </button>
+        </div>
+        
         {/* Inpaint Mode Controls */}
         {editMode === 'inpaint' && (
           <>
@@ -105,13 +149,15 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
           />
         )}
         
-        {/* Common Controls - Undo & Clear */}
-        <UndoClearButtons 
-          onUndo={onUndo} 
-          onClear={onClearMask} 
-          disabled={brushStrokes.length === 0}
-          variant={variant}
-        />
+        {/* Common Controls - Undo & Clear (only for inpaint and annotate modes) */}
+        {editMode !== 'text' && (
+          <UndoClearButtons 
+            onUndo={onUndo} 
+            onClear={onClearMask} 
+            disabled={brushStrokes.length === 0}
+            variant={variant}
+          />
+        )}
       </div>
       
       {/* Position Toggle Button - at bottom when panel is at top */}

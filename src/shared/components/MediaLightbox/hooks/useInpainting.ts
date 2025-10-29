@@ -672,12 +672,8 @@ export const useInpainting = ({
         setSelectedShapeId(null);
       }
       
-      // LIMIT TO ONE RECTANGLE: Clear existing rectangles when starting a new one
-      if (annotationStrokes.length > 0) {
-        console.log('[Annotate] Clearing existing rectangle to allow only one');
-        setAnnotationStrokes([]);
-        redrawStrokes([]);
-      }
+      // Note: Don't clear existing rectangles here on click
+      // They will be cleared when a new rectangle is successfully drawn (in handlePointerUp)
     }
     
     // Capture the pointer to receive events even when outside canvas
@@ -920,7 +916,14 @@ export const useInpainting = ({
         setAnnotationStrokes([]);
       }
       
-      setBrushStrokes(prev => [...prev, newStroke]);
+      // LIMIT TO ONE RECTANGLE: Clear existing rectangles when successfully drawing a new one
+      if (isAnnotateMode && shapeType === 'rectangle' && annotationStrokes.length > 0) {
+        console.log('[Annotate] Clearing existing rectangle - new one successfully drawn');
+        // Replace all existing rectangles with just the new one
+        setBrushStrokes([newStroke]);
+      } else {
+        setBrushStrokes(prev => [...prev, newStroke]);
+      }
       
       // Auto-select rectangle after drawing (shows delete button immediately)
       if (isAnnotateMode && shapeType === 'rectangle') {

@@ -120,18 +120,23 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           <div></div>
         )}
         
-        {/* Close Edit Mode Button and Close Lightbox Button */}
+        {/* Info | Edit Toggle and Close Lightbox Button */}
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleExitMagicEditMode}
-            className={`${closeButtonSize} md:flex md:flex-col md:items-center md:leading-tight hover:bg-transparent active:bg-transparent`}
-          >
-            <span className="md:hidden">Close edit mode</span>
-            <span className="hidden md:block">Close</span>
-            <span className="hidden md:block">Edit Mode</span>
-          </Button>
+          {/* Two-way toggle: Info | Edit */}
+          <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+            <button
+              onClick={handleExitMagicEditMode}
+              className="px-3 py-1.5 text-sm rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-background/50"
+            >
+              Info
+            </button>
+            <button
+              className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
+              disabled
+            >
+              Edit
+            </button>
+          </div>
           
           <Button
             variant="ghost"

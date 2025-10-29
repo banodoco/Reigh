@@ -989,10 +989,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
 
                     {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
-                    {isSpecialEditMode && shouldShowSidePanel && editMode !== 'text' && (
+                    {isSpecialEditMode && shouldShowSidePanel && (
                       <FloatingToolControls
                         variant="tablet"
                         editMode={editMode}
+                        onSetEditMode={setEditMode}
                         brushSize={brushSize}
                         isEraseMode={isEraseMode}
                         onSetBrushSize={setBrushSize}
@@ -1135,17 +1136,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <div></div>
                         )}
                         
-                        {/* Open Edit Mode Button */}
+                        {/* Info | Edit Toggle and Close Lightbox Button */}
                         <div className="flex items-center gap-3">
-                          <OpenEditModeButton
-                            readOnly={readOnly}
-                            showImageEditTools={showImageEditTools}
-                            onOpenEditMode={() => {
-                              setIsInpaintMode(true);
-                              setEditMode('inpaint');
-                            }}
-                            variant="desktop"
-                          />
+                          {/* Two-way toggle: Info | Edit */}
+                          {showImageEditTools && !readOnly && (
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
+                                disabled
+                              >
+                                Info
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsInpaintMode(true);
+                                  setEditMode('inpaint');
+                                }}
+                                className="px-3 py-1.5 text-sm rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-background/50"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1232,6 +1244,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <FloatingToolControls
                         variant="mobile"
                         editMode={editMode}
+                        onSetEditMode={setEditMode}
                         brushSize={brushSize}
                         isEraseMode={isEraseMode}
                         onSetBrushSize={setBrushSize}

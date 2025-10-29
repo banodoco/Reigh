@@ -117,8 +117,8 @@ export const TopRightControls: React.FC<TopRightControlsProps> = ({
 }) => {
   return (
     <div className="absolute top-4 right-4 flex items-center space-x-2 z-[70]">
-      {/* Download Button */}
-      {showDownload && !readOnly && !isSpecialEditMode && (
+      {/* Download Button - Keep visible in edit mode */}
+      {showDownload && !readOnly && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -137,8 +137,8 @@ export const TopRightControls: React.FC<TopRightControlsProps> = ({
         </Tooltip>
       )}
 
-      {/* Delete Button */}
-      {onDelete && !readOnly && !isVideo && !isSpecialEditMode && handleDelete && (
+      {/* Delete Button - Keep visible in edit mode */}
+      {onDelete && !readOnly && !isVideo && handleDelete && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -162,23 +162,7 @@ export const TopRightControls: React.FC<TopRightControlsProps> = ({
         </Tooltip>
       )}
 
-      {/* Close Button - Always visible */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="bg-black/50 hover:bg-black/70 text-white rounded-full h-9 w-9 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent className="z-[100001]">Close lightbox</TooltipContent>
-      </Tooltip>
+      {/* Close Button - Removed per user request (close button in task details panel is sufficient) */}
     </div>
   );
 };
@@ -295,10 +279,7 @@ export const BottomRightControls: React.FC<BottomRightControlsProps> = ({
   addToReferencesSuccess,
   handleAddToReferences,
 }) => {
-  if (isSpecialEditMode) {
-    return null;
-  }
-
+  // Keep visible in edit mode - users can star and add to references while editing
   return (
     <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
       {/* Star Button */}
