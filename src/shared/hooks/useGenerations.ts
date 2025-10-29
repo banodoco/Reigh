@@ -525,6 +525,7 @@ export async function fetchDerivedGenerations(
       shot_generations(shot_id, timeline_frame)
     `)
     .eq('based_on', sourceGenerationId)
+    .order('starred', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
   
   if (error) {
