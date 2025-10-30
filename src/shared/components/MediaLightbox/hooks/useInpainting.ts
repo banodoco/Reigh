@@ -1018,7 +1018,7 @@ export const useInpainting = ({
     }
   }, [editMode, annotationMode, setAnnotationMode]);
 
-  // Handle mouse/touch drawing
+  // Handle mouse/touch drawing (canvas coordinate system)
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = displayCanvasRef.current;
     console.error('[InpaintPointer] 🖱️ handlePointerDown', {
