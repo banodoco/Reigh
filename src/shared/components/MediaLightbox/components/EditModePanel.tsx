@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X } from 'lucide-react';
@@ -98,6 +98,32 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   variant,
 }) => {
   const isMobile = variant === 'mobile';
+  
+  // Track previous edit mode to detect changes
+  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode);
+  
+  // Auto-reset LoRA mode to "none" when switching to inpaint or annotate
+  useEffect(() => {
+    const prevMode = prevEditModeRef.current;
+    
+    // If switching TO inpaint or annotate mode (from any other mode), reset LoRA to none
+    if (prevMode !== editMode && (editMode === 'inpaint' || editMode === 'annotate')) {
+      console.log('[LoraReset] Switching to', editMode, 'mode - resetting LoRA to none');
+      setLoraMode('none');
+    }
+    
+    prevEditModeRef.current = editMode;
+  }, [editMode, setLoraMode]);
+  
+  // Handle LoRA mode selection with toggle-off capability
+  const handleLoraChange = (value: LoraMode) => {
+    // If clicking the same value, deselect it (set to none)
+    if (value === loraMode) {
+      setLoraMode('none');
+    } else {
+      setLoraMode(value);
+    }
+  };
   
   // Responsive styles
   const padding = isMobile ? 'p-4' : 'p-6';
@@ -242,7 +268,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           <div className={cn(isMobile ? "" : "flex-1")}>
             <div className="flex items-center gap-3">
               <label className={`${labelSize} font-medium whitespace-nowrap`}>Lora Mode</label>
-              <Select value={loraMode} onValueChange={setLoraMode}>
+              <Select value={loraMode} onValueChange={handleLoraChange}>
                 <SelectTrigger className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
                   <SelectValue />
                 </SelectTrigger>
