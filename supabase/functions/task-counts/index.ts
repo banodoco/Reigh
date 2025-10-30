@@ -18,6 +18,44 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
  * }
  * 
  * Returns:
+ * {
+ *   mode: 'count',
+ *   timestamp: string,
+ *   run_type_filter?: 'gpu' | 'api' | null,
+ *   
+ *   // Quick counts for scaling math
+ *   totals: {
+ *     queued_only: number,        // Tasks waiting to be claimed
+ *     active_only: number,         // Tasks being processed
+ *     queued_plus_active: number   // Total workload
+ *   },
+ *   
+ *   // Detailed task arrays for logging context
+ *   queued_tasks: [{
+ *     task_id: string,
+ *     task_type: string,
+ *     user_id: string,
+ *     created_at: string
+ *   }],
+ *   
+ *   active_tasks: [{
+ *     task_id: string,
+ *     task_type: string,
+ *     worker_id: string | null,
+ *     user_id: string,
+ *     started_at: string
+ *   }],
+ *   
+ *   // Additional breakdown and user stats (service role only)
+ *   global_task_breakdown?: {...},
+ *   users?: [...],
+ *   
+ *   // User-specific info (user token only)
+ *   user_id?: string,
+ *   user_info?: {...},
+ *   debug_summary?: {...}
+ * }
+ * 
  * - 200 OK with detailed task count data and breakdown
  * - 401 Unauthorized if no valid token
  * - 403 Forbidden if token invalid or user not found
@@ -285,6 +323,136 @@ serve(async (req) => {
         console.log(`[TASK_COUNT_DEBUG] [DISCREPANCY] [${runType || 'ALL'}] ⚠️  MISMATCH: Main says ${queued_only} queued, fallback says ${fallbackTotalQueued}!`);
       }
 
+      // Fetch detailed task information for ELIGIBLE queued and active tasks
+      // Must match the same eligibility criteria as count_eligible_tasks_service_role
+      console.log(`[TASK_COUNT_DEBUG] [DETAILS] [${runType || 'ALL'}] Fetching eligible task information...`);
+      
+      // Fetch queued tasks with eligibility criteria:
+      // - Status = 'Queued'
+      // - NOT orchestrator tasks
+      // - User has credits > 0
+      // - No dependencies (dependant_on IS NULL)
+      // - Optionally filter by run_type via user settings
+      const { data: queuedTasksData, error: queuedError } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          id,
+          task_type,
+          created_at,
+          dependant_on,
+          projects!inner(
+            user_id,
+            users!inner(credits, settings)
+          )
+        `)
+        .eq('status', 'Queued')
+        .is('dependant_on', null)  // No dependencies
+        .order('created_at', { ascending: true });
+      
+      if (queuedError) {
+        console.error(`[TASK_COUNT_DEBUG] [DETAILS] Error fetching queued tasks:`, queuedError);
+      }
+      
+      // Fetch active/in-progress tasks with eligibility criteria:
+      // - Status = 'In Progress'
+      // - NOT orchestrator tasks
+      // - User has credits > 0
+      // - Has worker_id (cloud-claimed)
+      // - Optionally filter by run_type via user settings
+      const { data: activeTasksData, error: activeError } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          id,
+          task_type,
+          worker_id,
+          updated_at,
+          projects!inner(
+            user_id,
+            users!inner(credits, settings)
+          )
+        `)
+        .eq('status', 'In Progress')
+        .not('worker_id', 'is', null)  // Must have worker_id (cloud-claimed)
+        .order('updated_at', { ascending: true });
+      
+      if (activeError) {
+        console.error(`[TASK_COUNT_DEBUG] [DETAILS] Error fetching active tasks:`, activeError);
+      }
+
+      // Apply eligibility filters that can't be done in SQL
+      const queuedFiltered = (queuedTasksData || []).filter(task => {
+        // Exclude orchestrator tasks
+        if (task.task_type && task.task_type.toLowerCase().includes('orchestrator')) {
+          return false;
+        }
+        
+        // User must have credits > 0
+        if (task.projects.users.credits <= 0) {
+          return false;
+        }
+        
+        // If run_type filter is specified, check user settings
+        if (runType === 'gpu') {
+          const inCloud = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
+          if (!inCloud) return false;
+        } else if (runType === 'api') {
+          const inCloud = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
+          if (inCloud) return false;
+        }
+        
+        return true;
+      });
+
+      const activeFiltered = (activeTasksData || []).filter(task => {
+        // Exclude orchestrator tasks
+        if (task.task_type && task.task_type.toLowerCase().includes('orchestrator')) {
+          return false;
+        }
+        
+        // User must have credits > 0
+        if (task.projects.users.credits <= 0) {
+          return false;
+        }
+        
+        // If run_type filter is specified, check user settings
+        if (runType === 'gpu') {
+          const inCloud = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
+          if (!inCloud) return false;
+        } else if (runType === 'api') {
+          const inCloud = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
+          if (inCloud) return false;
+        }
+        
+        return true;
+      });
+
+      // Format queued tasks
+      const queued_tasks = queuedFiltered.map(task => ({
+        task_id: task.id,
+        task_type: task.task_type,
+        user_id: task.projects.user_id,
+        created_at: task.created_at
+      }));
+
+      // Format active tasks
+      const active_tasks = activeFiltered.map(task => ({
+        task_id: task.id,
+        task_type: task.task_type,
+        worker_id: task.worker_id,
+        user_id: task.projects.user_id,
+        started_at: task.updated_at // Using updated_at as proxy for when task was claimed
+      }));
+
+      console.log(`[TASK_COUNT_DEBUG] [DETAILS] [${runType || 'ALL'}] Eligible tasks: ${queued_tasks.length} queued, ${active_tasks.length} active`);
+      
+      // Validation: arrays should match totals
+      if (queued_tasks.length !== queued_only) {
+        console.warn(`[TASK_COUNT_DEBUG] [VALIDATION] [${runType || 'ALL'}] ⚠️  MISMATCH: queued_tasks array (${queued_tasks.length}) != queued_only count (${queued_only})`);
+      }
+      if (active_tasks.length !== active_only) {
+        console.warn(`[TASK_COUNT_DEBUG] [VALIDATION] [${runType || 'ALL'}] ⚠️  MISMATCH: active_tasks array (${active_tasks.length}) != active_only count (${active_only})`);
+      }
+
       return new Response(JSON.stringify({
         mode: 'count',
         timestamp: new Date().toISOString(),
@@ -294,6 +462,8 @@ serve(async (req) => {
           active_only,
           queued_plus_active
         },
+        queued_tasks,
+        active_tasks,
         global_task_breakdown: taskBreakdown,
         users: user_stats,
         recent_tasks: [] // Removed direct database query - using function-based counts only
@@ -353,8 +523,111 @@ serve(async (req) => {
       const in_progress_cloud = active_only_capacity; // Our user function excludes orchestrators
       const in_progress_cloud_non_orchestrator = active_only_capacity; // Already excluded by our function
       
-      // Remove recent tasks direct query - using function-based approach only
-      const recent_user_tasks: any[] = [];
+      // Fetch detailed task information for this user's ELIGIBLE queued and active tasks
+      // Must match the same eligibility criteria as count_eligible_tasks_user_pat
+      console.log(`${pathTag} [TaskCounts:Details] Fetching eligible task information for user ${callerId}...`);
+      
+      // Get user's project IDs first
+      const { data: userProjects } = await supabaseAdmin
+        .from('projects')
+        .select('id')
+        .eq('user_id', callerId);
+      
+      const projectIds = userProjects?.map(p => p.id) || [];
+      
+      let user_queued_tasks: any[] = [];
+      let user_active_tasks: any[] = [];
+      
+      if (projectIds.length > 0) {
+        // Fetch queued tasks with eligibility criteria:
+        // - Status = 'Queued'
+        // - NOT orchestrator tasks
+        // - No dependencies (dependant_on IS NULL)
+        // Note: PAT functions bypass credits check, so we don't filter by credits here
+        const { data: queuedTasksData, error: queuedError } = await supabaseAdmin
+          .from('tasks')
+          .select(`
+            id,
+            task_type,
+            created_at,
+            dependant_on,
+            project_id
+          `)
+          .eq('status', 'Queued')
+          .in('project_id', projectIds)
+          .is('dependant_on', null)  // No dependencies
+          .order('created_at', { ascending: true });
+        
+        if (queuedError) {
+          console.error(`${pathTag} [TaskCounts:Details] Error fetching queued tasks:`, queuedError);
+        }
+        
+        // Fetch active/in-progress tasks with eligibility criteria:
+        // - Status = 'In Progress'
+        // - NOT orchestrator tasks
+        // - Has worker_id (cloud-claimed)
+        const { data: activeTasksData, error: activeError } = await supabaseAdmin
+          .from('tasks')
+          .select(`
+            id,
+            task_type,
+            worker_id,
+            updated_at,
+            project_id
+          `)
+          .eq('status', 'In Progress')
+          .in('project_id', projectIds)
+          .not('worker_id', 'is', null)  // Must have worker_id (cloud-claimed)
+          .order('updated_at', { ascending: true });
+        
+        if (activeError) {
+          console.error(`${pathTag} [TaskCounts:Details] Error fetching active tasks:`, activeError);
+        }
+
+        // Apply eligibility filters that can't be done in SQL
+        const queuedFiltered = (queuedTasksData || []).filter(task => {
+          // Exclude orchestrator tasks
+          if (task.task_type && task.task_type.toLowerCase().includes('orchestrator')) {
+            return false;
+          }
+          return true;
+        });
+
+        const activeFiltered = (activeTasksData || []).filter(task => {
+          // Exclude orchestrator tasks
+          if (task.task_type && task.task_type.toLowerCase().includes('orchestrator')) {
+            return false;
+          }
+          return true;
+        });
+
+        // Format queued tasks
+        user_queued_tasks = queuedFiltered.map(task => ({
+          task_id: task.id,
+          task_type: task.task_type,
+          user_id: callerId,
+          created_at: task.created_at
+        }));
+
+        // Format active tasks
+        user_active_tasks = activeFiltered.map(task => ({
+          task_id: task.id,
+          task_type: task.task_type,
+          worker_id: task.worker_id,
+          user_id: callerId,
+          started_at: task.updated_at // Using updated_at as proxy for when task was claimed
+        }));
+
+        console.log(`${pathTag} [TaskCounts:Details] Eligible tasks: ${user_queued_tasks.length} queued, ${user_active_tasks.length} active`);
+        
+        // Validation: arrays should match totals
+        if (user_queued_tasks.length !== queued_only_capacity) {
+          console.warn(`${pathTag} [TaskCounts:Validation] ⚠️  MISMATCH: queued_tasks array (${user_queued_tasks.length}) != queued_only count (${queued_only_capacity})`);
+        }
+        if (user_active_tasks.length !== active_only_capacity) {
+          console.warn(`${pathTag} [TaskCounts:Validation] ⚠️  MISMATCH: active_tasks array (${user_active_tasks.length}) != active_only count (${active_only_capacity})`);
+        }
+      }
 
       return new Response(JSON.stringify({
         mode: 'count',
@@ -370,8 +643,10 @@ serve(async (req) => {
           in_progress_cloud,
           in_progress_cloud_non_orchestrator
         },
+        queued_tasks: user_queued_tasks,
+        active_tasks: user_active_tasks,
         user_info,
-        recent_tasks: recent_user_tasks,
+        recent_tasks: [], // Deprecated - using queued_tasks and active_tasks instead
         debug_summary: {
           at_capacity: in_progress_any >= 5,
           capacity_used_pct: Math.round((in_progress_any / 5) * 100),
