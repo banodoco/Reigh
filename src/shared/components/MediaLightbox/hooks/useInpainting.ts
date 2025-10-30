@@ -927,9 +927,10 @@ export const useInpainting = ({
     
     console.log('[Inpaint] Redrawn strokes', { count: strokes.length, selectedId: selectedShapeId });
     
-    // Debug: Check canvas visibility
+    // Debug: Check canvas visibility and scaling
     if (canvas) {
       const canvasStyle = window.getComputedStyle(canvas);
+      const bufferVsDisplay = canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight;
       console.error('[InpaintDraw] 📊 Canvas style check', {
         zIndex: canvasStyle.zIndex,
         opacity: canvasStyle.opacity,
@@ -937,11 +938,15 @@ export const useInpainting = ({
         visibility: canvasStyle.visibility,
         pointerEvents: canvasStyle.pointerEvents,
         position: canvasStyle.position,
-        width: canvas.width,
-        height: canvas.height,
-        offsetWidth: canvas.offsetWidth,
-        offsetHeight: canvas.offsetHeight
+        bufferSize: { width: canvas.width, height: canvas.height },
+        displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight },
+        MISMATCH: bufferVsDisplay ? '⚠️ BUFFER SIZE != DISPLAY SIZE!' : '✅ Sizes match',
+        scaleRatio: {
+          x: canvas.offsetWidth / canvas.width,
+          y: canvas.offsetHeight / canvas.height
+        }
       });
+      addDebugLog(`Canvas: buffer=${canvas.width}x${canvas.height} display=${canvas.offsetWidth}x${canvas.offsetHeight}`);
     }
   }, [selectedShapeId, addDebugLog]);
   
