@@ -589,7 +589,7 @@ export const useInpainting = ({
         hasImageContainer: !!imageContainerRef.current
       });
     }
-  }, [isInpaintMode, media.location, imageDimensions, media.id]); // FIXED: Removed stroke deps to prevent reinit on every stroke
+  }, [isInpaintMode, media.location, media.id]); // Canvas size from getBoundingClientRect, not imageDimensions (which changes constantly)
 
   // Handle window resize to keep canvas aligned with image
   useEffect(() => {
