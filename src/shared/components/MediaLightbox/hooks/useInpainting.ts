@@ -64,6 +64,7 @@ export interface UseInpaintingReturn {
   handleToggleFreeForm: () => void;
   getDeleteButtonPosition: () => { x: number; y: number } | null;
   redrawStrokes: (strokes: BrushStroke[]) => void;
+  debugLog: string[];
 }
 
 /**
@@ -124,6 +125,12 @@ export const useInpainting = ({
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
   const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate'>('inpaint');
   const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
+  
+  // Debug state for production
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const addDebugLog = useCallback((msg: string) => {
+    setDebugLog(prev => [...prev.slice(-20), `${new Date().toISOString().split('T')[1].slice(0, -1)}: ${msg}`]);
+  }, []);
   
   // Computed: backwards compatibility
   const isAnnotateMode = editMode === 'annotate';
@@ -1346,6 +1353,7 @@ export const useInpainting = ({
         shapeType
       };
       
+      addDebugLog(`Created stroke: ${newStroke.shapeType} pts=${newStroke.points.length}`);
       console.log('[InpaintPointer] ✅ New stroke created', {
         id: newStroke.id.substring(0, 8),
         shapeType: newStroke.shapeType,
@@ -1513,6 +1521,7 @@ export const useInpainting = ({
 
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
+    addDebugLog(`Effect: strokes=${brushStrokes.length} drag=${isDraggingShape} draw=${isDrawing}`);
     console.log('[InpaintEffect] 🔄 Stroke change effect triggered', {
       isInpaintMode,
       strokeCount: brushStrokes.length,
@@ -1524,14 +1533,16 @@ export const useInpainting = ({
     
     // Skip redraw during drag - handlePointerMove redraws manually to prevent flicker
     if (isDraggingShape) {
+      addDebugLog('Effect: SKIP (dragging)');
       console.log('[InpaintEffect] ⏸️ Skipping redraw during drag (handled manually)');
       return;
     }
     
     if (isInpaintMode) {
+      addDebugLog(`Effect: REDRAW ${brushStrokes.length} strokes`);
       redrawStrokes(brushStrokes);
     }
-  }, [brushStrokes, isInpaintMode, redrawStrokes, editMode, media.id, isDraggingShape, isDrawing]);
+  }, [brushStrokes, isInpaintMode, redrawStrokes, editMode, media.id, isDraggingShape, isDrawing, addDebugLog]);
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
@@ -1873,6 +1884,7 @@ export const useInpainting = ({
     handleToggleFreeForm,
     getDeleteButtonPosition,
     redrawStrokes,
+    debugLog, // For production debugging
   };
 };
 

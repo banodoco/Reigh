@@ -323,6 +323,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleDeleteSelected,
     handleToggleFreeForm,
     getDeleteButtonPosition,
+    debugLog,
   } = inpaintingHook;
   
   // Handle exiting inpaint mode from UI buttons
@@ -517,6 +518,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   return (
     <TooltipProvider delayDuration={500}>
+      {/* Production Debug Overlay */}
+      {debugLog.length > 0 && isInpaintMode && (
+        <div className="fixed top-4 right-4 z-[200000] bg-black/90 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto font-mono text-xs">
+          <div className="flex justify-between items-center mb-2">
+            <span className="font-bold">Inpaint Debug Log</span>
+            <button 
+              onClick={() => {
+                const logs = debugLog.join('\n');
+                navigator.clipboard.writeText(logs);
+                alert('Debug logs copied to clipboard!');
+              }}
+              className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30"
+            >
+              Copy
+            </button>
+          </div>
+          {debugLog.map((log, i) => (
+            <div key={i} className="text-green-400">{log}</div>
+          ))}
+        </div>
+      )}
+      
       <DialogPrimitive.Root 
         open={true} 
         // Allow scrolling/interactions outside when tasks pane is open on desktop
