@@ -599,6 +599,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 return;
               }
               
+              // Single clicks don't close - only double-clicks close now
+              // Just reset the tracking
+              pointerDownTargetRef.current = null;
+            }}
+            onDoubleClick={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't handle the click
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
+              // Prevent closing when in inpaint mode to avoid accidental data loss
+              if (isInpaintMode) {
+                return;
+              }
+              
               // Only close if BOTH the click started AND ended on the overlay
               // This prevents accidental closure when dragging from inside the modal
               const clickStartedOnOverlay = pointerDownTargetRef.current === e.currentTarget;
@@ -607,9 +628,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               if (clickStartedOnOverlay && clickEndedOnOverlay) {
                 onClose();
               }
-              
-              // Reset the tracking
-              pointerDownTargetRef.current = null;
             }}
             onTouchStart={(e) => {
               // Allow touch events on canvas when in inpaint mode
@@ -944,7 +962,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div 
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
-                  // Swallow event, and close if clicking on the background (not on content)
+                  // Swallow event - single clicks don't close, only double-clicks
+                  e.stopPropagation();
+                }}
+                onDoubleClick={(e) => {
+                  // Close if double-clicking on the background (not on content)
                   e.stopPropagation();
                   if (e.target === e.currentTarget) {
                     onClose();
@@ -956,7 +978,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   className="flex-1 flex items-center justify-center relative"
                   style={{ width: '60%' }}
                   onClick={(e) => {
-                    // Swallow event, and close if clicking on the media section background (not on content)
+                    // Swallow event - single clicks don't close, only double-clicks
+                    e.stopPropagation();
+                  }}
+                  onDoubleClick={(e) => {
+                    // Close if double-clicking on the media section background (not on content)
                     e.stopPropagation();
                     if (e.target === e.currentTarget) {
                       onClose();
@@ -1269,7 +1295,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   className="flex-1 flex items-center justify-center relative"
                   style={{ height: '60%' }}
                   onClick={(e) => {
-                    // Close if clicking on the black space (not on the media or controls)
+                    // Single clicks don't close - only double-clicks
+                    e.stopPropagation();
+                  }}
+                  onDoubleClick={(e) => {
+                    // Close if double-clicking on the black space (not on the media or controls)
                     if (e.target === e.currentTarget) {
                       onClose();
                     }
@@ -1536,7 +1566,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Mobile/Tablet layout using new FlexContainer + MediaWrapper
               <FlexContainer
                 onClick={(e) => {
-                  // Only allow background clicks to close when not in edit modes
+                  // Single clicks don't close - only double-clicks
+                  if (isInpaintMode) {
+                    e.stopPropagation();
+                    return;
+                  }
+                  e.stopPropagation();
+                }}
+                onDoubleClick={(e) => {
+                  // Only allow background double-clicks to close when not in edit modes
                   // and only if the click is on the container itself (not children)
                   if (isInpaintMode) {
                     e.stopPropagation();
