@@ -491,7 +491,7 @@ export const useInpainting = ({
       return;
     }
     
-    console.log('[InpaintCanvas] 🔄 Canvas initialization effect triggered', {
+    console.error('[InpaintCanvas] 🔄 Canvas initialization effect triggered', {
       isInpaintMode,
       hasDisplayCanvas: !!displayCanvasRef.current,
       hasMaskCanvas: !!maskCanvasRef.current,
@@ -770,6 +770,13 @@ export const useInpainting = ({
 
   // Redraw all strokes on canvas
   const redrawStrokes = useCallback((strokes: BrushStroke[]) => {
+    console.error('[InpaintDraw] 🖌️ redrawStrokes called', {
+      strokeCount: strokes.length,
+      selectedId: selectedShapeId,
+      canvasExists: !!displayCanvasRef.current,
+      maskExists: !!maskCanvasRef.current,
+      timestamp: Date.now()
+    });
     console.log('[InpaintDraw] 🖌️ redrawStrokes called', {
       strokeCount: strokes.length,
       selectedId: selectedShapeId,
@@ -1357,6 +1364,11 @@ export const useInpainting = ({
       };
       
       addDebugLog(`Created stroke: ${newStroke.shapeType} pts=${newStroke.points.length}`);
+      console.error('[InpaintPointer] ✅ New stroke created', {
+        id: newStroke.id.substring(0, 8),
+        shapeType: newStroke.shapeType,
+        pointCount: newStroke.points.length
+      });
       console.log('[InpaintPointer] ✅ New stroke created', {
         id: newStroke.id.substring(0, 8),
         shapeType: newStroke.shapeType,
@@ -1525,6 +1537,14 @@ export const useInpainting = ({
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
     addDebugLog(`Effect: strokes=${brushStrokes.length} drag=${isDraggingShape} draw=${isDrawing}`);
+    console.error('[InpaintEffect] 🔄 Stroke change effect triggered', {
+      isInpaintMode,
+      strokeCount: brushStrokes.length,
+      editMode,
+      mediaId: media.id.substring(0, 8),
+      isDraggingShape,
+      isDrawing
+    });
     console.log('[InpaintEffect] 🔄 Stroke change effect triggered', {
       isInpaintMode,
       strokeCount: brushStrokes.length,
