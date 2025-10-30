@@ -500,8 +500,10 @@ export const useInpainting = ({
       hasMaskCanvas: !!maskCanvasRef.current,
       hasImageContainer: !!imageContainerRef.current,
       mediaId: media.id.substring(0, 8),
-      imageLocation: media.location?.substring(0, 50)
+      imageLocation: media.location?.substring(0, 50),
+      imageDimensions
     });
+    addDebugLog(`Canvas init: dims=${JSON.stringify(imageDimensions)}`);
     
     if (isInpaintMode && displayCanvasRef.current && maskCanvasRef.current && imageContainerRef.current) {
       const container = imageContainerRef.current;
@@ -924,6 +926,23 @@ export const useInpainting = ({
     });
     
     console.log('[Inpaint] Redrawn strokes', { count: strokes.length, selectedId: selectedShapeId });
+    
+    // Debug: Check canvas visibility
+    if (canvas) {
+      const canvasStyle = window.getComputedStyle(canvas);
+      console.error('[InpaintDraw] 📊 Canvas style check', {
+        zIndex: canvasStyle.zIndex,
+        opacity: canvasStyle.opacity,
+        display: canvasStyle.display,
+        visibility: canvasStyle.visibility,
+        pointerEvents: canvasStyle.pointerEvents,
+        position: canvasStyle.position,
+        width: canvas.width,
+        height: canvas.height,
+        offsetWidth: canvas.offsetWidth,
+        offsetHeight: canvas.offsetHeight
+      });
+    }
   }, [selectedShapeId, addDebugLog]);
   
   // Store latest redrawStrokes in ref to avoid stale closures in effects
@@ -1545,16 +1564,20 @@ export const useInpainting = ({
 
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
-    addDebugLog(`Effect: strokes=${brushStrokes.length} drag=${isDraggingShape} draw=${isDrawing}`);
+    const effectId = Math.random().toString(36).slice(2, 6);
+    addDebugLog(`Effect[${effectId}]: strokes=${brushStrokes.length} drag=${isDraggingShape} draw=${isDrawing}`);
     console.error('[InpaintEffect] 🔄 Stroke change effect triggered', {
+      effectId,
       isInpaintMode,
       strokeCount: brushStrokes.length,
       editMode,
       mediaId: media.id.substring(0, 8),
       isDraggingShape,
-      isDrawing
+      isDrawing,
+      brushStrokesRef: brushStrokes
     });
     console.log('[InpaintEffect] 🔄 Stroke change effect triggered', {
+      effectId,
       isInpaintMode,
       strokeCount: brushStrokes.length,
       editMode,
