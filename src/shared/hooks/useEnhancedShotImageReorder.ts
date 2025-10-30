@@ -71,7 +71,7 @@ export const useEnhancedShotImageReorder = (
       // Safety check: If orderedIds has more items than currentImages, data is out of sync
       // This can happen when an image was just added but positions haven't reloaded yet
       if (orderedShotImageEntryIds.length !== currentImages.length) {
-        console.warn('[useEnhancedShotImageReorder] Data sync issue - array length mismatch:', {
+        console.error('[useEnhancedShotImageReorder] Data sync issue - array length mismatch:', {
           orderedIdsLength: orderedShotImageEntryIds.length,
           currentImagesLength: currentImages.length,
           orderedIds: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
@@ -81,7 +81,7 @@ export const useEnhancedShotImageReorder = (
         // Check if any IDs in orderedIds are missing from currentImages
         const missingIds = orderedShotImageEntryIds.filter(id => !currentOrder.includes(id));
         if (missingIds.length > 0) {
-          console.warn('[useEnhancedShotImageReorder] Missing IDs detected - aborting reorder:', {
+          console.error('[useEnhancedShotImageReorder] Missing IDs detected - aborting reorder:', {
             missingIds: missingIds.map(id => id.substring(0, 8)),
             note: 'This can happen when reordering immediately after adding an image. Try again in a moment.'
           });
@@ -147,7 +147,7 @@ export const useEnhancedShotImageReorder = (
           
           // Safety check: Ensure both images exist AND have id field (handles race conditions from just-added images)
           if (!currentImg || !targetImg || !currentImg.id || !targetImg.id) {
-            console.warn('[useEnhancedShotImageReorder] Skipping change - missing image data or id:', {
+            console.error('[useEnhancedShotImageReorder] Skipping change - missing image data or id:', {
               shotImageEntryId: shotImageEntryId.substring(0, 8),
               oldPos,
               newPos,
