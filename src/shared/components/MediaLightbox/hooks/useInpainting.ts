@@ -129,6 +129,7 @@ export const useInpainting = ({
   const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('inpaint');
   const prevMediaIdRef = useRef(media.id); // Track media ID changes
   const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode); // Track mode changes for selection
+  const prevCanvasSizeRef = useRef<{ width: number; height: number } | null>(null); // Track canvas size for scaling
 
   // Wrapper setters that persist to mediaStateRef
   const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | ((prev: 'text' | 'inpaint' | 'annotate') => 'text' | 'inpaint' | 'annotate')) => {
@@ -244,6 +245,28 @@ export const useInpainting = ({
   }, [inpaintStrokes, annotationStrokes, inpaintPrompt, inpaintNumGenerations, brushSize, isInpaintMode, media.id]);
 
 
+  // Helper function to scale strokes proportionally
+  const scaleStrokes = useCallback((strokes: BrushStroke[], oldWidth: number, oldHeight: number, newWidth: number, newHeight: number): BrushStroke[] => {
+    const scaleX = newWidth / oldWidth;
+    const scaleY = newHeight / oldHeight;
+    
+    console.log('[InpaintResize] Scaling strokes', {
+      oldSize: { width: oldWidth, height: oldHeight },
+      newSize: { width: newWidth, height: newHeight },
+      scale: { x: scaleX, y: scaleY },
+      strokeCount: strokes.length
+    });
+    
+    return strokes.map(stroke => ({
+      ...stroke,
+      points: stroke.points.map(point => ({
+        x: point.x * scaleX,
+        y: point.y * scaleY
+      })),
+      // Keep brush size the same (it's relative to drawing, not image size)
+    }));
+  }, []);
+
   // Initialize canvas when entering inpaint mode
   useEffect(() => {
     console.log('[InpaintPaint] 🔄 Canvas initialization effect', {
@@ -267,15 +290,42 @@ export const useInpainting = ({
         const canvas = displayCanvasRef.current;
         const maskCanvas = maskCanvasRef.current;
         
-        canvas.width = rect.width;
-        canvas.height = rect.height;
+        const newWidth = rect.width;
+        const newHeight = rect.height;
+        
+        // If canvas size is changing and we have existing strokes, scale them
+        const prevSize = prevCanvasSizeRef.current;
+        if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
+          console.log('[InpaintResize] Canvas size changed, scaling strokes', {
+            from: prevSize,
+            to: { width: newWidth, height: newHeight }
+          });
+          
+          // Scale both inpaint and annotation strokes
+          if (inpaintStrokes.length > 0) {
+            const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+            setInpaintStrokes(scaledInpaintStrokes);
+          }
+          
+          if (annotationStrokes.length > 0) {
+            const scaledAnnotationStrokes = scaleStrokes(annotationStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+            setAnnotationStrokes(scaledAnnotationStrokes);
+          }
+        }
+        
+        // Update canvas dimensions
+        canvas.width = newWidth;
+        canvas.height = newHeight;
         canvas.style.left = `${rect.left - containerRect.left}px`;
         canvas.style.top = `${rect.top - containerRect.top}px`;
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
+        canvas.style.width = `${newWidth}px`;
+        canvas.style.height = `${newHeight}px`;
         
-        maskCanvas.width = rect.width;
-        maskCanvas.height = rect.height;
+        maskCanvas.width = newWidth;
+        maskCanvas.height = newHeight;
+        
+        // Store new size for future comparisons
+        prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
         
         console.log('[InpaintPaint] ✅ Canvas initialized', {
           canvasWidth: canvas.width,
@@ -291,7 +341,96 @@ export const useInpainting = ({
         console.log('[InpaintPaint] ❌ No image found in container');
       }
     }
-  }, [isInpaintMode, media.location, imageDimensions]);
+  }, [isInpaintMode, media.location, imageDimensions, scaleStrokes, inpaintStrokes, annotationStrokes, setInpaintStrokes, setAnnotationStrokes]);
+
+  // Handle window resize to keep canvas aligned with image
+  useEffect(() => {
+    if (!isInpaintMode) return;
+    
+    const handleResize = () => {
+      console.log('[InpaintResize] Window resized, recalculating canvas');
+      
+      // Force canvas re-initialization by triggering the effect above
+      // We do this by checking if the image size has changed
+      if (displayCanvasRef.current && imageContainerRef.current) {
+        const container = imageContainerRef.current;
+        const img = container.querySelector('img');
+        
+        if (img) {
+          const rect = img.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const canvas = displayCanvasRef.current;
+          const maskCanvas = maskCanvasRef.current;
+          
+          if (!maskCanvas) return;
+          
+          const newWidth = rect.width;
+          const newHeight = rect.height;
+          
+          // Only update if size actually changed
+          if (canvas.width !== newWidth || canvas.height !== newHeight) {
+            const prevSize = prevCanvasSizeRef.current;
+            
+            // Scale strokes if we have a previous size
+            if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
+              console.log('[InpaintResize] Scaling strokes on resize', {
+                from: prevSize,
+                to: { width: newWidth, height: newHeight }
+              });
+              
+              if (inpaintStrokes.length > 0) {
+                const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+                setInpaintStrokes(scaledInpaintStrokes);
+              }
+              
+              if (annotationStrokes.length > 0) {
+                const scaledAnnotationStrokes = scaleStrokes(annotationStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+                setAnnotationStrokes(scaledAnnotationStrokes);
+              }
+            }
+            
+            // Update canvas dimensions
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            canvas.style.left = `${rect.left - containerRect.left}px`;
+            canvas.style.top = `${rect.top - containerRect.top}px`;
+            canvas.style.width = `${newWidth}px`;
+            canvas.style.height = `${newHeight}px`;
+            
+            maskCanvas.width = newWidth;
+            maskCanvas.height = newHeight;
+            
+            // Store new size
+            prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
+            
+            // Strokes will be redrawn automatically via the brushStrokes effect
+          }
+        }
+      }
+    };
+    
+    // Use ResizeObserver for better performance and accuracy
+    let resizeObserver: ResizeObserver | null = null;
+    
+    if (imageContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        // Debounce with requestAnimationFrame for smooth resizing
+        requestAnimationFrame(handleResize);
+      });
+      
+      resizeObserver.observe(imageContainerRef.current);
+    }
+    
+    // Fallback to window resize event
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isInpaintMode, inpaintStrokes, annotationStrokes, editMode, scaleStrokes, setInpaintStrokes, setAnnotationStrokes, displayCanvasRef, imageContainerRef, maskCanvasRef]);
 
   // Helper function to detect if a point is near a shape
   const isPointOnShape = (x: number, y: number, stroke: BrushStroke, threshold: number = 15): boolean => {
