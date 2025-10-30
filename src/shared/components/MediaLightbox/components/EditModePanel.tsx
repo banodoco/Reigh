@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X } from 'lucide-react';
+import { CheckCircle, Loader2, Paintbrush, Pencil, Sparkles, Type, X, XCircle } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
@@ -115,14 +115,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
     prevEditModeRef.current = editMode;
   }, [editMode, setLoraMode]);
   
-  // Handle LoRA mode selection with toggle-off capability
-  const handleLoraChange = (value: LoraMode) => {
-    // If clicking the same value, deselect it (set to none)
-    if (value === loraMode) {
-      setLoraMode('none');
-    } else {
-      setLoraMode(value);
-    }
+  // Handle clearing LoRA mode
+  const handleClearLora = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoraMode('none');
   };
   
   // Responsive styles
@@ -268,17 +264,33 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           <div className={cn(isMobile ? "" : "flex-1")}>
             <div className="flex items-center gap-3">
               <label className={`${labelSize} font-medium whitespace-nowrap`}>Lora Mode</label>
-              <Select value={loraMode} onValueChange={handleLoraChange}>
-                <SelectTrigger className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[100001]">
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="in-scene">InScene</SelectItem>
-                  <SelectItem value="next-scene">Next Scene</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-1 flex-1">
+                <Select value={loraMode} onValueChange={setLoraMode}>
+                  <SelectTrigger className={cn("flex-1", isMobile ? "h-9 text-sm" : "h-10")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[100001]">
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="in-scene">InScene</SelectItem>
+                    <SelectItem value="next-scene">Next Scene</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+                {loraMode !== 'none' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearLora}
+                    className={cn(
+                      "h-9 w-9 p-0 hover:bg-muted shrink-0",
+                      isMobile && "h-8 w-8"
+                    )}
+                    title="Clear LoRA selection"
+                  >
+                    <XCircle className={cn("h-4 w-4 text-muted-foreground", isMobile && "h-3.5 w-3.5")} />
+                  </Button>
+                )}
+              </div>
             </div>
             
             {/* Custom URL Input - Show when Custom is selected */}
