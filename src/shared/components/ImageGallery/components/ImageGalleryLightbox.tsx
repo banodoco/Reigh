@@ -487,7 +487,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       return;
     }
 
-    // Not in filtered images, fetch from Supabase
+    // Not in filtered images, fetch from Supabase and open it directly
     console.log('[DerivedNav:Gallery] 📥 Fetching external generation from database', {
       generationId: generationId.substring(0, 8)
     });
@@ -495,21 +495,85 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     try {
       const { data, error } = await supabase
         .from('generations')
-        .select('*')
+        .select(`
+          *,
+          shot_generations(shot_id, timeline_frame)
+        `)
         .eq('id', generationId)
         .single();
 
       if (error) throw error;
 
       if (data) {
-        console.log('[DerivedNav:Gallery] ✅ Fetched external generation, updating lightbox', {
+        console.log('[DerivedNav:Gallery] ✅ Fetched external generation, opening in lightbox', {
           generationId: data.id.substring(0, 8),
           type: data.type
         });
 
-        // For ImageGallery, we don't have a mechanism to add to filtered images temporarily
-        // So we'll just show a message that the image is external
-        toast.info('This generation is not in the current filter. Please adjust filters to view it.');
+        // Transform to GeneratedImageWithMetadata format
+        // Database uses 'params' field for metadata
+        const params = (data as any).params || {};
+        const basedOnValue = (data as any).based_on || params?.based_on || null;
+        const shotGenerations = (data as any).shot_generations || [];
+        
+        // Database fields: location (full image), thumbnail_url (thumb)
+        const imageUrl = (data as any).location || (data as any).upscaled_url || (data as any).thumbnail_url;
+        const thumbUrl = (data as any).thumbnail_url || (data as any).location;
+        
+        const transformedData: GeneratedImageWithMetadata = {
+          id: data.id,
+          url: imageUrl,
+          thumbUrl,
+          prompt: params?.prompt || '',
+          metadata: params,
+          createdAt: data.created_at,
+          starred: data.starred || false,
+          isVideo: !!(data as any).video_url,
+          videoUrl: (data as any).video_url || undefined,
+          // Include based_on for lineage navigation
+          based_on: basedOnValue,
+          sourceGenerationId: basedOnValue,
+          // Add shot associations
+          shotIds: shotGenerations.map((sg: any) => sg.shot_id),
+          timelineFrames: shotGenerations.reduce((acc: any, sg: any) => {
+            acc[sg.shot_id] = sg.timeline_frame;
+            return acc;
+          }, {}),
+        } as any;
+        
+        console.log('[DerivedNav:Gallery] 🎯 Opening external generation in lightbox', {
+          generationId: transformedData.id.substring(0, 8),
+          hasBasedOn: !!basedOnValue,
+          isVideo: transformedData.isVideo
+        });
+        
+        // Check if already in filtered images (e.g., from a previous navigation)
+        const existingIndex = filteredImages.findIndex(img => img.id === transformedData.id);
+        if (existingIndex !== -1) {
+          // Already exists, just navigate to it
+          console.log('[DerivedNav:Gallery] External generation already in filtered images, navigating to existing', {
+            existingIndex
+          });
+          if (setActiveLightboxIndex) {
+            setActiveLightboxIndex(existingIndex);
+          }
+        } else {
+          // Add to filtered images temporarily so navigation works
+          // Note: This modifies the array in place, which is not ideal but works within
+          // the current architecture. A better solution would be to pass a dedicated
+          // callback for opening external generations.
+          filteredImages.push(transformedData);
+          
+          console.log('[DerivedNav:Gallery] Added external generation to filtered images', {
+            newIndex: filteredImages.length - 1,
+            totalFiltered: filteredImages.length
+          });
+          
+          // Navigate to the newly added item (last index)
+          if (setActiveLightboxIndex) {
+            setActiveLightboxIndex(filteredImages.length - 1);
+          }
+        }
       } else {
         console.log('[DerivedNav:Gallery] ⚠️ No data returned from query');
         toast.error('Generation not found');
