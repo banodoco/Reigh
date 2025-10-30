@@ -408,6 +408,9 @@ export const useInpainting = ({
     
     if (!ctx || !maskCtx) return;
     
+    // Disable image smoothing for crisp, sharp edges on mask canvas
+    maskCtx.imageSmoothingEnabled = false;
+    
     // Clear both canvases
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
@@ -805,6 +808,9 @@ export const useInpainting = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Disable image smoothing for crisp edges
+    ctx.imageSmoothingEnabled = false;
+    
     // In annotation mode, redraw with the updated shape preview
     if (isAnnotateMode && annotationMode) {
       // Redraw all saved strokes first
@@ -1139,6 +1145,30 @@ export const useInpainting = ({
       // Scale up the mask canvas content
       tempCtx.drawImage(maskCanvas, 0, 0, scaledWidth, scaledHeight);
       
+      // Apply binary threshold to eliminate any anti-aliasing artifacts
+      // This ensures pure black/white mask with no gray/semi-transparent pixels
+      const imageData = tempCtx.getImageData(0, 0, scaledWidth, scaledHeight);
+      const data = imageData.data;
+      const threshold = 128; // Mid-point threshold
+      
+      for (let i = 0; i < data.length; i += 4) {
+        // Check alpha channel - if pixel has any opacity, make it fully opaque white
+        if (data[i + 3] > threshold) {
+          data[i] = 255;     // R
+          data[i + 1] = 255; // G
+          data[i + 2] = 255; // B
+          data[i + 3] = 255; // A
+        } else {
+          // Otherwise make it fully transparent black
+          data[i] = 0;
+          data[i + 1] = 0;
+          data[i + 2] = 0;
+          data[i + 3] = 0;
+        }
+      }
+      
+      tempCtx.putImageData(imageData, 0, 0);
+      
       // Create mask image from scaled canvas
       const maskImageData = tempCanvas.toDataURL('image/png');
       
@@ -1243,6 +1273,30 @@ export const useInpainting = ({
       
       // Scale up the mask canvas content
       tempCtx.drawImage(maskCanvas, 0, 0, scaledWidth, scaledHeight);
+      
+      // Apply binary threshold to eliminate any anti-aliasing artifacts
+      // This ensures pure black/white mask with no gray/semi-transparent pixels
+      const imageData = tempCtx.getImageData(0, 0, scaledWidth, scaledHeight);
+      const data = imageData.data;
+      const threshold = 128; // Mid-point threshold
+      
+      for (let i = 0; i < data.length; i += 4) {
+        // Check alpha channel - if pixel has any opacity, make it fully opaque white
+        if (data[i + 3] > threshold) {
+          data[i] = 255;     // R
+          data[i + 1] = 255; // G
+          data[i + 2] = 255; // B
+          data[i + 3] = 255; // A
+        } else {
+          // Otherwise make it fully transparent black
+          data[i] = 0;
+          data[i + 1] = 0;
+          data[i + 2] = 0;
+          data[i + 3] = 0;
+        }
+      }
+      
+      tempCtx.putImageData(imageData, 0, 0);
       
       // Create mask image from scaled canvas
       const maskImageData = tempCanvas.toDataURL('image/png');
