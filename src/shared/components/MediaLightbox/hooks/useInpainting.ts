@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
 import { GenerationRow } from '@/types/shots';
@@ -96,6 +96,21 @@ export const useInpainting = ({
     annotationMode: 'rectangle' | null;
   }>>(new Map());
 
+  // Per-media stroke cache (prevents cross-media contamination)
+  const mediaStrokeCacheRef = useRef<Map<string, {
+    inpaintStrokes: BrushStroke[];
+    annotationStrokes: BrushStroke[];
+    prompt: string;
+    numGenerations: number;
+    brushSize: number;
+  }>>(new Map());
+
+  // Track which media have been hydrated from localStorage (prevent re-hydration)
+  const hydratedMediaIdsRef = useRef<Set<string>>(new Set());
+  
+  // Flag to prevent canvas scaling during media transitions
+  const isMediaTransitioningRef = useRef(false);
+
   const [isInpaintMode, setIsInpaintMode] = useState(false);
   const [inpaintStrokes, setInpaintStrokes] = useState<BrushStroke[]>([]); // Strokes for inpainting
   const [annotationStrokes, setAnnotationStrokes] = useState<BrushStroke[]>([]); // Strokes for annotations
@@ -156,36 +171,150 @@ export const useInpainting = ({
     setEditMode(boolValue ? 'annotate' : 'inpaint');
   }, [editMode, setEditMode]);
 
-  // Restore state when media changes
-  useEffect(() => {
+  // Track pending rAF to cancel on rapid media switches
+  const transitionRafRef = useRef<number | null>(null);
+
+  // Synchronously swap state when media changes (prevents flicker)
+  useLayoutEffect(() => {
     // Only run if media.id actually changed
     if (prevMediaIdRef.current === media.id) {
       return;
     }
     
-    console.log('[Media] 🔄 Media changed', { 
-      from: prevMediaIdRef.current.substring(0, 8), 
-      to: media.id.substring(0, 8) 
+    const oldMediaId = prevMediaIdRef.current;
+    const newMediaId = media.id;
+    
+    console.log('[Media] 🔄 Media switching (synchronous)', { 
+      from: oldMediaId.substring(0, 8), 
+      to: newMediaId.substring(0, 8) 
     });
     
-    prevMediaIdRef.current = media.id;
+    // Cancel any pending transition completion callback from previous switch
+    if (transitionRafRef.current !== null) {
+      cancelAnimationFrame(transitionRafRef.current);
+      transitionRafRef.current = null;
+      console.log('[Media] ⚠️ Cancelled pending transition callback (rapid switching)');
+    }
     
-    const savedState = mediaStateRef.current.get(media.id);
+    // Set transition flag to prevent canvas scaling mid-swap
+    isMediaTransitioningRef.current = true;
+    
+    // Cancel any pending save (prevent saving during media transition)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+      console.log('[Media] ⚠️ Cancelled pending save (media switching)');
+    }
+    
+    // 1. Save current media's state to cache before switching
+    if (oldMediaId) {
+      // Capture stroke state at this exact moment (before any state updates)
+      const currentInpaintStrokes = inpaintStrokes;
+      const currentAnnotationStrokes = annotationStrokes;
+      const currentPrompt = inpaintPrompt;
+      const currentNumGenerations = inpaintNumGenerations;
+      const currentBrushSize = brushSize;
+      
+      mediaStrokeCacheRef.current.set(oldMediaId, {
+        inpaintStrokes: currentInpaintStrokes,
+        annotationStrokes: currentAnnotationStrokes,
+        prompt: currentPrompt,
+        numGenerations: currentNumGenerations,
+        brushSize: currentBrushSize,
+      });
+      console.log('[Media] 💾 Cached state for old media', { 
+        mediaId: oldMediaId.substring(0, 8),
+        inpaintCount: currentInpaintStrokes.length,
+        annotationCount: currentAnnotationStrokes.length
+      });
+    }
+    
+    // 2. Clear stroke state immediately (prevents stale strokes from rendering)
+    setInpaintStrokes([]);
+    setAnnotationStrokes([]);
+    setSelectedShapeId(null);
+    console.log('[Media] 🧹 Cleared stroke state');
+    
+    // 3. Try to load from in-memory cache first (instant, no flicker)
+    const cached = mediaStrokeCacheRef.current.get(newMediaId);
+    if (cached) {
+      console.log('[Media] ✅ Loaded from in-memory cache', { 
+        mediaId: newMediaId.substring(0, 8),
+        inpaintCount: cached.inpaintStrokes.length,
+        annotationCount: cached.annotationStrokes.length
+      });
+      setInpaintStrokes(cached.inpaintStrokes);
+      setAnnotationStrokes(cached.annotationStrokes);
+      setInpaintPrompt(cached.prompt);
+      setInpaintNumGenerations(cached.numGenerations);
+      setBrushSize(cached.brushSize);
+    } else if (isInpaintMode && !hydratedMediaIdsRef.current.has(newMediaId)) {
+      // 4. Load from localStorage if not in cache (only once per media)
+      try {
+        const savedData = localStorage.getItem(`inpaint-data-${newMediaId}`);
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          const loadedInpaintStrokes = parsed.inpaintStrokes || parsed.strokes || [];
+          const loadedAnnotationStrokes = parsed.annotationStrokes || [];
+          
+          setInpaintStrokes(loadedInpaintStrokes);
+          setAnnotationStrokes(loadedAnnotationStrokes);
+          setInpaintPrompt(parsed.prompt || '');
+          setInpaintNumGenerations(parsed.numGenerations || 4);
+          setBrushSize(parsed.brushSize || 20);
+          
+          hydratedMediaIdsRef.current.add(newMediaId);
+          
+          console.log('[Media] ✅ Loaded from localStorage', { 
+            mediaId: newMediaId.substring(0, 8),
+            inpaintCount: loadedInpaintStrokes.length,
+            annotationCount: loadedAnnotationStrokes.length
+          });
+        } else {
+          console.log('[Media] ℹ️ No localStorage data for new media', { mediaId: newMediaId.substring(0, 8) });
+        }
+      } catch (e) {
+        console.warn('[Media] ⚠️ Failed to load from localStorage, starting fresh', e);
+        // Continue with empty arrays (already set above)
+      }
+    } else {
+      console.log('[Media] ℹ️ No cached data, starting with empty state', { 
+        mediaId: newMediaId.substring(0, 8),
+        isInpaintMode,
+        alreadyHydrated: hydratedMediaIdsRef.current.has(newMediaId)
+      });
+    }
+    
+    // 5. Restore UI state (mode, annotation mode)
+    const savedState = mediaStateRef.current.get(newMediaId);
     if (savedState) {
-      console.log('[InpaintState] Restoring state for media', { mediaId: media.id.substring(0, 8), savedState });
+      console.log('[Media] Restoring UI state', { mediaId: newMediaId.substring(0, 8), savedState });
       setEditModeInternal(savedState.editMode);
       setAnnotationModeInternal(savedState.annotationMode);
     } else {
-      console.log('[InpaintState] No saved state for media, using defaults', { mediaId: media.id.substring(0, 8) });
-      // Initialize with defaults for new media
+      console.log('[Media] Using default UI state', { mediaId: newMediaId.substring(0, 8) });
       setEditModeInternal('inpaint');
       setAnnotationModeInternal(null);
     }
     
-    // Clear selection when switching media
-    console.log('[Selection] ❌ Clearing selection - switched media');
-    setSelectedShapeId(null);
-  }, [media.id]);
+    prevMediaIdRef.current = newMediaId;
+    
+    // Clear transition flag after a frame (allows canvas to reinitialize safely)
+    // Store rAF ID so we can cancel it on rapid switches
+    transitionRafRef.current = requestAnimationFrame(() => {
+      // Double-check we're still on the same media (prevent race with rapid switching)
+      if (prevMediaIdRef.current === newMediaId) {
+        isMediaTransitioningRef.current = false;
+        console.log('[Media] ✅ Transition complete', { mediaId: newMediaId.substring(0, 8) });
+      } else {
+        console.log('[Media] ⚠️ Media changed during rAF, keeping transition flag', {
+          expected: newMediaId.substring(0, 8),
+          current: prevMediaIdRef.current.substring(0, 8)
+        });
+      }
+      transitionRafRef.current = null;
+    });
+  }, [media.id, isInpaintMode]); // FIXED: Removed stroke state from deps (only trigger on media.id/mode changes)
   
   console.log('[InpaintPaint] 🔍 Hook initialized with refs', {
     hasDisplayCanvasRef: !!displayCanvasRef,
@@ -196,53 +325,119 @@ export const useInpainting = ({
     hasImageContainer: !!imageContainerRef?.current
   });
 
-  // Load saved settings from localStorage when entering inpaint mode or changing media
+  // Load saved settings from localStorage ONLY when entering inpaint mode for the first time
+  // (media changes are handled by useLayoutEffect above, which uses cache first)
   useEffect(() => {
-    if (isInpaintMode) {
+    // Only hydrate if:
+    // 1. Just entered inpaint mode
+    // 2. Haven't hydrated this media yet
+    // 3. Not already in cache
+    if (isInpaintMode && 
+        !hydratedMediaIdsRef.current.has(media.id) && 
+        !mediaStrokeCacheRef.current.has(media.id)) {
+      
       try {
         const savedData = localStorage.getItem(`inpaint-data-${media.id}`);
         if (savedData) {
           const parsed = JSON.parse(savedData);
-          // Load both stroke arrays separately
-          setInpaintStrokes(parsed.inpaintStrokes || parsed.strokes || []); // Support old format
-          setAnnotationStrokes(parsed.annotationStrokes || []);
+          const loadedInpaintStrokes = parsed.inpaintStrokes || parsed.strokes || [];
+          const loadedAnnotationStrokes = parsed.annotationStrokes || [];
+          
+          setInpaintStrokes(loadedInpaintStrokes);
+          setAnnotationStrokes(loadedAnnotationStrokes);
           setInpaintPrompt(parsed.prompt || '');
           setInpaintNumGenerations(parsed.numGenerations || 4);
           setBrushSize(parsed.brushSize || 20);
-          console.log('[Inpaint] Loaded saved data from localStorage', {
-            mediaId: media.id,
-            inpaintStrokeCount: (parsed.inpaintStrokes || parsed.strokes || []).length,
-            annotationStrokeCount: (parsed.annotationStrokes || []).length,
-            prompt: parsed.prompt?.substring(0, 30),
-            numGenerations: parsed.numGenerations,
-            brushSize: parsed.brushSize
-          });
           
-          // Redraw will happen automatically via the redraw effect
+          hydratedMediaIdsRef.current.add(media.id);
+          
+          console.log('[Inpaint] ✅ Hydrated on mode enter', { 
+            mediaId: media.id.substring(0, 8),
+            inpaintCount: loadedInpaintStrokes.length,
+            annotationCount: loadedAnnotationStrokes.length
+          });
+        } else {
+          console.log('[Inpaint] ℹ️ No localStorage data on mode enter', { mediaId: media.id.substring(0, 8) });
         }
       } catch (e) {
-        console.error('[Inpaint] Error loading saved data:', e);
+        console.warn('[Inpaint] ⚠️ Hydration failed on mode enter, starting fresh', e);
+        // Continue with current state (don't crash)
       }
     }
-  }, [isInpaintMode, media.id]); // Removed isAnnotateMode and displayCanvasRef - only load on mode entry or media change
+  }, [isInpaintMode, media.id]); // Only runs when entering inpaint mode or media changes (but gated by refs)
 
-  // Save all settings to localStorage when they change
-  useEffect(() => {
-    if (isInpaintMode) {
-      try {
-        localStorage.setItem(`inpaint-data-${media.id}`, JSON.stringify({
-          inpaintStrokes: inpaintStrokes,
-          annotationStrokes: annotationStrokes,
-          prompt: inpaintPrompt,
-          numGenerations: inpaintNumGenerations,
-          brushSize: brushSize,
-          savedAt: Date.now()
-        }));
-      } catch (e) {
-        console.error('[Inpaint] Error saving data:', e);
-      }
+  // Ref to hold save timeout for debouncing
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper function to save to localStorage (with error handling)
+  const saveToLocalStorage = useCallback(() => {
+    if (!isInpaintMode) return;
+    
+    // Capture media ID at the moment of save (prevent race if media changes during timeout)
+    const mediaIdAtSaveTime = media.id;
+    const inpaintStrokesAtSaveTime = inpaintStrokes;
+    const annotationStrokesAtSaveTime = annotationStrokes;
+    const promptAtSaveTime = inpaintPrompt;
+    const numGenerationsAtSaveTime = inpaintNumGenerations;
+    const brushSizeAtSaveTime = brushSize;
+    
+    try {
+      const data = {
+        inpaintStrokes: inpaintStrokesAtSaveTime,
+        annotationStrokes: annotationStrokesAtSaveTime,
+        prompt: promptAtSaveTime,
+        numGenerations: numGenerationsAtSaveTime,
+        brushSize: brushSizeAtSaveTime,
+        savedAt: Date.now()
+      };
+      localStorage.setItem(`inpaint-data-${mediaIdAtSaveTime}`, JSON.stringify(data));
+      console.log('[Inpaint] 💾 Saved to localStorage', { 
+        mediaId: mediaIdAtSaveTime.substring(0, 8),
+        inpaintCount: inpaintStrokesAtSaveTime.length,
+        annotationCount: annotationStrokesAtSaveTime.length
+      });
+    } catch (e) {
+      console.warn('[Inpaint] ⚠️ Save failed (localStorage full or disabled?)', e);
+      // Don't crash, just log the error
     }
   }, [inpaintStrokes, annotationStrokes, inpaintPrompt, inpaintNumGenerations, brushSize, isInpaintMode, media.id]);
+
+  // Debounced auto-save (500ms delay to avoid thrashing)
+  useEffect(() => {
+    if (!isInpaintMode) return;
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Schedule save after 500ms of no changes
+    saveTimeoutRef.current = setTimeout(() => {
+      saveToLocalStorage();
+    }, 500);
+    
+    // Cleanup on unmount or before next save
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [inpaintStrokes, annotationStrokes, inpaintPrompt, inpaintNumGenerations, brushSize, isInpaintMode, media.id, saveToLocalStorage]);
+
+  // Immediate save on mode exit or unmount (don't lose unsaved changes)
+  useEffect(() => {
+    return () => {
+      // If we're in inpaint mode when unmounting, save immediately
+      if (isInpaintMode) {
+        // Cancel any pending debounced save
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        // Save immediately
+        saveToLocalStorage();
+      }
+    };
+  }, [isInpaintMode, saveToLocalStorage]);
 
 
   // Helper function to scale strokes proportionally
@@ -269,6 +464,12 @@ export const useInpainting = ({
 
   // Initialize canvas when entering inpaint mode
   useEffect(() => {
+    // Skip if we're in the middle of a media transition (prevents accidental scaling)
+    if (isMediaTransitioningRef.current) {
+      console.log('[InpaintPaint] ⏸️ Skipping canvas init during media transition');
+      return;
+    }
+    
     console.log('[InpaintPaint] 🔄 Canvas initialization effect', {
       isInpaintMode,
       hasDisplayCanvas: !!displayCanvasRef.current,
@@ -345,7 +546,7 @@ export const useInpainting = ({
 
   // Handle window resize to keep canvas aligned with image
   useEffect(() => {
-    if (!isInpaintMode) return;
+    if (!isInpaintMode || isMediaTransitioningRef.current) return;
     
     const handleResize = () => {
       console.log('[InpaintResize] Window resized, recalculating canvas');
