@@ -519,8 +519,16 @@ export const useInpainting = ({
         const canvas = displayCanvasRef.current;
         const maskCanvas = maskCanvasRef.current;
         
-        const newWidth = rect.width;
-        const newHeight = rect.height;
+        const newWidth = Math.round(rect.width);
+        const newHeight = Math.round(rect.height);
+        
+        // Skip if canvas is already the right size (prevents constant reinits during layout settling)
+        if (canvas.width === newWidth && canvas.height === newHeight) {
+          console.log('[InpaintCanvas] ⏸️ Canvas already correct size, skipping reinit', {
+            size: { width: newWidth, height: newHeight }
+          });
+          return;
+        }
         
         // If canvas size is changing and we have existing strokes, scale them
         const prevSize = prevCanvasSizeRef.current;
@@ -596,7 +604,8 @@ export const useInpainting = ({
     if (!isInpaintMode || isMediaTransitioningRef.current) return;
     
     const handleResize = () => {
-      console.log('[InpaintResize] Window resized, recalculating canvas');
+      console.error('[InpaintResize] ⚠️ Window resized, recalculating canvas');
+      addDebugLog(`Window resize triggered`);
       
       // Force canvas re-initialization by triggering the effect above
       // We do this by checking if the image size has changed
