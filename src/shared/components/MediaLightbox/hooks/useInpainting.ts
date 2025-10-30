@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
 import { GenerationRow } from '@/types/shots';
@@ -128,8 +128,11 @@ export const useInpainting = ({
   // Computed: backwards compatibility
   const isAnnotateMode = editMode === 'annotate';
   
-  // Computed: current brush strokes based on mode
-  const brushStrokes = editMode === 'annotate' ? annotationStrokes : editMode === 'inpaint' ? inpaintStrokes : [];
+  // Computed: current brush strokes based on mode (memoized to prevent redraw loops)
+  const brushStrokes = useMemo(() => {
+    return editMode === 'annotate' ? annotationStrokes : editMode === 'inpaint' ? inpaintStrokes : [];
+  }, [editMode, annotationStrokes, inpaintStrokes]);
+  
   const setBrushStrokes = editMode === 'annotate' ? setAnnotationStrokes : setInpaintStrokes;
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [isDraggingShape, setIsDraggingShape] = useState(false);
@@ -848,17 +851,6 @@ export const useInpainting = ({
 
   // Note: Mode separation (preventing cross-over) is now handled during drawing
   // This allows both stroke types to persist in localStorage while only showing the current mode's strokes
-  
-  // Redraw when switching between annotate and inpaint modes
-  useEffect(() => {
-    if (isInpaintMode) {
-      console.log('[InpaintMode] Mode switched, redrawing', {
-        isAnnotateMode,
-        strokeCount: brushStrokes.length
-      });
-      redrawStrokes(brushStrokes);
-    }
-  }, [isAnnotateMode, isInpaintMode, brushStrokes, redrawStrokes]);
   
   // Clear selection only when actually switching modes (not on re-renders)
   useEffect(() => {
