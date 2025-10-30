@@ -1044,7 +1044,6 @@ export const useInpainting = ({
     e.preventDefault();
     e.stopPropagation();
     
-    const canvas = displayCanvasRef.current;
     if (!canvas) {
       console.log('[MobilePaintDebug] ❌ No canvas ref, returning');
       return;
