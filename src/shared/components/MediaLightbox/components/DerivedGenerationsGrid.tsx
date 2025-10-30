@@ -113,19 +113,23 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             {derived.createdAt && (
               <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} z-10 pointer-events-none`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
-                  {formatDistanceToNow(new Date(derived.createdAt), { addSuffix: true })
-                    .replace('about ', '')
-                    .replace(' minutes', 'm')
-                    .replace(' minute', 'm')
-                    .replace(' hours', 'h')
-                    .replace(' hour', 'h')
-                    .replace(' days', 'd')
-                    .replace(' day', 'd')
-                    .replace(' months', 'mo')
-                    .replace(' month', 'mo')
-                    .replace(' ago', '')
-                    .replace('less than a ', '<1')
-                  }
+                  {(() => {
+                    const formatted = formatDistanceToNow(new Date(derived.createdAt), { addSuffix: true });
+                    if (formatted.includes('less than')) return 'Just now';
+                    return formatted
+                      .replace('about ', '')
+                      .replace(' minutes', 'm')
+                      .replace(' minute', 'm')
+                      .replace(' hours', 'h')
+                      .replace(' hour', 'h')
+                      .replace(' days', 'd')
+                      .replace(' day', 'd')
+                      .replace(' months', 'mo')
+                      .replace(' month', 'mo')
+                      .replace(' years', 'y')
+                      .replace(' year', 'y')
+                      .replace(' ago', '');
+                  })()}
                 </span>
               </div>
             )}

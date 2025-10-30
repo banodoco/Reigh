@@ -1111,8 +1111,36 @@ export const useInpainting = ({
         strokeCount: inpaintStrokes.length
       });
 
-      // Create green mask image from mask canvas
-      const maskImageData = maskCanvas.toDataURL('image/png');
+      // Scale mask to 1.5x the actual image size
+      const actualWidth = imageDimensions?.width || maskCanvas.width;
+      const actualHeight = imageDimensions?.height || maskCanvas.height;
+      const scaledWidth = Math.round(actualWidth * 1.5);
+      const scaledHeight = Math.round(actualHeight * 1.5);
+      
+      console.log('[Inpaint] Scaling mask', {
+        displaySize: { width: maskCanvas.width, height: maskCanvas.height },
+        actualSize: { width: actualWidth, height: actualHeight },
+        scaledSize: { width: scaledWidth, height: scaledHeight }
+      });
+
+      // Create a temporary canvas at 1.5x original resolution
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = scaledWidth;
+      tempCanvas.height = scaledHeight;
+      
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) {
+        throw new Error('Could not create temporary canvas context');
+      }
+      
+      // Disable image smoothing for crisp, sharp mask edges (no jaggedness)
+      tempCtx.imageSmoothingEnabled = false;
+      
+      // Scale up the mask canvas content
+      tempCtx.drawImage(maskCanvas, 0, 0, scaledWidth, scaledHeight);
+      
+      // Create mask image from scaled canvas
+      const maskImageData = tempCanvas.toDataURL('image/png');
       
       // Upload mask to storage
       const maskFile = await fetch(maskImageData)
@@ -1188,8 +1216,36 @@ export const useInpainting = ({
         annotationCount: annotationStrokes.length
       });
 
-      // Create mask image from mask canvas
-      const maskImageData = maskCanvas.toDataURL('image/png');
+      // Scale mask to 1.5x the actual image size
+      const actualWidth = imageDimensions?.width || maskCanvas.width;
+      const actualHeight = imageDimensions?.height || maskCanvas.height;
+      const scaledWidth = Math.round(actualWidth * 1.5);
+      const scaledHeight = Math.round(actualHeight * 1.5);
+      
+      console.log('[AnnotatedEdit] Scaling mask', {
+        displaySize: { width: maskCanvas.width, height: maskCanvas.height },
+        actualSize: { width: actualWidth, height: actualHeight },
+        scaledSize: { width: scaledWidth, height: scaledHeight }
+      });
+
+      // Create a temporary canvas at 1.5x original resolution
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = scaledWidth;
+      tempCanvas.height = scaledHeight;
+      
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) {
+        throw new Error('Could not create temporary canvas context');
+      }
+      
+      // Disable image smoothing for crisp, sharp mask edges (no jaggedness)
+      tempCtx.imageSmoothingEnabled = false;
+      
+      // Scale up the mask canvas content
+      tempCtx.drawImage(maskCanvas, 0, 0, scaledWidth, scaledHeight);
+      
+      // Create mask image from scaled canvas
+      const maskImageData = tempCanvas.toDataURL('image/png');
       
       // Upload mask to storage
       const maskFile = await fetch(maskImageData)
