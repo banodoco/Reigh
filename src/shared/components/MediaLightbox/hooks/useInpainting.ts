@@ -129,7 +129,10 @@ export const useInpainting = ({
   // Debug state for production
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const addDebugLog = useCallback((msg: string) => {
-    setDebugLog(prev => [...prev.slice(-20), `${new Date().toISOString().split('T')[1].slice(0, -1)}: ${msg}`]);
+    const timestampedMsg = `${new Date().toISOString().split('T')[1].slice(0, -1)}: ${msg}`;
+    setDebugLog(prev => [...prev.slice(-20), timestampedMsg]);
+    // Also log as error so it shows in production console
+    console.error(`[INPAINT_DEBUG] ${timestampedMsg}`);
   }, []);
   
   // Computed: backwards compatibility
