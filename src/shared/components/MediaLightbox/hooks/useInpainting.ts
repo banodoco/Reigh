@@ -848,6 +848,9 @@ export const useInpainting = ({
         ctx.lineWidth = 8;
         maskCtx.lineWidth = 8;
         
+        // For rectangles, use source-over instead of lighten (makes them always visible)
+        ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'source-over';
+        
         if (stroke.isFreeForm && stroke.points.length === 4) {
           // Draw free-form quadrilateral (4 independent corners)
           ctx.beginPath();
@@ -856,7 +859,8 @@ export const useInpainting = ({
             ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
           }
           ctx.closePath();
-          ctx.stroke();
+          ctx.fill(); // Fill first
+          ctx.stroke(); // Then stroke
           
           maskCtx.beginPath();
           maskCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
@@ -864,7 +868,8 @@ export const useInpainting = ({
             maskCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
           }
           maskCtx.closePath();
-          maskCtx.stroke();
+          maskCtx.fill(); // Fill first
+          maskCtx.stroke(); // Then stroke
         } else {
           // Draw standard rectangle from 2 points
           const x = Math.min(startPoint.x, endPoint.x);
@@ -872,7 +877,11 @@ export const useInpainting = ({
           const width = Math.abs(endPoint.x - startPoint.x);
           const height = Math.abs(endPoint.y - startPoint.y);
           
+          // Fill and stroke rectangle (fill makes it visible even with light backgrounds)
+          ctx.fillRect(x, y, width, height);
           ctx.strokeRect(x, y, width, height);
+          
+          maskCtx.fillRect(x, y, width, height);
           maskCtx.strokeRect(x, y, width, height);
         }
       } else {
@@ -1138,6 +1147,12 @@ export const useInpainting = ({
         const deltaX = newStartX - oldStartPoint.x;
         const deltaY = newStartY - oldStartPoint.y;
         
+        console.log('[Drag] Moving shape', {
+          shapeId: shape.id.substring(0, 8),
+          delta: { x: deltaX, y: deltaY },
+          newPos: { x: newStartX, y: newStartY }
+        });
+        
         // Update the shape's position
         const updatedPoints = shape.points.map(p => ({
           x: p.x + deltaX,
@@ -1156,6 +1171,7 @@ export const useInpainting = ({
         );
         setBrushStrokes(newStrokes);
         selectedShapeRef.current = updatedShape;
+        // Only redraw directly, don't wait for effect (prevents flicker)
         redrawStrokes(newStrokes);
       } else if (dragMode === 'resize' && dragOffset) {
         // RESIZE MODE: Change the shape itself (clicked on corner)
@@ -1194,6 +1210,11 @@ export const useInpainting = ({
     
     // In annotation mode, redraw with the updated shape preview
     if (isAnnotateMode && annotationMode) {
+      console.log('[InpaintPointer] 🖌️ Drawing preview during pointer move', {
+        currentStrokeLength: currentStroke.length,
+        existingStrokesCount: brushStrokes.length
+      });
+      
       // Redraw all saved strokes first
       redrawStrokes(brushStrokes);
       
@@ -1490,19 +1511,27 @@ export const useInpainting = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isInpaintMode, isAnnotateMode, selectedShapeId, handleDeleteSelected]);
 
-  // Redraw when strokes change
+  // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
     console.log('[InpaintEffect] 🔄 Stroke change effect triggered', {
       isInpaintMode,
       strokeCount: brushStrokes.length,
       editMode,
-      mediaId: media.id.substring(0, 8)
+      mediaId: media.id.substring(0, 8),
+      isDraggingShape,
+      isDrawing
     });
+    
+    // Skip redraw during drag - handlePointerMove redraws manually to prevent flicker
+    if (isDraggingShape) {
+      console.log('[InpaintEffect] ⏸️ Skipping redraw during drag (handled manually)');
+      return;
+    }
     
     if (isInpaintMode) {
       redrawStrokes(brushStrokes);
     }
-  }, [brushStrokes, isInpaintMode, redrawStrokes, editMode, media.id]);
+  }, [brushStrokes, isInpaintMode, redrawStrokes, editMode, media.id, isDraggingShape, isDrawing]);
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
