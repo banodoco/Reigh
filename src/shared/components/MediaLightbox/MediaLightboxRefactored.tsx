@@ -754,63 +754,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             onPointerDown={(e) => {
               // Allow Radix Select/dropdown components to work properly
               const target = e.target as HTMLElement;
-              const isRadixSelect = target.closest('[data-radix-select-trigger]') !== null || 
-                                    target.closest('[data-radix-select-content]') !== null ||
-                                    target.closest('[data-radix-select-item]') !== null ||
-                                    target.closest('[role="combobox"]') !== null ||
-                                    target.closest('[role="option"]') !== null;
+              const isRadixPortal = target.closest('[data-radix-popper-content-wrapper]') !== null;
               
-              console.log('[ShotSelectorDebug] MediaLightbox onPointerDown:', {
-                targetTag: target.tagName,
-                targetClass: target.className,
-                isRadixSelect,
-                hasTrigger: target.closest('[data-radix-select-trigger]') !== null,
-                hasContent: target.closest('[data-radix-select-content]') !== null,
-                hasItem: target.closest('[data-radix-select-item]') !== null,
-                hasCombobox: target.closest('[role="combobox"]') !== null,
-                hasOption: target.closest('[role="option"]') !== null,
-                willStopPropagation: !isRadixSelect
-              });
-              
-              if (isRadixSelect) {
-                // Let Radix Select handle its own events
-                console.log('[ShotSelectorDebug] ✅ Allowing Radix Select event to propagate');
+              if (isRadixPortal) {
                 return;
               }
               
-              console.log('[ShotSelectorDebug] ❌ Stopping propagation for non-Radix element');
               e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
-              }
             }}
             onClick={(e) => {
-              // Allow Radix Select/dropdown components to work properly
-              const target = e.target as HTMLElement;
-              const isRadixSelect = target.closest('[data-radix-select-trigger]') !== null || 
-                                    target.closest('[data-radix-select-content]') !== null ||
-                                    target.closest('[data-radix-select-item]') !== null ||
-                                    target.closest('[role="combobox"]') !== null ||
-                                    target.closest('[role="option"]') !== null;
-              
-              console.log('[ShotSelectorDebug] MediaLightbox onClick:', {
-                targetTag: target.tagName,
-                targetClass: target.className,
-                isRadixSelect,
-                willStopPropagation: !isRadixSelect
-              });
-              
-              if (isRadixSelect) {
-                // Let Radix Select handle its own events
-                console.log('[ShotSelectorDebug] ✅ Allowing Radix Select click to propagate');
-                return;
-              }
-              
-              console.log('[ShotSelectorDebug] ❌ Stopping click propagation for non-Radix element');
               e.stopPropagation();
-              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-                e.nativeEvent.stopImmediatePropagation();
-              }
             }}
             onTouchStart={(e) => {
               // Allow touch events on canvas when in inpaint mode
@@ -884,6 +837,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               
               // Block touch end events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
+            }}
+            onTouchCancel={(e) => {
+              // Check if a higher z-index dialog is open - if so, don't block events
+              const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
+              const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
+                const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
+                return zIndex > 100000;
+              });
+              
+              if (hasHigherZIndexDialog) {
+                return; // Let the higher dialog handle the event
+              }
+              
+              // Block touch cancel events on mobile
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.nativeEvent && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                e.nativeEvent.stopImmediatePropagation();
+              }
             }}
             className={cn(
               "fixed z-[100000]",
