@@ -556,6 +556,16 @@ export const useInpainting = ({
         // Store new size for future comparisons
         prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
         
+        console.error('[InpaintCanvas] ✅ Canvas initialized', {
+          bufferSize: { width: canvas.width, height: canvas.height },
+          styleSize: { width: canvas.style.width, height: canvas.style.height },
+          offsetSize: { width: canvas.offsetWidth, height: canvas.offsetHeight },
+          imgRect: { width: rect.width, height: rect.height },
+          position: { left: canvas.style.left, top: canvas.style.top },
+          inpaintStrokes: inpaintStrokes.length,
+          annotationStrokes: annotationStrokes.length
+        });
+        addDebugLog(`Canvas init: buffer=${canvas.width}x${canvas.height} style=${canvas.style.width}x${canvas.style.height}`);
         console.log('[InpaintCanvas] ✅ Canvas initialized successfully', {
           canvasWidth: canvas.width,
           canvasHeight: canvas.height,
@@ -811,9 +821,11 @@ export const useInpainting = ({
     maskCtx.imageSmoothingEnabled = false;
     
     // Clear both canvases
-    console.log('[InpaintDraw] 🧹 Clearing canvases', {
-      canvasSize: { width: canvas.width, height: canvas.height }
+    console.error('[InpaintDraw] 🧹 Clearing canvases', {
+      bufferSize: { width: canvas.width, height: canvas.height },
+      displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight }
     });
+    addDebugLog(`Clearing canvas: ${canvas.width}x${canvas.height}`);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     
@@ -829,6 +841,19 @@ export const useInpainting = ({
       const shapeType = stroke.shapeType || 'line';
       const isSelected = stroke.id === selectedShapeId;
       
+      console.error('[InpaintDraw] ✏️ Drawing stroke', {
+        index,
+        id: stroke.id.substring(0, 8),
+        type: shapeType,
+        points: stroke.points.length,
+        isSelected,
+        isErasing: stroke.isErasing,
+        isFreeForm: stroke.isFreeForm,
+        firstPoint: stroke.points[0],
+        lastPoint: stroke.points[stroke.points.length - 1],
+        canvasBuffer: { width: canvas.width, height: canvas.height },
+        canvasDisplay: { width: canvas.offsetWidth, height: canvas.offsetHeight }
+      });
       console.log('[InpaintDraw] ✏️ Drawing stroke', {
         index,
         id: stroke.id.substring(0, 8),
@@ -995,6 +1020,14 @@ export const useInpainting = ({
 
   // Handle mouse/touch drawing
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = displayCanvasRef.current;
+    console.error('[InpaintPointer] 🖱️ handlePointerDown', {
+      canvasBufferSize: canvas ? { width: canvas.width, height: canvas.height } : null,
+      canvasDisplaySize: canvas ? { width: canvas.offsetWidth, height: canvas.offsetHeight } : null,
+      pointerPosition: { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY },
+      clientPosition: { x: e.clientX, y: e.clientY }
+    });
+    addDebugLog(`PointerDown: offset=(${e.nativeEvent.offsetX},${e.nativeEvent.offsetY})`);
     console.log('[MobilePaintDebug] 🔧 handlePointerDown called', {
       isInpaintMode,
       hasCanvas: !!displayCanvasRef.current,
@@ -1396,11 +1429,17 @@ export const useInpainting = ({
         shapeType
       };
       
+      const canvas = displayCanvasRef.current;
       addDebugLog(`Created stroke: ${newStroke.shapeType} pts=${newStroke.points.length}`);
-      console.error('[InpaintPointer] ✅ New stroke created', {
+      console.error('[InpointPointer] ✅ New stroke created', {
         id: newStroke.id.substring(0, 8),
         shapeType: newStroke.shapeType,
-        pointCount: newStroke.points.length
+        pointCount: newStroke.points.length,
+        canvasBufferSize: canvas ? { width: canvas.width, height: canvas.height } : null,
+        canvasDisplaySize: canvas ? { width: canvas.offsetWidth, height: canvas.offsetHeight } : null,
+        firstPoint: newStroke.points[0],
+        lastPoint: newStroke.points[newStroke.points.length - 1],
+        samplePoints: newStroke.points.slice(0, 3)
       });
       console.log('[InpaintPointer] ✅ New stroke created', {
         id: newStroke.id.substring(0, 8),
