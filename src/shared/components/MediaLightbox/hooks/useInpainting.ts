@@ -111,6 +111,9 @@ export const useInpainting = ({
   
   // Flag to prevent canvas scaling during media transitions
   const isMediaTransitioningRef = useRef(false);
+  
+  // Ref to latest redrawStrokes to avoid stale closures
+  const redrawStrokesRef = useRef<((strokes: BrushStroke[]) => void) | null>(null);
 
   const [isInpaintMode, setIsInpaintMode] = useState(false);
   const [inpaintStrokes, setInpaintStrokes] = useState<BrushStroke[]>([]); // Strokes for inpainting
@@ -784,6 +787,7 @@ export const useInpainting = ({
       maskExists: !!maskCanvasRef.current,
       timestamp: Date.now()
     });
+    addDebugLog(`redrawStrokes: ${strokes.length} strokes`);
     
     const canvas = displayCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
@@ -920,7 +924,12 @@ export const useInpainting = ({
     });
     
     console.log('[Inpaint] Redrawn strokes', { count: strokes.length, selectedId: selectedShapeId });
-  }, [selectedShapeId]);
+  }, [selectedShapeId, addDebugLog]);
+  
+  // Store latest redrawStrokes in ref to avoid stale closures in effects
+  useEffect(() => {
+    redrawStrokesRef.current = redrawStrokes;
+  }, [redrawStrokes]);
 
   // Rectangles don't need control points (arrow control point logic removed)
 
@@ -1561,11 +1570,11 @@ export const useInpainting = ({
       return;
     }
     
-    if (isInpaintMode) {
+    if (isInpaintMode && redrawStrokesRef.current) {
       addDebugLog(`Effect: REDRAW ${brushStrokes.length} strokes`);
-      redrawStrokes(brushStrokes);
+      redrawStrokesRef.current(brushStrokes);
     }
-  }, [brushStrokes, isInpaintMode, redrawStrokes, editMode, media.id, isDraggingShape, isDrawing, addDebugLog]);
+  }, [brushStrokes, isInpaintMode, editMode, media.id, isDraggingShape, isDrawing, addDebugLog]);
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
