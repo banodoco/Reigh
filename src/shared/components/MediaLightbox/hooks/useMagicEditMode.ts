@@ -23,6 +23,7 @@ interface UseMagicEditModeParams {
   sourceUrlForTasks: string;
   imageDimensions: { width: number; height: number } | null;
   toolTypeOverride?: string;
+  isInSceneBoostEnabled: boolean;
   setIsInSceneBoostEnabled: (enabled: boolean) => void;
 }
 
@@ -65,6 +66,7 @@ export const useMagicEditMode = ({
   sourceUrlForTasks,
   imageDimensions,
   toolTypeOverride,
+  isInSceneBoostEnabled,
   setIsInSceneBoostEnabled,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state

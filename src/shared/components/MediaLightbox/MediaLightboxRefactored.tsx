@@ -352,6 +352,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     sourceUrlForTasks,
     imageDimensions,
     toolTypeOverride,
+    isInSceneBoostEnabled,
     setIsInSceneBoostEnabled
   });
   const {
