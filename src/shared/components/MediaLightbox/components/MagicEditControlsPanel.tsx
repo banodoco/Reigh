@@ -120,7 +120,7 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
       const loras = [];
       if (isInSceneBoostEnabled) {
         loras.push({
-          url: 'https://huggingface.co/peteromallet/ad_motion_loras/resolve/main/in_scene_different_perspective_000019000.safetensors',
+          url: 'https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000002750.safetensors',
           strength: 1.0
         });
       }
