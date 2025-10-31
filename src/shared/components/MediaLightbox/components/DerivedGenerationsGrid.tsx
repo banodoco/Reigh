@@ -53,18 +53,16 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
       if (a.starred && !b.starred) return -1;
       if (!a.starred && b.starred) return 1;
       
-      // Then items in current shot (with timeline_frame)
+      // Then items in current shot (with timeline_frame - must be positioned)
       if (currentShotId) {
-        const aInShot = (a as any).shot_id === currentShotId || 
-          (Array.isArray((a as any).all_shot_associations) && 
-           (a as any).all_shot_associations.some((assoc: any) => 
-             assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
-           ));
-        const bInShot = (b as any).shot_id === currentShotId || 
-          (Array.isArray((b as any).all_shot_associations) && 
-           (b as any).all_shot_associations.some((assoc: any) => 
-             assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
-           ));
+        const aInShot = Array.isArray((a as any).all_shot_associations) && 
+          (a as any).all_shot_associations.some((assoc: any) => 
+            assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
+          );
+        const bInShot = Array.isArray((b as any).all_shot_associations) && 
+          (b as any).all_shot_associations.some((assoc: any) => 
+            assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
+          );
         
         if (aInShot && !bInShot) return -1;
         if (!aInShot && bInShot) return 1;
@@ -114,14 +112,12 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
       
       <div className={`grid ${gridCols} ${gap}`}>
         {sortedDerived.map((derived) => {
-          // Check if item is in current shot with timeline position
-          const isInShot = currentShotId && (
-            (derived as any).shot_id === currentShotId || 
-            (Array.isArray((derived as any).all_shot_associations) && 
-             (derived as any).all_shot_associations.some((assoc: any) => 
-               assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
-             ))
-          );
+          // Check if item is in current shot with timeline position (must have timeline_frame)
+          const isInShot = currentShotId && 
+            Array.isArray((derived as any).all_shot_associations) && 
+            (derived as any).all_shot_associations.some((assoc: any) => 
+              assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
+            );
           
           // Check if item is new (created in last 2 minutes)
           const isNew = derived.createdAt && 
@@ -205,7 +201,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             {/* In shot badge - bottom right */}
             {isInShot && (
               <div className={`absolute ${isMobile ? 'bottom-0.5 right-0.5' : 'bottom-1 right-1'} z-10 pointer-events-none`}>
-                <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-blue-500 text-white rounded font-semibold`}>
+                <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
                   In shot
                 </span>
               </div>
