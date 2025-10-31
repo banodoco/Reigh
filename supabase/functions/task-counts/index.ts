@@ -327,36 +327,43 @@ serve(async (req) => {
       // Must match the same eligibility criteria as count_eligible_tasks_service_role
       console.log(`[TASK_COUNT_DEBUG] [DETAILS] [${runType || 'ALL'}] Fetching eligible task information...`);
       
+      // First, fetch task_types lookup table if run_type filtering is needed
+      let taskTypeRunTypeMap: Map<string, string> | null = null;
+      if (runType) {
+        const { data: taskTypes, error: taskTypesError } = await supabaseAdmin
+          .from('task_types')
+          .select('name, run_type')
+          .eq('is_active', true);
+        
+        if (taskTypesError) {
+          console.error(`[TASK_COUNT_DEBUG] [DETAILS] Error fetching task_types:`, taskTypesError);
+        } else if (taskTypes) {
+          taskTypeRunTypeMap = new Map(taskTypes.map(tt => [tt.name, tt.run_type]));
+          console.log(`[TASK_COUNT_DEBUG] [DETAILS] Loaded ${taskTypeRunTypeMap.size} task type mappings`);
+        }
+      }
+      
       // Fetch queued tasks with eligibility criteria:
       // - Status = 'Queued'
       // - NOT orchestrator tasks (filtered in JS)
       // - User has credits > 0 (filtered in JS)
       // - No dependencies (dependant_on IS NULL)
       // - Optionally filter by run_type via task_types.run_type (GPU vs API tasks)
-      let queuedQuery = supabaseAdmin
+      const { data: queuedTasksData, error: queuedError } = await supabaseAdmin
         .from('tasks')
         .select(`
           id,
           task_type,
           created_at,
           dependant_on,
-          task_types!inner(run_type),
           projects!inner(
             user_id,
             users!inner(credits, settings)
           )
         `)
         .eq('status', 'Queued')
-        .is('dependant_on', null);  // No dependencies
-      
-      // Apply run_type filter if specified - filters by task definition, not worker
-      if (runType === 'gpu') {
-        queuedQuery = queuedQuery.eq('task_types.run_type', 'gpu');
-      } else if (runType === 'api') {
-        queuedQuery = queuedQuery.eq('task_types.run_type', 'api');
-      }
-      
-      const { data: queuedTasksData, error: queuedError } = await queuedQuery.order('created_at', { ascending: true });
+        .is('dependant_on', null)  // No dependencies
+        .order('created_at', { ascending: true });
       
       if (queuedError) {
         console.error(`[TASK_COUNT_DEBUG] [DETAILS] Error fetching queued tasks:`, queuedError);
@@ -368,30 +375,21 @@ serve(async (req) => {
       // - User has credits > 0 (filtered in JS)
       // - Has worker_id (cloud-claimed)
       // - Optionally filter by run_type via task_types.run_type (GPU vs API tasks)
-      let activeQuery = supabaseAdmin
+      const { data: activeTasksData, error: activeError } = await supabaseAdmin
         .from('tasks')
         .select(`
           id,
           task_type,
           worker_id,
           updated_at,
-          task_types!inner(run_type),
           projects!inner(
             user_id,
             users!inner(credits, settings)
           )
         `)
         .eq('status', 'In Progress')
-        .not('worker_id', 'is', null);  // Must have worker_id (cloud-claimed)
-      
-      // Apply run_type filter if specified - filters by task definition, not worker
-      if (runType === 'gpu') {
-        activeQuery = activeQuery.eq('task_types.run_type', 'gpu');
-      } else if (runType === 'api') {
-        activeQuery = activeQuery.eq('task_types.run_type', 'api');
-      }
-      
-      const { data: activeTasksData, error: activeError } = await activeQuery.order('updated_at', { ascending: true });
+        .not('worker_id', 'is', null)  // Must have worker_id (cloud-claimed)
+        .order('updated_at', { ascending: true });
       
       if (activeError) {
         console.error(`[TASK_COUNT_DEBUG] [DETAILS] Error fetching active tasks:`, activeError);
@@ -409,7 +407,15 @@ serve(async (req) => {
           return false;
         }
         
-        // No need to check inCloud settings anymore - run_type is now filtered in SQL
+        // Filter by run_type if specified
+        if (runType && taskTypeRunTypeMap) {
+          const taskRunType = taskTypeRunTypeMap.get(task.task_type);
+          if (taskRunType !== runType) {
+            console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding queued task ${task.id.substring(0, 8)} (${task.task_type}) - run_type ${taskRunType} != ${runType}`);
+            return false;
+          }
+        }
+        
         return true;
       });
 
@@ -424,7 +430,15 @@ serve(async (req) => {
           return false;
         }
         
-        // No need to check inCloud settings anymore - run_type is now filtered in SQL
+        // Filter by run_type if specified
+        if (runType && taskTypeRunTypeMap) {
+          const taskRunType = taskTypeRunTypeMap.get(task.task_type);
+          if (taskRunType !== runType) {
+            console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding active task ${task.id.substring(0, 8)} (${task.task_type}) with worker ${task.worker_id} - run_type ${taskRunType} != ${runType}`);
+            return false;
+          }
+        }
+        
         return true;
       });
 
@@ -622,7 +636,7 @@ serve(async (req) => {
           task_type: task.task_type,
           worker_id: task.worker_id,
           user_id: callerId,
-          started_at: task.updated_at // Using updated_at as proxy for when task was claimed
+          started_atcl: task.updated_at // Using updated_at as proxy for when task was claimed
         }));
 
         console.log(`${pathTag} [TaskCounts:Details] Eligible tasks: ${user_queued_tasks.length} queued, ${user_active_tasks.length} active`);
