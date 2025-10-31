@@ -555,7 +555,6 @@ serve(async (req) => {
             task_type,
             created_at,
             dependant_on,
-            task_types!inner(run_type),
             project_id
           `)
           .eq('status', 'Queued')
@@ -580,7 +579,6 @@ serve(async (req) => {
             task_type,
             worker_id,
             updated_at,
-            task_types!inner(run_type),
             project_id
           `)
           .eq('status', 'In Progress')
