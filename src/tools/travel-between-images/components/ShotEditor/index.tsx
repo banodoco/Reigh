@@ -2736,7 +2736,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               {/* Subtle grain overlay to match GlobalHeader vibe */}
               <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={(e) => {
                   e.preventDefault();
@@ -2744,7 +2744,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   if (onPreviousShotNoScroll) onPreviousShotNoScroll();
                 }}
                 disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                className="flex-shrink-0 pointer-events-auto"
+                className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
                 title="Previous shot"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -2759,7 +2759,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               </span>
               
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={(e) => {
                   e.preventDefault();
@@ -2767,7 +2767,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   if (onNextShotNoScroll) onNextShotNoScroll();
                 }}
                 disabled={!hasNext || state.isTransitioningFromNameEdit}
-                className="flex-shrink-0 pointer-events-auto"
+                className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
                 title="Next shot"
               >
                 <ChevronRight className="h-4 w-4" />

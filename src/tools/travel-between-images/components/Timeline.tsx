@@ -147,6 +147,13 @@ export interface TimelineProps {
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
   uploadProgress?: number;
+  // Shot management for external generation viewing
+  allShots?: Array<{ id: string; name: string }>;
+  selectedShotId?: string;
+  onShotChange?: (shotId: string) => void;
+  onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
 }
 
 /**
@@ -193,7 +200,14 @@ const Timeline: React.FC<TimelineProps> = ({
   autoCreateIndividualPrompts,
   onImageUpload,
   isUploadingImage,
-  uploadProgress = 0
+  uploadProgress = 0,
+  // Shot management props
+  allShots,
+  selectedShotId,
+  onShotChange,
+  onAddToShot,
+  onAddToShotWithoutPosition,
+  onCreateShot
 }) => {
   
   // Navigation
@@ -201,7 +215,11 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Core state
   const [isPersistingPositions, setIsPersistingPositions] = useState<boolean>(false);
+  
+  // Local state for shot selector dropdown (separate from the shot being viewed)
+  const [lightboxSelectedShotId, setLightboxSelectedShotId] = useState<string | undefined>(selectedShotId || shotId);
   const [isDragInProgress, setIsDragInProgress] = useState<boolean>(false);
+  
 
   // Refs (removed initialContextFrames - no longer needed for auto-adjustment)
 
@@ -351,6 +369,62 @@ const Timeline: React.FC<TimelineProps> = ({
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
   const hasNext = derivedHasNext;
   const hasPrevious = derivedHasPrevious;
+  
+  // Adapter functions for onAddToShot that use the lightbox selected shot ID
+  const handleAddToShotAdapter = useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    if (!onAddToShot || !lightboxSelectedShotId) {
+      console.warn('[Timeline] Cannot add to shot: missing onAddToShot or lightboxSelectedShotId');
+      return false;
+    }
+
+    try {
+      console.log('[Timeline] Adding generation to shot with position', {
+        generationId: generationId.substring(0, 8),
+        shotId: lightboxSelectedShotId.substring(0, 8)
+      });
+
+      // Call parent's onAddToShot with the selected shot ID
+      // Position is a number according to ShotEditor's signature: (shotId: string, generationId: string, position: number)
+      await onAddToShot(lightboxSelectedShotId as any, generationId as any, 0 as any);
+      toast.success('Added to shot');
+      return true;
+    } catch (error) {
+      console.error('[Timeline] Error adding to shot:', error);
+      toast.error(`Failed to add to shot: ${(error as Error).message}`);
+      return false;
+    }
+  }, [lightboxSelectedShotId, onAddToShot]);
+
+  const handleAddToShotWithoutPositionAdapter = useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    if (!onAddToShotWithoutPosition || !lightboxSelectedShotId) {
+      console.warn('[Timeline] Cannot add to shot without position: missing handler or lightboxSelectedShotId');
+      return false;
+    }
+
+    try {
+      console.log('[Timeline] Adding generation to shot without position', {
+        generationId: generationId.substring(0, 8),
+        shotId: lightboxSelectedShotId.substring(0, 8)
+      });
+
+      // Call parent's onAddToShotWithoutPosition with the selected shot ID
+      await onAddToShotWithoutPosition(lightboxSelectedShotId as any, generationId as any);
+      toast.success('Added to shot (unpositioned)');
+      return true;
+    } catch (error) {
+      console.error('[Timeline] Error adding to shot without position:', error);
+      toast.error(`Failed to add to shot: ${(error as Error).message}`);
+      return false;
+    }
+  }, [lightboxSelectedShotId, onAddToShotWithoutPosition]);
 
   // Detect tablet/iPad size (768px+) for side-by-side task details layout
   const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
@@ -808,86 +882,126 @@ const Timeline: React.FC<TimelineProps> = ({
       />
 
       {/* Lightbox */}
-      {lightboxIndex !== null && currentLightboxImage && (
-        <MediaLightbox
-          media={currentLightboxImage}
-          shotId={shotId}
-          starred={currentLightboxImage.starred ?? false}
-          autoEnterInpaint={autoEnterInpaint}
-          toolTypeOverride="travel-between-images"
-          onClose={closeLightbox}
-          onNext={images.length > 1 ? wrappedGoNext : undefined}
-          onPrevious={images.length > 1 ? wrappedGoPrev : undefined}
-          readOnly={readOnly}
-          onDelete={!readOnly ? (mediaId: string) => {
-            console.log('[Timeline] Delete from lightbox', {
-              mediaId,
-              shotImageEntryId: currentLightboxImage.shotImageEntryId
-            });
-            // Use shotImageEntryId for deletion to target the specific shot_generations entry
-            onImageDelete(currentLightboxImage.shotImageEntryId);
-          } : undefined}
-          onImageSaved={async (newUrl: string, createNew?: boolean) => {
-            console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
-              imageId: currentLightboxImage.id,
-              newUrl,
-              createNew,
-              timestamp: Date.now()
-            });
-            
-            await onImageSaved(currentLightboxImage.id, newUrl, createNew);
-            
-            console.log('[ImageFlipDebug] [Timeline] Parent onImageSaved completed, triggering onTimelineChange', {
-              timestamp: Date.now()
-            });
-            
-            // Trigger reload of timeline data after flip
-            if (onTimelineChange) {
-              await onTimelineChange();
-              console.log('[ImageFlipDebug] [Timeline] onTimelineChange completed', {
+      {lightboxIndex !== null && currentLightboxImage && (() => {
+        // Determine if the current image is positioned in the selected shot
+        // For timeline images (non-external gens), check if they have a timeline_frame
+        // Use lightboxSelectedShotId instead of selectedShotId so it updates when dropdown changes
+        const isExternalGen = lightboxIndex >= images.length;
+        const isInSelectedShot = !isExternalGen && lightboxSelectedShotId && (
+          shotId === lightboxSelectedShotId || 
+          (currentLightboxImage as any).shot_id === lightboxSelectedShotId ||
+          (Array.isArray((currentLightboxImage as any).all_shot_associations) && 
+           (currentLightboxImage as any).all_shot_associations.some((assoc: any) => assoc.shot_id === lightboxSelectedShotId))
+        );
+        
+        const positionedInSelectedShot = isInSelectedShot
+          ? (currentLightboxImage as any).timeline_frame !== null && (currentLightboxImage as any).timeline_frame !== undefined
+          : undefined;
+        
+        const associatedWithoutPositionInSelectedShot = isInSelectedShot
+          ? (currentLightboxImage as any).timeline_frame === null || (currentLightboxImage as any).timeline_frame === undefined
+          : undefined;
+
+        return (
+          <MediaLightbox
+            media={currentLightboxImage}
+            shotId={shotId}
+            starred={currentLightboxImage.starred ?? false}
+            autoEnterInpaint={autoEnterInpaint}
+            toolTypeOverride="travel-between-images"
+            onClose={() => {
+              closeLightbox();
+              // Reset dropdown to current shot when closing
+              setLightboxSelectedShotId(selectedShotId || shotId);
+            }}
+            onNext={images.length > 1 ? wrappedGoNext : undefined}
+            onPrevious={images.length > 1 ? wrappedGoPrev : undefined}
+            readOnly={readOnly}
+            onDelete={!readOnly ? (mediaId: string) => {
+              console.log('[Timeline] Delete from lightbox', {
+                mediaId,
+                shotImageEntryId: currentLightboxImage.shotImageEntryId
+              });
+              // Use shotImageEntryId for deletion to target the specific shot_generations entry
+              onImageDelete(currentLightboxImage.shotImageEntryId);
+            } : undefined}
+            onImageSaved={async (newUrl: string, createNew?: boolean) => {
+              console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
+                imageId: currentLightboxImage.id,
+                newUrl,
+                createNew,
                 timestamp: Date.now()
               });
-            }
-          }}
-          showNavigation={showNavigation}
-          showMagicEdit={true}
-          hasNext={hasNext}
-          hasPrevious={hasPrevious}
-          onNavigateToGeneration={(generationId: string) => {
-            console.log('[Timeline:DerivedNav] 📍 Navigate to generation', {
-              generationId: generationId.substring(0, 8),
-              timelineImagesCount: images.length,
-              externalGenerationsCount: externalGens.externalGenerations.length,
-              tempDerivedCount: externalGens.tempDerivedGenerations.length,
-              totalImagesCount: currentImages.length
-            });
-            // Search in combined images (timeline + external + derived)
-            const index = currentImages.findIndex((img: any) => img.id === generationId);
-            if (index !== -1) {
-              console.log('[Timeline:DerivedNav] ✅ Found at index', index);
-              openLightbox(index);
-            } else {
-              console.log('[Timeline:DerivedNav] ⚠️ Not found in current images');
-              toast.info('This generation is not currently loaded');
-            }
-          }}
-          onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
-          onMagicEdit={(imageUrl, prompt, numImages) => {
-            // TODO: Implement magic edit generation
-            timelineDebugger.logEvent('Magic edit requested', { shotId, imageUrl, prompt, numImages });
-          }}
-          // Task details functionality - now shown on all devices including mobile
-          showTaskDetails={true}
-          taskDetailsData={{
-            task,
-            isLoading: isLoadingTask,
-            error: taskError,
-            inputImages,
-            taskId: task?.id || null,
-            onClose: closeLightbox
-          }}
-        />
-      )}
+              
+              await onImageSaved(currentLightboxImage.id, newUrl, createNew);
+              
+              console.log('[ImageFlipDebug] [Timeline] Parent onImageSaved completed, triggering onTimelineChange', {
+                timestamp: Date.now()
+              });
+              
+              // Trigger reload of timeline data after flip
+              if (onTimelineChange) {
+                await onTimelineChange();
+                console.log('[ImageFlipDebug] [Timeline] onTimelineChange completed', {
+                  timestamp: Date.now()
+                });
+              }
+            }}
+            showNavigation={showNavigation}
+            showMagicEdit={true}
+            hasNext={hasNext}
+            hasPrevious={hasPrevious}
+            onNavigateToGeneration={(generationId: string) => {
+              console.log('[Timeline:DerivedNav] 📍 Navigate to generation', {
+                generationId: generationId.substring(0, 8),
+                timelineImagesCount: images.length,
+                externalGenerationsCount: externalGens.externalGenerations.length,
+                tempDerivedCount: externalGens.tempDerivedGenerations.length,
+                totalImagesCount: currentImages.length
+              });
+              // Search in combined images (timeline + external + derived)
+              const index = currentImages.findIndex((img: any) => img.id === generationId);
+              if (index !== -1) {
+                console.log('[Timeline:DerivedNav] ✅ Found at index', index);
+                openLightbox(index);
+              } else {
+                console.log('[Timeline:DerivedNav] ⚠️ Not found in current images');
+                toast.info('This generation is not currently loaded');
+              }
+            }}
+            onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
+            onMagicEdit={(imageUrl, prompt, numImages) => {
+              // TODO: Implement magic edit generation
+              timelineDebugger.logEvent('Magic edit requested', { shotId, imageUrl, prompt, numImages });
+            }}
+            // Task details functionality - now shown on all devices including mobile
+            showTaskDetails={true}
+            taskDetailsData={{
+              task,
+              isLoading: isLoadingTask,
+              error: taskError,
+              inputImages,
+              taskId: task?.id || null,
+              onClose: closeLightbox
+            }}
+            // Shot management props
+            allShots={allShots}
+            selectedShotId={isExternalGen ? externalGens.externalGenLightboxSelectedShot : lightboxSelectedShotId}
+            onShotChange={isExternalGen ? (shotId) => {
+              externalGens.setExternalGenLightboxSelectedShot(shotId);
+            } : (shotId) => {
+              console.log('[Timeline] Shot selector changed to:', shotId);
+              setLightboxSelectedShotId(shotId);
+              onShotChange?.(shotId);
+            }}
+            onAddToShot={isExternalGen ? externalGens.handleExternalGenAddToShot : (onAddToShot ? handleAddToShotAdapter : undefined)}
+            onAddToShotWithoutPosition={isExternalGen ? externalGens.handleExternalGenAddToShotWithoutPosition : (onAddToShotWithoutPosition ? handleAddToShotWithoutPositionAdapter : undefined)}
+            onCreateShot={onCreateShot}
+            positionedInSelectedShot={positionedInSelectedShot}
+            associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
+          />
+        );
+      })()}
     </div>
   );
 };

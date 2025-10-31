@@ -41,6 +41,9 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
     setLightboxIndexRef
   });
   
+  // Local state for shot selector dropdown (separate from the shot being viewed)
+  const [lightboxSelectedShotId, setLightboxSelectedShotId] = React.useState<string | undefined>(props.selectedShotId);
+  
   // Selection management
   const selection = useSelection({
     images: optimistic.optimisticOrder,
@@ -134,6 +137,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
         mobileGestures={mobileGestures}
         optimistic={optimistic}
         externalGens={externalGens}
+        lightboxSelectedShotId={lightboxSelectedShotId}
+        setLightboxSelectedShotId={setLightboxSelectedShotId}
       />
     );
   }
@@ -149,6 +154,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
       optimistic={optimistic}
       externalGens={externalGens}
       getFramePosition={getFramePosition}
+      lightboxSelectedShotId={lightboxSelectedShotId}
+      setLightboxSelectedShotId={setLightboxSelectedShotId}
     />
   );
 };

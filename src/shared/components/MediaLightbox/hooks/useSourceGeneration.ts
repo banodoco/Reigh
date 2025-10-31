@@ -59,22 +59,44 @@ export const useSourceGeneration = ({
       });
       
       try {
+        // Fetch source generation with shot associations to check timeline position
         const { data, error } = await supabase
           .from('generations')
-          .select('*')
+          .select(`
+            *,
+            shot_generations!inner(
+              shot_id,
+              timeline_frame
+            )
+          `)
           .eq('id', effectiveBasedOnId)
           .single();
         
         if (error) throw error;
         
         if (data) {
+          // Extract shot associations from joined data
+          const shotAssociations = (data as any).shot_generations || [];
+          
           console.log('[TasksPane:BasedOn] ✅ Fetched source generation:', {
             sourceId: data.id.substring(0, 8),
             type: data.type,
             location: data.location?.substring(0, 50),
+            shotAssociationsCount: shotAssociations.length,
+            shotAssociations: shotAssociations.map((assoc: any) => ({
+              shotId: assoc.shot_id?.substring(0, 8),
+              timelineFrame: assoc.timeline_frame
+            })),
             timestamp: Date.now()
           });
-          setSourceGenerationData(data);
+          
+          // Add shot associations to the data for easy access
+          const enrichedData = {
+            ...data,
+            all_shot_associations: shotAssociations
+          };
+          
+          setSourceGenerationData(enrichedData as any);
         } else {
           console.log('[TasksPane:BasedOn] ⚠️ No data returned from query');
           setSourceGenerationData(null);

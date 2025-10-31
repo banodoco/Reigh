@@ -1,6 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
-import { useListShots, useRemoveImageFromShot, useUpdateShotImageOrder } from '@/shared/hooks/useShots';
+import { 
+  useListShots, 
+  useRemoveImageFromShot, 
+  useUpdateShotImageOrder,
+  useAddImageToShot,
+  useAddImageToShotWithoutPosition
+} from '@/shared/hooks/useShots';
 import { Shot, GenerationRow } from '@/types/shots';
 import ShotListDisplay from '@/tools/travel-between-images/components/ShotListDisplay';
 import ShotImageManager from '@/shared/components/ShotImageManager';
@@ -19,6 +25,8 @@ const ShotsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const removeImageFromShotMutation = useRemoveImageFromShot();
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
+  const addImageToShotMutation = useAddImageToShot();
+  const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -122,6 +130,96 @@ const ShotsPage: React.FC = () => {
     });
   };
 
+  // Simplified shot options for the lightbox shot selector
+  const simplifiedShotOptions = useMemo(() => 
+    shots ? shots.map(s => ({ id: s.id, name: s.name })) : [],
+    [shots]
+  );
+
+  // Handler for adding a generation to a shot with position
+  const handleAddToShot = useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    if (!currentShotId || !selectedProjectId) {
+      toast.error('Cannot add to shot: No shot or project selected');
+      return false;
+    }
+
+    try {
+      console.log('[ShotsPage] Adding generation to shot with position', {
+        generationId: generationId.substring(0, 8),
+        shotId: currentShotId.substring(0, 8)
+      });
+
+      // Get the next available position
+      const maxPosition = managedImages.reduce((max, img) => {
+        const pos = (img as any).timeline_frame ?? 0;
+        return Math.max(max, pos);
+      }, -1);
+      const nextPosition = maxPosition + 1;
+
+      await addImageToShotMutation.mutateAsync({
+        shot_id: currentShotId,
+        generation_id: generationId,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        project_id: selectedProjectId,
+        timelineFrame: nextPosition,
+      });
+
+      toast.success('Added to shot with position');
+      await refreshSelectedShotImages();
+      return true;
+    } catch (error) {
+      console.error('[ShotsPage] Error adding to shot:', error);
+      toast.error(`Failed to add to shot: ${(error as Error).message}`);
+      return false;
+    }
+  }, [currentShotId, selectedProjectId, managedImages, addImageToShotMutation, refreshSelectedShotImages]);
+
+  // Handler for adding a generation to a shot without position
+  const handleAddToShotWithoutPosition = useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    if (!currentShotId || !selectedProjectId) {
+      toast.error('Cannot add to shot: No shot or project selected');
+      return false;
+    }
+
+    try {
+      console.log('[ShotsPage] Adding generation to shot without position', {
+        generationId: generationId.substring(0, 8),
+        shotId: currentShotId.substring(0, 8)
+      });
+
+      await addImageToShotWithoutPositionMutation.mutateAsync({
+        shot_id: currentShotId,
+        generation_id: generationId,
+        imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
+        project_id: selectedProjectId,
+      });
+
+      toast.success('Added to shot (unpositioned)');
+      await refreshSelectedShotImages();
+      return true;
+    } catch (error) {
+      console.error('[ShotsPage] Error adding to shot without position:', error);
+      toast.error(`Failed to add to shot: ${(error as Error).message}`);
+      return false;
+    }
+  }, [currentShotId, selectedProjectId, addImageToShotWithoutPositionMutation, refreshSelectedShotImages]);
+
+  // Handler for changing the selected shot in the lightbox
+  const handleShotChange = useCallback((shotId: string) => {
+    console.log('[ShotsPage] Shot change requested:', shotId);
+    setCurrentShotId(shotId);
+  }, [setCurrentShotId]);
+
   if (!selectedProjectId) {
     return <div className="container mx-auto p-4">Please select a project to view shots.</div>;
   }
@@ -159,7 +257,24 @@ const ShotsPage: React.FC = () => {
             onImageDelete={handleDeleteImage}
             onImageReorder={handleReorderImage}
             columns={8}
+            generationMode="batch"
+            allShots={simplifiedShotOptions}
+            selectedShotId={currentShotId || undefined}
+            onShotChange={handleShotChange}
+            onAddToShot={handleAddToShot}
+            onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
           />
+          {/* Debug logging */}
+          {console.log('[ShotSelectorDebug] ShotsPage -> ShotImageManager', {
+            component: 'ShotsPage',
+            allShotsLength: simplifiedShotOptions.length,
+            selectedShotId: currentShotId,
+            hasOnAddToShot: !!handleAddToShot,
+            hasOnAddToShotWithoutPosition: !!handleAddToShotWithoutPosition,
+            hasOnShotChange: !!handleShotChange,
+            imagesCount: managedImages.length,
+            generationMode: 'batch'
+          })}
         </>
       )}
     </div>

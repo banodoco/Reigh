@@ -26,6 +26,7 @@ export interface ImageGenerationTaskParams {
   subject_strength?: number; // Strength for subject reference (0.0-2.0)
   subject_description?: string; // Text description of the subject for Qwen.Image model
   in_this_scene?: boolean; // Whether the subject is "in this scene"
+  in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
   steps?: number; // Number of inference steps
 }
 
@@ -50,6 +51,7 @@ export interface BatchImageGenerationTaskParams {
   subject_strength?: number; // Strength for subject reference (0.0-2.0)
   subject_description?: string; // Text description of the subject for Qwen.Image model
   in_this_scene?: boolean; // Whether the subject is "in this scene"
+  in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
   steps?: number; // Number of inference steps
 }
 
@@ -196,13 +198,24 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       negative_prompt: params.negative_prompt,
       // Use provided steps value if available, otherwise use default of 12
       steps: params.steps ?? 12,
-      // Include LoRAs if present
-      ...(params.loras?.length && {
-        additional_loras: params.loras.reduce<Record<string, number>>((acc, lora) => {
-          acc[lora.path] = lora.strength;
-          return acc;
-        }, {})
-      }),
+      // Include LoRAs if present, plus the "in this scene" LoRA if enabled
+      ...(() => {
+        const lorasMap: Record<string, number> = {};
+        
+        // Add user-selected LoRAs
+        if (params.loras?.length) {
+          params.loras.forEach(lora => {
+            lorasMap[lora.path] = lora.strength;
+          });
+        }
+        
+        // Add "in this scene" LoRA if enabled for Qwen models
+        if (isQwenModel && params.in_this_scene && params.in_this_scene_strength && params.in_this_scene_strength > 0) {
+          lorasMap['https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000002750.safetensors'] = params.in_this_scene_strength;
+        }
+        
+        return Object.keys(lorasMap).length > 0 ? { additional_loras: lorasMap } : {};
+      })(),
       // Include style reference for Qwen.Image
       ...(isQwenModel && params.style_reference_image && {
         style_reference_image: params.style_reference_image,
@@ -281,7 +294,8 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
             subject_reference_image: params.subject_reference_image || params.style_reference_image, // Fallback to style image
             subject_strength: params.subject_strength,
             subject_description: params.subject_description,
-            in_this_scene: params.in_this_scene
+            in_this_scene: params.in_this_scene,
+            in_this_scene_strength: params.in_this_scene_strength
           })
         } as ImageGenerationTaskParams;
       });

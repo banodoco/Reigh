@@ -12,6 +12,10 @@ export interface EditModePanelProps {
   // Source generation
   sourceGenerationData: GenerationRow | null;
   onOpenExternalGeneration?: (generationId: string, derivedContext?: string[]) => Promise<void>;
+  currentShotId?: string; // Optional: to check if parent is in same shot
+  allShots?: Array<{ id: string; name: string }>; // Optional: for shot names
+  isCurrentMediaPositioned?: boolean;
+  onReplaceInShot?: (parentGenerationId: string, currentMediaId: string, parentTimelineFrame: number, currentShotId: string) => Promise<void>;
   
   // Edit mode state
   editMode: 'text' | 'inpaint' | 'annotate';
@@ -69,6 +73,10 @@ export interface EditModePanelProps {
 export const EditModePanel: React.FC<EditModePanelProps> = ({
   sourceGenerationData,
   onOpenExternalGeneration,
+  currentShotId,
+  allShots,
+  isCurrentMediaPositioned,
+  onReplaceInShot,
   editMode,
   setEditMode,
   setIsInpaintMode,
@@ -149,6 +157,11 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
             sourceGeneration={sourceGenerationData}
             onNavigate={onOpenExternalGeneration}
             variant="compact"
+            currentShotId={currentShotId}
+            allShots={allShots}
+            currentMediaId={currentMediaId}
+            isCurrentMediaPositioned={isCurrentMediaPositioned}
+            onReplaceInShot={onReplaceInShot}
           />
         ) : (
           <div></div>

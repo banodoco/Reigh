@@ -28,6 +28,8 @@ interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   optimistic: any;
   externalGens: any;
   getFramePosition: (index: number) => number | undefined;
+  lightboxSelectedShotId?: string;
+  setLightboxSelectedShotId?: (shotId: string | undefined) => void;
 }
 
 export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = ({
@@ -38,8 +40,21 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   optimistic,
   externalGens,
   getFramePosition,
+  lightboxSelectedShotId,
+  setLightboxSelectedShotId,
   ...props
 }) => {
+  // Debug: Log props received
+  console.log('[ShotSelectorDebug] ShotImageManagerDesktop received props', {
+    component: 'ShotImageManagerDesktop',
+    hasOnAddToShot: !!props.onAddToShot,
+    hasOnAddToShotWithoutPosition: !!props.onAddToShotWithoutPosition,
+    allShotsLength: props.allShots?.length || 0,
+    selectedShotId: props.selectedShotId,
+    hasOnShotChange: !!props.onShotChange,
+    generationMode: props.generationMode
+  });
+
   // Fetch task details for current lightbox image
   const currentLightboxImageId = lightbox.lightboxIndex !== null 
     ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
@@ -137,6 +152,27 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             hasPrevious = lightbox.lightboxIndex > 0;
           }
           
+          const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
+          
+          // Determine if the current image is positioned in the selected shot
+          // For non-external gens (images from the shot itself), check if they have a timeline_frame
+          // Use lightboxSelectedShotId instead of props.selectedShotId so it updates when dropdown changes
+          const effectiveSelectedShotId = lightboxSelectedShotId || props.selectedShotId;
+          const isInSelectedShot = !isExternalGen && effectiveSelectedShotId && (
+            props.shotId === effectiveSelectedShotId || 
+            (currentImage as any).shot_id === effectiveSelectedShotId ||
+            (Array.isArray((currentImage as any).all_shot_associations) && 
+             (currentImage as any).all_shot_associations.some((assoc: any) => assoc.shot_id === effectiveSelectedShotId))
+          );
+          
+          const positionedInSelectedShot = isInSelectedShot
+            ? (currentImage as any).timeline_frame !== null && (currentImage as any).timeline_frame !== undefined
+            : undefined;
+          
+          const associatedWithoutPositionInSelectedShot = isInSelectedShot
+            ? (currentImage as any).timeline_frame === null || (currentImage as any).timeline_frame === undefined
+            : undefined;
+
           console.log('[BasedOnNav] 📊 MediaLightbox props (Desktop):', {
             mediaId: lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8),
             showTaskDetails: true,
@@ -150,9 +186,13 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             lightboxIndex: lightbox.lightboxIndex,
             currentImagesLength: lightbox.currentImages.length,
             isExternalGen,
-            isTempDerived: lightbox.lightboxIndex >= baseImagesCount + externalGens.externalGenerations.length
+            isTempDerived: lightbox.lightboxIndex >= baseImagesCount + externalGens.externalGenerations.length,
+            positionedInSelectedShot,
+            associatedWithoutPositionInSelectedShot,
+            currentImageTimelineFrame: (currentImage as any).timeline_frame
           });
           
+
           return (
             <MediaLightbox
               media={lightbox.currentImages[lightbox.lightboxIndex]}
@@ -177,6 +217,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
                 if (isExternalGen) {
                   externalGens.setExternalGenLightboxSelectedShot(props.selectedShotId);
                 }
+                // Reset dropdown to current shot when closing
+                setLightboxSelectedShotId?.(props.selectedShotId);
               }}
               onNext={lightbox.handleNext}
               onPrevious={lightbox.handlePrevious}
@@ -205,13 +247,31 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               }}
               onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
               allShots={props.allShots}
-              selectedShotId={isExternalGen ? externalGens.externalGenLightboxSelectedShot : props.selectedShotId}
+              selectedShotId={isExternalGen ? externalGens.externalGenLightboxSelectedShot : (lightboxSelectedShotId || props.selectedShotId)}
               onShotChange={isExternalGen ? (shotId) => {
                 externalGens.setExternalGenLightboxSelectedShot(shotId);
-              } : props.onShotChange}
-              onAddToShot={isExternalGen ? externalGens.handleExternalGenAddToShot : props.onAddToShot}
+              } : (shotId) => {
+                console.log('[ShotImageManagerDesktop] Shot selector changed to:', shotId);
+                setLightboxSelectedShotId?.(shotId);
+                props.onShotChange?.(shotId);
+              }}
+              onAddToShot={(() => {
+                const result = isExternalGen ? externalGens.handleExternalGenAddToShot : props.onAddToShot;
+                console.log('[ShotSelectorDebug] ShotImageManagerDesktop -> MediaLightbox onAddToShot', {
+                  component: 'ShotImageManagerDesktop',
+                  isExternalGen,
+                  propsOnAddToShot: !!props.onAddToShot,
+                  externalGensHandler: !!externalGens.handleExternalGenAddToShot,
+                  finalOnAddToShot: !!result,
+                  allShotsLength: props.allShots?.length || 0,
+                  selectedShotId: props.selectedShotId
+                });
+                return result;
+              })()}
               onAddToShotWithoutPosition={isExternalGen ? externalGens.handleExternalGenAddToShotWithoutPosition : props.onAddToShotWithoutPosition}
               onCreateShot={props.onCreateShot}
+              positionedInSelectedShot={positionedInSelectedShot}
+              associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
             />
           );
         })()}

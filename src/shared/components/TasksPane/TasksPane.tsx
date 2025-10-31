@@ -150,6 +150,9 @@ interface TasksPaneProps {
 const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const queryClient = useQueryClient();
   
+  // Local state for shot selector dropdown (separate from the shot being viewed)
+  const [lightboxSelectedShotId, setLightboxSelectedShotId] = useState<string | undefined>(undefined);
+  
   // Expose queryClient globally for diagnostics
   useEffect(() => {
     if (typeof window !== 'undefined' && queryClient) {
@@ -1221,7 +1224,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         return createPortal(
           <MediaLightbox
             media={actualMedia as GenerationRow}
-            onClose={handleCloseLightbox}
+            onClose={() => {
+              // Reset dropdown to current shot when closing
+              setLightboxSelectedShotId(currentShotId || lastAffectedShotId || undefined);
+              handleCloseLightbox();
+            }}
             onNext={handleNext}
             onPrevious={handlePrevious}
             showNavigation={lightboxData.type === 'video' && totalVideos > 1}
@@ -1233,12 +1240,13 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             showTaskDetails={true}
             taskDetailsData={taskDetailsData}
             allShots={simplifiedShotOptions}
-            selectedShotId={currentShotId || lastAffectedShotId || undefined}
+            selectedShotId={lightboxSelectedShotId || currentShotId || lastAffectedShotId || undefined}
             onShotChange={(shotId) => {
-              console.log('[TasksPane:AddToShot] 📝 Shot change requested (not implemented in TasksPane):', {
+              console.log('[TasksPane:AddToShot] 📝 Shot change requested:', {
                 newShotId: shotId.substring(0, 8),
                 timestamp: Date.now()
               });
+              setLightboxSelectedShotId(shotId);
             }}
             onAddToShot={handleAddToShot}
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}

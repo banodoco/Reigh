@@ -144,6 +144,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [isEditingSubjectDescription, setIsEditingSubjectDescription] = useState<boolean>(false);
   const [lastSubjectDescriptionFromParent, setLastSubjectDescriptionFromParent] = useState<string>('');
   const [inThisScene, setInThisScene] = useState<boolean>(false);
+  const [inThisSceneStrength, setInThisSceneStrength] = useState<number>(0.5);
   const [referenceMode, setReferenceMode] = useState<ReferenceMode>('custom');
   const [styleBoostTerms, setStyleBoostTerms] = useState<string>('');
   const pendingReferenceModeUpdate = useRef<ReferenceMode | null>(null);
@@ -255,6 +256,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Default to 'this character' when subject description is empty but subject strength is active
   const effectiveSubjectDescription = currentSubjectDescription.trim() || 'this character';
   const currentInThisScene = selectedReference?.inThisScene ?? projectImageSettings?.inThisScene ?? false;
+  const currentInThisSceneStrength = selectedReference?.inThisSceneStrength ?? (selectedReference?.inThisScene ? 1.0 : 0);
   const currentReferenceMode = (selectedReference?.referenceMode ?? 'custom') as ReferenceMode;
   const currentStyleBoostTerms = selectedReference?.styleBoostTerms ?? '';
   
@@ -342,6 +344,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.log('[RefSettings] 📝 Updating local inThisScene:', currentInThisScene);
       setInThisScene(currentInThisScene);
     }
+    if (inThisSceneStrength !== currentInThisSceneStrength && currentInThisSceneStrength !== undefined) {
+      console.log('[RefSettings] 📝 Updating local inThisSceneStrength:', currentInThisSceneStrength);
+      setInThisSceneStrength(currentInThisSceneStrength);
+    }
     
     // For reference mode: check if database caught up with pending update
     if (pendingReferenceModeUpdate.current && currentReferenceMode === pendingReferenceModeUpdate.current) {
@@ -359,7 +365,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } else if (referenceMode === currentReferenceMode) {
       console.log('[RefSettings] ✅ Mode already in sync:', referenceMode);
     }
-  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, referenceMode, selectedReferenceId, selectedReference?.name]);
+  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, inThisSceneStrength, referenceMode, selectedReferenceId, selectedReference?.name]);
 
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
@@ -457,6 +463,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           subjectStrength: projectImageSettings.subjectStrength ?? 0.0,
           subjectDescription: projectImageSettings.subjectDescription ?? "",
           inThisScene: projectImageSettings.inThisScene ?? false,
+          inThisSceneStrength: 1.0,
           referenceMode: 'style',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -502,6 +509,48 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     migrateLegacyReference();
   }, [effectiveShotId, projectImageSettings, selectedProjectId, updateProjectImageSettings]);
+  
+  // Migrate references missing inThisSceneStrength field and old scene modes
+  useEffect(() => {
+    const migrateSceneSettings = async () => {
+      if (!projectImageSettings || !references.length) return;
+      
+      // Check if any references need migration
+      const needsMigration = references.some(ref => 
+        ref.inThisSceneStrength === undefined || 
+        (ref.referenceMode as string) === 'scene-imprecise' || 
+        (ref.referenceMode as string) === 'scene-precise'
+      );
+      
+      if (needsMigration) {
+        console.log('[RefSettings] 🔧 Migrating references for scene mode updates');
+        const updatedReferences = references.map(ref => {
+          const updates: Partial<ReferenceImage> = { ...ref };
+          
+          // Migrate old scene modes to new unified 'scene' mode
+          if ((ref.referenceMode as string) === 'scene-imprecise' || (ref.referenceMode as string) === 'scene-precise') {
+            updates.referenceMode = 'scene';
+            // Keep existing inThisSceneStrength if present, otherwise set to 1.0
+            updates.inThisSceneStrength = ref.inThisSceneStrength ?? 1.0;
+          } else if (ref.inThisSceneStrength === undefined) {
+            // Add missing inThisSceneStrength field
+            updates.inThisSceneStrength = ref.inThisScene ? 1.0 : 0;
+          }
+          
+          return updates as ReferenceImage;
+        });
+        
+        try {
+          await updateProjectImageSettings('project', { references: updatedReferences });
+          console.log('[RefSettings] ✅ Successfully migrated scene settings');
+        } catch (error) {
+          console.error('[RefSettings] ❌ Failed to migrate scene settings:', error);
+        }
+      }
+    };
+    
+    migrateSceneSettings();
+  }, [references, projectImageSettings, updateProjectImageSettings]);
   
   // Mark that we've visited this page in the session
   React.useEffect(() => {
@@ -946,6 +995,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subjectStrength: 0.0,
         subjectDescription: "",
         inThisScene: false,
+        inThisSceneStrength: 1.0,
         referenceMode: 'style',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -1221,6 +1271,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     await handleUpdateReference(selectedReferenceId, { inThisScene: value });
   }, [selectedReferenceId, handleUpdateReference]);
 
+  const handleInThisSceneStrengthChange = useCallback(async (value: number) => {
+    if (!selectedReferenceId) return;
+    setInThisSceneStrength(value);
+    await handleUpdateReference(selectedReferenceId, { inThisSceneStrength: value });
+  }, [selectedReferenceId, handleUpdateReference]);
+
   const handleStyleBoostTermsChange = useCallback(async (value: string) => {
     if (!selectedReferenceId) return;
     
@@ -1245,18 +1301,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.styleReferenceStrength = 1.1;
       updates.subjectStrength = 0;
       updates.inThisScene = false;
+      updates.inThisSceneStrength = 0;
     } else if (mode === 'subject') {
       updates.styleReferenceStrength = 0;
       updates.subjectStrength = 1.1;
       updates.inThisScene = false;
+      updates.inThisSceneStrength = 0;
     } else if (mode === 'style-character') {
       updates.styleReferenceStrength = 0.5;
       updates.subjectStrength = 1.0;
       updates.inThisScene = false;
-    } else if (mode === 'scene-imprecise') {
+      updates.inThisSceneStrength = 0;
+    } else if (mode === 'scene') {
       updates.styleReferenceStrength = 0.5;
       updates.subjectStrength = 1.0;
       updates.inThisScene = true;
+      updates.inThisSceneStrength = 1.0;
     }
     // For 'custom', don't auto-change strength values or inThisScene
     
@@ -1273,6 +1333,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
     if (updates.inThisScene !== undefined) {
       setInThisScene(updates.inThisScene);
+    }
+    if (updates.inThisSceneStrength !== undefined) {
+      setInThisSceneStrength(updates.inThisSceneStrength);
     }
     
     // Single batched update to avoid race conditions
@@ -1407,7 +1470,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subject_reference_image: styleReferenceImageGeneration,
         subject_strength: currentSubjectStrength,
         subject_description: effectiveSubjectDescription,
-        in_this_scene: currentInThisScene
+        in_this_scene: currentInThisScene,
+        in_this_scene_strength: currentInThisSceneStrength
       }),
     };
 
@@ -1670,6 +1734,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setSubjectStrength(selectedReference.subjectStrength);
       setSubjectDescription(selectedReference.subjectDescription);
       setInThisScene(selectedReference.inThisScene);
+      setInThisSceneStrength(selectedReference.inThisSceneStrength ?? (selectedReference.inThisScene ? 1.0 : 0));
       setReferenceMode(selectedReference.referenceMode);
     }
   }, [selectedReference, projectImageSettings, isEditingSubjectDescription]);
@@ -1688,7 +1753,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (inThisScene !== currentInThisScene) {
       setInThisScene(currentInThisScene);
     }
-  }, [styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene]);
+    if (inThisSceneStrength !== currentInThisSceneStrength && currentInThisSceneStrength !== undefined) {
+      setInThisSceneStrength(currentInThisSceneStrength);
+    }
+  }, [styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, inThisSceneStrength, currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength]);
 
   return (
     <>
@@ -1749,6 +1817,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             subjectStrength={subjectStrength}
             subjectDescription={subjectDescription}
             inThisScene={inThisScene}
+            inThisSceneStrength={inThisSceneStrength}
             isUploadingStyleReference={isUploadingStyleReference}
             onStyleUpload={handleStyleReferenceUpload}
             onStyleRemove={handleRemoveStyleReference}
@@ -1758,6 +1827,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             onSubjectDescriptionFocus={handleSubjectDescriptionFocus}
             onSubjectDescriptionBlur={handleSubjectDescriptionBlur}
             onInThisSceneChange={handleInThisSceneChange}
+            onInThisSceneStrengthChange={handleInThisSceneStrengthChange}
             referenceMode={referenceMode}
             onReferenceModeChange={handleReferenceModeChange}
             styleBoostTerms={styleBoostTerms}

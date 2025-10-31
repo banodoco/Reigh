@@ -118,6 +118,9 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   setActiveLightboxIndex,
 }) => {
   
+  // Local state for shot selector dropdown (separate from the shot being viewed)
+  const [lightboxSelectedShotId, setLightboxSelectedShotId] = React.useState<string | undefined>(selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined);
+  
   // Extract autoEnterEditMode from media metadata (more reliable than separate state)
   const effectiveAutoEnterEditMode = React.useMemo(() => {
     const fromMetadata = activeLightboxMedia?.metadata?.__autoEnterEditMode as boolean | undefined;
@@ -603,7 +606,11 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
         <MediaLightbox
           media={enhancedMedia}
           autoEnterInpaint={effectiveAutoEnterEditMode}
-          onClose={onClose}
+          onClose={() => {
+            // Reset dropdown to current shot when closing
+            setLightboxSelectedShotId(selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined);
+            onClose();
+          }}
           onNext={onNext}
           onPrevious={onPrevious}
           onImageSaved={wrappedOnImageSaved}
@@ -614,9 +621,13 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           hasNext={hasNext}
           hasPrevious={hasPrevious}
           allShots={simplifiedShotOptions}
-          selectedShotId={selectedShotIdLocal}
+          selectedShotId={lightboxSelectedShotId || (selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined)}
           shotId={selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined}
-          onShotChange={onShotChange}
+          onShotChange={(shotId) => {
+            console.log('[ImageGalleryLightbox] Shot selector changed to:', shotId);
+            setLightboxSelectedShotId(shotId);
+            onShotChange(shotId);
+          }}
           onAddToShot={onAddToShot}
           onAddToShotWithoutPosition={onAddToShotWithoutPosition}
           onDelete={onDelete}

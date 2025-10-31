@@ -3,6 +3,8 @@ import { GenerationRow, Shot } from '@/types/shots';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -515,6 +517,76 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       onShowTaskDetails();
     }
   };
+  
+  // Replace in shot handler - swaps timeline position from parent to current image
+  const handleReplaceInShot = React.useCallback(async (
+    parentGenerationId: string,
+    currentMediaId: string,
+    parentTimelineFrame: number,
+    shotIdParam: string
+  ) => {
+    console.log('[ReplaceInShot] Handler started', {
+      parentId: parentGenerationId.substring(0, 8),
+      currentId: currentMediaId.substring(0, 8),
+      frame: parentTimelineFrame,
+      shotId: shotIdParam.substring(0, 8)
+    });
+    
+    try {
+      // 1. Remove timeline_frame from parent's shot_generation record
+      const { error: removeError } = await supabase
+        .from('shot_generations')
+        .update({ timeline_frame: null })
+        .eq('generation_id', parentGenerationId)
+        .eq('shot_id', shotIdParam);
+      
+      if (removeError) throw removeError;
+      
+      // 2. Update or create shot_generation for current image with the timeline_frame
+      // First check if current image already has a shot_generation for this shot
+      const { data: existingAssoc } = await supabase
+        .from('shot_generations')
+        .select('id')
+        .eq('generation_id', currentMediaId)
+        .eq('shot_id', shotIdParam)
+        .single();
+      
+      if (existingAssoc) {
+        // Update existing
+        const { error: updateError } = await supabase
+          .from('shot_generations')
+          .update({ 
+            timeline_frame: parentTimelineFrame,
+            metadata: { user_positioned: true, drag_source: 'replace_parent' }
+          })
+          .eq('id', existingAssoc.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        // Create new
+        const { error: createError } = await supabase
+          .from('shot_generations')
+          .insert({
+            shot_id: shotIdParam,
+            generation_id: currentMediaId,
+            timeline_frame: parentTimelineFrame,
+            metadata: { user_positioned: true, drag_source: 'replace_parent' }
+          });
+        
+        if (createError) throw createError;
+      }
+      
+      console.log('[ReplaceInShot] Handler completed successfully');
+      
+      // Trigger any callbacks to refresh data
+      if (onShowTick) {
+        onShowTick(currentMediaId);
+      }
+    } catch (error) {
+      console.error('[ReplaceInShot] Handler failed:', error);
+      throw error;
+    }
+  }, [onShowTick]);
 
   return (
     <TooltipProvider delayDuration={500}>
@@ -1184,6 +1256,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <EditModePanel
                       sourceGenerationData={sourceGenerationData}
                       onOpenExternalGeneration={onOpenExternalGeneration}
+                      currentShotId={selectedShotId || shotId}
+                      allShots={allShots}
+                      currentMediaId={media.id}
+                      isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
+                      onReplaceInShot={handleReplaceInShot}
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
@@ -1208,7 +1285,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedPage={derivedPage}
                       derivedTotalPages={derivedTotalPages}
                       setDerivedPage={setDerivedPage}
-                      currentMediaId={media.id}
                       onClose={onClose}
                       variant="desktop"
                     />
@@ -1217,11 +1293,30 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       {/* Top bar with Based On (left) and Open Edit Mode (right) */}
                       <div className="flex items-center justify-between border-b border-border p-4">
                         {/* Based On display - Show source image this was derived from */}
+                        {(() => {
+                          console.log('[ReplaceInShot] MediaLightbox passing props', {
+                            hasSourceGeneration: !!sourceGenerationData,
+                            selectedShotId: selectedShotId?.substring(0, 8),
+                            shotId: shotId?.substring(0, 8),
+                            effectiveShotId: (selectedShotId || shotId)?.substring(0, 8),
+                            allShotsCount: allShots?.length || 0,
+                            allShotsFirstThree: allShots?.slice(0, 3).map(s => ({ id: s.id.substring(0, 8), name: s.name })),
+                            currentMediaId: media.id.substring(0, 8),
+                            isCurrentMediaPositioned: isAlreadyPositionedInSelectedShot,
+                            hasOnReplaceInShot: !!handleReplaceInShot
+                          });
+                          return null;
+                        })()}
                         {sourceGenerationData && onOpenExternalGeneration ? (
                           <SourceGenerationDisplay
                             sourceGeneration={sourceGenerationData}
                             onNavigate={onOpenExternalGeneration}
                             variant="compact"
+                            currentShotId={selectedShotId || shotId}
+                            allShots={allShots}
+                            currentMediaId={media.id}
+                            isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
+                            onReplaceInShot={handleReplaceInShot}
                           />
                         ) : (
                           <div></div>
@@ -1470,6 +1565,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     <EditModePanel
                       sourceGenerationData={sourceGenerationData}
                       onOpenExternalGeneration={onOpenExternalGeneration}
+                      currentShotId={selectedShotId || shotId}
+                      allShots={allShots}
+                      currentMediaId={media.id}
+                      isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
+                      onReplaceInShot={handleReplaceInShot}
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
@@ -1494,7 +1594,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       derivedPage={derivedPage}
                       derivedTotalPages={derivedTotalPages}
                       setDerivedPage={setDerivedPage}
-                      currentMediaId={media.id}
                       onClose={onClose}
                       variant="mobile"
                     />
@@ -1508,6 +1607,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             sourceGeneration={sourceGenerationData}
                             onNavigate={onOpenExternalGeneration}
                             variant="compact"
+                            currentShotId={selectedShotId || shotId}
+                            allShots={allShots}
+                            currentMediaId={media.id}
+                            isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
+                            onReplaceInShot={handleReplaceInShot}
                           />
                         ) : (
                           <div></div>

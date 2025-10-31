@@ -47,7 +47,7 @@ export interface PersistedFormSettings {
 }
 
 // Reference mode type
-export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene-imprecise' | 'custom';
+export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene' | 'custom';
 
 // Individual reference image with its own settings
 export interface ReferenceImage {
@@ -60,6 +60,7 @@ export interface ReferenceImage {
   subjectStrength: number; // 0.0 - 2.0
   subjectDescription: string; // Text description
   inThisScene: boolean; // Boolean flag
+  inThisSceneStrength: number; // Strength for "in this scene" LoRA (0.0 - 2.0)
   referenceMode?: ReferenceMode; // How to use this reference
   styleBoostTerms?: string; // Style-boost terms to append to prompts
   createdAt: string; // ISO timestamp

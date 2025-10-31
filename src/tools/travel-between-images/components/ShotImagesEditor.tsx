@@ -395,6 +395,60 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     }
   }, [onDefaultPromptChange, clearAllEnhancedPrompts]);
 
+  // Adapter functions to convert between ShotImageManager's signature and ShotEditor's signature
+  const handleAddToShotAdapter = React.useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    console.log('[ShotSelectorDebug] ShotImagesEditor handleAddToShotAdapter called', {
+      component: 'ShotImagesEditor',
+      hasOnAddToShot: !!onAddToShot,
+      selectedShotId: selectedShotId,
+      generationId: generationId?.substring(0, 8)
+    });
+
+    if (!onAddToShot || !selectedShotId) {
+      console.warn('[ShotImagesEditor] Cannot add to shot: missing onAddToShot or selectedShotId');
+      return false;
+    }
+
+    try {
+      // Calculate next available position for the target shot
+      // Get max position from current images
+      const maxPosition = images.reduce((max, img) => {
+        const pos = (img as any).timeline_frame ?? (img as any).position ?? 0;
+        return Math.max(max, pos);
+      }, -1);
+      const nextPosition = maxPosition + 1;
+
+      await onAddToShot(selectedShotId, generationId, nextPosition);
+      return true;
+    } catch (error) {
+      console.error('[ShotImagesEditor] Error adding to shot:', error);
+      return false;
+    }
+  }, [onAddToShot, selectedShotId, images]);
+
+  const handleAddToShotWithoutPositionAdapter = React.useCallback(async (
+    generationId: string,
+    imageUrl?: string,
+    thumbUrl?: string
+  ): Promise<boolean> => {
+    if (!onAddToShotWithoutPosition || !selectedShotId) {
+      console.warn('[ShotImagesEditor] Cannot add to shot without position: missing handler or selectedShotId');
+      return false;
+    }
+
+    try {
+      await onAddToShotWithoutPosition(selectedShotId, generationId);
+      return true;
+    } catch (error) {
+      console.error('[ShotImagesEditor] Error adding to shot without position:', error);
+      return false;
+    }
+  }, [onAddToShotWithoutPosition, selectedShotId]);
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -559,6 +613,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onImageUpload={onImageUpload}
                 isUploadingImage={isUploadingImage}
                 uploadProgress={uploadProgress}
+                // Shot management for external generation viewing
+                allShots={allShots}
+                selectedShotId={selectedShotId}
+                onShotChange={onShotChange}
+                onAddToShot={onAddToShot ? handleAddToShotAdapter : undefined}
+                onAddToShotWithoutPosition={onAddToShotWithoutPosition ? handleAddToShotWithoutPositionAdapter : undefined}
+                onCreateShot={onCreateShot ? async (shotName: string, files: File[]) => {
+                  const shotId = await onCreateShot(shotName);
+                  return { shotId, shotName };
+                } : undefined}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
@@ -616,7 +680,19 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   allShots={allShots}
                   selectedShotId={selectedShotId}
                   onShotChange={onShotChange}
-                  // onAddToShot and onAddToShotWithoutPosition are handled internally by ShotImageManager for external generations
+                  onAddToShot={(() => {
+                    const result = onAddToShot ? handleAddToShotAdapter : undefined;
+                    console.log('[ShotSelectorDebug] ShotImagesEditor -> ShotImageManager onAddToShot', {
+                      component: 'ShotImagesEditor',
+                      hasOnAddToShot: !!onAddToShot,
+                      hasAdapter: !!handleAddToShotAdapter,
+                      finalOnAddToShot: !!result,
+                      allShotsLength: allShots?.length || 0,
+                      selectedShotId: selectedShotId
+                    });
+                    return result;
+                  })()}
+                  onAddToShotWithoutPosition={onAddToShotWithoutPosition ? handleAddToShotWithoutPositionAdapter : undefined}
                   onCreateShot={onCreateShot ? async (shotName: string, files: File[]) => {
                     const shotId = await onCreateShot(shotName);
                     return { shotId, shotName };

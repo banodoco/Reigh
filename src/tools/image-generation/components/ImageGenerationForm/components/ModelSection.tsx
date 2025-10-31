@@ -18,6 +18,7 @@ interface ModelSectionProps {
   subjectStrength: number;
   subjectDescription: string;
   inThisScene: boolean;
+  inThisSceneStrength: number;
   isUploadingStyleReference: boolean;
   onStyleUpload: (files: File[]) => void;
   onStyleRemove: () => void;
@@ -27,6 +28,7 @@ interface ModelSectionProps {
   onSubjectDescriptionFocus?: () => void;
   onSubjectDescriptionBlur?: () => void;
   onInThisSceneChange: (value: boolean) => void;
+  onInThisSceneStrengthChange: (value: number) => void;
   // New multiple references props
   references?: ReferenceImage[];
   selectedReferenceId?: string | null;
@@ -273,6 +275,7 @@ const StyleReferenceSection: React.FC<{
   subjectStrength: number;
   subjectDescription: string;
   inThisScene: boolean;
+  inThisSceneStrength: number;
   isUploadingStyleReference: boolean;
   isGenerating: boolean;
   onStyleUpload: (files: File[]) => void;
@@ -283,6 +286,7 @@ const StyleReferenceSection: React.FC<{
   onSubjectDescriptionFocus?: () => void;
   onSubjectDescriptionBlur?: () => void;
   onInThisSceneChange: (value: boolean) => void;
+  onInThisSceneStrengthChange: (value: number) => void;
   referenceMode?: ReferenceMode;
   onReferenceModeChange?: (mode: ReferenceMode) => void;
   styleBoostTerms?: string;
@@ -299,6 +303,7 @@ const StyleReferenceSection: React.FC<{
   subjectStrength,
   subjectDescription,
   inThisScene,
+  inThisSceneStrength,
   isUploadingStyleReference,
   isGenerating,
   onStyleUpload,
@@ -309,6 +314,7 @@ const StyleReferenceSection: React.FC<{
   onSubjectDescriptionFocus,
   onSubjectDescriptionBlur,
   onInThisSceneChange,
+  onInThisSceneStrengthChange,
   referenceMode = 'custom',
   onReferenceModeChange,
   styleBoostTerms = '',
@@ -412,8 +418,8 @@ const StyleReferenceSection: React.FC<{
                 <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + subject</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="scene-imprecise" id="mode-scene-imprecise" />
-                <Label htmlFor="mode-scene-imprecise" className="cursor-pointer font-normal">Scene (imprecise)</Label>
+                <RadioGroupItem value="scene" id="mode-scene" />
+                <Label htmlFor="mode-scene" className="cursor-pointer font-normal">Scene</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="custom" id="mode-custom" />
@@ -424,40 +430,14 @@ const StyleReferenceSection: React.FC<{
 
           {/* Right column - Strength sliders and subject description */}
           <div className="flex-1 space-y-4">
-            {/* Style and Subject strength sliders - only show in custom mode */}
-            {referenceMode === 'custom' && (
+            {/* Scene strength slider - only show in scene mode */}
+            {referenceMode === 'scene' && (
               <div className="flex gap-4">
                 <div className="flex-1">
                   <SliderWithValue
-                    label="Style strength"
-                    value={styleReferenceStrength}
-                    onChange={(value) => {
-                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                      const newTotal = value + subjectStrength;
-                      if (newTotal < 0.5) {
-                        return;
-                      }
-                      onStyleStrengthChange(value);
-                    }}
-                    min={0.0}
-                    max={2.0}
-                    step={0.1}
-                    disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                    numberInputClassName="w-10"
-                  />
-                </div>
-                <div className="flex-1">
-                  <SliderWithValue
-                    label="Subject strength"
-                    value={subjectStrength}
-                    onChange={(value) => {
-                      // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
-                      const newTotal = styleReferenceStrength + value;
-                      if (newTotal < 0.5) {
-                        return;
-                      }
-                      onSubjectStrengthChange(value);
-                    }}
+                    label="How much like this scene"
+                    value={inThisSceneStrength}
+                    onChange={onInThisSceneStrengthChange}
                     min={0.0}
                     max={2.0}
                     step={0.1}
@@ -468,11 +448,71 @@ const StyleReferenceSection: React.FC<{
               </div>
             )}
             
+            {/* Style and Subject strength sliders - only show in custom mode */}
+            {referenceMode === 'custom' && (
+              <>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <SliderWithValue
+                      label="Style strength"
+                      value={styleReferenceStrength}
+                      onChange={(value) => {
+                        // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                        const newTotal = value + subjectStrength;
+                        if (newTotal < 0.5) {
+                          return;
+                        }
+                        onStyleStrengthChange(value);
+                      }}
+                      min={0.0}
+                      max={2.0}
+                      step={0.1}
+                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                      numberInputClassName="w-10"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <SliderWithValue
+                      label="Subject strength"
+                      value={subjectStrength}
+                      onChange={(value) => {
+                        // Validation: style + subject must ALWAYS be >= 0.5 (no exceptions)
+                        const newTotal = styleReferenceStrength + value;
+                        if (newTotal < 0.5) {
+                          return;
+                        }
+                        onSubjectStrengthChange(value);
+                      }}
+                      min={0.0}
+                      max={2.0}
+                      step={0.1}
+                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                      numberInputClassName="w-10"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <SliderWithValue
+                      label="In scene strength"
+                      value={inThisSceneStrength}
+                      onChange={onInThisSceneStrengthChange}
+                      min={0.0}
+                      max={2.0}
+                      step={0.1}
+                      disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
+                      numberInputClassName="w-10"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
             {/* Show subject description and/or style-boost terms based on mode */}
-            {(subjectStrength > 0 || referenceMode === 'scene-imprecise' || referenceMode === 'style' || referenceMode === 'style-character') && styleReferenceImage && (
+            {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'style-character' || (referenceMode === 'subject') || (referenceMode === 'custom' && subjectStrength > 0)) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Show subject description when subject strength > 0 OR in scene-imprecise mode */}
-                {(subjectStrength > 0 || referenceMode === 'scene-imprecise') && (
+                {/* Show subject description when subject strength > 0 (excludes scene mode via outer condition) */}
+                {subjectStrength > 0 && (
                   <div className="space-y-2">
                     <Label htmlFor="subject-description" className="text-sm font-medium">
                       Which subject from this image?
@@ -706,13 +746,17 @@ export const ModelSection: React.FC<ModelSectionProps & {
   subjectStrength,
   subjectDescription,
   inThisScene,
+  inThisSceneStrength,
   isUploadingStyleReference,
   onStyleUpload,
   onStyleRemove,
   onStyleStrengthChange,
   onSubjectStrengthChange,
   onSubjectDescriptionChange,
+  onSubjectDescriptionFocus,
+  onSubjectDescriptionBlur,
   onInThisSceneChange,
+  onInThisSceneStrengthChange,
   referenceMode,
   onReferenceModeChange,
   styleBoostTerms,
@@ -732,6 +776,7 @@ export const ModelSection: React.FC<ModelSectionProps & {
         subjectStrength={subjectStrength}
         subjectDescription={subjectDescription}
         inThisScene={inThisScene}
+        inThisSceneStrength={inThisSceneStrength}
         isUploadingStyleReference={isUploadingStyleReference}
         isGenerating={isGenerating}
         onStyleUpload={onStyleUpload}
@@ -739,7 +784,10 @@ export const ModelSection: React.FC<ModelSectionProps & {
         onStyleStrengthChange={onStyleStrengthChange}
         onSubjectStrengthChange={onSubjectStrengthChange}
         onSubjectDescriptionChange={onSubjectDescriptionChange}
+        onSubjectDescriptionFocus={onSubjectDescriptionFocus}
+        onSubjectDescriptionBlur={onSubjectDescriptionBlur}
         onInThisSceneChange={onInThisSceneChange}
+        onInThisSceneStrengthChange={onInThisSceneStrengthChange}
         referenceMode={referenceMode}
         onReferenceModeChange={onReferenceModeChange}
         styleBoostTerms={styleBoostTerms}

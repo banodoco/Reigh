@@ -181,11 +181,11 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             // Show navigation buttons tightly around the shot name
             <div className="flex items-center space-x-2">
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 size="sm" 
                 onClick={onPreviousShot}
                 disabled={!hasPrevious || isTransitioningFromNameEdit}
-                className="flex-shrink-0"
+                className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
                 title="Previous shot"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -200,11 +200,11 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               </span>
               
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 size="sm" 
                 onClick={onNextShot}
                 disabled={!hasNext || isTransitioningFromNameEdit}
-                className="flex-shrink-0"
+                className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
                 title="Next shot"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -268,11 +268,11 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             {/* Shot name with navigation buttons - tighter spacing */}
             <div className="flex items-center space-x-1">
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 size="sm" 
                 onClick={onPreviousShot}
                 disabled={!hasPrevious || isTransitioningFromNameEdit}
-                className="flex-shrink-0"
+                className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
                 title="Previous shot"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -287,11 +287,11 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               </span>
               
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 size="sm" 
                 onClick={onNextShot}
                 disabled={!hasNext || isTransitioningFromNameEdit}
-                className="flex-shrink-0"
+                className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
                 title="Next shot"
               >
                 <ChevronRight className="h-4 w-4" />
