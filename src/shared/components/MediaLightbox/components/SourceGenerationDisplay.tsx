@@ -108,7 +108,6 @@ export const SourceGenerationDisplay: React.FC<SourceGenerationDisplayProps> = (
               className="w-full h-full object-cover"
             />
           </div>
-          <span className="group-hover:underline">Click to view</span>
         </button>
       </div>
       

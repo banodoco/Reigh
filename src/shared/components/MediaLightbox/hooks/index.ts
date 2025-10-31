@@ -28,7 +28,8 @@ export type { UseStarToggleProps, UseStarToggleReturn } from './useStarToggle';
 export { useShotPositioning } from './useShotPositioning';
 export type { UseShotPositioningProps, UseShotPositioningReturn } from './useShotPositioning';
 
-export { useInSceneBoost } from './useInSceneBoost';
+export { useEditModeLoRAs } from './useEditModeLoRAs';
+export type { LoraMode } from './useEditModeLoRAs';
 export { useSourceGeneration } from './useSourceGeneration';
 export { useLayoutMode } from './useLayoutMode';
 export { useMagicEditMode } from './useMagicEditMode';

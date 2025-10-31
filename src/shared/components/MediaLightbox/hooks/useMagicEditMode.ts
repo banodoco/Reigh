@@ -19,11 +19,11 @@ interface UseMagicEditModeParams {
   setInpaintPrompt: (value: string) => void;
   inpaintNumGenerations: number;
   setInpaintNumGenerations: (value: number) => void;
-  isInSceneBoostEnabled: boolean;
-  setIsInSceneBoostEnabled: (value: boolean) => void;
+  editModeLoRAs: Array<{ url: string; strength: number }> | undefined;
   sourceUrlForTasks: string;
   imageDimensions: { width: number; height: number } | null;
   toolTypeOverride?: string;
+  setIsInSceneBoostEnabled: (enabled: boolean) => void;
 }
 
 interface UseMagicEditModeReturn {
@@ -61,11 +61,11 @@ export const useMagicEditMode = ({
   setInpaintPrompt,
   inpaintNumGenerations,
   setInpaintNumGenerations,
-  isInSceneBoostEnabled,
-  setIsInSceneBoostEnabled,
+  editModeLoRAs,
   sourceUrlForTasks,
   imageDimensions,
-  toolTypeOverride
+  toolTypeOverride,
+  setIsInSceneBoostEnabled,
 }: UseMagicEditModeParams): UseMagicEditModeReturn => {
   // Magic Edit mode state
   const [isMagicEditMode, setIsMagicEditMode] = useState(false);
@@ -189,15 +189,6 @@ export const useMagicEditMode = ({
       setMagicEditTasksCreated(false);
       
       try {
-        // Build loras array if In-Scene boost is enabled
-        const loras = [];
-        if (isInSceneBoostEnabled) {
-          loras.push({
-            url: 'https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000002750.safetensors',
-            strength: 1.0
-          });
-        }
-        
         const batchParams = {
           project_id: selectedProjectId,
           prompt,
@@ -208,14 +199,14 @@ export const useMagicEditMode = ({
           seed: 11111,
           shot_id: currentShotId || undefined,
           tool_type: toolTypeOverride,
-          loras: loras.length > 0 ? loras : undefined,
+          loras: editModeLoRAs,
           based_on: media.id, // Track source generation for lineage
         };
         
         console.log('[MediaLightbox] Creating magic edit tasks with loras:', {
           ...batchParams,
-          lorasEnabled: isInSceneBoostEnabled,
-          lorasCount: loras.length
+          lorasEnabled: !!editModeLoRAs,
+          lorasCount: editModeLoRAs?.length || 0
         });
         const results = await createBatchMagicEditTasks(batchParams);
         console.log(`[MediaLightbox] Created ${results.length} magic edit tasks`);

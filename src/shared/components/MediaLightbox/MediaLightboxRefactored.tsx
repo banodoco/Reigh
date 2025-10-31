@@ -36,7 +36,7 @@ import {
   useLightboxNavigation,
   useStarToggle,
   useShotPositioning,
-  useInSceneBoost,
+  useEditModeLoRAs,
   useSourceGeneration,
   useLayoutMode,
   useMagicEditMode,
@@ -274,8 +274,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     canvasRef,
   } = imageFlipHook;
 
-  // In-Scene Boost hook
-  const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, inpaintLoras } = useInSceneBoost();
+  // Edit Mode LoRAs hook
+  const { isInSceneBoostEnabled, setIsInSceneBoostEnabled, loraMode, setLoraMode, customLoraUrl, setCustomLoraUrl, editModeLoRAs } = useEditModeLoRAs();
 
   // Inpainting hook
   const inpaintingHook = useInpainting({
@@ -291,7 +291,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleExitInpaintMode: () => {
       // The hook will handle the state reset
     },
-    loras: inpaintLoras,
+    loras: editModeLoRAs,
   });
   const {
     isInpaintMode,
@@ -348,11 +348,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setInpaintPrompt,
     inpaintNumGenerations,
     setInpaintNumGenerations,
-    isInSceneBoostEnabled,
-    setIsInSceneBoostEnabled,
+    editModeLoRAs,
     sourceUrlForTasks,
     imageDimensions,
-    toolTypeOverride
+    toolTypeOverride,
+    setIsInSceneBoostEnabled
   });
   const {
         isMagicEditMode,

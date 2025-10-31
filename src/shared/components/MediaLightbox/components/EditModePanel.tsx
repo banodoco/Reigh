@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/utils';
 import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
 import { GenerationRow } from '@/types/shots';
-import type { LoraMode } from '../hooks/useInSceneBoost';
+import type { LoraMode } from '../hooks';
 
 export interface EditModePanelProps {
   // Source generation

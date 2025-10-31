@@ -2,24 +2,29 @@ import { useState, useMemo } from 'react';
 
 export type LoraMode = 'none' | 'in-scene' | 'next-scene' | 'custom';
 
-interface UseInSceneBoostReturn {
+interface UseEditModeLoRAsReturn {
+  // Mode selection for automatic LoRAs
+  loraMode: LoraMode;
+  setLoraMode: (mode: LoraMode) => void;
+  
+  // Custom URL support
+  customLoraUrl: string;
+  setCustomLoraUrl: (url: string) => void;
+  
+  // The computed LoRAs based on mode
+  editModeLoRAs: Array<{ url: string; strength: number }> | undefined;
+  
   // Legacy boolean support for backward compatibility
   isInSceneBoostEnabled: boolean;
   setIsInSceneBoostEnabled: (enabled: boolean) => void;
-  // New lora mode support
-  loraMode: LoraMode;
-  setLoraMode: (mode: LoraMode) => void;
-  customLoraUrl: string;
-  setCustomLoraUrl: (url: string) => void;
-  inpaintLoras: Array<{ url: string; strength: number }> | undefined;
 }
 
 /**
- * Hook to manage Lora mode state and generate loras array
+ * Hook to manage LoRA mode state for image editing operations
  * Supports: In-Scene, Next Scene, Custom, or None
  * Used by both inpainting and magic edit modes
  */
-export const useInSceneBoost = (): UseInSceneBoostReturn => {
+export const useEditModeLoRAs = (): UseEditModeLoRAsReturn => {
   const [loraMode, setLoraMode] = useState<LoraMode>('in-scene');
   const [customLoraUrl, setCustomLoraUrl] = useState<string>('');
 
@@ -30,7 +35,7 @@ export const useInSceneBoost = (): UseInSceneBoostReturn => {
   };
 
   // Build loras array based on selected mode
-  const inpaintLoras = useMemo(() => {
+  const editModeLoRAs = useMemo(() => {
     switch (loraMode) {
       case 'in-scene':
         return [{
@@ -55,15 +60,17 @@ export const useInSceneBoost = (): UseInSceneBoostReturn => {
   }, [loraMode, customLoraUrl]);
 
   return {
+    // Mode selection
+    loraMode,
+    setLoraMode,
+    // Custom URL
+    customLoraUrl,
+    setCustomLoraUrl,
+    // Computed LoRAs
+    editModeLoRAs,
     // Legacy boolean support
     isInSceneBoostEnabled,
     setIsInSceneBoostEnabled,
-    // New lora mode support
-    loraMode,
-    setLoraMode,
-    customLoraUrl,
-    setCustomLoraUrl,
-    inpaintLoras
   };
 };
 

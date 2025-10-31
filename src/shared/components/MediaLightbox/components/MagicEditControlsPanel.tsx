@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { createBatchMagicEditTasks, TaskValidationError } from '@/shared/lib/tasks/magicEdit';
 import { useShotGenerationMetadata } from '@/shared/hooks/useShotGenerationMetadata';
 import { cn } from '@/shared/lib/utils';
+import { useEditModeLoRAs } from '../hooks';
 
 export interface MagicEditControlsPanelProps {
   variant: 'desktop' | 'mobile';
@@ -44,9 +45,15 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [magicEditShotId, setMagicEditShotId] = useState<string | null>(null);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
-  const [isInSceneBoostEnabled, setIsInSceneBoostEnabled] = useState(true);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
   const [tasksCreated, setTasksCreated] = useState(false);
+
+  // LoRA mode management
+  const { 
+    isInSceneBoostEnabled, 
+    setIsInSceneBoostEnabled, 
+    editModeLoRAs 
+  } = useEditModeLoRAs();
 
   // Project context functionality
   const { selectedProjectId } = useProject();
@@ -116,15 +123,6 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
     try {
       const shotId = currentShotId || magicEditShotId || undefined;
       
-      // Build loras array if In-Scene boost is enabled
-      const loras = [];
-      if (isInSceneBoostEnabled) {
-        loras.push({
-          url: 'https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000002750.safetensors',
-          strength: 1.0
-        });
-      }
-      
       const batchParams = {
         project_id: selectedProjectId,
         prompt: magicEditPrompt,
@@ -135,7 +133,7 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
         seed: 11111,
         shot_id: shotId,
         tool_type: toolTypeOverride,
-        loras: loras.length > 0 ? loras : undefined,
+        loras: editModeLoRAs,
         based_on: shotGenerationId, // Track source generation for lineage
       };
       
@@ -168,8 +166,8 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
         setMagicEditPrompt('');
         setMagicEditNumImages(4);
         setMagicEditShotId(null);
-        setIsInSceneBoostEnabled(true);
         setTasksCreated(false);
+        // Note: LoRA mode state is managed by the hook and persists across sessions
       }, 2000);
     } catch (error) {
       console.error('[TaskDetailsSidebar] MagicEditPanel: Error creating tasks', error);
