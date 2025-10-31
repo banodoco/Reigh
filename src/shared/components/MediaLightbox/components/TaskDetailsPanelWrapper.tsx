@@ -29,6 +29,7 @@ export interface TaskDetailsPanelWrapperProps {
   onSetDerivedPage: (page: number | ((prev: number) => number)) => void;
   onNavigateToGeneration?: (generationId: string, derivedContext?: string[]) => Promise<void>;
   currentMediaId: string;
+  currentShotId?: string; // To check if derived items are in current shot
   
   // State
   replaceImages: boolean;
@@ -59,6 +60,7 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
   onSetDerivedPage,
   onNavigateToGeneration,
   currentMediaId,
+  currentShotId,
   replaceImages,
   onReplaceImagesChange,
   onClose,
@@ -113,6 +115,7 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
                 onSetDerivedPage={onSetDerivedPage}
                 onNavigate={onNavigateToGeneration}
                 currentMediaId={currentMediaId}
+                currentShotId={currentShotId}
                 variant={variant}
                 title={`Based on this (${derivedGenerations.length})`}
                 showTopBorder={!!taskDetailsData?.task}

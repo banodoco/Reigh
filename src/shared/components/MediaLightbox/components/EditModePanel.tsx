@@ -395,6 +395,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           onSetDerivedPage={setDerivedPage}
           onNavigate={onOpenExternalGeneration}
           currentMediaId={currentMediaId}
+          currentShotId={currentShotId}
           variant={variant}
           title={`Edits of this image (${derivedGenerations.length})`}
           showTopBorder={true}

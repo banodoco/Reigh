@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { GenerationRow } from '@/types/shots';
@@ -12,6 +12,7 @@ export interface DerivedGenerationsGridProps {
   onSetDerivedPage: (page: number | ((prev: number) => number)) => void;
   onNavigate: (derivedId: string, derivedContext: string[]) => Promise<void>;
   currentMediaId: string;
+  currentShotId?: string; // To check if items are positioned in current shot
   variant?: 'desktop' | 'mobile';
   title?: string;
   showTopBorder?: boolean; // Whether to show the top border (when task details are present above)
@@ -29,6 +30,7 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   onSetDerivedPage,
   onNavigate,
   currentMediaId,
+  currentShotId,
   variant = 'desktop',
   title,
   showTopBorder = true,
@@ -41,6 +43,37 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
   const buttonSize = isMobile ? 'h-6 w-6' : 'h-7 w-7';
   const iconSize = isMobile ? 'h-3 w-3' : 'h-4 w-4';
   const textSize = isMobile ? 'text-sm' : 'text-lg';
+  
+  // Sort derived generations: starred first, then in-shot, then others
+  const sortedDerived = useMemo(() => {
+    if (!paginatedDerived) return [];
+    
+    return [...paginatedDerived].sort((a, b) => {
+      // Starred items first
+      if (a.starred && !b.starred) return -1;
+      if (!a.starred && b.starred) return 1;
+      
+      // Then items in current shot (with timeline_frame)
+      if (currentShotId) {
+        const aInShot = (a as any).shot_id === currentShotId || 
+          (Array.isArray((a as any).all_shot_associations) && 
+           (a as any).all_shot_associations.some((assoc: any) => 
+             assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
+           ));
+        const bInShot = (b as any).shot_id === currentShotId || 
+          (Array.isArray((b as any).all_shot_associations) && 
+           (b as any).all_shot_associations.some((assoc: any) => 
+             assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
+           ));
+        
+        if (aInShot && !bInShot) return -1;
+        if (!aInShot && bInShot) return 1;
+      }
+      
+      // Then by creation date (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [paginatedDerived, currentShotId]);
 
   return (
     <div className={showTopBorder ? "border-t border-border pt-4 mt-4" : "pt-4"}>
@@ -80,7 +113,21 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
       </div>
       
       <div className={`grid ${gridCols} ${gap}`}>
-        {paginatedDerived.map((derived) => (
+        {sortedDerived.map((derived) => {
+          // Check if item is in current shot with timeline position
+          const isInShot = currentShotId && (
+            (derived as any).shot_id === currentShotId || 
+            (Array.isArray((derived as any).all_shot_associations) && 
+             (derived as any).all_shot_associations.some((assoc: any) => 
+               assoc.shot_id === currentShotId && assoc.timeline_frame !== null && assoc.timeline_frame !== undefined
+             ))
+          );
+          
+          // Check if item is new (created in last 2 minutes)
+          const isNew = derived.createdAt && 
+            (Date.now() - new Date(derived.createdAt).getTime()) < 2 * 60 * 1000;
+          
+          return (
           <div
             key={derived.id}
             className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
@@ -109,9 +156,9 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             {/* Simple hover overlay */}
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors pointer-events-none" />
             
-            {/* Timestamp - top left */}
+            {/* Timestamp and NEW badge - top left */}
             {derived.createdAt && (
-              <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} z-10 pointer-events-none`}>
+              <div className={`absolute ${isMobile ? 'top-0.5 left-0.5' : 'top-1 left-1'} z-10 pointer-events-none flex items-center gap-1`}>
                 <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-black/70 text-white rounded`}>
                   {(() => {
                     const formatted = formatDistanceToNow(new Date(derived.createdAt), { addSuffix: true });
@@ -131,6 +178,11 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
                       .replace(' ago', '');
                   })()}
                 </span>
+                {isNew && (
+                  <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-green-500 text-white rounded font-semibold`}>
+                    NEW
+                  </span>
+                )}
               </div>
             )}
             
@@ -149,8 +201,18 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
                 </span>
               </div>
             )}
+            
+            {/* In shot badge - bottom right */}
+            {isInShot && (
+              <div className={`absolute ${isMobile ? 'bottom-0.5 right-0.5' : 'bottom-1 right-1'} z-10 pointer-events-none`}>
+                <span className={`${isMobile ? 'text-[9px] px-1 py-0.5' : 'text-[10px] px-1.5 py-0.5'} bg-blue-500 text-white rounded font-semibold`}>
+                  In shot
+                </span>
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
