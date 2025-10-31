@@ -578,15 +578,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       
       console.log('[ReplaceInShot] Handler completed successfully');
       
-      // Trigger any callbacks to refresh data
-      if (onShowTick) {
-        onShowTick(currentMediaId);
-      }
+      // Close lightbox to force refresh when reopened
+      onClose();
     } catch (error) {
       console.error('[ReplaceInShot] Handler failed:', error);
       throw error;
     }
-  }, [onShowTick]);
+  }, [onClose]);
 
   return (
     <TooltipProvider delayDuration={500}>
