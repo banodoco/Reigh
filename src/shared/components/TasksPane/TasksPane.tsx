@@ -984,18 +984,16 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const effectiveIsOpen = !isMobile && isTasksPaneOpenProgrammatic ? true : isOpen;
 
   // Delay pointer events until animation completes to prevent tap bleed-through on mobile
-  const [isPointerEventsEnabled, setIsPointerEventsEnabled] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   
   useEffect(() => {
     if (isOpen) {
-      // Delay enabling pointer events by 300ms (matching the transition duration)
+      setIsAnimating(true);
+      // Disable pointer events for 300ms (matching the transition duration)
       const timeoutId = setTimeout(() => {
-        setIsPointerEventsEnabled(true);
+        setIsAnimating(false);
       }, 300);
       return () => clearTimeout(timeoutId);
-    } else {
-      // Disable immediately when closing
-      setIsPointerEventsEnabled(false);
     }
   }, [isOpen]);
 
@@ -1045,7 +1043,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           <div 
             className={cn(
               'flex flex-col h-full',
-              (isPointerEventsEnabled || effectiveIsOpen) ? 'pointer-events-auto' : 'pointer-events-none'
+              isMobile
+                ? (isAnimating || !isOpen ? 'pointer-events-none' : 'pointer-events-auto')
+                : (effectiveIsOpen ? 'pointer-events-auto' : 'pointer-events-none')
             )}
           >
             <div className="p-2 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">

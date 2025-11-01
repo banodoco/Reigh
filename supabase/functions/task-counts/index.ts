@@ -410,6 +410,14 @@ serve(async (req) => {
         // Filter by run_type if specified
         if (runType && taskTypeRunTypeMap) {
           const taskRunType = taskTypeRunTypeMap.get(task.task_type);
+          
+          // If task type not found in map, exclude it by default
+          if (taskRunType === undefined) {
+            console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding queued task ${task.id.substring(0, 8)} (${task.task_type}) - task type not found in task_types table`);
+            return false;
+          }
+          
+          // Exclude if run_type doesn't match
           if (taskRunType !== runType) {
             console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding queued task ${task.id.substring(0, 8)} (${task.task_type}) - run_type ${taskRunType} != ${runType}`);
             return false;
@@ -430,9 +438,23 @@ serve(async (req) => {
           return false;
         }
         
+        // CRITICAL: Exclude tasks already running on api-worker-main when filtering for GPU
+        if (runType === 'gpu' && task.worker_id === 'api-worker-main') {
+          console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding active task ${task.id.substring(0, 8)} (${task.task_type}) - already on api-worker-main`);
+          return false;
+        }
+        
         // Filter by run_type if specified
         if (runType && taskTypeRunTypeMap) {
           const taskRunType = taskTypeRunTypeMap.get(task.task_type);
+          
+          // If task type not found in map, exclude it by default
+          if (taskRunType === undefined) {
+            console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding active task ${task.id.substring(0, 8)} (${task.task_type}) - task type not found in task_types table`);
+            return false;
+          }
+          
+          // Exclude if run_type doesn't match
           if (taskRunType !== runType) {
             console.log(`[TASK_COUNT_DEBUG] [FILTER] Excluding active task ${task.id.substring(0, 8)} (${task.task_type}) with worker ${task.worker_id} - run_type ${taskRunType} != ${runType}`);
             return false;

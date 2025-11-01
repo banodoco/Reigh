@@ -137,11 +137,46 @@ serve(async (req)=>{
         // Expected format: userId/tasks/{task_id}/filename or userId/tasks/{task_id}/thumbnails/filename
         const pathTaskId = pathParts[2];
         if (pathTaskId !== task_id) {
-          console.error(`[COMPLETE-TASK-DEBUG] Security violation: storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id})`);
-          return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
+          console.log(`[COMPLETE-TASK-DEBUG] storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id}) - checking if orchestrator task`);
+          
+          // EXCEPTION: Allow orchestrator tasks to reference other task outputs
+          // Security is already enforced by:
+          // 1. Task ownership verification (caller must own the task being completed)
+          // 2. File existence check (file must exist in storage)
+          // 3. Storage RLS policies (cross-user access already protected)
+          const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+          const supabaseUrl = Deno.env.get("SUPABASE_URL");
+          if (!serviceKey || !supabaseUrl) {
+            console.error("Missing required environment variables");
+            return new Response("Server configuration error", { status: 500 });
+          }
+          const tempClient = createClient(supabaseUrl, serviceKey);
+          
+          const { data: currentTask, error: taskFetchError } = await tempClient
+            .from('tasks')
+            .select('task_type')
+            .eq('id', task_id)
+            .single();
+          
+          if (taskFetchError) {
+            console.error(`[COMPLETE-TASK-DEBUG] Error fetching task for validation: ${taskFetchError.message}`);
+            return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
+          }
+          
+          // Check if this is an orchestrator task
+          const isOrchestrator = currentTask?.task_type?.includes('orchestrator');
+          
+          if (isOrchestrator) {
+            console.log(`[COMPLETE-TASK-DEBUG] ✅ Orchestrator task ${task_id} referencing task ${pathTaskId} output - allowing (will verify file exists)`);
+            // Allow orchestrator tasks to reference other task outputs
+            // File existence will be verified in MODE 4 validation section
+          } else {
+            console.error(`[COMPLETE-TASK-DEBUG] ❌ Security violation: Non-orchestrator task attempting to reference different task's output`);
+            return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
+          }
+        } else {
+          console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
         }
-        
-        console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
         
         // Validate thumbnail path if provided
         if (thumbnail_storage_path) {
@@ -151,6 +186,8 @@ serve(async (req)=>{
           }
           const thumbTaskId = thumbParts[2];
           if (thumbTaskId !== task_id) {
+            // Note: For now, require thumbnail to match orchestrator task ID
+            // Could be extended to allow child task thumbnails if needed
             console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
             return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
           }
