@@ -19,6 +19,7 @@ import { WelcomeBonusModal } from '@/shared/components/WelcomeBonusModal';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { usePageVisibility } from '@/shared/hooks/usePageVisibility';
 import '@/shared/lib/debugPolling';
+import { SocialIcons } from '@/shared/components/SocialIcons';
 
 // Scroll to top component
 function ScrollToTop() {
@@ -192,6 +193,11 @@ const Layout: React.FC = () => {
       
       {/* Decorative footer line */}
       <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10"></div>
+      
+      {/* Social Icons Footer */}
+      <div className="relative z-10">
+        <SocialIcons />
+      </div>
       
       <SettingsModal
         isOpen={isSettingsModalOpen}

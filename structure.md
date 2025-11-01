@@ -159,7 +159,7 @@ src/app/
 | Component | Purpose | Notable Features |
 |-----------|---------|------------------|
 | **`App.tsx`** | App root | QueryClient, DND setup, global toast |
-| **`Layout.tsx`** | UI shell | GlobalHeader, sliding panes, responsive margins |
+| **`Layout.tsx`** | UI shell | GlobalHeader, sliding panes, responsive margins, social icons footer |
 | **`routes.tsx`** | Routing | Tool routes, protected paths, 404 handling |
 
 #### 🔧 Environment Variables
@@ -179,7 +179,7 @@ Serverless functions handle AI processing, payments, and task management. For co
 | Page | Route | Description |
 |------|-------|-------------|
 | **ToolSelectorPage** | `/tools` | Grid of available tools (or `/` in non-web envs) |
-| **HomePage** | `/` | Landing page (web env only) with hero section, social icons (GitHub/Discord), and Banodoco logo linking to banodoco.ai |
+| **HomePage** | `/` | Landing page (web env only) with hero section and Banodoco logo linking to banodoco.ai |
 | **ShotsPage** | `/shots` | Project shots management |
 | **GenerationsPage** | `/generations` | Media gallery with filtering (type/shot/search) & pagination |
 | **SharePage** | `/share/:shareId` | Public page for shared generations with video preview, input images, settings display, and "Copy to My Account" CTA |
@@ -234,6 +234,7 @@ For the complete catalog, see [`shared_hooks_contexts.md`](docs/structure_detail
 | **MediaLightbox** | Modal lightbox for viewing media with task details and video scrubbing |
 | **ToolSettingsGate** | Loading wrapper for settings hydration |
 | **PaneHeader** | Consistent pane headers |
+| **SocialIcons** | GitHub and Discord social links displayed in footer on all pages |
 | **transitions/** | Fade animations (PageFadeIn, FadeInSection) |
 
 #### 🪝 Essential Hooks
