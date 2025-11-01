@@ -171,7 +171,7 @@ const Layout: React.FC = () => {
   const containerSpacing = isLg ? 'py-1' : 'py-1';
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col">
       <ScrollToTop />
       {/* Theme-adaptive background gradient */}
       <div className="fixed inset-0 bg-gradient-to-br from-[hsl(var(--color-surface))] via-[hsl(var(--color-surface-bright))] to-[hsl(var(--color-tertiary)_/_0.1)] opacity-60 pointer-events-none"></div>
@@ -183,7 +183,7 @@ const Layout: React.FC = () => {
       />
       
       <div
-        className="flex-grow relative z-10 transition-[margin,padding] duration-300 ease-smooth content-container"
+        className="relative z-10 transition-[margin,padding] duration-300 ease-smooth content-container"
         style={mainContentStyle}
       >
         <GlobalProcessingWarning onOpenSettings={handleOpenSettings} />
