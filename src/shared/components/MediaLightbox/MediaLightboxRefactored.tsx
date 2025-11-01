@@ -325,7 +325,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleDeleteSelected,
     handleToggleFreeForm,
     getDeleteButtonPosition,
-    debugLog,
   } = inpaintingHook;
   
   // Handle exiting inpaint mode from UI buttons
@@ -589,28 +588,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   return (
     <TooltipProvider delayDuration={500}>
-      {/* Production Debug Overlay */}
-      {debugLog.length > 0 && isInpaintMode && (
-        <div className="fixed top-4 right-4 z-[200000] bg-black/90 text-white p-4 rounded-lg max-w-md max-h-96 overflow-y-auto font-mono text-xs">
-          <div className="flex justify-between items-center mb-2">
-            <span className="font-bold">Inpaint Debug Log</span>
-            <button 
-              onClick={() => {
-                const logs = debugLog.join('\n');
-                navigator.clipboard.writeText(logs);
-                alert('Debug logs copied to clipboard!');
-              }}
-              className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30"
-            >
-              Copy
-            </button>
-          </div>
-          {debugLog.map((log, i) => (
-            <div key={i} className="text-green-400">{log}</div>
-          ))}
-        </div>
-      )}
-      
       <DialogPrimitive.Root 
         open={true} 
         // Allow scrolling/interactions outside when tasks pane is open on desktop
@@ -1289,8 +1266,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Top bar with Based On (left) and Open Edit Mode (right) */}
-                      <div className="flex items-center justify-between border-b border-border p-4">
+                      {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
+                      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
                         {/* Based On display - Show source image this was derived from */}
                         {(() => {
                           console.log('[ReplaceInShot] MediaLightbox passing props', {
@@ -1321,9 +1298,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <div></div>
                         )}
                         
-                        {/* Info | Edit Toggle and Close Lightbox Button */}
+                        {/* Info | Edit Toggle and Close Button */}
                         <div className="flex items-center gap-3">
-                          {/* Two-way toggle: Info | Edit */}
                           {showImageEditTools && !readOnly && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                               <button
@@ -1380,10 +1356,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             ) : (showTaskDetails || isSpecialEditMode) && isMobile ? (
               // Mobile layout with task details or special edit modes - stacked
               <div className="w-full h-full flex flex-col bg-black/90">
-                {/* Media section - Top (60% height) */}
+                {/* Media section - Top (50% height) */}
                 <div 
                   className="flex-1 flex items-center justify-center relative"
-                  style={{ height: '60%' }}
+                  style={{ height: '50%' }}
                   onClick={(e) => {
                     // Single clicks don't close - only double-clicks
                     e.stopPropagation();
@@ -1552,14 +1528,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                 </div>
 
-                {/* Task Details / Inpaint / Magic Edit Panel - Bottom (40% height) */}
+                {/* Task Details / Inpaint / Magic Edit Panel - Bottom (50% height) */}
                 <div 
                   data-task-details-panel
                   className={cn(
                     "bg-background border-t border-border overflow-y-auto relative z-[60]"
                     // Removed flex centering to prevent top clipping with long content
                   )}
-                  style={{ height: '40%' }}
+                  style={{ height: '50%' }}
                 >
                   {isSpecialEditMode ? (
                     <EditModePanel
@@ -1599,8 +1575,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   ) : (
                     <div className="w-full">
-                      {/* Top bar with Based On (left) and Open Edit Mode (right) */}
-                      <div className="flex items-center justify-between border-b border-border p-4">
+                      {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
+                      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
                         {/* Based On display - Show source image this was derived from */}
                         {sourceGenerationData && onOpenExternalGeneration ? (
                           <SourceGenerationDisplay
@@ -1617,17 +1593,27 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <div></div>
                         )}
                         
-                        {/* Open Edit Mode Button */}
+                        {/* Info | Edit Toggle and Close Button */}
                         <div className="flex items-center gap-3">
-                          <OpenEditModeButton
-                            readOnly={readOnly}
-                            showImageEditTools={showImageEditTools}
-                            onOpenEditMode={() => {
-                              setIsInpaintMode(true);
-                              setEditMode('inpaint');
-                            }}
-                            variant="mobile"
-                          />
+                          {showImageEditTools && !readOnly && (
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
+                                disabled
+                              >
+                                Info
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsInpaintMode(true);
+                                  setEditMode('inpaint');
+                                }}
+                                className="px-3 py-1.5 text-sm rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-background/50"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"

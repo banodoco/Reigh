@@ -157,6 +157,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<Set<string>>(new Set());
+  const [showStarredOnly, setShowStarredOnly] = useState(false);
   
   // Ref for lightbox index setter (needed for external generations)
   const setLightboxIndexRef = useRef<(index: number) => void>(() => {});
@@ -394,17 +395,25 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     setShareSlugs(prev => ({ ...prev, [videoId]: shareSlug }));
   }, []);
   
-  // Sort video outputs by creation date
+  // Sort video outputs by creation date and apply starred filter
   const sortedVideoOutputs = useMemo(() => {
     const sorted = sortVideoOutputsByDate(videoOutputs);
+    
+    // Apply starred filter if enabled
+    const filtered = showStarredOnly 
+      ? sorted.filter(video => (video as { starred?: boolean }).starred === true)
+      : sorted;
+    
     console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_SORTED:`, {
       originalCount: videoOutputs.length,
       sortedCount: sorted.length,
-      sortedIds: sorted.slice(0, 5).map(item => item.id?.substring(0, 8)),
+      filteredCount: filtered.length,
+      showStarredOnly,
+      sortedIds: filtered.slice(0, 5).map(item => item.id?.substring(0, 8)),
       timestamp: Date.now()
     });
-    return sorted;
-  }, [videoOutputs]);
+    return filtered;
+  }, [videoOutputs, showStarredOnly]);
 
   // External generations hook (same as ShotImageManager and Timeline)
   const externalGens = useExternalGenerations({
@@ -753,6 +762,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       resetToFirstPage();
       setLightboxIndex(null);
       setSelectedVideoForDetails(null);
+      setShowStarredOnly(false); // Reset starred filter
       handleHoverEnd();
       
       // Reset stable count for new shot
@@ -849,6 +859,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           totalPages={totalPages}
           currentPage={currentPage}
           cachedCount={cachedCount}
+          showStarredOnly={showStarredOnly}
+          onStarredFilterChange={setShowStarredOnly}
         />
 
         {/* SIMPLIFIED: Show video-specific skeleton layout or videos */}

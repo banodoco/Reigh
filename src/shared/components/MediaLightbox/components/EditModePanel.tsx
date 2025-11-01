@@ -149,8 +149,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
 
   return (
     <div className="w-full">
-      {/* Top bar with Based On (left) and Close Edit Mode (right) */}
-      <div className="flex items-center justify-between border-b border-border p-4">
+      {/* Top bar with Based On (left) and Info/Edit Toggle + Close (right) - Sticky */}
+      <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
         {/* Based On display - Show source image this was derived from */}
         {sourceGenerationData && onOpenExternalGeneration ? (
           <SourceGenerationDisplay
@@ -167,9 +167,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           <div></div>
         )}
         
-        {/* Info | Edit Toggle and Close Lightbox Button */}
+        {/* Info | Edit Toggle and Close Button */}
         <div className="flex items-center gap-3">
-          {/* Two-way toggle: Info | Edit */}
           <div className="flex items-center gap-1 bg-muted rounded-md p-1">
             <button
               onClick={handleExitMagicEditMode}

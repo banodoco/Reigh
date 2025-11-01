@@ -406,15 +406,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     const imageUrls = taskParams.parsed?.orchestrator_details?.input_image_paths_resolved || [];
     
     // Convert video generations from database to GenerationRow format
-    const videoOutputs = videoGenerations?.map(gen => ({
-      id: gen.id,
-      location: gen.location,
-      imageUrl: gen.location,
-      thumbUrl: gen.thumbnail_url || gen.location,
-      type: gen.type || 'video',
-      createdAt: gen.created_at,
-      metadata: gen.params || {},
-    } as GenerationRow)) || null;
+    const videoOutputs = videoGenerations?.map(gen => {
+      const genAny = gen as any; // Type assertion for database fields not in type definition
+      return {
+        id: gen.id,
+        location: gen.location,
+        imageUrl: gen.location,
+        thumbUrl: gen.thumbnail_url || gen.location,
+        videoUrl: genAny.video_url || gen.location,
+        type: gen.type || 'video',
+        createdAt: gen.created_at,
+        taskId: genAny.task_id, // ✅ Include taskId for proper task details display
+        metadata: gen.params || {},
+      } as GenerationRow;
+    }) || null;
     
     return {
       imageUrls,
@@ -720,14 +725,20 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     return travelData.videoOutputs || [];
   }, [travelData.videoOutputs]);
 
-  // Handler for mobile tap - jump to shot for video tasks, open content for image tasks
+  // Handler for mobile tap - open lightbox for completed tasks
   const handleMobileTap = (e: React.MouseEvent) => {
     if (!isMobile) return; // Only handle on mobile
     
     e.stopPropagation();
     e.preventDefault();
     
-    // For video tasks - jump to the shot if available
+    // For completed video tasks - open video lightbox if video data is available
+    if (taskInfo.isCompletedVideoTask && onOpenVideoLightbox && travelData.videoOutputs && travelData.videoOutputs.length > 0) {
+      onOpenVideoLightbox(task, travelData.videoOutputs, 0);
+      return;
+    }
+    
+    // For video tasks without loaded videos - navigate to shot to see videos
     if (taskInfo.isVideoTask && shotId) {
       setCurrentShotId(shotId);
       navigate(`/tools/travel-between-images#${shotId}`, { state: { fromShotClick: true } });

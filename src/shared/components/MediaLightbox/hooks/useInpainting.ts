@@ -64,7 +64,6 @@ export interface UseInpaintingReturn {
   handleToggleFreeForm: () => void;
   getDeleteButtonPosition: () => { x: number; y: number } | null;
   redrawStrokes: (strokes: BrushStroke[]) => void;
-  debugLog: string[];
 }
 
 /**
@@ -130,13 +129,7 @@ export const useInpainting = ({
   const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
   
   // Debug state for production
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-  const addDebugLog = useCallback((msg: string) => {
-    const timestampedMsg = `${new Date().toISOString().split('T')[1].slice(0, -1)}: ${msg}`;
-    setDebugLog(prev => [...prev.slice(-20), timestampedMsg]);
-    // Also log as error so it shows in production console
-    console.error(`[INPAINT_DEBUG] ${timestampedMsg}`);
-  }, []);
+  // Debug logging removed - no longer needed
   
   // Computed: backwards compatibility
   const isAnnotateMode = editMode === 'annotate';
@@ -503,7 +496,6 @@ export const useInpainting = ({
       imageLocation: media.location?.substring(0, 50),
       imageDimensions
     });
-    addDebugLog(`Canvas init: dims=${JSON.stringify(imageDimensions)}`);
     
     if (isInpaintMode && displayCanvasRef.current && maskCanvasRef.current && imageContainerRef.current) {
       const container = imageContainerRef.current;
@@ -573,7 +565,6 @@ export const useInpainting = ({
           inpaintStrokes: inpaintStrokes.length,
           annotationStrokes: annotationStrokes.length
         });
-        addDebugLog(`Canvas init: buffer=${canvas.width}x${canvas.height} style=${canvas.style.width}x${canvas.style.height}`);
         console.log('[InpaintCanvas] ✅ Canvas initialized successfully', {
           canvasWidth: canvas.width,
           canvasHeight: canvas.height,
@@ -604,7 +595,6 @@ export const useInpainting = ({
     if (!isInpaintMode || isMediaTransitioningRef.current) return;
 
     console.error('[InpaintResize] ⚠️ Window resized, recalculating canvas');
-    addDebugLog(`Window resize triggered`);
 
     if (displayCanvasRef.current && imageContainerRef.current) {
       const container = imageContainerRef.current;
@@ -654,7 +644,7 @@ export const useInpainting = ({
         }
       }
     }
-  }, [isInpaintMode, addDebugLog, displayCanvasRef, imageContainerRef, maskCanvasRef, scaleStrokes, setInpaintStrokes, setAnnotationStrokes]);
+  }, [isInpaintMode, displayCanvasRef, imageContainerRef, maskCanvasRef, scaleStrokes, setInpaintStrokes, setAnnotationStrokes]);
 
   useEffect(() => {
     if (!isInpaintMode || isMediaTransitioningRef.current) return;
@@ -801,7 +791,6 @@ export const useInpainting = ({
       maskExists: !!maskCanvasRef.current,
       timestamp: Date.now()
     });
-    addDebugLog(`redrawStrokes: ${strokes.length} strokes`);
     
     const canvas = displayCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
@@ -827,7 +816,6 @@ export const useInpainting = ({
       bufferSize: { width: canvas.width, height: canvas.height },
       displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight }
     });
-    addDebugLog(`Clearing canvas: ${canvas.width}x${canvas.height}`);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     
@@ -973,9 +961,8 @@ export const useInpainting = ({
           y: canvas.offsetHeight / canvas.height
         }
       });
-      addDebugLog(`Canvas: buffer=${canvas.width}x${canvas.height} display=${canvas.offsetWidth}x${canvas.offsetHeight}`);
     }
-  }, [selectedShapeId, addDebugLog]);
+  }, [selectedShapeId]);
   
   // Store latest redrawStrokes in ref to avoid stale closures in effects
   useEffect(() => {
@@ -1029,7 +1016,6 @@ export const useInpainting = ({
       pointerPosition: { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY },
       clientPosition: { x: e.clientX, y: e.clientY }
     });
-    addDebugLog(`PointerDown: offset=(${e.nativeEvent.offsetX},${e.nativeEvent.offsetY})`);
     console.log('[MobilePaintDebug] 🔧 handlePointerDown called', {
       isInpaintMode,
       hasCanvas: !!displayCanvasRef.current,
@@ -1437,7 +1423,6 @@ export const useInpainting = ({
       };
       
       const canvas = displayCanvasRef.current;
-      addDebugLog(`Created stroke: ${newStroke.shapeType} pts=${newStroke.points.length}`);
       console.error('[InpointPointer] ✅ New stroke created', {
         id: newStroke.id.substring(0, 8),
         shapeType: newStroke.shapeType,
@@ -1616,7 +1601,6 @@ export const useInpainting = ({
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
     const effectId = Math.random().toString(36).slice(2, 6);
-    addDebugLog(`Effect[${effectId}]: strokes=${brushStrokes.length} drag=${isDraggingShape} draw=${isDrawing}`);
     console.error('[InpaintEffect] 🔄 Stroke change effect triggered', {
       effectId,
       isInpaintMode,
@@ -1639,16 +1623,14 @@ export const useInpainting = ({
     
     // Skip redraw during drag - handlePointerMove redraws manually to prevent flicker
     if (isDraggingShape) {
-      addDebugLog('Effect: SKIP (dragging)');
       console.log('[InpaintEffect] ⏸️ Skipping redraw during drag (handled manually)');
       return;
     }
     
     if (isInpaintMode && redrawStrokesRef.current) {
-      addDebugLog(`Effect: REDRAW ${brushStrokes.length} strokes`);
       redrawStrokesRef.current(brushStrokes);
     }
-  }, [brushStrokes, isInpaintMode, editMode, media.id, isDraggingShape, isDrawing, addDebugLog]);
+  }, [brushStrokes, isInpaintMode, editMode, media.id, isDraggingShape, isDrawing]);
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
@@ -1990,7 +1972,6 @@ export const useInpainting = ({
     handleToggleFreeForm,
     getDeleteButtonPosition,
     redrawStrokes,
-    debugLog, // For production debugging
   };
 };
 

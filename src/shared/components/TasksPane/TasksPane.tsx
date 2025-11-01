@@ -22,7 +22,6 @@ import { GenerationRow } from '@/types/shots';
 import { Task } from '@/types/tasks';
 import { useListShots, useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
 import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
-import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast as sonnerToast } from 'sonner';
@@ -203,15 +202,44 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   const simplifiedShotOptions = React.useMemo(() => shots?.map(s => ({ id: s.id, name: s.name })) || [], [shots]);
   
   // Task details for current lightbox media
-  const currentLightboxImageId = lightboxData?.type === 'image' && !Array.isArray(lightboxData.media) 
-    ? lightboxData.media.id 
-    : null;
-  const currentVideoGenerationId = lightboxData?.type === 'video' && Array.isArray(lightboxData.media) && lightboxData.videoIndex !== undefined
-    ? lightboxData.media[lightboxData.videoIndex]?.id 
-    : null;
-  const { taskDetailsData } = useTaskDetails({ 
-    generationId: currentLightboxImageId || currentVideoGenerationId 
-  });
+  // Derive input images from task params (helper function from useTaskDetails)
+  const deriveInputImages = (task: any): string[] => {
+    if (!task?.params) return [];
+    const params = task.params;
+    const inputImages: string[] = [];
+    if (params.input_image) inputImages.push(params.input_image);
+    if (params.image) inputImages.push(params.image);
+    if (params.init_image) inputImages.push(params.init_image);
+    if (params.control_image) inputImages.push(params.control_image);
+    if (params.images && Array.isArray(params.images)) inputImages.push(...params.images);
+    if (params.input_images && Array.isArray(params.input_images)) inputImages.push(...params.input_images);
+    // For travel tasks, also check orchestrator paths
+    if (params.full_orchestrator_payload?.input_image_paths_resolved && Array.isArray(params.full_orchestrator_payload.input_image_paths_resolved)) {
+      inputImages.push(...params.full_orchestrator_payload.input_image_paths_resolved);
+    }
+    if (params.orchestrator_details?.input_image_paths_resolved && Array.isArray(params.orchestrator_details.input_image_paths_resolved)) {
+      inputImages.push(...params.orchestrator_details.input_image_paths_resolved);
+    }
+    return inputImages.filter(Boolean);
+  };
+  
+  // Build task details data directly from lightbox task (no need to re-fetch)
+  const taskDetailsData = React.useMemo(() => {
+    if (!lightboxData?.task) return null;
+    
+    const task = lightboxData.task;
+    const inputImages = deriveInputImages(task);
+    
+    return {
+      task,
+      isLoading: false,
+      error: null,
+      inputImages,
+      taskId: task.id,
+      onApplySettingsFromTask: undefined,
+      onClose: undefined
+    };
+  }, [lightboxData?.task]);
   
   // Realtime connection status
   const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError, lastTaskUpdate, lastNewTask } = useSimpleRealtime();
