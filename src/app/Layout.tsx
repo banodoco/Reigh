@@ -198,12 +198,6 @@ const Layout: React.FC = () => {
       <ShotsPane />
       <GenerationsPane />
       
-      {/* Decorative footer line */}
-      <div 
-        className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10 transition-[margin] duration-300 ease-smooth"
-        style={footerStyle}
-      ></div>
-      
       {/* Social Icons Footer */}
       <div 
         className="relative z-10 transition-[margin] duration-300 ease-smooth"
