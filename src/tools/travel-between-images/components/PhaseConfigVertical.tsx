@@ -61,9 +61,9 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
   return (
     <div className="space-y-3">
       {/* Header with Load Preset, Save As Preset and Restore Defaults */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Phase Configuration</h3>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-lg font-medium truncate">Phase Configuration</h3>
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -84,33 +84,47 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
               <p>Load Preset</p>
             </TooltipContent>
           </Tooltip>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPresetModalTab('add-new');
-              setIsPresetModalOpen(true);
-            }}
-            type="button"
-          >
-            <Save className="h-3.5 w-3.5" />
-            Save As Preset
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPhaseConfigChange(DEFAULT_PHASE_CONFIG);
-            }}
-            type="button"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Restore Defaults
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 sm:w-auto w-8 h-8 sm:h-auto p-0 sm:px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPresetModalTab('add-new');
+                  setIsPresetModalOpen(true);
+                }}
+                type="button"
+              >
+                <Save className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Save As Preset</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="sm:hidden">
+              <p>Save As Preset</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 sm:w-auto w-8 h-8 sm:h-auto p-0 sm:px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPhaseConfigChange(DEFAULT_PHASE_CONFIG);
+                }}
+                type="button"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Restore Defaults</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="sm:hidden">
+              <p>Restore Defaults</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

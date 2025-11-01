@@ -22,7 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCreateGeneration } from '@/shared/hooks/useGenerations';
 import { useGetTaskIdForGeneration } from '@/shared/lib/generationTaskBridge';
 import { useGetTask } from '@/shared/hooks/useTasks';
-import { Check, X } from 'lucide-react';
+import { Check, X, Copy } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
@@ -59,6 +59,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
   const [showAllImages, setShowAllImages] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
+  const [paramsCopied, setParamsCopied] = useState(false);
 
   // Use the new hooks
   const getTaskIdMutation = useGetTaskIdForGeneration();
@@ -136,6 +137,17 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
     onClose?.();
   };
 
+  const handleCopyParams = async () => {
+    if (!task?.params) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(task.params, null, 2));
+      setParamsCopied(true);
+      setTimeout(() => setParamsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy parameters:', err);
+    }
+  };
+
   const isLoading = getTaskIdMutation.isPending || isLoadingTask;
   const error = getTaskIdMutation.error || taskError;
 
@@ -200,6 +212,19 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyParams}
+                      className="h-8 px-2 -ml-2"
+                      title="Copy all parameters"
+                    >
+                      {paramsCopied ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
                     <h3 className="text-lg font-light text-foreground">Detailed Task Parameters</h3>
                   </div>
                   <Button

@@ -742,13 +742,22 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         <div className="space-y-3">
           {/* Prompt */}
           {(() => {
-            const prompt = orchestratorDetails?.base_prompts_expanded?.[0] || orchestratorPayload?.base_prompts_expanded?.[0] || task?.params?.prompt;
+            const prompt = orchestratorDetails?.base_prompts_expanded?.[0] || 
+                          orchestratorPayload?.base_prompts_expanded?.[0] || 
+                          orchestratorDetails?.base_prompt ||
+                          orchestratorPayload?.base_prompt ||
+                          task?.params?.prompt;
+            const enhancePrompt = orchestratorDetails?.enhance_prompt || 
+                                 orchestratorPayload?.enhance_prompt || 
+                                 task?.params?.enhance_prompt;
             if (prompt) {
               const shouldTruncate = prompt.length > config.promptLength;
               const displayText = showFullPrompt || !shouldTruncate ? prompt : prompt.slice(0, config.promptLength) + '...';
               return (
                 <div className="space-y-1">
-                  <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt</p>
+                  <p className={`${config.textSize} font-medium text-muted-foreground`}>
+                    Prompt{enhancePrompt ? ' (enhanced)' : ''}
+                  </p>
                   <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap leading-relaxed`}>
                     {displayText}
                   </p>

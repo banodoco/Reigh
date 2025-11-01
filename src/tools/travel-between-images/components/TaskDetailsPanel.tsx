@@ -8,7 +8,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { Label } from '@/shared/components/ui/label';
 import { ScrollArea } from '@/shared/components/ui/scroll-area';
 import { Task } from '@/types/tasks';
-import { Check } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { SharedTaskDetails } from './SharedTaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
 import { useTaskType } from '@/shared/hooks/useTaskType';
@@ -59,6 +59,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   const [showAllImages, setShowAllImages] = useState(false);
   const [showFullPrompt, setShowFullPrompt] = useState(false);
   const [showFullNegativePrompt, setShowFullNegativePrompt] = useState(false);
+  const [paramsCopied, setParamsCopied] = useState(false);
   
   // Get task type info from database to check content_type
   const { data: taskTypeInfo } = useTaskType(task?.taskType || null);
@@ -70,6 +71,17 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   const handleApplySettingsFromTask = () => {
     if (taskId && onApplySettingsFromTask && task) {
       onApplySettingsFromTask(taskId, replaceImages, inputImages);
+    }
+  };
+
+  const handleCopyParams = async () => {
+    if (!task?.params) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(task.params, null, 2));
+      setParamsCopied(true);
+      setTimeout(() => setParamsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy parameters:', err);
     }
   };
 
@@ -183,6 +195,19 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyParams}
+                  className="h-7 px-2 -ml-2"
+                  title="Copy all parameters"
+                >
+                  {paramsCopied ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </Button>
                 <h4 className="text-sm font-medium text-muted-foreground">Detailed Task Parameters</h4>
               </div>
               <Button

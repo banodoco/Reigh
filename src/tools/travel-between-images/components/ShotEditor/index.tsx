@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { Info, ChevronLeft, ChevronRight } from "lucide-react";
+import { Info, ChevronLeft, ChevronRight, Sparkles, ArrowUp } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
@@ -24,6 +24,7 @@ import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 
 // Import modular components and hooks
 import { ShotEditorProps, GenerationsPaneSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './state/types';
@@ -42,6 +43,10 @@ import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } fro
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 import { resolveImageUrl } from '@/shared/lib/imageUrlResolver';
+import { AdvancedMotionSettings } from './AdvancedMotionSettings';
+import { CommonGenerationSettings } from './CommonGenerationSettings';
+import { TimelineGenerationSettings } from './TimelineGenerationSettings';
+import { BatchGenerationSettings } from './BatchGenerationSettings';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -2381,7 +2386,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
   
-    return (
+  // Intersection observer for sticky header (using existing ctaContainerRef from line 531)
+  useEffect(() => {
+    const ctaContainer = ctaContainerRef.current;
+    if (!ctaContainer) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsSticky(!entry.isIntersecting);
+      },
+      {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0,
+      }
+    );
+
+    observer.observe(ctaContainer);
+
+    return () => {
+      if (ctaContainer) {
+        observer.unobserve(ctaContainer);
+      }
+    };
+  }, []);
+
+  // Back to top button logic
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
     <div className="flex flex-col space-y-4 pb-4">
       {/* Header */}
       <div ref={headerContainerRef}>
@@ -2847,6 +2884,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Back to Top Button */}
+      {showBackToTop && (
+        <Button
+          variant="theme-soft"
+          size="icon"
+          className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg"
+          onClick={scrollToTop}
+          title="Back to top"
+        >
+          <ArrowUp />
+        </Button>
       )}
     </div>
   );
