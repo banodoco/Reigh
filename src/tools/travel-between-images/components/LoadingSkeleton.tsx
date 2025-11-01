@@ -16,7 +16,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
   if (type === 'editor') {
     return (
       <PageFadeIn className="pt-3 sm:pt-5">
-        <div className="flex flex-col space-y-4 pb-16">
+        <div className="flex flex-col space-y-4 pb-4">
           <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
             {/* Desktop skeleton - 3-column layout matching actual Header */}
             <div className="hidden sm:flex items-center px-2">

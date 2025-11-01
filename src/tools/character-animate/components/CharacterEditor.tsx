@@ -246,7 +246,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
   }, [characterImage, selectedMotionVideo]);
 
   return (
-    <div className="flex flex-col space-y-6 pb-16 px-4 max-w-7xl mx-auto">
+    <div className="flex flex-col space-y-6 pb-4 px-4 max-w-7xl mx-auto">
       {/* Header with navigation */}
       <div className="flex items-center justify-between py-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
