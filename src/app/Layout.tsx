@@ -158,6 +158,13 @@ const Layout: React.FC = () => {
     willChange: 'margin, padding',
   } as React.CSSProperties;
 
+  // Footer style matches main content margins for side panes
+  const footerStyle = {
+    marginRight: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0px',
+    marginLeft: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0px',
+    willChange: 'margin',
+  } as React.CSSProperties;
+
   // Content-responsive container padding
   const containerPadding = isLg ? 'px-6' : isSm ? 'px-4' : 'px-2';
   // Reduce vertical padding on small screens to avoid excessive space above headers
@@ -192,10 +199,16 @@ const Layout: React.FC = () => {
       <GenerationsPane />
       
       {/* Decorative footer line */}
-      <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10"></div>
+      <div 
+        className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent relative z-10 transition-[margin] duration-300 ease-smooth"
+        style={footerStyle}
+      ></div>
       
       {/* Social Icons Footer */}
-      <div className="relative z-10">
+      <div 
+        className="relative z-10 transition-[margin] duration-300 ease-smooth"
+        style={footerStyle}
+      >
         <SocialIcons />
       </div>
       
