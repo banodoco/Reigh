@@ -2246,11 +2246,28 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
     // Only add regular LoRAs if Advanced Mode is OFF
     // In Advanced Mode, LoRAs are defined per-phase in phase_config
-    if (!advancedMode && loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
-      requestBody.loras = loraManager.selectedLoras.map(l => ({ 
-        path: l.path, 
-        strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
-      }));
+    if (!advancedMode) {
+      const loras = [];
+      
+      // Add user-selected LoRAs
+      if (loraManager.selectedLoras && loraManager.selectedLoras.length > 0) {
+        loras.push(...loraManager.selectedLoras.map(l => ({ 
+          path: l.path, 
+          strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
+        })));
+      }
+      
+      // In basic mode, add the motion control LoRA based on the Amount of Motion slider
+      if (motionMode === 'basic' && amountOfMotion > 0) {
+        loras.push({
+          path: 'https://huggingface.co/peteromallet/random_junk/resolve/main/motion_scale_000006500_high_noise.safetensors',
+          strength: amountOfMotion / 100.0
+        });
+      }
+      
+      if (loras.length > 0) {
+        requestBody.loras = loras;
+      }
     }
 
     if (resolution) {

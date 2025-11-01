@@ -128,7 +128,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Controls the amount of motion in the generated video. <br /> 0 = minimal motion, 100 = maximum motion.</p>
+                <p>Controls the amount of motion in the generated video. <br /> Applies a motion control LoRA at the specified strength. <br /> 0 = minimal motion, 100 = maximum motion.</p>
               </TooltipContent>
             </Tooltip>
             <Slider
