@@ -234,41 +234,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
                 <div className="overflow-x-auto">
                   <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all leading-relaxed min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'break-word' }}>
                     {(() => {
-                      // Custom JSON formatting that handles long strings better
-                      const formatValue = (value: any, indent: number = 0): string => {
-                        const spaces = '  '.repeat(indent);
-                        
-                        if (value === null) return 'null';
-                        if (typeof value === 'boolean') return value.toString();
-                        if (typeof value === 'number') return value.toString();
-                        if (typeof value === 'string') {
-                          // Break very long strings into multiple lines
-                          if (value.length > 80) {
-                            const chunks = value.match(/.{1,80}/g) || [value];
-                            return `"${chunks.join('" +\n' + spaces + '  "')}"`;
-                          }
-                          return `"${value}"`;
-                        }
-                        
-                        if (Array.isArray(value)) {
-                          if (value.length === 0) return '[]';
-                          const items = value.map(item => spaces + '  ' + formatValue(item, indent + 1)).join(',\n');
-                          return `[\n${items}\n${spaces}]`;
-                        }
-                        
-                        if (typeof value === 'object') {
-                          const entries = Object.entries(value);
-                          if (entries.length === 0) return '{}';
-                          const items = entries.map(([key, val]) => 
-                            `${spaces}  "${key}": ${formatValue(val, indent + 1)}`
-                          ).join(',\n');
-                          return `{\n${items}\n${spaces}}`;
-                        }
-                        
-                        return String(value);
-                      };
-                      
-                      return formatValue(task?.params ?? {});
+                      return JSON.stringify(task?.params ?? {}, null, 2);
                     })()}
                   </pre>
                 </div>

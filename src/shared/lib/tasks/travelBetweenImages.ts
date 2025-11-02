@@ -41,6 +41,9 @@ export interface TravelBetweenImagesTaskParams {
   turbo_mode?: boolean;
   amount_of_motion?: number;
   advanced_mode?: boolean;                           // Whether Advanced Mode is enabled
+  // Post-generation adjustments
+  after_first_post_generation_saturation?: number;   // Saturation adjustment (1.0 = no change)
+  after_first_post_generation_brightness?: number;   // Brightness adjustment (0 = no change)
   // Structure video parameters (matches backend naming)
   structure_video_path?: string | null;              // Path to structure video (S3/Storage URL)
   structure_video_treatment?: 'adjust' | 'clip';     // How to handle frame mismatches
@@ -72,24 +75,15 @@ export interface TravelBetweenImagesTaskParams {
  * Default values for travel between images task settings
  */
 const DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES = {
-  colour_match_videos: false,
   model_name: "base_tester_model",
   seed: 789,
   steps: 20,
-  apply_reward_lora: false,
-  apply_causvid: false,
-  use_lighti2x_lora: false,
-  use_styleboost_loras: true,
-  fade_in_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
-  fade_out_duration: '{"low_point":0.0,"high_point":1.0,"curve_type":"ease_in_out","duration_factor":0.0}',
   after_first_post_generation_saturation: 1,
   after_first_post_generation_brightness: 0,
   debug: true,
   main_output_dir_for_run: "./outputs/default_travel_output",
   enhance_prompt: false,
-  openai_api_key: "",
   show_input_images: false,
-  accelerated_mode: false,
   generation_mode: "batch" as const,
   dimension_source: "project" as const,
   amount_of_motion: 0.5, // Default to 0.5 (equivalent to UI value of 50)
@@ -168,14 +162,6 @@ function buildTravelBetweenImagesPayload(
     }
   }
 
-  // Handle fade duration parameters (matching original logic)
-  const processFadeDuration = (fadeDuration: any, defaultValue: string): string => {
-    if (typeof fadeDuration === "object" && fadeDuration !== null) {
-      return JSON.stringify(fadeDuration);
-    }
-    return fadeDuration ?? defaultValue;
-  };
-
   // Handle random seed generation - if random_seed is true, generate a new random seed
   // Otherwise use the provided seed or default
   const finalSeed = params.random_seed 
@@ -205,22 +191,13 @@ function buildTravelBetweenImagesPayload(
     seed_base: finalSeed,
     // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase)
     ...(params.advanced_mode ? {} : { steps: stepsValue }),
-    apply_reward_lora: params.apply_reward_lora ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.apply_reward_lora,
-    colour_match_videos: params.colour_match_videos ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.colour_match_videos,
-    apply_causvid: params.apply_causvid ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.apply_causvid,
-    use_lighti2x_lora: params.use_lighti2x_lora ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.use_lighti2x_lora,
-    use_styleboost_loras: params.use_styleboost_loras ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.use_styleboost_loras,
-    fade_in_params_json_str: processFadeDuration(params.fade_in_duration, DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.fade_in_duration),
-    fade_out_params_json_str: processFadeDuration(params.fade_out_duration, DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.fade_out_duration),
     after_first_post_generation_saturation: params.after_first_post_generation_saturation ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.after_first_post_generation_saturation,
     after_first_post_generation_brightness: params.after_first_post_generation_brightness ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.after_first_post_generation_brightness,
     debug_mode_enabled: params.debug ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.debug,
     shot_id: params.shot_id ?? undefined,
     main_output_dir_for_run: params.main_output_dir_for_run ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.main_output_dir_for_run,
     enhance_prompt: params.enhance_prompt ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
-    openai_api_key: params.openai_api_key ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.openai_api_key,
     show_input_images: params.show_input_images ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.show_input_images,
-    accelerated_mode: params.accelerated_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.accelerated_mode,
     generation_mode: params.generation_mode ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.generation_mode,
     dimension_source: params.dimension_source ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.dimension_source,
     // Only include amount_of_motion if NOT in Advanced Mode
@@ -237,7 +214,6 @@ function buildTravelBetweenImagesPayload(
     enhance_prompt_default: DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
     was_params_value_undefined: params.enhance_prompt === undefined,
     was_params_value_null: params.enhance_prompt === null,
-    openai_api_key_provided: !!(params.openai_api_key ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.openai_api_key),
     WARNING: orchestratorPayload.enhance_prompt === true ? '⚠️ enhance_prompt is TRUE - check if this is intentional' : '✅ enhance_prompt is false'
   });
 

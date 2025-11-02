@@ -353,6 +353,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       shotIds,
       timelineFrames,
       all_shot_associations: allShotAssociations,
+      // Include variant name from generation record
+      name: (actualGeneration as any).name || undefined,
     } as GenerationRow;
   }, [hasGeneratedImage, actualGeneration, task.id]);
 
@@ -418,6 +420,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         createdAt: gen.created_at,
         taskId: genAny.task_id, // ✅ Include taskId for proper task details display
         metadata: gen.params || {},
+        name: genAny.name || undefined, // ✅ Include variant name from generation record
       } as GenerationRow;
     }) || null;
     
@@ -880,6 +883,22 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
             `Created ${createdTimeAgo}`
           }
         </span>
+        
+        {/* Variant Name - Same line as timestamp */}
+        {(() => {
+          // For video tasks, use the first video's name; for image tasks, use generationData's name
+          const variantName = taskInfo.isVideoTask 
+            ? travelData.videoOutputs?.[0]?.name 
+            : generationData?.name;
+          
+          if (!variantName) return null;
+          
+          return (
+            <span className="ml-2 px-1.5 py-0.5 bg-black/50 text-white text-[10px] rounded-md flex-shrink-0">
+              {variantName}
+            </span>
+          );
+        })()}
         
         {/* Action buttons for queued/in progress tasks */}
         {(task.status === 'Queued' || task.status === 'In Progress') && (

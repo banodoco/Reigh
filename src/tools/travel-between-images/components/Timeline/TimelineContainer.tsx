@@ -289,15 +289,83 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     isZooming,
   } = useZoom({ fullMin, fullMax, fullRange });
 
-  // Custom zoom handlers to zoom anchored to the leftmost part of timeline
+  // Custom zoom handlers that preserve the current viewport center
   const handleZoomInToCenter = () => {
-    // Zoom anchored to the leftmost frame
-    handleZoomIn(fullMin);
+    // Calculate the current viewport center from scroll position
+    const scrollContainer = timelineRef.current;
+    const timelineContainer = containerRef.current;
+    
+    if (!scrollContainer || !timelineContainer) {
+      // Fallback to fullMin if refs not available
+      console.log('[ZoomFix] No refs available, falling back to fullMin');
+      handleZoomIn(fullMin);
+      return;
+    }
+    
+    // Get current scroll position
+    const scrollLeft = scrollContainer.scrollLeft;
+    const scrollWidth = timelineContainer.scrollWidth;
+    const viewportWidth = scrollContainer.clientWidth;
+    
+    // Calculate the center of the current viewport in pixels
+    const viewportCenterPixel = scrollLeft + (viewportWidth / 2);
+    
+    // Convert pixel position to frame position
+    const viewportCenterFraction = scrollWidth > 0 ? viewportCenterPixel / scrollWidth : 0;
+    const viewportCenterFrame = fullMin + (viewportCenterFraction * fullRange);
+    
+    console.log('[ZoomFix] Zoom In - preserving viewport center:', {
+      scrollLeft,
+      scrollWidth,
+      viewportWidth,
+      viewportCenterPixel,
+      viewportCenterFraction: viewportCenterFraction.toFixed(3),
+      viewportCenterFrame: viewportCenterFrame.toFixed(1),
+      fullMin,
+      fullRange
+    });
+    
+    // Zoom anchored to the current viewport center
+    handleZoomIn(viewportCenterFrame);
   };
 
   const handleZoomOutFromCenter = () => {
-    // Zoom anchored to the leftmost frame
-    handleZoomOut(fullMin);
+    // Calculate the current viewport center from scroll position
+    const scrollContainer = timelineRef.current;
+    const timelineContainer = containerRef.current;
+    
+    if (!scrollContainer || !timelineContainer) {
+      // Fallback to fullMin if refs not available
+      console.log('[ZoomFix] No refs available, falling back to fullMin');
+      handleZoomOut(fullMin);
+      return;
+    }
+    
+    // Get current scroll position
+    const scrollLeft = scrollContainer.scrollLeft;
+    const scrollWidth = timelineContainer.scrollWidth;
+    const viewportWidth = scrollContainer.clientWidth;
+    
+    // Calculate the center of the current viewport in pixels
+    const viewportCenterPixel = scrollLeft + (viewportWidth / 2);
+    
+    // Convert pixel position to frame position
+    const viewportCenterFraction = scrollWidth > 0 ? viewportCenterPixel / scrollWidth : 0;
+    const viewportCenterFrame = fullMin + (viewportCenterFraction * fullRange);
+    
+    console.log('[ZoomFix] Zoom Out - preserving viewport center:', {
+      scrollLeft,
+      scrollWidth,
+      viewportWidth,
+      viewportCenterPixel,
+      viewportCenterFraction: viewportCenterFraction.toFixed(3),
+      viewportCenterFrame: viewportCenterFrame.toFixed(1),
+      fullMin,
+      fullRange
+    });
+    
+    // Zoom anchored to the current viewport center
+    handleZoomOut(viewportCenterFrame);
   };
 
   // Force re-render when zoom changes to update containerWidth measurement

@@ -1024,6 +1024,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     prevProps.video.id === nextProps.video.id &&
     prevProps.video.location === nextProps.video.location &&
     prevProps.video.thumbUrl === nextProps.video.thumbUrl &&
+    (prevProps.video as any).name === (nextProps.video as any).name && // Check variant name changes
     prevProps.index === nextProps.index &&
     prevProps.originalIndex === nextProps.originalIndex &&
     prevProps.isFirstVideo === nextProps.isFirstVideo &&

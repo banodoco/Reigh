@@ -503,9 +503,6 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                   alt={`Input image ${index + 1}`} 
                   className="w-full aspect-square object-cover rounded border shadow-sm transition-transform group-hover:scale-105"
                 />
-                <div className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-xs px-1 py-0.5 rounded">
-                  {index + 1}
-                </div>
               </div>
             ))}
             {inputImages.length > config.maxImages && !showAllImages && (

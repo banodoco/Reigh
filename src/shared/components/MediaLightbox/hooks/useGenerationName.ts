@@ -57,9 +57,20 @@ export const useGenerationName = ({
         newName: newName || '(cleared)'
       });
 
-      // Invalidate relevant queries to update UI
+      // Invalidate relevant queries to update UI everywhere
       if (selectedProjectId) {
+        // Invalidate VideoOutputsGallery queries
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
+        
+        // Invalidate TaskItem generation mapping queries (for image tasks)
+        queryClient.invalidateQueries({ queryKey: ['generation-for-task-legacy'] });
+        queryClient.invalidateQueries({ queryKey: ['task-generation-mapping'] });
+        
+        // Invalidate video generation queries (for video tasks in TasksPane)
+        queryClient.invalidateQueries({ queryKey: ['video-generations-for-task'] });
+        
+        // Invalidate generation queries by ID (for MediaLightbox and other components)
+        queryClient.invalidateQueries({ queryKey: ['generation', media.id] });
       }
       
     } catch (error) {
