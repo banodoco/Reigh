@@ -697,6 +697,48 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     const shotId = await onCreateShot(shotName);
                     return { shotId, shotName };
                   } : undefined}
+                  // Pair prompt props
+                  onPairClick={(pairIndex, pairData) => {
+                    console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex, pairData });
+                    setPairPromptModalData({
+                      isOpen: true,
+                      pairData,
+                    });
+                  }}
+                  pairPrompts={(() => {
+                    // Convert pairPrompts from useEnhancedShotPositions to the format expected by ShotImageManager
+                    const result: Record<number, { prompt: string; negativePrompt: string }> = {};
+                    shotGenerations.forEach((sg, index) => {
+                      const prompt = sg.metadata?.pair_prompt || "";
+                      const negativePrompt = sg.metadata?.pair_negative_prompt || "";
+                      if (prompt || negativePrompt) {
+                        result[index] = { prompt, negativePrompt };
+                      }
+                    });
+                    console.log('[PairIndicatorDebug] ShotImagesEditor pairPrompts:', {
+                      shotGenerationsCount: shotGenerations.length,
+                      resultKeys: Object.keys(result),
+                      result
+                    });
+                    return result;
+                  })()}
+                  enhancedPrompts={(() => {
+                    // Convert enhanced prompts to index-based format
+                    const result: Record<number, string> = {};
+                    shotGenerations.forEach((sg, index) => {
+                      const enhancedPrompt = sg.metadata?.enhanced_prompt;
+                      if (enhancedPrompt) {
+                        result[index] = enhancedPrompt;
+                      }
+                    });
+                    console.log('[PairIndicatorDebug] ShotImagesEditor enhancedPrompts:', {
+                      shotGenerationsCount: shotGenerations.length,
+                      resultKeys: Object.keys(result),
+                    });
+                    return result;
+                  })()}
+                  defaultPrompt={defaultPrompt}
+                  defaultNegativePrompt={defaultNegativePrompt}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

@@ -4,6 +4,7 @@ import { SortableImageItem } from '@/tools/travel-between-images/components/Sort
 import { cn } from '@/shared/lib/utils';
 import { DEFAULT_BATCH_VIDEO_FRAMES } from '../constants';
 import { AddImagesCard } from './AddImagesCard';
+import { PairPromptIndicator } from './PairPromptIndicator';
 
 interface ImageGridProps {
   images: GenerationRow[];
@@ -25,6 +26,12 @@ interface ImageGridProps {
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
   readOnly?: boolean;
+  // Pair prompt props
+  onPairClick?: (pairIndex: number, pairData: any) => void;
+  pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  enhancedPrompts?: Record<number, string>;
+  defaultPrompt?: string;
+  defaultNegativePrompt?: string;
 }
 
 export const ImageGrid: React.FC<ImageGridProps> = ({
@@ -46,8 +53,24 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   onGridDoubleClick,
   onImageUpload,
   isUploadingImage,
-  readOnly = false
+  readOnly = false,
+  onPairClick,
+  pairPrompts,
+  enhancedPrompts,
+  defaultPrompt,
+  defaultNegativePrompt,
 }) => {
+  console.log('[PairIndicatorDebug] ImageGrid render:', {
+    imagesCount: images.length,
+    hasOnPairClick: !!onPairClick,
+    hasPairPrompts: !!pairPrompts,
+    hasEnhancedPrompts: !!enhancedPrompts,
+    pairPromptsKeys: pairPrompts ? Object.keys(pairPrompts) : [],
+    enhancedPromptsKeys: enhancedPrompts ? Object.keys(enhancedPrompts) : [],
+    defaultPrompt: defaultPrompt?.substring(0, 50),
+    defaultNegativePrompt: defaultNegativePrompt?.substring(0, 50),
+  });
+
   return (
     <div
       className={cn("grid gap-3", gridColsClass)}
@@ -62,9 +85,16 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         const imageKey = ((image as any).shotImageEntryId ?? (image as any).id) as string;
         const desktopSelected = selectedIds.includes(imageKey);
         const frameNumber = index * batchVideoFrames;
+        const isLastImage = index === images.length - 1;
+        
+        // Get pair data for the indicator after this image
+        const pairPrompt = pairPrompts?.[index];
+        const enhancedPrompt = enhancedPrompts?.[index];
+        const startImage = images[index];
+        const endImage = images[index + 1];
         
         return (
-          <div key={image.shotImageEntryId} data-sortable-item>
+          <div key={image.shotImageEntryId} data-sortable-item className="relative">
             <SortableImageItem
               image={image}
               isSelected={desktopSelected}
@@ -84,6 +114,44 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
               shouldLoad={true}
               projectAspectRatio={projectAspectRatio}
             />
+            
+            {/* Pair indicator positioned in the gap to the right */}
+            {!isLastImage && onPairClick && (
+              <div className="absolute top-1/2 -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto">
+                <PairPromptIndicator
+                  pairIndex={index}
+                  frames={batchVideoFrames}
+                  startFrame={index * batchVideoFrames}
+                  endFrame={(index + 1) * batchVideoFrames}
+                  onPairClick={() => {
+                    console.log('[PairIndicatorDebug] Pair indicator clicked', { index });
+                    onPairClick(index, {
+                      index,
+                      frames: batchVideoFrames,
+                      startFrame: index * batchVideoFrames,
+                      endFrame: (index + 1) * batchVideoFrames,
+                      startImage: startImage ? {
+                        id: (startImage as any).shotImageEntryId,
+                        url: startImage.imageUrl || startImage.location,
+                        thumbUrl: startImage.thumbUrl,
+                        position: index + 1
+                      } : null,
+                      endImage: endImage ? {
+                        id: (endImage as any).shotImageEntryId,
+                        url: endImage.imageUrl || endImage.location,
+                        thumbUrl: endImage.thumbUrl,
+                        position: index + 2
+                      } : null
+                    });
+                  }}
+                  pairPrompt={pairPrompt?.prompt}
+                  pairNegativePrompt={pairPrompt?.negativePrompt}
+                  enhancedPrompt={enhancedPrompt}
+                  defaultPrompt={defaultPrompt}
+                  defaultNegativePrompt={defaultNegativePrompt}
+                />
+              </div>
+            )}
           </div>
         );
       })}

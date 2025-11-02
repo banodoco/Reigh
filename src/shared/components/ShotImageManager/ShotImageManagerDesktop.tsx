@@ -55,6 +55,17 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
     generationMode: props.generationMode
   });
 
+  console.log('[PairIndicatorDebug] ShotImageManagerDesktop received pair props', {
+    component: 'ShotImageManagerDesktop',
+    hasOnPairClick: !!props.onPairClick,
+    hasPairPrompts: !!props.pairPrompts,
+    hasEnhancedPrompts: !!props.enhancedPrompts,
+    hasDefaultPrompt: !!props.defaultPrompt,
+    hasDefaultNegativePrompt: !!props.defaultNegativePrompt,
+    pairPromptsKeys: props.pairPrompts ? Object.keys(props.pairPrompts) : [],
+    enhancedPromptsKeys: props.enhancedPrompts ? Object.keys(props.enhancedPrompts) : [],
+  });
+
   // Fetch task details for current lightbox image
   const currentLightboxImageId = lightbox.lightboxIndex !== null 
     ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
@@ -122,6 +133,11 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             onImageUpload={props.onImageUpload}
             isUploadingImage={props.isUploadingImage}
             readOnly={props.readOnly}
+            onPairClick={props.onPairClick}
+            pairPrompts={props.pairPrompts}
+            enhancedPrompts={props.enhancedPrompts}
+            defaultPrompt={props.defaultPrompt}
+            defaultNegativePrompt={props.defaultNegativePrompt}
           />
         </SortableContext>
         

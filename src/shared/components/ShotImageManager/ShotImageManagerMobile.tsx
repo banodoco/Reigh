@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { MobileImageItem } from './MobileImageItem';
 import { BaseShotImageManagerProps } from './types';
+import { PairPromptIndicator } from './components/PairPromptIndicator';
 
 export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   images,
@@ -32,6 +33,11 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   isUploadingImage,
   onSelectionChange,
   readOnly = false,
+  onPairClick,
+  pairPrompts,
+  enhancedPrompts,
+  defaultPrompt,
+  defaultNegativePrompt,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
@@ -289,6 +295,20 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     );
   }
 
+  console.log('[PairIndicatorDebug] ShotImageManagerMobile render:', {
+    imagesCount: currentImages.length,
+    hasOnPairClick: !!onPairClick,
+    hasPairPrompts: !!pairPrompts,
+    hasEnhancedPrompts: !!enhancedPrompts,
+    pairPromptsKeys: pairPrompts ? Object.keys(pairPrompts) : [],
+    enhancedPromptsKeys: enhancedPrompts ? Object.keys(enhancedPrompts) : [],
+  });
+
+  // Determine grid columns for positioning logic
+  const gridColumns = {
+    2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12,
+  }[columns] || 4;
+
   return (
     <>
       <div className={cn("grid gap-3", mobileGridColsClass)}>
@@ -304,9 +324,65 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
           const showLeftArrow = mobileSelectedIds.length > 0 && !isSelected && wouldActuallyMove(index);
           const showRightArrow = mobileSelectedIds.length > 0 && isLastItem && !isSelected && wouldActuallyMove(index + 1);
           
+          // Get pair data for the indicator
+          // Check if PREVIOUS image was at the end of a row (meaning this image starts a new row)
+          const isAtStartOfRow = index > 0 && index % gridColumns === 0;
+          const prevImageWasEndOfRow = isAtStartOfRow;
+          
+          // This image's pair indicator (after this image)
+          const pairPrompt = pairPrompts?.[index];
+          const enhancedPrompt = enhancedPrompts?.[index];
+          const startImage = currentImages[index];
+          const endImage = currentImages[index + 1];
+          
+          // Pair indicator from PREVIOUS image (before this image)
+          const prevPairPrompt = index > 0 ? pairPrompts?.[index - 1] : undefined;
+          const prevEnhancedPrompt = index > 0 ? enhancedPrompts?.[index - 1] : undefined;
+          const prevStartImage = index > 0 ? currentImages[index - 1] : undefined;
+          const prevEndImage = currentImages[index];
+          
           return (
             <React.Fragment key={imageKey}>
               <div className="relative">
+                {/* Pair indicator from previous image - shows on LEFT if at start of row */}
+                {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && (
+                  <div className="absolute top-1/2 -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                    <PairPromptIndicator
+                      pairIndex={index - 1}
+                      frames={batchVideoFrames}
+                      startFrame={(index - 1) * batchVideoFrames}
+                      endFrame={index * batchVideoFrames}
+                      isMobile={true}
+                      onPairClick={() => {
+                        console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (left)', { pairIndex: index - 1 });
+                        onPairClick(index - 1, {
+                          index: index - 1,
+                          frames: batchVideoFrames,
+                          startFrame: (index - 1) * batchVideoFrames,
+                          endFrame: index * batchVideoFrames,
+                          startImage: prevStartImage ? {
+                            id: (prevStartImage as any).shotImageEntryId,
+                            url: prevStartImage.imageUrl || prevStartImage.location,
+                            thumbUrl: prevStartImage.thumbUrl,
+                            position: index
+                          } : null,
+                          endImage: prevEndImage ? {
+                            id: (prevEndImage as any).shotImageEntryId,
+                            url: prevEndImage.imageUrl || prevEndImage.location,
+                            thumbUrl: prevEndImage.thumbUrl,
+                            position: index + 1
+                          } : null
+                        });
+                      }}
+                      pairPrompt={prevPairPrompt?.prompt}
+                      pairNegativePrompt={prevPairPrompt?.negativePrompt}
+                      enhancedPrompt={prevEnhancedPrompt}
+                      defaultPrompt={defaultPrompt}
+                      defaultNegativePrompt={defaultNegativePrompt}
+                    />
+                  </div>
+                )}
+                
                 <MobileImageItem
                   image={image}
                   isSelected={isSelected}
@@ -314,7 +390,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   onMobileTap={() => handleMobileTap(imageKey as string, index)}
                   onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
                   onDuplicate={onImageDuplicate}
-                  onOpenLightbox={onOpenLightbox}
+                  onOpenLightbox={onOpenLightbox ? () => onOpenLightbox(index) : undefined}
                   onInpaintClick={onInpaintClick ? () => onInpaintClick(index) : undefined}
                   hideDeleteButton={mobileSelectedIds.length > 0 || readOnly}
                   duplicatingImageId={duplicatingImageId}
@@ -358,6 +434,45 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                     >
                       <ArrowDown className="h-4 w-4" />
                     </Button>
+                  </div>
+                )}
+                
+                {/* Pair indicator after this image - shows on RIGHT if NOT at end of row */}
+                {!isLastItem && onPairClick && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (
+                  <div className="absolute top-1/2 -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto">
+                    <PairPromptIndicator
+                      pairIndex={index}
+                      frames={batchVideoFrames}
+                      startFrame={index * batchVideoFrames}
+                      endFrame={(index + 1) * batchVideoFrames}
+                      isMobile={true}
+                      onPairClick={() => {
+                        console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (right)', { index });
+                        onPairClick(index, {
+                          index,
+                          frames: batchVideoFrames,
+                          startFrame: index * batchVideoFrames,
+                          endFrame: (index + 1) * batchVideoFrames,
+                          startImage: startImage ? {
+                            id: (startImage as any).shotImageEntryId,
+                            url: startImage.imageUrl || startImage.location,
+                            thumbUrl: startImage.thumbUrl,
+                            position: index + 1
+                          } : null,
+                          endImage: endImage ? {
+                            id: (endImage as any).shotImageEntryId,
+                            url: endImage.imageUrl || endImage.location,
+                            thumbUrl: endImage.thumbUrl,
+                            position: index + 2
+                          } : null
+                        });
+                      }}
+                      pairPrompt={pairPrompt?.prompt}
+                      pairNegativePrompt={pairPrompt?.negativePrompt}
+                      enhancedPrompt={enhancedPrompt}
+                      defaultPrompt={defaultPrompt}
+                      defaultNegativePrompt={defaultNegativePrompt}
+                    />
                   </div>
                 )}
               </div>
@@ -481,10 +596,14 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setConfirmOpen(false);
-              setPendingDeleteIds([]);
-            }}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel 
+              onClick={() => {
+                setConfirmOpen(false);
+                setPendingDeleteIds([]);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => performBatchDelete(pendingDeleteIds)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

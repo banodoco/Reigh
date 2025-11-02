@@ -29,6 +29,12 @@ export interface ShotImageManagerProps {
   onAddToShot?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onCreateShot?: (shotName: string, files: File[]) => Promise<{shotId?: string; shotName?: string} | void>;
+  // Pair prompt props
+  onPairClick?: (pairIndex: number, pairData: any) => void;
+  pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  enhancedPrompts?: Record<number, string>;
+  defaultPrompt?: string;
+  defaultNegativePrompt?: string;
 }
 
 export interface DerivedNavContext {
@@ -58,6 +64,12 @@ export interface BaseShotImageManagerProps {
   isUploadingImage?: boolean;
   onSelectionChange?: (hasSelection: boolean) => void;
   readOnly?: boolean;
+  // Pair prompt props
+  onPairClick?: (pairIndex: number, pairData: any) => void;
+  pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
+  enhancedPrompts?: Record<number, string>;
+  defaultPrompt?: string;
+  defaultNegativePrompt?: string;
 }
 
 export interface MobileImageItemProps {

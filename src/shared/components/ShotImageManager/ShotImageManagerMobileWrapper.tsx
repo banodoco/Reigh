@@ -37,6 +37,17 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
     generationMode: props.generationMode
   });
 
+  console.log('[PairIndicatorDebug] ShotImageManagerMobileWrapper received pair props', {
+    component: 'ShotImageManagerMobileWrapper',
+    hasOnPairClick: !!props.onPairClick,
+    hasPairPrompts: !!props.pairPrompts,
+    hasEnhancedPrompts: !!props.enhancedPrompts,
+    hasDefaultPrompt: !!props.defaultPrompt,
+    hasDefaultNegativePrompt: !!props.defaultNegativePrompt,
+    pairPromptsKeys: props.pairPrompts ? Object.keys(props.pairPrompts) : [],
+    enhancedPromptsKeys: props.enhancedPrompts ? Object.keys(props.enhancedPrompts) : [],
+  });
+
   // Fetch task details for current lightbox image
   const currentLightboxImageId = lightbox.lightboxIndex !== null 
     ? lightbox.currentImages[lightbox.lightboxIndex]?.id 
@@ -71,9 +82,6 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
           lightbox.setLightboxIndex(index);
         }}
         columns={props.columns}
-        generationMode={props.generationMode}
-        onImageSaved={props.onImageSaved}
-        onMagicEdit={props.onMagicEdit}
         duplicatingImageId={props.duplicatingImageId}
         duplicateSuccessImageId={props.duplicateSuccessImageId}
         projectAspectRatio={props.projectAspectRatio}
@@ -82,6 +90,11 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
         readOnly={props.readOnly}
         isUploadingImage={props.isUploadingImage}
         onSelectionChange={props.onSelectionChange}
+        onPairClick={props.onPairClick}
+        pairPrompts={props.pairPrompts}
+        enhancedPrompts={props.enhancedPrompts}
+        defaultPrompt={props.defaultPrompt}
+        defaultNegativePrompt={props.defaultNegativePrompt}
       />
       
       {lightbox.lightboxIndex !== null && lightbox.currentImages[lightbox.lightboxIndex] && (() => {

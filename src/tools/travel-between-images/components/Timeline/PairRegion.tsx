@@ -1,5 +1,5 @@
 import React from "react";
-import { Pencil, X, Sparkles } from "lucide-react";
+import { MessageSquare, X, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Button } from "@/shared/components/ui/button";
 import { framesToSeconds } from "./utils/time-utils";
@@ -143,7 +143,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
             >
               <div className="flex items-center gap-1.5">
                 <span className="whitespace-nowrap">Pair {index + 1} • {framesToSeconds(actualFrames)}</span>
-                <Pencil 
+                <MessageSquare 
                   className={`h-3 w-3 ${hasCustomPrompt ? colorScheme.text : 'text-gray-400'} ${hasCustomPrompt ? 'opacity-100' : 'opacity-60'}`}
                 />
                 {enhancedPrompt && enhancedPrompt.trim() && (
@@ -156,7 +156,18 @@ const PairRegion: React.FC<PairRegionProps> = ({
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            <div className="max-w-xs">
+            <div 
+              className="max-w-xs cursor-pointer hover:bg-accent/50 p-2 -m-2 rounded transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPairClick?.(index, {
+                  index,
+                  frames: actualFrames,
+                  startFrame: startFrame,
+                  endFrame: endFrame,
+                });
+              }}
+            >
               <div className="space-y-2">
                 <div>
                   <span className="font-medium">Prompt:</span>
