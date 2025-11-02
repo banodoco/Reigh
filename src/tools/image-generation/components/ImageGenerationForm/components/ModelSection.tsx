@@ -509,9 +509,9 @@ const StyleReferenceSection: React.FC<{
             )}
             
             {/* Show subject description and/or style-boost terms based on mode */}
-            {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'style-character' || (referenceMode === 'subject') || (referenceMode === 'custom' && subjectStrength > 0)) && (
+            {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'style-character' || (referenceMode === 'subject')) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Show subject description when subject strength > 0 (excludes scene mode via outer condition) */}
+                {/* Show subject description when subject strength > 0 (excludes scene mode and custom mode) */}
                 {subjectStrength > 0 && (
                   <div className="space-y-2">
                     <Label htmlFor="subject-description" className="text-sm font-medium">
