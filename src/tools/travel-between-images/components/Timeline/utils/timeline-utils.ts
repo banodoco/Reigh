@@ -25,13 +25,20 @@ export const validateGaps = (
 
   for (let i = 1; i < positions.length; i++) {
     const diff = positions[i] - positions[i - 1];
-    if (diff > maxGap) {
+    
+    // FIRST GAP (first pair): Constrained to 81 frames (starts from beginning, no context needed)
+    // SUBSEQUENT GAPS: Constrained to 81 - contextFrames (need context from previous pair)
+    const isFirstGap = (i === 1);
+    const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+    
+    if (diff > effectiveMaxGap) {
       log('TimelineFrameLimitIssue', 'Gap violation detected', {
         index: i,
         prevFrame: positions[i - 1],
         nextFrame: positions[i],
         diff,
-        maxGap,
+        maxGap: effectiveMaxGap,
+        isFirstGap,
       });
       return false;
     }
@@ -42,6 +49,8 @@ export const validateGaps = (
 // ---------------------------------------------------------------------------
 // Utility: shrink oversized gaps by left-shifting subsequent frames so that
 // every gap ≤ maxGap.  Returns a **new** Map (does not mutate input).
+// NOTE: First gap (first pair) is constrained to 81 frames (no context needed).
+// Subsequent gaps are constrained to 81 - contextFrames (need context from previous pair).
 // ---------------------------------------------------------------------------
 export const shrinkOversizedGaps = (
   positions: Map<string, number>,
@@ -64,14 +73,22 @@ export const shrinkOversizedGaps = (
   let prev = 0;
   const result = new Map<string, number>();
 
-  for (const [id, originalPos] of entries) {
+  for (let i = 0; i < entries.length; i++) {
+    const [id, originalPos] = entries[i];
+    
     // Special case: preserve frame 0 exactly
     if (originalPos === 0) {
       result.set(id, 0);
       prev = 0;
     } else {
       const desiredPos = Math.max(originalPos, prev + 1); // keep minGap of 1
-      const allowedPos = Math.min(desiredPos, prev + maxGap);
+      
+      // FIRST GAP (i === 1): Constrained to 81 frames (first pair from start)
+      // SUBSEQUENT GAPS (i > 1): Constrained to 81 - contextFrames
+      const isFirstGap = (i === 1);
+      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      const allowedPos = Math.min(desiredPos, prev + effectiveMaxGap);
+      
       result.set(id, allowedPos);
       prev = allowedPos;
     }
@@ -216,12 +233,22 @@ export const applyFluidTimeline = (
     let wouldCreateViolation = false;
 
     // Use the original adjacent items for gap calculations
-    if (prevItem && limitedTargetFrame - prevItem[1] > maxGap) {
-      wouldCreateViolation = true;
+    // First gap (when prevItem is at position 0): constrained to 81 frames
+    // Subsequent gaps: constrained to 81 - contextFrames
+    if (prevItem) {
+      const isFirstGap = (prevItem[1] === 0);
+      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      if (limitedTargetFrame - prevItem[1] > effectiveMaxGap) {
+        wouldCreateViolation = true;
+      }
     }
 
-    if (nextItem && nextItem[1] - limitedTargetFrame > maxGap) {
-      wouldCreateViolation = true;
+    if (nextItem) {
+      const isFirstGap = (originalPos === 0);
+      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      if (nextItem[1] - limitedTargetFrame > effectiveMaxGap) {
+        wouldCreateViolation = true;
+      }
     }
 
     if (wouldCreateViolation) {
@@ -237,24 +264,32 @@ export const applyFluidTimeline = (
   }
 
   // Also check for gap violations (traditional logic) with the actual target frame
-  if (prevItem && targetFrame - prevItem[1] > maxGap) {
-    violations.push({
-      type: 'GAP_VIOLATION',
-      withItem: prevItem[0].substring(0, 8),
-      gap: targetFrame - prevItem[1],
-      maxAllowed: maxGap,
-      requiredShift: targetFrame - prevItem[1] - maxGap
-    });
+  if (prevItem) {
+    const isFirstGap = (prevItem[1] === 0);
+    const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+    if (targetFrame - prevItem[1] > effectiveMaxGap) {
+      violations.push({
+        type: 'GAP_VIOLATION',
+        withItem: prevItem[0].substring(0, 8),
+        gap: targetFrame - prevItem[1],
+        maxAllowed: effectiveMaxGap,
+        requiredShift: targetFrame - prevItem[1] - effectiveMaxGap
+      });
+    }
   }
 
-  if (nextItem && nextItem[1] - targetFrame > maxGap) {
-    violations.push({
-      type: 'GAP_VIOLATION',
-      withItem: nextItem[0].substring(0, 8),
-      gap: nextItem[1] - targetFrame,
-      maxAllowed: maxGap,
-      requiredShift: nextItem[1] - targetFrame - maxGap
-    });
+  if (nextItem) {
+    const isFirstGap = (originalPos === 0);
+    const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+    if (nextItem[1] - targetFrame > effectiveMaxGap) {
+      violations.push({
+        type: 'GAP_VIOLATION',
+        withItem: nextItem[0].substring(0, 8),
+        gap: nextItem[1] - targetFrame,
+        maxAllowed: effectiveMaxGap,
+        requiredShift: nextItem[1] - targetFrame - effectiveMaxGap
+      });
+    }
   }
 
   // [BoundaryCollisionDebug] Check for boundary collisions
@@ -421,8 +456,10 @@ export const applyFluidTimeline = (
   // If no boundary violations, use traditional logic for gap violations
   if (itemsToShift.length === 0) {
     // FIXED: Only shift immediately adjacent items, not all items on one side
-    const prevGapViolation = prevItem ? (targetFrame - prevItem[1] > maxGap) : false;
-    const nextGapViolation = nextItem ? (nextItem[1] - targetFrame > maxGap) : false;
+    // First gap (when prevItem is at position 0): constrained to 81 frames
+    // Subsequent gaps: constrained to 81 - contextFrames
+    const prevGapViolation = prevItem ? (targetFrame - prevItem[1] > (prevItem[1] === 0 ? 81 : maxGap)) : false;
+    const nextGapViolation = nextItem ? (nextItem[1] - targetFrame > (originalPos === 0 ? 81 : maxGap)) : false;
 
     if (limitedMovementAmount > 0 && prevGapViolation && prevItem) {
       // Right drag stretching gap to the left → only shift the immediately previous item
@@ -503,9 +540,13 @@ export const applyFluidTimeline = (
       // Apply gap constraint between dragged item and new adjacent item
       // For rightward drags, allow the dragged item to move past the next item
       // For leftward drags, allow the dragged item to move past the previous item
+      // Check if this is the first gap (when the adjacent item is at position 0)
+      const isFirstGap = (nextItemAfterShift.pos === 0);
+      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      
       const constraint = limitedMovementAmount > 0
-        ? nextItemAfterShift.pos + maxGap  // Allow dragging past the next item
-        : nextItemAfterShift.pos - maxGap; // Allow dragging past the previous item
+        ? nextItemAfterShift.pos + effectiveMaxGap  // Allow dragging past the next item
+        : nextItemAfterShift.pos - effectiveMaxGap; // Allow dragging past the previous item
 
       const constrainedPos = limitedMovementAmount > 0
         ? Math.min(limitedTargetFrame, constraint)
