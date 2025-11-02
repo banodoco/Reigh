@@ -1,7 +1,6 @@
 /**
  * Processes a style reference image to match project aspect ratio.
- * Uses cropping when the image is larger than needed, or padding when smaller.
- * Padding uses empty (transparent) space to maintain the original image content.
+ * Always crops the image to fit the target aspect ratio (center-cropping).
  * Images are scaled to 1.5x the project resolution for higher quality style reference.
  */
 
@@ -66,8 +65,7 @@ const getScaledDimensions = (aspectRatioString: string): { width: number; height
 
 /**
  * Processes a style reference image to match project aspect ratio at 1.5x scale.
- * Uses cropping when the image is larger than needed, or padding when smaller.
- * Padding uses empty (transparent) space to maintain the original image content.
+ * Always crops the image to fit (center-cropping) - no padding/dead space added.
  * This function works with data URLs for processing - the result should be uploaded to storage.
  * 
  * @param dataURL The base64 data URL of the image
@@ -131,89 +129,42 @@ export const processStyleReferenceForAspectRatio = async (
       }
 
       else if (originalAspectRatio > targetAspectRatio) {
-        // Original image is wider than target
-        // We need to either crop the width or pad the height
-        // Let's use a hybrid approach: if the difference is small, pad; if large, crop
-        const aspectRatioDiff = originalAspectRatio / targetAspectRatio;
-        
-        if (aspectRatioDiff < 1.5) {
-          // Small difference: pad the height
-          if (targetDimensions) {
-            canvasWidth = targetDimensions.width;
-            canvasHeight = targetDimensions.height;
-            // Scale and center the image
-            const scale = Math.min(canvasWidth / originalWidth, canvasHeight / originalHeight);
-            drawWidth = originalWidth * scale;
-            drawHeight = originalHeight * scale;
-            drawX = (canvasWidth - drawWidth) / 2;
-            drawY = (canvasHeight - drawHeight) / 2;
-          } else {
-            canvasWidth = originalWidth;
-            canvasHeight = originalWidth / targetAspectRatio;
-            drawX = 0;
-            drawY = (canvasHeight - originalHeight) / 2;
-          }
+        // Original image is wider than target - crop the width
+        if (targetDimensions) {
+          canvasWidth = targetDimensions.width;
+          canvasHeight = targetDimensions.height;
+          // Scale to fill height, crop width (center horizontally)
+          const scale = canvasHeight / originalHeight;
+          drawWidth = originalWidth * scale;
+          drawHeight = canvasHeight;
+          drawX = (canvasWidth - drawWidth) / 2;
+          drawY = 0;
         } else {
-          // Large difference: crop the width
-          if (targetDimensions) {
-            canvasWidth = targetDimensions.width;
-            canvasHeight = targetDimensions.height;
-            // Scale to fill height, crop width
-            const scale = canvasHeight / originalHeight;
-            drawWidth = originalWidth * scale;
-            drawHeight = canvasHeight;
-            drawX = (canvasWidth - drawWidth) / 2;
-            drawY = 0;
-          } else {
-            canvasHeight = originalHeight;
-            canvasWidth = originalHeight * targetAspectRatio;
-            drawX = 0;
-            drawY = 0;
-            drawWidth = canvasWidth;
-            drawHeight = originalHeight;
-          }
+          canvasHeight = originalHeight;
+          canvasWidth = originalHeight * targetAspectRatio;
+          drawX = 0;
+          drawY = 0;
+          drawWidth = canvasWidth;
+          drawHeight = originalHeight;
         }
       } else {
-        // Original image is taller than target
-        // We need to either crop the height or pad the width
-        const aspectRatioDiff = targetAspectRatio / originalAspectRatio;
-        
-        if (aspectRatioDiff < 1.5) {
-          // Small difference: pad the width
-          if (targetDimensions) {
-            canvasWidth = targetDimensions.width;
-            canvasHeight = targetDimensions.height;
-            // Scale and center the image
-            const scale = Math.min(canvasWidth / originalWidth, canvasHeight / originalHeight);
-            drawWidth = originalWidth * scale;
-            drawHeight = originalHeight * scale;
-            drawX = (canvasWidth - drawWidth) / 2;
-            drawY = (canvasHeight - drawHeight) / 2;
-          } else {
-            canvasHeight = originalHeight;
-            canvasWidth = originalHeight * targetAspectRatio;
-            drawX = (canvasWidth - originalWidth) / 2;
-            drawY = 0;
-          }
+        // Original image is taller than target - crop the height
+        if (targetDimensions) {
+          canvasWidth = targetDimensions.width;
+          canvasHeight = targetDimensions.height;
+          // Scale to fill width, crop height (center vertically)
+          const scale = canvasWidth / originalWidth;
+          drawWidth = canvasWidth;
+          drawHeight = originalHeight * scale;
+          drawX = 0;
+          drawY = (canvasHeight - drawHeight) / 2;
         } else {
-          // Large difference: crop the height
-          if (targetDimensions) {
-            canvasWidth = targetDimensions.width;
-            canvasHeight = targetDimensions.height;
-            // Scale to fill width, crop height
-            const scale = canvasWidth / originalWidth;
-            drawWidth = canvasWidth;
-            drawHeight = originalHeight * scale;
-            drawX = 0;
-            drawY = (canvasHeight - drawHeight) / 2;
-          } else {
-            canvasWidth = originalWidth;
-            canvasHeight = originalWidth / targetAspectRatio;
-            drawX = 0;
-            drawY = 0;
-            drawWidth = originalWidth;
-            drawHeight = canvasHeight;
-          }
+          canvasWidth = originalWidth;
+          canvasHeight = originalWidth / targetAspectRatio;
+          drawX = 0;
+          drawY = 0;
+          drawWidth = originalWidth;
+          drawHeight = canvasHeight;
         }
       }
 
@@ -239,14 +190,14 @@ export const processStyleReferenceForAspectRatio = async (
         return;
       }
 
-      // Fill with transparent background for padding
+      // Clear canvas before drawing
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Draw the image with calculated dimensions and positioning
+      // Draw the image with calculated dimensions and positioning (center-cropped to fill canvas)
       ctx.drawImage(
         img,
         0, 0, originalWidth, originalHeight, // source: full original image
-        drawX, drawY, drawWidth, drawHeight // destination: scaled and positioned on canvas
+        drawX, drawY, drawWidth, drawHeight // destination: scaled and positioned to fill canvas
       );
 
       // Debug: Check canvas dimensions after drawing
