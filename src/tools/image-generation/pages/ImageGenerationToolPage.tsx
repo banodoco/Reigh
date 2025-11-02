@@ -37,6 +37,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Sparkles, Settings2 } from 'luc
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useStableObject } from '@/shared/hooks/useStableObject';
+import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -121,6 +122,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     shotsPaneWidth,
     tasksPaneWidth
   } = usePanes();
+  const { setHeader, clearHeader } = useToolPageHeader();
   
   // Early prefetch of public LoRAs to reduce loading time
   const publicLorasResult = useListPublicResources('lora');
@@ -1065,6 +1067,17 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
   }, []);
 
+  useEffect(() => {
+    setHeader(
+      <div className="mb-2 sm:mb-4 mt-4 sm:mt-6">
+        <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
+          Image Generation
+        </h1>
+      </div>
+    );
+    return () => clearHeader();
+  }, [setHeader, clearHeader]);
+
   // Ref to track ongoing server-side prefetch operations
   const prefetchOperationsRef = useRef<{
     images: HTMLImageElement[];
@@ -1178,7 +1191,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   });
 
   return (
-    <PageFadeIn className="pt-6 sm:pt-6">
+    <PageFadeIn>
 
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
@@ -1315,7 +1328,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             );
           })()}
 
-          <div ref={galleryRef} className="pt-0 pb-5">
+          <div ref={galleryRef} className="pt-0">
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {(() => {
               const showSkeleton = !effectiveProjectId || (isLoadingGenerations && imagesToShow.length === 0);
@@ -1339,6 +1352,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             ) : (
               <div className={isLoadingGenerations && isFilterChange ? 'opacity-60 pointer-events-none transition-opacity duration-200' : ''}>
                 <ImageGallery
+                reducedSpacing={true}
                 images={imagesToShow}
                 onDelete={handleDeleteImage}
                 onImageSaved={handleImageSaved}

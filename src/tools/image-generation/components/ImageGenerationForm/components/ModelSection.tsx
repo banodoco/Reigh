@@ -433,9 +433,9 @@ const StyleReferenceSection: React.FC<{
             {/* Scene strength slider - only show in scene mode */}
             {referenceMode === 'scene' && (
               <div className="flex gap-4">
-                <div className="flex-1">
+                <div className="flex-[0.5]">
                   <SliderWithValue
-                    label="How much like this scene"
+                    label="Scene strength"
                     value={inThisSceneStrength}
                     onChange={onInThisSceneStrengthChange}
                     min={0.0}
@@ -492,9 +492,9 @@ const StyleReferenceSection: React.FC<{
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <div className="flex-1">
+                  <div className="flex-[0.5]">
                     <SliderWithValue
-                      label="In scene strength"
+                      label="Scene strength"
                       value={inThisSceneStrength}
                       onChange={onInThisSceneStrengthChange}
                       min={0.0}
