@@ -158,16 +158,29 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
       >
         <div className={modal.headerClass}>
           <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-1' : 'px-6 pt-2 pb-1'} flex-shrink-0`}>
-            <div className="flex items-start gap-4">
-              {/* Images Preview - Left Side */}
-              {(pairData.startImage || pairData.endImage) && (
-                <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Images with Navigation Arrows - Centered at Top */}
+            {(pairData.startImage || pairData.endImage) && (
+              <div className="flex items-center justify-center gap-3 mb-3">
+                {/* Left Navigation Arrow */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNavigatePrevious}
+                  disabled={!hasPrevious}
+                  className={`${modal.isMobile ? 'h-8 w-8' : 'h-10 w-10'} p-0 flex-shrink-0`}
+                  title="Previous pair"
+                >
+                  <ChevronLeft className={modal.isMobile ? 'h-5 w-5' : 'h-6 w-6'} />
+                </Button>
+
+                {/* Images */}
+                <div className="flex items-center gap-4 flex-shrink-0">
                   {pairData.startImage && (
                     <div className="relative">
                       <img
                         src={pairData.startImage.thumbUrl || pairData.startImage.url}
                         alt="Start image"
-                        className={`${modal.isMobile ? 'w-12 h-12' : 'w-16 h-16'} rounded-lg object-cover border border-border shadow-sm`}
+                        className={`${modal.isMobile ? 'w-20 h-20' : 'w-24 h-24'} rounded-lg object-cover border border-border shadow-sm`}
                       />
                       <div className="absolute -bottom-1 -left-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded font-medium">
                         {pairData.startImage.position}
@@ -176,7 +189,7 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                   )}
                   
                   {pairData.startImage && pairData.endImage && (
-                    <div className={`text-muted-foreground ${modal.isMobile ? 'text-base' : 'text-lg'}`}>→</div>
+                    <div className={`text-muted-foreground ${modal.isMobile ? 'text-xl' : 'text-2xl'}`}>→</div>
                   )}
                   
                   {pairData.endImage && (
@@ -184,7 +197,7 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                       <img
                         src={pairData.endImage.thumbUrl || pairData.endImage.url}
                         alt="End image"
-                        className={`${modal.isMobile ? 'w-12 h-12' : 'w-16 h-16'} rounded-lg object-cover border border-border shadow-sm`}
+                        className={`${modal.isMobile ? 'w-20 h-20' : 'w-24 h-24'} rounded-lg object-cover border border-border shadow-sm`}
                       />
                       <div className="absolute -bottom-1 -left-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded font-medium">
                         {pairData.endImage.position}
@@ -192,42 +205,29 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                     </div>
                   )}
                 </div>
-              )}
-              
-              {/* Title - Right Side */}
-              <div className="flex flex-col gap-1 min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <DialogTitle className={modal.isMobile ? 'text-base' : 'text-lg'}>
-                    Pair {pairData.index + 1} Prompts
-                  </DialogTitle>
-                  {/* Navigation Chevrons */}
-                  <div className="flex items-center gap-1 ml-auto">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleNavigatePrevious}
-                      disabled={!hasPrevious}
-                      className="h-7 w-7 p-0"
-                      title="Previous pair"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleNavigateNext}
-                      disabled={!hasNext}
-                      className="h-7 w-7 p-0"
-                      title="Next pair"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <span className="text-sm font-normal text-muted-foreground">
-                  {framesToSeconds(pairData.frames)} ({pairData.frames} frames) • {framesToSeconds(pairData.startFrame)} → {framesToSeconds(pairData.endFrame)}
-                </span>
+
+                {/* Right Navigation Arrow */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNavigateNext}
+                  disabled={!hasNext}
+                  className={`${modal.isMobile ? 'h-8 w-8' : 'h-10 w-10'} p-0 flex-shrink-0`}
+                  title="Next pair"
+                >
+                  <ChevronRight className={modal.isMobile ? 'h-5 w-5' : 'h-6 w-6'} />
+                </Button>
               </div>
+            )}
+            
+            {/* Title and Info - Centered Below Images */}
+            <div className="flex flex-col gap-1 items-center text-center">
+              <DialogTitle className={modal.isMobile ? 'text-base' : 'text-lg'}>
+                Pair {pairData.index + 1} Prompts
+              </DialogTitle>
+              <span className="text-sm font-normal text-muted-foreground">
+                {framesToSeconds(pairData.frames)} ({pairData.frames} frames) • {framesToSeconds(pairData.startFrame)} → {framesToSeconds(pairData.endFrame)}
+              </span>
             </div>
           </DialogHeader>
         </div>

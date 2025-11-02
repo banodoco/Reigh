@@ -5,6 +5,7 @@ import { GenerationRow } from '@/types/shots';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { createAnnotatedImageEditTask } from '@/shared/lib/tasks/annotatedImageEdit';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface BrushStroke {
   id: string;
@@ -113,6 +114,76 @@ export const useInpainting = ({
   
   // Ref to latest redrawStrokes to avoid stale closures
   const redrawStrokesRef = useRef<((strokes: BrushStroke[]) => void) | null>(null);
+  
+  // Track last used edit mode globally (for inheritance when visiting new media)
+  const lastUsedEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('text');
+  
+  // Helper: Load edit mode from database
+  const loadEditModeFromDB = useCallback(async (generationId: string): Promise<'text' | 'inpaint' | 'annotate' | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('generations')
+        .select('params')
+        .eq('id', generationId)
+        .single();
+      
+      if (error) {
+        console.warn('[EditMode] Failed to load edit mode from DB:', error);
+        return null;
+      }
+      
+      const savedMode = (data?.params as any)?.ui?.editMode;
+      if (savedMode && ['text', 'inpaint', 'annotate'].includes(savedMode)) {
+        console.log('[EditMode] ✅ Loaded from DB:', { generationId: generationId.substring(0, 8), mode: savedMode });
+        return savedMode as 'text' | 'inpaint' | 'annotate';
+      }
+      
+      return null;
+    } catch (err) {
+      console.warn('[EditMode] Error loading from DB:', err);
+      return null;
+    }
+  }, []);
+  
+  // Helper: Save edit mode to database
+  const saveEditModeToDB = useCallback(async (generationId: string, mode: 'text' | 'inpaint' | 'annotate') => {
+    try {
+      // First, fetch current params to merge
+      const { data: current, error: fetchError } = await supabase
+        .from('generations')
+        .select('params')
+        .eq('id', generationId)
+        .single();
+      
+      if (fetchError) {
+        console.warn('[EditMode] Failed to fetch current params:', fetchError);
+        return;
+      }
+      
+      // Merge with existing params
+      const currentParams = (current?.params || {}) as Record<string, any>;
+      const updatedParams = {
+        ...currentParams,
+        ui: {
+          ...(currentParams.ui || {}),
+          editMode: mode
+        }
+      };
+      
+      const { error: updateError } = await supabase
+        .from('generations')
+        .update({ params: updatedParams })
+        .eq('id', generationId);
+      
+      if (updateError) {
+        console.warn('[EditMode] Failed to save edit mode to DB:', updateError);
+      } else {
+        console.log('[EditMode] 💾 Saved to DB:', { generationId: generationId.substring(0, 8), mode });
+      }
+    } catch (err) {
+      console.warn('[EditMode] Error saving to DB:', err);
+    }
+  }, []);
 
   const [isInpaintMode, setIsInpaintMode] = useState(false);
   const [inpaintStrokes, setInpaintStrokes] = useState<BrushStroke[]>([]); // Strokes for inpainting
@@ -125,7 +196,7 @@ export const useInpainting = ({
   const [inpaintGenerateSuccess, setInpaintGenerateSuccess] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<Array<{ x: number; y: number }>>([]);
-  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate'>('inpaint');
+  const [editMode, setEditModeInternal] = useState<'text' | 'inpaint' | 'annotate'>('text');
   const [annotationMode, setAnnotationModeInternal] = useState<'rectangle' | null>(null);
   
   // Debug state for production
@@ -158,25 +229,32 @@ export const useInpainting = ({
   const lastClickPositionRef = useRef<{ x: number; y: number } | null>(null); // Default to adjust
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const selectedShapeRef = useRef<BrushStroke | null>(null);
-  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('inpaint');
+  const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('text');
   const prevMediaIdRef = useRef(media.id); // Track media ID changes
   const prevModeForSelectionRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode); // Track mode changes for selection
   const prevCanvasSizeRef = useRef<{ width: number; height: number } | null>(null); // Track canvas size for scaling
 
-  // Wrapper setters that persist to mediaStateRef
+  // Wrapper setters that persist to mediaStateRef and database
   const setEditMode = useCallback((value: 'text' | 'inpaint' | 'annotate' | ((prev: 'text' | 'inpaint' | 'annotate') => 'text' | 'inpaint' | 'annotate')) => {
     setEditModeInternal(prev => {
       const newValue = typeof value === 'function' ? value(prev) : value;
-      const currentState = mediaStateRef.current.get(media.id) || { editMode: 'inpaint', annotationMode: null };
+      const currentState = mediaStateRef.current.get(media.id) || { editMode: 'text', annotationMode: null };
       mediaStateRef.current.set(media.id, { ...currentState, editMode: newValue });
+      
+      // Update global last-used mode (for inheritance)
+      lastUsedEditModeRef.current = newValue;
+      
+      // Save to database (async, non-blocking)
+      saveEditModeToDB(media.id, newValue);
+      
       return newValue;
     });
-  }, [media.id]);
+  }, [media.id, saveEditModeToDB]);
 
   const setAnnotationMode = useCallback((value: 'rectangle' | null | ((prev: 'rectangle' | null) => 'rectangle' | null)) => {
     setAnnotationModeInternal(prev => {
       const newValue = typeof value === 'function' ? value(prev) : value;
-      const currentState = mediaStateRef.current.get(media.id) || { editMode: 'inpaint', annotationMode: null };
+      const currentState = mediaStateRef.current.get(media.id) || { editMode: 'text', annotationMode: null };
       mediaStateRef.current.set(media.id, { ...currentState, annotationMode: newValue });
       return newValue;
     });
@@ -303,14 +381,55 @@ export const useInpainting = ({
     }
     
     // 5. Restore UI state (mode, annotation mode)
+    // Load edit mode: cache → database → inherit from last used → default to 'text'
     const savedState = mediaStateRef.current.get(newMediaId);
     if (savedState) {
-      console.log('[Media] Restoring UI state', { mediaId: newMediaId.substring(0, 8), savedState });
+      // Found in memory cache
+      console.log('[Media] Restoring UI state from cache', { mediaId: newMediaId.substring(0, 8), savedState });
       setEditModeInternal(savedState.editMode);
       setAnnotationModeInternal(savedState.annotationMode);
+      lastUsedEditModeRef.current = savedState.editMode; // Update last used
     } else {
-      console.log('[Media] Using default UI state', { mediaId: newMediaId.substring(0, 8) });
-      setEditModeInternal('inpaint');
+      // Not in cache - try loading from database
+      console.log('[Media] No cached UI state, loading from database', { mediaId: newMediaId.substring(0, 8) });
+      
+      // Load asynchronously to avoid blocking UI
+      loadEditModeFromDB(newMediaId).then(dbMode => {
+        // Only apply if we're still on the same media (prevent race conditions)
+        if (prevMediaIdRef.current === newMediaId) {
+          if (dbMode) {
+            // Found in database
+            console.log('[Media] ✅ Loaded edit mode from DB', { mediaId: newMediaId.substring(0, 8), mode: dbMode });
+            setEditModeInternal(dbMode);
+            lastUsedEditModeRef.current = dbMode;
+            mediaStateRef.current.set(newMediaId, { editMode: dbMode, annotationMode: null });
+          } else {
+            // Not in database - inherit from last used or default to 'text'
+            const inheritedMode = lastUsedEditModeRef.current;
+            console.log('[Media] 🔄 Inheriting edit mode', { 
+              mediaId: newMediaId.substring(0, 8), 
+              mode: inheritedMode,
+              source: 'last-used'
+            });
+            setEditModeInternal(inheritedMode);
+            mediaStateRef.current.set(newMediaId, { editMode: inheritedMode, annotationMode: null });
+            // Save to DB for next time
+            saveEditModeToDB(newMediaId, inheritedMode);
+          }
+        }
+      }).catch(err => {
+        console.warn('[Media] Failed to load edit mode from DB:', err);
+        // Fallback to inherited mode
+        if (prevMediaIdRef.current === newMediaId) {
+          const inheritedMode = lastUsedEditModeRef.current;
+          setEditModeInternal(inheritedMode);
+          mediaStateRef.current.set(newMediaId, { editMode: inheritedMode, annotationMode: null });
+        }
+      });
+      
+      // Set initial mode immediately (will be updated by DB response)
+      const initialMode = lastUsedEditModeRef.current;
+      setEditModeInternal(initialMode);
       setAnnotationModeInternal(null);
     }
     
@@ -331,7 +450,7 @@ export const useInpainting = ({
       }
       transitionRafRef.current = null;
     });
-  }, [media.id, isInpaintMode]); // FIXED: Removed stroke state from deps (only trigger on media.id/mode changes)
+  }, [media.id, isInpaintMode, loadEditModeFromDB, saveEditModeToDB]); // FIXED: Removed stroke state from deps (only trigger on media.id/mode changes)
   
   console.log('[InpaintPaint] 🔍 Hook initialized with refs', {
     hasDisplayCanvasRef: !!displayCanvasRef,
