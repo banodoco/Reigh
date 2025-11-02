@@ -807,32 +807,139 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         })()}
         defaultPrompt={defaultPrompt}
         defaultNegativePrompt={defaultNegativePrompt}
-          onSave={async (pairIndex, prompt, negativePrompt) => {
-            try {
-              // CRITICAL FIX: Use the actual shot_generation.id from the timeline
-              // instead of recalculating it from index (which can be wrong with duplicates)
-              const shotGenerationId = pairPromptModalData.pairData?.startImage?.id;
-              
-              if (!shotGenerationId) {
-                console.error('[PairPrompts] ❌ No shot_generation.id found in pairData:', pairPromptModalData.pairData);
-                return;
-              }
-              
-              console.log(`[PairPrompts] 💾 Saving prompts for Pair ${pairIndex + 1} to shot_generation:`, {
-                shotGenerationId: shotGenerationId.substring(0, 8),
-                fullId: shotGenerationId,
-                prompt,
-                negativePrompt
-              });
-              
-              await updatePairPrompts(shotGenerationId, prompt, negativePrompt);
-              console.log(`[PairPrompts] ✅ Saved prompts for Pair ${pairIndex + 1}`);
-              // Timeline now uses shared hook data, so changes are reactive
-            } catch (error) {
-              console.error(`[PairPrompts] ❌ Failed to save prompts for Pair ${pairIndex + 1}:`, error);
+        onNavigatePrevious={(() => {
+          if (!pairPromptModalData.pairData) return undefined;
+          const currentIndex = pairPromptModalData.pairData.index;
+          if (currentIndex <= 0) return undefined;
+          
+          // Calculate previous pair data
+          return () => {
+            const sortedImages = [...shotGenerations]
+              .filter(sg => sg.generation && sg.timeline_frame != null)
+              .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
+            
+            if (sortedImages.length < 2) return;
+            
+            const prevIndex = currentIndex - 1;
+            if (prevIndex < 0 || prevIndex >= sortedImages.length - 1) return;
+            
+            const startImage = sortedImages[prevIndex];
+            const endImage = sortedImages[prevIndex + 1];
+            
+            // Access location from generation object (matches transformForTimeline)
+            const startLocation = (startImage.generation as any)?.location;
+            const endLocation = (endImage.generation as any)?.location;
+            
+            setPairPromptModalData({
+              isOpen: true,
+              pairData: {
+                index: prevIndex,
+                frames: endImage.timeline_frame! - startImage.timeline_frame!,
+                startFrame: startImage.timeline_frame!,
+                endFrame: endImage.timeline_frame!,
+                startImage: {
+                  id: startImage.id,
+                  url: startLocation,
+                  thumbUrl: startLocation,
+                  timeline_frame: startImage.timeline_frame!,
+                  position: prevIndex + 1,
+                },
+                endImage: {
+                  id: endImage.id,
+                  url: endLocation,
+                  thumbUrl: endLocation,
+                  timeline_frame: endImage.timeline_frame!,
+                  position: prevIndex + 2,
+                },
+              },
+            });
+          };
+        })()}
+        onNavigateNext={(() => {
+          if (!pairPromptModalData.pairData) return undefined;
+          const currentIndex = pairPromptModalData.pairData.index;
+          
+          // Calculate if there's a next pair
+          const sortedImages = [...shotGenerations]
+            .filter(sg => sg.generation && sg.timeline_frame != null)
+            .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
+          
+          if (currentIndex >= sortedImages.length - 2) return undefined;
+          
+          // Calculate next pair data
+          return () => {
+            const nextIndex = currentIndex + 1;
+            if (nextIndex < 0 || nextIndex >= sortedImages.length - 1) return;
+            
+            const startImage = sortedImages[nextIndex];
+            const endImage = sortedImages[nextIndex + 1];
+            
+            // Access location from generation object (matches transformForTimeline)
+            const startLocation = (startImage.generation as any)?.location;
+            const endLocation = (endImage.generation as any)?.location;
+            
+            setPairPromptModalData({
+              isOpen: true,
+              pairData: {
+                index: nextIndex,
+                frames: endImage.timeline_frame! - startImage.timeline_frame!,
+                startFrame: startImage.timeline_frame!,
+                endFrame: endImage.timeline_frame!,
+                startImage: {
+                  id: startImage.id,
+                  url: startLocation,
+                  thumbUrl: startLocation,
+                  timeline_frame: startImage.timeline_frame!,
+                  position: nextIndex + 1,
+                },
+                endImage: {
+                  id: endImage.id,
+                  url: endLocation,
+                  thumbUrl: endLocation,
+                  timeline_frame: endImage.timeline_frame!,
+                  position: nextIndex + 2,
+                },
+              },
+            });
+          };
+        })()}
+        hasPrevious={(() => {
+          if (!pairPromptModalData.pairData) return false;
+          return pairPromptModalData.pairData.index > 0;
+        })()}
+        hasNext={(() => {
+          if (!pairPromptModalData.pairData) return false;
+          const sortedImages = [...shotGenerations]
+            .filter(sg => sg.generation && sg.timeline_frame != null)
+            .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
+          return pairPromptModalData.pairData.index < sortedImages.length - 2;
+        })()}
+        onSave={async (pairIndex, prompt, negativePrompt) => {
+          try {
+            // CRITICAL FIX: Use the actual shot_generation.id from the timeline
+            // instead of recalculating it from index (which can be wrong with duplicates)
+            const shotGenerationId = pairPromptModalData.pairData?.startImage?.id;
+            
+            if (!shotGenerationId) {
+              console.error('[PairPrompts] ❌ No shot_generation.id found in pairData:', pairPromptModalData.pairData);
+              return;
             }
-                }}
-              />
+            
+            console.log(`[PairPrompts] 💾 Saving prompts for Pair ${pairIndex + 1} to shot_generation:`, {
+              shotGenerationId: shotGenerationId.substring(0, 8),
+              fullId: shotGenerationId,
+              prompt,
+              negativePrompt
+            });
+            
+            await updatePairPrompts(shotGenerationId, prompt, negativePrompt);
+            console.log(`[PairPrompts] ✅ Saved prompts for Pair ${pairIndex + 1}`);
+            // Timeline now uses shared hook data, so changes are reactive
+          } catch (error) {
+            console.error(`[PairPrompts] ❌ Failed to save prompts for Pair ${pairIndex + 1}:`, error);
+          }
+        }}
+      />
     </Card>
   );
 };

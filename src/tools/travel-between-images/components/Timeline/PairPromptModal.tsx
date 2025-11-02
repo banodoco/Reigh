@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/shared/components/ui/button";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
-import { X, Save } from "lucide-react";
+import { X, Save, ChevronLeft, ChevronRight } from "lucide-react";
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { framesToSeconds } from "./utils/time-utils";
@@ -34,6 +34,10 @@ interface PairPromptModalProps {
   defaultPrompt: string;
   defaultNegativePrompt: string;
   onSave: (pairIndex: number, prompt: string, negativePrompt: string) => void;
+  onNavigatePrevious?: () => void;
+  onNavigateNext?: () => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
   readOnly?: boolean;
 }
 
@@ -47,10 +51,15 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   onSave,
+  onNavigatePrevious,
+  onNavigateNext,
+  hasPrevious = false,
+  hasNext = false,
 }) => {
   const [prompt, setPrompt] = useState(pairPrompt);
   const [negativePrompt, setNegativePrompt] = useState(pairNegativePrompt);
   const isMobile = useIsMobile();
+  const promptTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   
   // Modal styling
   const modal = useMediumModal();
@@ -62,6 +71,11 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
       // Leave empty if using defaults to show faded placeholders
       setPrompt(pairPrompt?.trim() ? pairPrompt : '');
       setNegativePrompt(pairNegativePrompt?.trim() ? pairNegativePrompt : '');
+      
+      // Focus the prompt textarea when modal opens
+      setTimeout(() => {
+        promptTextareaRef.current?.focus();
+      }, 100);
     }
   }, [isOpen, pairData, pairPrompt, pairNegativePrompt]);
 
@@ -83,6 +97,52 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
       onClose(); // Close modal since changes are saved
     }
   };
+
+  const handleNavigatePrevious = () => {
+    if (pairData && onNavigatePrevious) {
+      // Save current changes before navigating
+      onSave(pairData.index, prompt.trim(), negativePrompt.trim());
+      onNavigatePrevious();
+    }
+  };
+
+  const handleNavigateNext = () => {
+    if (pairData && onNavigateNext) {
+      // Save current changes before navigating
+      onSave(pairData.index, prompt.trim(), negativePrompt.trim());
+      onNavigateNext();
+    }
+  };
+
+  // Handle keyboard navigation
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Tab key opens next modal
+      if (e.key === 'Tab' && !e.shiftKey && hasNext) {
+        e.preventDefault();
+        handleNavigateNext();
+      }
+      // Shift+Tab opens previous modal
+      else if (e.key === 'Tab' && e.shiftKey && hasPrevious) {
+        e.preventDefault();
+        handleNavigatePrevious();
+      }
+      // Arrow keys for navigation (when not typing in textarea)
+      else if (e.key === 'ArrowRight' && hasNext && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        handleNavigateNext();
+      }
+      else if (e.key === 'ArrowLeft' && hasPrevious && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        handleNavigatePrevious();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, hasNext, hasPrevious, handleNavigateNext, handleNavigatePrevious]);
 
   // Check if there are any custom prompts to reset
   const hasCustomPrompts = (prompt.trim() !== '') || (negativePrompt.trim() !== '');
@@ -135,10 +195,35 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
               )}
               
               {/* Title - Right Side */}
-              <div className="flex flex-col gap-1 min-w-0">
-                <DialogTitle className={modal.isMobile ? 'text-base' : 'text-lg'}>
-                  Pair {pairData.index + 1} Prompts
-                </DialogTitle>
+              <div className="flex flex-col gap-1 min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className={modal.isMobile ? 'text-base' : 'text-lg'}>
+                    Pair {pairData.index + 1} Prompts
+                  </DialogTitle>
+                  {/* Navigation Chevrons */}
+                  <div className="flex items-center gap-1 ml-auto">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleNavigatePrevious}
+                      disabled={!hasPrevious}
+                      className="h-7 w-7 p-0"
+                      title="Previous pair"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleNavigateNext}
+                      disabled={!hasNext}
+                      className="h-7 w-7 p-0"
+                      title="Next pair"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
                 <span className="text-sm font-normal text-muted-foreground">
                   {framesToSeconds(pairData.frames)} ({pairData.frames} frames) • {framesToSeconds(pairData.startFrame)} → {framesToSeconds(pairData.endFrame)}
                 </span>
@@ -160,6 +245,7 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
                 )}
               </Label>
               <Textarea
+                ref={promptTextareaRef}
                 id="pairPrompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
