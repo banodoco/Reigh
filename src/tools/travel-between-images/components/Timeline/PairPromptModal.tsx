@@ -157,10 +157,10 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
         {...{...modal.props}}
       >
         <div className={modal.headerClass}>
-          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-1' : 'px-6 pt-2 pb-1'} flex-shrink-0`}>
+          <DialogHeader className={`${modal.isMobile ? 'px-4 pt-2 pb-0' : 'px-6 pt-2 pb-0'} flex-shrink-0`}>
             {/* Images with Navigation Arrows - Centered at Top */}
             {(pairData.startImage || pairData.endImage) && (
-              <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="flex items-center justify-center gap-3 mb-2">
                 {/* Left Navigation Arrow */}
                 <Button
                   variant="ghost"
@@ -233,7 +233,7 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
         </div>
         
         <div className={`flex-shrink-0 ${modal.isMobile ? 'px-4' : 'px-6'}`}>
-          <div className="grid gap-4 py-3">
+          <div className="grid gap-4 pt-2 pb-3">
             {/* Pair Prompt */}
             <div>
               <Label htmlFor="pairPrompt" className="text-sm font-medium">
