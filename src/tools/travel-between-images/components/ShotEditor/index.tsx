@@ -1298,7 +1298,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
 
       // Extract settings with sensible fallbacks
-      const newPrompt: string | undefined = orchestrator.base_prompts_expanded?.[0] ?? orchestrator.base_prompt ?? params.prompt;
+      // Filter out empty strings when extracting prompts
+      const newPrompt: string | undefined = (
+        (orchestrator.base_prompts_expanded?.[0] && orchestrator.base_prompts_expanded[0].trim()) ||
+        (orchestrator.base_prompt && orchestrator.base_prompt.trim()) ||
+        (params.prompt && params.prompt.trim()) ||
+        undefined
+      );
       const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? params.negative_prompt;
       const newSteps: number | undefined = orchestrator.steps ?? params.num_inference_steps;
       const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded;
@@ -1357,15 +1363,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         console.log('[ApplySettings] ⏭️  Skipping model (no change or undefined)');
       }
 
-      if (typeof newPrompt === 'string') {
+      if (typeof newPrompt === 'string' && newPrompt.trim()) {
         console.log('[ApplySettings] 💬 Applying prompt:', {
           prompt: `"${newPrompt.substring(0, 60)}${newPrompt.length > 60 ? '...' : ''}"`,
           length: newPrompt.length,
-          source: orchestrator.base_prompts_expanded?.[0] ? 'base_prompts_expanded[0]' : orchestrator.base_prompt ? 'base_prompt' : 'params.prompt'
+          source: orchestrator.base_prompts_expanded?.[0]?.trim() ? 'base_prompts_expanded[0]' : orchestrator.base_prompt?.trim() ? 'base_prompt' : 'params.prompt'
         });
         onBatchVideoPromptChange(newPrompt);
       } else {
-        console.log('[ApplySettings] ⏭️  Skipping prompt (undefined or not string)');
+        console.log('[ApplySettings] ⏭️  Skipping prompt (undefined, empty, or not string)');
       }
       
       // Apply negative prompt - clear it if task didn't have one
