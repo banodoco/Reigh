@@ -1145,13 +1145,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
               <div className="flex gap-1">
                 {(['Succeeded', 'Failed'] as FilterGroup[]).map((filter) => {
                   const getCount = () => {
-                    // Show total count from paginated data when viewing that filter
-                    // This makes the badge consistent with the task list
-                    if (selectedFilter === filter) {
-                      return (displayPaginatedData as any)?.total || 0;
-                    }
-                    
-                    // When not viewing this filter, show recent count (past hour)
+                    // Always show recent count (past hour) for Succeeded/Failed
                     if (!displayStatusCounts) return 0;
                     switch (filter) {
                       case 'Succeeded':
