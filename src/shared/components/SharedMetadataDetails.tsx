@@ -169,6 +169,8 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                              (metadata as any).originalParams?.style_reference_strength;
         const subjectStrength = (metadata as any).subject_strength ?? 
                                (metadata as any).originalParams?.subject_strength;
+        const sceneStrength = (metadata as any).scene_reference_strength ?? 
+                             (metadata as any).originalParams?.scene_reference_strength;
         
         const hasStyleReference = styleImage && styleImage !== '';
         
@@ -230,6 +232,11 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                 {subjectStrength !== undefined && subjectStrength !== null && (
                   <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
                     Subject: {Math.round(subjectStrength * 100)}%
+                  </div>
+                )}
+                {sceneStrength !== undefined && sceneStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Scene: {Math.round(sceneStrength * 100)}%
                   </div>
                 )}
               </div>

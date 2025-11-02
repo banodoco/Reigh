@@ -223,15 +223,15 @@ export const useImageGalleryActions = ({
   }, [markOptimisticDeleted, removeOptimisticDeleted, onDelete, activeLightboxMedia, setActiveLightboxMedia, toast, isServerPagination, serverPage, onBackfillRequest, itemsPerPage, setIsBackfillLoading, setBackfillSkeletonCount]);
 
   const handleOpenLightbox = useCallback((image: GeneratedImageWithMetadata, autoEnterEditMode = false) => {
-    console.log('[EditModeDebug] handleOpenLightbox called with image:', {
-      imageId: image.id?.substring(0, 8),
-      imageUrl: image.url?.substring(0, 50) + '...',
-      isVideo: image.isVideo,
-      autoEnterEditMode,
-      willSetAutoEnterEditMode: autoEnterEditMode,
-      hasUpscaledUrl: !!image.upscaled_url,
-      timestamp: Date.now()
-    });
+    console.log('[BasedOnDebug] 🎯 handleOpenLightbox called with image:');
+    console.log('  imageId:', image.id?.substring(0, 8));
+    console.log('  hasBasedOn:', !!image.based_on);
+    console.log('  basedOnValue:', image.based_on);
+    console.log('  hasBasedOnInMetadata:', !!(image.metadata?.based_on));
+    console.log('  basedOnInMetadata:', image.metadata?.based_on);
+    console.log('  imageKeys:', Object.keys(image));
+    console.log('  metadataKeys:', image.metadata ? Object.keys(image.metadata) : 'no metadata');
+    console.log('  timestamp:', Date.now());
     
     // We need to map the partial `GeneratedImageWithMetadata` to a `GenerationRow` for the lightbox
     const mediaRow: GenerationRow = {
@@ -243,20 +243,22 @@ export const useImageGalleryActions = ({
       metadata: {
         ...image.metadata,
         __autoEnterEditMode: autoEnterEditMode, // Store the flag in metadata
+        based_on: image.based_on, // Include based_on in metadata for MediaLightbox
       },
       thumbUrl: image.isVideo ? image.url : undefined, // simple fallback
       upscaled_url: image.upscaled_url, // Pass through upscaled version URL if available
-    };
+      based_on: image.based_on, // Include based_on field directly on the GenerationRow
+    } as GenerationRow;
     
-    console.log('[EditModeDebug] Setting activeLightboxMedia with embedded autoEnterEditMode:', {
-      mediaRowId: mediaRow.id?.substring(0, 8),
-      mediaRowType: mediaRow.type,
-      hasMetadata: !!mediaRow.metadata,
-      autoEnterEditMode,
-      embeddedInMetadata: mediaRow.metadata?.__autoEnterEditMode,
-      hasUpscaledUrl: !!mediaRow.upscaled_url,
-      timestamp: Date.now()
-    });
+    console.log('[BasedOnDebug] 📤 Setting activeLightboxMedia with based_on data:');
+    console.log('  mediaRowId:', mediaRow.id?.substring(0, 8));
+    console.log('  hasBasedOnInMediaRow:', !!(mediaRow as any).based_on);
+    console.log('  basedOnInMediaRow:', (mediaRow as any).based_on);
+    console.log('  hasBasedOnInMetadata:', !!(mediaRow.metadata as any)?.based_on);
+    console.log('  basedOnInMetadata:', (mediaRow.metadata as any)?.based_on);
+    console.log('  mediaRowKeys:', Object.keys(mediaRow));
+    console.log('  metadataKeys:', mediaRow.metadata ? Object.keys(mediaRow.metadata) : 'no metadata');
+    console.log('  timestamp:', Date.now());
     
     setActiveLightboxMedia(mediaRow);
     setAutoEnterEditMode(autoEnterEditMode);

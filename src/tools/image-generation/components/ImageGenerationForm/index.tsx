@@ -1313,8 +1313,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'scene') {
-      updates.styleReferenceStrength = 0.5;
-      updates.subjectStrength = 1.0;
+      updates.styleReferenceStrength = 0;
+      updates.subjectStrength = 0;
       updates.inThisScene = true;
       updates.inThisSceneStrength = 1.0;
     }
@@ -1572,7 +1572,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subject_reference_image: styleReferenceImageGeneration, // Same image for now
         subject_strength: currentSubjectStrength,
         subject_description: effectiveSubjectDescription,
-        in_this_scene: currentInThisScene
+        in_this_scene: currentInThisScene,
+        in_this_scene_strength: currentInThisSceneStrength
       }),
       // resolution will be resolved by the helper
     };

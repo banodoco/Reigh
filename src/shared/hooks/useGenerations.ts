@@ -564,6 +564,17 @@ export async function fetchDerivedGenerations(
     const thumbnailUrl = item.thumbnail_url || mainUrl;
     const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
     
+    // Debug based_on field
+    console.log('[BasedOnDebug] 🔍 useGenerations mapping item:');
+    console.log('  itemId:', item.id?.substring(0, 8));
+    console.log('  hasBasedOnField:', !!item.based_on);
+    console.log('  basedOnValue:', item.based_on);
+    console.log('  hasBasedOnInParams:', !!(item.params?.based_on));
+    console.log('  basedOnInParams:', item.params?.based_on);
+    console.log('  allItemKeys:', Object.keys(item));
+    console.log('  paramsKeys:', item.params ? Object.keys(item.params) : 'no params');
+    console.log('  timestamp:', Date.now());
+    
     const baseItem: GeneratedImageWithMetadata = {
       id: item.id,
       url: mainUrl,
@@ -581,7 +592,13 @@ export async function fetchDerivedGenerations(
       position: null,
       timeline_frame: null,
       derivedCount: derivedCounts[item.id] || 0,
+      based_on: item.based_on || item.params?.based_on || null, // Include based_on from database or params
     };
+    
+    console.log('[BasedOnDebug] ✅ Created baseItem:');
+    console.log('  baseItemId:', baseItem.id?.substring(0, 8));
+    console.log('  baseItem.based_on:', baseItem.based_on);
+    console.log('  baseItemKeys:', Object.keys(baseItem));
     
     // Include shot association data
     const shotGenerations = item.shot_generations || [];

@@ -39,7 +39,7 @@ export const useEditModeLoRAs = (): UseEditModeLoRAsReturn => {
     switch (loraMode) {
       case 'in-scene':
         return [{
-          url: 'https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000002750.safetensors',
+          url: 'https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000010500.safetensors',
           strength: 1.0
         }];
       case 'next-scene':

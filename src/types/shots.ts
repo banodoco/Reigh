@@ -15,6 +15,7 @@ export interface GenerationRow {
   starred?: boolean; // Whether this generation is starred
   upscaled_url?: string | null; // URL of upscaled version if available
   derivedCount?: number; // Number of generations based on this one
+  based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
 }
 
 export interface Shot {

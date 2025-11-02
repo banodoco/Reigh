@@ -2226,7 +2226,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       ...(hasValidEnhancedPrompts ? { enhanced_prompts: enhancedPromptsArray } : {}),
       model_name: actualModelName,
       seed: steerableMotionSettings.seed,
-      // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)
+      // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)o
       ...(advancedMode ? {} : { steps: batchVideoSteps }),
       debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
       show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,

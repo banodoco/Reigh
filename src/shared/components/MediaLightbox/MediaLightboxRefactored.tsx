@@ -232,6 +232,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
 
+  // Debug logging for based_on data
+  console.log('[BasedOnDebug] 🎬 MediaLightbox received media:');
+  console.log('  mediaId:', media.id?.substring(0, 8));
+  console.log('  hasBasedOnField:', !!(media as any).based_on);
+  console.log('  basedOnValue:', (media as any).based_on);
+  console.log('  hasBasedOnInMetadata:', !!(media.metadata as any)?.based_on);
+  console.log('  basedOnInMetadata:', (media.metadata as any)?.based_on);
+  console.log('  mediaKeys:', Object.keys(media));
+  console.log('  metadataKeys:', media.metadata ? Object.keys(media.metadata) : 'no metadata');
+  console.log('  timestamp:', Date.now());
+
   // Safety check
   if (!media) {
     return null;

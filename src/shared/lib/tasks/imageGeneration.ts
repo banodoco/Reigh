@@ -211,7 +211,7 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
         
         // Add "in this scene" LoRA if enabled for Qwen models
         if (isQwenModel && params.in_this_scene && params.in_this_scene_strength && params.in_this_scene_strength > 0) {
-          lorasMap['https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000002750.safetensors'] = params.in_this_scene_strength;
+          lorasMap['https://huggingface.co/peteromallet/random_junk/resolve/main/in_scene_different_object_000010500.safetensors'] = params.in_this_scene_strength;
         }
         
         return Object.keys(lorasMap).length > 0 ? { additional_loras: lorasMap } : {};
@@ -224,6 +224,10 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
         subject_strength: params.subject_strength ?? 0.0,
         subject_description: params.subject_description,
         in_this_scene: params.in_this_scene
+      }),
+      // Include scene reference strength for Qwen.Image when available
+      ...(isQwenModel && params.in_this_scene_strength !== undefined && {
+        scene_reference_strength: params.in_this_scene_strength
       }),
       // Include shot association
       ...(params.shot_id ? { shot_id: params.shot_id } : {}),

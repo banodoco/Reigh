@@ -688,6 +688,8 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                              orchestratorDetails?.style_reference_strength;
         const subjectStrength = task?.params?.subject_strength ?? 
                                orchestratorDetails?.subject_strength;
+        const sceneStrength = task?.params?.scene_reference_strength ?? 
+                             orchestratorDetails?.scene_reference_strength;
         const resolution = orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh;
         
         const hasStyleReference = styleImage && styleImage !== '';
@@ -727,6 +729,11 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
                 {subjectStrength !== undefined && subjectStrength !== null && (
                   <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
                     Subject: {Math.round(subjectStrength * 100)}%
+                  </div>
+                )}
+                {sceneStrength !== undefined && sceneStrength !== null && (
+                  <div className={`${config.textSize} ${config.fontWeight} text-foreground`}>
+                    Scene: {Math.round(sceneStrength * 100)}%
                   </div>
                 )}
               </div>
