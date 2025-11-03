@@ -361,7 +361,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // No local caching or debouncing needed
   
   // Get pair prompts data for checking if all pairs have prompts
-  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts } = useEnhancedShotPositions(selectedShotId);
+  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts, updatePairPromptsByIndex } = useEnhancedShotPositions(selectedShotId);
   
   // Check if all pairs (except the last one) have custom prompts
   const allPairsHavePrompts = React.useMemo(() => {
@@ -1306,6 +1306,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         undefined
       );
       const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? params.negative_prompt;
+      
+      // Extract individual prompts and negative prompts for each pair (for timeline mode)
+      const newPrompts: string[] | undefined = orchestrator.base_prompts_expanded;
+      const newNegativePrompts: string[] | undefined = orchestrator.negative_prompts_expanded;
       const newSteps: number | undefined = orchestrator.steps ?? params.num_inference_steps;
       const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded;
       const newContext: number | undefined = orchestrator.frame_overlap_expanded?.[0] ?? params.frame_overlap_expanded;
@@ -1345,6 +1349,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         hasLoras: !!(newLoras && newLoras.length > 0),
         lorasCount: newLoras?.length,
         hasStructureVideo: !!newStructureVideoPath,
+        structureVideoPath: newStructureVideoPath,
+        structureVideoInOrchestrator: orchestrator.structure_video_path,
+        structureVideoInParams: params.structure_video_path,
+        structureVideoType: newStructureVideoType,
+        structureVideoTreatment: newStructureVideoTreatment,
+        structureVideoMotionStrength: newStructureVideoMotionStrength,
         textBeforePrompts: newTextBeforePrompts,
         textAfterPrompts: newTextAfterPrompts
       });
@@ -1372,6 +1382,40 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onBatchVideoPromptChange(newPrompt);
       } else {
         console.log('[ApplySettings] ⏭️  Skipping prompt (undefined, empty, or not string)');
+      }
+      
+      // Apply individual prompts for each pair if they exist (timeline mode)
+      if (newPrompts && newPrompts.length > 1 && generationMode === 'timeline') {
+        console.log('[ApplySettings] 📝 Applying individual prompts for timeline mode:', {
+          promptCount: newPrompts.length,
+          hasNegativePrompts: !!(newNegativePrompts && newNegativePrompts.length > 0)
+        });
+        
+        // Apply each prompt to its corresponding pair
+        for (let i = 0; i < newPrompts.length; i++) {
+          const pairPrompt = newPrompts[i]?.trim();
+          const pairNegativePrompt = newNegativePrompts?.[i]?.trim() || '';
+          
+          if (pairPrompt) {
+            console.log('[ApplySettings] 📝 Applying prompt for pair', i, ':', {
+              prompt: `"${pairPrompt.substring(0, 40)}${pairPrompt.length > 40 ? '...' : ''}"`,
+              hasNegativePrompt: !!pairNegativePrompt
+            });
+            
+            // Use updatePairPromptsByIndex if available
+            if (updatePairPromptsByIndex) {
+              try {
+                await updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
+              } catch (e) {
+                console.error(`[ApplySettings] ❌ Failed to apply prompt for pair ${i}:`, e);
+              }
+            }
+          }
+        }
+        
+        console.log('[ApplySettings] ✅ Individual prompts applied');
+      } else if (newPrompts && newPrompts.length > 1) {
+        console.log('[ApplySettings] ⏭️  Skipping individual prompts (not in timeline mode)');
       }
       
       // Apply negative prompt - clear it if task didn't have one
@@ -1618,26 +1662,35 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
 
       // Apply structure video settings
-      if (newStructureVideoPath) {
-        console.log('[ApplySettings] 🎥 Applying structure video:', {
-          path: newStructureVideoPath.substring(newStructureVideoPath.lastIndexOf('/') + 1),
-          treatment: newStructureVideoTreatment,
-          motionStrength: newStructureVideoMotionStrength,
-          type: newStructureVideoType,
-          source: orchestrator.structure_video_path !== undefined ? 'orchestrator' : 'params'
-        });
-        handleStructureVideoChange(
-          newStructureVideoPath,
-          null, // metadata will be fetched from the video path
-          newStructureVideoTreatment || 'adjust',
-          newStructureVideoMotionStrength ?? 1.0,
-          newStructureVideoType || 'flow'
-        );
-      } else if (newStructureVideoPath === null) {
-        console.log('[ApplySettings] 🗑️  Clearing structure video (was null in task)');
-        handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+      // Important: Check if structure_video_path was explicitly set in the task (even if null)
+      // Only apply/clear if it was explicitly defined in orchestrator or params
+      const hasStructureVideoInTask = 
+        orchestrator.hasOwnProperty('structure_video_path') || 
+        params.hasOwnProperty('structure_video_path');
+      
+      if (hasStructureVideoInTask) {
+        if (newStructureVideoPath) {
+          console.log('[ApplySettings] 🎥 Applying structure video:', {
+            path: newStructureVideoPath.substring(newStructureVideoPath.lastIndexOf('/') + 1),
+            treatment: newStructureVideoTreatment,
+            motionStrength: newStructureVideoMotionStrength,
+            type: newStructureVideoType,
+            source: orchestrator.structure_video_path !== undefined ? 'orchestrator' : 'params',
+            fullPath: newStructureVideoPath
+          });
+          handleStructureVideoChange(
+            newStructureVideoPath,
+            null, // metadata will be fetched from the video path
+            newStructureVideoTreatment || 'adjust',
+            newStructureVideoMotionStrength ?? 1.0,
+            newStructureVideoType || 'flow'
+          );
+        } else {
+          console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
+          handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+        }
       } else {
-        console.log('[ApplySettings] ⏭️  Skipping structure video (undefined)');
+        console.log('[ApplySettings] ⏭️  Skipping structure video (not defined in task params)');
       }
 
       // Replace images if requested
@@ -1755,6 +1808,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     batchVideoSteps,
     batchVideoFrames,
     batchVideoContext,
+    updatePairPromptsByIndex,
   ]);
 
 
