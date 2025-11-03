@@ -218,10 +218,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     console.log('[ShotEditor] [DEBUG] State setters called, new structureType should be:', structureType);
 
     // Save to database
-    if (videoPath && metadata) {
+    if (videoPath) {
+      // Save structure video (metadata is optional - can be fetched later from path)
       updateStructureVideoSettings('shot', {
         path: videoPath,
-        metadata,
+        metadata: metadata || null,
+        treatment,
+        motionStrength,
+        structureType
+      });
+      console.log('[ShotEditor] [DEBUG] Structure video saved to database:', { 
+        path: videoPath.substring(0, 50) + '...',
+        hasMetadata: !!metadata,
         treatment,
         motionStrength,
         structureType
@@ -235,6 +243,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength: null,
         structureType: null
       });
+      console.log('[ShotEditor] [DEBUG] Structure video cleared from database');
     }
   }, [updateStructureVideoSettings]);
 
