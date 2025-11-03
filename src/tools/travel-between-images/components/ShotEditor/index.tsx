@@ -171,15 +171,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Load structure video from settings when shot loads
   useEffect(() => {
     if (!hasInitializedStructureVideo && !isStructureVideoSettingsLoading && selectedShot?.id) {
-      if (structureVideoSettings?.path && structureVideoSettings?.metadata) {
-        console.log('[ShotEditor] Loading structure video from settings:', structureVideoSettings);
+      // Only check for path - metadata is optional and can be null
+      if (structureVideoSettings?.path) {
+        console.log('[ShotEditor] Loading structure video from settings:', {
+          path: structureVideoSettings.path.substring(0, 50) + '...',
+          hasMetadata: !!structureVideoSettings.metadata,
+          treatment: structureVideoSettings.treatment,
+          motionStrength: structureVideoSettings.motionStrength,
+          structureType: structureVideoSettings.structureType
+        });
         setStructureVideoPath(structureVideoSettings.path);
-        setStructureVideoMetadata(structureVideoSettings.metadata);
+        setStructureVideoMetadata(structureVideoSettings.metadata || null);
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
       } else {
         // No saved structure video - initialize with defaults
+        console.log('[ShotEditor] No structure video in settings, initializing to defaults');
         setStructureVideoPath(null);
         setStructureVideoMetadata(null);
         setStructureVideoTreatment('adjust');
