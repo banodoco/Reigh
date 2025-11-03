@@ -85,6 +85,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onMotionModeChange,
   advancedMode,
   onAdvancedModeChange,
+  regenerateAnchors,
+  onRegenerateAnchorsChange,
   phaseConfig,
   onPhaseConfigChange,
   selectedPhasePresetId,
@@ -2295,6 +2297,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       advanced_mode: advancedMode,
       motion_mode: motionMode, // Motion control mode (basic/presets/advanced)
       phase_config: advancedMode && phaseConfig ? phaseConfig : undefined,
+      // Include regenerate_anchors if in Advanced Mode
+      ...(advancedMode && regenerateAnchors !== undefined ? { regenerate_anchors: regenerateAnchors } : {}),
       // Include selected phase preset ID for UI state restoration
       selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
       // Add generation name if provided
@@ -2776,6 +2780,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onPhasePresetRemove={onPhasePresetRemove || (() => {})}
                             advancedMode={advancedMode || false}
                             onAdvancedModeChange={onAdvancedModeChange || (() => {})}
+                            regenerateAnchors={regenerateAnchors}
+                            onRegenerateAnchorsChange={onRegenerateAnchorsChange}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={onPhaseConfigChange || (() => {})}
                             onBlurSave={onBlurSave}

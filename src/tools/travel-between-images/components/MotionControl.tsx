@@ -37,6 +37,8 @@ export interface MotionControlProps {
   // Advanced mode props
   advancedMode: boolean;
   onAdvancedModeChange: (value: boolean) => void;
+  regenerateAnchors?: boolean;
+  onRegenerateAnchorsChange?: (value: boolean) => void;
   phaseConfig?: PhaseConfig;
   onPhaseConfigChange: (config: PhaseConfig) => void;
   onBlurSave?: () => void;
@@ -64,6 +66,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   onPhasePresetRemove,
   advancedMode,
   onAdvancedModeChange,
+  regenerateAnchors,
+  onRegenerateAnchorsChange,
   phaseConfig,
   onPhaseConfigChange,
   onBlurSave,
@@ -184,6 +188,8 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               onBlurSave={onBlurSave}
               randomSeed={randomSeed}
               onRandomSeedChange={onRandomSeedChange}
+              regenerateAnchors={regenerateAnchors}
+              onRegenerateAnchorsChange={onRegenerateAnchorsChange}
               availableLoras={availableLoras}
               selectedPhasePresetId={selectedPhasePresetId}
               onPhasePresetSelect={onPhasePresetSelect}

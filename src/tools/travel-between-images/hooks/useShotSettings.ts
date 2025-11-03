@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   turboMode: false,
   amountOfMotion: 50,
   advancedMode: false,
+  regenerateAnchors: false,
   phaseConfig: undefined,
   generationMode: 'batch',
   pairConfigs: [],

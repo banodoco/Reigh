@@ -80,6 +80,7 @@ export interface VideoTravelSettings {
   amountOfMotion: number; // 0-100 range for UI
   motionMode?: 'basic' | 'presets' | 'advanced'; // Motion control mode
   advancedMode: boolean; // Toggle for showing phase_config settings
+  regenerateAnchors: boolean; // Whether to regenerate anchor images (Advanced Mode only)
   phaseConfig?: PhaseConfig; // Advanced phase configuration
   selectedPhasePresetId?: string | null; // ID of the selected phase config preset (null if manually configured)
   textBeforePrompts?: string; // Text to prepend to all prompts
@@ -138,6 +139,7 @@ export const videoTravelSettings = {
     amountOfMotion: 50,
     motionMode: 'basic' as const,
     advancedMode: false,
+    regenerateAnchors: false,
     selectedMode: 'Zippy Supreme' as const,
     steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
     customWidth: undefined,
