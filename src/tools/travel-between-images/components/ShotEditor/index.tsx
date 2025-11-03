@@ -47,6 +47,7 @@ import { AdvancedMotionSettings } from './AdvancedMotionSettings';
 import { CommonGenerationSettings } from './CommonGenerationSettings';
 import { TimelineGenerationSettings } from './TimelineGenerationSettings';
 import { BatchGenerationSettings } from './BatchGenerationSettings';
+import * as ApplySettingsService from './services/applySettingsService';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -1297,526 +1298,83 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       currentGenerationMode: generationMode,
       currentShotId: selectedShot?.id?.substring(0, 8)
     });
+    
     try {
-      // Fetch the task to extract params
-      console.log('[ApplySettings] 📡 Fetching task from database...');
-      const { data: taskRow, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('id', taskId)
-        .single();
-      
-      if (error || !taskRow) {
-        console.error('[ApplySettings] ❌ Failed to fetch task:', error);
+      // Step 1: Fetch task from database
+      const taskData = await ApplySettingsService.fetchTask(taskId);
+      if (!taskData) {
         return;
       }
       
-      console.log('[ApplySettings] ✅ Task fetched successfully');
-
-      const params: any = taskRow.params || {};
-      const orchestrator: any = params.full_orchestrator_payload || {};
-
-      console.log('[ApplySettings] 🔍 Task data structure:', {
-        hasParams: !!params,
-        hasOrchestrator: !!orchestrator,
-        paramsKeys: Object.keys(params).slice(0, 10),
-        orchestratorKeys: Object.keys(orchestrator).slice(0, 10)
-      });
-
-      // Extract settings with sensible fallbacks
-      // Filter out empty strings when extracting prompts
-      const newPrompt: string | undefined = (
-        (orchestrator.base_prompts_expanded?.[0] && orchestrator.base_prompts_expanded[0].trim()) ||
-        (orchestrator.base_prompt && orchestrator.base_prompt.trim()) ||
-        (params.prompt && params.prompt.trim()) ||
-        undefined
-      );
-      const newNegativePrompt: string | undefined = orchestrator.negative_prompts_expanded?.[0] ?? params.negative_prompt;
+      // Step 2: Extract all settings
+      const settings = ApplySettingsService.extractSettings(taskData);
       
-      // Extract individual prompts and negative prompts for each pair (for timeline mode)
-      const newPrompts: string[] | undefined = orchestrator.base_prompts_expanded;
-      const newNegativePrompts: string[] | undefined = orchestrator.negative_prompts_expanded;
-      const newSteps: number | undefined = orchestrator.steps ?? params.num_inference_steps;
-      const newFrames: number | undefined = orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded;
-      const newContext: number | undefined = orchestrator.frame_overlap_expanded?.[0] ?? params.frame_overlap_expanded;
-      const newModel: string | undefined = params.model_name ?? orchestrator.model_name;
-      const parsedResolution: string | undefined = params.parsed_resolution_wh;
-      const newGenerationMode: 'batch' | 'timeline' | undefined = orchestrator.generation_mode ?? params.generation_mode;
-      const newAdvancedMode: boolean | undefined = orchestrator.advanced_mode ?? params.advanced_mode;
-      const newMotionMode: 'basic' | 'presets' | 'advanced' | undefined = orchestrator.motion_mode ?? params.motion_mode;
-      const newPhaseConfig: any = orchestrator.phase_config ?? params.phase_config;
-      const newSelectedPhasePresetId: string | null | undefined = orchestrator.selected_phase_preset_id ?? params.selected_phase_preset_id;
-      const newTurboMode: boolean | undefined = orchestrator.turbo_mode ?? params.turbo_mode;
-      const newEnhancePrompt: boolean | undefined = orchestrator.enhance_prompt ?? params.enhance_prompt;
-      const newAmountOfMotion: number | undefined = orchestrator.amount_of_motion ?? params.amount_of_motion;
-      const newLoras: Array<{ path: string; strength: number }> | undefined = orchestrator.loras ?? params.loras;
-      const newStructureVideoPath: string | null | undefined = orchestrator.structure_video_path ?? params.structure_video_path;
-      const newStructureVideoTreatment: 'adjust' | 'clip' | undefined = orchestrator.structure_video_treatment ?? params.structure_video_treatment;
-      const newStructureVideoMotionStrength: number | undefined = orchestrator.structure_video_motion_strength ?? params.structure_video_motion_strength;
-      const newStructureVideoType: 'flow' | 'canny' | 'depth' | undefined = orchestrator.structure_video_type ?? params.structure_video_type;
-      const newTextBeforePrompts: string | undefined = orchestrator.text_before_prompts ?? params.text_before_prompts;
-      const newTextAfterPrompts: string | undefined = orchestrator.text_after_prompts ?? params.text_after_prompts;
-
-      console.log('[ApplySettings] 📋 Extracted settings:', {
-        prompt: newPrompt ? `"${newPrompt.substring(0, 50)}${newPrompt.length > 50 ? '...' : ''}"` : undefined,
-        promptSource: orchestrator.base_prompts_expanded?.[0] ? 'base_prompts_expanded[0]' : orchestrator.base_prompt ? 'base_prompt' : params.prompt ? 'params.prompt' : 'none',
-        negativePrompt: newNegativePrompt ? `"${newNegativePrompt.substring(0, 30)}..."` : undefined,
-        model: newModel,
-        steps: newSteps,
-        frames: newFrames,
-        context: newContext,
-        generationMode: newGenerationMode,
-        advancedMode: newAdvancedMode,
-        motionMode: newMotionMode,
-        turboMode: newTurboMode,
-        enhancePrompt: newEnhancePrompt,
-        amountOfMotion: newAmountOfMotion,
-        hasPhaseConfig: !!newPhaseConfig,
-        hasLoras: !!(newLoras && newLoras.length > 0),
-        lorasCount: newLoras?.length,
-        hasStructureVideo: !!newStructureVideoPath,
-        structureVideoPath: newStructureVideoPath,
-        structureVideoInOrchestrator: orchestrator.structure_video_path,
-        structureVideoInParams: params.structure_video_path,
-        structureVideoType: newStructureVideoType,
-        structureVideoTreatment: newStructureVideoTreatment,
-        structureVideoMotionStrength: newStructureVideoMotionStrength,
-        textBeforePrompts: newTextBeforePrompts,
-        textAfterPrompts: newTextAfterPrompts
-      });
-      
-      // Log error if structure video appears to exist but wasn't extracted
-      if ((orchestrator.structure_video_path || params.structure_video_path) && !newStructureVideoPath) {
-        console.error('[ApplySettings] ⚠️  Structure video in task params but extraction failed:', {
-          orchestratorValue: orchestrator.structure_video_path,
-          paramsValue: params.structure_video_path,
-          extractedValue: newStructureVideoPath,
-          extractionLogic: 'orchestrator.structure_video_path ?? params.structure_video_path'
-        });
-      }
-
       console.log('[ApplySettings] 🔧 === APPLYING SETTINGS ===');
       
-      if (newModel && newModel !== steerableMotionSettings.model_name) {
-        console.log('[ApplySettings] 🎨 Applying model:', {
-          from: steerableMotionSettings.model_name,
-          to: newModel
-        });
-        onSteerableMotionSettingsChange({ 
-          model_name: newModel
-        });
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping model (no change or undefined)');
-      }
-
-      if (typeof newPrompt === 'string' && newPrompt.trim()) {
-        console.log('[ApplySettings] 💬 Applying prompt:', {
-          prompt: `"${newPrompt.substring(0, 60)}${newPrompt.length > 60 ? '...' : ''}"`,
-          length: newPrompt.length,
-          source: orchestrator.base_prompts_expanded?.[0]?.trim() ? 'base_prompts_expanded[0]' : orchestrator.base_prompt?.trim() ? 'base_prompt' : 'params.prompt'
-        });
-        onBatchVideoPromptChange(newPrompt);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping prompt (undefined, empty, or not string)');
-      }
-      
-      // Apply individual prompts for each pair if they exist (timeline mode)
-      if (newPrompts && newPrompts.length > 1 && generationMode === 'timeline') {
-        console.log('[ApplySettings] 📝 Applying individual prompts for timeline mode:', {
-          promptCount: newPrompts.length,
-          hasNegativePrompts: !!(newNegativePrompts && newNegativePrompts.length > 0)
-        });
+      // Step 3: Build context with all callbacks and current state
+      const context: ApplySettingsService.ApplyContext = {
+        // Current state
+        currentGenerationMode: generationMode,
+        currentAdvancedMode: advancedMode,
         
-        // Apply each prompt to its corresponding pair
-        for (let i = 0; i < newPrompts.length; i++) {
-          const pairPrompt = newPrompts[i]?.trim();
-          const pairNegativePrompt = newNegativePrompts?.[i]?.trim() || '';
-          
-          if (pairPrompt) {
-            console.log('[ApplySettings] 📝 Applying prompt for pair', i, ':', {
-              prompt: `"${pairPrompt.substring(0, 40)}${pairPrompt.length > 40 ? '...' : ''}"`,
-              hasNegativePrompt: !!pairNegativePrompt
-            });
-            
-            // Use updatePairPromptsByIndex if available
-            if (updatePairPromptsByIndex) {
-              try {
-                await updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
-              } catch (e) {
-                console.error(`[ApplySettings] ❌ Failed to apply prompt for pair ${i}:`, e);
-              }
-            }
-          }
-        }
+        // Callbacks
+        onBatchVideoPromptChange,
+        onSteerableMotionSettingsChange,
+        onBatchVideoFramesChange,
+        onBatchVideoContextChange,
+        onBatchVideoStepsChange,
+        onGenerationModeChange,
+        onAdvancedModeChange,
+        onMotionModeChange,
+        onPhaseConfigChange,
+        onPhasePresetSelect,
+        onPhasePresetRemove,
+        onTurboModeChange,
+        onEnhancePromptChange,
+        onTextBeforePromptsChange,
+        onTextAfterPromptsChange,
+        onAmountOfMotionChange,
+        handleStructureVideoChange,
+        loraManager,
+        availableLoras,
+        updatePairPromptsByIndex,
         
-        console.log('[ApplySettings] ✅ Individual prompts applied');
-      } else if (newPrompts && newPrompts.length > 1) {
-        console.log('[ApplySettings] ⏭️  Skipping individual prompts (not in timeline mode)');
-      }
+        // Current values for comparison
+        steerableMotionSettings,
+        batchVideoFrames,
+        batchVideoContext,
+        batchVideoSteps,
+        textBeforePrompts,
+        textAfterPrompts,
+        turboMode,
+        enhancePrompt,
+        amountOfMotion,
+        motionMode,
+      };
       
-      // Apply negative prompt - clear it if task didn't have one
-      if (newNegativePrompt !== undefined) {
-        console.log('[ApplySettings] 🚫 Applying negative prompt:', {
-          hasContent: !!newNegativePrompt,
-          willClear: !newNegativePrompt,
-          preview: newNegativePrompt ? `"${newNegativePrompt.substring(0, 40)}..."` : '(empty)'
-        });
-        onSteerableMotionSettingsChange({ negative_prompt: newNegativePrompt || '' });
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping negative prompt (undefined)');
-      }
+      // Step 4: Apply all settings in sequence (some have dependencies)
+      // We could parallelize independent operations, but keeping sequential for now for safety
+      const results: ApplySettingsService.ApplyResult[] = [];
       
-      if (typeof newFrames === 'number' && !Number.isNaN(newFrames)) {
-        console.log('[ApplySettings] 🎞️  Applying frames:', {
-          frames: newFrames,
-          currentFrames: batchVideoFrames
-        });
-        onBatchVideoFramesChange(newFrames);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping frames (invalid or undefined)');
-      }
-      
-      if (typeof newContext === 'number' && !Number.isNaN(newContext)) {
-        console.log('[ApplySettings] 🔗 Applying context:', {
-          context: newContext,
-          currentContext: batchVideoContext
-        });
-        onBatchVideoContextChange(newContext);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping context (invalid or undefined)');
-      }
-      
-      if (typeof newSteps === 'number' && !Number.isNaN(newSteps)) {
-        console.log('[ApplySettings] 👣 Applying steps:', {
-          steps: newSteps,
-          currentSteps: batchVideoSteps
-        });
-        onBatchVideoStepsChange(newSteps);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping steps (invalid or undefined)');
-      }
-
-      // NOTE: We intentionally DON'T apply parsedResolution here.
-      // The dimension source (project/firstImage/custom) should be controlled
-      // by the shot's aspect ratio settings, not overridden by task history.
-
-      // Apply generation mode (batch vs timeline)
-      if (newGenerationMode && (newGenerationMode === 'batch' || newGenerationMode === 'timeline')) {
-        console.log('[ApplySettings] 🎬 Applying generation mode:', {
-          from: generationMode,
-          to: newGenerationMode,
-          source: orchestrator.generation_mode ? 'orchestrator' : 'params'
-        });
-        onGenerationModeChange(newGenerationMode);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping generation mode (invalid or undefined)');
-      }
-
-      // Apply advanced mode and phase configuration
-      if (newAdvancedMode !== undefined) {
-        console.log('[ApplySettings] 🎛️  Applying advanced mode:', {
-          from: advancedMode,
-          to: newAdvancedMode,
-          hasPhaseConfig: !!newPhaseConfig,
-          source: orchestrator.advanced_mode !== undefined ? 'orchestrator' : 'params'
-        });
-        onAdvancedModeChange(newAdvancedMode);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping advanced mode (undefined)');
-      }
-
-      // Apply motion mode
-      if (newMotionMode !== undefined && onMotionModeChange) {
-        console.log('[ApplySettings] 🎨 Applying motion mode:', {
-          from: motionMode,
-          to: newMotionMode,
-          source: orchestrator.motion_mode !== undefined ? 'orchestrator' : 'params'
-        });
-        onMotionModeChange(newMotionMode);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping motion mode (undefined or no handler)');
-      }
-
-      if (newPhaseConfig) {
-        console.log('[ApplySettings] ⚙️  Applying phase configuration:', {
-          num_phases: newPhaseConfig.num_phases,
-          phases_count: newPhaseConfig.phases?.length,
-          steps_per_phase: newPhaseConfig.steps_per_phase,
-          flow_shift: newPhaseConfig.flow_shift,
-          model_switch_phase: newPhaseConfig.model_switch_phase,
-          sample_solver: newPhaseConfig.sample_solver,
-          source: orchestrator.phase_config ? 'orchestrator' : 'params'
-        });
-        onPhaseConfigChange(newPhaseConfig);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping phase config (undefined)');
-      }
-
-      // Apply selected phase preset ID if provided (for UI state restoration)
-      if (newSelectedPhasePresetId !== undefined) {
-        console.log('[ApplySettings] 📌 Applying phase preset ID:', {
-          presetId: newSelectedPhasePresetId ? newSelectedPhasePresetId.substring(0, 8) : null,
-          source: orchestrator.selected_phase_preset_id !== undefined ? 'orchestrator' : 'params'
-        });
-        if (newSelectedPhasePresetId && onPhasePresetSelect && newPhaseConfig) {
-          onPhasePresetSelect(newSelectedPhasePresetId, newPhaseConfig);
-        } else if (!newSelectedPhasePresetId && onPhasePresetRemove) {
-          console.log('[ApplySettings] 🗑️  Clearing preset (task had no preset selected)');
-          onPhasePresetRemove();
-        }
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping phase preset ID (undefined)');
-      }
-
-      // Apply turbo mode
-      if (newTurboMode !== undefined && onTurboModeChange) {
-        console.log('[ApplySettings] ⚡ Applying turbo mode:', {
-          from: turboMode,
-          to: newTurboMode,
-          source: orchestrator.turbo_mode !== undefined ? 'orchestrator' : 'params'
-        });
-        onTurboModeChange(newTurboMode);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping turbo mode (undefined or no handler)');
-      }
-
-      // Apply enhance prompt
-      if (newEnhancePrompt !== undefined && onEnhancePromptChange) {
-        console.log('[ApplySettings] ✨ Applying enhance prompt:', {
-          from: enhancePrompt,
-          to: newEnhancePrompt,
-          changed: newEnhancePrompt !== enhancePrompt,
-          source: orchestrator.enhance_prompt !== undefined ? 'orchestrator' : 'params'
-        });
-        onEnhancePromptChange(newEnhancePrompt);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping enhance prompt (undefined or no handler)');
-      }
-
-      // Apply text before prompts
-      if (newTextBeforePrompts !== undefined && onTextBeforePromptsChange) {
-        console.log('[ApplySettings] 📝 Applying text before prompts:', {
-          from: textBeforePrompts ? `"${textBeforePrompts.substring(0, 30)}..."` : '(empty)',
-          to: newTextBeforePrompts ? `"${newTextBeforePrompts.substring(0, 30)}..."` : '(empty)',
-          source: orchestrator.text_before_prompts !== undefined ? 'orchestrator' : 'params'
-        });
-        onTextBeforePromptsChange(newTextBeforePrompts);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping text before prompts (undefined or no handler)');
-      }
-
-      // Apply text after prompts
-      if (newTextAfterPrompts !== undefined && onTextAfterPromptsChange) {
-        console.log('[ApplySettings] 📝 Applying text after prompts:', {
-          from: textAfterPrompts ? `"${textAfterPrompts.substring(0, 30)}..."` : '(empty)',
-          to: newTextAfterPrompts ? `"${newTextAfterPrompts.substring(0, 30)}..."` : '(empty)',
-          source: orchestrator.text_after_prompts !== undefined ? 'orchestrator' : 'params'
-        });
-        onTextAfterPromptsChange(newTextAfterPrompts);
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping text after prompts (undefined or no handler)');
-      }
-
-      // Apply amount of motion (only if NOT in Advanced Mode)
-      if (newAmountOfMotion !== undefined && !newAdvancedMode && onAmountOfMotionChange) {
-        console.log('[ApplySettings] 🎢 Applying amount of motion:', {
-          from: amountOfMotion,
-          to: newAmountOfMotion * 100,
-          rawValue: newAmountOfMotion,
-          skippedDueToAdvancedMode: newAdvancedMode,
-          source: orchestrator.amount_of_motion !== undefined ? 'orchestrator' : 'params'
-        });
-        onAmountOfMotionChange(newAmountOfMotion * 100);
-      } else if (newAdvancedMode) {
-        console.log('[ApplySettings] ⏭️  Skipping amount of motion (advanced mode enabled)');
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping amount of motion (undefined or no handler)');
-      }
-
-      // Apply LoRAs (only if NOT in Advanced Mode)
-      if (newLoras !== undefined && !newAdvancedMode) {
-        if (newLoras && newLoras.length > 0) {
-          console.log('[ApplySettings] 🎨 Applying LoRAs from task:', {
-            lorasCount: newLoras.length,
-            loras: newLoras.map(l => ({ 
-              path: l.path.split('/').pop(), 
-              strength: l.strength 
-            })),
-            source: orchestrator.loras !== undefined ? 'orchestrator' : 'params'
-          });
-          
-          // Clear existing LoRAs first
-          console.log('[ApplySettings] 🗑️  Clearing existing LoRAs...');
-          if (loraManager.setSelectedLoras) {
-            loraManager.setSelectedLoras([]);
-          }
-          
-          // Map paths to available LoRAs and restore them
-          setTimeout(() => {
-            console.log('[ApplySettings] 🔍 Matching and adding LoRAs...');
-            let matchedCount = 0;
-            newLoras.forEach(loraData => {
-              // Try to find the LoRA by matching the path/URL
-              const matchingLora = availableLoras.find(lora => {
-                const loraUrl = (lora as any).huggingface_url || lora['Download Link'] || '';
-                // Match by exact URL or by filename at the end of the path
-                return loraUrl === loraData.path || 
-                       loraUrl.endsWith(loraData.path) ||
-                       loraData.path.endsWith(loraUrl.split('/').pop() || '');
-              });
-              
-              if (matchingLora) {
-                console.log('[ApplySettings] ✅ Matched and adding LoRA:', {
-                  id: matchingLora['Model ID'],
-                  name: matchingLora.Name,
-                  strength: loraData.strength,
-                  path: loraData.path.split('/').pop()
-                });
-                loraManager.handleAddLora(matchingLora, false, loraData.strength);
-                matchedCount++;
-              } else {
-                console.warn('[ApplySettings] ⚠️  Could not find matching LoRA for path:', loraData.path.split('/').pop());
-              }
-            });
-            console.log('[ApplySettings] 📊 LoRA restoration complete:', {
-              requested: newLoras.length,
-              matched: matchedCount,
-              failed: newLoras.length - matchedCount
-            });
-          }, 100); // Small delay to ensure state is cleared
-        } else {
-          // Task has no LoRAs - clear existing ones
-          console.log('[ApplySettings] 🗑️  Clearing LoRAs (task had none)');
-          if (loraManager.setSelectedLoras) {
-            loraManager.setSelectedLoras([]);
-          }
-        }
-      } else if (newAdvancedMode) {
-        console.log('[ApplySettings] ⏭️  Skipping LoRAs (advanced mode enabled)');
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping LoRAs (undefined)');
-      }
-
-      // Apply structure video settings
-      // Important: Check if structure_video_path was explicitly set in the task (even if null)
-      // Only apply/clear if it was explicitly defined in orchestrator or params
-      const hasStructureVideoInTask = 
-        orchestrator.hasOwnProperty('structure_video_path') || 
-        params.hasOwnProperty('structure_video_path');
-      
-      if (hasStructureVideoInTask) {
-        if (newStructureVideoPath) {
-          console.log('[ApplySettings] 🎥 Applying structure video:', {
-            path: newStructureVideoPath.substring(newStructureVideoPath.lastIndexOf('/') + 1),
-            treatment: newStructureVideoTreatment,
-            motionStrength: newStructureVideoMotionStrength,
-            type: newStructureVideoType,
-            source: orchestrator.structure_video_path !== undefined ? 'orchestrator' : 'params',
-            fullPath: newStructureVideoPath
-          });
-          try {
-            handleStructureVideoChange(
-              newStructureVideoPath,
-              null, // metadata will be fetched from the video path
-              newStructureVideoTreatment || 'adjust',
-              newStructureVideoMotionStrength ?? 1.0,
-              newStructureVideoType || 'flow'
-            );
-            console.log('[ApplySettings] ✅ Structure video change handler called successfully');
-          } catch (error) {
-            console.error('[ApplySettings] ❌ ERROR applying structure video:', {
-              error,
-              errorMessage: error instanceof Error ? error.message : String(error),
-              path: newStructureVideoPath,
-              treatment: newStructureVideoTreatment,
-              motionStrength: newStructureVideoMotionStrength,
-              type: newStructureVideoType
-            });
-          }
-        } else {
-          console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
-          handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
-        }
-      } else {
-        // This might indicate a problem if we expect a structure video
-        if (orchestrator.structure_video_path || params.structure_video_path) {
-          console.error('[ApplySettings] ⚠️  WARNING: Structure video exists in task but hasOwnProperty check failed:', {
-            orchestratorHasIt: !!orchestrator.structure_video_path,
-            paramsHasIt: !!params.structure_video_path,
-            orchestratorValue: orchestrator.structure_video_path,
-            paramsValue: params.structure_video_path
-          });
-        }
-        console.log('[ApplySettings] ⏭️  Skipping structure video (not defined in task params)');
-      }
-
-      // Replace images if requested
-      if (replaceImages && selectedShot?.id && projectId) {
-        console.log('[ApplySettings] 🖼️  === REPLACING IMAGES ===', {
-          shotId: selectedShot.id.substring(0, 8),
-          existingImagesCount: simpleFilteredImages.length,
-          newImagesCount: inputImages.length
-        });
-        
-        try {
-          // Remove existing non-video images
-          const imagesToDelete = simpleFilteredImages.filter(img => !!img.shotImageEntryId);
-          console.log('[ApplySettings] 🗑️  Removing existing images:', {
-            count: imagesToDelete.length
-          });
-          
-          const deletions = imagesToDelete.map(img => removeImageFromShotMutation.mutateAsync({
-            shot_id: selectedShot.id,
-            shotImageEntryId: img.shotImageEntryId!,
-            project_id: projectId,
-          }));
-          
-          if (deletions.length > 0) {
-            await Promise.allSettled(deletions);
-            console.log('[ApplySettings] ✅ Existing images removed');
-          }
-
-          // Calculate timeline positions based on segment_frames
-          const segmentFrames = newFrames || 60;
-          
-          console.log('[ApplySettings] 📐 Calculating timeline positions:', {
-            segmentFrames,
-            imageCount: inputImages.length,
-            extractedFrom: newFrames ? 'task params' : 'default fallback'
-          });
-
-          // Add input images in order with calculated timeline_frame positions
-          const additions = (inputImages || []).map((url, index) => {
-            const timelineFrame = index * segmentFrames;
-            console.log('[ApplySettings] ➕ Adding image:', {
-              index,
-              filename: url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 20) + '...',
-              timelineFrame,
-              calculation: `${index} × ${segmentFrames} = ${timelineFrame}`
-            });
-            
-            return addImageToShotMutation.mutateAsync({
-              shot_id: selectedShot.id,
-              generation_id: '',
-              project_id: projectId,
-              imageUrl: url,
-              thumbUrl: url,
-              timelineFrame: timelineFrame,
-            } as any);
-          });
-          
-          if (additions.length > 0) {
-            await Promise.allSettled(additions);
-            console.log('[ApplySettings] ✅ New images added');
-          }
-        } catch (e) {
-          console.error('[ApplySettings] ❌ Error replacing images:', e);
-        }
-      } else if (replaceImages) {
-        console.log('[ApplySettings] ⏭️  Skipping image replacement (missing shot or project)');
-      } else {
-        console.log('[ApplySettings] ⏭️  Skipping image replacement (replaceImages = false)');
-      }
+      results.push(await ApplySettingsService.applyModelSettings(settings, context));
+      results.push(await ApplySettingsService.applyPromptSettings(settings, context));
+      results.push(await ApplySettingsService.applyGenerationSettings(settings, context));
+      results.push(await ApplySettingsService.applyModeSettings(settings, context));
+      results.push(await ApplySettingsService.applyAdvancedModeSettings(settings, context));
+      results.push(await ApplySettingsService.applyTextPromptAddons(settings, context));
+      results.push(await ApplySettingsService.applyMotionSettings(settings, context));
+      results.push(await ApplySettingsService.applyLoRAs(settings, context));
+      results.push(await ApplySettingsService.applyStructureVideo(settings, context, taskData));
+      results.push(await ApplySettingsService.replaceImagesIfRequested(
+        settings,
+        replaceImages,
+        inputImages,
+        selectedShot,
+        projectId,
+        simpleFilteredImages,
+        addImageToShotMutation,
+        removeImageFromShotMutation
+      ));
       
       console.log('[ApplySettings] 🎉 === APPLY SETTINGS COMPLETE ===', {
         taskId: taskId.substring(0, 8),
@@ -1824,38 +1382,46 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
       
       // Production-friendly summary with ALL details
+      const failedResults = results.filter(r => !r.success);
+      const successfulResults = results.filter(r => r.success);
+      
       console.error('[ApplySettings] 📊 COMPLETE SUMMARY - All values extracted and applied:', {
         taskId: taskId.substring(0, 8),
         extractedValues: {
-          prompt: newPrompt ? `"${newPrompt.substring(0, 60)}..."` : 'undefined',
-          prompts: newPrompts ? `${newPrompts.length} prompts` : 'undefined',
-          negativePrompt: newNegativePrompt || 'undefined',
-          model: newModel || 'undefined',
-          steps: newSteps || 'undefined',
-          frames: newFrames || 'undefined',
-          context: newContext || 'undefined',
-          generationMode: newGenerationMode || 'undefined',
-          advancedMode: newAdvancedMode !== undefined ? newAdvancedMode : 'undefined',
-          motionMode: newMotionMode || 'undefined',
-          turboMode: newTurboMode !== undefined ? newTurboMode : 'undefined',
-          enhancePrompt: newEnhancePrompt !== undefined ? newEnhancePrompt : 'undefined',
-          amountOfMotion: newAmountOfMotion || 'undefined',
-          lorasCount: newLoras?.length || 0,
+          prompt: settings.prompt ? `"${settings.prompt.substring(0, 60)}..."` : 'undefined',
+          prompts: settings.prompts ? `${settings.prompts.length} prompts` : 'undefined',
+          negativePrompt: settings.negativePrompt || 'undefined',
+          model: settings.model || 'undefined',
+          steps: settings.steps || 'undefined',
+          frames: settings.frames || 'undefined',
+          context: settings.context || 'undefined',
+          generationMode: settings.generationMode || 'undefined',
+          advancedMode: settings.advancedMode !== undefined ? settings.advancedMode : 'undefined',
+          motionMode: settings.motionMode || 'undefined',
+          turboMode: settings.turboMode !== undefined ? settings.turboMode : 'undefined',
+          enhancePrompt: settings.enhancePrompt !== undefined ? settings.enhancePrompt : 'undefined',
+          amountOfMotion: settings.amountOfMotion || 'undefined',
+          lorasCount: settings.loras?.length || 0,
           structureVideo: {
-            path: newStructureVideoPath || 'NOT SET',
-            type: newStructureVideoType || 'undefined',
-            treatment: newStructureVideoTreatment || 'undefined',
-            motionStrength: newStructureVideoMotionStrength || 'undefined',
-            inOrchestrator: orchestrator.structure_video_path ? 'YES' : 'NO',
-            inParams: params.structure_video_path ? 'YES' : 'NO',
+            path: settings.structureVideoPath || 'NOT SET',
+            type: settings.structureVideoType || 'undefined',
+            treatment: settings.structureVideoTreatment || 'undefined',
+            motionStrength: settings.structureVideoMotionStrength || 'undefined',
+            inOrchestrator: taskData.orchestrator.structure_video_path ? 'YES' : 'NO',
+            inParams: taskData.params.structure_video_path ? 'YES' : 'NO',
           }
         },
         applicationStatus: {
-          promptApplied: typeof newPrompt === 'string' && newPrompt.trim(),
-          individualPromptsApplied: !!(newPrompts && newPrompts.length > 1 && generationMode === 'timeline'),
-          structureVideoAttempted: !!(orchestrator.hasOwnProperty('structure_video_path') || params.hasOwnProperty('structure_video_path')),
-          structureVideoApplied: !!(newStructureVideoPath && (orchestrator.hasOwnProperty('structure_video_path') || params.hasOwnProperty('structure_video_path'))),
+          promptApplied: typeof settings.prompt === 'string' && settings.prompt.trim(),
+          individualPromptsApplied: !!(settings.prompts && settings.prompts.length > 1 && generationMode === 'timeline'),
+          structureVideoAttempted: !!(taskData.orchestrator.hasOwnProperty('structure_video_path') || taskData.params.hasOwnProperty('structure_video_path')),
+          structureVideoApplied: !!(settings.structureVideoPath && (taskData.orchestrator.hasOwnProperty('structure_video_path') || taskData.params.hasOwnProperty('structure_video_path'))),
           imagesReplaced: replaceImages && selectedShot?.id && projectId && inputImages.length > 0
+        },
+        results: {
+          successful: successfulResults.length,
+          failed: failedResults.length,
+          failures: failedResults.map(r => ({ setting: r.settingName, error: r.error }))
         },
         settings: {
           generationMode,
