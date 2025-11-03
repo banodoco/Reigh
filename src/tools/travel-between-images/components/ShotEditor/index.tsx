@@ -1273,6 +1273,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       inputImagesCount: inputImages.length,
       timestamp: Date.now()
     });
+    console.error('[ApplySettings] 🚀 STARTING - Apply These Settings clicked', {
+      taskId: taskId.substring(0, 8),
+      replaceImages,
+      inputImagesCount: inputImages.length,
+      currentGenerationMode: generationMode,
+      currentShotId: selectedShot?.id?.substring(0, 8)
+    });
     try {
       // Fetch the task to extract params
       console.log('[ApplySettings] 📡 Fetching task from database...');
@@ -1797,6 +1804,47 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.log('[ApplySettings] 🎉 === APPLY SETTINGS COMPLETE ===', {
         taskId: taskId.substring(0, 8),
         timestamp: Date.now()
+      });
+      
+      // Production-friendly summary with ALL details
+      console.error('[ApplySettings] 📊 COMPLETE SUMMARY - All values extracted and applied:', {
+        taskId: taskId.substring(0, 8),
+        extractedValues: {
+          prompt: newPrompt ? `"${newPrompt.substring(0, 60)}..."` : 'undefined',
+          prompts: newPrompts ? `${newPrompts.length} prompts` : 'undefined',
+          negativePrompt: newNegativePrompt || 'undefined',
+          model: newModel || 'undefined',
+          steps: newSteps || 'undefined',
+          frames: newFrames || 'undefined',
+          context: newContext || 'undefined',
+          generationMode: newGenerationMode || 'undefined',
+          advancedMode: newAdvancedMode !== undefined ? newAdvancedMode : 'undefined',
+          motionMode: newMotionMode || 'undefined',
+          turboMode: newTurboMode !== undefined ? newTurboMode : 'undefined',
+          enhancePrompt: newEnhancePrompt !== undefined ? newEnhancePrompt : 'undefined',
+          amountOfMotion: newAmountOfMotion || 'undefined',
+          lorasCount: newLoras?.length || 0,
+          structureVideo: {
+            path: newStructureVideoPath || 'NOT SET',
+            type: newStructureVideoType || 'undefined',
+            treatment: newStructureVideoTreatment || 'undefined',
+            motionStrength: newStructureVideoMotionStrength || 'undefined',
+            inOrchestrator: orchestrator.structure_video_path ? 'YES' : 'NO',
+            inParams: params.structure_video_path ? 'YES' : 'NO',
+          }
+        },
+        applicationStatus: {
+          promptApplied: typeof newPrompt === 'string' && newPrompt.trim(),
+          individualPromptsApplied: !!(newPrompts && newPrompts.length > 1 && generationMode === 'timeline'),
+          structureVideoAttempted: !!(orchestrator.hasOwnProperty('structure_video_path') || params.hasOwnProperty('structure_video_path')),
+          structureVideoApplied: !!(newStructureVideoPath && (orchestrator.hasOwnProperty('structure_video_path') || params.hasOwnProperty('structure_video_path'))),
+          imagesReplaced: replaceImages && selectedShot?.id && projectId && inputImages.length > 0
+        },
+        settings: {
+          generationMode,
+          replaceImages,
+          inputImagesCount: inputImages.length
+        }
       });
     } catch (e) {
       console.error('[ApplySettings] ❌ === FAILED TO APPLY SETTINGS ===', e);
