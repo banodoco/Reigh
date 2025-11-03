@@ -1360,6 +1360,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         textBeforePrompts: newTextBeforePrompts,
         textAfterPrompts: newTextAfterPrompts
       });
+      
+      // Log error if structure video appears to exist but wasn't extracted
+      if ((orchestrator.structure_video_path || params.structure_video_path) && !newStructureVideoPath) {
+        console.error('[ApplySettings] ⚠️  Structure video in task params but extraction failed:', {
+          orchestratorValue: orchestrator.structure_video_path,
+          paramsValue: params.structure_video_path,
+          extractedValue: newStructureVideoPath,
+          extractionLogic: 'orchestrator.structure_video_path ?? params.structure_video_path'
+        });
+      }
 
       console.log('[ApplySettings] 🔧 === APPLYING SETTINGS ===');
       
@@ -1680,18 +1690,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             source: orchestrator.structure_video_path !== undefined ? 'orchestrator' : 'params',
             fullPath: newStructureVideoPath
           });
-          handleStructureVideoChange(
-            newStructureVideoPath,
-            null, // metadata will be fetched from the video path
-            newStructureVideoTreatment || 'adjust',
-            newStructureVideoMotionStrength ?? 1.0,
-            newStructureVideoType || 'flow'
-          );
+          try {
+            handleStructureVideoChange(
+              newStructureVideoPath,
+              null, // metadata will be fetched from the video path
+              newStructureVideoTreatment || 'adjust',
+              newStructureVideoMotionStrength ?? 1.0,
+              newStructureVideoType || 'flow'
+            );
+            console.log('[ApplySettings] ✅ Structure video change handler called successfully');
+          } catch (error) {
+            console.error('[ApplySettings] ❌ ERROR applying structure video:', {
+              error,
+              errorMessage: error instanceof Error ? error.message : String(error),
+              path: newStructureVideoPath,
+              treatment: newStructureVideoTreatment,
+              motionStrength: newStructureVideoMotionStrength,
+              type: newStructureVideoType
+            });
+          }
         } else {
           console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
           handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
         }
       } else {
+        // This might indicate a problem if we expect a structure video
+        if (orchestrator.structure_video_path || params.structure_video_path) {
+          console.error('[ApplySettings] ⚠️  WARNING: Structure video exists in task but hasOwnProperty check failed:', {
+            orchestratorHasIt: !!orchestrator.structure_video_path,
+            paramsHasIt: !!params.structure_video_path,
+            orchestratorValue: orchestrator.structure_video_path,
+            paramsValue: params.structure_video_path
+          });
+        }
         console.log('[ApplySettings] ⏭️  Skipping structure video (not defined in task params)');
       }
 
