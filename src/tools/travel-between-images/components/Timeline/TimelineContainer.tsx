@@ -285,9 +285,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleZoomReset,
     handleZoomToStart,
     handleTimelineDoubleClick,
-    handleWheel,
     isZooming,
-  } = useZoom({ fullMin, fullMax, fullRange });
+  } = useZoom({ fullMin, fullMax, fullRange, containerRef: timelineRef });
 
   // Custom zoom handlers that preserve the current viewport center
   const handleZoomInToCenter = () => {
@@ -678,7 +677,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             paddingTop: structureVideoPath && structureVideoMetadata ? "4rem" : "1rem", 
             paddingBottom: "4.5rem" 
           }}
-          onWheel={handleWheel}
           onDragEnter={handleDragEnter}
           onDragOver={(e) => handleDragOver(e, containerRef)}
           onDragLeave={handleDragLeave}

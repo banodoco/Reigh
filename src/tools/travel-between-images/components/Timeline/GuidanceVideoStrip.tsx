@@ -224,7 +224,19 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             frameIndex = Math.floor(Math.min(timelinePosition, videoMetadata.total_frames - 1));
           }
           
+          // Validate frame_rate to prevent NaN/Infinity errors
+          if (!videoMetadata.frame_rate || videoMetadata.frame_rate <= 0 || !isFinite(videoMetadata.frame_rate)) {
+            console.error('[GuidanceVideoStrip] Invalid frame_rate:', videoMetadata.frame_rate);
+            throw new Error(`Invalid video frame rate: ${videoMetadata.frame_rate}`);
+          }
+          
           const timeInSeconds = frameIndex / videoMetadata.frame_rate;
+          
+          // Additional safety check for currentTime value
+          if (!isFinite(timeInSeconds) || timeInSeconds < 0) {
+            console.error('[GuidanceVideoStrip] Invalid time value:', { frameIndex, frame_rate: videoMetadata.frame_rate, timeInSeconds });
+            throw new Error(`Invalid time value calculated: ${timeInSeconds}`);
+          }
           
           // Seek to frame
           video.currentTime = timeInSeconds;

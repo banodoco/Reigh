@@ -113,7 +113,20 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
     }
 
     const fps = videoMetadata.frame_rate;
+    
+    // Validate frame_rate to prevent NaN/Infinity errors
+    if (!fps || fps <= 0 || !isFinite(fps)) {
+      console.error('[BatchGuidanceVideo] Invalid frame_rate:', fps);
+      return;
+    }
+    
     const timeInSeconds = videoFrame / fps;
+    
+    // Additional safety check for currentTime value
+    if (!isFinite(timeInSeconds) || timeInSeconds < 0) {
+      console.error('[BatchGuidanceVideo] Invalid time value:', { videoFrame, fps, timeInSeconds });
+      return;
+    }
 
     video.currentTime = timeInSeconds;
 

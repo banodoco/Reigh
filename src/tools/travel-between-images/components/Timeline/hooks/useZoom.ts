@@ -5,9 +5,10 @@ interface UseZoomProps {
   fullMin: number;
   fullMax: number;
   fullRange: number;
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
-export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
+export const useZoom = ({ fullMin, fullMax, fullRange, containerRef }: UseZoomProps) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState(0);
   const [isZooming, setIsZooming] = useState(false);
@@ -70,16 +71,29 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
     setZoomCenter(clickFrame);
   }, [fullMin, fullRange]);
 
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    if (zoomLevel <= 1) return;
-    const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-    if (!isHorizontal && Math.abs(e.deltaY) > 0) {
-      e.preventDefault();
-      const pan = (e.deltaY * fullRange) / 2000;
-      setIsZooming(true);
-      setZoomCenter(z => z + pan);
-    }
-  }, [zoomLevel, fullRange]);
+  // Attach wheel event listener with { passive: false } to allow preventDefault
+  useEffect(() => {
+    const container = containerRef?.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (zoomLevel <= 1) return;
+      const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (!isHorizontal && Math.abs(e.deltaY) > 0) {
+        e.preventDefault();
+        const pan = (e.deltaY * fullRange) / 2000;
+        setIsZooming(true);
+        setZoomCenter(z => z + pan);
+      }
+    };
+
+    // Attach with { passive: false } to allow preventDefault
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [zoomLevel, fullRange, containerRef]);
   
   useEffect(() => {
     if (isZooming) {
@@ -133,7 +147,6 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
     handleZoomReset,
     handleZoomToStart,
     handleTimelineDoubleClick,
-    handleWheel,
     setZoomCenter, // Export for external control
     isZooming,
   };

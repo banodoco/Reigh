@@ -639,7 +639,28 @@ export const useAddImageToShot = () => {
       
       const startTime = Date.now();
 
-      // Check what currently exists for this shot-generation combo
+      // First create generation if imageUrl is provided and generation_id is empty/missing
+      // This must happen BEFORE we query shot_generations to avoid UUID errors
+      if (imageUrl && !generation_id) {
+        console.log('[PositionFix] Creating new generation from imageUrl');
+        const { data: newGeneration, error: genError } = await supabase
+          .from('generations')
+          .insert({
+            location: imageUrl,
+            type: 'image',
+            project_id: project_id,
+            params: {}
+          })
+          .select()
+          .single();
+        
+        if (genError) throw genError;
+        generation_id = newGeneration.id;
+        console.log('[PositionFix] Created new generation:', { newGenerationId: generation_id });
+      }
+
+      // Now check what currently exists for this shot-generation combo
+      // This happens AFTER generation creation to ensure we have a valid UUID
       const { data: allExistingRecords, error: checkError } = await supabase
         .from('shot_generations')
         .select('id, shot_id, generation_id, timeline_frame, created_at')
@@ -661,25 +682,6 @@ export const useAddImageToShot = () => {
             isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
           })) || []
         });
-      }
-      
-      // First create generation if imageUrl is provided
-      if (imageUrl && !generation_id) {
-        console.log('[PositionFix] Creating new generation from imageUrl');
-        const { data: newGeneration, error: genError } = await supabase
-          .from('generations')
-          .insert({
-            location: imageUrl,
-            type: 'image',
-            project_id: project_id,
-            params: {}
-          })
-          .select()
-          .single();
-        
-        if (genError) throw genError;
-        generation_id = newGeneration.id;
-        console.log('[PositionFix] Created new generation:', { newGenerationId: generation_id });
       }
       
       // Use RPC function to atomically add generation to shot with proper position
