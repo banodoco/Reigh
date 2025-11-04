@@ -320,6 +320,7 @@ export const applyPromptSettings = async (
       currentMode: context.currentGenerationMode,
       hasCallback: !!context.updatePairPromptsByIndex,
       prompts: settings.prompts.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
+      promptsRaw: settings.prompts, // Show the actual raw values
       note: 'Prompts applied regardless of current mode'
     });
     
@@ -327,6 +328,17 @@ export const applyPromptSettings = async (
     const successes: number[] = [];
     
     for (let i = 0; i < settings.prompts.length; i++) {
+      const rawPrompt = settings.prompts[i];
+      console.error(`[ApplySettings] 🔍 Processing pair ${i}:`, {
+        rawValue: rawPrompt,
+        typeOf: typeof rawPrompt,
+        isString: typeof rawPrompt === 'string',
+        isNull: rawPrompt === null,
+        isUndefined: rawPrompt === undefined,
+        length: rawPrompt?.length,
+        afterTrim: rawPrompt?.trim?.(),
+        afterTrimLength: rawPrompt?.trim?.().length
+      });
       const pairPrompt = settings.prompts[i]?.trim();
       const pairNegativePrompt = settings.negativePrompts?.[i]?.trim() || '';
       
@@ -633,98 +645,7 @@ export const applyLoRAs = async (
             matchedCount++;
           } else {
             console.warn('[ApplySettings] ⚠️  Could not find matching LoRA for path:', loraData.path.split('/').pop());
-          }
-        });
-        
-        console.log('[ApplySettings] 📊 LoRA restoration complete:', {
-          requested: settings.loras!.length,
-          matched: matchedCount,
-          failed: settings.loras!.length - matchedCount
-        });
-        
-        resolve({
-          success: true,
-          settingName: 'loras',
-          details: { matched: matchedCount, total: settings.loras!.length }
-        });
-      }, 100);
-    });
-  } else {
-    // Task has no LoRAs - clear existing ones
-    console.log('[ApplySettings] 🗑️  Clearing LoRAs (task had none)');
-    if (context.loraManager.setSelectedLoras) {
-      context.loraManager.setSelectedLoras([]);
-    }
-    return { success: true, settingName: 'loras', details: 'cleared' };
-  }
-};
-
-export const applyStructureVideo = async (
-  settings: ExtractedSettings,
-  context: ApplyContext,
-  taskData: TaskData
-): Promise<ApplyResult> => {
-  // Check if structure video data exists (including null values mean it was explicitly set)
-  const orchestratorHasField = 'structure_video_path' in taskData.orchestrator;
-  const paramsHasField = 'structure_video_path' in taskData.params;
-  const hasStructureVideoInTask = orchestratorHasField || paramsHasField;
-  
-  // USE console.error so this shows in production logs
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK:', {
-    orchestratorHasField,
-    paramsHasField,
-    orchestratorValue: taskData.orchestrator.structure_video_path,
-    paramsValue: taskData.params.structure_video_path,
-    extractedValue: settings.structureVideoPath,
-    hasStructureVideoInTask,
-    willApply: !!settings.structureVideoPath
-  });
-  
-  if (!hasStructureVideoInTask) {
-    console.log('[ApplySettings] ⏭️  Skipping structure video (field not present in task)');
-    return { success: true, settingName: 'structureVideo', details: 'skipped - not in task' };
-  }
-  
-  if (settings.structureVideoPath) {
-    // USE console.error so this shows in production logs
-    console.error('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
-    console.error('[ApplySettings] 🎥 Structure video extracted values:', {
-      path: settings.structureVideoPath,
-      pathFilename: settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1),
-      treatment: settings.structureVideoTreatment,
-      motionStrength: settings.structureVideoMotionStrength,
-      type: settings.structureVideoType,
-      hasHandler: !!context.handleStructureVideoChange,
-      handlerType: typeof context.handleStructureVideoChange
-    });
-    
-    if (!context.handleStructureVideoChange) {
-      console.error('[ApplySettings] ❌ handleStructureVideoChange is not defined in context!');
-      return {
-        success: false,
-        settingName: 'structureVideo',
-        error: 'handleStructureVideoChange not defined in context'
-      };
-    }
-    
-    try {
-      // Extract metadata from the video URL
-      console.error('[ApplySettings] 🎥 Extracting metadata from video URL...');
-      let metadata = null;
-      try {
-        metadata = await extractVideoMetadataFromUrl(settings.structureVideoPath);
-        console.error('[ApplySettings] ✅ Metadata extracted successfully:', {
-          duration: metadata.duration_seconds,
-          frameRate: metadata.frame_rate,
-          totalFrames: metadata.total_frames,
-          dimensions: `${metadata.width}x${metadata.height}`
-        });
-      } catch (metadataError) {
-        console.error('[ApplySettings] ⚠️  Failed to extract metadata, proceeding without it:', metadataError);
-        // Continue without metadata - UI will try to extract it later
-      }
-      
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
+C('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
         videoPath: settings.structureVideoPath,
         hasMetadata: !!metadata,
         treatment: settings.structureVideoTreatment || 'adjust',
