@@ -1032,10 +1032,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
   // Get pair prompts in Timeline component format as a reactive value
   const pairPrompts = useMemo((): Record<number, { prompt: string; negativePrompt: string }> => {
-    // CRITICAL: Filter out videos to match the timeline display and generation logic
+    // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     const filteredGenerations = shotGenerations.filter(sg => {
       // Must have a generation
       if (!sg.generation) return false;
+      
+      // CRITICAL: Must have a timeline_frame (positioned on timeline)
+      // This excludes old/unpositioned images from being considered
+      if (sg.timeline_frame == null) return false;
       
       // Filter out videos
       const isVideo = sg.generation.type === 'video' ||
@@ -1110,11 +1114,15 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   const updatePairPromptsByIndex = useCallback(async (pairIndex: number, prompt: string, negativePrompt: string) => {
     console.log(`[PairPrompts-SAVE] 💾 START updatePairPromptsByIndex for pair ${pairIndex}`);
     
-    // CRITICAL: Filter out videos to match the timeline display and generation logic
+    // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     // This ensures pair prompt indexes match the visual pairs in the UI
     const filteredGenerations = shotGenerations.filter(sg => {
       // Must have a generation
       if (!sg.generation) return false;
+      
+      // CRITICAL: Must have a timeline_frame (positioned on timeline)
+      // This excludes old/unpositioned images from being considered
+      if (sg.timeline_frame == null) return false;
       
       // Filter out videos
       const isVideo = sg.generation.type === 'video' ||
