@@ -1051,21 +1051,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     });
 
     // 🎯 PERFORMANCE: Early return if no generations to process
-    // Prevents wasteful iteration and logging when there's nothing to pair
     if (filteredGenerations.length === 0) {
-      console.error('[PairPrompts-GETTER] ⏭️ SKIPPING - no generations to process');
       return {};
     }
-
-    console.error('[PairPrompts-GETTER] 📖 Reading pair prompts from shotGenerations:', {
-      totalGenerations: shotGenerations.length,
-      afterVideoFilter: filteredGenerations.length,
-      filteredShotGenIds: filteredGenerations.map(sg => ({
-        id: sg.id.substring(0, 8),
-        timeline_frame: sg.timeline_frame,
-        hasGeneration: !!sg.generation
-      }))
-    });
 
     const sortedGenerations = [...filteredGenerations]
       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
@@ -1075,34 +1063,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     // Each pair is represented by its first item (index in the sorted array)
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
-      console.error(`[PairPrompts-GETTER] 🔍 Checking pair ${i}:`, {
-        shotGenId: firstItem.id.substring(0, 8),
-        timeline_frame: firstItem.timeline_frame,
-        has_pair_prompt: !!firstItem.metadata?.pair_prompt,
-        pair_prompt: firstItem.metadata?.pair_prompt || '(none)',
-        has_pair_negative_prompt: !!firstItem.metadata?.pair_negative_prompt,
-        pair_negative_prompt: firstItem.metadata?.pair_negative_prompt || '(none)'
-      });
       
       if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
         pairPromptsData[i] = {
           prompt: firstItem.metadata.pair_prompt || '',
           negativePrompt: firstItem.metadata.pair_negative_prompt || '',
         };
-        console.error(`[PairPrompts-GETTER] ✅ Added pair ${i} to pairPromptsData`);
       }
     }
-
-    console.error('[PairPrompts-GETTER] 📊 Final pair prompts data:', {
-      totalPairs: sortedGenerations.length - 1,
-      customPairs: Object.keys(pairPromptsData).length,
-      pairIndexes: Object.keys(pairPromptsData).map(Number),
-      pairPromptsData: Object.entries(pairPromptsData).map(([idx, data]) => ({
-        pairIndex: idx,
-        prompt: data.prompt.substring(0, 30) + '...',
-        negativePrompt: data.negativePrompt.substring(0, 30) + '...'
-      }))
-    });
 
     return pairPromptsData;
   }, [shotGenerations]);
