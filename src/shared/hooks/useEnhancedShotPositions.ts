@@ -992,7 +992,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       console.error('[updatePairPrompts] FOUND generation:', generation.id.substring(0, 8));
-      console.error('[updatePairPrompts] CURRENT metadata:', generation.metadata);
+      console.error('[updatePairPrompts] CURRENT metadata.pair_prompt:', generation.metadata?.pair_prompt);
+      console.error('[updatePairPrompts] CURRENT metadata.pair_negative_prompt:', generation.metadata?.pair_negative_prompt);
+      console.error('[updatePairPrompts] CURRENT metadata.enhanced_prompt:', generation.metadata?.enhanced_prompt);
 
       // Update metadata with pair prompts
       // CRITICAL: Clear enhanced_prompt when user manually edits pair_prompt
@@ -1003,9 +1005,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         enhanced_prompt: '', // Clear enhanced prompt when manually editing
       };
 
-      console.error('[updatePairPrompts] NEW metadata to save:', updatedMetadata);
       console.error('[updatePairPrompts] NEW metadata.pair_prompt:', updatedMetadata.pair_prompt);
       console.error('[updatePairPrompts] NEW metadata.pair_negative_prompt:', updatedMetadata.pair_negative_prompt);
+      console.error('[updatePairPrompts] NEW metadata.enhanced_prompt:', updatedMetadata.enhanced_prompt);
 
       // Update in database
       const { data, error } = await supabase
@@ -1018,8 +1020,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         .single();
 
       console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - error:', error);
-      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data:', data);
-      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata:', data?.metadata);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - hasData:', !!data);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.id:', data?.id?.substring(0, 8));
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.pair_prompt:', data?.metadata?.pair_prompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.pair_negative_prompt:', data?.metadata?.pair_negative_prompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.enhanced_prompt:', data?.metadata?.enhanced_prompt);
 
       if (error) {
         console.error('[PairPrompts] Error updating pair prompts:', error);
@@ -1090,9 +1095,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       
       console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - checking pair', i);
       console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - firstItem.id:', firstItem.id.substring(0, 8));
-      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - firstItem.metadata:', firstItem.metadata);
-      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - pair_prompt:', firstItem.metadata?.pair_prompt);
-      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - pair_negative_prompt:', firstItem.metadata?.pair_negative_prompt);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - firstItem.timeline_frame:', firstItem.timeline_frame);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - firstItem.generation_id:', firstItem.generation_id?.substring(0, 8));
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - metadata.pair_prompt:', firstItem.metadata?.pair_prompt);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - metadata.pair_negative_prompt:', firstItem.metadata?.pair_negative_prompt);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - metadata.enhanced_prompt:', firstItem.metadata?.enhanced_prompt);
       
       if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
         pairPromptsData[i] = {
@@ -1121,15 +1128,42 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   const updatePairPromptsByIndex = useCallback(async (pairIndex: number, prompt: string, negativePrompt: string) => {
     console.log(`[PairPrompts-SAVE] 💾 START updatePairPromptsByIndex for pair ${pairIndex}`);
     
+    // CRITICAL: Query fresh shotGenerations from DB to avoid stale data
+    // This ensures we're working with the latest data, especially after image replacement
+    if (!shotId) {
+      console.error('[PairPrompts-SAVE] ❌ No shotId');
+      return;
+    }
+    
+    const { data: freshShotGens, error: fetchError } = await supabase
+      .from('shot_generations')
+      .select(`
+        id,
+        timeline_frame,
+        metadata,
+        generation:generations(id, type, location)
+      `)
+      .eq('shot_id', shotId)
+      .not('timeline_frame', 'is', null); // Only positioned images
+    
+    if (fetchError) {
+      console.error('[PairPrompts-SAVE] ❌ Error fetching fresh shotGenerations:', fetchError);
+      return;
+    }
+    
+    console.log(`[PairPrompts-SAVE] 🔄 Fetched fresh shotGenerations:`, {
+      count: freshShotGens?.length || 0,
+      ids: freshShotGens?.map(sg => ({
+        id: sg.id.substring(0, 8),
+        timeline_frame: sg.timeline_frame
+      }))
+    });
+    
     // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     // This ensures pair prompt indexes match the visual pairs in the UI
-    const filteredGenerations = shotGenerations.filter(sg => {
+    const filteredGenerations = (freshShotGens || []).filter(sg => {
       // Must have a generation
       if (!sg.generation) return false;
-      
-      // CRITICAL: Must have a timeline_frame (positioned on timeline)
-      // This excludes old/unpositioned images from being considered
-      if (sg.timeline_frame == null) return false;
       
       // Filter out videos
       const isVideo = sg.generation.type === 'video' ||
@@ -1139,7 +1173,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     });
 
     console.log(`[PairPrompts-SAVE] 📊 Filtered shotGenerations:`, {
-      totalGenerations: shotGenerations.length,
+      totalGenerations: freshShotGens?.length || 0,
       afterVideoFilter: filteredGenerations.length,
       filteredIds: filteredGenerations.map((sg, idx) => ({
         arrayIndex: idx,
@@ -1178,7 +1212,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     
     await updatePairPrompts(firstItem.id, prompt, negativePrompt);
     console.log(`[PairPrompts-SAVE] ✅ COMPLETED updatePairPromptsByIndex for pair ${pairIndex}`);
-  }, [shotGenerations, updatePairPrompts]);
+  }, [shotId, updatePairPrompts]);
 
   // Clear enhanced prompt for a specific pair/generation
   const clearEnhancedPrompt = useCallback(async (generationId: string) => {
