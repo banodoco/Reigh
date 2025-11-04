@@ -124,14 +124,19 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   useEffect(() => {
     if (!videoMetadata && !isExtractingMetadata && !extractedMetadata) {
       setIsExtractingMetadata(true);
-      console.log('[GuidanceVideoStrip] Extracting metadata from URL:', videoUrl);
+      console.log('[GuidanceVideoStrip] 🎬 Extracting metadata from URL:', videoUrl.substring(0, 100) + '...');
       extractVideoMetadataFromUrl(videoUrl)
         .then(metadata => {
-          console.log('[GuidanceVideoStrip] Metadata extracted:', metadata);
+          console.log('[GuidanceVideoStrip] ✅ Metadata extracted successfully:', {
+            duration: metadata.duration_seconds,
+            frameRate: metadata.frame_rate,
+            totalFrames: metadata.total_frames,
+            dimensions: `${metadata.width}x${metadata.height}`
+          });
           setExtractedMetadata(metadata);
         })
         .catch(error => {
-          console.error('[GuidanceVideoStrip] Failed to extract metadata:', error);
+          console.error('[GuidanceVideoStrip] ❌ Failed to extract metadata:', error);
         })
         .finally(() => {
           setIsExtractingMetadata(false);
@@ -190,9 +195,20 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    
+    // CRITICAL: Don't start extraction until we have metadata!
+    if (!effectiveMetadata) {
+      console.log('[GuidanceVideoStrip] ⏳ Waiting for metadata before extracting frames...');
+      return;
+    }
 
     const extractFrames = async () => {
-      console.log('[GuidanceVideoStrip] Extracting frames for treatment:', treatment);
+      console.log('[GuidanceVideoStrip] 🎞️ Starting frame extraction:', {
+        treatment,
+        totalFrames: effectiveMetadata.total_frames,
+        frameRate: effectiveMetadata.frame_rate,
+        duration: effectiveMetadata.duration_seconds
+      });
       setIsExtractingFrames(true);
       // Don't set isVideoReady to false - keep old frames visible during re-extraction
       
