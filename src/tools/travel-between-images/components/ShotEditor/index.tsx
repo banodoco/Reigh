@@ -1373,18 +1373,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       };
       
       // Step 4: Apply all settings in sequence (some have dependencies)
-      // We could parallelize independent operations, but keeping sequential for now for safety
+      // CRITICAL: Replace images FIRST, then apply prompts to the new images
       const results: ApplySettingsService.ApplyResult[] = [];
       
-      results.push(await ApplySettingsService.applyModelSettings(settings, context));
-      results.push(await ApplySettingsService.applyPromptSettings(settings, context));
-      results.push(await ApplySettingsService.applyGenerationSettings(settings, context));
-      results.push(await ApplySettingsService.applyModeSettings(settings, context));
-      results.push(await ApplySettingsService.applyAdvancedModeSettings(settings, context));
-      results.push(await ApplySettingsService.applyTextPromptAddons(settings, context));
-      results.push(await ApplySettingsService.applyMotionSettings(settings, context));
-      results.push(await ApplySettingsService.applyLoRAs(settings, context));
-      results.push(await ApplySettingsService.applyStructureVideo(settings, context, taskData));
+      // Replace images first if requested (creates new images with positions)
       results.push(await ApplySettingsService.replaceImagesIfRequested(
         settings,
         replaceImages,
@@ -1395,6 +1387,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         addImageToShotMutation,
         removeImageFromShotMutation
       ));
+      
+      // Now apply all other settings (including prompts to the NEW images)
+      results.push(await ApplySettingsService.applyModelSettings(settings, context));
+      results.push(await ApplySettingsService.applyPromptSettings(settings, context));
+      results.push(await ApplySettingsService.applyGenerationSettings(settings, context));
+      results.push(await ApplySettingsService.applyModeSettings(settings, context));
+      results.push(await ApplySettingsService.applyAdvancedModeSettings(settings, context));
+      results.push(await ApplySettingsService.applyTextPromptAddons(settings, context));
+      results.push(await ApplySettingsService.applyMotionSettings(settings, context));
+      results.push(await ApplySettingsService.applyLoRAs(settings, context));
+      results.push(await ApplySettingsService.applyStructureVideo(settings, context, taskData));
       
       console.log('[ApplySettings] 🎉 === APPLY SETTINGS COMPLETE ===', {
         taskId: taskId.substring(0, 8),
