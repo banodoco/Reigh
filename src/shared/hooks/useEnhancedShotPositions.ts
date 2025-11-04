@@ -979,12 +979,20 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!shotId) return;
 
     try {
+      // TOP-LEVEL DEBUG: Database UPDATE for pair prompts
+      console.error('[updatePairPrompts] DATABASE UPDATE START - generationId:', generationId.substring(0, 8));
+      console.error('[updatePairPrompts] DATABASE UPDATE START - pairPrompt:', pairPrompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE START - pairNegativePrompt:', pairNegativePrompt);
 
       // Find the current generation
       const generation = shotGenerations.find(sg => sg.id === generationId);
       if (!generation) {
+        console.error('[updatePairPrompts] ERROR - Generation not found:', generationId.substring(0, 8));
         throw new Error(`Generation ${generationId} not found`);
       }
+
+      console.error('[updatePairPrompts] FOUND generation:', generation.id.substring(0, 8));
+      console.error('[updatePairPrompts] CURRENT metadata:', generation.metadata);
 
       // Update metadata with pair prompts
       // CRITICAL: Clear enhanced_prompt when user manually edits pair_prompt
@@ -995,6 +1003,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         enhanced_prompt: '', // Clear enhanced prompt when manually editing
       };
 
+      console.error('[updatePairPrompts] NEW metadata to save:', updatedMetadata);
+      console.error('[updatePairPrompts] NEW metadata.pair_prompt:', updatedMetadata.pair_prompt);
+      console.error('[updatePairPrompts] NEW metadata.pair_negative_prompt:', updatedMetadata.pair_negative_prompt);
+
       // Update in database
       const { data, error } = await supabase
         .from('shot_generations')
@@ -1004,6 +1016,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         .eq('id', generationId)
         .select()
         .single();
+
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - error:', error);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data:', data);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata:', data?.metadata);
 
       if (error) {
         console.error('[PairPrompts] Error updating pair prompts:', error);
