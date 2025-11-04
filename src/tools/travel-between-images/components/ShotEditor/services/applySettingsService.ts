@@ -643,15 +643,35 @@ export const applyStructureVideo = async (
   }
   
   if (settings.structureVideoPath) {
-    console.log('[ApplySettings] 🎥 Applying structure video:', {
-      path: settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1),
+    console.log('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
+    console.log('[ApplySettings] 🎥 Structure video extracted values:', {
+      path: settings.structureVideoPath,
+      pathFilename: settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1),
       treatment: settings.structureVideoTreatment,
       motionStrength: settings.structureVideoMotionStrength,
       type: settings.structureVideoType,
-      fullPath: settings.structureVideoPath
+      hasHandler: !!context.handleStructureVideoChange,
+      handlerType: typeof context.handleStructureVideoChange
     });
     
+    if (!context.handleStructureVideoChange) {
+      console.error('[ApplySettings] ❌ handleStructureVideoChange is not defined in context!');
+      return {
+        success: false,
+        settingName: 'structureVideo',
+        error: 'handleStructureVideoChange not defined in context'
+      };
+    }
+    
     try {
+      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
+        videoPath: settings.structureVideoPath,
+        metadata: null,
+        treatment: settings.structureVideoTreatment || 'adjust',
+        motionStrength: settings.structureVideoMotionStrength ?? 1.0,
+        structureType: settings.structureVideoType || 'flow'
+      });
+      
       context.handleStructureVideoChange(
         settings.structureVideoPath,
         null, // metadata will be fetched from the video path
@@ -659,13 +679,17 @@ export const applyStructureVideo = async (
         settings.structureVideoMotionStrength ?? 1.0,
         settings.structureVideoType || 'flow'
       );
-      console.log('[ApplySettings] ✅ Structure video change handler called successfully');
+      
+      console.log('[ApplySettings] ✅ Structure video change handler completed successfully');
+      console.log('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
       return { success: true, settingName: 'structureVideo' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
       console.error('[ApplySettings] ❌ ERROR applying structure video:', {
         error,
         errorMessage,
+        errorStack,
         path: settings.structureVideoPath,
         treatment: settings.structureVideoTreatment,
         motionStrength: settings.structureVideoMotionStrength,
@@ -679,7 +703,9 @@ export const applyStructureVideo = async (
     }
   } else {
     console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
-    context.handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+    if (context.handleStructureVideoChange) {
+      context.handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+    }
     return { success: true, settingName: 'structureVideo', details: 'cleared' };
   }
 };
