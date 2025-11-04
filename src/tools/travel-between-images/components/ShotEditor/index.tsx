@@ -1388,6 +1388,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         removeImageFromShotMutation
       ));
       
+      // CRITICAL: Reload shotGenerations so prompts can be applied to the NEW images
+      if (replaceImages && inputImages.length > 0) {
+        console.error('[ApplySettings] 🔄 Images replaced - reloading shotGenerations before applying prompts...');
+        await loadPositions({ silent: true });
+        console.error('[ApplySettings] ✅ shotGenerations reloaded with new images');
+      }
+      
       // Now apply all other settings (including prompts to the NEW images)
       results.push(await ApplySettingsService.applyModelSettings(settings, context));
       results.push(await ApplySettingsService.applyPromptSettings(settings, context));
