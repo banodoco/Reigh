@@ -19,14 +19,6 @@ export const useShotGenerations = (
     queryKey: ['unified-generations', 'shot', shotId],
     enabled: !!shotId,
     initialPageParam: 0,
-    // Add retry logic for aborted requests (same as useAllShotGenerations)
-    retry: (failureCount, error) => {
-      if (error instanceof Error && (error.message.includes('aborted') || error.message.includes('cancelled'))) {
-        return failureCount < 3;
-      }
-      return false;
-    },
-    retryDelay: (attemptIndex) => Math.min(100 * Math.pow(2, attemptIndex), 1000),
     queryFn: async ({ pageParam, signal }: { pageParam: number; signal?: AbortSignal }) => {
       // Don't throw immediately on abort - let the fetch fail naturally
 
@@ -193,17 +185,6 @@ export const useAllShotGenerations = (
     refetchOnMount: !options?.disableRefetch,
     refetchOnWindowFocus: !options?.disableRefetch,
     refetchOnReconnect: !options?.disableRefetch,
-    // CRITICAL: Add retry logic for aborted requests to prevent "signal is aborted without reason" errors
-    // When mutations invalidate queries, in-flight requests get cancelled. Retry ensures we eventually get the data.
-    retry: (failureCount, error) => {
-      // Retry aborted requests up to 3 times
-      if (error instanceof Error && (error.message.includes('aborted') || error.message.includes('cancelled'))) {
-        return failureCount < 3;
-      }
-      // Don't retry other errors
-      return false;
-    },
-    retryDelay: (attemptIndex) => Math.min(100 * Math.pow(2, attemptIndex), 1000), // Exponential backoff: 100ms, 200ms, 400ms
     queryFn: async ({ signal }) => {
       // Don't throw immediately on abort - let the fetch fail naturally
       // This prevents the "signal is aborted without reason" error from being thrown manually

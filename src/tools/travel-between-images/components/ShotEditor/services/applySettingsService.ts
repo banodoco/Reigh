@@ -645,49 +645,23 @@ export const applyLoRAs = async (
             matchedCount++;
           } else {
             console.warn('[ApplySettings] ⚠️  Could not find matching LoRA for path:', loraData.path.split('/').pop());
-C('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
-        videoPath: settings.structureVideoPath,
-        hasMetadata: !!metadata,
-        treatment: settings.structureVideoTreatment || 'adjust',
-        motionStrength: settings.structureVideoMotionStrength ?? 1.0,
-        structureType: settings.structureVideoType || 'flow'
-      });
-      
-      context.handleStructureVideoChange(
-        settings.structureVideoPath,
-        metadata, // Now passing real metadata if extraction succeeded
-        settings.structureVideoTreatment || 'adjust',
-        settings.structureVideoMotionStrength ?? 1.0,
-        settings.structureVideoType || 'flow'
-      );
-      
-      console.error('[ApplySettings] ✅ Structure video change handler completed successfully');
-      console.error('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
-      return { success: true, settingName: 'structureVideo' };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      console.error('[ApplySettings] ❌ ERROR applying structure video:', {
-        error,
-        errorMessage,
-        errorStack,
-        path: settings.structureVideoPath,
-        treatment: settings.structureVideoTreatment,
-        motionStrength: settings.structureVideoMotionStrength,
-        type: settings.structureVideoType
-      });
-      return {
-        success: false,
-        settingName: 'structureVideo',
-        error: errorMessage
-      };
-    }
+          }
+        });
+        
+        console.log('[ApplySettings] ✅ LoRAs applied successfully:', {
+          matched: matchedCount,
+          total: settings.loras!.length
+        });
+        
+        resolve({ success: true, settingName: 'loras', details: `${matchedCount}/${settings.loras!.length} matched` });
+      }, 100); // Small delay to ensure state clears
+    });
   } else {
-    console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
-    if (context.handleStructureVideoChange) {
-      context.handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+    console.log('[ApplySettings] 🗑️  Clearing LoRAs (empty array in task)');
+    if (context.loraManager.setSelectedLoras) {
+      context.loraManager.setSelectedLoras([]);
     }
-    return { success: true, settingName: 'structureVideo', details: 'cleared' };
+    return { success: true, settingName: 'loras', details: 'cleared' };
   }
 };
 

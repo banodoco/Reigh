@@ -77,14 +77,14 @@ export const useZoom = ({ fullMin, fullMax, fullRange, containerRef }: UseZoomPr
     if (!container) return;
 
     const handleWheel = (e: WheelEvent) => {
-      if (zoomLevel <= 1) return;
-      const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-      if (!isHorizontal && Math.abs(e.deltaY) > 0) {
-        e.preventDefault();
-        const pan = (e.deltaY * fullRange) / 2000;
-        setIsZooming(true);
-        setZoomCenter(z => z + pan);
-      }
+    if (zoomLevel <= 1) return;
+    const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+    if (!isHorizontal && Math.abs(e.deltaY) > 0) {
+      e.preventDefault();
+      const pan = (e.deltaY * fullRange) / 2000;
+      setIsZooming(true);
+      setZoomCenter(z => z + pan);
+    }
     };
 
     // Attach with { passive: false } to allow preventDefault
