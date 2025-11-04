@@ -401,7 +401,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // No local caching or debouncing needed
   
   // Get pair prompts data for checking if all pairs have prompts
-  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts, updatePairPromptsByIndex } = useEnhancedShotPositions(selectedShotId);
+  const { pairPrompts, shotGenerations, clearAllEnhancedPrompts, updatePairPromptsByIndex, loadPositions } = useEnhancedShotPositions(selectedShotId);
   
   // Check if all pairs (except the last one) have custom prompts
   const allPairsHavePrompts = React.useMemo(() => {
@@ -1449,6 +1449,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           inputImagesCount: inputImages.length
         }
       });
+      
+      // Force reload shotGenerations to show updated pair prompts in UI
+      console.error('[ApplySettings] 🔄 Reloading shotGenerations to refresh UI...');
+      await loadPositions({ silent: true });
+      console.error('[ApplySettings] ✅ shotGenerations reloaded - pair prompts should now be visible');
     } catch (e) {
       console.error('[ApplySettings] ❌ === FAILED TO APPLY SETTINGS ===', e);
     }
@@ -1493,6 +1498,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     batchVideoFrames,
     batchVideoContext,
     updatePairPromptsByIndex,
+    loadPositions,
   ]);
 
 
