@@ -21,7 +21,8 @@ export interface ExtractedSettings {
   
   // Generation settings
   steps?: number;
-  frames?: number;
+  frames?: number;  // Legacy: single value for uniform spacing
+  segmentFramesExpanded?: number[];  // NEW: array of gaps between successive frames
   context?: number;
   model?: string;
   
@@ -134,13 +135,18 @@ export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
   console.log('[ApplySettings] ✅ Task fetched successfully');
   
   const params: any = taskRow.params || {};
-  const orchestrator: any = params.full_orchestrator_payload || {};
+  // FIX: Structure video is stored in orchestrator_details (new format), 
+  // fallback to full_orchestrator_payload (old format)
+  const orchestrator: any = params.orchestrator_details || params.full_orchestrator_payload || {};
   
   console.log('[ApplySettings] 🔍 Task data structure:', {
     hasParams: !!params,
-    hasOrchestrator: !!orchestrator,
-    paramsKeys: Object.keys(params).slice(0, 10),
-    orchestratorKeys: Object.keys(orchestrator).slice(0, 10)
+    hasOrchestratorDetails: !!params.orchestrator_details,
+    hasFullOrchestratorPayload: !!params.full_orchestrator_payload,
+    usingOrchestrator: params.orchestrator_details ? 'orchestrator_details' : (params.full_orchestrator_payload ? 'full_orchestrator_payload' : 'none'),
+    paramsKeys: Object.keys(params).slice(0, 15),
+    orchestratorKeys: Object.keys(orchestrator).slice(0, 15),
+    structureVideoPath: orchestrator.structure_video_path || 'NOT FOUND'
   });
   
   return { params, orchestrator };
@@ -166,7 +172,8 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     
     // Generation settings
     steps: orchestrator.steps ?? params.num_inference_steps,
-    frames: orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded,
+    frames: orchestrator.segment_frames_expanded?.[0] ?? params.segment_frames_expanded, // Legacy: single value for backward compat
+    segmentFramesExpanded: orchestrator.segment_frames_expanded ?? params.segment_frames_expanded, // NEW: full array of gaps
     context: orchestrator.frame_overlap_expanded?.[0] ?? params.frame_overlap_expanded,
     model: params.model_name ?? orchestrator.model_name,
     
@@ -188,14 +195,28 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     // Motion
     amountOfMotion: orchestrator.amount_of_motion ?? params.amount_of_motion,
     
-    // LoRAs
-    loras: orchestrator.loras ?? params.loras,
+    // LoRAs - convert from object format to array format
+    // Backend stores as { "url": strength, ... } but we need [{ path, strength }, ...]
+    loras: (() => {
+      const loraData = orchestrator.loras ?? orchestrator.additional_loras ?? params.loras ?? params.additional_loras;
+      if (!loraData) return undefined;
+      
+      // If already array format, return as-is
+      if (Array.isArray(loraData)) return loraData;
+      
+      // Convert object format to array format
+      return Object.entries(loraData).map(([path, strength]) => ({
+        path,
+        strength: strength as number
+      }));
+    })(),
     
     // Structure video
     structureVideoPath: orchestrator.structure_video_path ?? params.structure_video_path,
     structureVideoTreatment: orchestrator.structure_video_treatment ?? params.structure_video_treatment,
     structureVideoMotionStrength: orchestrator.structure_video_motion_strength ?? params.structure_video_motion_strength,
-    structureVideoType: orchestrator.structure_video_type ?? params.structure_video_type,
+    // Note: Backend uses both "structure_type" and "structure_video_type" - check both
+    structureVideoType: orchestrator.structure_video_type ?? orchestrator.structure_type ?? params.structure_video_type ?? params.structure_type,
   };
   
   console.log('[ApplySettings] 📋 Extracted settings:', {
@@ -205,6 +226,7 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     model: extracted.model,
     steps: extracted.steps,
     frames: extracted.frames,
+    segmentFramesExpanded: extracted.segmentFramesExpanded,  // NEW: log the full array
     context: extracted.context,
     generationMode: extracted.generationMode,
     advancedMode: extracted.advancedMode,
@@ -601,21 +623,22 @@ export const applyStructureVideo = async (
   context: ApplyContext,
   taskData: TaskData
 ): Promise<ApplyResult> => {
-  const hasStructureVideoInTask =
-    taskData.orchestrator.hasOwnProperty('structure_video_path') ||
-    taskData.params.hasOwnProperty('structure_video_path');
+  // Check if structure video data exists (including null values mean it was explicitly set)
+  const orchestratorHasField = 'structure_video_path' in taskData.orchestrator;
+  const paramsHasField = 'structure_video_path' in taskData.params;
+  const hasStructureVideoInTask = orchestratorHasField || paramsHasField;
+  
+  console.log('[ApplySettings] 🔍 Structure video field check:', {
+    orchestratorHasField,
+    paramsHasField,
+    orchestratorValue: taskData.orchestrator.structure_video_path,
+    paramsValue: taskData.params.structure_video_path,
+    extractedValue: settings.structureVideoPath,
+    hasStructureVideoInTask
+  });
   
   if (!hasStructureVideoInTask) {
-    // Check if structure video exists but hasOwnProperty check failed
-    if (taskData.orchestrator.structure_video_path || taskData.params.structure_video_path) {
-      console.error('[ApplySettings] ⚠️  WARNING: Structure video exists in task but hasOwnProperty check failed:', {
-        orchestratorHasIt: !!taskData.orchestrator.structure_video_path,
-        paramsHasIt: !!taskData.params.structure_video_path,
-        orchestratorValue: taskData.orchestrator.structure_video_path,
-        paramsValue: taskData.params.structure_video_path
-      });
-    }
-    console.log('[ApplySettings] ⏭️  Skipping structure video (not defined in task params)');
+    console.log('[ApplySettings] ⏭️  Skipping structure video (field not present in task)');
     return { success: true, settingName: 'structureVideo', details: 'skipped - not in task' };
   }
   
@@ -661,6 +684,106 @@ export const applyStructureVideo = async (
   }
 };
 
+// ==================== Apply Frame Positions ====================
+
+/**
+ * Apply frame positions from segment_frames_expanded to existing images
+ * This is used when settings are applied WITHOUT replacing images
+ */
+export const applyFramePositionsToExistingImages = async (
+  settings: ExtractedSettings,
+  selectedShot: any,
+  simpleFilteredImages: any[]
+): Promise<ApplyResult> => {
+  const segmentGaps = settings.segmentFramesExpanded;
+  const hasSegmentGaps = Array.isArray(segmentGaps) && segmentGaps.length > 0;
+  
+  if (!hasSegmentGaps) {
+    console.log('[ApplySettings] ⏭️  No segment_frames_expanded to apply to existing images');
+    return { success: true, settingName: 'framePositions', details: 'no data' };
+  }
+  
+  if (!selectedShot?.id) {
+    console.log('[ApplySettings] ⏭️  Cannot apply frame positions: missing shot');
+    return { success: true, settingName: 'framePositions', details: 'skipped - no shot' };
+  }
+  
+  // Calculate cumulative positions from gaps
+  const cumulativePositions: number[] = [0]; // First image always at frame 0
+  for (let i = 0; i < segmentGaps.length; i++) {
+    const prevPosition = cumulativePositions[cumulativePositions.length - 1];
+    cumulativePositions.push(prevPosition + segmentGaps[i]);
+  }
+  
+  console.log('[ApplySettings] 📐 Applying frame positions to existing images:', {
+    shotId: selectedShot.id.substring(0, 8),
+    imageCount: simpleFilteredImages.length,
+    segmentGaps,
+    cumulativePositions: cumulativePositions.slice(0, simpleFilteredImages.length),
+    positionsToApply: Math.min(simpleFilteredImages.length, cumulativePositions.length)
+  });
+  
+  try {
+    // Update timeline_frame for each image
+    const updates = simpleFilteredImages.map(async (img, index) => {
+      if (!img.shotImageEntryId) {
+        console.warn('[ApplySettings] ⚠️  Skipping image without shotImageEntryId:', index);
+        return null;
+      }
+      
+      // Use cumulative position if available
+      const newTimelineFrame = index < cumulativePositions.length 
+        ? cumulativePositions[index]
+        : cumulativePositions[cumulativePositions.length - 1] + (index - cumulativePositions.length + 1) * (segmentGaps[segmentGaps.length - 1] || 60);
+      
+      console.log('[ApplySettings] 🎯 Updating timeline_frame:', {
+        index,
+        shotImageEntryId: img.shotImageEntryId.substring(0, 8),
+        oldTimelineFrame: img.timeline_frame,
+        newTimelineFrame,
+        source: index < cumulativePositions.length ? 'cumulative position' : 'extrapolated'
+      });
+      
+      const { error } = await supabase
+        .from('shot_generations')
+        .update({ timeline_frame: newTimelineFrame })
+        .eq('id', img.shotImageEntryId);
+      
+      if (error) {
+        console.error('[ApplySettings] ❌ Failed to update timeline_frame:', error);
+        return null;
+      }
+      
+      return { shotImageEntryId: img.shotImageEntryId, newTimelineFrame };
+    });
+    
+    const results = await Promise.all(updates);
+    const successCount = results.filter(r => r !== null).length;
+    
+    console.log('[ApplySettings] ✅ Frame positions applied:', {
+      total: simpleFilteredImages.length,
+      success: successCount,
+      failed: simpleFilteredImages.length - successCount
+    });
+    
+    return {
+      success: true,
+      settingName: 'framePositions',
+      details: { updated: successCount, total: simpleFilteredImages.length }
+    };
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error('[ApplySettings] ❌ Error applying frame positions:', e);
+    return {
+      success: false,
+      settingName: 'framePositions',
+      error: errorMessage
+    };
+  }
+};
+
+// ==================== Replace Images ====================
+
 export const replaceImagesIfRequested = async (
   settings: ExtractedSettings,
   replaceImages: boolean,
@@ -673,7 +796,8 @@ export const replaceImagesIfRequested = async (
 ): Promise<ApplyResult> => {
   if (!replaceImages) {
     console.log('[ApplySettings] ⏭️  Skipping image replacement (replaceImages = false)');
-    return { success: true, settingName: 'images', details: 'skipped' };
+    // NEW: Apply frame positions to existing images even when not replacing
+    return await applyFramePositionsToExistingImages(settings, selectedShot, simpleFilteredImages);
   }
   
   if (!selectedShot?.id || !projectId) {
@@ -705,23 +829,48 @@ export const replaceImagesIfRequested = async (
       console.log('[ApplySettings] ✅ Existing images removed');
     }
     
-    // Calculate timeline positions based on segment_frames
-    const segmentFrames = settings.frames || 60;
+    // Calculate timeline positions from segment_frames_expanded array
+    // segment_frames_expanded contains GAPS between successive frames
+    // e.g., [65, 37, 21] means: image0=0, image1=0+65=65, image2=65+37=102, image3=102+21=123
+    const segmentGaps = settings.segmentFramesExpanded;
+    const hasSegmentGaps = Array.isArray(segmentGaps) && segmentGaps.length > 0;
+    
+    // Calculate cumulative positions from gaps
+    let cumulativePositions: number[] = [];
+    if (hasSegmentGaps) {
+      cumulativePositions = [0]; // First image always at frame 0
+      for (let i = 0; i < segmentGaps.length; i++) {
+        const prevPosition = cumulativePositions[cumulativePositions.length - 1];
+        cumulativePositions.push(prevPosition + segmentGaps[i]);
+      }
+    }
+    
+    // Fallback to uniform spacing if no segment_frames_expanded
+    const uniformSpacing = settings.frames || 60;
     
     console.log('[ApplySettings] 📐 Calculating timeline positions:', {
-      segmentFrames,
+      hasSegmentGaps,
+      segmentGaps,
+      cumulativePositions,
+      uniformSpacingFallback: !hasSegmentGaps ? uniformSpacing : 'not used',
       imageCount: inputImages.length,
-      extractedFrom: settings.frames ? 'task params' : 'default fallback'
+      extractedFrom: hasSegmentGaps ? 'task segment_frames_expanded' : (settings.frames ? 'task frames (uniform)' : 'default fallback')
     });
     
     // Add input images in order with calculated timeline_frame positions
     const additions = (inputImages || []).map((url, index) => {
-      const timelineFrame = index * segmentFrames;
+      // Use cumulative position if available, otherwise fall back to uniform spacing
+      const timelineFrame = hasSegmentGaps && index < cumulativePositions.length
+        ? cumulativePositions[index]
+        : index * uniformSpacing;
+      
       console.log('[ApplySettings] ➕ Adding image:', {
         index,
         filename: url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 20) + '...',
         timelineFrame,
-        calculation: `${index} × ${segmentFrames} = ${timelineFrame}`
+        calculation: hasSegmentGaps 
+          ? `cumulative position from gaps: ${cumulativePositions[index]}` 
+          : `uniform spacing: ${index} × ${uniformSpacing} = ${timelineFrame}`
       });
       
       return addImageToShotMutation.mutateAsync({
