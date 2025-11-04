@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useQuery, UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from '@/shared/hooks/useSmartPolling';
-import { GenerationRow } from '@/types/shots';
+import { GenerationRow, TimelineGenerationRow } from '@/types/shots';
+import { isTimelineGeneration } from '@/shared/lib/typeGuards';
 import React from 'react';
 
 interface ShotGenerationsPage {
@@ -135,7 +136,40 @@ export const useUnpositionedGenerationsCount = (
   });
 };
 
-// Hook for getting all generations for a shot (non-paginated, for backward compatibility)
+/**
+ * Hook for loading ALL shot generations (non-paginated)
+ * 
+ * This is the primary data source for shot images throughout the app.
+ * It loads positioned and unpositioned images with full metadata including pair prompts.
+ * 
+ * **Data Loaded:**
+ * - All shot_generations for the shot (positioned + unpositioned)
+ * - Full generation data (location, type, starred, etc.)
+ * - Metadata (pair_prompt, enhanced_prompt, timeline positioning data)
+ * 
+ * **Use Cases:**
+ * - Image galleries and lightboxes
+ * - Timeline display (filter to positioned images)
+ * - Shot image management
+ * 
+ * **For Timeline-Specific Use:**
+ * Consider using `useTimelineShotGenerations` instead, which filters to only
+ * positioned images with metadata and provides stronger type guarantees.
+ * 
+ * @param shotId - The shot ID to load generations for
+ * @param options - Query options
+ * @param options.disableRefetch - Prevents refetching during drag/persist operations
+ * @returns Query result with GenerationRow[] data
+ * 
+ * @example
+ * ```typescript
+ * // General use
+ * const { data: allImages } = useAllShotGenerations(shotId);
+ * 
+ * // With refetch disabled during sensitive operations
+ * const { data: images } = useAllShotGenerations(shotId, { disableRefetch: isDragging });
+ * ```
+ */
 export const useAllShotGenerations = (
   shotId: string | null,
   options?: {
@@ -311,4 +345,57 @@ export const useAllShotGenerations = (
       }
     }
   });
+};
+
+/**
+ * Specialized hook for timeline-specific shot generations
+ * Returns only positioned images with metadata (required for pair prompts)
+ * 
+ * This is a typed wrapper around useAllShotGenerations that:
+ * 1. Filters to only positioned images (timeline_frame != null)
+ * 2. Filters to only images with metadata (required for pair prompts)
+ * 3. Returns TimelineGenerationRow type (guarantees metadata exists)
+ * 
+ * @param shotId - The shot ID to load generations for
+ * @param options - Query options (disableRefetch, etc.)
+ * @returns Query result with TimelineGenerationRow[] data
+ * 
+ * @example
+ * ```typescript
+ * const { data: timelineImages } = useTimelineShotGenerations(shotId);
+ * // TypeScript knows timelineImages have metadata
+ * timelineImages?.forEach(img => {
+ *   console.log(img.metadata.pair_prompt); // No type error!
+ * });
+ * ```
+ */
+export const useTimelineShotGenerations = (
+  shotId: string | null,
+  options?: {
+    disableRefetch?: boolean;
+  }
+): UseQueryResult<TimelineGenerationRow[]> => {
+  const baseQuery = useAllShotGenerations(shotId, options);
+  
+  // Transform the data to filter and type-narrow
+  const timelineData = React.useMemo(() => {
+    if (!baseQuery.data) return undefined;
+    
+    // Filter to only timeline generations (positioned + has metadata)
+    const filtered = baseQuery.data.filter(isTimelineGeneration);
+    
+    console.log('[useTimelineShotGenerations] Filtered timeline generations:', {
+      shotId,
+      totalGenerations: baseQuery.data.length,
+      timelineGenerations: filtered.length,
+      filteredOut: baseQuery.data.length - filtered.length
+    });
+    
+    return filtered;
+  }, [baseQuery.data, shotId]);
+  
+  return {
+    ...baseQuery,
+    data: timelineData
+  };
 }; 
