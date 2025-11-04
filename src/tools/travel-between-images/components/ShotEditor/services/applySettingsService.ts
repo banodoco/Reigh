@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { extractVideoMetadataFromUrl } from '@/shared/lib/videoUploader';
 
 // ==================== Types ====================
 
@@ -682,9 +683,25 @@ export const applyStructureVideo = async (
     }
     
     try {
+      // Extract metadata from the video URL
+      console.error('[ApplySettings] 🎥 Extracting metadata from video URL...');
+      let metadata = null;
+      try {
+        metadata = await extractVideoMetadataFromUrl(settings.structureVideoPath);
+        console.error('[ApplySettings] ✅ Metadata extracted successfully:', {
+          duration: metadata.duration_seconds,
+          frameRate: metadata.frame_rate,
+          totalFrames: metadata.total_frames,
+          dimensions: `${metadata.width}x${metadata.height}`
+        });
+      } catch (metadataError) {
+        console.error('[ApplySettings] ⚠️  Failed to extract metadata, proceeding without it:', metadataError);
+        // Continue without metadata - UI will try to extract it later
+      }
+      
       console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
         videoPath: settings.structureVideoPath,
-        metadata: null,
+        hasMetadata: !!metadata,
         treatment: settings.structureVideoTreatment || 'adjust',
         motionStrength: settings.structureVideoMotionStrength ?? 1.0,
         structureType: settings.structureVideoType || 'flow'
@@ -692,7 +709,7 @@ export const applyStructureVideo = async (
       
       context.handleStructureVideoChange(
         settings.structureVideoPath,
-        null, // metadata will be fetched from the video path
+        metadata, // Now passing real metadata if extraction succeeded
         settings.structureVideoTreatment || 'adjust',
         settings.structureVideoMotionStrength ?? 1.0,
         settings.structureVideoType || 'flow'

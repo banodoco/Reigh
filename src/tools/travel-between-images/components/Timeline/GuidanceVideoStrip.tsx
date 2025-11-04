@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { VideoMetadata } from '@/shared/lib/videoUploader';
+import { VideoMetadata, extractVideoMetadataFromUrl } from '@/shared/lib/videoUploader';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
@@ -10,7 +10,7 @@ import { X } from 'lucide-react';
 
 interface GuidanceVideoStripProps {
   videoUrl: string;
-  videoMetadata: VideoMetadata;
+  videoMetadata: VideoMetadata | null; // Can be null - will be extracted from video
   treatment: 'adjust' | 'clip';
   motionStrength: number;
   onTreatmentChange: (treatment: 'adjust' | 'clip') => void;
@@ -36,8 +36,10 @@ const calculateAdjustModeFrame = (
   containerWidth: number,
   fullMin: number,
   fullMax: number,
-  videoMetadata: VideoMetadata
+  videoMetadata: VideoMetadata | null
 ): number => {
+  if (!videoMetadata) return 0;
+  
   // 1. Calculate cursor position in timeline coordinate space
   // Use the same coordinate system as images/ruler to ensure alignment
   const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
@@ -55,8 +57,10 @@ const calculateClipModeFrame = (
   containerWidth: number,
   fullMin: number,
   fullMax: number,
-  videoMetadata: VideoMetadata
+  videoMetadata: VideoMetadata | null
 ): number => {
+  if (!videoMetadata) return 0;
+  
   // Direct 1:1 mapping - timeline frame = video frame
   // Use the same coordinate system as images/ruler to ensure alignment
   const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
@@ -109,11 +113,37 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   const SEEK_THROTTLE_MS = 30; // Minimum time between seeks (reduced for responsiveness)
   const BLANK_CHECK_THROTTLE_MS = 200; // Minimum time between blank checks to avoid infinite resets
   
+  // Extract metadata if not provided
+  const [extractedMetadata, setExtractedMetadata] = useState<VideoMetadata | null>(null);
+  const [isExtractingMetadata, setIsExtractingMetadata] = useState(false);
+  
+  // Use provided metadata or extracted metadata
+  const effectiveMetadata = videoMetadata || extractedMetadata;
+  
+  // Extract metadata from URL if not provided
+  useEffect(() => {
+    if (!videoMetadata && !isExtractingMetadata && !extractedMetadata) {
+      setIsExtractingMetadata(true);
+      console.log('[GuidanceVideoStrip] Extracting metadata from URL:', videoUrl);
+      extractVideoMetadataFromUrl(videoUrl)
+        .then(metadata => {
+          console.log('[GuidanceVideoStrip] Metadata extracted:', metadata);
+          setExtractedMetadata(metadata);
+        })
+        .catch(error => {
+          console.error('[GuidanceVideoStrip] Failed to extract metadata:', error);
+        })
+        .finally(() => {
+          setIsExtractingMetadata(false);
+        });
+    }
+  }, [videoUrl, videoMetadata, isExtractingMetadata, extractedMetadata]);
+  
   // Calculate timeline duration and frames
   const ASSUMED_TIMELINE_FPS = 24;
   const timelineDuration = (fullMax - fullMin) / ASSUMED_TIMELINE_FPS;
   const timelineFrames = fullMax - fullMin + 1;
-  const totalVideoFrames = videoMetadata?.total_frames || 0;
+  const totalVideoFrames = effectiveMetadata?.total_frames || 0;
   
   // Calculate video coverage for clip mode
   const videoCoversFrames = treatment === 'clip' ? Math.min(totalVideoFrames, timelineFrames) : timelineFrames;
@@ -121,7 +151,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   
   // Calculate playback speed for adjust mode
   const playbackSpeed = treatment === 'adjust' 
-    ? videoMetadata.duration_seconds / timelineDuration 
+    ? (effectiveMetadata?.duration_seconds || 0) / timelineDuration 
     : 1.0;
   
   // Calculate adjust mode description (stretch/compress)
@@ -217,24 +247,24 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           
           if (treatment === 'adjust') {
             // Adjust mode: show entire video stretched/compressed to fit timeline
-            frameIndex = Math.floor((i / (numFrames - 1)) * (videoMetadata.total_frames - 1));
+            frameIndex = Math.floor((i / (numFrames - 1)) * ((effectiveMetadata?.total_frames || 1) - 1));
           } else {
             // Clip mode: show only frames within timeline range
             const timelinePosition = (i / (numFrames - 1)) * timelineFrameCount;
-            frameIndex = Math.floor(Math.min(timelinePosition, videoMetadata.total_frames - 1));
+            frameIndex = Math.floor(Math.min(timelinePosition, (effectiveMetadata?.total_frames || 1) - 1));
           }
           
           // Validate frame_rate to prevent NaN/Infinity errors
-          if (!videoMetadata.frame_rate || videoMetadata.frame_rate <= 0 || !isFinite(videoMetadata.frame_rate)) {
-            console.error('[GuidanceVideoStrip] Invalid frame_rate:', videoMetadata.frame_rate);
-            throw new Error(`Invalid video frame rate: ${videoMetadata.frame_rate}`);
+          if (!effectiveMetadata?.frame_rate || effectiveMetadata.frame_rate <= 0 || !isFinite(effectiveMetadata.frame_rate)) {
+            console.error('[GuidanceVideoStrip] Invalid frame_rate:', effectiveMetadata?.frame_rate);
+            throw new Error(`Invalid video frame rate: ${effectiveMetadata?.frame_rate}`);
           }
           
-          const timeInSeconds = frameIndex / videoMetadata.frame_rate;
+          const timeInSeconds = frameIndex / effectiveMetadata.frame_rate;
           
           // Additional safety check for currentTime value
           if (!isFinite(timeInSeconds) || timeInSeconds < 0) {
-            console.error('[GuidanceVideoStrip] Invalid time value:', { frameIndex, frame_rate: videoMetadata.frame_rate, timeInSeconds });
+            console.error('[GuidanceVideoStrip] Invalid time value:', { frameIndex, frame_rate: effectiveMetadata.frame_rate, timeInSeconds });
             throw new Error(`Invalid time value calculated: ${timeInSeconds}`);
           }
           
@@ -294,15 +324,15 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       extractFrames();
     } else {
       // Wait for video to load
-      video.addEventListener('loadedmetadata', handleLoadedMetadata);
-      video.addEventListener('error', handleError);
-    }
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('error', handleError);
+  }
 
-    return () => {
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      video.removeEventListener('error', handleError);
-    };
-  }, [videoUrl, videoMetadata, treatment]); // REMOVED: containerWidth, fullMin, fullMax
+  return () => {
+    video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    video.removeEventListener('error', handleError);
+  };
+}, [videoUrl, effectiveMetadata, treatment]); // REMOVED: containerWidth, fullMin, fullMax
   
   const isCanvasBlank = useCallback((canvas: HTMLCanvasElement): boolean => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -587,18 +617,18 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     
     // Calculate video frame based on treatment mode
     const videoFrame = treatment === 'adjust'
-      ? calculateAdjustModeFrame(cursorX, containerWidth, fullMin, fullMax, videoMetadata)
-      : calculateClipModeFrame(cursorX, containerWidth, fullMin, fullMax, videoMetadata);
+      ? calculateAdjustModeFrame(cursorX, containerWidth, fullMin, fullMax, effectiveMetadata)
+      : calculateClipModeFrame(cursorX, containerWidth, fullMin, fullMax, effectiveMetadata);
     
-    if (videoFrame !== currentFrame) {
+    if (videoFrame !== currentFrame && effectiveMetadata) {
       setCurrentFrame(videoFrame);
       
       // Seek to frame for preview canvas
       if (videoRef.current) {
-        seekToFrame(videoRef.current, videoFrame, videoMetadata.frame_rate);
+        seekToFrame(videoRef.current, videoFrame, effectiveMetadata.frame_rate);
       }
     }
-  }, [treatment, containerWidth, fullMin, fullMax, videoMetadata, currentFrame, isVideoReady, seekToFrame]);
+  }, [treatment, containerWidth, fullMin, fullMax, effectiveMetadata, currentFrame, isVideoReady, seekToFrame]);
   
   const handleMouseEnter = useCallback(() => {
     setIsHovering(true);
@@ -693,7 +723,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
                 <SelectTrigger className="h-6 w-[180px] text-[9px] px-2 py-0 bg-background/95 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                   <SelectValue>
                     {treatment === 'adjust' 
-                      ? (videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
+                      ? ((effectiveMetadata?.total_frames || 0) > timelineFrames ? 'Compress' : (effectiveMetadata?.total_frames || 0) < timelineFrames ? 'Stretch' : 'Match') + ' to timeline'
                       : 'Use video as is'}
                   </SelectValue>
                 </SelectTrigger>
@@ -701,11 +731,11 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
                   <SelectItem value="adjust">
                     <div className="flex flex-col gap-0.5 py-1">
                       <span className="text-xs font-medium">
-                        {videoMetadata.total_frames > timelineFrames ? 'Compress' : videoMetadata.total_frames < timelineFrames ? 'Stretch' : 'Match'} to timeline
+                        {(effectiveMetadata?.total_frames || 0) > timelineFrames ? 'Compress' : (effectiveMetadata?.total_frames || 0) < timelineFrames ? 'Stretch' : 'Match'} to timeline
                       </span>
                       <span className="text-[10px] text-muted-foreground leading-tight">
                         {(() => {
-                          const totalVideoFrames = videoMetadata.total_frames;
+                          const totalVideoFrames = effectiveMetadata?.total_frames || 0;
                           const timelineRange = fullMax - fullMin + 1;
                           if (totalVideoFrames === 0 || timelineRange === 0) return '';
                           if (totalVideoFrames > timelineRange) {
@@ -726,7 +756,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
                       <span className="text-xs font-medium">Use video as is</span>
                       <span className="text-[10px] text-muted-foreground leading-tight">
                         {(() => {
-                          const totalVideoFrames = videoMetadata.total_frames;
+                          const totalVideoFrames = effectiveMetadata?.total_frames || 0;
                           const timelineRange = fullMax - fullMin + 1;
                           if (totalVideoFrames === 0 || timelineRange === 0) return '';
                           if (totalVideoFrames > timelineRange) {

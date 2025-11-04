@@ -684,11 +684,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         >
         {/* Structure video strip (show if exists) or uploader (only if not readOnly) */}
         {shotId && projectId && onStructureVideoChange && (
-          structureVideoPath && structureVideoMetadata ? (
+          structureVideoPath ? (
+            // FIX: Show video strip if there's a path, even without metadata (metadata can be fetched from video)
             // Show video strip if there's a video (even in readOnly mode for viewing)
             <GuidanceVideoStrip
               videoUrl={structureVideoPath}
-              videoMetadata={structureVideoMetadata}
+              videoMetadata={structureVideoMetadata || null}
               treatment={structureVideoTreatment}
               motionStrength={structureVideoMotionStrength}
               onTreatmentChange={(treatment) => {

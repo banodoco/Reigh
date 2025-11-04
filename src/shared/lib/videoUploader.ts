@@ -49,6 +49,43 @@ export const extractVideoMetadata = async (file: File): Promise<VideoMetadata> =
 };
 
 /**
+ * Extracts video metadata from a URL (for videos already uploaded)
+ */
+export const extractVideoMetadataFromUrl = async (videoUrl: string): Promise<VideoMetadata> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.crossOrigin = 'anonymous'; // Handle CORS for external URLs
+    
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      
+      // Estimate frame rate (assume 30fps as standard, could be improved)
+      const frameRate = 30;
+      const totalFrames = Math.floor(duration * frameRate);
+      
+      resolve({
+        duration_seconds: duration,
+        frame_rate: frameRate,
+        total_frames: totalFrames,
+        width,
+        height,
+        file_size: 0 // Unknown from URL
+      });
+    };
+    
+    video.onerror = (e) => {
+      console.error('[extractVideoMetadataFromUrl] Error loading video:', e);
+      reject(new Error('Failed to load video metadata from URL'));
+    };
+    
+    video.src = videoUrl;
+  });
+};
+
+/**
  * Uploads a video file to Supabase storage with real progress tracking.
  * Uses XMLHttpRequest to track actual upload progress.
  */
