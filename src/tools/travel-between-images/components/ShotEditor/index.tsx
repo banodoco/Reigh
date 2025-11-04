@@ -1436,7 +1436,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             id: sg.id.substring(0, 8),
             timeline_frame: sg.timeline_frame,
             has_metadata: !!sg.metadata,
-            has_pair_prompt: !!(sg.metadata as any)?.pair_prompt
+            has_pair_prompt: !!sg.metadata?.pair_prompt
           }))
         });
         
@@ -1476,11 +1476,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               id: sg.id.substring(0, 8),
               timeline_frame: sg.timeline_frame,
               has_metadata: !!sg.metadata,
-              has_pair_prompt: !!(sg.metadata as any)?.pair_prompt,
-              generation_type: (sg as any)?.generation?.type,
-              isVideo: (sg as any)?.generation?.type === 'video' ||
-                       (sg as any)?.generation?.type === 'video_travel_output' ||
-                       ((sg as any)?.generation?.location?.endsWith?.('.mp4'))
+              has_pair_prompt: !!sg.metadata?.pair_prompt,
+              generation_type: sg.generation?.type,
+              isVideo: sg.generation?.type === 'video' ||
+                       sg.generation?.type === 'video_travel_output' ||
+                       (sg.generation?.location?.endsWith?.('.mp4') ?? false)
             }))
           });
         }

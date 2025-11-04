@@ -878,12 +878,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             
             // Read pair prompts from props first, then fallback to metadata
             // Props take precedence when passed (used during batch generation setup)
-            const pairPromptFromMetadata = (startImage as any)?.metadata?.pair_prompt || '';
-            const pairNegativePromptFromMetadata = (startImage as any)?.metadata?.pair_negative_prompt || '';
+            // Type-safe access to metadata (no 'as any' needed)
+            const pairPromptFromMetadata = startImage?.metadata?.pair_prompt || '';
+            const pairNegativePromptFromMetadata = startImage?.metadata?.pair_negative_prompt || '';
             
             // Enhanced prompt: use prop if provided, otherwise fallback to metadata
             const enhancedPromptFromProps = enhancedPrompts?.[index] || '';
-            const enhancedPromptFromMetadata = (startImage as any)?.metadata?.enhanced_prompt || '';
+            const enhancedPromptFromMetadata = startImage?.metadata?.enhanced_prompt || '';
             const actualEnhancedPrompt = enhancedPromptFromProps || enhancedPromptFromMetadata;
 
             return (

@@ -60,6 +60,7 @@
 | **Mobile Video Toggle** | - | Mobile UI toggle functionality between MediaLightbox video playback and TaskDetailsModal for viewing generation parameters |
 | **Railway Deployment** | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Complete Railway.com deployment guide |
 | **Instrumentation System** | [instrumentation/README.md](src/integrations/supabase/instrumentation/README.md) | Centralized instrumentation management, diagnostics, and debugging tools |
+| **Shot Generation Data Flow** | See "Data Flow Architecture" section below | How shot image data flows from database to UI components |
 
 This document is meant to serve as a comprehensive view of Reigh's architecture. 
 
@@ -249,6 +250,123 @@ Shared hooks provide data management, state persistence, real-time updates, and 
 | **database triggers** | migr. SQL | Instant task processing, status broadcasts |
 | **lib/** utilities | `/src/shared/lib/` | Image/video upload (`imageUploader.ts`, `videoUploader.ts`), auth, math helpers, task creation patterns, reference image recropping (`recropReferences.ts`), generation transformers (`generationTransformers.ts`), URL resolution (`imageUrlResolver.ts`) |
 | **lib/tasks/** | `/src/shared/lib/tasks/` | Task creation utilities for specific task types: `imageUpscale.ts`, `imageInpaint.ts` |
+
+---
+
+## 3.5. Data Flow Architecture: Shot Generations
+
+### Overview
+Shot generation data flows from the database through React Query hooks to UI components. This architecture ensures a single source of truth for image data, metadata (including pair prompts), and timeline positions.
+
+### Key Types
+
+**`GenerationMetadata`** (`src/types/shots.ts`)
+- Single source of truth for all shot_generation metadata
+- Contains pair prompts, enhanced prompts, and timeline positioning data
+- Fields:
+  - `pair_prompt`, `pair_negative_prompt` - Prompts for video generation pairs
+  - `enhanced_prompt` - AI-enhanced version of base prompt
+  - `frame_spacing`, `is_keyframe`, `locked`, etc. - Timeline positioning metadata
+
+**`GenerationRow`** (`src/types/shots.ts`)
+- Base type for all generation data throughout the app
+- Used in galleries, lightboxes, shot managers
+- Includes optional `metadata: GenerationMetadata`
+
+**`TimelineGenerationRow`** (`src/types/shots.ts`)
+- Extends `GenerationRow` with required fields for timeline display
+- Guarantees `timeline_frame: number` and `metadata: GenerationMetadata` are present
+- Use when you need type-safe access to pair prompts or timeline positions
+
+### Data Loading Hooks
+
+**`useAllShotGenerations(shotId, options?)`** (`src/shared/hooks/useShotGenerations.ts`)
+- **Primary data source** for shot images
+- Loads ALL shot_generations (positioned + unpositioned) with full metadata
+- Returns `GenerationRow[]`
+- Use cases: galleries, lightboxes, shot image management
+- Options:
+  - `disableRefetch: boolean` - Prevents refetching during drag/persist operations
+
+**`useTimelineShotGenerations(shotId, options?)`** (`src/shared/hooks/useShotGenerations.ts`)
+- **Timeline-specific wrapper** around `useAllShotGenerations`
+- Filters to only positioned images with metadata
+- Returns `TimelineGenerationRow[]` (stronger type guarantees)
+- Use cases: Timeline display, pair prompt reading
+- Automatically filters out:
+  - Unpositioned images (`timeline_frame == null`)
+  - Images without metadata (`metadata == null`)
+
+### Type Guards
+
+**`isTimelineGeneration(gen)`** (`src/shared/lib/typeGuards.ts`)
+- Runtime check + TypeScript type narrowing
+- Ensures both `timeline_frame` and `metadata` are present
+- Example:
+  ```typescript
+  const timelineImages = allImages.filter(isTimelineGeneration);
+  // TypeScript now knows timelineImages have metadata
+  timelineImages.forEach(img => {
+    console.log(img.metadata.pair_prompt); // No type error!
+  });
+  ```
+
+### Data Flow Diagram
+
+```
+Database (shot_generations table)
+  ↓
+useAllShotGenerations (loads all with metadata)
+  ↓
+  ├─→ Galleries / Lightboxes (GenerationRow[])
+  ├─→ Shot Image Manager (GenerationRow[])
+  └─→ useTimelineShotGenerations (filters + types)
+       ↓
+       Timeline Components (TimelineGenerationRow[])
+         ↓
+         Pair Prompts Display
+```
+
+### Best Practices
+
+1. **Use `useAllShotGenerations` by default** - It's the single source of truth
+2. **Use `useTimelineShotGenerations` for timeline UI** - Provides type safety for metadata access
+3. **Never cast metadata with `as any`** - Use proper types instead
+4. **Use type guards for filtering** - `isTimelineGeneration` provides both runtime check and type narrowing
+5. **Metadata is always loaded** - Both hooks fetch the full metadata field from the database
+
+### Common Patterns
+
+**Reading pair prompts in Timeline:**
+```typescript
+const { data: timelineImages } = useTimelineShotGenerations(shotId);
+// Type-safe access (no 'as any' needed)
+const pairPrompt = timelineImages?.[0]?.metadata.pair_prompt || '';
+```
+
+**Filtering positioned images:**
+```typescript
+const { data: allImages } = useAllShotGenerations(shotId);
+const timelineImages = allImages?.filter(isTimelineGeneration) || [];
+// timelineImages is now TimelineGenerationRow[]
+```
+
+**Updating pair prompts:**
+```typescript
+// Update via shot_generations table
+await supabase
+  .from('shot_generations')
+  .update({ 
+    metadata: { 
+      ...existing.metadata, 
+      pair_prompt: newPrompt 
+    } 
+  })
+  .eq('id', shotGenerationId);
+
+// Invalidate cache to trigger refetch
+queryClient.invalidateQueries(['unified-generations', 'shot', shotId]);
+```
 
 ---
 
