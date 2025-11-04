@@ -139,14 +139,23 @@ export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
   // fallback to full_orchestrator_payload (old format)
   const orchestrator: any = params.orchestrator_details || params.full_orchestrator_payload || {};
   
-  console.log('[ApplySettings] 🔍 Task data structure:', {
+  // USE console.error so this shows in production logs
+  console.error('[ApplySettings] 🔍 TASK DATA STRUCTURE:', {
     hasParams: !!params,
     hasOrchestratorDetails: !!params.orchestrator_details,
     hasFullOrchestratorPayload: !!params.full_orchestrator_payload,
     usingOrchestrator: params.orchestrator_details ? 'orchestrator_details' : (params.full_orchestrator_payload ? 'full_orchestrator_payload' : 'none'),
     paramsKeys: Object.keys(params).slice(0, 15),
     orchestratorKeys: Object.keys(orchestrator).slice(0, 15),
-    structureVideoPath: orchestrator.structure_video_path || 'NOT FOUND'
+    structureVideoPath: orchestrator.structure_video_path || 'NOT FOUND',
+    // MOST SUSPECT: Show actual orchestrator content for structure video fields
+    orchestrator_structure_fields: {
+      structure_video_path: orchestrator.structure_video_path,
+      structure_video_treatment: orchestrator.structure_video_treatment,
+      structure_video_motion_strength: orchestrator.structure_video_motion_strength,
+      structure_video_type: orchestrator.structure_video_type,
+      structure_type: orchestrator.structure_type,  // Alternative field name
+    }
   });
   
   return { params, orchestrator };
@@ -219,14 +228,27 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     structureVideoType: orchestrator.structure_video_type ?? orchestrator.structure_type ?? params.structure_video_type ?? params.structure_type,
   };
   
-  console.log('[ApplySettings] 📋 Extracted settings:', {
+  // USE console.error for structure video fields so they show in production
+  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (STRUCTURE VIDEO):', {
+    structureVideo: {
+      path: extracted.structureVideoPath || 'NOT SET',
+      type: extracted.structureVideoType,
+      treatment: extracted.structureVideoTreatment,
+      motionStrength: extracted.structureVideoMotionStrength,
+      pathLength: extracted.structureVideoPath?.length || 0,
+      pathPreview: extracted.structureVideoPath ? extracted.structureVideoPath.substring(0, 80) + '...' : 'NULL'
+    },
+    segmentFramesExpanded: extracted.segmentFramesExpanded,
+    hasPhaseConfig: !!extracted.phaseConfig,
+  });
+  
+  console.log('[ApplySettings] 📋 Extracted settings (full):', {
     prompt: extracted.prompt ? `"${extracted.prompt.substring(0, 50)}..."` : undefined,
     prompts: extracted.prompts ? `${extracted.prompts.length} prompts` : undefined,
     negativePrompt: extracted.negativePrompt ? `"${extracted.negativePrompt.substring(0, 30)}..."` : undefined,
     model: extracted.model,
     steps: extracted.steps,
     frames: extracted.frames,
-    segmentFramesExpanded: extracted.segmentFramesExpanded,  // NEW: log the full array
     context: extracted.context,
     generationMode: extracted.generationMode,
     advancedMode: extracted.advancedMode,
@@ -234,15 +256,8 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     turboMode: extracted.turboMode,
     enhancePrompt: extracted.enhancePrompt,
     amountOfMotion: extracted.amountOfMotion,
-    hasPhaseConfig: !!extracted.phaseConfig,
     hasLoras: !!(extracted.loras && extracted.loras.length > 0),
     lorasCount: extracted.loras?.length,
-    structureVideo: {
-      path: extracted.structureVideoPath || 'NOT SET',
-      type: extracted.structureVideoType,
-      treatment: extracted.structureVideoTreatment,
-      motionStrength: extracted.structureVideoMotionStrength,
-    }
   });
   
   // Log warning if structure video appears to exist but wasn't extracted
@@ -628,13 +643,15 @@ export const applyStructureVideo = async (
   const paramsHasField = 'structure_video_path' in taskData.params;
   const hasStructureVideoInTask = orchestratorHasField || paramsHasField;
   
-  console.log('[ApplySettings] 🔍 Structure video field check:', {
+  // USE console.error so this shows in production logs
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK:', {
     orchestratorHasField,
     paramsHasField,
     orchestratorValue: taskData.orchestrator.structure_video_path,
     paramsValue: taskData.params.structure_video_path,
     extractedValue: settings.structureVideoPath,
-    hasStructureVideoInTask
+    hasStructureVideoInTask,
+    willApply: !!settings.structureVideoPath
   });
   
   if (!hasStructureVideoInTask) {
@@ -643,8 +660,9 @@ export const applyStructureVideo = async (
   }
   
   if (settings.structureVideoPath) {
-    console.log('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
-    console.log('[ApplySettings] 🎥 Structure video extracted values:', {
+    // USE console.error so this shows in production logs
+    console.error('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
+    console.error('[ApplySettings] 🎥 Structure video extracted values:', {
       path: settings.structureVideoPath,
       pathFilename: settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1),
       treatment: settings.structureVideoTreatment,
@@ -664,7 +682,7 @@ export const applyStructureVideo = async (
     }
     
     try {
-      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
+      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange with:', {
         videoPath: settings.structureVideoPath,
         metadata: null,
         treatment: settings.structureVideoTreatment || 'adjust',
@@ -680,8 +698,8 @@ export const applyStructureVideo = async (
         settings.structureVideoType || 'flow'
       );
       
-      console.log('[ApplySettings] ✅ Structure video change handler completed successfully');
-      console.log('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
+      console.error('[ApplySettings] ✅ Structure video change handler completed successfully');
+      console.error('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
       return { success: true, settingName: 'structureVideo' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
