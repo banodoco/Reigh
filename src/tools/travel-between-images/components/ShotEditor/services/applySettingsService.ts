@@ -243,9 +243,10 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     hasPhaseConfig: !!extracted.phaseConfig,
   });
   
-  console.log('[ApplySettings] 📋 Extracted settings (full):', {
+  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (PROMPTS):', {
     prompt: extracted.prompt ? `"${extracted.prompt.substring(0, 50)}..."` : undefined,
     prompts: extracted.prompts ? `${extracted.prompts.length} prompts` : undefined,
+    promptsArray: extracted.prompts?.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
     negativePrompt: extracted.negativePrompt ? `"${extracted.negativePrompt.substring(0, 30)}..."` : undefined,
     model: extracted.model,
     steps: extracted.steps,
@@ -300,13 +301,13 @@ export const applyPromptSettings = async (
 ): Promise<ApplyResult> => {
   // Apply main prompt
   if (typeof settings.prompt === 'string' && settings.prompt.trim()) {
-    console.log('[ApplySettings] 💬 Applying prompt:', {
+    console.error('[ApplySettings] 💬 Applying main prompt:', {
       prompt: `"${settings.prompt.substring(0, 60)}..."`,
       length: settings.prompt.length
     });
     context.onBatchVideoPromptChange(settings.prompt);
   } else {
-    console.log('[ApplySettings] ⏭️  Skipping prompt (undefined, empty, or not string)');
+    console.error('[ApplySettings] ⏭️  Skipping main prompt (undefined, empty, or not string)');
   }
   
   // Apply individual prompts to pair configs (regardless of current mode)
