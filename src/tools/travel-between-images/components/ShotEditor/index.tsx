@@ -170,6 +170,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [selectedShot?.id, hasInitializedStructureVideo]);
 
+  // Log current structure video state values whenever they change
+  useEffect(() => {
+    console.log('[StructureVideoDebug] 📺 Current structure video state:', {
+      path: structureVideoPath ? structureVideoPath.substring(0, 60) + '...' : null,
+      hasPath: !!structureVideoPath,
+      hasMetadata: !!structureVideoMetadata,
+      treatment: structureVideoTreatment,
+      motionStrength: structureVideoMotionStrength,
+      type: structureVideoType,
+      selectedShotId: selectedShot?.id?.substring(0, 8)
+    });
+  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType, selectedShot?.id]);
+
   // Load structure video from settings when shot loads
   useEffect(() => {
     // USE console.error so this shows in production
@@ -193,11 +206,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           motionStrength: structureVideoSettings.motionStrength,
           structureType: structureVideoSettings.structureType
         });
+        console.log('[StructureVideoDebug] 🔄 About to set state from DB:', {
+          path: structureVideoSettings.path.substring(0, 60) + '...',
+          treatment: structureVideoSettings.treatment || 'adjust',
+          motionStrength: structureVideoSettings.motionStrength ?? 1.0,
+          structureType: structureVideoSettings.structureType || 'flow'
+        });
         setStructureVideoPath(structureVideoSettings.path);
         setStructureVideoMetadata(structureVideoSettings.metadata || null);
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
+        console.log('[StructureVideoDebug] ✅ State set from DB complete');
       } else {
         // No saved structure video - initialize with defaults
         console.error('[ShotEditor] ⚠️  No structure video in settings, initializing to defaults:', {
@@ -233,13 +253,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       previousStructureType: structureVideoType // Show what it was before
     });
     
+    console.log('[StructureVideoDebug] 🔄 Setting state values:', {
+      videoPath: videoPath ? videoPath.substring(0, 60) + '...' : null,
+      hasMetadata: !!metadata,
+      treatment,
+      motionStrength,
+      structureType
+    });
+    
     setStructureVideoPath(videoPath);
     setStructureVideoMetadata(metadata); // Always update, even if null (important for clearing old metadata)
     setStructureVideoTreatment(treatment);
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);
     
-    console.log('[ShotEditor] [DEBUG] State setters called, new structureType should be:', structureType);
+    console.log('[StructureVideoDebug] ✅ State setters called successfully');
 
     // Save to database
     if (videoPath) {
