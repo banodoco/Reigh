@@ -91,12 +91,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           )
         `)
         .eq('shot_id', shotId)
-        .order('timeline_frame', { ascending: true })
+        .not('timeline_frame', 'is', null) // CRITICAL: Only load positioned images (on timeline)
+        .order('timeline_frame', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true });
 
-      console.debug('[PositionLoadDebug] Loaded shot_generations from DB:', {
+      console.debug('[PositionLoadDebug] Loaded POSITIONED shot_generations from DB:', {
         shotId,
         count: data?.length || 0,
+        note: 'Only includes images with timeline_frame set (positioned on timeline)',
         items: (data || []).map((sg: any) => ({
           id: sg.id,
           genId: sg.generation_id,
