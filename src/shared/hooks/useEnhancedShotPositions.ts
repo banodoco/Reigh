@@ -1034,6 +1034,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
   // Get pair prompts in Timeline component format as a reactive value
   const pairPrompts = useMemo((): Record<number, { prompt: string; negativePrompt: string }> => {
+    // TOP-LEVEL DEBUG: Database read for pair prompts
+    console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - totalShotGenerations:', shotGenerations.length);
+    
     // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     const filteredGenerations = shotGenerations.filter(sg => {
       // Must have a generation
@@ -1050,13 +1053,18 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       return !isVideo;
     });
 
+    console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - filteredGenerations:', filteredGenerations.length);
+
     // 🎯 PERFORMANCE: Early return if no generations to process
     if (filteredGenerations.length === 0) {
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - NO GENERATIONS, returning empty');
       return {};
     }
 
     const sortedGenerations = [...filteredGenerations]
       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+
+    console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - sortedGenerations:', sortedGenerations.length);
 
     const pairPromptsData: Record<number, { prompt: string; negativePrompt: string }> = {};
 
@@ -1064,13 +1072,26 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
       
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - checking pair', i);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - firstItem.id:', firstItem.id.substring(0, 8));
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - firstItem.metadata:', firstItem.metadata);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - pair_prompt:', firstItem.metadata?.pair_prompt);
+      console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - pair_negative_prompt:', firstItem.metadata?.pair_negative_prompt);
+      
       if (firstItem.metadata?.pair_prompt || firstItem.metadata?.pair_negative_prompt) {
         pairPromptsData[i] = {
           prompt: firstItem.metadata.pair_prompt || '',
           negativePrompt: firstItem.metadata.pair_negative_prompt || '',
         };
+        console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - ADDED pair', i, pairPromptsData[i]);
+      } else {
+        console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - SKIPPED pair', i, '(no prompt in metadata)');
       }
     }
+
+    console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - FINAL pairPromptsData:', pairPromptsData);
+    console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - FINAL pairPromptsKeys:', Object.keys(pairPromptsData));
+    console.error('[useEnhancedShotPositions] PAIR PROMPTS READ - FINAL pairPromptsCount:', Object.keys(pairPromptsData).length);
 
     return pairPromptsData;
   }, [shotGenerations]);

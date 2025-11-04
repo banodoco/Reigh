@@ -237,6 +237,16 @@ const Timeline: React.FC<TimelineProps> = ({
   const actualPairPrompts = pairPrompts || databasePairPrompts; // Fallback to props for backward compatibility
   const isLoading = propShotGenerations ? false : hookData.isLoading; // If props provided, never show loading (shared data)
   
+  // TOP-LEVEL DEBUG: Pair prompts at Timeline level
+  console.error('[Timeline] PAIR PROMPTS SOURCE - shotId:', shotId.substring(0, 8));
+  console.error('[Timeline] PAIR PROMPTS SOURCE - propPairPrompts:', pairPrompts);
+  console.error('[Timeline] PAIR PROMPTS SOURCE - databasePairPrompts:', databasePairPrompts);
+  console.error('[Timeline] PAIR PROMPTS SOURCE - databasePairPromptsKeys:', databasePairPrompts ? Object.keys(databasePairPrompts) : 'NONE');
+  console.error('[Timeline] PAIR PROMPTS SOURCE - databasePairPromptsCount:', databasePairPrompts ? Object.keys(databasePairPrompts).length : 0);
+  console.error('[Timeline] PAIR PROMPTS SOURCE - actualPairPrompts:', actualPairPrompts);
+  console.error('[Timeline] PAIR PROMPTS SOURCE - actualPairPromptsKeys:', actualPairPrompts ? Object.keys(actualPairPrompts) : 'NONE');
+  console.error('[Timeline] PAIR PROMPTS SOURCE - actualPairPromptsCount:', actualPairPrompts ? Object.keys(actualPairPrompts).length : 0);
+  
   // Use provided images or generate from shotGenerations
   const images = React.useMemo(() => {
     let result: (GenerationRow & { timeline_frame?: number })[];
