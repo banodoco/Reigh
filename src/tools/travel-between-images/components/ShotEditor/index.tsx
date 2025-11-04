@@ -1409,7 +1409,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           .from('shot_generations')
           .select('id, timeline_frame, metadata')
           .eq('shot_id', selectedShot.id)
-          .order('timeline_frame', { ascending: true });
+          .order('timeline_frame', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
         
         console.error('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
           count: freshGens?.length || 0,
