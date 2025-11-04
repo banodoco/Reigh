@@ -149,6 +149,9 @@ export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
     paramsKeys: Object.keys(params).slice(0, 15),
     orchestratorKeys: Object.keys(orchestrator).slice(0, 15),
     structureVideoPath: orchestrator.structure_video_path || 'NOT FOUND',
+    basePromptsInOrchestratorDetails: params.orchestrator_details?.base_prompts_expanded,
+    basePromptsInFullPayload: params.full_orchestrator_payload?.base_prompts_expanded,
+    basePromptsInSelectedOrchestrator: orchestrator.base_prompts_expanded,
     // MOST SUSPECT: Show actual orchestrator content for structure video fields
     orchestrator_structure_fields: {
       structure_video_path: orchestrator.structure_video_path,
