@@ -692,7 +692,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             pathValue: structureVideoPath ? structureVideoPath.substring(0, 60) + '...' : null,
             willRender: shotId && projectId && onStructureVideoChange && !!structureVideoPath
           };
-          console.log('[StructureVideoDebug] 🎬 TimelineContainer render check:', conditionCheck);
+          console.error('[StructureVideoDebug] 🎬 TimelineContainer render check:', conditionCheck);
           return null;
         })()}
         {shotId && projectId && onStructureVideoChange && (

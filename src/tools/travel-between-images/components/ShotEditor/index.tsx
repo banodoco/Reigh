@@ -172,7 +172,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Log current structure video state values whenever they change
   useEffect(() => {
-    console.log('[StructureVideoDebug] 📺 Current structure video state:', {
+    console.error('[StructureVideoDebug] 📺 Current structure video state:', {
       path: structureVideoPath ? structureVideoPath.substring(0, 60) + '...' : null,
       hasPath: !!structureVideoPath,
       hasMetadata: !!structureVideoMetadata,
@@ -206,7 +206,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           motionStrength: structureVideoSettings.motionStrength,
           structureType: structureVideoSettings.structureType
         });
-        console.log('[StructureVideoDebug] 🔄 About to set state from DB:', {
+        console.error('[StructureVideoDebug] 🔄 About to set state from DB:', {
           path: structureVideoSettings.path.substring(0, 60) + '...',
           treatment: structureVideoSettings.treatment || 'adjust',
           motionStrength: structureVideoSettings.motionStrength ?? 1.0,
@@ -217,7 +217,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
-        console.log('[StructureVideoDebug] ✅ State set from DB complete');
+        console.error('[StructureVideoDebug] ✅ State set from DB complete');
       } else {
         // No saved structure video - initialize with defaults
         console.error('[ShotEditor] ⚠️  No structure video in settings, initializing to defaults:', {
@@ -253,7 +253,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       previousStructureType: structureVideoType // Show what it was before
     });
     
-    console.log('[StructureVideoDebug] 🔄 Setting state values:', {
+    console.error('[StructureVideoDebug] 🔄 Setting state values:', {
       videoPath: videoPath ? videoPath.substring(0, 60) + '...' : null,
       hasMetadata: !!metadata,
       treatment,
@@ -267,7 +267,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);
     
-    console.log('[StructureVideoDebug] ✅ State setters called successfully');
+    console.error('[StructureVideoDebug] ✅ State setters called successfully');
 
     // Save to database
     if (videoPath) {
