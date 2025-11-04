@@ -80,7 +80,7 @@ export interface ShotSettings {
 export interface ShotEditorProps {
   selectedShotId: string;
   projectId: string;
-  videoPairConfigs: VideoPairConfig[];
+  videoPairConfigs?: VideoPairConfig[]; // DEPRECATED - pair prompts now in shot_generations.metadata.pair_prompt
   
   // NEW: Settings bundle (preferred way)
   settings?: ShotSettings;

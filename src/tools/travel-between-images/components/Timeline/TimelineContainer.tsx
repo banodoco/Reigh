@@ -672,7 +672,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
-          style={{
+          style={{ 
             minHeight: "240px", 
             paddingTop: structureVideoPath ? "4rem" : "1rem",  // Show padding if structure video exists (metadata can be null during extraction)
             paddingBottom: "4.5rem" 

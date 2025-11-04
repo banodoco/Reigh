@@ -625,7 +625,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [dimensionSource, setDimensionSource] = useState<'project' | 'firstImage' | 'custom'>('firstImage');
   const [customWidth, setCustomWidth] = useState<number | undefined>(undefined);
   const [customHeight, setCustomHeight] = useState<number | undefined>(undefined);
-  const [videoPairConfigs, setVideoPairConfigs] = useState<any[]>([]);
+  // DEPRECATED: videoPairConfigs removed - pair prompts now stored in shot_generations.metadata.pair_prompt
   
   // Add state for toggling between shots and videos view
   const [showVideosView, setShowVideosView] = useState<boolean>(false);
@@ -869,7 +869,6 @@ const VideoTravelToolPage: React.FC = () => {
         // Shot from hash doesn't exist - redirect to main view
         console.log(`[VideoTravelTool] Shot ${hashShotId} not found, redirecting to main view`);
         setSelectedShot(null);
-        setVideoPairConfigs([]);
         setCurrentShotId(null);
         navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
         return;
@@ -955,7 +954,6 @@ const VideoTravelToolPage: React.FC = () => {
     if (!selectedProjectId) {
       if (selectedShotRef.current) {
         setSelectedShot(null);
-        setVideoPairConfigs([]);
         setCurrentShotId(null);
       }
       return;
@@ -968,12 +966,10 @@ const VideoTravelToolPage: React.FC = () => {
         }
       } else {
         setSelectedShot(null);
-        setVideoPairConfigs([]);
         setCurrentShotId(null);
       }
     } else if (!isLoading && shots !== undefined && selectedShotRef.current) {
       setSelectedShot(null);
-      setVideoPairConfigs([]);
       setCurrentShotId(null);
     }
   }, [shots, selectedProjectId, isLoading, setCurrentShotId]);
@@ -1062,41 +1058,9 @@ const VideoTravelToolPage: React.FC = () => {
   // This ensures consistency with ShotEditor's image selection logic
   const shotImagesForCalculation = needsFullImageData && fullShotImages.length > 0 ? fullShotImages : contextImages;
 
-  // Memoize video pair configs calculation using full image data
-  const computedVideoPairConfigs = useMemo(() => {
-    if (shotImagesForCalculation && shotImagesForCalculation.length >= 2) {
-      const nonVideoImages = shotImagesForCalculation.filter(img => !img.type?.includes('video'));
-      if (nonVideoImages.length >= 2) {
-        const pairs = [];
-        for (let i = 0; i < nonVideoImages.length - 1; i++) {
-          pairs.push({
-            id: `${nonVideoImages[i].id}_${nonVideoImages[i + 1].id}`,
-            imageA: nonVideoImages[i],
-            imageB: nonVideoImages[i + 1],
-            prompt: '',
-            frames: 30,
-            context: 10,
-          });
-        }
-        return pairs;
-      }
-    }
-    return [];
-  }, [shotImagesForCalculation]);
-
-  // Update videoPairConfigs when computed configs change
-  // OPTIMIZATION: Use React.startTransition to prevent blocking renders
-  const videoPairConfigsRef = useRef(videoPairConfigs);
-  videoPairConfigsRef.current = videoPairConfigs;
-  
-  useEffect(() => {
-    // Only update if the configs have actually changed to prevent infinite loops
-    if (!deepEqual(videoPairConfigsRef.current, computedVideoPairConfigs)) {
-      startTransition(() => {
-        setVideoPairConfigs(computedVideoPairConfigs);
-      });
-    }
-  }, [computedVideoPairConfigs]);
+  // DEPRECATED: videoPairConfigs computation removed
+  // Pair prompts are now stored directly in shot_generations.metadata.pair_prompt
+  // and accessed via useEnhancedShotPositions hook
 
   // Clear any previously selected shot unless this navigation explicitly came from a shot click
   // OR if there's a hash in the URL (direct navigation to a specific shot)
@@ -1108,7 +1072,6 @@ const VideoTravelToolPage: React.FC = () => {
       }
       if (selectedShot) {
         setSelectedShot(null);
-        setVideoPairConfigs([]);
       }
     }
     // We only want this to run once on mount
@@ -1127,7 +1090,6 @@ const VideoTravelToolPage: React.FC = () => {
       if (selectedShot) {
         startTransition(() => {
           setSelectedShot(null);
-          setVideoPairConfigs([]);
         });
       }
       return;
@@ -1148,7 +1110,6 @@ const VideoTravelToolPage: React.FC = () => {
         console.log(`[VideoTravelTool] Shot ${currentShotId} not found, redirecting to main view`);
         startTransition(() => {
           setSelectedShot(null);
-          setVideoPairConfigs([]);
           setCurrentShotId(null);
         });
         navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
@@ -1166,13 +1127,11 @@ const VideoTravelToolPage: React.FC = () => {
   useEffect(() => {
     if (!currentShotId && selectedShot) {
       setSelectedShot(null);
-      setVideoPairConfigs([]);
     }
   }, [currentShotId, selectedShot]);
 
   const handleBackToShotList = useCallback(() => {
     setSelectedShot(null);
-    setVideoPairConfigs([]);
     setCurrentShotId(null);
     // Reset videos view when going back to shot list
     setShowVideosView(false);
@@ -1553,7 +1512,6 @@ const VideoTravelToolPage: React.FC = () => {
               <ShotEditor
                 selectedShotId={shotToEdit.id}
                 projectId={selectedProjectId}
-              videoPairConfigs={videoPairConfigs}
               videoControlMode={videoControlMode}
               batchVideoPrompt={batchVideoPrompt}
               batchVideoFrames={batchVideoFrames}

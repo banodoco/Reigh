@@ -348,14 +348,14 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       extractFrames();
     } else {
       // Wait for video to load
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    video.addEventListener('error', handleError);
-  }
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('error', handleError);
+    }
 
-  return () => {
-    video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    video.removeEventListener('error', handleError);
-  };
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('error', handleError);
+    };
 }, [videoUrl, effectiveMetadata, treatment]); // REMOVED: containerWidth, fullMin, fullMax
   
   const isCanvasBlank = useCallback((canvas: HTMLCanvasElement): boolean => {
