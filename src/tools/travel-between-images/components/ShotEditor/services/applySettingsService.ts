@@ -312,42 +312,65 @@ export const applyPromptSettings = async (
   // Apply individual prompts to pair configs (regardless of current mode)
   // These prompts populate the pair fields whether you're in batch or timeline mode
   if (settings.prompts && settings.prompts.length > 1 && context.updatePairPromptsByIndex) {
-    console.log('[ApplySettings] 📝 Applying individual prompts to pair configs:', {
+    console.error('[ApplySettings] 📝 === APPLYING INDIVIDUAL PROMPTS TO PAIR CONFIGS ===');
+    console.error('[ApplySettings] 📝 Prompt application details:', {
       promptCount: settings.prompts.length,
       hasNegativePrompts: !!(settings.negativePrompts && settings.negativePrompts.length > 0),
       currentMode: context.currentGenerationMode,
+      hasCallback: !!context.updatePairPromptsByIndex,
+      prompts: settings.prompts.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
       note: 'Prompts applied regardless of current mode'
     });
     
     const errors: string[] = [];
+    const successes: number[] = [];
     
     for (let i = 0; i < settings.prompts.length; i++) {
       const pairPrompt = settings.prompts[i]?.trim();
       const pairNegativePrompt = settings.negativePrompts?.[i]?.trim() || '';
       
       if (pairPrompt) {
-        console.log('[ApplySettings] 📝 Applying prompt for pair', i, ':', {
+        console.error(`[ApplySettings] 📝 Applying prompt for pair ${i}:`, {
           prompt: `"${pairPrompt.substring(0, 40)}..."`,
+          promptLength: pairPrompt.length,
           hasNegativePrompt: !!pairNegativePrompt
         });
         
         try {
           await context.updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
+          successes.push(i);
+          console.error(`[ApplySettings] ✅ Successfully saved prompt for pair ${i}`);
         } catch (e) {
           const error = `Failed to apply prompt for pair ${i}: ${e}`;
-          console.error(`[ApplySettings] ❌ ${error}`);
+          console.error(`[ApplySettings] ❌ ${error}`, e);
           errors.push(error);
         }
+      } else {
+        console.error(`[ApplySettings] ⏭️ Skipping pair ${i} - empty prompt`);
       }
     }
     
-    console.log('[ApplySettings] ✅ Individual prompts applied to pair configs');
+    console.error('[ApplySettings] 📊 PAIR PROMPTS APPLICATION SUMMARY:', {
+      totalPrompts: settings.prompts.length,
+      successCount: successes.length,
+      errorCount: errors.length,
+      skippedCount: settings.prompts.length - successes.length - errors.length,
+      successIndexes: successes,
+      errors: errors
+    });
     
     if (errors.length > 0) {
       return { success: false, settingName: 'prompts', error: errors.join('; ') };
     }
-  } else if (settings.prompts && settings.prompts.length > 1) {
-    console.log('[ApplySettings] ⏭️  Skipping individual prompts (updatePairPromptsByIndex not available)');
+  } else {
+    console.error('[ApplySettings] ⏭️ SKIPPING INDIVIDUAL PROMPTS:', {
+      hasPrompts: !!settings.prompts,
+      promptsLength: settings.prompts?.length,
+      hasCallback: !!context.updatePairPromptsByIndex,
+      reason: !settings.prompts ? 'no prompts' : 
+              settings.prompts.length <= 1 ? 'only 1 or fewer prompts' : 
+              !context.updatePairPromptsByIndex ? 'callback not available' : 'unknown'
+    });
   }
   
   // Apply negative prompt
