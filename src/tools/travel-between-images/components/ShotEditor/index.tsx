@@ -1409,6 +1409,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           .from('shot_generations')
           .select('id, timeline_frame, metadata')
           .eq('shot_id', selectedShot.id)
+          .not('timeline_frame', 'is', null) // CRITICAL: Only positioned images
           .order('timeline_frame', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: true });
         
