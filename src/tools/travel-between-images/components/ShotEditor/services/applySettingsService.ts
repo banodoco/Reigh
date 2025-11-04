@@ -309,11 +309,14 @@ export const applyPromptSettings = async (
     console.log('[ApplySettings] ⏭️  Skipping prompt (undefined, empty, or not string)');
   }
   
-  // Apply individual prompts for timeline mode
-  if (settings.prompts && settings.prompts.length > 1 && context.currentGenerationMode === 'timeline') {
-    console.log('[ApplySettings] 📝 Applying individual prompts for timeline mode:', {
+  // Apply individual prompts to pair configs (regardless of current mode)
+  // These prompts populate the pair fields whether you're in batch or timeline mode
+  if (settings.prompts && settings.prompts.length > 1 && context.updatePairPromptsByIndex) {
+    console.log('[ApplySettings] 📝 Applying individual prompts to pair configs:', {
       promptCount: settings.prompts.length,
-      hasNegativePrompts: !!(settings.negativePrompts && settings.negativePrompts.length > 0)
+      hasNegativePrompts: !!(settings.negativePrompts && settings.negativePrompts.length > 0),
+      currentMode: context.currentGenerationMode,
+      note: 'Prompts applied regardless of current mode'
     });
     
     const errors: string[] = [];
@@ -328,25 +331,23 @@ export const applyPromptSettings = async (
           hasNegativePrompt: !!pairNegativePrompt
         });
         
-        if (context.updatePairPromptsByIndex) {
-          try {
-            await context.updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
-          } catch (e) {
-            const error = `Failed to apply prompt for pair ${i}: ${e}`;
-            console.error(`[ApplySettings] ❌ ${error}`);
-            errors.push(error);
-          }
+        try {
+          await context.updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
+        } catch (e) {
+          const error = `Failed to apply prompt for pair ${i}: ${e}`;
+          console.error(`[ApplySettings] ❌ ${error}`);
+          errors.push(error);
         }
       }
     }
     
-    console.log('[ApplySettings] ✅ Individual prompts applied');
+    console.log('[ApplySettings] ✅ Individual prompts applied to pair configs');
     
     if (errors.length > 0) {
       return { success: false, settingName: 'prompts', error: errors.join('; ') };
     }
   } else if (settings.prompts && settings.prompts.length > 1) {
-    console.log('[ApplySettings] ⏭️  Skipping individual prompts (not in timeline mode)');
+    console.log('[ApplySettings] ⏭️  Skipping individual prompts (updatePairPromptsByIndex not available)');
   }
   
   // Apply negative prompt
