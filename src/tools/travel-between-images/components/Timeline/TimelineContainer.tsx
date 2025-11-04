@@ -563,7 +563,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       {/* Timeline wrapper with fixed overlays */}
       <div className="relative">
         {/* Fixed top controls overlay - Zoom and Structure controls (not in read-only) */}
-        {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && structureVideoMetadata && (
+        {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && (
         <div
           className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
           style={{ top: '55px' }}
@@ -672,9 +672,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
-          style={{ 
+          style={{
             minHeight: "240px", 
-            paddingTop: structureVideoPath && structureVideoMetadata ? "4rem" : "1rem", 
+            paddingTop: structureVideoPath ? "4rem" : "1rem",  // Show padding if structure video exists (metadata can be null during extraction)
             paddingBottom: "4.5rem" 
           }}
           onDragEnter={handleDragEnter}
@@ -700,6 +700,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               }}
               onRemove={() => {
                 onStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+              }}
+              onMetadataExtracted={(metadata) => {
+                // Save extracted metadata back to database (backup when metadata wasn't saved initially)
+                console.log('[TimelineContainer] 💾 Saving extracted metadata back to database');
+                onStructureVideoChange(structureVideoPath, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
               }}
               fullMin={fullMin}
               fullMax={fullMax}

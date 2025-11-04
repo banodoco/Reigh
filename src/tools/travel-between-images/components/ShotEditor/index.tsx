@@ -225,6 +225,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     console.log('[ShotEditor] [DEBUG] handleStructureVideoChange called:', {
       videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
       hasMetadata: !!metadata,
+      metadataDetails: metadata ? { totalFrames: metadata.total_frames, frameRate: metadata.frame_rate } : null,
       treatment,
       motionStrength,
       structureType,
@@ -232,9 +233,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
     
     setStructureVideoPath(videoPath);
-    if (metadata) {
-      setStructureVideoMetadata(metadata);
-    }
+    setStructureVideoMetadata(metadata); // Always update, even if null (important for clearing old metadata)
     setStructureVideoTreatment(treatment);
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);

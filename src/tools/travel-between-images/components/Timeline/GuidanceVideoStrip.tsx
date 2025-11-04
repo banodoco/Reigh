@@ -16,6 +16,7 @@ interface GuidanceVideoStripProps {
   onTreatmentChange: (treatment: 'adjust' | 'clip') => void;
   onMotionStrengthChange: (strength: number) => void;
   onRemove: () => void;
+  onMetadataExtracted?: (metadata: VideoMetadata) => void; // Callback when metadata is extracted (so it can be saved to DB)
   // Timeline coordinate system
   fullMin: number;
   fullMax: number;
@@ -85,6 +86,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   onTreatmentChange,
   onMotionStrengthChange,
   onRemove,
+  onMetadataExtracted,
   fullMin,
   fullMax,
   fullRange,
@@ -134,6 +136,12 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
             dimensions: `${metadata.width}x${metadata.height}`
           });
           setExtractedMetadata(metadata);
+          
+          // Save extracted metadata back to database via callback
+          if (onMetadataExtracted) {
+            console.log('[GuidanceVideoStrip] 💾 Calling onMetadataExtracted to save metadata to database');
+            onMetadataExtracted(metadata);
+          }
         })
         .catch(error => {
           console.error('[GuidanceVideoStrip] ❌ Failed to extract metadata:', error);
@@ -142,7 +150,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           setIsExtractingMetadata(false);
         });
     }
-  }, [videoUrl, videoMetadata, isExtractingMetadata, extractedMetadata]);
+  }, [videoUrl, videoMetadata, isExtractingMetadata, extractedMetadata, onMetadataExtracted]);
   
   // Calculate timeline duration and frames
   const ASSUMED_TIMELINE_FPS = 24;
