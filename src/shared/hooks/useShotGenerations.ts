@@ -200,6 +200,7 @@ export const useAllShotGenerations = (
         .select(`
           id,
           timeline_frame,
+          metadata,
           generation:generations(
             id,
             location,
@@ -261,6 +262,7 @@ export const useAllShotGenerations = (
           shot_generation_id: sg.id,
           position: Math.floor((sg.timeline_frame ?? 0) / 50),
           timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
+          metadata: sg.metadata, // Include metadata for pair prompts
           imageUrl: sg.generation?.location,
           thumbUrl: sg.generation?.location,
         }));
