@@ -1053,11 +1053,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     // 🎯 PERFORMANCE: Early return if no generations to process
     // Prevents wasteful iteration and logging when there's nothing to pair
     if (filteredGenerations.length === 0) {
-      console.log('[PairPrompts-GETTER] ⏭️ SKIPPING - no generations to process');
+      console.error('[PairPrompts-GETTER] ⏭️ SKIPPING - no generations to process');
       return {};
     }
 
-    console.log('[PairPrompts-GETTER] 📖 Reading pair prompts from shotGenerations:', {
+    console.error('[PairPrompts-GETTER] 📖 Reading pair prompts from shotGenerations:', {
       totalGenerations: shotGenerations.length,
       afterVideoFilter: filteredGenerations.length,
       filteredShotGenIds: filteredGenerations.map(sg => ({
@@ -1075,7 +1075,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     // Each pair is represented by its first item (index in the sorted array)
     for (let i = 0; i < sortedGenerations.length - 1; i++) {
       const firstItem = sortedGenerations[i];
-      console.log(`[PairPrompts-GETTER] 🔍 Checking pair ${i}:`, {
+      console.error(`[PairPrompts-GETTER] 🔍 Checking pair ${i}:`, {
         shotGenId: firstItem.id.substring(0, 8),
         timeline_frame: firstItem.timeline_frame,
         has_pair_prompt: !!firstItem.metadata?.pair_prompt,
@@ -1089,11 +1089,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           prompt: firstItem.metadata.pair_prompt || '',
           negativePrompt: firstItem.metadata.pair_negative_prompt || '',
         };
-        console.log(`[PairPrompts-GETTER] ✅ Added pair ${i} to pairPromptsData`);
+        console.error(`[PairPrompts-GETTER] ✅ Added pair ${i} to pairPromptsData`);
       }
     }
 
-    console.log('[PairPrompts-GETTER] 📊 Final pair prompts data:', {
+    console.error('[PairPrompts-GETTER] 📊 Final pair prompts data:', {
       totalPairs: sortedGenerations.length - 1,
       customPairs: Object.keys(pairPromptsData).length,
       pairIndexes: Object.keys(pairPromptsData).map(Number),
