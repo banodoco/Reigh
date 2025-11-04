@@ -668,6 +668,104 @@ export const applyLoRAs = async (
   }
 };
 
+// ==================== Apply Structure Video ====================
+
+export const applyStructureVideo = async (
+  settings: ExtractedSettings,
+  context: ApplyContext,
+  taskData: TaskData
+): Promise<ApplyResult> => {
+  const orchestratorHasField = 'structure_video_path' in taskData.orchestrator;
+  const paramsHasField = 'structure_video_path' in taskData.params;
+  const hasStructureVideoInTask = orchestratorHasField || paramsHasField;
+  
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorHasField:', orchestratorHasField);
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsHasField:', paramsHasField);
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorValue:', taskData.orchestrator.structure_video_path);
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsValue:', taskData.params.structure_video_path);
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - extractedValue:', settings.structureVideoPath);
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - hasStructureVideoInTask:', hasStructureVideoInTask);
+  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - willApply:', !!settings.structureVideoPath);
+  
+  if (!hasStructureVideoInTask) {
+    console.log('[ApplySettings] ⏭️  Skipping structure video (field not present in task)');
+    return { success: true, settingName: 'structureVideo', details: 'skipped - not in task' };
+  }
+  
+  if (settings.structureVideoPath) {
+    console.error('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
+    console.error('[ApplySettings] 🎥 Structure video path:', settings.structureVideoPath);
+    console.error('[ApplySettings] 🎥 Structure video pathFilename:', settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1));
+    console.error('[ApplySettings] 🎥 Structure video treatment:', settings.structureVideoTreatment);
+    console.error('[ApplySettings] 🎥 Structure video motionStrength:', settings.structureVideoMotionStrength);
+    console.error('[ApplySettings] 🎥 Structure video type:', settings.structureVideoType);
+    console.error('[ApplySettings] 🎥 Structure video hasHandler:', !!context.handleStructureVideoChange);
+    console.error('[ApplySettings] 🎥 Structure video handlerType:', typeof context.handleStructureVideoChange);
+    
+    if (!context.handleStructureVideoChange) {
+      console.error('[ApplySettings] ❌ handleStructureVideoChange is not defined in context!');
+      return {
+        success: false,
+        settingName: 'structureVideo',
+        error: 'handleStructureVideoChange not defined in context'
+      };
+    }
+    
+    try {
+      console.error('[ApplySettings] 🎥 Extracting metadata from video URL...');
+      let metadata = null;
+      try {
+        metadata = await extractVideoMetadataFromUrl(settings.structureVideoPath);
+        console.error('[ApplySettings] ✅ Metadata duration:', metadata.duration_seconds);
+        console.error('[ApplySettings] ✅ Metadata frameRate:', metadata.frame_rate);
+        console.error('[ApplySettings] ✅ Metadata totalFrames:', metadata.total_frames);
+        console.error('[ApplySettings] ✅ Metadata dimensions:', `${metadata.width}x${metadata.height}`);
+      } catch (metadataError) {
+        console.error('[ApplySettings] ⚠️  Failed to extract metadata, proceeding without it:', metadataError);
+      }
+      
+      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - videoPath:', settings.structureVideoPath);
+      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - hasMetadata:', !!metadata);
+      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - treatment:', settings.structureVideoTreatment || 'adjust');
+      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - motionStrength:', settings.structureVideoMotionStrength ?? 1.0);
+      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - structureType:', settings.structureVideoType || 'flow');
+      
+      context.handleStructureVideoChange(
+        settings.structureVideoPath,
+        metadata,
+        settings.structureVideoTreatment || 'adjust',
+        settings.structureVideoMotionStrength ?? 1.0,
+        settings.structureVideoType || 'flow'
+      );
+      
+      console.error('[ApplySettings] ✅ Structure video change handler completed successfully');
+      console.error('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
+      return { success: true, settingName: 'structureVideo' };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error('[ApplySettings] ❌ ERROR applying structure video - error:', error);
+      console.error('[ApplySettings] ❌ ERROR applying structure video - errorMessage:', errorMessage);
+      console.error('[ApplySettings] ❌ ERROR applying structure video - errorStack:', errorStack);
+      console.error('[ApplySettings] ❌ ERROR applying structure video - path:', settings.structureVideoPath);
+      console.error('[ApplySettings] ❌ ERROR applying structure video - treatment:', settings.structureVideoTreatment);
+      console.error('[ApplySettings] ❌ ERROR applying structure video - motionStrength:', settings.structureVideoMotionStrength);
+      console.error('[ApplySettings] ❌ ERROR applying structure video - type:', settings.structureVideoType);
+      return {
+        success: false,
+        settingName: 'structureVideo',
+        error: errorMessage
+      };
+    }
+  } else {
+    console.log('[ApplySettings] 🗑️  Clearing structure video (was null/undefined in task)');
+    if (context.handleStructureVideoChange) {
+      context.handleStructureVideoChange(null, null, 'adjust', 1.0, 'flow');
+    }
+    return { success: true, settingName: 'structureVideo', details: 'cleared' };
+  }
+};
+
 // ==================== Apply Frame Positions ====================
 
 /**
