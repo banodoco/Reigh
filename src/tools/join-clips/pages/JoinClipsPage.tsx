@@ -49,7 +49,8 @@ const JoinClipsPage: React.FC = () => {
   const [startingVideo, setStartingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [endingVideo, setEndingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingStarting, setIsUploadingStarting] = useState(false);
+  const [isUploadingEnding, setIsUploadingEnding] = useState(false);
   
   // Loading states for smooth transitions
   const [startingVideoLoaded, setStartingVideoLoaded] = useState(false);
@@ -251,7 +252,11 @@ const JoinClipsPage: React.FC = () => {
   }, [endingVideo]); // Re-run when the video source changes
   
   // Helper function to upload a video file and extract poster frame
-  const uploadVideoFile = async (file: File, type: 'starting' | 'ending'): Promise<{ videoUrl: string; posterUrl: string } | null> => {
+  const uploadVideoFile = async (
+    file: File, 
+    type: 'starting' | 'ending',
+    setUploading: (value: boolean) => void
+  ): Promise<{ videoUrl: string; posterUrl: string } | null> => {
     if (!file.type.startsWith('video/')) {
       toast({
         title: 'Invalid file type',
@@ -261,7 +266,7 @@ const JoinClipsPage: React.FC = () => {
       return null;
     }
     
-    setIsUploading(true);
+    setUploading(true);
     try {
       // Extract poster frame
       const posterBlob = await extractVideoPosterFrame(file);
@@ -318,7 +323,7 @@ const JoinClipsPage: React.FC = () => {
       });
       return null;
     } finally {
-      setIsUploading(false);
+      setUploading(false);
     }
   };
   
@@ -327,7 +332,7 @@ const JoinClipsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const result = await uploadVideoFile(file, 'starting');
+    const result = await uploadVideoFile(file, 'starting', setIsUploadingStarting);
     if (!result) return;
     
     // Reset loaded and playing state
@@ -350,7 +355,7 @@ const JoinClipsPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const result = await uploadVideoFile(file, 'ending');
+    const result = await uploadVideoFile(file, 'ending', setIsUploadingEnding);
     if (!result) return;
     
     // Reset loaded and playing state
@@ -413,7 +418,7 @@ const JoinClipsPage: React.FC = () => {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     
-    const result = await uploadVideoFile(file, 'starting');
+    const result = await uploadVideoFile(file, 'starting', setIsUploadingStarting);
     if (!result) return;
     
     // Reset loaded and playing state
@@ -476,7 +481,7 @@ const JoinClipsPage: React.FC = () => {
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     
-    const result = await uploadVideoFile(file, 'ending');
+    const result = await uploadVideoFile(file, 'ending', setIsUploadingEnding);
     if (!result) return;
     
     // Reset loaded and playing state
@@ -617,14 +622,14 @@ const JoinClipsPage: React.FC = () => {
                 isDraggingOverStarting 
                   ? 'border-primary bg-primary/10' 
                   : 'border-border hover:border-primary/50'
-              } ${!startingVideo && !isUploading ? 'cursor-pointer' : ''}`}
+              } ${!startingVideo && !isUploadingStarting ? 'cursor-pointer' : ''}`}
               onDragOver={handleStartingDragOver}
               onDragEnter={handleStartingDragEnter}
               onDragLeave={handleStartingDragLeave}
               onDrop={handleStartingDrop}
-              onClick={() => !startingVideo && !isUploading && startingVideoInputRef.current?.click()}
+              onClick={() => !startingVideo && !isUploadingStarting && startingVideoInputRef.current?.click()}
             >
-              {isUploading ? (
+              {isUploadingStarting ? (
                 <UploadingVideoState />
               ) : startingVideo ? (
                 <>
@@ -688,7 +693,7 @@ const JoinClipsPage: React.FC = () => {
                         });
                       }
                     }}
-                    disabled={isUploading}
+                    disabled={isUploadingStarting}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -791,14 +796,14 @@ const JoinClipsPage: React.FC = () => {
                 isDraggingOverEnding 
                   ? 'border-primary bg-primary/10' 
                   : 'border-border hover:border-primary/50'
-              } ${!endingVideo && !isUploading ? 'cursor-pointer' : ''}`}
+              } ${!endingVideo && !isUploadingEnding ? 'cursor-pointer' : ''}`}
               onDragOver={handleEndingDragOver}
               onDragEnter={handleEndingDragEnter}
               onDragLeave={handleEndingDragLeave}
               onDrop={handleEndingDrop}
-              onClick={() => !endingVideo && !isUploading && endingVideoInputRef.current?.click()}
+              onClick={() => !endingVideo && !isUploadingEnding && endingVideoInputRef.current?.click()}
             >
-              {isUploading ? (
+              {isUploadingEnding ? (
                 <UploadingVideoState />
               ) : endingVideo ? (
                 <>
@@ -862,7 +867,7 @@ const JoinClipsPage: React.FC = () => {
                         });
                       }
                     }}
-                    disabled={isUploading}
+                    disabled={isUploadingEnding}
                   >
                     <X className="h-4 w-4" />
                   </Button>

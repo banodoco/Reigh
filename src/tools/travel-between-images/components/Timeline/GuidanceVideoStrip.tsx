@@ -250,6 +250,26 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         
         const numFrames = maxThumbnails;
         
+        // Validate inputs before extraction to prevent NaN/Infinity errors
+        if (numFrames < 1) {
+          console.error('[GuidanceVideoStrip] Invalid numFrames:', numFrames);
+          setIsExtractingFrames(false);
+          return;
+        }
+        
+        if (!effectiveMetadata.total_frames || effectiveMetadata.total_frames < 1) {
+          console.error('[GuidanceVideoStrip] Invalid total_frames:', effectiveMetadata.total_frames);
+          setIsExtractingFrames(false);
+          return;
+        }
+        
+        const timelineFrameCount = fullMax - fullMin;
+        if (!isFinite(timelineFrameCount) || timelineFrameCount < 0) {
+          console.error('[GuidanceVideoStrip] Invalid timelineFrameCount:', { fullMax, fullMin, timelineFrameCount });
+          setIsExtractingFrames(false);
+          return;
+        }
+        
         const extractedFrames: string[] = [];
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -264,24 +284,38 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         canvas.height = video.videoHeight;
         
         // Calculate which frames to extract based on treatment mode
-        const timelineFrameCount = fullMax - fullMin;
-        
         for (let i = 0; i < numFrames; i++) {
           let frameIndex: number;
           
-          if (treatment === 'adjust') {
+          // Handle edge case: if only extracting 1 frame, use the first frame
+          if (numFrames === 1) {
+            frameIndex = 0;
+          } else if (treatment === 'adjust') {
             // Adjust mode: show entire video stretched/compressed to fit timeline
-            frameIndex = Math.floor((i / (numFrames - 1)) * ((effectiveMetadata?.total_frames || 1) - 1));
+            frameIndex = Math.floor((i / (numFrames - 1)) * (effectiveMetadata.total_frames - 1));
           } else {
             // Clip mode: show only frames within timeline range
             const timelinePosition = (i / (numFrames - 1)) * timelineFrameCount;
-            frameIndex = Math.floor(Math.min(timelinePosition, (effectiveMetadata?.total_frames || 1) - 1));
+            frameIndex = Math.floor(Math.min(timelinePosition, effectiveMetadata.total_frames - 1));
+          }
+          
+          // Validate frameIndex after calculation
+          if (!isFinite(frameIndex) || frameIndex < 0) {
+            console.error('[GuidanceVideoStrip] Invalid frameIndex calculated:', { 
+              i, 
+              numFrames, 
+              treatment, 
+              timelineFrameCount, 
+              totalFrames: effectiveMetadata.total_frames,
+              frameIndex 
+            });
+            throw new Error(`Invalid frame index calculated: ${frameIndex}`);
           }
           
           // Validate frame_rate to prevent NaN/Infinity errors
-          if (!effectiveMetadata?.frame_rate || effectiveMetadata.frame_rate <= 0 || !isFinite(effectiveMetadata.frame_rate)) {
-            console.error('[GuidanceVideoStrip] Invalid frame_rate:', effectiveMetadata?.frame_rate);
-            throw new Error(`Invalid video frame rate: ${effectiveMetadata?.frame_rate}`);
+          if (!effectiveMetadata.frame_rate || effectiveMetadata.frame_rate <= 0 || !isFinite(effectiveMetadata.frame_rate)) {
+            console.error('[GuidanceVideoStrip] Invalid frame_rate:', effectiveMetadata.frame_rate);
+            throw new Error(`Invalid video frame rate: ${effectiveMetadata.frame_rate}`);
           }
           
           const timeInSeconds = frameIndex / effectiveMetadata.frame_rate;
