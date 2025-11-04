@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { pixelToFrame } from "../utils/timeline-utils";
 
 interface UseZoomProps {
@@ -11,6 +11,9 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState(0);
   const [isZooming, setIsZooming] = useState(false);
+  
+  // Track previous coordinate system to detect changes
+  const prevCoordinateSystemRef = useRef({ fullMin, fullMax, fullRange });
 
   // Calculate zoom viewport
   const getZoomViewport = useCallback(() => {
@@ -84,6 +87,40 @@ export const useZoom = ({ fullMin, fullMax, fullRange }: UseZoomProps) => {
       return () => clearTimeout(timer);
     }
   }, [isZooming]);
+  
+  // Preserve zoom when coordinate system changes (items added/deleted)
+  useEffect(() => {
+    const prev = prevCoordinateSystemRef.current;
+    
+    // Check if coordinate system actually changed (not just initial mount)
+    const coordinateSystemChanged = prev.fullMin !== fullMin || prev.fullMax !== fullMax || prev.fullRange !== fullRange;
+    
+    if (coordinateSystemChanged) {
+      // Only adjust if we're currently zoomed in and this isn't the initial mount
+      if (zoomLevel > 1 && prev.fullRange > 0 && (prev.fullMin !== 0 || prev.fullMax !== 0)) {
+        // Calculate the relative position of zoom center in the old coordinate system
+        const relativePosition = (zoomCenter - prev.fullMin) / prev.fullRange;
+        
+        // Map to the new coordinate system, preserving the relative viewing position
+        const newZoomCenter = fullMin + (relativePosition * fullRange);
+        
+        console.log('[ZoomPreserve] Coordinate system changed, adjusting zoom center:', {
+          oldSystem: { fullMin: prev.fullMin, fullMax: prev.fullMax, fullRange: prev.fullRange },
+          newSystem: { fullMin, fullMax, fullRange },
+          oldZoomCenter: zoomCenter,
+          newZoomCenter,
+          relativePosition: relativePosition.toFixed(3),
+          zoomLevel
+        });
+        
+        // Don't trigger isZooming flag since this is a coordinate system adjustment, not a user action
+        setZoomCenter(newZoomCenter);
+      }
+      
+      // Update ref for next comparison
+      prevCoordinateSystemRef.current = { fullMin, fullMax, fullRange };
+    }
+  }, [fullMin, fullMax, fullRange, zoomLevel, zoomCenter]);
 
   const viewport = getZoomViewport();
 

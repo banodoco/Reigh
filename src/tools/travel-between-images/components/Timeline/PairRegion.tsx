@@ -1,5 +1,5 @@
 import React from "react";
-import { MessageSquare, X, Sparkles } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { Button } from "@/shared/components/ui/button";
 import { framesToSeconds } from "./utils/time-utils";
@@ -66,8 +66,8 @@ const PairRegion: React.FC<PairRegionProps> = ({
   ];
   const colorScheme = pairColorSchemes[index % pairColorSchemes.length];
 
-  // Check if there's a custom prompt for this pair
-  const hasCustomPrompt = (pairPrompt && pairPrompt.trim()) || (pairNegativePrompt && pairNegativePrompt.trim());
+  // Check if there's a custom prompt for this pair (includes enhanced prompts)
+  const hasCustomPrompt = (pairPrompt && pairPrompt.trim()) || (pairNegativePrompt && pairNegativePrompt.trim()) || (enhancedPrompt && enhancedPrompt.trim());
 
   return (
     <React.Fragment key={`pair-${index}`}>
@@ -142,16 +142,10 @@ const PairRegion: React.FC<PairRegionProps> = ({
               }}
             >
               <div className="flex items-center gap-1.5">
-                <span className="whitespace-nowrap">Pair {index + 1} • {framesToSeconds(actualFrames)}</span>
+                <span className={`whitespace-nowrap ${hasCustomPrompt ? colorScheme.text : ''}`}>Pair {index + 1} • {framesToSeconds(actualFrames)}</span>
                 <MessageSquare 
                   className={`h-3 w-3 ${hasCustomPrompt ? colorScheme.text : 'text-gray-400'} ${hasCustomPrompt ? 'opacity-100' : 'opacity-60'}`}
                 />
-                {enhancedPrompt && enhancedPrompt.trim() && (
-                  <Sparkles 
-                    className={`h-3 w-3 ${colorScheme.text} opacity-100`}
-                    title="Has enhanced prompt"
-                  />
-                )}
               </div>
             </div>
           </TooltipTrigger>
