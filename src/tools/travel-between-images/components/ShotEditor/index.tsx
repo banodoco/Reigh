@@ -1348,6 +1348,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       currentShotId: selectedShot?.id?.substring(0, 8)
     });
     
+    let pairPromptSnapshot: Array<{
+      id: string;
+      timeline_frame: number | null;
+      metadata: any;
+      generation?: {
+        id?: string | null;
+        type?: string | null;
+        location?: string | null;
+      } | null;
+    }> = [];
+
     try {
       // Step 1: Fetch task from database
       const taskData = await ApplySettingsService.fetchTask(taskId);
@@ -1438,25 +1449,153 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         await loadPositions({ silent: true });
         
         // Query DB directly to get fresh generation IDs for verification
-        const { data: freshGens } = await supabase
+        const { data: freshGens, error: freshGensError } = await supabase
           .from('shot_generations')
-          .select('id, timeline_frame, metadata')
+          .select(`
+            id,
+            timeline_frame,
+            metadata,
+            generation:generations(
+              id,
+              type,
+              location
+            )
+          `)
           .eq('shot_id', selectedShot.id)
           .not('timeline_frame', 'is', null) // CRITICAL: Only positioned images
           .order('timeline_frame', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: true });
-        
-        console.error('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
-          count: freshGens?.length || 0,
-          ids: freshGens?.map(sg => ({
-            id: sg.id.substring(0, 8),
-            timeline_frame: sg.timeline_frame,
-            has_metadata: !!sg.metadata,
-            has_pair_prompt: !!(sg.metadata as any)?.pair_prompt
-          })) || []
-        });
+
+        if (freshGensError) {
+          console.error('[ApplySettings] ❌ Error fetching fresh shot generations after replacement:', freshGensError);
+        } else {
+          pairPromptSnapshot = freshGens || [];
+          console.error('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
+            count: pairPromptSnapshot.length,
+            ids: pairPromptSnapshot.map(sg => ({
+              id: sg.id.substring(0, 8),
+              timeline_frame: sg.timeline_frame,
+              has_metadata: !!sg.metadata,
+              has_pair_prompt: !!(sg.metadata as any)?.pair_prompt,
+              generation_type: (sg as any)?.generation?.type,
+              isVideo: (sg as any)?.generation?.type === 'video' ||
+                       (sg as any)?.generation?.type === 'video_travel_output' ||
+                       ((sg as any)?.generation?.location?.endsWith?.('.mp4'))
+            }))
+          });
+        }
         
         console.error('[ApplySettings] 💡 updatePairPromptsByIndex will use current hook state (should match DB)');
+      }
+
+      if ((!pairPromptSnapshot || pairPromptSnapshot.length === 0) && selectedShot?.id) {
+        const { data: snapshotRows, error: snapshotError } = await supabase
+          .from('shot_generations')
+          .select(`
+            id,
+            timeline_frame,
+            metadata,
+            generation:generations(
+              id,
+              type,
+              location
+            )
+          `)
+          .eq('shot_id', selectedShot.id)
+          .not('timeline_frame', 'is', null)
+          .order('timeline_frame', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
+
+        if (snapshotError) {
+          console.error('[ApplySettings] ❌ Failed to fetch pair prompt snapshot:', snapshotError);
+        } else {
+          pairPromptSnapshot = snapshotRows || [];
+          console.error('[ApplySettings] 📦 Loaded snapshot for pair prompt updates:', {
+            count: pairPromptSnapshot.length,
+            replaceImages,
+            inputImagesCount: inputImages.length
+          });
+        }
+      }
+
+      let preparedPairPromptTargets = pairPromptSnapshot && pairPromptSnapshot.length > 0
+        ? [...pairPromptSnapshot]
+        : [];
+
+      preparedPairPromptTargets = preparedPairPromptTargets
+        .filter(row => {
+          const generation = (row as any)?.generation;
+          const genType = generation?.type;
+          const location: string | undefined = generation?.location || undefined;
+          const isVideo = genType === 'video' ||
+                          genType === 'video_travel_output' ||
+                          (location ? location.endsWith('.mp4') : false);
+          return !isVideo;
+        })
+        .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+
+      if (preparedPairPromptTargets.length === 0) {
+        console.error('[ApplySettings] ⚠️ No positioned non-video shot_generations available for pair prompt updates.', {
+          replaceImages,
+          snapshotCount: pairPromptSnapshot.length,
+          originalShotGenerationCount: shotGenerations.length
+        });
+      } else {
+        console.error('[ApplySettings] 🧮 Pair prompt snapshot ready for updates:', {
+          totalItems: preparedPairPromptTargets.length,
+          totalPairs: Math.max(0, preparedPairPromptTargets.length - 1)
+        });
+
+        context.updatePairPromptsByIndex = async (pairIndex: number, prompt: string, negativePrompt: string) => {
+          const trimmedPrompt = (prompt ?? '').trim();
+          const trimmedNegative = (negativePrompt ?? '').trim();
+          const target = preparedPairPromptTargets[pairIndex];
+
+          if (!target) {
+            console.error('[ApplySettings] ❌ Snapshot updater - invalid pair index', {
+              pairIndex,
+              availablePairs: Math.max(0, preparedPairPromptTargets.length - 1),
+              totalItems: preparedPairPromptTargets.length,
+              promptsLength: settings.prompts?.length
+            });
+            return;
+          }
+
+          console.error('[ApplySettings] 💾 Saving pair prompt via snapshot updater:', {
+            pairIndex,
+            shotGenerationId: target.id.substring(0, 8),
+            timeline_frame: target.timeline_frame,
+            promptPreview: trimmedPrompt ? `${trimmedPrompt.substring(0, 40)}...` : '(empty)',
+            negativePromptPreview: trimmedNegative ? `${trimmedNegative.substring(0, 40)}...` : '(empty)'
+          });
+
+          const updatedMetadata = {
+            ...(target.metadata || {}),
+            pair_prompt: trimmedPrompt || undefined,
+            pair_negative_prompt: trimmedNegative || undefined,
+            enhanced_prompt: ''
+          };
+
+          const { error: pairUpdateError } = await supabase
+            .from('shot_generations')
+            .update({ metadata: updatedMetadata as any })
+            .eq('id', target.id);
+
+          if (pairUpdateError) {
+            console.error('[ApplySettings] ❌ Failed to save pair prompt via snapshot updater:', {
+              pairIndex,
+              error: pairUpdateError
+            });
+            throw pairUpdateError;
+          }
+
+          console.error('[ApplySettings] ✅ Pair prompt saved via snapshot updater:', {
+            pairIndex,
+            shotGenerationId: target.id.substring(0, 8)
+          });
+
+          target.metadata = updatedMetadata;
+        };
       }
       
       // Now apply all other settings (including prompts to the NEW images)
