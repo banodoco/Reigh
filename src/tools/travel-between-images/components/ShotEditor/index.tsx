@@ -171,11 +171,22 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Load structure video from settings when shot loads
   useEffect(() => {
+    // USE console.error so this shows in production
+    console.error('[ShotEditor] 🎬 STRUCTURE VIDEO INIT CHECK:', {
+      hasInitializedStructureVideo,
+      isStructureVideoSettingsLoading,
+      selectedShotId: selectedShot?.id?.substring(0, 8),
+      hasStructureVideoSettings: !!structureVideoSettings,
+      settingsPath: structureVideoSettings?.path || 'NO PATH',
+      willInitialize: !hasInitializedStructureVideo && !isStructureVideoSettingsLoading && !!selectedShot?.id
+    });
+    
     if (!hasInitializedStructureVideo && !isStructureVideoSettingsLoading && selectedShot?.id) {
       // Only check for path - metadata is optional and can be null
       if (structureVideoSettings?.path) {
-        console.log('[ShotEditor] Loading structure video from settings:', {
-          path: structureVideoSettings.path.substring(0, 50) + '...',
+        console.error('[ShotEditor] ✅ Loading structure video from settings:', {
+          path: structureVideoSettings.path,
+          pathPreview: structureVideoSettings.path.substring(0, 80) + '...',
           hasMetadata: !!structureVideoSettings.metadata,
           treatment: structureVideoSettings.treatment,
           motionStrength: structureVideoSettings.motionStrength,
@@ -188,7 +199,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
       } else {
         // No saved structure video - initialize with defaults
-        console.log('[ShotEditor] No structure video in settings, initializing to defaults');
+        console.error('[ShotEditor] ⚠️  No structure video in settings, initializing to defaults:', {
+          settingsRaw: structureVideoSettings,
+          hasSettingsObject: !!structureVideoSettings,
+          settingsKeys: structureVideoSettings ? Object.keys(structureVideoSettings) : []
+        });
         setStructureVideoPath(null);
         setStructureVideoMetadata(null);
         setStructureVideoTreatment('adjust');
@@ -229,6 +244,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Save to database
     if (videoPath) {
       // Save structure video (metadata is optional - can be fetched later from path)
+      console.error('[ShotEditor] 💾 SAVING structure video to database:', { 
+        path: videoPath,
+        pathPreview: videoPath.substring(0, 80) + '...',
+        hasMetadata: !!metadata,
+        treatment,
+        motionStrength,
+        structureType,
+        toolId: 'travel-structure-video',
+        scope: 'shot',
+        selectedShotId: selectedShot?.id?.substring(0, 8)
+      });
       updateStructureVideoSettings('shot', {
         path: videoPath,
         metadata: metadata || null,
@@ -236,15 +262,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength,
         structureType
       });
-      console.log('[ShotEditor] [DEBUG] Structure video saved to database:', { 
-        path: videoPath.substring(0, 50) + '...',
-        hasMetadata: !!metadata,
-        treatment,
-        motionStrength,
-        structureType
-      });
+      console.error('[ShotEditor] ✅ Structure video save requested');
     } else {
       // Clear structure video - explicitly set fields to null to ensure deletion
+      console.error('[ShotEditor] 🗑️  CLEARING structure video from database');
       updateStructureVideoSettings('shot', {
         path: null,
         metadata: null,
@@ -252,7 +273,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength: null,
         structureType: null
       });
-      console.log('[ShotEditor] [DEBUG] Structure video cleared from database');
+      console.error('[ShotEditor] ✅ Structure video clear requested');
     }
   }, [updateStructureVideoSettings]);
 
