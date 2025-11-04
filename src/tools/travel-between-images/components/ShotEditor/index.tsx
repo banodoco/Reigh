@@ -24,6 +24,7 @@ import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // Import modular components and hooks
@@ -1390,9 +1391,37 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // CRITICAL: Reload shotGenerations so prompts can be applied to the NEW images
       if (replaceImages && inputImages.length > 0) {
-        console.error('[ApplySettings] 🔄 Images replaced - reloading shotGenerations before applying prompts...');
+        console.error('[ApplySettings] 🔄 BEFORE RELOAD - Current shotGenerations:', {
+          count: shotGenerations.length,
+          ids: shotGenerations.map(sg => ({
+            id: sg.id.substring(0, 8),
+            timeline_frame: sg.timeline_frame,
+            has_metadata: !!sg.metadata,
+            has_pair_prompt: !!(sg.metadata as any)?.pair_prompt
+          }))
+        });
+        
+        console.error('[ApplySettings] 🔄 Images replaced - reloading shotGenerations...');
         await loadPositions({ silent: true });
-        console.error('[ApplySettings] ✅ shotGenerations reloaded with new images');
+        
+        // Query DB directly to get fresh generation IDs for verification
+        const { data: freshGens } = await supabase
+          .from('shot_generations')
+          .select('id, timeline_frame, metadata')
+          .eq('shot_id', selectedShot.id)
+          .order('timeline_frame', { ascending: true });
+        
+        console.error('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
+          count: freshGens?.length || 0,
+          ids: freshGens?.map(sg => ({
+            id: sg.id.substring(0, 8),
+            timeline_frame: sg.timeline_frame,
+            has_metadata: !!sg.metadata,
+            has_pair_prompt: !!(sg.metadata as any)?.pair_prompt
+          })) || []
+        });
+        
+        console.error('[ApplySettings] 💡 updatePairPromptsByIndex will use current hook state (should match DB)');
       }
       
       // Now apply all other settings (including prompts to the NEW images)
