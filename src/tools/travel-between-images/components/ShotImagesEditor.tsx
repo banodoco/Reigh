@@ -837,9 +837,22 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         pairPrompt={(() => {
           // CRITICAL: Read prompt from the exact shot_generation being displayed
           // instead of using index-based lookup (which can fail with duplicates)
-          if (!pairPromptModalData.pairData?.startImage?.id) return "";
+          if (!pairPromptModalData.pairData?.startImage?.id) {
+            console.error('[PairPrompt-READ] ⚠️ No start image ID');
+            return "";
+          }
           const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
-          return shotGen?.metadata?.pair_prompt || "";
+          const prompt = shotGen?.metadata?.pair_prompt || "";
+          console.error('[PairPrompt-READ] 📖 Reading pair prompt for modal:', {
+            pairIndex: pairPromptModalData.pairData.index,
+            shotGenId: pairPromptModalData.pairData.startImage.id.substring(0, 8),
+            found: !!shotGen,
+            hasMetadata: !!shotGen?.metadata,
+            hasPairPrompt: !!shotGen?.metadata?.pair_prompt,
+            prompt: prompt ? `"${prompt.substring(0, 40)}..."` : '(empty)',
+            promptLength: prompt?.length || 0
+          });
+          return prompt;
         })()}
         pairNegativePrompt={(() => {
           // CRITICAL: Read negative prompt from the exact shot_generation being displayed
