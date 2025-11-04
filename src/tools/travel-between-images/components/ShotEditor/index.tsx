@@ -1401,7 +1401,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           }))
         });
         
-        console.error('[ApplySettings] 🔄 Images replaced - reloading shotGenerations...');
+        console.error('[ApplySettings] 🔄 Images replaced - clearing cache and reloading...');
+        // Force clear the query cache before reloading
+        queryClient.removeQueries({ queryKey: ['unified-generations', 'shot', selectedShot.id] });
+        queryClient.removeQueries({ queryKey: ['shot-generations', selectedShot.id] });
         await loadPositions({ silent: true });
         
         // Query DB directly to get fresh generation IDs for verification
@@ -1492,9 +1495,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
       
       // Force reload shotGenerations to show updated pair prompts in UI
-      console.error('[ApplySettings] 🔄 Reloading shotGenerations to refresh UI...');
+      console.error('[ApplySettings] 🔄 Clearing cache and reloading shotGenerations to refresh UI...');
+      // Force clear the query cache to ensure we get fresh data with prompts
+      queryClient.removeQueries({ queryKey: ['unified-generations', 'shot', selectedShot.id] });
+      queryClient.removeQueries({ queryKey: ['shot-generations', selectedShot.id] });
+      // Wait a tiny bit for DB writes to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
       await loadPositions({ silent: true });
-      console.error('[ApplySettings] ✅ shotGenerations reloaded - pair prompts should now be visible');
+      console.error('[ApplySettings] ✅ shotGenerations reloaded with fresh data - pair prompts should now be visible');
     } catch (e) {
       console.error('[ApplySettings] ❌ === FAILED TO APPLY SETTINGS ===', e);
     }
