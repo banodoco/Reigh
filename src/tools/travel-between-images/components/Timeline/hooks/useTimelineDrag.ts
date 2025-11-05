@@ -52,9 +52,6 @@ export const useTimelineDrag = ({
   containerRect,
   setIsDragInProgress,
 }: UseTimelineDragProps) => {
-  
-  // Debug: Log if setIsDragInProgress is available
-  console.log('[TimelineMovementDebug] 🔧 useTimelineDrag initialized with setIsDragInProgress:', !!setIsDragInProgress);
   // Drag threshold in pixels - must move this far before drag starts
   const DRAG_THRESHOLD = 5;
 
@@ -103,26 +100,6 @@ export const useTimelineDrag = ({
     const finalFrame = isExpanding ? 
       Math.round(baseCalculatedFrame + ((targetRelativePos - effectiveWidth) / effectiveWidth) * fullRange) :
       baseCalculatedFrame;
-      
-    console.log('[TimelineExpansion] 🎯 DOM-BASED TARGET CALCULATION:', {
-      clientX,
-      containerLeft,
-      relativeMouseX,
-      dragOffsetX,
-      originalFramePos: dragState.originalFramePos,
-      fullMin,
-      fullRange,
-      containerWidth,
-      effectiveWidth,
-      paddingOffset: TIMELINE_PADDING_OFFSET,
-      originalRelativePos,
-      targetRelativePos,
-      baseCalculatedFrame,
-      isExpanding,
-      overshoot: isExpanding ? targetRelativePos - effectiveWidth : 0,
-      finalFrame,
-      timestamp: new Date().toISOString()
-    });
 
     // Calculate frame position, allowing expansion beyond current timeline bounds
     const calculatedFrame = Math.max(0, pixelToFrame(targetRelativePos, effectiveWidth, fullMin, fullRange));
@@ -176,13 +153,6 @@ export const useTimelineDrag = ({
     );
 
     if (swapTarget) {
-      console.log('[FluidTimelineDebug] 🔄 SWAP DETECTED - Item would swap with:', {
-        itemId: dragState.activeId.substring(0, 8),
-        swapWithId: swapTarget[0].substring(0, 8),
-        swapWithPos: swapTarget[1],
-        newPos: finalPosition
-      });
-
       // Swap positions
       newPositions.set(swapTarget[0], originalPos);
       newPositions.set(dragState.activeId, finalPosition);
@@ -193,10 +163,6 @@ export const useTimelineDrag = ({
           .filter(([id]) => id !== dragState.activeId)
           .sort((a, b) => a[1] - b[1])[0];
         if (nearest) {
-          console.log('[FluidTimelineDebug] 📍 FRAME 0 REASSIGNMENT - Moving frame 0 to:', {
-            itemId: dragState.activeId.substring(0, 8),
-            newFrame0Holder: nearest[0].substring(0, 8)
-          });
           newPositions.set(nearest[0], 0);
         }
       }
@@ -204,37 +170,7 @@ export const useTimelineDrag = ({
     }
 
     // Apply fluid timeline behavior (new behavior)
-    console.log('[FluidTimelineDebug] 🌊 APPLYING FLUID TIMELINE - Before fluid timeline:', {
-      itemId: dragState.activeId.substring(0, 8),
-      positions: Array.from(newPositions.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      }))
-    });
-
     const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames, undefined, fullMin, fullMax);
-
-    console.log('[FluidTimelineDebug] ✅ FLUID TIMELINE RESULT - After fluid timeline:', {
-      itemId: dragState.activeId.substring(0, 8),
-      originalPos,
-      targetFrame,
-      finalPosition,
-      resultPositions: Array.from(result.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-      positionsChanged: Array.from(result.entries())
-        .filter(([id, pos]) => pos !== (framePositions.get(id) ?? 0))
-        .map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          oldPos: framePositions.get(id) ?? 0,
-          newPos: pos,
-          delta: pos - (framePositions.get(id) ?? 0)
-        })),
-      totalItemsShifted: Array.from(result.entries())
-        .filter(([id, pos]) => pos !== (framePositions.get(id) ?? 0) && id !== dragState.activeId)
-        .length
-    });
 
     return result;
   }, [
@@ -257,21 +193,6 @@ export const useTimelineDrag = ({
     const targetFrame = calculateTargetFrame(clientX, containerRect);
     const finalPosition = calculateFinalPosition(targetFrame);
 
-    console.log('[GroundTruthDrop] 🎯 DOM-BASED FINAL DROP CALCULATION:', {
-      clientX,
-      containerRect: containerRect ? {
-        left: containerRect.left,
-        width: containerRect.width
-      } : null,
-      targetFrame,
-      finalPosition,
-      originalPos: framePositions.get(dragState.activeId) ?? 0,
-      itemId: dragState.activeId.substring(0, 8),
-      approach: 'DOM_GROUND_TRUTH_WITH_CURRENT_MOUSE_REF',
-      coordinate_source: 'currentMousePosRef.current.x',
-      timestamp: new Date().toISOString()
-    });
-
     const newPositions = new Map(framePositions);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
 
@@ -281,13 +202,6 @@ export const useTimelineDrag = ({
     );
 
     if (swapTarget) {
-      console.log('[FinalDropDebug] 🔄 SWAP DETECTED - Item would swap with:', {
-        itemId: dragState.activeId.substring(0, 8),
-        swapWithId: swapTarget[0].substring(0, 8),
-        swapWithPos: swapTarget[1],
-        newPos: finalPosition
-      });
-
       // Swap positions
       newPositions.set(swapTarget[0], originalPos);
       newPositions.set(dragState.activeId, finalPosition);
@@ -298,10 +212,6 @@ export const useTimelineDrag = ({
           .filter(([id]) => id !== dragState.activeId)
           .sort((a, b) => a[1] - b[1])[0];
         if (nearest) {
-          console.log('[FinalDropDebug] 📍 FRAME 0 REASSIGNMENT - Moving frame 0 to:', {
-            itemId: dragState.activeId.substring(0, 8),
-            newFrame0Holder: nearest[0].substring(0, 8)
-          });
           newPositions.set(nearest[0], 0);
         }
       }
@@ -309,37 +219,7 @@ export const useTimelineDrag = ({
     }
 
     // Apply fluid timeline behavior (new behavior)
-    console.log('[FinalDropDebug] 🌊 APPLYING FLUID TIMELINE - Before fluid timeline:', {
-      itemId: dragState.activeId.substring(0, 8),
-      positions: Array.from(newPositions.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      }))
-    });
-
     const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames, undefined, fullMin, fullMax);
-
-    console.log('[FinalDropDebug] ✅ FINAL DROP RESULT - After fluid timeline:', {
-      itemId: dragState.activeId.substring(0, 8),
-      originalPos,
-      targetFrame,
-      finalPosition,
-      resultPositions: Array.from(result.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-      positionsChanged: Array.from(result.entries())
-        .filter(([id, pos]) => pos !== (framePositions.get(id) ?? 0))
-        .map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          oldPos: framePositions.get(id) ?? 0,
-          newPos: pos,
-          delta: pos - (framePositions.get(id) ?? 0)
-        })),
-      totalItemsShifted: Array.from(result.entries())
-        .filter(([id, pos]) => pos !== (framePositions.get(id) ?? 0) && id !== dragState.activeId)
-        .length
-    });
 
     return result;
   }, [
