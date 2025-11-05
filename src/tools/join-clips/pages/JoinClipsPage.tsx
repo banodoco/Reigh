@@ -111,7 +111,7 @@ const JoinClipsPage: React.FC = () => {
   
   // Fetch available LoRAs
   const publicLorasResult = useListPublicResources('lora');
-  const availableLoras = (publicLorasResult.data || []) as LoraModel[];
+  const availableLoras = ((publicLorasResult.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[];
   
   // Initialize LoRA manager with project persistence
   const loraManager = useLoraManager(availableLoras, {
