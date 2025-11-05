@@ -567,16 +567,6 @@ export const useInpainting = ({
       return;
     }
     
-    console.error('[InpaintCanvas] 🔄 Canvas initialization effect triggered', {
-      isInpaintMode,
-      hasDisplayCanvas: !!displayCanvasRef.current,
-      hasMaskCanvas: !!maskCanvasRef.current,
-      hasImageContainer: !!imageContainerRef.current,
-      mediaId: media.id.substring(0, 8),
-      imageLocation: media.location?.substring(0, 50),
-      imageDimensions
-    });
-    
     if (isInpaintMode && displayCanvasRef.current && maskCanvasRef.current && imageContainerRef.current) {
       const container = imageContainerRef.current;
       const img = container.querySelector('img');
@@ -625,16 +615,6 @@ export const useInpainting = ({
         
         // Store new size for future comparisons
         prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
-        
-        console.error('[InpaintCanvas] ✅ Canvas initialized', {
-          bufferSize: { width: canvas.width, height: canvas.height },
-          styleSize: { width: canvas.style.width, height: canvas.style.height },
-          offsetSize: { width: canvas.offsetWidth, height: canvas.offsetHeight },
-          imgRect: { width: rect.width, height: rect.height },
-          position: { left: canvas.style.left, top: canvas.style.top },
-          inpaintStrokes: inpaintStrokes.length,
-          annotationStrokes: annotationStrokes.length
-        });
         } else {
         }
     } else {
@@ -644,8 +624,6 @@ export const useInpainting = ({
   // Handle window resize to keep canvas aligned with image
   const handleResize = useCallback(() => {
     if (!isInpaintMode || isMediaTransitioningRef.current) return;
-
-    console.error('[InpaintResize] ⚠️ Window resized, recalculating canvas');
 
     if (displayCanvasRef.current && imageContainerRef.current) {
       const container = imageContainerRef.current;
@@ -823,15 +801,6 @@ export const useInpainting = ({
 
   // Redraw all strokes on canvas
   const redrawStrokes = useCallback((strokes: BrushStroke[]) => {
-    console.error('[InpaintDraw] 🖌️ redrawStrokes called', {
-      strokeCount: strokes.length,
-      selectedId: selectedShapeId,
-      canvasExists: !!displayCanvasRef.current,
-      maskExists: !!maskCanvasRef.current,
-      timestamp: Date.now()
-    });
-    });
-    
     const canvas = displayCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
     
@@ -852,10 +821,6 @@ export const useInpainting = ({
     maskCtx.imageSmoothingEnabled = false;
     
     // Clear both canvases
-    console.error('[InpaintDraw] 🧹 Clearing canvases', {
-      bufferSize: { width: canvas.width, height: canvas.height },
-      displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight }
-    });
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     
@@ -869,27 +834,6 @@ export const useInpainting = ({
       const strokeBrushSize = stroke.brushSize || 20;
       const shapeType = stroke.shapeType || 'line';
       const isSelected = stroke.id === selectedShapeId;
-      
-      console.error('[InpaintDraw] ✏️ Drawing stroke', {
-        index,
-        id: stroke.id.substring(0, 8),
-        type: shapeType,
-        points: stroke.points.length,
-        isSelected,
-        isErasing: stroke.isErasing,
-        isFreeForm: stroke.isFreeForm,
-        firstPoint: stroke.points[0],
-        lastPoint: stroke.points[stroke.points.length - 1],
-        canvasBuffer: { width: canvas.width, height: canvas.height },
-        canvasDisplay: { width: canvas.offsetWidth, height: canvas.offsetHeight }
-      });
-      ,
-        type: shapeType,
-        points: stroke.points.length,
-        isSelected,
-        isErasing: stroke.isErasing,
-        isFreeForm: stroke.isFreeForm
-      });
       
       // Set up context for display canvas
       ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'lighten';
@@ -977,26 +921,6 @@ export const useInpainting = ({
       }
     });
     
-    // Debug: Check canvas visibility and scaling
-    if (canvas) {
-      const canvasStyle = window.getComputedStyle(canvas);
-      const bufferVsDisplay = canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight;
-      console.error('[InpaintDraw] 📊 Canvas style check', {
-        zIndex: canvasStyle.zIndex,
-        opacity: canvasStyle.opacity,
-        display: canvasStyle.display,
-        visibility: canvasStyle.visibility,
-        pointerEvents: canvasStyle.pointerEvents,
-        position: canvasStyle.position,
-        bufferSize: { width: canvas.width, height: canvas.height },
-        displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight },
-        MISMATCH: bufferVsDisplay ? '⚠️ BUFFER SIZE != DISPLAY SIZE!' : '✅ Sizes match',
-        scaleRatio: {
-          x: canvas.offsetWidth / canvas.width,
-          y: canvas.offsetHeight / canvas.height
-        }
-      });
-    }
   }, [selectedShapeId]);
   
   // Store latest redrawStrokes in ref to avoid stale closures in effects
@@ -1041,12 +965,6 @@ export const useInpainting = ({
   // Handle mouse/touch drawing (canvas coordinate system)
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = displayCanvasRef.current;
-    console.error('[InpaintPointer] 🖱️ handlePointerDown', {
-      canvasBufferSize: canvas ? { width: canvas.width, height: canvas.height } : null,
-      canvasDisplaySize: canvas ? { width: canvas.offsetWidth, height: canvas.offsetHeight } : null,
-      pointerPosition: { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY },
-      clientPosition: { x: e.clientX, y: e.clientY }
-    });
     if (!isInpaintMode) {
       return;
     }
@@ -1559,25 +1477,8 @@ export const useInpainting = ({
 
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
-    const effectId = Math.random().toString(36).slice(2, 6);
-    console.error('[InpaintEffect] 🔄 Stroke change effect triggered', {
-      effectId,
-      isInpaintMode,
-      strokeCount: brushStrokes.length,
-      editMode,
-      mediaId: media.id.substring(0, 8),
-      isDraggingShape,
-      isDrawing,
-      brushStrokesRef: brushStrokes
-    });
-    ,
-      isDraggingShape,
-      isDrawing
-    });
-    
     // Skip redraw during drag - handlePointerMove redraws manually to prevent flicker
     if (isDraggingShape) {
-      ');
       return;
     }
     
