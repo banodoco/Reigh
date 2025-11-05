@@ -166,34 +166,6 @@ export const applyFluidTimeline = (
   const maxSingleMove = 50; // Maximum frames an item can move in one drag operation
   const limitedMovementAmount = Math.max(-maxSingleMove, Math.min(maxSingleMove, movementAmount));
 
-  console.log('[FluidTimelineCore] 🎯 APPLY FLUID TIMELINE - Starting fluid timeline calculation:', {
-    draggedId: draggedId.substring(0, 8),
-    originalPos,
-    targetFrame,
-    movementAmount,
-    limitedMovementAmount,
-    maxGap,
-    contextFrames,
-    timestamp: new Date().toISOString()
-  });
-
-  // 🎯 DEBUG: Check for position conflicts (multiple items at same position)
-  const positionConflicts = new Map<number, string[]>();
-  for (const [id, pos] of positions) {
-    if (!positionConflicts.has(pos)) {
-      positionConflicts.set(pos, []);
-    }
-    positionConflicts.get(pos)!.push(id.substring(0, 8));
-  }
-  
-  const conflicts = Array.from(positionConflicts.entries())
-    .filter(([pos, ids]) => ids.length > 1);
-  
-  if (conflicts.length > 0) {
-    console.log(`[TIMELINE_TRACK] [POSITION_CONFLICTS] ⚠️ Multiple items at same positions:`, 
-      conflicts.map(([pos, ids]) => `${pos}: [${ids.join(', ')}]`).join(', '));
-  }
-
   // Start with the proposed position (but use limited movement)
   const result = new Map(positions);
   const limitedTargetFrame = originalPos + limitedMovementAmount;
@@ -207,7 +179,6 @@ export const applyFluidTimeline = (
   // Find the dragged item's position in the ORIGINAL sorted list
   const originalDraggedIndex = originalSorted.findIndex(([id, _]) => id === draggedId);
   if (originalDraggedIndex === -1) {
-    console.log('[FluidTimelineCore] ⚠️ DRAGGED ITEM NOT FOUND - Falling back to shrinkOversizedGaps');
     return shrinkOversizedGaps(result, contextFrames, excludeId);
   }
 
@@ -219,16 +190,7 @@ export const applyFluidTimeline = (
   let shiftAmount = 0;
   let violations = [];
 
-  console.log('[FluidTimelineCore] 🔄 MOVEMENT ANALYSIS:', {
-    originalPos,
-    targetFrame,
-    rawMovementAmount: movementAmount,
-    limitedMovementAmount,
-    maxSingleMove
-  });
-
   if (limitedMovementAmount !== 0) {
-    const limitedTargetFrame = originalPos + limitedMovementAmount;
 
     let wouldCreateViolation = false;
 
@@ -297,22 +259,6 @@ export const applyFluidTimeline = (
   const hitsRightBoundary = targetFrame >= fullMax;
 
   if (hitsLeftBoundary || hitsRightBoundary) {
-    console.log('[BoundaryCollisionDebug] 🚨 BOUNDARY COLLISION DETECTED:', {
-      draggedId: draggedId.substring(0, 8),
-      targetFrame,
-      fullMin,
-      fullMax,
-      hitsLeftBoundary,
-      hitsRightBoundary,
-      boundaryType: hitsLeftBoundary ? 'LEFT_EDGE' : 'RIGHT_EDGE',
-      boundaryContext: {
-        distanceFromLeftBoundary: targetFrame - fullMin,
-        distanceFromRightBoundary: fullMax - targetFrame,
-        movementDirection: movementAmount > 0 ? 'RIGHT' : 'LEFT'
-      },
-      timestamp: new Date().toISOString()
-    });
-
     // When hitting a boundary, we need to shift adjacent items to make room
     if (hitsLeftBoundary) {
       // When hitting left boundary while moving left, shift items to the RIGHT
@@ -343,92 +289,7 @@ export const applyFluidTimeline = (
     }
   }
 
-  // COMPREHENSIVE FLUID TIMELINE ANALYSIS - All decision factors in one place
-  console.log('[FLUID_TIMELINE_ANALYSIS] 🌊 FLUID TIMELINE DECISION MATRIX:', {
-    // Input Parameters
-    input: {
-      draggedId: draggedId.substring(0, 8),
-      originalPos,
-      targetFrame,
-      limitedTargetFrame,
-      movementAmount,
-      limitedMovementAmount,
-      maxGap,
-      contextFrames
-    },
-
-    // Adjacent Items Analysis
-    adjacent: {
-      prevItem: prevItem ? {
-        id: prevItem[0].substring(0, 8),
-        pos: prevItem[1],
-        gapToDragged: targetFrame - prevItem[1],
-        gapToLimited: limitedTargetFrame - prevItem[1],
-        violation: targetFrame - prevItem[1] > maxGap ? 'YES' : 'NO'
-      } : null,
-      nextItem: nextItem ? {
-        id: nextItem[0].substring(0, 8),
-        pos: nextItem[1],
-        gapFromDragged: nextItem[1] - targetFrame,
-        gapFromLimited: nextItem[1] - limitedTargetFrame,
-        violation: nextItem[1] - targetFrame > maxGap ? 'YES' : 'NO'
-      } : null
-    },
-
-    // Violation Analysis
-    violations: violations.map(v => ({
-      type: v.type,
-      withItem: v.withItem,
-      gap: v.gap,
-      maxAllowed: v.maxAllowed,
-      requiredShift: v.requiredShift,
-      severity: v.gap > v.maxAllowed ? 'CRITICAL' : 'MINOR',
-      direction: v.direction || 'UNKNOWN'
-    })),
-
-    // Decision Logic
-    decision: {
-      needsShift,
-      shiftAmount,
-      shiftDirection: limitedMovementAmount > 0 ? 'RIGHT' : 'LEFT',
-      shiftReason: needsShift ?
-        (violations.length > 0 ? 'VIOLATIONS' : 'FLUID_MOVEMENT') :
-        'NO_MOVEMENT_NEEDED',
-      shiftType: violations.length > 0 ? 'CORRECTIVE' : 'ENHANCEMENT'
-    },
-
-    // Movement Limits Applied
-    limits: {
-      maxSingleMove: 50,
-      movementLimited: movementAmount !== limitedMovementAmount,
-      limitApplied: Math.abs(movementAmount) > 50 ? 'YES' : 'NO'
-    },
-
-    // Timeline Impact (preview based on current state)
-    impact: {
-      itemsToShift: originalSorted.slice(originalDraggedIndex + 1).length,
-      shiftMagnitude: shiftAmount,
-      totalAffectedItems: 1 + originalSorted.slice(originalDraggedIndex + 1).length, // dragged + subsequent
-      wouldCross: false, // Will be calculated after shifting
-      constraintApplied: 'PENDING_CALCULATION'
-    },
-
-    // Final State Preview (preview based on current state)
-    preview: {
-      draggedFinalPos: limitedTargetFrame,
-      subsequentItemsShifted: originalSorted.slice(originalDraggedIndex + 1).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        oldPos: pos,
-        newPos: pos + (shiftAmount * (limitedMovementAmount > 0 ? 1 : -1))
-      }))
-    },
-
-    // Timestamp
-    timestamp: new Date().toISOString()
-  });
-
   if (!needsShift) {
-    console.log('[FluidTimelineCore] ✅ NO MOVEMENT - Using standard gap enforcement');
     return shrinkOversizedGaps(result, contextFrames, excludeId);
   }
 
