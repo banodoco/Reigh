@@ -77,8 +77,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const isMobile = useIsMobile();
 
   // Component initialization log
-  console.log('[LIGHTBOX-DEBUG] 🚀 LightboxScrubVideo component render', {
-    src: src.substring(src.lastIndexOf('/') + 1) || 'no-src',
+  + 1) || 'no-src',
     poster: poster?.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
     isMobile,
     currentState: { posterLoaded, isVideoPlaying },
@@ -89,10 +88,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     if (videoRef.current && !isScrubbingRef.current) {
       // Check if video is already playing to prevent restart
       if (!videoRef.current.paused) {
-        console.log('[AutoplayDebugger:LIGHTBOX] Video already playing, skipping autoplay', {
-          src: videoRef.current.src,
-          currentTime: videoRef.current.currentTime,
-          timestamp: Date.now()
         });
         return;
       }
@@ -113,25 +108,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         currentTime: v.currentTime
       }));
       
-      console.log('[AutoplayDebugger:LIGHTBOX] 🚀 ATTEMPTING AUTOPLAY', {
-        // Video context
-        targetVideoSrc: videoRef.current.src,
-        targetVideoPaused: videoRef.current.paused,
-        targetVideoReadyState: videoRef.current.readyState,
-        targetVideoCurrentTime: videoRef.current.currentTime,
-        targetVideoMuted: videoRef.current.muted,
-        
-        // Page video context
-        totalVideosOnPage: allVideos.length,
-        playingVideosCount: playingVideos.length,
-        allVideoStates: videoSources,
-        
-        // Browser context
-        isMobile,
-        userAgent: navigator.userAgent,
-        
-        // User interaction context
-        documentHasFocus: document.hasFocus(),
+      ,
         documentVisibilityState: document.visibilityState,
         
         timestamp: Date.now()
@@ -231,9 +208,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
-      console.log('[LightboxAutoplay] Metadata loaded, duration set', {
-        duration: videoRef.current.duration,
-        timestamp: Date.now()
       });
     }
   }, []);
@@ -254,8 +228,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     const galleryVideos = document.querySelectorAll('[data-video-id]').length;
     
     const initContext = getAutoplayContext(isMobile);
-    console.log('[AutoplayDebugger:LIGHTBOX] 🎭 INITIALIZING', {
-      videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+    + 1) || 'no-src',
       autoplayContext: initContext,
       initializationState: {
         pageVideoCount,
@@ -270,20 +243,12 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
     const attemptAutoplay = () => {
       if (!hasAttemptedAutoplay && !isScrubbingRef.current) {
-        console.log('[LightboxAutoplay] attemptAutoplay called', {
-          hasAttemptedAutoplay,
-          isScrubbingRef: isScrubbingRef.current,
-          videoPaused: video.paused,
-          currentTime: video.currentTime,
-          readyState: video.readyState,
-          isMobile,
-          timestamp: Date.now()
         });
         hasAttemptedAutoplay = true;
         // iOS CRITICAL FIX: Force load() only if video hasn't loaded at all (readyState 0)
         // Avoid load() if video has any data to prevent flicker/reset
         if (isMobile && video.readyState === 0) {
-          console.log('[AutoplayDebugger:LIGHTBOX] 🔄 Forcing video.load() for iOS (readyState 0)', {
+          for iOS (readyState 0)', {
             readyState: video.readyState,
             timestamp: Date.now()
           });
@@ -293,7 +258,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
             console.warn('[AutoplayDebugger:LIGHTBOX] video.load() failed', e);
           }
         } else if (isMobile && video.readyState > 0) {
-          console.log('[AutoplayDebugger:LIGHTBOX] ⏭️ Skipping load() - video already has data', {
+          - video already has data', {
             readyState: video.readyState,
             reason: 'Avoid flicker/reset',
             timestamp: Date.now()
@@ -301,20 +266,13 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         }
         startAutoPlay();
       } else if (!video.paused) {
-        console.log('[LightboxAutoplay] Skipping autoplay - already playing', {
-          currentTime: video.currentTime,
-          timestamp: Date.now()
         });
       }
     };
 
     const handleCanPlay = () => {
       const canPlayContext = getAutoplayContext(isMobile);
-      console.log('[AutoplayDebugger:LIGHTBOX] 🟢 canplay event', {
-        videoState: {
-          readyState: video.readyState,
-          paused: video.paused,
-          src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src'
+      + 1) || 'no-src'
         },
         autoplayContext: canPlayContext,
         timestamp: Date.now()
@@ -326,11 +284,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
     const handleLoadedData = () => {
       const loadedDataContext = getAutoplayContext(isMobile);
-      console.log('[AutoplayDebugger:LIGHTBOX] 🟡 loadeddata event', {
-        videoState: {
-          readyState: video.readyState,
-          paused: video.paused,
-          src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src'
+      + 1) || 'no-src'
         },
         autoplayContext: loadedDataContext,
         timestamp: Date.now()
@@ -340,12 +294,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
       // Use a small delay to ensure the video is truly ready
       setTimeout(() => {
         const timeoutContext = getAutoplayContext(isMobile);
-        console.log('[AutoplayDebugger:LIGHTBOX] ⏰ Autoplay timeout triggered', {
-          hasAttemptedAutoplay,
-          videoPaused: video.paused,
-          autoplayContext: timeoutContext,
-          timeoutReason: 'iOS/iPadOS loadeddata fallback',
-          timestamp: Date.now()
         });
         attemptAutoplay();
       }, 100);
@@ -362,12 +310,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     // iOS/iPadOS specific: Also try on first user interaction if autoplay hasn't started
     const handleFirstInteraction = () => {
               const gestureContext = getAutoplayContext(isMobile);
-        console.log('[AutoplayDebugger:LIGHTBOX] 💆 User gesture detected', {
-          hasAttemptedAutoplay,
-          videoPaused: video.paused,
-          autoplayContext: gestureContext,
-          interactionType: 'first-touch-or-click',
-          timestamp: Date.now()
         });
       
       if (!hasAttemptedAutoplay && video.paused) {
@@ -375,12 +317,12 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         if (video.readyState === 0) {
           try { 
             video.load(); 
-            console.log('[AutoplayDebugger:LIGHTBOX] 🔄 Forced video.load() on user gesture (readyState 0)');
+            on user gesture (readyState 0)');
           } catch (e) {
             console.warn('[AutoplayDebugger:LIGHTBOX] video.load() on gesture failed', e);
           }
         } else {
-          console.log('[AutoplayDebugger:LIGHTBOX] ⏭️ Skipping load() on gesture - video has data', {
+          on gesture - video has data', {
             readyState: video.readyState,
             timestamp: Date.now()
           });
@@ -390,10 +332,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     };
 
     const handlePlay = () => {
-      console.log('[LIGHTBOX-DEBUG] 🎬 handlePlay called - setting isVideoPlaying to true', {
-        oldIsVideoPlaying: isVideoPlaying,
-        newIsVideoPlaying: true,
-        videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+      + 1) || 'no-src',
         videoPaused: video.paused,
         videoCurrentTime: video.currentTime,
         timestamp: Date.now()
@@ -402,10 +341,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     };
 
     const handlePause = () => {
-      console.log('[LIGHTBOX-DEBUG] ⏸️ handlePause called - setting isVideoPlaying to false', {
-        oldIsVideoPlaying: isVideoPlaying,
-        newIsVideoPlaying: false,
-        videoSrc: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+      + 1) || 'no-src',
         videoPaused: video.paused,
         videoCurrentTime: video.currentTime,
         timestamp: Date.now()
@@ -429,11 +365,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     // This works when the lightbox opens from a user gesture (poster click)
     if (isMobile) {
       const mountTimeoutId = setTimeout(() => {
-        console.log('[AutoplayDebugger:LIGHTBOX] 🚨 MOUNT FALLBACK AUTOPLAY', {
-          hasAttemptedAutoplay,
-          videoPaused: video.paused,
-          readyState: video.readyState,
-          src: video.src?.substring(video.src.lastIndexOf('/') + 1) || 'no-src',
+        + 1) || 'no-src',
           reason: 'iOS mount-time fallback after poster click',
           timestamp: Date.now()
         });
@@ -443,12 +375,12 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
           if (video.readyState === 0) {
             try {
               video.load();
-              console.log('[AutoplayDebugger:LIGHTBOX] 🔄 Mount fallback: forced video.load() (readyState 0)');
+              (readyState 0)');
             } catch (e) {
               console.warn('[AutoplayDebugger:LIGHTBOX] Mount fallback: video.load() failed', e);
             }
           } else {
-            console.log('[AutoplayDebugger:LIGHTBOX] ⏭️ Mount fallback: skipping load() - video has data', {
+            - video has data', {
               readyState: video.readyState,
               timestamp: Date.now()
             });
@@ -507,12 +439,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
     >
       {/* Always show static img poster first on mobile to prevent blink - hide when video starts playing */}
       {isMobile && poster && !isVideoPlaying && (() => {
-        console.log('[LIGHTBOX-DEBUG] 📸 Static IMG poster should be visible', {
-          isMobile,
-          hasPoster: !!poster,
-          isVideoPlaying,
-          condition: isMobile && poster && !isVideoPlaying,
-          timestamp: Date.now()
         });
         return true;
       })() && (
@@ -527,8 +453,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
             objectPosition: 'center'
           }}
           onLoad={() => {
-            console.log('[LIGHTBOX-DEBUG] 🖼️ Static poster IMG loaded', {
-              posterSrc: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+            + 1) || 'no-poster',
               willMountVideo: true,
               currentState: { posterLoaded, isVideoPlaying },
               timestamp: Date.now()
@@ -549,19 +474,12 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
       {/* Only mount video after poster loads on mobile, or immediately on desktop */}
       {(posterLoaded || !isMobile) && (() => {
-        console.log('[LIGHTBOX-DEBUG] 🎬 Video mounting condition met', {
-          isMobile,
-          posterLoaded,
-          isVideoPlaying,
-          condition: posterLoaded || !isMobile,
-          timestamp: Date.now()
         });
         return (
           <>
             {/* Poster overlay - shows poster image until video actually starts playing */}
             {poster && !isVideoPlaying && (() => {
-              console.log('[LIGHTBOX-DEBUG] 🎭 Background poster overlay rendering', {
-                posterUrl: poster.substring(poster.lastIndexOf('/') + 1) || 'no-poster',
+              + 1) || 'no-poster',
                 isVideoPlaying,
                 willShow: true,
                 timestamp: Date.now()
@@ -581,9 +499,7 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
 
             <video
               ref={(el) => {
-                console.log('[LIGHTBOX-DEBUG] 🎥 Video element ref set', {
-                  videoElement: !!el,
-                  src: el?.src?.substring(el.src.lastIndexOf('/') + 1) || 'no-src',
+                + 1) || 'no-src',
                   poster: el?.poster?.substring(el.poster.lastIndexOf('/') + 1) || 'no-poster',
                   readyState: el?.readyState,
                   paused: el?.paused,
@@ -598,12 +514,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
               preload={isMobile ? 'auto' : preloadProp}
               controls={false}
               onLoadedMetadata={(e) => {
-                console.log('[LIGHTBOX-DEBUG] 📊 Video metadata loaded', {
-                  duration: e.currentTarget.duration,
-                  readyState: e.currentTarget.readyState,
-                  videoWidth: e.currentTarget.videoWidth,
-                  videoHeight: e.currentTarget.videoHeight,
-                  timestamp: Date.now()
                 });
                 
                 // Update video dimensions for smooth transitions
@@ -615,53 +525,28 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
                 handleLoadedMetadata();
                 
                 // CRITICAL: Trigger autoplay immediately after metadata loads
-                console.log('[LIGHTBOX-DEBUG] 🎯 Triggering autoplay after metadata load');
                 setTimeout(() => {
                   if (videoRef.current && !isVideoPlaying) {
-                    console.log('[LIGHTBOX-DEBUG] 🚀 Attempting autoplay via metadata callback', {
-                      videoPaused: videoRef.current.paused,
-                      readyState: videoRef.current.readyState,
-                      timestamp: Date.now()
                     });
                     startAutoPlay();
                   }
                 }, 10); // Tiny delay to ensure ref is stable
               }}
               onCanPlay={(e) => {
-                console.log('[LIGHTBOX-DEBUG] ✅ Video can play', {
-                  readyState: e.currentTarget.readyState,
-                  paused: e.currentTarget.paused,
-                  currentTime: e.currentTarget.currentTime,
-                  timestamp: Date.now()
                 });
                 
                 // BACKUP: Also trigger autoplay on canplay event
-                console.log('[LIGHTBOX-DEBUG] 🎯 Triggering autoplay on canplay event');
                 setTimeout(() => {
                   if (videoRef.current && !isVideoPlaying && videoRef.current.paused) {
-                    console.log('[LIGHTBOX-DEBUG] 🚀 Attempting autoplay via canplay callback', {
-                      videoPaused: videoRef.current.paused,
-                      readyState: videoRef.current.readyState,
-                      timestamp: Date.now()
                     });
                     startAutoPlay();
                   }
                 }, 10);
               }}
               onPlay={(e) => {
-                console.log('[LIGHTBOX-DEBUG] ▶️ Video play event fired', {
-                  currentTime: e.currentTarget.currentTime,
-                  paused: e.currentTarget.paused,
-                  isVideoPlayingState: isVideoPlaying,
-                  timestamp: Date.now()
                 });
               }}
               onPause={(e) => {
-                console.log('[LIGHTBOX-DEBUG] ⏸️ Video pause event fired', {
-                  currentTime: e.currentTarget.currentTime,
-                  paused: e.currentTarget.paused,
-                  isVideoPlayingState: isVideoPlaying,
-                  timestamp: Date.now()
                 });
               }}
               onError={(e) => {

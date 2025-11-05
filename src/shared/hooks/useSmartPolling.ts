@@ -83,8 +83,7 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
     // Subscribe to freshness manager updates
     const unsubscribe = dataFreshnessManager.subscribe(() => {
       if (debug) {
-        console.log(`[SmartPolling] 🔄 Freshness update for query:`, queryKey);
-      }
+        }
       forceUpdate();
     });
 
@@ -141,7 +140,7 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
       diagnostics
     };
 
-    console.log(`[SmartPolling] 📊 Config for query ${JSON.stringify(queryKey)}:`, {
+    }:`, {
       refetchInterval: finalInterval,
       staleTime,
       isDataFresh,

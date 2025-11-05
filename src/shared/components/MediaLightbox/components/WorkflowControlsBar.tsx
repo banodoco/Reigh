@@ -85,12 +85,7 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   handleApplySettings,
 }) => {
   // Debug logging
-  console.log('[ShotSelectorDebug] WorkflowControlsBar render check', {
-    component: 'WorkflowControlsBar',
-    hasOnAddToShot: !!onAddToShot,
-    hasOnDelete: !!onDelete,
-    hasOnApplySettings: !!onApplySettings,
-    passedFirstCheck: !!(onAddToShot || onDelete || onApplySettings),
+  ,
     allShotsLength: allShots?.length || 0,
     isVideo,
     isSpecialEditMode,
@@ -101,12 +96,6 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
 
   // Don't render if no workflow actions available
   if (!(onAddToShot || onDelete || onApplySettings)) {
-    console.log('[ShotSelectorDebug] WorkflowControlsBar NOT rendering - no workflow actions', {
-      component: 'WorkflowControlsBar',
-      hasOnAddToShot: !!onAddToShot,
-      hasOnDelete: !!onDelete,
-      hasOnApplySettings: !!onApplySettings
-    });
     return null;
   }
 

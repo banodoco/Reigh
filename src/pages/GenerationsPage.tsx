@@ -130,12 +130,6 @@ const GenerationsPage: React.FC = () => {
     }
 
     try {
-      console.log('[BackfillDebug] Triggering data refresh for backfill:', {
-        deletedCount,
-        currentPage,
-        itemsPerPage,
-        selectedProjectId,
-        timestamp: Date.now()
       });
 
       const filters = { 
@@ -154,8 +148,6 @@ const GenerationsPage: React.FC = () => {
         queryKey: ['unified-generations', 'project', selectedProjectId, currentPage, itemsPerPage, filters] 
       });
 
-      console.log('[BackfillDebug] Data refresh completed for backfill');
-      
       // Return empty array since the refresh will update the main data source
       return [];
     } catch (error) {

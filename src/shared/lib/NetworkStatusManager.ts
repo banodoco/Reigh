@@ -31,11 +31,7 @@ export class NetworkStatusManager {
       previousOnlineStatus: navigator.onLine
     };
     
-    console.log('[NetworkStatusManager] 🌐 INITIALIZED', {
-      isOnline: this.status.isOnline,
-      effectiveType: this.status.effectiveType
-    });
-  }
+    }
 
   initialize(): void {
     if (this.initialized) return;
@@ -52,8 +48,7 @@ export class NetworkStatusManager {
     }
 
     this.initialized = true;
-    console.log('[NetworkStatusManager] ✅ EVENT LISTENERS INITIALIZED');
-  }
+    }
 
   getStatus(): NetworkStatus {
     return { ...this.status };
@@ -91,34 +86,7 @@ export class NetworkStatusManager {
     
     // Enhanced network transition logging - always log for debugging
     const timeSinceLastTransition = now - this.status.lastTransitionAt;
-    console.log('[NetworkDebug] Network event received:', {
-      eventType,
-      triggeredBy: event?.type,
-      currentState: {
-        isOnline: this.status.isOnline,
-        effectiveType: this.status.effectiveType,
-        lastTransitionAt: this.status.lastTransitionAt
-      },
-      newState: {
-        isOnline: newIsOnline,
-        effectiveType: newEffectiveType
-      },
-      changes: {
-        onlineStatusChanged,
-        connectionChanged,
-        timeSinceLastTransitionMs: timeSinceLastTransition
-      },
-      connectionDetails: connection ? {
-        downlink: connection.downlink,
-        rtt: connection.rtt,
-        saveData: connection.saveData,
-        type: connection.type
-      } : null,
-      timestamp: now
-    });
-    
     if (!onlineStatusChanged && !connectionChanged) {
-      console.log('[NetworkDebug] No state change detected, ignoring event');
       return;
     }
     
@@ -163,8 +131,7 @@ export class NetworkStatusManager {
     // Browser online/offline event logging
     if (onlineStatusChanged) {
       if (newIsOnline) {
-        console.log('[NetworkDebug] 📶 Browser detected ONLINE - network connectivity restored');
-      } else {
+        } else {
         console.warn('[NetworkDebug] 📵 Browser detected OFFLINE - network connectivity lost');
       }
     }
@@ -194,17 +161,13 @@ export function getNetworkStatusManager(): NetworkStatusManager {
       (window as any).checkNetworkStatus = () => {
         const status = networkStatusManager.getStatus();
         const intervals = networkStatusManager.getRecommendedIntervals();
-        console.log('[NetworkStatusManager] 🔍 DEBUG INFO:', {
-          status,
-          intervals,
-          isSlowConnection: networkStatusManager.isSlowConnection(),
+        ,
           subscriberCount: networkStatusManager['subscribers'].size
         });
       };
       
       // Add manual network change simulator for testing
       (window as any).simulateNetworkChange = (isOnline: boolean, effectiveType?: string) => {
-        console.log('[NetworkStatusManager] 🧪 SIMULATING NETWORK CHANGE:', { isOnline, effectiveType });
         const originalOnLine = navigator.onLine;
         const originalEffectiveType = (navigator as any).connection?.effectiveType;
         

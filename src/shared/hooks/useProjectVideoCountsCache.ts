@@ -51,8 +51,6 @@ const globalProjectVideoCountsCache = new ProjectVideoCountsCache();
  * Fetch all shot video counts for a project using shot_statistics view
  */
 async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<string, number>> {
-  console.log('[ProjectVideoCountsCache] Fetching all shot video counts for project:', projectId);
-  
   const { data, error } = await supabase
     .from('shot_statistics')
     .select('shot_id, video_count')
@@ -68,10 +66,7 @@ async function fetchProjectVideoCountsFromDB(projectId: string): Promise<Map<str
     counts.set(row.shot_id, row.video_count || 0);
   });
   
-  console.log('[ProjectVideoCountsCache] Fetched video counts:', {
-    projectId,
-    shotCount: counts.size,
-    totalVideos: Array.from(counts.values()).reduce((sum, count) => sum + count, 0),
+  ).reduce((sum, count) => sum + count, 0),
     shotBreakdown: Object.fromEntries(counts),
     timestamp: Date.now()
   });
@@ -141,19 +136,16 @@ export function useProjectVideoCountsCache(projectId: string | null) {
   
   const clearCache = useCallback((): void => {
     cacheRef.current.clear();
-    console.log('[ProjectVideoCountsCache] Cleared all cached project video counts');
-  }, []);
+    }, []);
   
   const deleteProjectCache = useCallback((projectId: string | null): void => {
     if (!projectId) return;
     cacheRef.current.deleteProject(projectId);
-    console.log('[ProjectVideoCountsCache] Deleted cached counts for project:', projectId);
-  }, []);
+    }, []);
   
   // Debug function to log cache state
   const logCacheState = useCallback((): void => {
-    console.log('[ProjectVideoCountsCache] Current cache state:', {
-      size: cacheRef.current.size(),
+    ,
       cachedProjectIds: cacheRef.current.getCachedProjectIds(),
       currentProjectCounts: projectId ? getAllShotCounts() : null,
       timestamp: Date.now()
@@ -165,8 +157,7 @@ export function useProjectVideoCountsCache(projectId: string | null) {
     if (projectId) {
       cacheRef.current.deleteProject(projectId);
       refetch();
-      console.log('[ProjectVideoCountsCache] Invalidated cache due to video changes for project:', projectId);
-    }
+      }
   }, [projectId, refetch]);
 
   return {

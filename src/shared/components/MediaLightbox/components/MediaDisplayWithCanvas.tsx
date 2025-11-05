@@ -149,12 +149,6 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
 
           {/* Canvas Overlay for Inpainting */}
           {(() => {
-            console.log(`[${debugContext}] 🖼️ Canvas render check`, {
-              isInpaintMode,
-              hasDisplayCanvasRef: !!displayCanvasRef,
-              hasDisplayCanvas: !!displayCanvasRef?.current,
-              shouldRenderCanvas: isInpaintMode
-            });
             return isInpaintMode;
           })() && (
             <>
@@ -169,33 +163,18 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                   WebkitUserSelect: 'none'
                 }}
                 onPointerDown={(e) => {
-                  console.log(`[${debugContext}] 🎨 Canvas onPointerDown`, {
-                    clientX: e.clientX,
-                    clientY: e.clientY,
-                    canvasWidth: displayCanvasRef.current?.width,
-                    canvasHeight: displayCanvasRef.current?.height,
-                    isInpaintMode,
-                    hasHandler: !!handlePointerDown
-                  });
                   handlePointerDown?.(e);
                 }}
                 onPointerMove={(e) => {
-                  console.log(`[${debugContext}] 🖌️ Canvas onPointerMove`, {
-                    clientX: e.clientX,
-                    clientY: e.clientY
-                  });
                   handlePointerMove?.(e);
                 }}
                 onPointerUp={(e) => {
-                  console.log(`[${debugContext}] 🛑 Canvas onPointerUp`);
                   handlePointerUp?.(e);
                 }}
                 onPointerCancel={(e) => {
-                  console.log(`[${debugContext}] ⚠️ Canvas onPointerCancel`);
                   handlePointerUp?.(e);
                 }}
                 onDragStart={(e) => {
-                  console.log(`[${debugContext}] 🚫 Preventing drag`);
                   e.preventDefault();
                 }}
               />

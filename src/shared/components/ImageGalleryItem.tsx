@@ -146,8 +146,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // [VideoThumbnailRender] Debug if this component is rendering for videos
   React.useEffect(() => {
     if (image.isVideo && index < 3) {
-      console.log('[VideoThumbnailRender] ImageGalleryItem mounting for video:', {
-        imageId: image.id?.substring(0, 8),
+      ,
         index,
         isVideo: image.isVideo,
         shouldLoad,
@@ -159,9 +158,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // Debug mobile state for first few items (reduced frequency)
   React.useEffect(() => {
     if (index < 3) {
-      console.log(`[MobileDebug] ImageGalleryItem ${index} mounted:`, {
-        isMobile,
-        imageId: image.id?.substring(0, 8),
+      ,
         hasOnMobileTap: typeof onMobileTap === 'function',
         timestamp: Date.now()
       });
@@ -190,8 +187,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // [ThumbToFullTransition] Log progressive loading state changes for first few items
   React.useEffect(() => {
     if (index < 3) {
-      console.log(`[ThumbToFullTransition] Item ${index} state:`, {
-        imageId: image.id?.substring(0, 8),
+      ,
         progressiveEnabled,
         phase,
         isThumbShowing,
@@ -213,8 +209,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       const videoDisplayUrl = getDisplayUrl(image.thumbUrl || image.url);
       
       if (index === 0) { // Only log the first video item in detail
-        console.log('[VideoThumbnailFIXED] ImageGalleryItem video URL selection:', {
-          imageId: image.id?.substring(0, 8),
+        ,
           index,
           progressiveEnabled,
           usingThumbnail: !!image.thumbUrl,
@@ -233,8 +228,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     // For images, use progressive loading if enabled
     if (progressiveEnabled && progressiveSrc) {
       if (index < 3) {
-        console.log(`[ThumbToFullTransition] Item ${index} using progressiveSrc:`, {
-          imageId: image.id?.substring(0, 8),
+        ,
           progressiveSrc: progressiveSrc?.substring(0, 50),
           phase,
           timestamp: Date.now()
@@ -245,7 +239,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     
     const fallbackUrl = getDisplayUrl(image.thumbUrl || image.url);
     if (index < 3 && progressiveEnabled) {
-      console.log(`[ThumbToFullTransition] Item ${index} using fallback (no progressiveSrc yet):`, {
+      :`, {
         imageId: image.id?.substring(0, 8),
         fallbackUrl: fallbackUrl?.substring(0, 50),
         phase,
@@ -313,20 +307,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     
     setAddingToShotImageId(image.id);
     try {
-      console.log('[QuickCreate] Starting atomic shot creation with image:', {
-        projectId: selectedProjectId,
-        shotName: newShotName,
-        generationId: image.id
-      });
-      
       // Use the atomic database function to create shot and add image in one operation
       const result = await createShotWithImageMutation.mutateAsync({
         projectId: selectedProjectId,
         shotName: newShotName,
         generationId: image.id
       });
-      
-      console.log('[QuickCreate] Atomic operation successful:', result);
       
       // Set the newly created shot as the last affected shot
       updateLastAffectedShotId(result.shotId);
@@ -378,7 +364,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     
     if (imageRetryCount < MAX_RETRIES) {
-      console.log(`[ImageGalleryItem] Auto-retrying image load for ${image.id} in ${1000 * (imageRetryCount + 1)}ms...`);
+      }ms...`);
       // Auto-retry with cache busting after a delay
       setTimeout(() => {
         setImageRetryCount(prev => prev + 1);
@@ -408,16 +394,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     }
     
     if (index < 3) {
-      console.log(`[ImageGalleryItem-${index}] Image changed, resetting state`, {
-        prevId: prevImageIdentifierRef.current,
-        newId: imageIdentifier
-      });
-    }
+      }
     
     // [VideoThumbnailLoop] Debug what's causing the reset loop
     if (image.isVideo && index === 0) {
-      console.log('[VideoThumbnailLoop] imageIdentifier changed, causing reset:', {
-        imageId: image.id?.substring(0, 8),
+      ,
         prevIdentifier: prevImageIdentifierRef.current,
         newIdentifier: imageIdentifier,
         url: image.url?.substring(0, 50) + '...',
@@ -448,8 +429,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // [VideoThumbnailActualSrc] Debug actualSrc changes for videos
   React.useEffect(() => {
     if (image.isVideo && index === 0) {
-      console.log('[VideoThumbnailActualSrc] actualSrc changed:', {
-        imageId: image.id?.substring(0, 8),
+      ,
         actualSrc: actualSrc?.substring(0, 50) + '...' || 'NULL',
         actualSrcExists: !!actualSrc,
         timestamp: Date.now(),
@@ -461,8 +441,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // [VideoThumbnailIssue] Debug shouldLoad for videos
   React.useEffect(() => {
     if (image.isVideo && index === 0) {
-      console.log('[VideoThumbnailLoad] shouldLoad state for first video:', {
-        imageId: image.id?.substring(0, 8),
+      ,
         shouldLoad,
         actualSrc: !!actualSrc,
         displayUrl: displayUrl?.substring(0, 50) + '...',
@@ -488,8 +467,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     const isPreloaded = isImageCached(image);
     
     if (index < 3) {
-      console.log(`[ThumbToFullTransition] Item ${index} actualSrc effect:`, {
-        imageId: image.id?.substring(0, 8),
+      ,
         shouldLoad,
         actualSrc: actualSrc?.substring(0, 50),
         actualDisplayUrl: actualDisplayUrl?.substring(0, 50),
@@ -511,8 +489,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       // This handles both initial load AND progressive thumbnail→full transitions
       if (actualSrc !== actualDisplayUrl) {
         if (index < 3) {
-          console.log(`[ThumbToFullTransition] Item ${index} updating actualSrc:`, {
-            imageId: image.id?.substring(0, 8),
+          ,
             from: actualSrc?.substring(0, 50),
             to: actualDisplayUrl?.substring(0, 50),
             timestamp: Date.now()
@@ -578,8 +555,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   useEffect(() => {
     setVideoReady(false);
     if (index < 3 && isVideoContent) {
-      console.log(`[VideoHover] Video URL changed for item ${index}:`, {
-        imageId: image.id?.substring(0, 8),
+      ,
         videoUrl: videoUrl?.substring(0, 50) + '...',
         isVideoContent,
         hasThumbnailImage,
@@ -594,8 +570,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       videoEl.pause();
       videoEl.currentTime = 0;
       if (index < 3 && isVideoContent) {
-        console.log(`[VideoHover] Paused ${label} for item ${index}`);
-      }
+        }
     } catch (error) {
       if (index < 3 && isVideoContent) {
         console.warn(`[VideoHover] Failed to pause ${label} for item ${index}:`, error);
@@ -607,8 +582,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     if (!videoEl) return;
     
     if (index < 3 && isVideoContent) {
-      console.log(`[VideoHover] Hover state changed for item ${index}:`, {
-        imageId: image.id?.substring(0, 8),
+      ,
         isHovering,
         videoReady,
         hasThumbnailImage,
@@ -620,8 +594,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     
     if (isHovering && videoReady) {
       if (index < 3 && isVideoContent) {
-        console.log(`[VideoHover] Starting play for item ${index}:`, {
-          imageId: image.id?.substring(0, 8),
+        ,
           videoSrc: videoEl.src?.substring(0, 50) + '...',
           timestamp: Date.now()
         });
@@ -637,8 +610,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       });
     } else {
       if (index < 3 && isVideoContent) {
-        console.log(`[VideoHover] Stopping play for item ${index}:`, {
-          imageId: image.id?.substring(0, 8),
+        ,
           reason: !isHovering ? 'not hovering' : 'not ready',
           timestamp: Date.now()
         });
@@ -744,7 +716,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     
     // Throttled logging to track visibility changes (not on every render)
     if (shouldShow) {
-      console.log('[AddWithoutPosition] Button will show for image:', image.id?.substring(0, 8));
+      );
     }
     
     return shouldShow;
@@ -772,7 +744,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         });
       } else {
         // Shot not in list yet, but we have the ID and name, so navigate anyway
-        console.log('[QuickCreate] Shot not in list yet, navigating with stored data');
         navigateToShot({ 
           id: quickCreateSuccess.shotId, 
           name: quickCreateSuccess.shotName || `Shot`,
@@ -894,8 +865,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       }, 0);
     }
     
-    console.log('[GenerationDrag] Drag started:', {
-      generationId: image.id?.substring(0, 8),
+    ,
       imageUrl: image.url?.substring(0, 50),
       timestamp: Date.now()
     });
@@ -917,8 +887,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         onMouseEnter={() => { 
           if (!isMobile && isVideoContent) {
             if (index < 3) {
-              console.log(`[VideoHover] Mouse enter on item ${index}:`, {
-                imageId: image.id?.substring(0, 8),
+              ,
                 hasThumbnailImage,
                 videoReady,
                 timestamp: Date.now()
@@ -930,8 +899,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         onMouseLeave={() => { 
           if (!isMobile && isVideoContent) {
             if (index < 3) {
-              console.log(`[VideoHover] Mouse leave on item ${index}:`, {
-                imageId: image.id?.substring(0, 8),
+              ,
                 hasThumbnailImage,
                 videoReady,
                 timestamp: Date.now()
@@ -942,8 +910,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               try {
                 visibleVideoRef.current.pause();
                 visibleVideoRef.current.currentTime = 0;
-                if (index < 3) console.log(`[VideoHover] Immediate pause on mouseleave for item ${index}`);
-              } catch {}
+                if (index < 3) } catch {}
             }
             setIsHovering(false);
           }
@@ -976,8 +943,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       style={{ backgroundColor: 'transparent', cursor: 'pointer' }}
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
-                      console.log('[MobileDebug] Video onTouchEnd fired', {
-                        imageId: image.id?.substring(0, 8),
+                      ,
                         target: (e.target as HTMLElement)?.tagName,
                         timestamp: Date.now()
                       });
@@ -1021,8 +987,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       onLoadStart={() => setImageLoading(true)}
                       onLoadedMetadata={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video loadedmetadata for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
+                          ,
                             hasThumbnailImage,
                             videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
                             timestamp: Date.now()
@@ -1032,8 +997,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       }}
                       onLoadedData={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video loadeddata for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
+                          ,
                             hasThumbnailImage,
                             videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
                             timestamp: Date.now()
@@ -1044,8 +1008,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       }}
                       onCanPlay={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video canplay for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
+                          ,
                             hasThumbnailImage,
                             videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
                             timestamp: Date.now()
@@ -1055,18 +1018,16 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       }}
                       onWaiting={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video waiting (buffering) for item ${index}`);
+                          for item ${index}`);
                         }
                       }}
                       onStalled={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video stalled for item ${index}`);
-                        }
+                          }
                       }}
                       onSuspend={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video suspend for item ${index}`);
-                        }
+                          }
                       }}
                       onError={handleImageError}
                       onAbort={() => setImageLoading(false)}
@@ -1087,7 +1048,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       onLoadStart={() => setImageLoading(true)}
                       onCanPlay={() => {
                         if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] No-thumbnail video ready (canPlay) for item ${index}:`, {
+                          for item ${index}:`, {
                             imageId: image.id?.substring(0, 8),
                             hasThumbnailImage,
                             videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
@@ -1115,17 +1076,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                         style={{ cursor: 'pointer' }}
                         onPlay={() => {
                           if (index < 3 && isVideoContent) {
-                            console.log(`[VideoHover] Visible video playing for item ${index}`);
-                          }
+                            }
                         }}
                         onPause={() => {
                           if (index < 3 && isVideoContent) {
-                            console.log(`[VideoHover] Visible video paused for item ${index}`);
-                          }
+                            }
                         }}
                         onWaiting={() => {
                           if (index < 3 && isVideoContent) {
-                            console.log(`[VideoHover] Visible video buffering (waiting) for item ${index}`);
+                            for item ${index}`);
                           }
                         }}
                         onError={handleImageError}
@@ -1179,8 +1138,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   )}
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                   onTouchEnd={isMobile ? (e) => {
-                    console.log('[MobileDebug] Image onTouchEnd fired', {
-                      imageId: image.id?.substring(0, 8),
+                    ,
                       target: (e.target as HTMLElement)?.tagName,
                       timestamp: Date.now()
                     });
@@ -1211,12 +1169,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               {/* Show skeleton only while the media is still loading */}
               {/* Only show skeleton if image hasn't loaded yet - never show it for already-loaded images */}
               {!imageLoaded && (
-                index < 3 && console.log(`[ImageGalleryItem-${index}] Showing skeleton`, {
-                  imageId: image.id,
-                  imageLoaded,
-                  imageLoading,
-                  actualSrc
-                }),
+                index < 3 && ,
                 <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
@@ -1292,11 +1245,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                   }
                               }
                               
-                              console.log('[GenerationsPane] Add to Shot button clicked', {
-                                imageId: image.id,
-                                selectedShotIdLocal,
-                                isAlreadyPositionedInSelectedShot,
-                                simplifiedShotOptions: simplifiedShotOptions.map(s => ({ id: s.id, name: s.name })),
+                              ),
                                 imageUrl: image.url?.substring(0, 50) + '...',
                                 timestamp: Date.now()
                               });
@@ -1307,15 +1256,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                               }
 
                               if (!selectedShotIdLocal) {
-                                  console.log('[GenerationsPane] ❌ No shot selected for adding image');
                                   toast({ title: "Select a Shot", description: "Please select a shot first to add this image.", variant: "destructive" });
                                   return;
                               }
                               
-                              console.log('[GenerationsPane] 🚀 Starting add to shot process', {
-                                imageId: image.id,
-                                targetShotId: selectedShotIdLocal,
-                                targetShotName: simplifiedShotOptions.find(s => s.id === selectedShotIdLocal)?.name
+                              ?.name
                               });
                               
                               setAddingToShotImageId(image.id!);
@@ -1337,9 +1282,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           const imageUrlToUse = image.url || displayUrl;
                                           const thumbUrlToUse = image.thumbUrl || imageUrlToUse;
                                           
-                                          console.log(`[GenerationsPane] Calling onAddToLastShot - Attempt ${retryCount + 1}/${maxRetries}`, {
-                                            imageId: image.id,
-                                            imageUrlToUse: imageUrlToUse?.substring(0, 80) + '...',
+                                          + '...',
                                             thumbUrlToUse: thumbUrlToUse?.substring(0, 80) + '...',
                                             selectedShotIdLocal,
                                             timestamp: Date.now()
@@ -1348,13 +1291,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           success = await onAddToLastShot(image.id!, imageUrlToUse, thumbUrlToUse);
                                           
                                           if (success) {
-                                              console.log(`[GenerationsPane] ✅ Success on attempt ${retryCount + 1} for image ${image.id}`);
                                               onShowTick(image.id!);
                                               onOptimisticPositioned?.(image.id!);
                                               log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
                                           } else {
-                                              console.log(`[GenerationsPane] ❌ Failed on attempt ${retryCount + 1} for image ${image.id}`);
-                                          }
+                                              }
                                       } catch (error) {
                                           retryCount++;
                                           log('MobileAddToShot', `Attempt ${retryCount} failed for image ${image.id}:`, error);
@@ -1450,10 +1391,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                 return;
                                             }
                                         }
-                                        console.log('[GenerationsPane] Add to Shot WITHOUT position button clicked', {
-                                          imageId: image.id,
-                                          selectedShotIdLocal,
-                                          simplifiedShotOptions: simplifiedShotOptions.map(s => ({ id: s.id, name: s.name })),
+                                        ),
                                           imageUrl: image.url?.substring(0, 50) + '...',
                                           timestamp: Date.now()
                                         });
@@ -1471,9 +1409,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                     const imageUrlToUse = image.url || displayUrl;
                                                     const thumbUrlToUse = image.thumbUrl || imageUrlToUse;
                                                     
-                                                    console.log(`[GenerationsPane] Calling onAddToLastShotWithoutPosition - Attempt ${retryCount + 1}/${maxRetries}`, {
-                                                      imageId: image.id,
-                                                      imageUrlToUse: imageUrlToUse?.substring(0, 80) + '...',
+                                                    + '...',
                                                       thumbUrlToUse: thumbUrlToUse?.substring(0, 80) + '...',
                                                       selectedShotIdLocal,
                                                       timestamp: Date.now()
@@ -1482,12 +1418,10 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                     success = await onAddToLastShotWithoutPosition(image.id!, imageUrlToUse, thumbUrlToUse);
                                                     
                                                     if (success) {
-                                                        console.log(`[GenerationsPane] ✅ Success without position on attempt ${retryCount + 1} for image ${image.id}`);
                                                         onShowSecondaryTick?.(image.id!);
                                                         onOptimisticUnpositioned?.(image.id!);
                                                     } else {
-                                                        console.log(`[GenerationsPane] ❌ Failed without position on attempt ${retryCount + 1} for image ${image.id}`);
-                                                    }
+                                                        }
                                                 } catch (error) {
                                                     retryCount++;
                                                     

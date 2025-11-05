@@ -85,14 +85,7 @@ const logVideoStateChanges = (current: VideoState[], previous: VideoState[]) => 
   });
   
   if (changes.length > 0) {
-    console.log('[AutoplayMonitor] 📊 Video state changes detected:', {
-      changes,
-      currentStates: current.map(v => ({
-        src: v.src,
-        paused: v.paused,
-        isLightbox: v.isLightbox,
-        isGallery: v.isGallery
-      })),
+    ),
       timestamp: Date.now()
     });
   }
@@ -101,7 +94,6 @@ const logVideoStateChanges = (current: VideoState[], previous: VideoState[]) => 
 export const startAutoplayMonitoring = () => {
   if (monitoringActive || process.env.NODE_ENV !== 'development') return;
   
-  console.log('[AutoplayMonitor] 🎬 Starting autoplay monitoring...');
   monitoringActive = true;
   previousVideoStates = captureVideoStates();
   
@@ -118,7 +110,6 @@ export const startAutoplayMonitoring = () => {
 export const stopAutoplayMonitoring = () => {
   if (!monitoringActive) return;
   
-  console.log('[AutoplayMonitor] 🛑 Stopping autoplay monitoring...');
   monitoringActive = false;
   
   if (monitorInterval) {
@@ -131,7 +122,6 @@ export const stopAutoplayMonitoring = () => {
 if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
   // Start monitoring after a short delay to let the page load
   setTimeout(() => {
-    console.log('[📊 MONITOR] Starting autoplay monitoring system...');
     startAutoplayMonitoring();
   }, 2000);
 }

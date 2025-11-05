@@ -88,7 +88,6 @@ export const useMobileOptimizedState = <T>(
   useEffect(() => {
     if (isLowMemoryMode) {
       const timer = setTimeout(() => {
-        console.log('[MobileOptimizedState] Recovering from low memory mode');
         setIsLowMemoryMode(false);
         performanceConfig.current = customConfig || getPerformanceConfig(deviceCapabilities.current);
       }, 30000); // 30 seconds
@@ -163,7 +162,6 @@ export const useMobileOptimizedOptimisticState = <T>(
     
     // Skip optimistic updates on low-end devices to prevent race conditions
     if (!config.enableOptimisticUpdates || shouldUseConservativeMode()) {
-      console.log('[MobileOptimizedOptimistic] Skipping optimistic update - conservative mode');
       onServerUpdate(newState);
       return;
     }
@@ -203,7 +201,6 @@ export const useMobileOptimizedOptimisticState = <T>(
     reconciliationTimeoutRef.current = setTimeout(() => {
       // Check if this reconciliation is still current
       if (currentReconciliationId !== reconciliationId) {
-        console.log('[MobileOptimizedOptimistic] Reconciliation cancelled - newer update in progress');
         return;
       }
       
@@ -212,12 +209,9 @@ export const useMobileOptimizedOptimisticState = <T>(
       const serverIds = serverState.map((item: any) => item.id || item.shotImageEntryId).join(',');
       
       if (optimisticIds === serverIds) {
-        console.log('[MobileOptimizedOptimistic] Server caught up with optimistic state');
         setIsOptimisticUpdate(false);
         updateState(serverState, 'immediate');
       } else {
-        console.log('[MobileOptimizedOptimistic] Server state differs - keeping optimistic state temporarily');
-        
         // Safety timeout: force reconciliation after a reasonable time
         setTimeout(() => {
           if (isOptimisticUpdate) {

@@ -76,8 +76,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
             isConnecting: false, 
             error: null 
           }));
-          console.log('[SimpleRealtimeProvider] ✅ Connected to project:', selectedProjectId);
-        } else {
+          } else {
           setState(prev => ({ 
             ...prev, 
             isConnected: false, 
@@ -116,9 +115,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     // NEW: Handle batched task updates more efficiently
     const handleTaskUpdateBatch = (event: CustomEvent) => {
       const { payloads, count } = event.detail;
-      console.log('[SimpleRealtimeProvider:Batching] 📦 Batched task updates received:', {
-        count,
-        timestamp: Date.now()
       });
 
       // Analyze batch to determine what needs invalidation
@@ -135,11 +131,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         lastTaskUpdate: { payload: event.detail, timestamp: Date.now() }
       }));
 
-      console.log('[TasksPaneRealtimeDebug:Batching] 🔄 Targeted invalidation for batched updates', {
-        context: 'realtime-invalidation-task-batch',
-        batchSize: count,
-        hasCompleteTask,
-        completedShotIds: Array.from(completedShotIds).map(id => (id as string).substring(0, 8)),
+      .map(id => (id as string).substring(0, 8)),
         keysToInvalidate: hasCompleteTask ? 3 : 2, // Reduced from 6+
         timestamp: Date.now()
       });
@@ -158,7 +150,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         
         // Invalidate only the specific shots that completed
         if (completedShotIds.size > 0) {
-          console.log('[TasksPaneRealtimeDebug:Batching] 🎯 Targeted invalidation for', completedShotIds.size, 'completed shots');
           completedShotIds.forEach((shotId) => {
             queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
             queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] }); // 🚀 For useEnhancedShotPositions (Timeline)
@@ -178,7 +169,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
 
     // OLD: Handle individual task updates (legacy, will be replaced by batching)
     const handleTaskUpdate = (event: CustomEvent) => {
-      console.log('[SimpleRealtimeProvider] 📨 Task update received (legacy - should be batched):', event.detail);
+      :', event.detail);
       
       const payload = event.detail;
       const isComplete = payload?.new?.status === 'Complete';
@@ -201,9 +192,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     // NEW: Handle batched new tasks more efficiently
     const handleNewTaskBatch = (event: CustomEvent) => {
       const { payloads, count } = event.detail;
-      console.log('[SimpleRealtimeProvider:Batching] 📦 Batched new tasks received:', {
-        count,
-        timestamp: Date.now()
       });
       
       setState(prev => ({
@@ -213,12 +201,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       
       const activeQueries = queryClient.getQueryCache().getAll().length;
       
-      console.log('[TasksPaneRealtimeDebug:Batching] 🔄 Targeted invalidation for batched new tasks', {
-        context: 'realtime-invalidation-new-task-batch',
-        batchSize: count,
-        activeQueriesBeforeInvalidation: activeQueries,
-        keysToInvalidate: 2, // Reduced from 6+
-        timestamp: Date.now()
       });
       
       // ONLY invalidate task queries (most new tasks are just queued, not complete)
@@ -228,17 +210,14 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       // Note: We don't invalidate generation queries here because new tasks
       // haven't completed yet. They'll be invalidated when tasks complete.
       
-      console.log('[TasksPaneRealtimeDebug:Batching] ✅ Batched invalidation complete:', {
-        duration: '<5ms',
-        batchSize: count,
-        activeQueriesAfterInvalidation: queryClient.getQueryCache().getAll().length,
+      .getAll().length,
         timestamp: Date.now()
       });
     };
 
     // OLD: Handle individual new tasks (legacy - should not be called with batching)
     const handleNewTask = (event: CustomEvent) => {
-      console.log('[SimpleRealtimeProvider] 📨 New task received (legacy - should be batched):', event.detail);
+      :', event.detail);
       
       setState(prev => ({
         ...prev,
@@ -254,17 +233,12 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     const handleShotGenerationChangeBatch = (event: CustomEvent) => {
       const { payloads, count, affectedShotIds } = event.detail;
       
-      console.log('[SimpleRealtimeProvider:Batching] 📦 Batched shot generation changes received:', {
-        count,
-        affectedShots: affectedShotIds?.length || 0,
-        timestamp: Date.now()
       });
 
       // Invalidate queries for all affected shots in batch
       // This prevents multiple invalidations during rapid timeline drag operations
       if (affectedShotIds && affectedShotIds.length > 0) {
-        console.log('[SimpleRealtimeProvider:Batching] 🎯 Batch invalidating', affectedShotIds.length, 'shots:', 
-          affectedShotIds.map((id: string) => id.substring(0, 8)).join(', '));
+        => id.substring(0, 8)).join(', '));
         
         affectedShotIds.forEach((shotId: string) => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
@@ -278,7 +252,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     const handleShotGenerationChange = (event: CustomEvent) => {
       const { shotId, isPositioned, eventType } = event.detail;
       
-      console.log('[SimpleRealtimeProvider] 🎯 Shot generation change received (legacy - should be batched):', {
+      :', {
         shotId: shotId?.substring(0, 8),
         isPositioned,
         eventType,
@@ -287,7 +261,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       
       // Simplified invalidation for legacy events
       if (shotId) {
-        console.log('[SimpleRealtimeProvider] 🎯 Targeted shot invalidation for positioned image:', { shotId: shotId.substring(0, 8) });
+        });
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shotId] });

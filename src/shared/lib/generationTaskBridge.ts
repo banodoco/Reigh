@@ -192,8 +192,6 @@ export async function preloadGenerationTaskMappings(
     preloadFullTaskData = false 
   } = options;
 
-  console.log('[GenerationTaskBridge] Preloading task mappings for', generationIds.length, 'generations');
-
   for (let i = 0; i < generationIds.length; i += batchSize) {
     const batch = generationIds.slice(i, i + batchSize);
     

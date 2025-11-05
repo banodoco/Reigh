@@ -100,18 +100,14 @@ export const useMagicEditMode = ({
   }, [media.id]);
 
   const handleEnterMagicEditMode = useCallback(() => {
-    console.log('[MobilePaintDebug] ✨ Entering unified edit mode - START');
-    
     setIsMagicEditMode(true);
-    console.log('[MobilePaintDebug] ✨ Called setIsMagicEditMode(true)');
+    ');
     
-    console.log('[MobilePaintDebug] About to call handleEnterInpaintMode, ref exists:', !!handleEnterInpaintMode);
     handleEnterInpaintMode();
-    console.log('[MobilePaintDebug] ✨ Called handleEnterInpaintMode()');
+    ');
   }, [handleEnterInpaintMode]);
 
   const handleExitMagicEditMode = useCallback(() => {
-    console.log('[MediaLightbox] ✨ Exiting unified edit mode');
     hasManuallyExitedRef.current = true;
     setIsMagicEditMode(false);
     setIsInpaintMode(false);
@@ -119,19 +115,9 @@ export const useMagicEditMode = ({
 
   // Auto-enter unified edit mode if requested (only once, not after manual exit)
   useEffect(() => {
-    console.log('[EditModeDebug] Auto-enter effect check:', {
-      autoEnterInpaint,
-      isInpaintMode,
-      isMagicEditMode,
-      isVideo,
-      selectedProjectId,
-      hasManuallyExited: hasManuallyExitedRef.current,
-      willEnter: autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && !!selectedProjectId && !hasManuallyExitedRef.current,
-      timestamp: Date.now()
     });
     
     if (autoEnterInpaint && !isInpaintMode && !isMagicEditMode && !isVideo && selectedProjectId && !hasManuallyExitedRef.current) {
-      console.log('[EditModeDebug] 🎨 Auto-entering unified edit mode NOW');
       handleEnterMagicEditMode();
     }
   }, [autoEnterInpaint, isInpaintMode, isMagicEditMode, isVideo, selectedProjectId, handleEnterMagicEditMode]);
@@ -143,10 +129,6 @@ export const useMagicEditMode = ({
       const lastSettings = getLastSettings();
       
       if (lastPrompt && !inpaintPrompt) {
-        console.log('[MediaLightbox] Restoring saved magic edit prompt', {
-          promptLength: lastPrompt.length,
-          settings: lastSettings
-        });
         setInpaintPrompt(lastPrompt);
         setInpaintNumGenerations(lastSettings.numImages);
         setIsInSceneBoostEnabled(lastSettings.isInSceneBoostEnabled);
@@ -159,12 +141,7 @@ export const useMagicEditMode = ({
 
   // Debug logging for state changes
   useEffect(() => {
-    console.log('[MediaLightbox] 🔄 State changed');
-    console.log('  - isInpaintMode:', isInpaintMode);
-    console.log('  - isMagicEditMode:', isMagicEditMode);
-    console.log('  - isSpecialEditMode:', isSpecialEditMode);
-    console.log('  - brushStrokesCount:', brushStrokes.length);
-  }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, brushStrokes.length]);
+    }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, brushStrokes.length]);
 
   // Unified generate handler - routes based on brush strokes
   const handleUnifiedGenerate = useCallback(async () => {
@@ -182,11 +159,11 @@ export const useMagicEditMode = ({
     // Route based on whether there are brush strokes
     if (brushStrokes.length > 0) {
       // Has brush strokes -> inpaint
-      console.log('[MediaLightbox] Routing to inpaint (has brush strokes)');
+      ');
       await handleGenerateInpaint();
     } else {
       // No brush strokes -> magic edit
-      console.log('[MediaLightbox] Routing to magic edit (no brush strokes)');
+      ');
       setIsCreatingMagicEditTasks(true);
       setMagicEditTasksCreated(false);
       
@@ -205,14 +182,7 @@ export const useMagicEditMode = ({
           based_on: media.id, // Track source generation for lineage
         };
         
-        console.log('[MediaLightbox] Creating magic edit tasks with loras:', {
-          ...batchParams,
-          lorasEnabled: !!editModeLoRAs,
-          lorasCount: editModeLoRAs?.length || 0
-        });
         const results = await createBatchMagicEditTasks(batchParams);
-        console.log(`[MediaLightbox] Created ${results.length} magic edit tasks`);
-        
         // Save the prompt to shot generation metadata
         if (currentShotId && media.id) {
           try {
@@ -222,8 +192,7 @@ export const useMagicEditMode = ({
               false, // Legacy parameter
               isInSceneBoostEnabled
             );
-            console.log('[MediaLightbox] Saved magic edit prompt to metadata');
-          } catch (error) {
+            } catch (error) {
             console.error('[MediaLightbox] Failed to save prompt to metadata:', error);
             // Don't fail the entire operation if metadata save fails
           }

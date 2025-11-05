@@ -29,7 +29,6 @@ export const useVideoElementIntegration = (
     
     // Skip hover video integration on mobile devices (use consistent detection)
     if (isMobile) {
-      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - MOBILE_SKIP: Hover integration disabled on mobile`);
       return;
     }
     
@@ -38,17 +37,6 @@ export const useVideoElementIntegration = (
       const videoElement = container?.querySelector('video') as HTMLVideoElement | null;
       
       if (process.env.NODE_ENV === 'development') {
-        console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_SEARCH:`, {
-          videoId: video.id,
-          phase: 'VIDEO_ELEMENT_SEARCH',
-          containerFound: !!container,
-          videoElementFound: !!videoElement,
-          containerSelector: `[data-video-id="${video.id}"]`,
-          videoSrc: videoElement?.src || 'NO_SRC',
-          shouldPreload: shouldPreload,
-          videoReadyState: videoElement?.readyState || 'NO_ELEMENT',
-          isFirstVideo: index === 0,
-          timestamp: Date.now()
         });
       }
       
@@ -58,24 +46,12 @@ export const useVideoElementIntegration = (
         // Event handlers
         const handleLoadStart = () => {
           if (process.env.NODE_ENV === 'development') {
-            console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOAD_STARTED:`, {
-              videoId: video.id,
-              phase: 'VIDEO_LOAD_STARTED',
-              src: videoElement.src,
-              preload: shouldPreload,
-              timestamp: Date.now()
             });
           }
         };
 
         const handleLoadedMetadata = () => {
           if (process.env.NODE_ENV === 'development') {
-            console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_METADATA_LOADED:`, {
-              videoId: video.id,
-              phase: 'VIDEO_METADATA_LOADED',
-              duration: videoElement?.duration,
-              dimensions: `${videoElement?.videoWidth}x${videoElement?.videoHeight}`,
-              timestamp: Date.now()
             });
           }
           setVideoMetadataLoaded(true);
@@ -87,13 +63,6 @@ export const useVideoElementIntegration = (
           posterFallbackTimeoutRef.current = setTimeout(() => {
             if (!videoPosterLoaded) {
               if (process.env.NODE_ENV === 'development') {
-                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_FALLBACK:`, {
-                  videoId: video.id,
-                  phase: 'VIDEO_POSTER_FALLBACK',
-                  reason: 'onLoadedData did not fire within 2 seconds',
-                  readyState: videoElement?.readyState,
-                  networkState: videoElement?.networkState,
-                  timestamp: Date.now()
                 });
               }
               setVideoPosterLoaded(true);
@@ -102,13 +71,6 @@ export const useVideoElementIntegration = (
         };
 
         const handleLoadedData = () => {
-          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_LOADED:`, {
-            videoId: video.id,
-            phase: 'VIDEO_POSTER_LOADED',
-            currentTime: videoElement?.currentTime,
-            readyState: videoElement?.readyState,
-            nextPhase: 'Will transition to VIDEO_READY',
-            timestamp: Date.now()
           });
           setVideoPosterLoaded(true);
           
@@ -137,20 +99,9 @@ export const useVideoElementIntegration = (
         };
 
         const handleCanPlay = () => {
-          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_CAN_PLAY:`, {
-            videoId: video.id,
-            phase: 'VIDEO_CAN_PLAY',
-            readyState: videoElement?.readyState,
-            timestamp: Date.now()
           });
           
           if (!videoPosterLoaded && shouldPreload === 'none') {
-            console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_CANPLAY_FALLBACK:`, {
-              videoId: video.id,
-              phase: 'VIDEO_CANPLAY_FALLBACK',
-              reason: 'preload=none fallback trigger',
-              triggeredBy: 'onCanPlay',
-              timestamp: Date.now()
             });
             setVideoPosterLoaded(true);
             
@@ -169,25 +120,9 @@ export const useVideoElementIntegration = (
         videoElement.addEventListener('canplay', handleCanPlay);
         
         // Check if video is already loaded
-        console.log(`🎬 [VideoLifecycle] Video ${index + 1} - PRELOAD_CHECK:`, {
-          videoId: video.id,
-          phase: 'PRELOAD_CHECK',
-          shouldPreload: shouldPreload,
-          willTriggerManualLoad: shouldPreload === 'none',
-          videoReadyState: videoElement.readyState,
-          timestamp: Date.now()
         });
         
         if (videoElement.readyState >= 2) {
-          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ALREADY_LOADED:`, {
-            videoId: video.id,
-            phase: 'VIDEO_ALREADY_LOADED',
-            readyState: videoElement.readyState,
-            readyStateText: videoElement.readyState === 4 ? 'HAVE_ENOUGH_DATA' : 
-                           videoElement.readyState === 3 ? 'HAVE_FUTURE_DATA' : 
-                           videoElement.readyState === 2 ? 'HAVE_CURRENT_DATA' : 'UNKNOWN',
-            willSetStates: true,
-            timestamp: Date.now()
           });
           
           setVideoMetadataLoaded(true);
@@ -201,13 +136,6 @@ export const useVideoElementIntegration = (
             triggerLoadOnce('(HoverScrubVideo integration)');
           }, 50);
         } else {
-          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - AUTO_PRELOAD_EXPECTED:`, {
-            videoId: video.id,
-            phase: 'AUTO_PRELOAD_EXPECTED',
-            shouldPreload: shouldPreload,
-            message: 'Video should start loading automatically with this preload setting',
-            videoReadyState: videoElement.readyState,
-            timestamp: Date.now()
           });
         }
         
@@ -234,11 +162,6 @@ export const useVideoElementIntegration = (
           const retryVideoElement = retryContainer?.querySelector('video') as HTMLVideoElement | null;
           
           if (retryVideoElement) {
-            console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_FOUND_ON_RETRY:`, {
-              videoId: video.id,
-              phase: 'VIDEO_ELEMENT_FOUND_ON_RETRY',
-              retrySuccessful: true,
-              timestamp: Date.now()
             });
             
             videoRef.current = retryVideoElement;
@@ -246,7 +169,7 @@ export const useVideoElementIntegration = (
             // Apply the same event listeners as in the main path
             const handleLoadStart = () => {
               if (process.env.NODE_ENV === 'development') {
-                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOAD_STARTED (retry):`, {
+                :`, {
                   videoId: video.id,
                   phase: 'VIDEO_LOAD_STARTED',
                   src: retryVideoElement.src,
@@ -258,7 +181,7 @@ export const useVideoElementIntegration = (
 
             const handleLoadedMetadata = () => {
               if (process.env.NODE_ENV === 'development') {
-                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_METADATA_LOADED (retry):`, {
+                :`, {
                   videoId: video.id,
                   phase: 'VIDEO_METADATA_LOADED',
                   duration: retryVideoElement?.duration,
@@ -275,7 +198,7 @@ export const useVideoElementIntegration = (
               posterFallbackTimeoutRef.current = setTimeout(() => {
                 if (!videoPosterLoaded) {
                   if (process.env.NODE_ENV === 'development') {
-                    console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_FALLBACK (retry):`, {
+                    :`, {
                       videoId: video.id,
                       phase: 'VIDEO_POSTER_FALLBACK',
                       reason: 'onLoadedData did not fire within 2 seconds',
@@ -290,7 +213,7 @@ export const useVideoElementIntegration = (
             };
 
             const handleLoadedData = () => {
-              console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_POSTER_LOADED (retry):`, {
+              :`, {
                 videoId: video.id,
                 phase: 'VIDEO_POSTER_LOADED',
                 currentTime: retryVideoElement?.currentTime,
@@ -312,7 +235,7 @@ export const useVideoElementIntegration = (
             
             // Check if video is already loaded
             if (retryVideoElement.readyState >= 2) {
-              console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ALREADY_LOADED (retry):`, {
+              :`, {
                 videoId: video.id,
                 phase: 'VIDEO_ALREADY_LOADED',
                 readyState: retryVideoElement.readyState,

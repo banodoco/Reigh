@@ -45,9 +45,7 @@ export const SourceGenerationDisplay: React.FC<SourceGenerationDisplayProps> = (
   const showReplaceCTA = isParentPositioned && !isCurrentMediaPositioned && onReplaceInShot && currentMediaId;
   
   // Debug logging
-  console.log('[ReplaceInShot] SourceGenerationDisplay render', {
-    hasCurrentShotId: !!currentShotId,
-    currentShotId: currentShotId?.substring(0, 8),
+  ,
     allShotsCount: allShots?.length || 0,
     allShotsIds: allShots?.map(s => ({ id: s.id.substring(0, 8), name: s.name })),
     foundShotName: shotName,
@@ -67,24 +65,20 @@ export const SourceGenerationDisplay: React.FC<SourceGenerationDisplayProps> = (
     showReplaceCTA
   });
   const handleClick = async () => {
-    console.log('[BasedOnNav] 🖼️ SourceGenerationDisplay clicked - Navigating to source generation', {
-      sourceId: sourceGeneration.id.substring(0, 8),
+    ,
       clearingDerivedContext: true,
       timestamp: Date.now()
     });
     // Clear derived context by not passing it - exits derived nav mode
-    console.log('[BasedOnNav] 🎯 Calling onNavigate WITHOUT derivedContext to exit derived mode');
     await onNavigate(sourceGeneration.id);
-    console.log('[BasedOnNav] ✅ onNavigate completed');
-  };
+    };
 
   const handleReplace = async () => {
     if (!onReplaceInShot || !currentMediaId || !currentShotId || parentTimelineFrame === null || parentTimelineFrame === undefined) {
       return;
     }
     
-    console.log('[ReplaceInShot] Replace button clicked', {
-      parentId: sourceGeneration.id.substring(0, 8),
+    ,
       currentMediaId: currentMediaId.substring(0, 8),
       parentFrame: parentTimelineFrame,
       shotId: currentShotId.substring(0, 8)

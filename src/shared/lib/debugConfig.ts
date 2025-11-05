@@ -82,28 +82,24 @@ export const debugConfig = {
   // Enable/disable specific categories at runtime
   enable: (category: keyof DebugConfig): void => {
     runtimeConfig[category] = true;
-    console.log(`🔧 [DebugConfig] Enabled: ${category}`);
-  },
+    },
   
   disable: (category: keyof DebugConfig): void => {
     runtimeConfig[category] = false;
-    console.log(`🔧 [DebugConfig] Disabled: ${category}`);
-  },
+    },
   
   // Bulk operations
   enableAll: (): void => {
     Object.keys(runtimeConfig).forEach(key => {
       runtimeConfig[key as keyof DebugConfig] = true;
     });
-    console.log('🔧 [DebugConfig] Enabled all debug categories');
-  },
+    },
   
   disableAll: (): void => {
     Object.keys(runtimeConfig).forEach(key => {
       runtimeConfig[key as keyof DebugConfig] = false;
     });
-    console.log('🔧 [DebugConfig] Disabled all debug categories');
-  },
+    },
   
   // Preset configurations
   setQuietMode: (): void => {
@@ -121,8 +117,7 @@ export const debugConfig = {
       skeletonDebug: false,
       videoDebug: false
     };
-    console.log('🔇 [DebugConfig] Quiet mode enabled - minimal logging');
-  },
+    },
   
   setDevelopmentMode: (): void => {
     runtimeConfig = {
@@ -139,8 +134,7 @@ export const debugConfig = {
       skeletonDebug: true,
       videoDebug: true
     };
-    console.log('🛠️ [DebugConfig] Development mode enabled - balanced logging');
-  },
+    },
   
   // Get current configuration
   getConfig: (): DebugConfig => ({ ...runtimeConfig }),
@@ -149,8 +143,7 @@ export const debugConfig = {
   status: (): void => {
     console.group('🔍 [DebugConfig] Current Configuration');
     Object.entries(runtimeConfig).forEach(([key, value]) => {
-      console.log(`${value ? '✅' : '❌'} ${key}: ${value}`);
-    });
+      });
     console.groupEnd();
   }
 };
@@ -158,15 +151,13 @@ export const debugConfig = {
 // Make debug config available globally for runtime control
 if (typeof window !== 'undefined') {
   (window as any).debugConfig = debugConfig;
-  console.log('🔧 [DebugConfig] Available at window.debugConfig');
-  console.log('🔧 [DebugConfig] Try: debugConfig.setQuietMode() or debugConfig.status()');
+  or debugConfig.status()');
 }
 
 // Conditional logging helper
 export const conditionalLog = (category: keyof DebugConfig, tag: string, ...args: any[]): void => {
   if (debugConfig.isEnabled(category)) {
-    console.log(`[${tag}]`, ...args);
-  }
+    }
 };
 
 // Throttled logging helper to reduce noise
@@ -186,6 +177,5 @@ export const throttledLog = (
   
   if (now - lastLog >= throttleMs) {
     logThrottleMap.set(key, now);
-    console.log(`[${tag}]`, ...args);
-  }
+    }
 };

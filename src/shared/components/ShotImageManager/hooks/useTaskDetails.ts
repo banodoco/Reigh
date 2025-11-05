@@ -61,8 +61,7 @@ export function useTaskDetails({
   // Derive input images from task params
   const inputImages = useMemo(() => deriveInputImages(task), [task]);
   
-  console.log('[BasedOnNav] 🔍 useTaskDetails:', {
-    generationId: generationId?.substring(0, 8),
+  ,
     hasTaskMapping: !!taskMapping,
     taskId: taskMapping?.taskId,
     hasTask: !!task,

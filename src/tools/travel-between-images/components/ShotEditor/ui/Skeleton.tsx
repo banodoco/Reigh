@@ -41,14 +41,6 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
       }
     });
     
-    console.log('[PROFILING] Skeleton - Real shot composition:', {
-      totalImages: shotImages.length,
-      positionedNonVideoCount,
-      videosFiltered,
-      unpositionedFiltered,
-      projectAspectRatio
-    });
-    
     return positionedNonVideoCount;
   }, [shotImages, projectAspectRatio]);
 

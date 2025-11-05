@@ -36,12 +36,7 @@ export const VideoHoverPreview = React.memo<VideoHoverPreviewProps>(({
 
   return createPortal(
     (() => {
-      console.log('[VideoGenMissing] Rendering hover preview:', {
-        hoveredVideoId: hoveredVideo.id,
-        hoverTaskId: hoverTaskMapping?.taskId,
-        isLoadingHoverTask,
-        hoverTask: !!hoverTask,
-        hoverTaskKeys: hoverTask ? Object.keys(hoverTask) : []
+      : []
       });
       
       return (

@@ -9,15 +9,9 @@ export const getFramePositionForIndex = (
   currentImages: GenerationRow[],
   batchVideoFrames: number
 ): number | undefined => {
-  console.log('[BatchDropPositionIssue] 📊 getFramePositionForIndex called:', {
-    index,
-    currentImagesLength: currentImages.length,
-    batchVideoFrames,
-    timestamp: Date.now()
   });
 
   if (currentImages.length === 0) {
-    console.log('[BatchDropPositionIssue] 🆕 NO IMAGES - RETURNING 0');
     return 0;
   }
   
@@ -25,10 +19,6 @@ export const getFramePositionForIndex = (
     const firstImage = currentImages[0];
     const firstFrame = firstImage.timeline_frame ?? 0;
     const result = Math.max(0, Math.floor(firstFrame / 2));
-    console.log('[BatchDropPositionIssue] 🔝 INSERTING AT START:', {
-      firstFrame,
-      result
-    });
     return result;
   }
   
@@ -36,10 +26,6 @@ export const getFramePositionForIndex = (
     const lastImage = currentImages[currentImages.length - 1];
     const lastFrame = lastImage.timeline_frame ?? (currentImages.length - 1) * batchVideoFrames;
     const result = lastFrame + batchVideoFrames;
-    console.log('[BatchDropPositionIssue] 🔚 INSERTING AT END:', {
-      lastFrame,
-      result
-    });
     return result;
   }
   
@@ -48,13 +34,6 @@ export const getFramePositionForIndex = (
   const prevFrame = prevImage.timeline_frame ?? (index - 1) * batchVideoFrames;
   const nextFrame = nextImage.timeline_frame ?? index * batchVideoFrames;
   const result = Math.floor((prevFrame + nextFrame) / 2);
-  
-  console.log('[BatchDropPositionIssue] 🔄 INSERTING BETWEEN:', {
-    index,
-    prevFrame,
-    nextFrame,
-    midpoint: result
-  });
   
   return result;
 };

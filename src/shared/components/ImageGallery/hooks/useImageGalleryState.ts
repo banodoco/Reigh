@@ -92,9 +92,7 @@ export const useImageGalleryState = ({
   
   // Debug logging for lightbox state changes
   useEffect(() => {
-    console.log('[MobileDebug] activeLightboxMedia state changed:', {
-      hasMedia: !!activeLightboxMedia,
-      mediaId: activeLightboxMedia?.id?.substring(0, 8),
+    ,
       mediaType: activeLightboxMedia?.type,
       autoEnterEditMode,
       timestamp: Date.now()
@@ -114,23 +112,12 @@ export const useImageGalleryState = ({
   
   // Debug skeleton state changes
   useEffect(() => {
-    console.log('[SKELETON_DEBUG] State changed:', {
-      isBackfillLoading,
-      backfillSkeletonCount,
-      timestamp: Date.now()
     });
   }, [isBackfillLoading, backfillSkeletonCount]);
   
   // Shot selection state
   const [selectedShotIdLocal, setSelectedShotIdLocal] = useState<string>(() => {
     const initial = currentShotId || lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
-    console.log('[GenerationsPane] ImageGallery initial selectedShotIdLocal:', {
-      initial,
-      currentShotId,
-      lastShotId,
-      simplifiedShotOptionsLength: simplifiedShotOptions.length,
-      firstShotId: simplifiedShotOptions[0]?.id
-    });
     return initial;
   });
   
@@ -216,14 +203,6 @@ export const useImageGalleryState = ({
     if (!isCurrentSelectionValid) {
       const newSelection = lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
       if (newSelection && newSelection !== selectedShotIdLocal) {
-        console.log('[ShotSelectionDebug] Fixing invalid selectedShotIdLocal:', {
-          oldSelection: selectedShotIdLocal,
-          newSelection,
-          lastShotId,
-          availableShots: simplifiedShotOptions.length,
-          firstShotId: simplifiedShotOptions[0]?.id,
-          context: 'invalid selection'
-        });
         setSelectedShotIdLocal(newSelection);
       }
     }
@@ -243,7 +222,7 @@ export const useImageGalleryState = ({
     
     // Clear backfill skeleton immediately when new images arrive (server pagination only)
     if (isServerPagination && isBackfillLoading && images.length > prevImageCountRef.current) {
-      console.log('[SKELETON_DEBUG] State reconciliation - clearing skeleton (new images detected):', {
+      :', {
         prevCount: prevImageCountRef.current,
         newCount: images.length,
         serverPage,

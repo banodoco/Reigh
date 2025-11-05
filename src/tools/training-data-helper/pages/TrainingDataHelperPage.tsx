@@ -34,7 +34,6 @@ export default function TrainingDataHelperPage() {
   // Clear selection if the selected video no longer exists
   useEffect(() => {
     if (selectedVideo && !videos.find(v => v.id === selectedVideo)) {
-      console.log(`[TrainingDataHelperPage] Selected video ${selectedVideo} no longer exists, clearing selection`);
       setSelectedVideo(null);
     }
   }, [videos, selectedVideo]);

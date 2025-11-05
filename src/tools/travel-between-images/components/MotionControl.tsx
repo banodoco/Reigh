@@ -93,7 +93,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   const handleModeChange = useCallback((newMode: string) => {
     // Prevent switching to advanced/presets when turbo mode is active
     if (turboMode && (newMode === 'advanced' || newMode === 'presets')) {
-      console.log('[MotionControl] Cannot switch to advanced/presets mode while turbo mode is active');
       return;
     }
     

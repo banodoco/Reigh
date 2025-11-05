@@ -22,8 +22,6 @@ export const useProjectContextDebug = () => {
       userAgent: navigator.userAgent,
     };
 
-    console.log(`[ProjectContextDebug]`, debugInfo);
-    
     // Also log to a global debug array for inspection
     if (!(window as any).__projectDebugLog) {
       (window as any).__projectDebugLog = [];

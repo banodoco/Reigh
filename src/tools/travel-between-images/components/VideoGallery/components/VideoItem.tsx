@@ -77,8 +77,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   
   // Debug log for Apply Settings button rendering
   useEffect(() => {
-    console.log('[ApplySettings] VideoItem render check:', {
-      videoId: video.id?.substring(0, 8),
+    ,
       hasTaskMapping: !!taskMapping,
       taskId: taskMapping?.taskId,
       willRenderButton: !!taskMapping?.taskId,
@@ -104,7 +103,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   
   // DEBUG: Track re-renders to verify memo is working
   if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-    console.log('[HoverIssue] 🔄 VideoItem re-render (first item):', {
+    :', {
       videoId: video.id?.substring(0, 8),
       timestamp: Date.now()
     });
@@ -132,8 +131,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
   // DEEP DEBUG: Log thumbnail state changes
   useEffect(() => {
-    console.log(`[VideoGalleryPreload] VIDEO_ITEM_THUMBNAIL_STATE:`, {
-      videoId: video.id?.substring(0, 8),
+    ,
       thumbnailLoaded,
       thumbnailError,
       hasThumbnail,
@@ -168,8 +166,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   
   const startMobileVideoPreload = React.useCallback(() => {
     if (!isMobile || isMobilePreloading || preloadVideoRef.current) {
-      console.log('[MobilePreload] Skipping preload', {
-        videoId: video.id?.substring(0, 8),
+      ,
         isMobile,
         isMobilePreloading,
         hasExistingPreloadVideo: !!preloadVideoRef.current,
@@ -178,8 +175,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
       return;
     }
     
-    console.log('[MobilePreload] Starting video preload', {
-      videoId: video.id?.substring(0, 8),
+    ,
       videoSrc: video.location?.substring(video.location.lastIndexOf('/') + 1) || 'no-src',
       timestamp: Date.now()
     });
@@ -200,16 +196,14 @@ export const VideoItem = React.memo<VideoItemProps>(({
     
     // Add event listeners for preload tracking
     const handleCanPlay = () => {
-      console.log('[MobilePreload] Video can play - preload successful', {
-        videoId: video.id?.substring(0, 8),
+      ,
         readyState: preloadVideo.readyState,
         timestamp: Date.now()
       });
     };
     
     const handleLoadedData = () => {
-      console.log('[MobilePreload] Video data loaded - preload progressing', {
-        videoId: video.id?.substring(0, 8),
+      ,
         readyState: preloadVideo.readyState,
         timestamp: Date.now()
       });
@@ -246,8 +240,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     
     // Auto-cleanup after 30 seconds if video not opened
     const timeoutId = setTimeout(() => {
-      console.log('[MobilePreload] Auto-cleanup preload video after timeout', {
-        videoId: video.id?.substring(0, 8),
+      ,
         timestamp: Date.now()
       });
       cleanup();
@@ -545,12 +538,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
       const timer = setTimeout(() => {
         setVideoFullyVisible(true);
         if (process.env.NODE_ENV === 'development') {
-          console.log(`🎬 [VideoLifecycle] Video ${index + 1} - TRANSITION_COMPLETE:`, {
-            videoId: video.id,
-            phase: 'TRANSITION_COMPLETE',
-            thumbnailWillHide: true,
-            videoFullyVisible: true,
-            timestamp: Date.now()
           });
         }
       }, 350); // Slightly longer than the 300ms transition
@@ -664,8 +651,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     : null;
   
   if (process.env.NODE_ENV === 'development' && shouldUsePosterOnMobile) {
-    console.log('[AutoplayDebugger:GALLERY] 📱 Using poster optimization', {
-      videoId: video.id?.substring(0, 8),
+    ,
       hasThumbnail,
       posterSrc: posterImageSrc?.substring(posterImageSrc.lastIndexOf('/') + 1) || 'none',
       reason: 'Mobile optimization - ALL gallery videos use posters to maximize lightbox autoplay budget',
@@ -692,8 +678,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
               e.preventDefault();
               e.stopPropagation();
               if (process.env.NODE_ENV === 'development') {
-                console.log('[AutoplayDebugger:GALLERY] 📱 Poster clicked, opening lightbox', {
-                  videoId: video.id?.substring(0, 8),
+                ,
                   originalIndex,
                   timestamp: Date.now()
                 });
@@ -708,8 +693,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
               e.preventDefault();
               e.stopPropagation();
               if (process.env.NODE_ENV === 'development') {
-                console.log('[AutoplayDebugger:GALLERY] 📱 Poster touched, opening lightbox', {
-                  videoId: video.id?.substring(0, 8),
+                ,
                   originalIndex,
                   timestamp: Date.now()
                 });
@@ -743,18 +727,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
             onLoad={() => {
               setThumbnailLoaded(true);
               if (process.env.NODE_ENV === 'development') {
-                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_LOADED:`, {
-                  videoId: video.id,
-                  thumbnailUrl: video.thumbUrl,
-                  phase: 'THUMBNAIL_LOADED',
-                  nextPhase: 'Will transition to video when ready',
-                  wasInitiallyCached: isInitiallyCached,
-                  inPreloaderCache,
-                  inBrowserCache,
-                  timestamp: Date.now()
                 });
-                console.log(`[VideoGalleryPreload] THUMBNAIL_LOADED - URL: ${video.thumbUrl}`);
-              }
+                }
             }}
             onError={() => {
               setThumbnailError(true);
@@ -775,8 +749,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             {/* Loading placeholder - shows until thumbnail or video poster is ready */}
             {/* Don't show loading if thumbnail was initially cached */}
             {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (() => {
-              console.log(`[VideoGalleryPreload] VIDEO_ITEM_SHOWING_LOADING_SPINNER:`, {
-                videoId: video.id?.substring(0, 8),
+              ,
                 thumbnailLoaded,
                 videoPosterLoaded,
                 isInitiallyCached,
@@ -866,26 +839,19 @@ export const VideoItem = React.memo<VideoItemProps>(({
             size="icon"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('[MobileButtonDebug] [InfoButton] Button clicked START:', {
-                isMobile,
-                videoId: video.id,
-                timestamp: Date.now()
               });
               
               if (isMobile) {
                 // On mobile, open the modal
-                console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
                 onMobileModalOpen(video);
               } else {
                 // On desktop, open the lightbox
-                console.log('[MobileButtonDebug] [InfoButton] Desktop - opening lightbox');
                 onLightboxOpen(originalIndex);
               }
             }}
             onMouseEnter={(e) => {
               if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                console.log('[HoverIssue] 👆 Hover START on first item Info button:', {
-                  videoId: video.id?.substring(0, 8),
+                ,
                   timestamp: Date.now()
                 });
               }
@@ -893,8 +859,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
             }}
             onMouseLeave={() => {
               if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                console.log('[HoverIssue] 👇 Hover END on first item Info button:', {
-                  videoId: video.id?.substring(0, 8),
+                ,
                   timestamp: Date.now()
                 });
               }
@@ -915,15 +880,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
                     size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('[ApplySettings] Button clicked:', {
-                        videoId: video.id?.substring(0, 8),
+                      ,
                         taskId: taskMapping.taskId,
                         settingsApplied,
                         onApplySettingsFromTaskType: typeof onApplySettingsFromTask,
                         timestamp: Date.now()
                       });
                       if (taskMapping.taskId && !settingsApplied) {
-                        console.log('[ApplySettings] Calling onApplySettingsFromTask...');
                         // Call with empty inputImages array - will be populated from task data on server side
                         onApplySettingsFromTask(taskMapping.taskId, false, []);
                         // Show success state
@@ -933,11 +896,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                           setSettingsApplied(false);
                         }, 2000);
                       } else {
-                        console.log('[ApplySettings] Click ignored:', {
-                          hasTaskId: !!taskMapping.taskId,
-                          settingsApplied
-                        });
-                      }
+                        }
                     }}
                     disabled={settingsApplied}
                     className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${
@@ -964,15 +923,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
             size="icon"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
-                videoId: video.id,
-                deletingVideoId,
-                isDisabled: deletingVideoId === video.id,
-                timestamp: Date.now()
               });
               onDelete(video.id);
-              console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
-            }}
+              }}
             disabled={deletingVideoId === video.id}
             className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
             title="Delete video"

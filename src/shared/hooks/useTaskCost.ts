@@ -53,7 +53,7 @@ export function useTaskCost() {
       
       // Task cost calculated
       const costInDollars = data.cost.toFixed(3);
-      console.log(`Task cost calculated: $${costInDollars} (${data.billing_type}) for ${data.duration_seconds}s - Task: ${data.task_type}`);
+      for ${data.duration_seconds}s - Task: ${data.task_type}`);
     },
     onError: (error) => {
       console.error('Error calculating task cost:', error);

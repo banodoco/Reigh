@@ -92,10 +92,7 @@ const ShotsPaneComponent: React.FC = () => {
   // Filter and sort shots
   const filteredShots = useMemo(() => {
     // [VideoLoadSpeedIssue] Track ShotsPane data availability
-    console.log('[VideoLoadSpeedIssue] ShotsPane shots data:', {
-      shotsCount: shots?.length || 0,
-      isLoading,
-      timestamp: Date.now(),
+    ,
       firstShotPreview: shots?.[0] ? {
         id: shots[0].id,
         imagesCount: shots[0].images?.length || 0
@@ -293,8 +290,7 @@ const ShotsPaneComponent: React.FC = () => {
       };
       // Store the new shot ID to apply defaults when settings load
       sessionStorage.setItem(`apply-project-defaults-${createdShot.id}`, JSON.stringify(defaultsToApply));
-      console.log('[ShotsPane] Marked shot for project defaults application:', createdShot.id);
-    }
+      }
 
     // Navigate to the newly created shot
     if (createdShot) {

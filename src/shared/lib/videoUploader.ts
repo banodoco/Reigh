@@ -103,8 +103,6 @@ export const uploadVideoToStorage = async (
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`[videoUploader] Upload attempt ${attempt + 1}/${maxRetries}:`, fileName);
-      
       // Get upload URL from Supabase
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session?.access_token) {
@@ -121,7 +119,6 @@ export const uploadVideoToStorage = async (
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const percentComplete = Math.round((e.loaded / e.total) * 100);
-            console.log(`[videoUploader] Upload progress: ${percentComplete}%`);
             onProgress?.(percentComplete);
           }
         });
@@ -156,7 +153,6 @@ export const uploadVideoToStorage = async (
         .from('image_uploads')
         .getPublicUrl(fileName);
       
-      console.log('[videoUploader] Upload successful:', publicUrl);
       return publicUrl;
       
     } catch (error) {
@@ -166,7 +162,6 @@ export const uploadVideoToStorage = async (
       if (attempt < maxRetries - 1) {
         // Wait before retrying (exponential backoff)
         const delay = Math.pow(2, attempt) * 1000;
-        console.log(`[videoUploader] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

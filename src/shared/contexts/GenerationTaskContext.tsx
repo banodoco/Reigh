@@ -43,7 +43,7 @@ export function GenerationTaskProvider({
   const preloadTaskMappings = React.useCallback(async (generationIds: string[]) => {
     if (!isPreloadingEnabled || generationIds.length === 0) return;
 
-    console.log('[VideoGenMissing] Preloader start', { count: generationIds.length, timestamp: Date.now() });
+    });
     
     try {
       const result = await preloadGenerationTaskMappings(generationIds, queryClient, {
@@ -51,7 +51,7 @@ export function GenerationTaskProvider({
         delayBetweenBatches: preloadDelay,
         preloadFullTaskData: true, // Preload full task data for better UX
       });
-      console.log('[VideoGenMissing] Preloader done', { ...result, timestamp: Date.now() });
+      });
     } catch (error) {
       console.warn('[VideoGenMissing] Preloader failed', { error });
     }

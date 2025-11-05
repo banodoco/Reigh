@@ -43,13 +43,6 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   // [ShotReorderDebug] Log dragging state changes (only when actually dragging to reduce noise)
   React.useEffect(() => {
     if (isDragging) {
-      console.log(`${REORDER_DEBUG_TAG} Shot ${shot.id} is being dragged:`, {
-        shotId: shot.id,
-        shotName: shot.name,
-        shotPosition: shot.position,
-        shotIndex,
-        isDragging,
-        timestamp: Date.now()
       });
     }
   }, [isDragging]);

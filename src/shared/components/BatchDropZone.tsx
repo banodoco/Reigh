@@ -47,13 +47,6 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
         ? getFramePositionForIndex(dropTargetIndex) 
         : undefined;
       
-      console.log('[BatchDropPositionIssue] 📍 handleImageDropWithPosition called:', {
-        filesCount: files.length,
-        targetPosition,
-        framePosition,
-        dropTargetIndex,
-        hasFrameCalculator: !!getFramePositionForIndex,
-        timestamp: Date.now()
       });
       
       await onImageDrop(files, targetPosition, framePosition);
@@ -73,8 +66,7 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
         ? getFramePositionForIndex(dropTargetIndex) 
         : undefined;
       
-      console.log('[BatchDropPositionIssue] 🖼️ handleGenerationDropWithPosition called:', {
-        generationId: generationId?.substring(0, 8),
+      ,
         targetPosition,
         framePosition,
         dropTargetIndex,

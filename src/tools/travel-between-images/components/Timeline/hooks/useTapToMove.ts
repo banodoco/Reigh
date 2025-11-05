@@ -48,27 +48,24 @@ export const useTapToMove = ({
 
   // Handle tap on a timeline item
   const handleItemTap = useCallback((imageId: string) => {
-    console.log('[DoubleTapFlow] 🎯 useTapToMove handleItemTap called:', {
-      imageId: imageId.substring(0, 8),
+    ,
       isEnabled,
       currentlySelected: selectedItemId?.substring(0, 8),
       willToggle: selectedItemId === imageId ? 'DESELECT' : 'SELECT'
     });
     
     if (!isEnabled) {
-      console.log('[DoubleTapFlow] ⚠️ TapToMove not enabled - ignoring');
       return;
     }
 
     // If tapping the same item, deselect it
     if (selectedItemId === imageId) {
-      console.log('[DoubleTapFlow] 🔄 DESELECTING item (same item tapped)');
+      ');
       setSelectedItemId(null);
       return;
     }
 
     // Otherwise, select this item
-    console.log('[DoubleTapFlow] ✅ SELECTING item for tap-to-move');
     setSelectedItemId(imageId);
 
     // Auto-clear selection after 30 seconds if no action taken
@@ -76,7 +73,6 @@ export const useTapToMove = ({
       clearTimeout(tapTimeoutRef.current);
     }
     tapTimeoutRef.current = setTimeout(() => {
-      console.log('[DoubleTapFlow] ⏰ Auto-clearing selection after 30s timeout');
       setSelectedItemId(null);
     }, 30000);
   }, [isEnabled, selectedItemId]);
@@ -95,8 +91,7 @@ export const useTapToMove = ({
     const normalizedX = Math.max(0, Math.min(1, adjustedX / effectiveWidth));
     const targetFrame = Math.round(fullMin + (normalizedX * fullRange));
 
-    console.log('[TapToMove] Timeline tapped - placing item:', {
-      selectedId: selectedItemId.substring(0, 8),
+    ,
       clientX,
       relativeX,
       targetFrame,

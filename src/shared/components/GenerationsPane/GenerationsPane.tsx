@@ -104,15 +104,7 @@ const GenerationsPaneComponent: React.FC = () => {
 
   // Debug: Log the current filter state
   useEffect(() => {
-    console.log('[PositionFix] GenerationsPane filter state:', {
-      selectedShotFilter,
-      excludePositioned,
-      mediaTypeFilter,
-      currentShotId,
-      generationsCount: paginatedData.items.length,
-      hasPositionedItems: paginatedData.items.filter(item => {
-        // Check if any item has positioned associations with the selected shot
-        if (selectedShotFilter === 'all') return false;
+    return false;
         if (item.shot_id === selectedShotFilter) {
           return item.position !== null && item.position !== undefined;
         }
@@ -277,15 +269,6 @@ const GenerationsPaneComponent: React.FC = () => {
 
   // Debug: Log GenerationsPane state when it opens/changes
   useEffect(() => {
-    console.log('[GenerationsPane] State changed:', {
-      isOpen,
-      location: location.pathname,
-      selectedShotFilter,
-      excludePositioned,
-      lastAffectedShotId,
-      shotsDataLength: shotsData?.length,
-      totalGenerations: totalCount,
-      timestamp: Date.now()
     });
   }, [isOpen, location.pathname, selectedShotFilter, excludePositioned, lastAffectedShotId, shotsData, totalCount]);
 
@@ -525,12 +508,7 @@ const GenerationsPaneComponent: React.FC = () => {
             {error && <p className="text-red-500 text-center">Error: {error.message}</p>}
             {paginatedData.items.length > 0 && (
                 <>
-                  {console.log('[GenerationsPane] Rendering ImageGallery with:', {
-                    selectedShotFilter,
-                    currentShotId,
-                    itemsCount: paginatedData.items.length,
-                    timestamp: Date.now()
-                  })}
+                  {})}
                   <ImageGallery
                     images={paginatedData.items}
                     onDelete={handleDeleteGeneration}
@@ -540,9 +518,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     initialShotFilter={selectedShotFilter}
                     onShotFilterChange={setSelectedShotFilter}
                     onAddToLastShot={(generationId, imageUrl, thumbUrl) => {
-                      console.log('[GenerationsPane] ImageGallery onAddToLastShot called', {
-                        generationId,
-                        imageUrl: imageUrl?.substring(0, 50) + '...',
+                      + '...',
                         thumbUrl: thumbUrl?.substring(0, 50) + '...',
                         lastAffectedShotId,
                         selectedShotFilter,
@@ -553,9 +529,7 @@ const GenerationsPaneComponent: React.FC = () => {
                       return handleAddToShot(generationId, imageUrl);
                     }}
                     onAddToLastShotWithoutPosition={(generationId, imageUrl, thumbUrl) => {
-                      console.log('[GenerationsPane] ImageGallery onAddToLastShotWithoutPosition called', {
-                        generationId,
-                        imageUrl: imageUrl?.substring(0, 50) + '...',
+                      + '...',
                         thumbUrl: thumbUrl?.substring(0, 50) + '...',
                         lastAffectedShotId,
                         selectedShotFilter,

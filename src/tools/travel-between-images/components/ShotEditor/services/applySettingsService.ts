@@ -226,14 +226,9 @@ export const applyModelSettings = async (
   context: ApplyContext
 ): Promise<ApplyResult> => {
   if (!settings.model || settings.model === context.steerableMotionSettings.model_name) {
-    console.log('[ApplySettings] ⏭️  Skipping model (no change or undefined)');
+    ');
     return { success: true, settingName: 'model', details: 'skipped - no change' };
   }
-  
-  console.log('[ApplySettings] 🎨 Applying model:', {
-    from: context.steerableMotionSettings.model_name,
-    to: settings.model
-  });
   
   context.onSteerableMotionSettingsChange({ model_name: settings.model });
   
@@ -365,24 +360,22 @@ export const applyTextPromptAddons = async (
 ): Promise<ApplyResult> => {
   // Apply text before prompts
   if (settings.textBeforePrompts !== undefined && context.onTextBeforePromptsChange) {
-    console.log('[ApplySettings] 📝 Applying text before prompts:', {
-      from: context.textBeforePrompts ? `"${context.textBeforePrompts.substring(0, 30)}..."` : '(empty)',
+    }..."` : '(empty)',
       to: settings.textBeforePrompts ? `"${settings.textBeforePrompts.substring(0, 30)}..."` : '(empty)'
     });
     context.onTextBeforePromptsChange(settings.textBeforePrompts);
   } else {
-    console.log('[ApplySettings] ⏭️  Skipping text before prompts (undefined or no handler)');
+    ');
   }
   
   // Apply text after prompts
   if (settings.textAfterPrompts !== undefined && context.onTextAfterPromptsChange) {
-    console.log('[ApplySettings] 📝 Applying text after prompts:', {
-      from: context.textAfterPrompts ? `"${context.textAfterPrompts.substring(0, 30)}..."` : '(empty)',
+    }..."` : '(empty)',
       to: settings.textAfterPrompts ? `"${settings.textAfterPrompts.substring(0, 30)}..."` : '(empty)'
     });
     context.onTextAfterPromptsChange(settings.textAfterPrompts);
   } else {
-    console.log('[ApplySettings] ⏭️  Skipping text after prompts (undefined or no handler)');
+    ');
   }
   
   return { success: true, settingName: 'textAddons' };
@@ -394,16 +387,11 @@ export const applyMotionSettings = async (
 ): Promise<ApplyResult> => {
   // Only apply if NOT in advanced mode
   if (settings.amountOfMotion !== undefined && !settings.advancedMode && context.onAmountOfMotionChange) {
-    console.log('[ApplySettings] 🎢 Applying amount of motion:', {
-      from: context.amountOfMotion,
-      to: settings.amountOfMotion * 100,
-      rawValue: settings.amountOfMotion
-    });
     context.onAmountOfMotionChange(settings.amountOfMotion * 100);
   } else if (settings.advancedMode) {
-    console.log('[ApplySettings] ⏭️  Skipping amount of motion (advanced mode enabled)');
+    ');
   } else {
-    console.log('[ApplySettings] ⏭️  Skipping amount of motion (undefined or no handler)');
+    ');
   }
   
   return { success: true, settingName: 'motion' };
@@ -416,24 +404,20 @@ export const applyLoRAs = async (
   // Only apply if NOT in advanced mode
   if (settings.loras === undefined || settings.advancedMode) {
     if (settings.advancedMode) {
-      console.log('[ApplySettings] ⏭️  Skipping LoRAs (advanced mode enabled)');
+      ');
     } else {
-      console.log('[ApplySettings] ⏭️  Skipping LoRAs (undefined)');
+      ');
     }
     return { success: true, settingName: 'loras', details: 'skipped' };
   }
   
   if (settings.loras && settings.loras.length > 0) {
-    console.log('[ApplySettings] 🎨 Applying LoRAs from task:', {
-      lorasCount: settings.loras.length,
-      loras: settings.loras.map(l => ({
-        path: l.path.split('/').pop(),
+    .pop(),
         strength: l.strength
       }))
     });
     
     // Clear existing LoRAs first
-    console.log('[ApplySettings] 🗑️  Clearing existing LoRAs...');
     if (context.loraManager.setSelectedLoras) {
       context.loraManager.setSelectedLoras([]);
     }
@@ -441,7 +425,6 @@ export const applyLoRAs = async (
     // Map paths to available LoRAs and restore them (with delay to ensure state is cleared)
     return new Promise((resolve) => {
       setTimeout(() => {
-        console.log('[ApplySettings] 🔍 Matching and adding LoRAs...');
         let matchedCount = 0;
         
         settings.loras!.forEach(loraData => {
@@ -453,11 +436,7 @@ export const applyLoRAs = async (
           });
           
           if (matchingLora) {
-            console.log('[ApplySettings] ✅ Matched and adding LoRA:', {
-              id: matchingLora['Model ID'],
-              name: matchingLora.Name,
-              strength: loraData.strength,
-              path: loraData.path.split('/').pop()
+            .pop()
             });
             context.loraManager.handleAddLora(matchingLora, false, loraData.strength);
             matchedCount++;
@@ -466,16 +445,11 @@ export const applyLoRAs = async (
           }
         });
         
-        console.log('[ApplySettings] ✅ LoRAs applied successfully:', {
-          matched: matchedCount,
-          total: settings.loras!.length
-        });
-        
         resolve({ success: true, settingName: 'loras', details: `${matchedCount}/${settings.loras!.length} matched` });
       }, 100); // Small delay to ensure state clears
     });
   } else {
-    console.log('[ApplySettings] 🗑️  Clearing LoRAs (empty array in task)');
+    ');
     if (context.loraManager.setSelectedLoras) {
       context.loraManager.setSelectedLoras([]);
     }
@@ -563,12 +537,10 @@ export const applyFramePositionsToExistingImages = async (
   const hasSegmentGaps = Array.isArray(segmentGaps) && segmentGaps.length > 0;
   
   if (!hasSegmentGaps) {
-    console.log('[ApplySettings] ⏭️  No segment_frames_expanded to apply to existing images');
     return { success: true, settingName: 'framePositions', details: 'no data' };
   }
   
   if (!selectedShot?.id) {
-    console.log('[ApplySettings] ⏭️  Cannot apply frame positions: missing shot');
     return { success: true, settingName: 'framePositions', details: 'skipped - no shot' };
   }
   
@@ -579,8 +551,7 @@ export const applyFramePositionsToExistingImages = async (
     cumulativePositions.push(prevPosition + segmentGaps[i]);
   }
   
-  console.log('[ApplySettings] 📐 Applying frame positions to existing images:', {
-    shotId: selectedShot.id.substring(0, 8),
+  ,
     imageCount: simpleFilteredImages.length,
     segmentGaps,
     cumulativePositions: cumulativePositions.slice(0, simpleFilteredImages.length),
@@ -600,9 +571,7 @@ export const applyFramePositionsToExistingImages = async (
         ? cumulativePositions[index]
         : cumulativePositions[cumulativePositions.length - 1] + (index - cumulativePositions.length + 1) * (segmentGaps[segmentGaps.length - 1] || 60);
       
-      console.log('[ApplySettings] 🎯 Updating timeline_frame:', {
-        index,
-        shotImageEntryId: img.shotImageEntryId.substring(0, 8),
+      ,
         oldTimelineFrame: img.timeline_frame,
         newTimelineFrame,
         source: index < cumulativePositions.length ? 'cumulative position' : 'extrapolated'
@@ -623,12 +592,6 @@ export const applyFramePositionsToExistingImages = async (
     
     const results = await Promise.all(updates);
     const successCount = results.filter(r => r !== null).length;
-    
-    console.log('[ApplySettings] ✅ Frame positions applied:', {
-      total: simpleFilteredImages.length,
-      success: successCount,
-      failed: simpleFilteredImages.length - successCount
-    });
     
     return {
       success: true,
@@ -659,18 +622,17 @@ export const replaceImagesIfRequested = async (
   removeImageFromShotMutation: any
 ): Promise<ApplyResult> => {
   if (!replaceImages) {
-    console.log('[ApplySettings] ⏭️  Skipping image replacement (replaceImages = false)');
+    ');
     // NEW: Apply frame positions to existing images even when not replacing
     return await applyFramePositionsToExistingImages(settings, selectedShot, simpleFilteredImages);
   }
   
   if (!selectedShot?.id || !projectId) {
-    console.log('[ApplySettings] ⏭️  Skipping image replacement (missing shot or project)');
+    ');
     return { success: true, settingName: 'images', details: 'skipped - missing context' };
   }
   
-  console.log('[ApplySettings] 🖼️  === REPLACING IMAGES ===', {
-    shotId: selectedShot.id.substring(0, 8),
+  ,
     existingImagesCount: simpleFilteredImages.length,
     newImagesCount: inputImages.length
   });
@@ -678,10 +640,6 @@ export const replaceImagesIfRequested = async (
   try {
     // Remove existing non-video images
     const imagesToDelete = simpleFilteredImages.filter(img => !!img.shotImageEntryId);
-    console.log('[ApplySettings] 🗑️  Removing existing images:', {
-      count: imagesToDelete.length
-    });
-    
     const deletions = imagesToDelete.map(img => removeImageFromShotMutation.mutateAsync({
       shot_id: selectedShot.id,
       shotImageEntryId: img.shotImageEntryId!,
@@ -690,8 +648,7 @@ export const replaceImagesIfRequested = async (
     
     if (deletions.length > 0) {
       await Promise.allSettled(deletions);
-      console.log('[ApplySettings] ✅ Existing images removed');
-    }
+      }
     
     // Calculate timeline positions from segment_frames_expanded array
     // segment_frames_expanded contains GAPS between successive frames
@@ -712,13 +669,7 @@ export const replaceImagesIfRequested = async (
     // Fallback to uniform spacing if no segment_frames_expanded
     const uniformSpacing = settings.frames || 60;
     
-    console.log('[ApplySettings] 📐 Calculating timeline positions:', {
-      hasSegmentGaps,
-      segmentGaps,
-      cumulativePositions,
-      uniformSpacingFallback: !hasSegmentGaps ? uniformSpacing : 'not used',
-      imageCount: inputImages.length,
-      extractedFrom: hasSegmentGaps ? 'task segment_frames_expanded' : (settings.frames ? 'task frames (uniform)' : 'default fallback')
+    ' : 'default fallback')
     });
     
     // Add input images in order with calculated timeline_frame positions
@@ -728,9 +679,7 @@ export const replaceImagesIfRequested = async (
         ? cumulativePositions[index]
         : index * uniformSpacing;
       
-      console.log('[ApplySettings] ➕ Adding image:', {
-        index,
-        filename: url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 20) + '...',
+      + 1, url.lastIndexOf('/') + 20) + '...',
         timelineFrame,
         calculation: hasSegmentGaps 
           ? `cumulative position from gaps: ${cumulativePositions[index]}` 
@@ -749,8 +698,7 @@ export const replaceImagesIfRequested = async (
     
     if (additions.length > 0) {
       await Promise.allSettled(additions);
-      console.log('[ApplySettings] ✅ New images added');
-    }
+      }
     
     return {
       success: true,

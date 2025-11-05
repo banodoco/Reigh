@@ -233,15 +233,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const isCloudMode = generationMethods.inCloud;
 
   // Debug logging for based_on data
-  console.log('[BasedOnDebug] 🎬 MediaLightbox received media:');
-  console.log('  mediaId:', media.id?.substring(0, 8));
-  console.log('  hasBasedOnField:', !!(media as any).based_on);
-  console.log('  basedOnValue:', (media as any).based_on);
-  console.log('  hasBasedOnInMetadata:', !!(media.metadata as any)?.based_on);
-  console.log('  basedOnInMetadata:', (media.metadata as any)?.based_on);
-  console.log('  mediaKeys:', Object.keys(media));
-  console.log('  metadataKeys:', media.metadata ? Object.keys(media.metadata) : 'no metadata');
-  console.log('  timestamp:', Date.now());
+  );
+  .based_on);
+  .based_on);
+  ?.based_on);
+  ?.based_on);
+  );
+  : 'no metadata');
+  );
 
   // Safety check
   if (!media) {
@@ -434,8 +433,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   
   // Log lineage data for debugging "Based On" feature
   useEffect(() => {
-    console.log('[MediaLightbox:BasedOn] 📊 Lineage hook results:', {
-      mediaId: media.id.substring(0, 8),
+    ,
       hasBasedOnField: !!(media as any).based_on,
       basedOnValue: (media as any).based_on?.substring(0, 8) || 'null',
       hasBasedOnInMetadata: !!(media.metadata as any)?.based_on,
@@ -536,8 +534,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     parentTimelineFrame: number,
     shotIdParam: string
   ) => {
-    console.log('[ReplaceInShot] Handler started', {
-      parentId: parentGenerationId.substring(0, 8),
+    ,
       currentId: currentMediaId.substring(0, 8),
       frame: parentTimelineFrame,
       shotId: shotIdParam.substring(0, 8)
@@ -586,8 +583,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         
         if (createError) throw createError;
       }
-      
-      console.log('[ReplaceInShot] Handler completed successfully');
       
       // Close lightbox to force refresh when reopened
       onClose();
@@ -715,7 +710,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
-                console.log('[InpaintPaint] 🎨 Allowing touch on canvas');
                 return; // Don't stop propagation for canvas
               }
               
@@ -729,7 +723,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                    target.closest('a') !== null;
               
               if (isInteractive) {
-                console.log('[TouchDebug] 🎯 Allowing touch on interactive element:', target.tagName);
                 return; // Allow propagation for interactive elements
               }
               
@@ -740,7 +733,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
-                console.log('[InpaintPaint] 🖌️ Allowing touch move on canvas');
                 return; // Don't stop propagation for canvas
               }
               
@@ -764,7 +756,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
-                console.log('[InpaintPaint] 🛑 Allowing touch end on canvas');
                 return; // Don't stop propagation for canvas
               }
               
@@ -851,7 +842,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
-                console.log('[InpaintPaint] 🎨 Allowing touch on canvas');
                 return; // Don't stop propagation for canvas
               }
               
@@ -865,7 +855,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                                    target.closest('a') !== null;
               
               if (isInteractive) {
-                console.log('[TouchDebug] 🎯 Allowing touch on interactive element:', target.tagName);
                 return; // Allow propagation for interactive elements
               }
               
@@ -876,7 +865,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
-                console.log('[InpaintPaint] 🖌️ Allowing touch move on canvas');
                 return; // Don't stop propagation for canvas
               }
               
@@ -900,7 +888,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
-                console.log('[InpaintPaint] 🛑 Allowing touch end on canvas');
                 return; // Don't stop propagation for canvas
               }
               
@@ -1281,9 +1268,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       <div className="flex items-center justify-between border-b border-border p-4 sticky top-0 z-[80] bg-background">
                         {/* Based On display - Show source image this was derived from */}
                         {(() => {
-                          console.log('[ReplaceInShot] MediaLightbox passing props', {
-                            hasSourceGeneration: !!sourceGenerationData,
-                            selectedShotId: selectedShotId?.substring(0, 8),
+                          ,
                             shotId: shotId?.substring(0, 8),
                             effectiveShotId: (selectedShotId || shotId)?.substring(0, 8),
                             allShotsCount: allShots?.length || 0,

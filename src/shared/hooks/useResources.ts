@@ -41,7 +41,7 @@ export const useListPublicResources = (type: ResourceType) => {
     return useQuery<Resource[], Error>({
         queryKey: ['public-resources', type],
         queryFn: async () => {
-            console.log('[PublicResources] Fetching public resources:', { type, timestamp: Date.now() });
+            });
             
             // Public resources should be readable by anyone
             // Filter for is_public = true using proper JSONB boolean check
@@ -56,11 +56,7 @@ export const useListPublicResources = (type: ResourceType) => {
                 throw error;
             }
             
-            console.log('[PublicResources] Query successful:', {
-                type,
-                count: data?.length || 0,
-                resources: data?.map(r => ({
-                    id: r.id?.substring(0, 8),
+            ,
                     userId: r.user_id?.substring(0, 8),
                     name: (r.metadata as any)?.name || (r.metadata as any)?.Name,
                     isPublic: (r.metadata as any)?.is_public,

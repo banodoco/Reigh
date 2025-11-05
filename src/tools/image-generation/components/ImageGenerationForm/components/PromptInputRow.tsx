@@ -45,9 +45,6 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
     if (!isEditingFullPrompt) {
       // If parent changed the prompt (like from AI edit), sync local state
       if (promptEntry.fullPrompt !== lastParentUpdate) {
-        console.log(`[PromptEditResetTrace] Row:${promptEntry.id}:Parent->Local sync`, {
-          oldLocal: lastParentUpdate.length, newFromParent: promptEntry.fullPrompt.length
-        });
         setLocalFullPrompt(promptEntry.fullPrompt);
         setLastParentUpdate(promptEntry.fullPrompt);
       }
@@ -158,8 +155,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
     const touch = e.touches[0];
     dragStartPos.current = { x: touch.clientX, y: touch.clientY };
     isDragging.current = false;
-    console.log(`[PromptInputRow:DRAG_DEBUG] Touch start on field ${promptEntry.id}. Recording position: ${touch.clientX}, ${touch.clientY}`);
-  };
+    };
 
   // Global touch move listener for drag detection
   useEffect(() => {
@@ -171,7 +167,7 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
         // Consider it a drag if moved more than 5px in any direction
         if (deltaX > 5 || deltaY > 5) {
           isDragging.current = true;
-          console.log(`[PromptInputRow:DRAG_DEBUG] Field ${promptEntry.id} - Setting isDragging to true (global touch)`);
+          `);
         }
       }
     };
@@ -197,13 +193,11 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
     if (isMobile) {
       // Only activate if it wasn't a drag
       if (!isDragging.current) {
-        console.log(`[PromptInputRow:CLICK_DEBUG] Field ${promptEntry.id} - Valid click, activating field`);
         // Request activation first, then enter edit when active to ensure single-tap switch works
         setPendingEnterEdit(true);
         onSetActiveForFullView(promptEntry.id);
       } else {
-        console.log(`[PromptInputRow:CLICK_DEBUG] Field ${promptEntry.id} - Ignoring click due to drag`);
-      }
+        }
       // Reset drag state
       dragStartPos.current = null;
       isDragging.current = false;
@@ -223,9 +217,6 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   };
 
   const handleBlur = () => {
-    console.log(`[PromptEditResetTrace] Row:${promptEntry.id}:onBlur save`, {
-      local: localFullPrompt.length, parent: promptEntry.fullPrompt.length
-    });
     setIsEditingFullPrompt(false);
     // Save changes when leaving edit mode
     if (localFullPrompt !== promptEntry.fullPrompt) {
@@ -236,9 +227,6 @@ export const PromptInputRow: React.FC<PromptInputRowProps> = React.memo(({
   // Save changes when edit mode is closed (e.g., when another prompt becomes active)
   useEffect(() => {
     if (!isEditingFullPrompt && localFullPrompt !== promptEntry.fullPrompt && localFullPrompt !== lastParentUpdate) {
-      console.log(`[PromptEditResetTrace] Row:${promptEntry.id}:EditClosed save`, {
-        local: localFullPrompt.length, parent: promptEntry.fullPrompt.length
-      });
       // Only save if the local prompt is different from both parent and last parent update
       // This prevents feedback loops when parent updates (like from AI edit)
       onUpdate(promptEntry.id, 'fullPrompt', localFullPrompt);

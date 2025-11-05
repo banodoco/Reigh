@@ -373,15 +373,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     }
   }, [images]);
 
-    console.log('[ShotImagesEditor] Render:', {
-    selectedShotId,
-    generationMode,
-    imagesCount: images.length,
-    positionsLoading,
-    isModeReady
-  });
-
-  // Wrap onDefaultPromptChange to also clear all enhanced prompts when base prompt changes
+    // Wrap onDefaultPromptChange to also clear all enhanced prompts when base prompt changes
   const handleDefaultPromptChange = React.useCallback(async (newPrompt: string) => {
     // First update the default prompt
     onDefaultPromptChange(newPrompt);
@@ -389,8 +381,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     // Then clear all enhanced prompts for the shot
     try {
       await clearAllEnhancedPrompts();
-      console.log('[ShotImagesEditor] 🧹 Cleared all enhanced prompts after base prompt change');
-    } catch (error) {
+      } catch (error) {
       console.error('[ShotImagesEditor] Error clearing enhanced prompts:', error);
     }
   }, [onDefaultPromptChange, clearAllEnhancedPrompts]);
@@ -401,11 +392,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     imageUrl?: string,
     thumbUrl?: string
   ): Promise<boolean> => {
-    console.log('[ShotSelectorDebug] ShotImagesEditor handleAddToShotAdapter called', {
-      component: 'ShotImagesEditor',
-      hasOnAddToShot: !!onAddToShot,
-      selectedShotId: selectedShotId,
-      generationId: generationId?.substring(0, 8)
     });
 
     if (!onAddToShot || !selectedShotId) {
@@ -560,7 +546,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 updateTimelineFrame={updateTimelineFrame}
                 images={images}
                 onTimelineChange={async () => {
-                  console.log('[ShotImagesEditor] 🔄 TIMELINE CHANGE - Reloading parent data');
                   await loadPositions({ silent: true });
                 }}
                 // Pass shared hook data to prevent creating duplicate instances
@@ -595,7 +580,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       return;
                     }
 
-                    console.log('[ClearEnhancedPrompt] Clearing enhanced prompt for pair:', pairIndex, 'generation:', firstItem.id.substring(0, 8));
+                    );
                     await clearEnhancedPrompt(firstItem.id);
                   } catch (error) {
                     console.error('[ClearEnhancedPrompt] Error:', error);
@@ -662,8 +647,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onImageSaved={onImageSaved}
                   onMagicEdit={(imageUrl, prompt, numImages) => {
                     // TODO: Wire through real magic-edit handler later.
-                    console.log("Magic Edit:", { imageUrl, prompt, numImages });
-                  }}
+                    }}
                   duplicatingImageId={duplicatingImageId}
                   duplicateSuccessImageId={duplicateSuccessImageId}
                   projectAspectRatio={projectAspectRatio}
@@ -682,14 +666,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onShotChange={onShotChange}
                   onAddToShot={(() => {
                     const result = onAddToShot ? handleAddToShotAdapter : undefined;
-                    console.log('[ShotSelectorDebug] ShotImagesEditor -> ShotImageManager onAddToShot', {
-                      component: 'ShotImagesEditor',
-                      hasOnAddToShot: !!onAddToShot,
-                      hasAdapter: !!handleAddToShotAdapter,
-                      finalOnAddToShot: !!result,
-                      allShotsLength: allShots?.length || 0,
-                      selectedShotId: selectedShotId
-                    });
                     return result;
                   })()}
                   onAddToShotWithoutPosition={onAddToShotWithoutPosition ? handleAddToShotWithoutPositionAdapter : undefined}
@@ -699,7 +675,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   } : undefined}
                   // Pair prompt props
                   onPairClick={(pairIndex, pairData) => {
-                    console.log('[PairIndicatorDebug] ShotImagesEditor onPairClick called', { pairIndex, pairData });
                     setPairPromptModalData({
                       isOpen: true,
                       pairData,
@@ -715,9 +690,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         result[index] = { prompt, negativePrompt };
                       }
                     });
-                    console.log('[PairIndicatorDebug] ShotImagesEditor pairPrompts:', {
-                      shotGenerationsCount: shotGenerations.length,
-                      resultKeys: Object.keys(result),
+                    ,
                       result
                     });
                     return result;
@@ -731,9 +704,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         result[index] = enhancedPrompt;
                       }
                     });
-                    console.log('[PairIndicatorDebug] ShotImagesEditor enhancedPrompts:', {
-                      shotGenerationsCount: shotGenerations.length,
-                      resultKeys: Object.keys(result),
+                    ,
                     });
                     return result;
                   })()}
@@ -983,15 +954,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
               return;
             }
             
-            console.log(`[PairPrompts] 💾 Saving prompts for Pair ${pairIndex + 1} to shot_generation:`, {
-              shotGenerationId: shotGenerationId.substring(0, 8),
+            ,
               fullId: shotGenerationId,
               prompt,
               negativePrompt
             });
             
             await updatePairPrompts(shotGenerationId, prompt, negativePrompt);
-            console.log(`[PairPrompts] ✅ Saved prompts for Pair ${pairIndex + 1}`);
             // Timeline now uses shared hook data, so changes are reactive
           } catch (error) {
             console.error(`[PairPrompts] ❌ Failed to save prompts for Pair ${pairIndex + 1}:`, error);

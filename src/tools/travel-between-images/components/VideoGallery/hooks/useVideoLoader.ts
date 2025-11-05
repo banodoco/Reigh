@@ -20,11 +20,7 @@ export const useVideoLoader = (
 
   const logVideoEvent = useCallback((phase: string, extraData: Record<string, any> = {}) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - ${phase}:`, {
-        videoId: video.id,
-        phase,
-        position: index + 1,
-        timestamp: Date.now(),
+      ,
         ...extraData
       });
     }
@@ -32,15 +28,6 @@ export const useVideoLoader = (
 
   const triggerLoadOnce = useCallback((reason: string) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - TRIGGER_LOAD_ATTEMPT:`, {
-        videoId: video.id,
-        phase: 'TRIGGER_LOAD_ATTEMPT',
-        reason,
-        hasTriggeredLoad: hasTriggeredLoadRef.current,
-        hasVideoRef: !!videoRef.current,
-        shouldPreload,
-        willTriggerLoad: !hasTriggeredLoadRef.current && videoRef.current && shouldPreload === 'none',
-        timestamp: Date.now()
       });
     }
     
@@ -49,12 +36,6 @@ export const useVideoLoader = (
       videoRef.current.load();
       
       if (process.env.NODE_ENV === 'development') {
-        console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_LOAD_TRIGGERED:`, {
-          videoId: video.id,
-          phase: 'VIDEO_LOAD_TRIGGERED',
-          reason,
-          videoSrc: videoRef.current.src,
-          timestamp: Date.now()
         });
       }
     }

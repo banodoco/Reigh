@@ -116,7 +116,6 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
     
     // If switching TO inpaint or annotate mode (from any other mode), reset LoRA to none
     if (prevMode !== editMode && (editMode === 'inpaint' || editMode === 'annotate')) {
-      console.log('[LoraReset] Switching to', editMode, 'mode - resetting LoRA to none');
       setLoraMode('none');
     }
     

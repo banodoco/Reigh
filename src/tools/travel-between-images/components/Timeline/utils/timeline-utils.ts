@@ -216,12 +216,12 @@ export const applyFluidTimeline = (
     if (wouldCreateViolation) {
       needsShift = true;
       shiftAmount = Math.abs(limitedMovementAmount);
-      console.log(`[TIMELINE_TRACK] [GAP_VIOLATION] ⚠️ Gap violation detected - shifting required for item ${draggedId.substring(0, 8)}`);
+      }`);
     } else {
       // NO SHIFT NEEDED: If no gap violation, don't shift adjacent items
       needsShift = false;
       shiftAmount = 0;
-      console.log(`[TIMELINE_TRACK] [NO_VIOLATION] ✅ No gap violation - no shifting needed for item ${draggedId.substring(0, 8)}`);
+      }`);
     }
   }
 

@@ -60,12 +60,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
 }) => {
-  console.log('[PairIndicatorDebug] ImageGrid render:', {
-    imagesCount: images.length,
-    hasOnPairClick: !!onPairClick,
-    hasPairPrompts: !!pairPrompts,
-    hasEnhancedPrompts: !!enhancedPrompts,
-    pairPromptsKeys: pairPrompts ? Object.keys(pairPrompts) : [],
+  : [],
     enhancedPromptsKeys: enhancedPrompts ? Object.keys(enhancedPrompts) : [],
     defaultPrompt: defaultPrompt?.substring(0, 50),
     defaultNegativePrompt: defaultNegativePrompt?.substring(0, 50),
@@ -124,7 +119,6 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                   startFrame={index * batchVideoFrames}
                   endFrame={(index + 1) * batchVideoFrames}
                   onPairClick={() => {
-                    console.log('[PairIndicatorDebug] Pair indicator clicked', { index });
                     onPairClick(index, {
                       index,
                       frames: batchVideoFrames,

@@ -77,10 +77,7 @@ export const transformUnifiedGenerationsData = (items: any[]): GenerationRow[] =
  */
 export const logVideoLoadingStrategy = (currentVideoOutputs: GenerationRow[], currentPage: number) => {
   if (currentVideoOutputs.length > 0 && process.env.NODE_ENV === 'development') {
-    console.log('🎬 [VideoLifecycle] PAGE_LOADING_STRATEGY:', {
-      currentPage,
-      totalVideosOnPage: currentVideoOutputs.length,
-      loadingPlan: currentVideoOutputs.map((video, index) => ({
+    => ({
         videoNum: index + 1,
         videoId: video.id,
         strategy: index === 0 ? 'IMMEDIATE (priority)' : `DELAYED (${200 + (index * 150)}ms)`,

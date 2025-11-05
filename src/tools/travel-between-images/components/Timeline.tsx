@@ -263,12 +263,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
     // [Position0Debug] Log timeline data transformation for debugging
     const position0Images = result.filter(img => img.timeline_frame === 0);
-    console.log(`[Position0Debug] 🎭 Timeline images data transformation:`, {
-      shotId,
-      totalImages: result.length,
-      dataSource: propImages ? 'propImages' : 'shotGenerations',
-      position0Images: position0Images.map(img => ({
-        id: img.shotImageEntryId?.substring(0, 8) || img.id?.substring(0, 8),
+    || img.id?.substring(0, 8),
         timeline_frame: img.timeline_frame,
         hasImageUrl: !!img.imageUrl
       })),
@@ -392,8 +387,7 @@ const Timeline: React.FC<TimelineProps> = ({
     }
 
     try {
-      console.log('[Timeline] Adding generation to shot with position', {
-        generationId: generationId.substring(0, 8),
+      ,
         shotId: lightboxSelectedShotId.substring(0, 8)
       });
 
@@ -420,8 +414,7 @@ const Timeline: React.FC<TimelineProps> = ({
     }
 
     try {
-      console.log('[Timeline] Adding generation to shot without position', {
-        generationId: generationId.substring(0, 8),
+      ,
         shotId: lightboxSelectedShotId.substring(0, 8)
       });
 
@@ -498,7 +491,6 @@ const Timeline: React.FC<TimelineProps> = ({
   // Close lightbox if current image no longer exists (e.g., deleted)
   useEffect(() => {
     if (lightboxIndex !== null && !currentLightboxImage) {
-      console.log('[Timeline] Current lightbox image no longer exists, closing lightbox');
       closeLightbox();
     }
   }, [lightboxIndex, currentLightboxImage, closeLightbox]);
@@ -511,9 +503,6 @@ const Timeline: React.FC<TimelineProps> = ({
       
       // Only refetch if this event is for our current shot
       if (updatedShotId === shotId) {
-        console.log('[StarPersist] 🎯 Timeline received star-updated event, refetching...', {
-          shotId,
-          timestamp: Date.now()
         });
         
         // Trigger a refetch of shot generations
@@ -541,26 +530,15 @@ const Timeline: React.FC<TimelineProps> = ({
     const prevContext = prevContextFramesRef.current;
     const currentContext = contextFrames;
     
-    console.log('[ContextAdjust] 🎚️ useEffect triggered:', { 
-      from: prevContext, 
-      to: currentContext,
-      isIncrease: currentContext > prevContext,
-      hasImages: images.length > 0,
-      positionsCount: framePositions.size
-    });
-    
     // Only adjust on increases (not decreases)
     if (currentContext <= prevContext || images.length === 0 || isLoading) {
       prevContextFramesRef.current = currentContext;
       return;
     }
     
-    console.log('[ContextAdjust] 📈 Context frames increased from', prevContext, 'to', currentContext);
-    
     // Use framePositions (source of truth)
     const currentPositions = new Map(framePositions);
     if (currentPositions.size === 0) {
-      console.log('[ContextAdjust] ⏸️ No positions to adjust yet');
       prevContextFramesRef.current = currentContext;
       return;
     }
@@ -568,23 +546,16 @@ const Timeline: React.FC<TimelineProps> = ({
     const isValid = validateGaps(currentPositions, currentContext);
     
     if (!isValid) {
-      console.log('[ContextAdjust] ⚠️ Current positions violate new constraint, adjusting...');
       isAdjustingRef.current = true;
       
       // Calculate new maxGap
       const newMaxGap = calculateMaxGap(currentContext);
       
-      console.log('[ContextAdjust] 🔧 Adjustment parameters:', {
-        currentContext,
-        newMaxGap,
-        itemCount: currentPositions.size
-      });
-      
       // Sort items by position
       const sorted = Array.from(currentPositions.entries())
         .sort((a, b) => a[1] - b[1]);
       
-      console.log('[ContextAdjust] 📊 Current positions (sorted):', 
+      :', 
         sorted.map(([id, pos]) => ({ id: id.substring(0, 8), pos }))
       );
       
@@ -597,14 +568,13 @@ const Timeline: React.FC<TimelineProps> = ({
           // Keep frame 0 at 0
           adjusted.set(id, 0);
           prevPosition = 0;
-          console.log('[ContextAdjust] 📌 Item at frame 0, keeping:', id.substring(0, 8));
+          );
         } else {
           // Calculate the allowed range
           const minAllowedPosition = prevPosition + 1;
           const maxAllowedPosition = prevPosition + newMaxGap;
           
-          console.log('[ContextAdjust] 🔍 Evaluating item:', {
-            id: id.substring(0, 8),
+          ,
             currentPos,
             prevPosition,
             minAllowedPosition,
@@ -616,15 +586,12 @@ const Timeline: React.FC<TimelineProps> = ({
           
           if (currentPos < minAllowedPosition) {
             // Too close - push down to minimum allowed
-            console.log('[ContextAdjust] 🔽 Too close! Pushing down from', currentPos, 'to', minAllowedPosition);
             newPosition = minAllowedPosition;
           } else if (currentPos > maxAllowedPosition) {
             // Too far - pull closer to fit within maxGap (this moves items to lower positions)
-            console.log('[ContextAdjust] 🔼 Gap too large! Pulling closer from', currentPos, 'to', maxAllowedPosition);
             newPosition = maxAllowedPosition;
           } else {
             // Position is valid, keep it
-            console.log('[ContextAdjust] ✓ Position valid, keeping at', currentPos);
             newPosition = currentPos;
           }
           
@@ -633,8 +600,7 @@ const Timeline: React.FC<TimelineProps> = ({
         }
       }
       
-      console.log('[ContextAdjust] 📊 Adjusted positions:', 
-        Array.from(adjusted.entries()).map(([id, pos]) => ({ id: id.substring(0, 8), pos }))
+      ).map(([id, pos]) => ({ id: id.substring(0, 8), pos }))
       );
       
       // Check if we actually changed anything
@@ -642,11 +608,8 @@ const Timeline: React.FC<TimelineProps> = ({
         ([id, newPos]) => newPos !== currentPositions.get(id)
       );
       
-      console.log('[ContextAdjust] 🔄 Has changes?', hasChanges);
-      
       if (hasChanges) {
-        console.log('[ContextAdjust] ✅ Applying adjusted positions:', {
-          changes: Array.from(adjusted.entries())
+        )
             .filter(([id, newPos]) => newPos !== currentPositions.get(id))
             .map(([id, newPos]) => ({
               id: id.substring(0, 8),
@@ -658,8 +621,7 @@ const Timeline: React.FC<TimelineProps> = ({
         // Apply the adjusted positions
         setFramePositions(adjusted).then(() => {
           isAdjustingRef.current = false;
-          console.log('[ContextAdjust] 🎉 Positions successfully updated');
-        }).catch((error) => {
+          }).catch((error) => {
           console.error('[ContextAdjust] ❌ Failed to adjust positions:', error);
           isAdjustingRef.current = false;
         });
@@ -667,8 +629,7 @@ const Timeline: React.FC<TimelineProps> = ({
         isAdjustingRef.current = false;
       }
     } else {
-      console.log('[ContextAdjust] ✅ Current positions are valid, no adjustment needed');
-    }
+      }
     
     prevContextFramesRef.current = currentContext;
   }, [contextFrames, framePositions, images.length, isLoading, setFramePositions]);
@@ -928,32 +889,19 @@ const Timeline: React.FC<TimelineProps> = ({
             onPrevious={images.length > 1 ? wrappedGoPrev : undefined}
             readOnly={readOnly}
             onDelete={!readOnly ? (mediaId: string) => {
-              console.log('[Timeline] Delete from lightbox', {
-                mediaId,
-                shotImageEntryId: currentLightboxImage.shotImageEntryId
-              });
               // Use shotImageEntryId for deletion to target the specific shot_generations entry
               onImageDelete(currentLightboxImage.shotImageEntryId);
             } : undefined}
             onImageSaved={async (newUrl: string, createNew?: boolean) => {
-              console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {
-                imageId: currentLightboxImage.id,
-                newUrl,
-                createNew,
-                timestamp: Date.now()
               });
               
               await onImageSaved(currentLightboxImage.id, newUrl, createNew);
               
-              console.log('[ImageFlipDebug] [Timeline] Parent onImageSaved completed, triggering onTimelineChange', {
-                timestamp: Date.now()
               });
               
               // Trigger reload of timeline data after flip
               if (onTimelineChange) {
                 await onTimelineChange();
-                console.log('[ImageFlipDebug] [Timeline] onTimelineChange completed', {
-                  timestamp: Date.now()
                 });
               }
             }}
@@ -962,8 +910,7 @@ const Timeline: React.FC<TimelineProps> = ({
             hasNext={hasNext}
             hasPrevious={hasPrevious}
             onNavigateToGeneration={(generationId: string) => {
-              console.log('[Timeline:DerivedNav] 📍 Navigate to generation', {
-                generationId: generationId.substring(0, 8),
+              ,
                 timelineImagesCount: images.length,
                 externalGenerationsCount: externalGens.externalGenerations.length,
                 tempDerivedCount: externalGens.tempDerivedGenerations.length,
@@ -972,10 +919,8 @@ const Timeline: React.FC<TimelineProps> = ({
               // Search in combined images (timeline + external + derived)
               const index = currentImages.findIndex((img: any) => img.id === generationId);
               if (index !== -1) {
-                console.log('[Timeline:DerivedNav] ✅ Found at index', index);
                 openLightbox(index);
               } else {
-                console.log('[Timeline:DerivedNav] ⚠️ Not found in current images');
                 toast.info('This generation is not currently loaded');
               }
             }}
@@ -1000,7 +945,6 @@ const Timeline: React.FC<TimelineProps> = ({
             onShotChange={isExternalGen ? (shotId) => {
               externalGens.setExternalGenLightboxSelectedShot(shotId);
             } : (shotId) => {
-              console.log('[Timeline] Shot selector changed to:', shotId);
               setLightboxSelectedShotId(shotId);
               onShotChange?.(shotId);
             }}

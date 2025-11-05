@@ -117,6 +117,5 @@ export const trackVideoStates = () => {
     isLightboxVideo: !!video.getAttribute('data-lightbox-video')
   }));
   
-  console.log('[AutoplayDebugger] 📊 Current video states:', states);
   return states;
 };

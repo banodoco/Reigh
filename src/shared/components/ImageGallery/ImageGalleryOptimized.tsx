@@ -105,17 +105,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
   React.useEffect(() => {
     const isVideoGallery = currentToolType === 'travel-between-images' && initialMediaTypeFilter === 'video';
     if (!isVideoGallery) return;
-    console.log('[VideoSkeletonDebug] ImageGallery mount/props:', {
-      isVideoGallery,
-      imagesLength: images?.length,
-      totalCount,
-      columnsPerRow,
-      itemsPerPage,
-      initialMediaTypeFilter,
-      currentToolType,
-      initialToolTypeFilter,
-      showShotFilter,
-      timestamp: Date.now()
     });
   }, [images, totalCount, columnsPerRow, itemsPerPage, initialMediaTypeFilter, currentToolType, initialToolTypeFilter, showShotFilter]);
 
@@ -134,12 +123,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
   
   // Debug mobile detection (reduced frequency)
   React.useEffect(() => {
-    console.log('[MobileDebug] Mobile detection changed:', {
-      rawIsMobile,
-      isMobile,
-      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'undefined',
-      isMobileType: typeof isMobile,
-      timestamp: Date.now()
     });
   }, [isMobile]); // Only log when isMobile actually changes
   
@@ -156,7 +139,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
           touchSupported: 'ontouchstart' in window,
           timestamp: Date.now()
         };
-        console.log('[MobileDebug] Debug info:', debugInfo);
         alert(`Mobile Debug:\nisMobile: ${isMobile}\nrawIsMobile: ${rawIsMobile}\nWindow: ${window.innerWidth}x${window.innerHeight}\nTouch: ${'ontouchstart' in window}`);
         return debugInfo;
       };
@@ -287,31 +269,19 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
 
   // Memoized navigation handler to prevent re-creation
   const handleNavigateToShot = useCallback((shot: Shot) => {
-    console.log('[VisitShotDebug] 6. ImageGallery handleNavigateToShot called', {
-      shot,
-      hasNavigateToShot: !!navigateToShot,
-      hasHandleCloseLightbox: !!actionsHook.handleCloseLightbox,
-      timestamp: Date.now()
     });
     
     try {
-      console.log('[VisitShotDebug] 7. ImageGallery calling navigateToShot');
       navigateToShot(shot);
-      console.log('[VisitShotDebug] 8. ImageGallery navigateToShot completed, now closing lightbox');
-      
       // Now we close the lightbox from the component that owns its state
       actionsHook.handleCloseLightbox();
-      console.log('[VisitShotDebug] 9. ImageGallery handleCloseLightbox completed');
-    } catch (error) {
+      } catch (error) {
       console.error('[VisitShotDebug] ERROR in ImageGallery handleNavigateToShot:', error);
     }
   }, [navigateToShot, actionsHook.handleCloseLightbox]);
 
   // Memoized visit shot handler
   const handleVisitShotFromNotifier = useCallback((shotId: string) => {
-    console.log('[VisitShotDebug] 1. ImageGallery handleVisitShotFromNotifier called', {
-      shotId,
-      timestamp: Date.now()
     });
     
     // Find the shot object from the shot ID
@@ -328,15 +298,11 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
       return;
     }
     
-    console.log('[VisitShotDebug] 2. ImageGallery found shot, calling navigateToShot', {
-      shot: fullShot,
-      timestamp: Date.now()
     });
     
     try {
       navigateToShot(fullShot);
-      console.log('[VisitShotDebug] 3. ImageGallery navigateToShot completed');
-    } catch (error) {
+      } catch (error) {
       console.error('[VisitShotDebug] ERROR in ImageGallery handleVisitShotFromNotifier:', error);
     }
   }, [simplifiedShotOptions, allShots, navigateToShot]);
@@ -436,19 +402,19 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
   const handleSetActiveLightboxIndex = useCallback((index: number) => {
     const { filteredImages } = navigationDataRef.current;
     
-    console.log('[BasedOnDebug] handleSetActiveLightboxIndex called (Optimized)', { 
+    ', { 
       index, 
       filteredImagesLength: filteredImages.length,
       targetImageId: filteredImages[index]?.id 
     });
     
     if (index >= 0 && index < filteredImages.length) {
-      console.log('[BasedOnDebug] Opening lightbox for image at index (Optimized)', { 
+      ', { 
         index, 
         imageId: filteredImages[index].id 
       });
       actionsHook.handleOpenLightbox(filteredImages[index]);
-      console.log('[BasedOnDebug] handleOpenLightbox called (Optimized)');
+      ');
     } else {
       console.warn('[BasedOnDebug] Invalid index for navigation (Optimized)', { index, filteredImagesLength: filteredImages.length });
     }
@@ -468,9 +434,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
 
   // Task details handlers
   const handleShowTaskDetails = useCallback(() => {
-    console.log('[TaskToggle] ImageGallery: handleShowTaskDetails called', { 
-      activeLightboxMedia: stateHook.state.activeLightboxMedia?.id,
-    });
     if (stateHook.state.activeLightboxMedia) {
       // Set up task details modal state first
       stateHook.setSelectedImageForDetails(stateHook.state.activeLightboxMedia);
@@ -479,12 +442,7 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
         stateHook.setShowTaskDetailsModal(true);
         // Close lightbox after modal is set to open
         stateHook.setActiveLightboxMedia(null);
-        console.log('[TaskToggle] ImageGallery: State updated for task details modal', {
-          newSelectedImage: stateHook.state.activeLightboxMedia?.id,
-          newShowModal: true,
-          closedLightbox: true
-        });
-      }, 100);
+        }, 100);
     } else {
       console.error('[TaskToggle] ImageGallery: No active lightbox media found');
     }

@@ -148,8 +148,7 @@ const ShotsPage: React.FC = () => {
     }
 
     try {
-      console.log('[ShotsPage] Adding generation to shot with position', {
-        generationId: generationId.substring(0, 8),
+      ,
         shotId: currentShotId.substring(0, 8)
       });
 
@@ -191,8 +190,7 @@ const ShotsPage: React.FC = () => {
     }
 
     try {
-      console.log('[ShotsPage] Adding generation to shot without position', {
-        generationId: generationId.substring(0, 8),
+      ,
         shotId: currentShotId.substring(0, 8)
       });
 
@@ -216,7 +214,6 @@ const ShotsPage: React.FC = () => {
 
   // Handler for changing the selected shot in the lightbox
   const handleShotChange = useCallback((shotId: string) => {
-    console.log('[ShotsPage] Shot change requested:', shotId);
     setCurrentShotId(shotId);
   }, [setCurrentShotId]);
 
@@ -265,16 +262,7 @@ const ShotsPage: React.FC = () => {
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
           />
           {/* Debug logging */}
-          {console.log('[ShotSelectorDebug] ShotsPage -> ShotImageManager', {
-            component: 'ShotsPage',
-            allShotsLength: simplifiedShotOptions.length,
-            selectedShotId: currentShotId,
-            hasOnAddToShot: !!handleAddToShot,
-            hasOnAddToShotWithoutPosition: !!handleAddToShotWithoutPosition,
-            hasOnShotChange: !!handleShotChange,
-            imagesCount: managedImages.length,
-            generationMode: 'batch'
-          })}
+          {}
         </>
       )}
     </div>

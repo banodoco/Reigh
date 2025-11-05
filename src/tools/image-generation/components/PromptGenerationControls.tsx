@@ -50,8 +50,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   onValuesChange,
   remixMode = false,
 }) => {
-  console.log(`[RemixContextDebug] Component render - remixMode: ${remixMode}, existingPromptsForContext.length: ${existingPromptsForContext.length}`);
-  
   const [overallPromptText, setOverallPromptText] = useState(initialValues?.overallPromptText || '');
   const [remixPromptText, setRemixPromptText] = useState(initialValues?.remixPromptText || 'More like this');
   const [rulesToRememberText, setRulesToRememberText] = useState(initialValues?.rulesToRememberText || '');
@@ -61,8 +59,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
   const [replaceCurrentPrompts, setReplaceCurrentPrompts] = useState(initialValues?.replaceCurrentPrompts || false);
   const [temperature, setTemperature] = useState<number>(initialValues?.temperature || 0.8);
   const [showAdvanced, setShowAdvanced] = useState(initialValues?.showAdvanced || false);
-
-  console.log(`[RemixContextDebug] Current state - includeExistingContext: ${includeExistingContext}, replaceCurrentPrompts: ${replaceCurrentPrompts}`);
 
   // Hydrate from initialValues only once to avoid overriding user typing on parent updates
   const hasHydratedRef = useRef(false);
@@ -112,9 +108,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
 
   // When remixMode is enabled, automatically set includeExistingContext and replaceCurrentPrompts to true
   useEffect(() => {
-    console.log(`[RemixContextDebug] Remix mode effect triggered - remixMode: ${remixMode}`);
     if (remixMode) {
-      console.log(`[RemixContextDebug] Setting includeExistingContext=true and replaceCurrentPrompts=true due to remix mode`);
       setIncludeExistingContext(true);
       setReplaceCurrentPrompts(true);
       
@@ -130,8 +124,7 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
         temperature,
         showAdvanced,
       });
-      console.log(`[RemixContextDebug] State updated for remix mode - includeExistingContext: true, replaceCurrentPrompts: true`);
-    }
+      }
   }, [remixMode, onValuesChange, overallPromptText, remixPromptText, rulesToRememberText, numberToGenerate, temperature, showAdvanced]);
 
   const handleGenerateClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -146,17 +139,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     const existingPromptsToUse = shouldIncludeExisting ? existingPromptsForContext : undefined;
     const promptTextToUse = remixMode ? remixPromptText : overallPromptText;
     
-    console.log(`[RemixContextDebug] handleGenerateClick - Building params:`, {
-      remixMode,
-      includeExistingContext,
-      replaceCurrentPrompts,
-      shouldIncludeExisting,
-      shouldReplace,
-      existingPromptsCount: existingPromptsToUse?.length ?? 0,
-      existingPromptsPresent: !!existingPromptsToUse,
-      promptTextToUse,
-    });
-    
     const params = {
       overallPromptText: promptTextToUse,
       rulesToRememberText,
@@ -166,11 +148,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       replaceCurrentPrompts: shouldReplace,
       temperature,
     };
-    
-    console.log(`[RemixContextDebug] Calling onGenerate with params:`, {
-      ...params,
-      existingPrompts: params.existingPrompts ? `${params.existingPrompts.length} prompts` : 'undefined',
-    });
     
     await onGenerate(params);
   };
@@ -190,17 +167,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
     const existingPromptsToUse = shouldIncludeExisting ? existingPromptsForContext : undefined;
     const promptTextToUse = remixMode ? remixPromptText : overallPromptText;
     
-    console.log(`[RemixContextDebug] handleGenerateAndQueueClick - Building params:`, {
-      remixMode,
-      includeExistingContext,
-      replaceCurrentPrompts,
-      shouldIncludeExisting,
-      shouldReplace,
-      existingPromptsCount: existingPromptsToUse?.length ?? 0,
-      existingPromptsPresent: !!existingPromptsToUse,
-      promptTextToUse,
-    });
-    
     const params = {
       overallPromptText: promptTextToUse,
       rulesToRememberText,
@@ -210,11 +176,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
       replaceCurrentPrompts: shouldReplace,
       temperature,
     };
-    
-    console.log(`[RemixContextDebug] Calling onGenerateAndQueue with params:`, {
-      ...params,
-      existingPrompts: params.existingPrompts ? `${params.existingPrompts.length} prompts` : 'undefined',
-    });
     
     await onGenerateAndQueue(params);
   };
@@ -494,7 +455,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                         checked={includeExistingContext} 
                         onCheckedChange={(checked) => {
                           const next = Boolean(checked);
-                          console.log(`[RemixContextDebug] User toggled includeExistingContext: ${includeExistingContext} -> ${next}`);
                           setIncludeExistingContext(next);
                           emitChange({ includeExistingContext: next });
                         }} 
@@ -510,7 +470,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                         checked={replaceCurrentPrompts} 
                         onCheckedChange={(checked) => {
                           const next = Boolean(checked);
-                          console.log(`[RemixContextDebug] User toggled replaceCurrentPrompts: ${replaceCurrentPrompts} -> ${next}`);
                           setReplaceCurrentPrompts(next);
                           emitChange({ replaceCurrentPrompts: next });
                         }} 
@@ -707,7 +666,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                         checked={includeExistingContext} 
                         onCheckedChange={(checked) => {
                           const next = Boolean(checked);
-                          console.log(`[RemixContextDebug] User toggled includeExistingContext: ${includeExistingContext} -> ${next}`);
                           setIncludeExistingContext(next);
                           emitChange({ includeExistingContext: next });
                         }} 
@@ -723,7 +681,6 @@ export const PromptGenerationControls: React.FC<PromptGenerationControlsProps> =
                         checked={replaceCurrentPrompts} 
                         onCheckedChange={(checked) => {
                           const next = Boolean(checked);
-                          console.log(`[RemixContextDebug] User toggled replaceCurrentPrompts: ${replaceCurrentPrompts} -> ${next}`);
                           setReplaceCurrentPrompts(next);
                           emitChange({ replaceCurrentPrompts: next });
                         }} 

@@ -103,10 +103,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 }, ref) => {
   
   // Debug logging for callback prop
-  console.log('[ShotChangeDebug] 🏗️ ImageGenerationForm rendered with onShotChange:', {
-    hasCallback: !!onShotChange,
-    callbackType: typeof onShotChange,
-    timestamp: Date.now()
   });
   // Track first-visit for this session using component state to avoid stale module-level cache
   const [hasVisitedImageGeneration, setHasVisitedImageGeneration] = useState<boolean>(() => {
@@ -197,8 +193,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     const prevId = prevSelectedReferenceId.current;
     
     if (hasChanged) {
-      console.log('[RefSettings] 🔄 Reference changed from', prevId, 'to', selectedReferenceId);
-      console.log('[RefSettings] 🔄 Clearing pending mode update and forcing mode sync');
       pendingReferenceModeUpdate.current = null;
       
       // Look up the reference directly to ensure we have the latest data
@@ -207,11 +201,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         const newSelectedRef = references.find(ref => ref.id === selectedReferenceId);
         if (newSelectedRef) {
           const newMode = newSelectedRef.referenceMode ?? 'custom';
-          console.log('[RefSettings] 🎯 Force syncing mode for new reference:', {
-            refId: selectedReferenceId,
-            refName: newSelectedRef.name,
-            newMode,
-            allModes: references.map(r => ({ id: r.id, mode: r.referenceMode }))
+          )
           });
           
           // Force sync all settings for this reference
@@ -232,16 +222,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Debug logging for reference state
   useEffect(() => {
-    console.log('[RefSettings] 📊 Current state:', {
-      effectiveShotId,
-      referencesCount: references.length,
-      selectedReferenceId,
-      hasSelectedReference: !!selectedReference,
-      selectedReferenceName: selectedReference?.name,
-      selectedReferenceStrength: selectedReference?.styleReferenceStrength,
-      selectedSubjectStrength: selectedReference?.subjectStrength,
-      selectedReferenceMode: selectedReference?.referenceMode,
-      allReferenceIds: references.map(r => r.id),
+    ,
       allReferenceModes: references.map(r => ({ id: r.id, name: r.name, mode: r.referenceMode })),
       allShotSelections: selectedReferenceIdByShot
     });
@@ -291,7 +272,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (references.length > 0 && projectImageSettings) {
       // Case 1: No selectedReferenceId for this shot
       if (!selectedReferenceId) {
-        console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(no ID set)');
+        ');
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
@@ -301,7 +282,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
       // Case 2: selectedReferenceId exists but doesn't match any reference (stale/corrupted)
       else if (!selectedReference) {
-        console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(stale ID)');
+        ');
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
@@ -314,57 +295,35 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Sync local state with selected reference settings (only when values actually change)
   useEffect(() => {
-    console.log('[RefSettings] 🔄 Syncing local state from DB/selected reference:', {
-      selectedReferenceId,
-      selectedReferenceName: selectedReference?.name,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: currentSubjectDescription,
-      inThisScene: currentInThisScene,
-      localReferenceMode: referenceMode,
-      dbReferenceMode: currentReferenceMode,
-      modeNeedsSync: referenceMode !== currentReferenceMode,
-      pendingModeUpdate: pendingReferenceModeUpdate.current
-    });
-    
     // Only update if values are different to avoid overriding optimistic updates
     if (styleReferenceStrength !== currentStyleStrength) {
-      console.log('[RefSettings] 📝 Updating local styleReferenceStrength:', currentStyleStrength);
       setStyleReferenceStrength(currentStyleStrength);
     }
     if (subjectStrength !== currentSubjectStrength) {
-      console.log('[RefSettings] 📝 Updating local subjectStrength:', currentSubjectStrength);
       setSubjectStrength(currentSubjectStrength);
     }
     if (subjectDescription !== currentSubjectDescription) {
-      console.log('[RefSettings] 📝 Updating local subjectDescription:', currentSubjectDescription);
       setSubjectDescription(currentSubjectDescription);
     }
     if (inThisScene !== currentInThisScene) {
-      console.log('[RefSettings] 📝 Updating local inThisScene:', currentInThisScene);
       setInThisScene(currentInThisScene);
     }
     if (inThisSceneStrength !== currentInThisSceneStrength && currentInThisSceneStrength !== undefined) {
-      console.log('[RefSettings] 📝 Updating local inThisSceneStrength:', currentInThisSceneStrength);
       setInThisSceneStrength(currentInThisSceneStrength);
     }
     
     // For reference mode: check if database caught up with pending update
     if (pendingReferenceModeUpdate.current && currentReferenceMode === pendingReferenceModeUpdate.current) {
       // Database now matches our pending update, clear the pending flag
-      console.log('[RefSettings] ✅ Database caught up with pending mode update:', currentReferenceMode);
       pendingReferenceModeUpdate.current = null;
     }
     
     // Only sync from database if no pending update
     if (!pendingReferenceModeUpdate.current && referenceMode !== currentReferenceMode) {
-      console.log('[RefSettings] 📝 Syncing mode from database:', { from: referenceMode, to: currentReferenceMode });
       setReferenceMode(currentReferenceMode);
     } else if (pendingReferenceModeUpdate.current) {
-      console.log('[RefSettings] ⏸️ Skipping mode sync, pending update in progress:', pendingReferenceModeUpdate.current);
-    } else if (referenceMode === currentReferenceMode) {
-      console.log('[RefSettings] ✅ Mode already in sync:', referenceMode);
-    }
+      } else if (referenceMode === currentReferenceMode) {
+      }
   }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, inThisSceneStrength, referenceMode, selectedReferenceId, selectedReference?.name]);
 
   // Generation image (always use processed version)
@@ -393,11 +352,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Clear model override once server settings reflect the change
   useEffect(() => {
     if (modelOverride && projectImageSettings?.selectedModel === modelOverride) {
-      console.log('[ModelFlipIssue] Server settings now match override. Clearing override.', {
-        serverModel: projectImageSettings?.selectedModel,
-        override: modelOverride,
-        isUpdating: isSavingProjectSettings
-      });
       setModelOverride(undefined);
     }
   }, [projectImageSettings?.selectedModel]);
@@ -408,8 +362,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       if (rawStyleReferenceImage && 
           rawStyleReferenceImage.startsWith('data:image/') && 
           selectedProjectId) {
-        console.log('[ImageGenerationForm] Migrating legacy base64 style reference to URL');
-        
         try {
           // Convert base64 to file
           const file = dataURLtoFile(rawStyleReferenceImage, `migrated-style-reference-${Date.now()}.png`);
@@ -427,8 +379,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             styleReferenceImageOriginal: uploadedUrl
           });
           
-          console.log('[ImageGenerationForm] Successfully migrated base64 style reference to URL:', uploadedUrl);
-        } catch (error) {
+          } catch (error) {
           console.error('[ImageGenerationForm] Failed to migrate base64 style reference:', error);
           toast.error('Failed to migrate style reference image');
         }
@@ -451,7 +402,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                                   !projectImageSettings.references;
       
       if (hasLegacyFlatFormat) {
-        console.log('[RefSettings] 🔧 Migrating legacy flat reference to array format');
         needsMigration = true;
         
         const legacyReference: ReferenceImage = {
@@ -487,7 +437,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                                             !projectImageSettings.selectedReferenceIdByShot;
       
       if (hasLegacyProjectWideSelection && !hasLegacyFlatFormat) {
-        console.log('[RefSettings] 🔧 Migrating project-wide selection to shot-specific');
         needsMigration = true;
         
         // Apply the old project-wide selection to the current shot
@@ -500,8 +449,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       if (needsMigration) {
         try {
           await updateProjectImageSettings('project', updates);
-          console.log('[RefSettings] ✅ Successfully migrated legacy reference settings');
-        } catch (error) {
+          } catch (error) {
           console.error('[RefSettings] ❌ Failed to migrate legacy reference:', error);
         }
       }
@@ -523,7 +471,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       );
       
       if (needsMigration) {
-        console.log('[RefSettings] 🔧 Migrating references for scene mode updates');
         const updatedReferences = references.map(ref => {
           const updates: Partial<ReferenceImage> = { ...ref };
           
@@ -542,8 +489,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         
         try {
           await updateProjectImageSettings('project', { references: updatedReferences });
-          console.log('[RefSettings] ✅ Successfully migrated scene settings');
-        } catch (error) {
+          } catch (error) {
           console.error('[RefSettings] ❌ Failed to migrate scene settings:', error);
         }
       }
@@ -575,16 +521,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Debug project context
   useEffect(() => {
-    console.log('[ImageGenerationForm] Project context - selectedProjectId:', selectedProjectId);
-  }, [selectedProjectId]);
+    }, [selectedProjectId]);
 
   // Debug persistence hook inputs
   useEffect(() => {
-    console.log('[ImageGenerationForm] Persistence hook inputs:', {
-      toolId: 'image-generation',
-      context: { projectId: selectedProjectId },
-      stateValues: {
-        promptsByShot: Object.keys(promptsByShot).length,
+    .length,
         associatedShotId,
         imagesPerPrompt,
         beforeEachPromptText: beforeEachPromptText.substring(0, 20) + '...',
@@ -614,11 +555,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Helper to update prompts for the current shot
   const setPrompts = useCallback((newPrompts: PromptEntry[] | ((prev: PromptEntry[]) => PromptEntry[])) => {
-    console.log('[ImageGenerationForm] setPrompts called for shot:', effectiveShotId);
     setPromptsByShot(prev => {
       const currentPrompts = prev[effectiveShotId] || [];
       const updatedPrompts = typeof newPrompts === 'function' ? newPrompts(currentPrompts) : newPrompts;
-      console.log('[ImageGenerationForm] Updating prompts from', currentPrompts.length, 'to', updatedPrompts.length, 'for shot:', effectiveShotId);
       return {
         ...prev,
         [effectiveShotId]: updatedPrompts
@@ -717,12 +656,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Debug persistence state changes
   useEffect(() => {
-    console.log('[ImageGenerationForm] Persistence state - ready:', ready, 'isSaving:', isSaving, 'associatedShotId:', associatedShotId);
-    
     // Log what would be saved when isSaving becomes true
     if (isSaving) {
-      console.log('[ImageGenerationForm] Currently saving settings:', {
-        promptsByShot: JSON.stringify(promptsByShot),
+      ,
         associatedShotId,
         selectedProjectId,
         imagesPerPrompt,
@@ -734,18 +670,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Debug prompts changes
   useEffect(() => {
-    console.log('[ImageGenerationForm] Prompts for shot', effectiveShotId, ':', prompts.length, 'prompts');
     prompts.forEach((p, i) => {
-      console.log(`  Prompt ${i + 1}:`, p.fullPrompt.substring(0, 50) + (p.fullPrompt.length > 50 ? '...' : ''));
+      + (p.fullPrompt.length > 50 ? '...' : ''));
     });
   }, [effectiveShotId, prompts]);
 
   // Debug settings hydration
   useEffect(() => {
     if (ready) {
-      console.log('[ImageGenerationForm] Settings hydrated:', {
-        associatedShotId,
-        promptsByShot: JSON.stringify(promptsByShot, null, 2),
+      ,
         effectiveShotId,
         projectId: selectedProjectId,
       });
@@ -757,7 +690,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (associatedShotId && shots) {
       const shotExists = shots.some(shot => shot.id === associatedShotId);
       if (!shotExists) {
-        console.log('[ImageGenerationForm] Selected shot', associatedShotId, 'no longer exists, resetting to None');
         setAssociatedShotId(null);
         markAsInteracted();
       }
@@ -772,7 +704,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // Double-check that we still need to initialize after the delay
         setPromptsByShot(prev => {
           if (!prev[effectiveShotId] || prev[effectiveShotId].length === 0) {
-            console.log('[ImageGenerationForm] Initializing empty prompts for shot:', effectiveShotId);
             return {
               ...prev,
               [effectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
@@ -904,16 +835,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const originalUploadedUrl = await uploadImageToStorage(originalFile);
       
       // Generate and upload thumbnail for grid display
-      console.log('[ThumbnailDebug] Generating thumbnail for reference image...');
       let thumbnailUrl: string | null = null;
       try {
         const thumbnailResult = await generateClientThumbnail(originalFile, 300, 0.8);
-        console.log('[ThumbnailDebug] Thumbnail generated:', {
-          width: thumbnailResult.thumbnailWidth,
-          height: thumbnailResult.thumbnailHeight,
-          size: thumbnailResult.thumbnailBlob.size
-        });
-        
         // Upload thumbnail to storage
         const timestamp = Date.now();
         const randomString = Math.random().toString(36).substring(2, 10);
@@ -936,8 +860,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             .from('image_uploads')
             .getPublicUrl(thumbnailPath);
           thumbnailUrl = thumbnailUrlData.publicUrl;
-          console.log('[ThumbnailDebug] Thumbnail uploaded successfully:', thumbnailUrl);
-        }
+          }
       } catch (thumbnailError) {
         console.error('[ThumbnailDebug] Error generating thumbnail:', thumbnailError);
         // Use original as fallback
@@ -948,13 +871,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       let processedDataURL = dataURL;
       if (selectedProjectId) {
         const { aspectRatio } = await resolveProjectResolution(selectedProjectId);
-        console.log('[StyleRefDebug] Project resolution lookup returned aspectRatio:', aspectRatio);
         const processed = await processStyleReferenceForAspectRatioString(dataURL, aspectRatio);
         
         if (processed) {
           processedDataURL = processed;
-          console.log('[StyleRefDebug] Style reference processing completed successfully');
-        } else {
+          } else {
           console.error('[StyleRefDebug] Style reference processing failed');
           throw new Error('Failed to process image for aspect ratio');
         }
@@ -966,24 +887,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         throw new Error('Failed to convert processed image to file');
       }
       
-      console.log('[StyleRefDebug] Processed file details:', {
-        name: processedFile.name,
-        size: processedFile.size,
-        type: processedFile.type
-      });
-      
       // Check the actual dimensions of the processed file
       const tempImg = new Image();
       tempImg.onload = () => {
-        console.log('[StyleRefDebug] Processed file actual dimensions:', tempImg.width, 'x', tempImg.height);
-      };
+        };
       tempImg.src = processedDataURL;
       
       // Upload processed version to storage
-      console.log('[StyleRefDebug] About to upload processed file to storage...');
       const processedUploadedUrl = await uploadImageToStorage(processedFile);
-      console.log('[StyleRefDebug] Upload completed, URL:', processedUploadedUrl);
-      
       // Create a new reference
       const newReference: ReferenceImage = {
         id: nanoid(),
@@ -1001,8 +912,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         updatedAt: new Date().toISOString()
       };
       
-      console.log('[RefSettings] ➕ Creating new reference:', newReference);
-      
       // Optimistic UI update
       try {
         queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
@@ -1014,7 +923,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               [effectiveShotId]: newReference.id
             }
           };
-          console.log('[RefSettings] ⚡ Applied optimistic cache update for new reference', { next });
           return next;
         });
       } catch (e) {
@@ -1034,8 +942,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Optimistically reflect the original uploaded image for display
       setStyleReferenceOverride(originalUploadedUrl);
       
-      console.log('[RefSettings] ✅ Style reference upload completed successfully!');
-    } catch (error) {
+      } catch (error) {
       console.error('Error uploading style reference:', error);
       toast.error('Failed to upload reference image');
     } finally {
@@ -1045,8 +952,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Handle selecting a reference for the current shot
   const handleSelectReference = useCallback(async (referenceId: string) => {
-    console.log('[RefSettings] 🔀 Selecting reference for shot', effectiveShotId, ':', referenceId);
-    
     // Optimistic UI update
     const optimisticUpdate = {
       ...selectedReferenceIdByShot,
@@ -1059,7 +964,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           ...(prev || {}), 
           selectedReferenceIdByShot: optimisticUpdate
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference selection', { next });
         return next;
       });
     } catch (e) {
@@ -1075,7 +979,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Handle deleting a reference
   const handleDeleteReference = useCallback(async (referenceId: string) => {
-    console.log('[RefSettings] 🗑️ Deleting reference:', referenceId);
     const filteredReferences = references.filter(ref => ref.id !== referenceId);
     
     // Update all shot selections that had this reference selected
@@ -1095,7 +998,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           references: filteredReferences,
           selectedReferenceIdByShot: updatedSelections
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference deletion', { next });
         return next;
       });
     } catch (e) {
@@ -1113,7 +1015,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Handle updating a reference's name
   const handleUpdateReferenceName = useCallback(async (referenceId: string, name: string) => {
-    console.log('[RefSettings] ✏️ Updating reference name:', referenceId, name);
     const updatedReferences = references.map(ref =>
       ref.id === referenceId
         ? { ...ref, name, updatedAt: new Date().toISOString() }
@@ -1127,7 +1028,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           ...(prev || {}), 
           references: updatedReferences
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference name', { next });
         return next;
       });
     } catch (e) {
@@ -1143,7 +1043,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Handle updating a reference's settings
   const handleUpdateReference = useCallback(async (referenceId: string, updates: Partial<ReferenceImage>) => {
-    console.log('[RefSettings] 💾 Updating reference settings:', { referenceId, updates });
     const updatedReferences = references.map(ref =>
       ref.id === referenceId
         ? { ...ref, ...updates, updatedAt: new Date().toISOString() }
@@ -1152,14 +1051,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     // Log what we're about to save
     const updatedRef = updatedReferences.find(r => r.id === referenceId);
-    console.log('[RefSettings] 📤 Will save reference to DB:', {
-      id: updatedRef?.id,
-      name: updatedRef?.name,
-      referenceMode: updatedRef?.referenceMode,
-      styleStrength: updatedRef?.styleReferenceStrength,
-      subjectStrength: updatedRef?.subjectStrength
-    });
-    
     // Optimistic UI update
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
@@ -1167,8 +1058,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           ...(prev || {}), 
           references: updatedReferences
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference settings', { 
-          updatedRefInCache: updatedReferences.find(r => r.id === referenceId)
         });
         return next;
       });
@@ -1176,11 +1065,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.warn('[RefSettings] Failed to set optimistic cache data', e);
     }
     
-    console.log('[RefSettings] ⏳ Saving to database (debounced 300ms)...');
+    ...');
     await updateProjectImageSettings('project', {
       references: updatedReferences
     });
-    console.log('[RefSettings] ✅ Update call completed (actual DB write may still be pending due to debounce)');
+    ');
     markAsInteracted();
   }, [references, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
   
@@ -1192,13 +1081,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Handle model change
   const handleModelChange = useCallback(async (value: GenerationMode) => {
-    console.log('[ModelFlipIssue] onValueChange fired', {
-      from: selectedModel,
-      to: value,
-      serverModel: projectImageSettings?.selectedModel,
-      isUpdating: isSavingProjectSettings
-    });
-
     // Optimistic UI flip
     setModelOverride(value);
 
@@ -1206,7 +1088,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
         const next = { ...(prev || {}), selectedModel: value };
-        console.log('[ModelFlipIssue] Applied optimistic cache update for selectedModel', { next });
         return next;
       });
     } catch (e) {
@@ -1289,8 +1170,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   const handleReferenceModeChange = useCallback(async (mode: ReferenceMode) => {
     if (!selectedReferenceId) return;
-    console.log('[RefSettings] 🎯 User changed mode to:', mode);
-    
     // Build update object with mode AND auto-set strength values
     const updates: Partial<ReferenceImage> = {
       referenceMode: mode
@@ -1319,8 +1198,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.inThisSceneStrength = 1.0;
     }
     // For 'custom', don't auto-change strength values or inThisScene
-    
-    console.log('[RefSettings] 🎯 Batched update for mode change:', updates);
     
     // Optimistic local updates
     pendingReferenceModeUpdate.current = mode;
@@ -1405,8 +1282,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   };
   
   const handleGenerateAndQueue = useCallback((updatedPrompts: PromptEntry[]) => {
-    console.log('[ImageGenerationForm] Generate & Queue: Received', updatedPrompts.length, 'prompts, saving and queuing');
-    
     // Save the prompts to state for future use
     handleSavePromptsFromModal(updatedPrompts);
     
@@ -1435,8 +1310,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     // Debug: Log what style reference we're about to send
     if (styleReferenceImageGeneration) {
-      console.log('[ImageGenerationForm] Generate & Queue - Style reference being sent to task:', {
-        isUrl: styleReferenceImageGeneration.startsWith('http'),
+      ,
         isBase64: styleReferenceImageGeneration.startsWith('data:'),
         length: styleReferenceImageGeneration.length,
         preview: styleReferenceImageGeneration.substring(0, 100) + '...'
@@ -1474,8 +1348,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         in_this_scene_strength: currentInThisSceneStrength
       }),
     };
-
-    console.log('[ImageGenerationForm] Generate & Queue: Calling onGenerate with', activePrompts.length, 'prompts');
 
     // Legacy data structure for backward compatibility
     const legacyGenerationData = {
@@ -1535,8 +1407,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     // Debug: Log what style reference we're about to send
     if (styleReferenceImageGeneration) {
-      console.log('[ImageGenerationForm] Style reference being sent to task:', {
-        isUrl: styleReferenceImageGeneration.startsWith('http'),
+      ,
         isBase64: styleReferenceImageGeneration.startsWith('data:'),
         length: styleReferenceImageGeneration.length,
         preview: styleReferenceImageGeneration.substring(0, 100) + '...'
@@ -1579,13 +1450,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     };
 
     // Debug logging to verify steps parameter flow
-    console.log('[StepsDebug] Form submission debug:', {
-      selectedModel,
-      isLocalGenerationEnabled,
-      userSelectedSteps: steps,
-      finalStepsInBatchParams: batchTaskParams.steps,
-      logic: isLocalGenerationEnabled ? 'Using user-selected steps for local generation' : 'Using backend defaults for cloud generation',
-      timestamp: Date.now()
     });
 
     // Legacy data structure for backward compatibility with existing onGenerate handler
@@ -1684,44 +1548,28 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Handle shot change with proper prompt initialization
   const handleShotChange = (value: string) => {
-    console.log('[ShotChangeDebug] 🔄 handleShotChange called:', {
-      fromShotId: associatedShotId,
-      toValue: value,
-      hasOnShotChangeCallback: !!onShotChange,
-      timestamp: Date.now()
     });
     
     markAsInteracted();
     const newShotId = value === "none" ? null : value;
     
-    console.log('[ShotChangeDebug] 📝 Setting new shot ID:', {
-      newShotId,
-      previousShotId: associatedShotId,
-      valueWasNone: value === "none"
-    });
-    
     setAssociatedShotId(newShotId);
     
     // Call the parent callback if provided
     if (onShotChange) {
-      console.log('[ShotChangeDebug] 📞 Calling parent onShotChange callback with:', newShotId);
       onShotChange(newShotId);
-      console.log('[ShotChangeDebug] ✅ Parent callback called successfully');
-    } else {
-      console.log('[ShotChangeDebug] ❌ No onShotChange callback provided');
-    }
+      } else {
+      }
     
     // Initialize prompts for the new shot if they don't exist
     const newEffectiveShotId = newShotId || 'none';
     if (!promptsByShot[newEffectiveShotId]) {
-      console.log('[ImageGenerationForm] Initializing prompts for shot:', newEffectiveShotId);
       setPromptsByShot(prev => ({
         ...prev,
         [newEffectiveShotId]: [{ id: generatePromptId(), fullPrompt: "", shortPrompt: "" }]
       }));
     } else {
-      console.log('[ImageGenerationForm] Shot', newEffectiveShotId, 'already has', promptsByShot[newEffectiveShotId]?.length, 'prompts');
-    }
+      }
   };
 
   // This large effect syncs the entire form state from either the selected reference or project settings
@@ -1730,7 +1578,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
     // When a reference image is selected, sync the form state to match its settings
     if (selectedReference) {
-      console.log('[RefSettings] Syncing state from selected reference:', selectedReference.name);
       setStyleReferenceStrength(selectedReference.styleReferenceStrength);
       setSubjectStrength(selectedReference.subjectStrength);
       setSubjectDescription(selectedReference.subjectDescription);

@@ -112,10 +112,7 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   // CONDITIONAL RENDERING (SAFE NOW THAT ALL HOOKS ARE CALLED)
   // ============================================================================
   
-  console.log(`[DEBUG] Checking images condition - images.length=${props.images?.length} selectedIds.length=${selection.selectedIds.length}`);
-  
   if (!props.images || props.images.length === 0) {
-    console.log(`[DEBUG] EARLY RETURN - No images`);
     return (
       <EmptyState
         onImageUpload={props.onImageUpload}
@@ -124,10 +121,7 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
     );
   }
   
-  console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${props.generationMode} selectedIds.length=${selection.selectedIds.length}`);
-  
   if (isMobile && props.generationMode === 'batch') {
-    console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
     return (
       <ShotImageManagerMobileWrapper
         {...props}

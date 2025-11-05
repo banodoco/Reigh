@@ -386,7 +386,6 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                         variant="destructive"
                                         size="sm"
                                         onClick={() => {
-                                          console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
                                           onRemoveLora(lora["Model ID"]);
                                         }}
                                       >
@@ -457,7 +456,6 @@ const CommunityLorasTab: React.FC<CommunityLorasTabProps & {
                                     variant="destructive"
                                     size="sm"
                                     onClick={() => {
-                                      console.log('[LoraRemovalDebug] Remove button clicked in LoraSelectorModal for LoRA:', { id: lora["Model ID"], name: lora.Name });
                                       onRemoveLora(lora["Model ID"]);
                                     }}
                                   >

@@ -143,7 +143,6 @@ export const useGenerationActions = ({
         }
 
         // Generate client-side thumbnail
-        console.log(`[ThumbnailGenDebug] Starting client-side thumbnail generation for ${file.name}`);
         let thumbnailUrl = '';
         let finalImageUrl = '';
         
@@ -157,15 +156,14 @@ export const useGenerationActions = ({
 
           // Generate thumbnail client-side
           const thumbnailResult = await generateClientThumbnail(fileToUpload, 300, 0.8);
-          console.log(`[ThumbnailGenDebug] Generated thumbnail: ${thumbnailResult.thumbnailWidth}x${thumbnailResult.thumbnailHeight} (original: ${thumbnailResult.originalWidth}x${thumbnailResult.originalHeight})`);
+          `);
           
           // Upload both main image and thumbnail
           const uploadResult = await uploadImageWithThumbnail(fileToUpload, thumbnailResult.thumbnailBlob, userId);
           finalImageUrl = croppedImageUrl ? getDisplayUrl(uploadResult.imageUrl) : uploadResult.imageUrl;
           thumbnailUrl = uploadResult.thumbnailUrl;
           
-          console.log(`[ThumbnailGenDebug] Upload complete - Image: ${finalImageUrl}, Thumbnail: ${thumbnailUrl}`);
-        } catch (thumbnailError) {
+          } catch (thumbnailError) {
           console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${file.name}:`, thumbnailError);
           // Fallback to original upload flow without thumbnail
           const imageUrl = await uploadImageToStorage(fileToUpload);
@@ -317,8 +315,7 @@ export const useGenerationActions = ({
       return;
     }
 
-    console.log('[OPTIMISTIC_DELETE] Parent handling optimistic removal from timeline', {
-      shotImageEntryId: shotImageEntryId.substring(0, 8),
+    ,
       currentCount: state.localOrderedShotImages.length
     });
 
@@ -335,7 +332,6 @@ export const useGenerationActions = ({
     }, {
       onError: () => {
         // Rollback on error
-        console.log('[OPTIMISTIC_DELETE] Rolling back optimistic removal');
         actions.setLocalOrderedShotImages(orderedShotImages);
         skipNextSyncRef.current = false;
       }
@@ -347,8 +343,7 @@ export const useGenerationActions = ({
       return;
     }
 
-    console.log('[OPTIMISTIC_DELETE] Parent handling batch optimistic removal from timeline', {
-      idsToRemove: shotImageEntryIds.map(id => id.substring(0, 8)),
+    ),
       totalCount: shotImageEntryIds.length,
       currentCount: state.localOrderedShotImages.length
     });
@@ -370,10 +365,8 @@ export const useGenerationActions = ({
 
     try {
       await Promise.all(removePromises);
-      console.log('[OPTIMISTIC_DELETE] Batch removal completed successfully');
-    } catch (error) {
+      } catch (error) {
       // Rollback on error
-      console.log('[OPTIMISTIC_DELETE] Rolling back batch optimistic removal');
       actions.setLocalOrderedShotImages(orderedShotImages);
       skipNextSyncRef.current = false;
       toast.error('Failed to remove some images from timeline');
@@ -381,8 +374,7 @@ export const useGenerationActions = ({
   }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages, state.localOrderedShotImages, skipNextSyncRef]);
 
   const handleDuplicateImage = useCallback(async (shotImageEntryId: string, timeline_frame: number) => {
-    console.log('[DUPLICATE_DEBUG] 🚀 DUPLICATE BUTTON CLICKED:', {
-      shotImageEntryId: shotImageEntryId.substring(0, 8),
+    ,
       timeline_frame,
       timestamp: Date.now(),
       source: 'timeline_duplicate_button'
@@ -400,8 +392,7 @@ export const useGenerationActions = ({
     }
     const generationId = originalImage.id;
     
-    console.log('[DUPLICATE_DEBUG] 📍 FOUND ORIGINAL IMAGE IN LOCAL STATE:', {
-      shotImageEntryId: shotImageEntryId.substring(0, 8),
+    ,
       generationId: generationId.substring(0, 8),
       timeline_frame_from_button: timeline_frame,
       timeline_frame_from_image: (originalImage as any).timeline_frame,
@@ -422,8 +413,7 @@ export const useGenerationActions = ({
       // Place duplicate right after the original for mobile batch view
     };
 
-    console.log('[OPTIMISTIC_DUPLICATE] Adding optimistic duplicate for mobile', {
-      originalId: shotImageEntryId.substring(0, 8),
+    ,
       tempDuplicateId: tempDuplicateId.substring(0, 8),
       currentImagesCount: state.localOrderedShotImages.length
     });
@@ -440,8 +430,7 @@ export const useGenerationActions = ({
     // Position is now computed from timeline_frame, so we don't need to calculate it
     // The useDuplicateImageInShot hook will calculate the timeline_frame midpoint
     
-    console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
-      originalTimelineFrame: (originalImage as any).timeline_frame
+    .timeline_frame
     });
 
     duplicateImageInShotMutation.mutate({
@@ -451,8 +440,6 @@ export const useGenerationActions = ({
       project_id: projectId,
     }, {
       onSuccess: (result) => {
-        console.log('[DUPLICATE] Duplicate mutation successful', result);
-        
         // Replace optimistic duplicate with real data
         const updatedImages = state.localOrderedShotImages.map(img => 
           img.shotImageEntryId === tempDuplicateId ? {
@@ -489,15 +476,6 @@ export const useGenerationActions = ({
    * This is now a clean orchestration function using extracted helpers
    */
   const handleTimelineImageDrop = useCallback(async (files: File[], targetFrame?: number) => {
-    console.log('[AddImagesDebug] 🎯 handleTimelineImageDrop called:', {
-      filesCount: files.length,
-      targetFrame,
-      targetFrameProvided: targetFrame !== undefined,
-      shotId: selectedShot?.id,
-      projectId,
-      batchVideoFrames
-    });
-
     if (!selectedShot?.id || !projectId) {
       toast.error("Cannot add images: No shot or project selected.");
       return;
@@ -517,7 +495,7 @@ export const useGenerationActions = ({
       );
       
       // 2. Upload images to shot
-      console.log('[AddImagesDebug] 📤 Uploading images to shot (WITHOUT auto-positioning)...');
+      ...');
       const result = await handleExternalImageDropMutation.mutateAsync({
         imageFiles: processedFiles,
         targetShotId: selectedShot.id,
@@ -525,31 +503,18 @@ export const useGenerationActions = ({
         currentShotCount: 0, // Not needed when adding to existing shot
         skipAutoPosition: true, // CRITICAL: Skip auto-positioning so we can set positions ourselves
         onProgress: (fileIndex, fileProgress, overallProgress) => {
-          console.log(`[UploadProgress] File ${fileIndex + 1}/${processedFiles.length}: ${fileProgress}% (Overall: ${overallProgress}%)`);
+          `);
         }
-      });
-
-      console.log('[AddImagesDebug] 📥 Upload result:', {
-        hasResult: !!result,
-        generationIds: result?.generationIds,
-        generationIdsCount: result?.generationIds?.length
       });
 
       // 3. Set pending positions for new images
       if (result?.generationIds?.length > 0) {
-        console.log('[AddImagesDebug] 🎯 Setting pending positions, targetFrame:', {
-          provided: targetFrame,
-          willCalculate: targetFrame === undefined
-        });
-
         // Calculate target frame if not provided
         const calculatedTargetFrame = await calculateNextAvailableFrame(
           selectedShot.id,
           targetFrame
         );
         
-        console.log('[AddImagesDebug] 🎯 Final calculatedTargetFrame:', calculatedTargetFrame);
-
         // Create position map for new images
         const newPending = createPositionMap(
           result.generationIds,
@@ -563,11 +528,7 @@ export const useGenerationActions = ({
           ...Array.from(newPending.entries())
         ]);
         
-        console.log('[AddImagesDebug] 💾 Set pending positions:', {
-          newPendingCount: newPending.size,
-          existingPendingCount: state.pendingFramePositions.size,
-          combinedCount: combined.size,
-          combined: Array.from(combined.entries()).map(([id, pos]) => ({
+        ).map(([id, pos]) => ({
             id: id.substring(0, 8),
             position: pos
           }))
@@ -583,15 +544,11 @@ export const useGenerationActions = ({
           batchVideoFrames
         );
       } else {
-        console.log('[AddImagesDebug] ⚠️ No generation IDs returned from upload, not setting positions');
-      }
+        }
 
       // 5. Refresh the shot data, which will trigger Timeline to update
-      console.log('[AddImagesDebug] 🔄 Calling onShotImagesUpdate to refresh...');
       onShotImagesUpdate();
-      console.log('[AddImagesDebug] ✅ handleTimelineImageDrop complete');
-      
-    } catch (error) {
+      } catch (error) {
       console.error('[AddImagesDebug] ❌ Error adding images to timeline:', error);
       // Let Timeline component handle the error display via re-throw
       throw error; 
@@ -622,8 +579,7 @@ export const useGenerationActions = ({
     thumbUrl: string | undefined, 
     targetFrame?: number
   ) => {
-    console.log('[GenerationDrop] 🎯 handleTimelineGenerationDrop called:', {
-      generationId: generationId?.substring(0, 8),
+    ,
       targetFrame,
       targetFrameProvided: targetFrame !== undefined,
       shotId: selectedShot?.id,
@@ -641,8 +597,6 @@ export const useGenerationActions = ({
     }
 
     try {
-      console.log('[GenerationDrop] 📤 Adding generation to shot...');
-      
       // Add the generation to the shot using the existing mutation
       // The addImageToShot API will handle creating the shot_image_entry
       await addImageToShotMutation.mutateAsync({
@@ -654,13 +608,10 @@ export const useGenerationActions = ({
         project_id: projectId
       });
       
-      console.log('[GenerationDrop] ✅ Generation added successfully, refreshing shot data...');
-      
       // Refresh shot data
       await onShotImagesUpdate();
       
-      console.log('[GenerationDrop] ✅ handleTimelineGenerationDrop complete');
-    } catch (error) {
+      } catch (error) {
       console.error('[GenerationDrop] ❌ Error adding generation to timeline:', error);
       toast.error(`Failed to add generation: ${(error as Error).message}`);
       throw error;
@@ -676,17 +627,9 @@ export const useGenerationActions = ({
     targetPosition?: number,
     framePosition?: number
   ) => {
-    console.log('[BatchDropPositionIssue] 🎯 handleBatchImageDrop ENTRY:', {
-      filesCount: files.length,
-      targetPosition,
-      framePosition,
-      shotId: selectedShot?.id,
-      projectId,
-      timestamp: Date.now()
     });
 
     if (!selectedShot?.id || !projectId) {
-      console.log('[BatchDropPositionIssue] ❌ MISSING SHOT OR PROJECT:', { shotId: selectedShot?.id, projectId });
       toast.error("Cannot add images: No shot or project selected.");
       return;
     }
@@ -694,8 +637,6 @@ export const useGenerationActions = ({
     try {
       // Set uploading state
       actions.setUploadingImage(true);
-      console.log('[BatchDropPositionIssue] 📤 UPLOAD STARTING...');
-      
       // Crop images to shot aspect ratio before uploading
       let processedFiles = files;
       
@@ -721,11 +662,9 @@ export const useGenerationActions = ({
           });
           
           processedFiles = await Promise.all(cropPromises);
-          console.log('[BatchDropPositionIssue] ✂️ CROPS COMPLETED:', { processedCount: processedFiles.length });
-        }
+          }
       }
       
-      console.log('[BatchDropPositionIssue] 📤 CALLING UPLOAD MUTATION...');
       const result = await handleExternalImageDropMutation.mutateAsync({
         imageFiles: processedFiles,
         targetShotId: selectedShot.id,
@@ -734,23 +673,18 @@ export const useGenerationActions = ({
         skipAutoPosition: true
       });
       
-      console.log('[BatchDropPositionIssue] ✅ MUTATION COMPLETED - GOT RESULT:', {
-        hasResult: !!result,
-        resultKeys: result ? Object.keys(result) : [],
+      : [],
         timestamp: Date.now()
       });
       
-      console.log('[BatchDropPositionIssue] 📥 UPLOAD RESULT:', {
-        hasResult: !!result,
-        generationIds: result?.generationIds?.map(id => id.substring(0, 8)),
+      ),
         generationIdsCount: result?.generationIds?.length,
         timestamp: Date.now()
       });
       
       // Update frame positions for the newly uploaded images
       if (result?.generationIds?.length > 0 && framePosition !== undefined) {
-        console.log('[BatchDropPositionIssue] 🎯 SETTING PENDING POSITIONS:', {
-          generationIds: result.generationIds.map(id => id.substring(0, 8)),
+        ),
           startFrame: framePosition,
           count: result.generationIds.length,
         });
@@ -759,18 +693,15 @@ export const useGenerationActions = ({
         result.generationIds.forEach((id, i) => {
           const newFrame = framePosition + i;
           newPendingPositions.set(id, newFrame);
-          console.log('[BatchDropPositionIssue] 📍 PENDING POSITION:', {
-            generationId: id.substring(0, 8),
+          ,
             index: i,
             frame: newFrame
           });
         });
         
-        console.log('[BatchDropPositionIssue] 💾 CALLING setPendingFramePositions...');
         actions.setPendingFramePositions(new Map([...state.pendingFramePositions, ...newPendingPositions]));
         
         // NOW: Directly update the database with these frame positions (like timeline does)
-        console.log('[BatchDropPositionIssue] 🔄 QUERYING FOR shot_generations RECORDS...');
         try {
           const { data: shotGenRecords, error: queryError } = await supabase
             .from('shot_generations')
@@ -778,11 +709,7 @@ export const useGenerationActions = ({
             .eq('shot_id', selectedShot.id)
             .in('generation_id', result.generationIds);
           
-          console.log('[BatchDropPositionIssue] 📋 QUERY RESULT:', {
-            hasError: !!queryError,
-            recordCount: shotGenRecords?.length,
-            records: shotGenRecords?.map(r => ({
-              shotGenId: r.id.substring(0, 8),
+          ,
               generationId: r.generation_id.substring(0, 8),
               currentFrame: (r as any).timeline_frame
             }))
@@ -803,18 +730,13 @@ export const useGenerationActions = ({
               .eq('shot_id', selectedShot.id)
               .in('generation_id', result.generationIds);
             
-            console.log('[BatchDropPositionIssue] 🔄 RETRY QUERY:', {
-              hasError: !!retryError,
-              recordCount: retryRecords?.length
-            });
-            
             if (retryError || !retryRecords || retryRecords.length === 0) {
               console.error('[BatchDropPositionIssue] ❌ STILL NO RECORDS AFTER RETRY');
               return;
             }
             
             // Use retry records
-            console.log('[BatchDropPositionIssue] 📤 UPDATING RECORDS (RETRY PATH)...');
+            ...');
             const updatePromises = result.generationIds.map(async (genId, index) => {
               const shotGenRecord = retryRecords.find(r => r.generation_id === genId);
               if (!shotGenRecord) {
@@ -823,8 +745,7 @@ export const useGenerationActions = ({
               }
               
               const frameValue = framePosition + index;
-              console.log('[BatchDropPositionIssue] 💾 UPDATING:', {
-                shotGenId: shotGenRecord.id.substring(0, 8),
+              ,
                 generationId: genId.substring(0, 8),
                 frameValue
               });
@@ -839,8 +760,7 @@ export const useGenerationActions = ({
                 return { success: false, genId, error: updateError };
               }
               
-              console.log('[BatchDropPositionIssue] ✅ UPDATED:', {
-                generationId: genId.substring(0, 8),
+              ,
                 frameValue
               });
               
@@ -848,7 +768,7 @@ export const useGenerationActions = ({
             });
             
             const updateResults = await Promise.all(updatePromises);
-            console.log('[BatchDropPositionIssue] 📊 UPDATE RESULTS (RETRY):', {
+            :', {
               total: updateResults.length,
               successful: updateResults.filter(r => r.success).length,
               failed: updateResults.filter(r => !r.success).length
@@ -858,7 +778,6 @@ export const useGenerationActions = ({
           }
           
           // Update all records
-          console.log('[BatchDropPositionIssue] 📤 UPDATING RECORDS...');
           const updatePromises = result.generationIds.map(async (genId, index) => {
             const shotGenRecord = shotGenRecords.find(r => r.generation_id === genId);
             if (!shotGenRecord) {
@@ -867,8 +786,7 @@ export const useGenerationActions = ({
             }
             
             const frameValue = framePosition + index;
-            console.log('[BatchDropPositionIssue] 💾 UPDATING:', {
-              shotGenId: shotGenRecord.id.substring(0, 8),
+            ,
               generationId: genId.substring(0, 8),
               frameValue
             });
@@ -883,8 +801,7 @@ export const useGenerationActions = ({
               return { success: false, genId, error: updateError };
             }
             
-            console.log('[BatchDropPositionIssue] ✅ UPDATED:', {
-              generationId: genId.substring(0, 8),
+            ,
               frameValue
             });
             
@@ -892,9 +809,7 @@ export const useGenerationActions = ({
           });
           
           const updateResults = await Promise.all(updatePromises);
-          console.log('[BatchDropPositionIssue] 📊 UPDATE RESULTS:', {
-            total: updateResults.length,
-            successful: updateResults.filter(r => r.success).length,
+          .length,
             failed: updateResults.filter(r => !r.success).length,
             details: updateResults.map(r => ({
               generationId: r.genId.substring(0, 8),
@@ -907,25 +822,17 @@ export const useGenerationActions = ({
           console.error('[BatchDropPositionIssue] ❌ DATABASE UPDATE ERROR:', dbError);
         }
       } else {
-        console.log('[BatchDropPositionIssue] ⚠️ SKIPPING PENDING POSITIONS:', {
-          hasGenerationIds: !!result?.generationIds?.length,
-          framePositionDefined: framePosition !== undefined,
-          framePosition
-        });
-      }
+        }
       
-      console.log('[BatchDropPositionIssue] 🔄 CALLING onShotImagesUpdate...');
       await onShotImagesUpdate();
       
-      console.log('[BatchDropPositionIssue] ✅ handleBatchImageDrop COMPLETE');
-    } catch (error) {
+      } catch (error) {
       console.error('[BatchDropPositionIssue] ❌ ERROR:', error);
       toast.error(`Failed to add images: ${(error as Error).message}`);
       throw error;
     } finally {
       actions.setUploadingImage(false);
-      console.log('[BatchDropPositionIssue] 🏁 UPLOAD STATE CLEARED');
-    }
+      }
   }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, onShotImagesUpdate, state.pendingFramePositions]);
 
   /**
@@ -939,8 +846,7 @@ export const useGenerationActions = ({
     targetPosition?: number,
     framePosition?: number
   ) => {
-    console.log('[BatchDrop] 🎯 handleBatchGenerationDrop called:', {
-      generationId: generationId?.substring(0, 8),
+    ,
       targetPosition,
       framePosition,
       shotId: selectedShot?.id,
@@ -958,7 +864,7 @@ export const useGenerationActions = ({
     }
 
     try {
-      console.log('[BatchDrop] 📤 Adding generation to shot (batch mode)...');
+      ...');
       
       // Add the generation to the shot at the specified position
       await addImageToShotMutation.mutateAsync({
@@ -971,13 +877,10 @@ export const useGenerationActions = ({
         timelineFrame: framePosition ?? targetPosition, // Prefer framePosition, fall back to targetPosition
       });
       
-      console.log('[BatchDrop] ✅ Generation added successfully, refreshing shot data...');
-      
       // Refresh shot data
       await onShotImagesUpdate();
       
-      console.log('[BatchDrop] ✅ handleBatchGenerationDrop complete');
-    } catch (error) {
+      } catch (error) {
       console.error('[BatchDrop] ❌ Error adding generation to batch:', error);
       toast.error(`Failed to add generation: ${(error as Error).message}`);
       throw error;

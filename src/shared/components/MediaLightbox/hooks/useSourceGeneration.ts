@@ -26,31 +26,20 @@ export const useSourceGeneration = ({
     const basedOnFromMetadata = (media.metadata as any)?.based_on;
     const effectMediaKeys = Object.keys(media);
     
-    console.log('[BasedOnDebug] 🔍 useSourceGeneration hook checking media:');
-    console.log('  mediaId:', media.id.substring(0, 8));
-    console.log('  hasBasedOnField:', !!basedOnId);
-    console.log('  basedOnValue:', basedOnId);
-    console.log('  hasBasedOnInMetadata:', !!basedOnFromMetadata);
-    console.log('  basedOnInMetadata:', basedOnFromMetadata);
-    console.log('  hasOnOpenExternalGeneration:', !!onOpenExternalGeneration);
-    console.log('  mediaType:', media.type);
-    console.log('  mediaKeys:', effectMediaKeys);
-    console.log('  hasBasedOnInKeys:', effectMediaKeys.includes('based_on'));
-    console.log('  willFetchSource:', !!basedOnId || !!basedOnFromMetadata);
-    console.log('  timestamp:', Date.now());
+    );
+    );
+    );
     
     // Check both direct field and metadata
     const effectiveBasedOnId = basedOnId || basedOnFromMetadata;
     
     if (!effectiveBasedOnId) {
-      console.log('[BasedOnDebug] ⚠️ No based_on ID found, setting sourceGenerationData to null');
       setSourceGenerationData(null);
       return;
     }
     
     const fetchSourceGeneration = async () => {
-      console.log('[BasedOnDebug] 📥 Fetching source generation:', {
-        currentMediaId: media.id.substring(0, 8),
+      ,
         basedOnId: effectiveBasedOnId.substring(0, 8),
         timestamp: Date.now()
       });
@@ -76,8 +65,7 @@ export const useSourceGeneration = ({
           // Extract shot associations from joined data
           const shotAssociations = (data as any).shot_generations || [];
           
-          console.log('[BasedOnDebug] ✅ Fetched source generation:', {
-            sourceId: data.id.substring(0, 8),
+          ,
             type: data.type,
             location: data.location?.substring(0, 50),
             shotAssociationsCount: shotAssociations.length,
@@ -96,7 +84,6 @@ export const useSourceGeneration = ({
           
           setSourceGenerationData(enrichedData as any);
         } else {
-          console.log('[BasedOnDebug] ⚠️ No data returned from query');
           setSourceGenerationData(null);
         }
       } catch (error) {

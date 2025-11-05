@@ -14,7 +14,7 @@ import { GenerationRow, TimelineGenerationRow } from '@/types/shots';
  * const timelineImages = allImages.filter(isTimelineGeneration);
  * // TypeScript now knows timelineImages have metadata and timeline_frame
  * timelineImages.forEach(img => {
- *   console.log(img.metadata.pair_prompt); // No type error!
+ *   // No type error!
  * });
  * ```
  */

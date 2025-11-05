@@ -84,8 +84,7 @@ export const useInpainting = ({
   handleExitInpaintMode,
   loras,
 }: UseInpaintingProps): UseInpaintingReturn => {
-  console.log('[InpaintDebug] 🎣 useInpainting hook received props:', {
-    shotId: shotId?.substring(0, 8),
+  ,
     toolTypeOverride,
     selectedProjectId: selectedProjectId?.substring(0, 8),
     mediaId: media.id.substring(0, 8)
@@ -134,7 +133,7 @@ export const useInpainting = ({
       
       const savedMode = (data?.params as any)?.ui?.editMode;
       if (savedMode && ['text', 'inpaint', 'annotate'].includes(savedMode)) {
-        console.log('[EditMode] ✅ Loaded from DB:', { generationId: generationId.substring(0, 8), mode: savedMode });
+        , mode: savedMode });
         return savedMode as 'text' | 'inpaint' | 'annotate';
       }
       
@@ -178,7 +177,7 @@ export const useInpainting = ({
       if (updateError) {
         console.warn('[EditMode] Failed to save edit mode to DB:', updateError);
       } else {
-        console.log('[EditMode] 💾 Saved to DB:', { generationId: generationId.substring(0, 8), mode });
+        , mode });
       }
     } catch (err) {
       console.warn('[EditMode] Error saving to DB:', err);
@@ -208,12 +207,6 @@ export const useInpainting = ({
   // Computed: current brush strokes based on mode (memoized to prevent redraw loops)
   const brushStrokes = useMemo(() => {
     const strokes = editMode === 'annotate' ? annotationStrokes : editMode === 'inpaint' ? inpaintStrokes : [];
-    console.log('[InpaintRender] 🎨 brushStrokes recomputed', {
-      mode: editMode,
-      inpaintCount: inpaintStrokes.length,
-      annotationCount: annotationStrokes.length,
-      activeCount: strokes.length,
-      mediaId: media.id.substring(0, 8)
     });
     return strokes;
   }, [editMode, annotationStrokes, inpaintStrokes, media.id]);
@@ -279,7 +272,7 @@ export const useInpainting = ({
     const oldMediaId = prevMediaIdRef.current;
     const newMediaId = media.id;
     
-    console.log('[Media] 🔄 Media switching (synchronous)', { 
+    ', { 
       from: oldMediaId.substring(0, 8), 
       to: newMediaId.substring(0, 8) 
     });
@@ -288,7 +281,7 @@ export const useInpainting = ({
     if (transitionRafRef.current !== null) {
       cancelAnimationFrame(transitionRafRef.current);
       transitionRafRef.current = null;
-      console.log('[Media] ⚠️ Cancelled pending transition callback (rapid switching)');
+      ');
     }
     
     // Set transition flag to prevent canvas scaling mid-swap
@@ -298,7 +291,7 @@ export const useInpainting = ({
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
-      console.log('[Media] ⚠️ Cancelled pending save (media switching)');
+      ');
     }
     
     // 1. Save current media's state to cache before switching
@@ -317,8 +310,7 @@ export const useInpainting = ({
         numGenerations: currentNumGenerations,
         brushSize: currentBrushSize,
       });
-      console.log('[Media] 💾 Cached state for old media', { 
-        mediaId: oldMediaId.substring(0, 8),
+      ,
         inpaintCount: currentInpaintStrokes.length,
         annotationCount: currentAnnotationStrokes.length
       });
@@ -328,13 +320,10 @@ export const useInpainting = ({
     setInpaintStrokes([]);
     setAnnotationStrokes([]);
     setSelectedShapeId(null);
-    console.log('[Media] 🧹 Cleared stroke state');
-    
     // 3. Try to load from in-memory cache first (instant, no flicker)
     const cached = mediaStrokeCacheRef.current.get(newMediaId);
     if (cached) {
-      console.log('[Media] ✅ Loaded from in-memory cache', { 
-        mediaId: newMediaId.substring(0, 8),
+      ,
         inpaintCount: cached.inpaintStrokes.length,
         annotationCount: cached.annotationStrokes.length
       });
@@ -360,21 +349,19 @@ export const useInpainting = ({
           
           hydratedMediaIdsRef.current.add(newMediaId);
           
-          console.log('[Media] ✅ Loaded from localStorage', { 
-            mediaId: newMediaId.substring(0, 8),
+          ,
             inpaintCount: loadedInpaintStrokes.length,
             annotationCount: loadedAnnotationStrokes.length
           });
         } else {
-          console.log('[Media] ℹ️ No localStorage data for new media', { mediaId: newMediaId.substring(0, 8) });
+          });
         }
       } catch (e) {
         console.warn('[Media] ⚠️ Failed to load from localStorage, starting fresh', e);
         // Continue with empty arrays (already set above)
       }
     } else {
-      console.log('[Media] ℹ️ No cached data, starting with empty state', { 
-        mediaId: newMediaId.substring(0, 8),
+      ,
         isInpaintMode,
         alreadyHydrated: hydratedMediaIdsRef.current.has(newMediaId)
       });
@@ -385,13 +372,13 @@ export const useInpainting = ({
     const savedState = mediaStateRef.current.get(newMediaId);
     if (savedState) {
       // Found in memory cache
-      console.log('[Media] Restoring UI state from cache', { mediaId: newMediaId.substring(0, 8), savedState });
+      , savedState });
       setEditModeInternal(savedState.editMode);
       setAnnotationModeInternal(savedState.annotationMode);
       lastUsedEditModeRef.current = savedState.editMode; // Update last used
     } else {
       // Not in cache - try loading from database
-      console.log('[Media] No cached UI state, loading from database', { mediaId: newMediaId.substring(0, 8) });
+      });
       
       // Load asynchronously to avoid blocking UI
       loadEditModeFromDB(newMediaId).then(dbMode => {
@@ -399,15 +386,14 @@ export const useInpainting = ({
         if (prevMediaIdRef.current === newMediaId) {
           if (dbMode) {
             // Found in database
-            console.log('[Media] ✅ Loaded edit mode from DB', { mediaId: newMediaId.substring(0, 8), mode: dbMode });
+            , mode: dbMode });
             setEditModeInternal(dbMode);
             lastUsedEditModeRef.current = dbMode;
             mediaStateRef.current.set(newMediaId, { editMode: dbMode, annotationMode: null });
           } else {
             // Not in database - inherit from last used or default to 'text'
             const inheritedMode = lastUsedEditModeRef.current;
-            console.log('[Media] 🔄 Inheriting edit mode', { 
-              mediaId: newMediaId.substring(0, 8), 
+            , 
               mode: inheritedMode,
               source: 'last-used'
             });
@@ -441,10 +427,9 @@ export const useInpainting = ({
       // Double-check we're still on the same media (prevent race with rapid switching)
       if (prevMediaIdRef.current === newMediaId) {
         isMediaTransitioningRef.current = false;
-        console.log('[Media] ✅ Transition complete', { mediaId: newMediaId.substring(0, 8) });
+        });
       } else {
-        console.log('[Media] ⚠️ Media changed during rAF, keeping transition flag', {
-          expected: newMediaId.substring(0, 8),
+        ,
           current: prevMediaIdRef.current.substring(0, 8)
         });
       }
@@ -452,15 +437,6 @@ export const useInpainting = ({
     });
   }, [media.id, isInpaintMode, loadEditModeFromDB, saveEditModeToDB]); // FIXED: Removed stroke state from deps (only trigger on media.id/mode changes)
   
-  console.log('[InpaintPaint] 🔍 Hook initialized with refs', {
-    hasDisplayCanvasRef: !!displayCanvasRef,
-    hasDisplayCanvas: !!displayCanvasRef?.current,
-    hasMaskCanvasRef: !!maskCanvasRef,
-    hasMaskCanvas: !!maskCanvasRef?.current,
-    hasImageContainerRef: !!imageContainerRef,
-    hasImageContainer: !!imageContainerRef?.current
-  });
-
   // Load saved settings from localStorage ONLY when entering inpaint mode for the first time
   // (media changes are handled by useLayoutEffect above, which uses cache first)
   useEffect(() => {
@@ -487,13 +463,12 @@ export const useInpainting = ({
           
           hydratedMediaIdsRef.current.add(media.id);
           
-          console.log('[Inpaint] ✅ Hydrated on mode enter', { 
-            mediaId: media.id.substring(0, 8),
+          ,
             inpaintCount: loadedInpaintStrokes.length,
             annotationCount: loadedAnnotationStrokes.length
           });
         } else {
-          console.log('[Inpaint] ℹ️ No localStorage data on mode enter', { mediaId: media.id.substring(0, 8) });
+          });
         }
       } catch (e) {
         console.warn('[Inpaint] ⚠️ Hydration failed on mode enter, starting fresh', e);
@@ -527,8 +502,7 @@ export const useInpainting = ({
           savedAt: Date.now()
       };
       localStorage.setItem(`inpaint-data-${mediaIdAtSaveTime}`, JSON.stringify(data));
-      console.log('[Inpaint] 💾 Saved to localStorage', { 
-        mediaId: mediaIdAtSaveTime.substring(0, 8),
+      ,
         inpaintCount: inpaintStrokesAtSaveTime.length,
         annotationCount: annotationStrokesAtSaveTime.length
       });
@@ -581,13 +555,6 @@ export const useInpainting = ({
     const scaleX = newWidth / oldWidth;
     const scaleY = newHeight / oldHeight;
     
-    console.log('[InpaintResize] Scaling strokes', {
-      oldSize: { width: oldWidth, height: oldHeight },
-      newSize: { width: newWidth, height: newHeight },
-      scale: { x: scaleX, y: scaleY },
-      strokeCount: strokes.length
-    });
-    
     return strokes.map(stroke => ({
       ...stroke,
       points: stroke.points.map(point => ({
@@ -602,7 +569,6 @@ export const useInpainting = ({
   useEffect(() => {
     // Skip if we're in the middle of a media transition (prevents accidental scaling)
     if (isMediaTransitioningRef.current) {
-      console.log('[InpaintCanvas] ⏸️ Skipping canvas init during media transition');
       return;
     }
     
@@ -620,8 +586,6 @@ export const useInpainting = ({
       const container = imageContainerRef.current;
       const img = container.querySelector('img');
       
-      console.log('[InpaintPaint] 🖼️ Found image', { hasImg: !!img });
-      
       if (img) {
         const rect = img.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
@@ -635,20 +599,12 @@ export const useInpainting = ({
         
         // Skip if canvas is already the right size (prevents constant reinits during layout settling)
         if (canvas.width === newWidth && canvas.height === newHeight) {
-          console.log('[InpaintCanvas] ⏸️ Canvas already correct size, skipping reinit', {
-            size: { width: newWidth, height: newHeight }
-          });
           return;
         }
         
         // If canvas size is changing and we have existing strokes, scale them
         const prevSize = prevCanvasSizeRef.current;
         if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
-          console.log('[InpaintResize] Canvas size changed, scaling strokes', {
-            from: prevSize,
-            to: { width: newWidth, height: newHeight }
-          });
-          
           // Scale both inpaint and annotation strokes
           if (inpaintStrokes.length > 0) {
             const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
@@ -684,29 +640,10 @@ export const useInpainting = ({
           inpaintStrokes: inpaintStrokes.length,
           annotationStrokes: annotationStrokes.length
         });
-        console.log('[InpaintCanvas] ✅ Canvas initialized successfully', {
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
-          canvasStyleLeft: canvas.style.left,
-          canvasStyleTop: canvas.style.top,
-          canvasStyleWidth: canvas.style.width,
-          canvasStyleHeight: canvas.style.height,
-          imgRect: { width: rect.width, height: rect.height, left: rect.left, top: rect.top },
-          containerRect: { left: containerRect.left, top: containerRect.top },
-          inpaintStrokeCount: inpaintStrokes.length,
-          annotationStrokeCount: annotationStrokes.length
-        });
-      } else {
-        console.log('[InpaintCanvas] ❌ No image found in container');
-      }
+        } else {
+        }
     } else {
-      console.log('[InpaintCanvas] ⚠️ Skipping init - missing requirements', {
-        isInpaintMode,
-        hasDisplayCanvas: !!displayCanvasRef.current,
-        hasMaskCanvas: !!maskCanvasRef.current,
-        hasImageContainer: !!imageContainerRef.current
-      });
-    }
+      }
   }, [isInpaintMode, media.location, media.id]); // Canvas size from getBoundingClientRect, not imageDimensions (which changes constantly)
 
   // Handle window resize to keep canvas aligned with image
@@ -734,11 +671,6 @@ export const useInpainting = ({
           const prevSize = prevCanvasSizeRef.current;
 
           if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
-            console.log('[InpaintResize] Scaling strokes on resize', {
-              from: prevSize,
-              to: { width: newWidth, height: newHeight },
-            });
-
             const scaleAndSet = (setStrokes: React.Dispatch<React.SetStateAction<BrushStroke[]>>) => {
               setStrokes(currentStrokes =>
                 scaleStrokes(currentStrokes, prevSize.width, prevSize.height, newWidth, newHeight)
@@ -903,12 +835,6 @@ export const useInpainting = ({
       maskExists: !!maskCanvasRef.current,
       timestamp: Date.now()
     });
-    console.log('[InpaintDraw] 🖌️ redrawStrokes called', {
-      strokeCount: strokes.length,
-      selectedId: selectedShapeId,
-      canvasExists: !!displayCanvasRef.current,
-      maskExists: !!maskCanvasRef.current,
-      timestamp: Date.now()
     });
     
     const canvas = displayCanvasRef.current;
@@ -941,7 +867,6 @@ export const useInpainting = ({
     // Redraw all strokes using each stroke's stored brush size
     strokes.forEach((stroke, index) => {
       if (stroke.points.length < 2) {
-        console.log('[InpaintDraw] ⚠️ Skipping stroke with < 2 points', { strokeId: stroke.id });
         return;
       }
       
@@ -963,9 +888,7 @@ export const useInpainting = ({
         canvasBuffer: { width: canvas.width, height: canvas.height },
         canvasDisplay: { width: canvas.offsetWidth, height: canvas.offsetHeight }
       });
-      console.log('[InpaintDraw] ✏️ Drawing stroke', {
-        index,
-        id: stroke.id.substring(0, 8),
+      ,
         type: shapeType,
         points: stroke.points.length,
         isSelected,
@@ -1059,8 +982,6 @@ export const useInpainting = ({
       }
     });
     
-    console.log('[Inpaint] Redrawn strokes', { count: strokes.length, selectedId: selectedShapeId });
-    
     // Debug: Check canvas visibility and scaling
     if (canvas) {
       const canvasStyle = window.getComputedStyle(canvas);
@@ -1099,7 +1020,6 @@ export const useInpainting = ({
     
     // Only clear if we're actually switching to a different mode
     if (prevMode !== editMode && prevMode === 'annotate') {
-      console.log('[Selection] ❌ Clearing selection due to mode switch from annotate', { prevMode, newMode: editMode });
       setSelectedShapeId(null);
     }
     
@@ -1108,18 +1028,15 @@ export const useInpainting = ({
   
   // Debug: Log whenever selectedShapeId changes
   useEffect(() => {
-    console.log('[Selection] 🔍 selectedShapeId changed:', selectedShapeId);
-  }, [selectedShapeId]);
+    }, [selectedShapeId]);
 
   // Auto-select default tools when switching modes
   useEffect(() => {
     // Only trigger when editMode actually changes
     if (prevEditModeRef.current !== editMode) {
       if (editMode === 'annotate' && annotationMode === null) {
-        console.log('[InpaintMode] Switching to annotate mode, auto-selecting rectangle');
         setAnnotationMode('rectangle');
       } else if (editMode === 'inpaint') {
-        console.log('[InpaintMode] Switching to inpaint mode, auto-selecting paint');
         setIsEraseMode(false);
       }
       prevEditModeRef.current = editMode;
@@ -1135,16 +1052,7 @@ export const useInpainting = ({
       pointerPosition: { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY },
       clientPosition: { x: e.clientX, y: e.clientY }
     });
-    console.log('[MobilePaintDebug] 🔧 handlePointerDown called', {
-      isInpaintMode,
-      hasCanvas: !!displayCanvasRef.current,
-      eventType: e.type,
-      pointerType: e.pointerType,
-      isAnnotateMode
-    });
-    
     if (!isInpaintMode) {
-      console.log('[MobilePaintDebug] ❌ Not in inpaint mode, returning');
       return;
     }
     
@@ -1152,7 +1060,6 @@ export const useInpainting = ({
     e.stopPropagation();
     
     if (!canvas) {
-      console.log('[MobilePaintDebug] ❌ No canvas ref, returning');
       return;
     }
     
@@ -1169,8 +1076,6 @@ export const useInpainting = ({
       for (let i = brushStrokes.length - 1; i >= 0; i--) {
         const stroke = brushStrokes[i];
         if (stroke.shapeType === 'rectangle' && isPointOnShape(x, y, stroke)) {
-          console.log('[DirectAction] Clicked on rectangle:', stroke.id);
-          
           // Select it
           setSelectedShapeId(stroke.id);
           
@@ -1188,7 +1093,6 @@ export const useInpainting = ({
           
           // If already in free-form mode, single click on corner starts free-form dragging
           if (stroke.isFreeForm && cornerIndex !== null) {
-            console.log('[Drag] Single-click on FREE-FORM corner - starting corner dragging');
             setDraggingCornerIndex(cornerIndex);
             setIsDraggingShape(true);
             selectedShapeRef.current = stroke;
@@ -1198,8 +1102,6 @@ export const useInpainting = ({
           
           // If NOT in free-form mode, double-click on corner enables free-form mode
           if (isDoubleClick && cornerIndex !== null && !stroke.isFreeForm) {
-            console.log('[Drag] DOUBLE-CLICK on corner - enabling FREE-FORM dragging');
-            
             // Convert to 4-point free-form
             const corners = getRectangleCorners(stroke);
             const updatedStroke: BrushStroke = {
@@ -1223,7 +1125,7 @@ export const useInpainting = ({
           const clickType = getRectangleClickType(x, y, stroke);
           
           if (clickType === 'edge') {
-            console.log('[Drag] IMMEDIATELY starting to MOVE rectangle (clicked edge)');
+            ');
             setDragMode('move');
             setIsDraggingShape(true);
             selectedShapeRef.current = stroke;
@@ -1233,7 +1135,7 @@ export const useInpainting = ({
             return;
           } else if (clickType === 'corner' && !stroke.isFreeForm) {
             // Standard rectangle resize (only for non-free-form rectangles)
-            console.log('[Drag] IMMEDIATELY starting to RESIZE rectangle (clicked corner)');
+            ');
             setDragMode('resize');
             setIsDraggingShape(true);
             selectedShapeRef.current = stroke;
@@ -1250,7 +1152,6 @@ export const useInpainting = ({
       
       // Clicked on empty space, deselect any selected shape
       if (selectedShapeId) {
-        console.log('[Selection] ❌ Clearing selection - clicked on empty space');
         setSelectedShapeId(null);
       }
       
@@ -1262,12 +1163,6 @@ export const useInpainting = ({
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     
     setIsDrawing(true);
-    
-    console.log('[MobilePaintDebug] ✅ Starting stroke', {
-      x,
-      y,
-      canvasRect: { width: rect.width, height: rect.height, left: rect.left, top: rect.top }
-    });
     
     setCurrentStroke([{ x, y }]);
   }, [isInpaintMode, isAnnotateMode, annotationMode, brushStrokes, annotationStrokes, selectedShapeId, isPointOnShape, getRectangleClickType, getClickedCornerIndex, getRectangleCorners, redrawStrokes, setBrushStrokes]);
@@ -1307,7 +1202,6 @@ export const useInpainting = ({
       
       // FREE-FORM CORNER DRAGGING: Move individual corner
       if (draggingCornerIndex !== null && shape.isFreeForm && shape.points.length === 4) {
-        console.log(`[FreeFormDrag] Dragging corner ${draggingCornerIndex}`);
         const newPoints = [...shape.points];
         newPoints[draggingCornerIndex] = { x, y };
         
@@ -1336,8 +1230,7 @@ export const useInpainting = ({
         const deltaX = newStartX - oldStartPoint.x;
         const deltaY = newStartY - oldStartPoint.y;
         
-        console.log('[Drag] Moving shape', {
-          shapeId: shape.id.substring(0, 8),
+        ,
           delta: { x: deltaX, y: deltaY },
           newPos: { x: newStartX, y: newStartY }
         });
@@ -1399,11 +1292,6 @@ export const useInpainting = ({
     
     // In annotation mode, redraw with the updated shape preview
     if (isAnnotateMode && annotationMode) {
-      console.log('[InpaintPointer] 🖌️ Drawing preview during pointer move', {
-        currentStrokeLength: currentStroke.length,
-        existingStrokesCount: brushStrokes.length
-      });
-      
       // Redraw all saved strokes first
       redrawStrokes(brushStrokes);
       
@@ -1448,19 +1336,10 @@ export const useInpainting = ({
   }, [isInpaintMode, isDrawing, isEraseMode, currentStroke, brushSize, isAnnotateMode, annotationMode, brushStrokes, redrawStrokes, isDraggingShape, isDraggingControlPoint, dragOffset, dragMode, draggingCornerIndex, displayCanvasRef, maskCanvasRef, setBrushStrokes]);
 
   const handlePointerUp = useCallback((e?: React.PointerEvent<HTMLCanvasElement>) => {
-    console.log('[InpaintPointer] 🛑 handlePointerUp called', {
-      isDraggingShape,
-      isDrawing,
-      currentStrokeLength: currentStroke.length,
-      editMode,
-      annotationMode
-    });
-    
     // Control point drag handling removed (rectangles don't have control points)
     
     // Handle finishing drag operation
     if (isDraggingShape) {
-      console.log('[Drag] ✅ Finished dragging shape');
       setIsDraggingShape(false);
       setDragOffset(null);
       setDraggingCornerIndex(null); // Reset free-form corner dragging
@@ -1471,8 +1350,7 @@ export const useInpainting = ({
         try {
           (e.target as HTMLElement).releasePointerCapture(e.pointerId);
         } catch (err) {
-          console.log('[Drag] Could not release pointer capture', err);
-        }
+          }
         
         // Prevent event from bubbling to overlay which might close the lightbox
         e.preventDefault();
@@ -1486,16 +1364,13 @@ export const useInpainting = ({
     
     if (!isInpaintMode || !isDrawing) return;
     
-    console.log('[MobilePaintDebug] 🛑 Finishing stroke');
-    
     // Release pointer capture if event is provided
     if (e && e.target) {
       try {
         (e.target as HTMLElement).releasePointerCapture(e.pointerId);
       } catch (err) {
         // Ignore errors if pointer capture wasn't active
-        console.log('[MobilePaintDebug] ⚠️ Could not release pointer capture', err);
-      }
+        }
       
       // Prevent event from bubbling to overlay which might close the lightbox
       e.preventDefault();
@@ -1510,15 +1385,6 @@ export const useInpainting = ({
     if (currentStroke.length > 1) {
       const shapeType = isAnnotateMode && annotationMode ? annotationMode : 'line';
       
-      console.log('[InpaintPointer] 📝 Creating new stroke', {
-        shapeType,
-        pointCount: currentStroke.length,
-        isEraseMode,
-        brushSize,
-        isAnnotateMode,
-        annotationMode
-      });
-      
       // For rectangles, require minimum drag distance (prevent accidental clicks from creating shapes)
       if (shapeType === 'rectangle') {
         const startPoint = currentStroke[0];
@@ -1527,7 +1393,6 @@ export const useInpainting = ({
         const MIN_DRAG_DISTANCE = 10; // pixels
         
         if (dragDistance < MIN_DRAG_DISTANCE) {
-          console.log('[Rectangle] ⚠️ Drag too short, not creating rectangle', { dragDistance });
           setCurrentStroke([]);
           return;
         }
@@ -1552,33 +1417,24 @@ export const useInpainting = ({
         lastPoint: newStroke.points[newStroke.points.length - 1],
         samplePoints: newStroke.points.slice(0, 3)
       });
-      console.log('[InpaintPointer] ✅ New stroke created', {
-        id: newStroke.id.substring(0, 8),
+      ,
         shapeType: newStroke.shapeType,
         pointCount: newStroke.points.length
       });
       
       // Clear opposite mode's strokes when starting to draw (prevents cross-over)
       if (isAnnotateMode && inpaintStrokes.length > 0) {
-        console.log('[ModeSeparation] Drawing in annotate mode - clearing inpaint strokes');
         setInpaintStrokes([]);
       } else if (!isAnnotateMode && annotationStrokes.length > 0) {
-        console.log('[ModeSeparation] Drawing in inpaint mode - clearing annotation strokes');
         setAnnotationStrokes([]);
       }
       
       // LIMIT TO ONE RECTANGLE: Clear existing rectangles when successfully drawing a new one
       if (isAnnotateMode && shapeType === 'rectangle' && annotationStrokes.length > 0) {
-        console.log('[Annotate] 🔄 Clearing existing rectangle - new one successfully drawn', {
-          oldCount: annotationStrokes.length,
-          newStrokeId: newStroke.id.substring(0, 8)
         });
         // Replace all existing rectangles with just the new one
         setBrushStrokes([newStroke]);
       } else {
-        console.log('[InpaintPointer] ➕ Adding stroke to existing', {
-          existingCount: brushStrokes.length,
-          newStrokeId: newStroke.id.substring(0, 8)
         });
         setBrushStrokes(prev => [...prev, newStroke]);
       }
@@ -1586,16 +1442,10 @@ export const useInpainting = ({
       // Auto-select rectangle after drawing (shows delete button immediately)
       if (isAnnotateMode && shapeType === 'rectangle') {
         setSelectedShapeId(newStroke.id);
-        console.log('[Selection] ✅ Auto-selecting newly drawn rectangle:', newStroke.id.substring(0, 8));
+        );
       }
       
-      console.log('[MobilePaintDebug] ✅ Stroke added', { 
-        strokeId: newStroke.id, 
-        pointCount: currentStroke.length, 
-        brushSize, 
-        shapeType: newStroke.shapeType
-      });
-    }
+      }
     
     setCurrentStroke([]);
   }, [isInpaintMode, isDrawing, currentStroke, isEraseMode, brushSize, isAnnotateMode, annotationMode, isDraggingShape, isDraggingControlPoint, setBrushStrokes, inpaintStrokes.length, annotationStrokes.length, setInpaintStrokes, setAnnotationStrokes]);
@@ -1613,8 +1463,7 @@ export const useInpainting = ({
     }
     redrawStrokes(newStrokes);
     
-    console.log('[Inpaint] Undo stroke', { remainingCount: newStrokes.length, mode: isAnnotateMode ? 'annotate' : 'inpaint' });
-  }, [brushStrokes, redrawStrokes, isAnnotateMode]);
+    }, [brushStrokes, redrawStrokes, isAnnotateMode]);
 
   // Clear all strokes
   const handleClearMask = useCallback(() => {
@@ -1626,8 +1475,7 @@ export const useInpainting = ({
     }
     setSelectedShapeId(null);
     redrawStrokes([]);
-    console.log('[Inpaint] Cleared all strokes', { mode: isAnnotateMode ? 'annotate' : 'inpaint' });
-  }, [redrawStrokes, isAnnotateMode]);
+    }, [redrawStrokes, isAnnotateMode]);
 
   // Delete selected shape
   const handleDeleteSelected = useCallback(() => {
@@ -1643,8 +1491,7 @@ export const useInpainting = ({
     setSelectedShapeId(null);
     redrawStrokes(newStrokes);
     
-    console.log('[Inpaint] Deleted selected shape', { shapeId: selectedShapeId, mode: isAnnotateMode ? 'annotate' : 'inpaint' });
-  }, [selectedShapeId, brushStrokes, redrawStrokes, isAnnotateMode]);
+    }, [selectedShapeId, brushStrokes, redrawStrokes, isAnnotateMode]);
 
   // Toggle free-form mode for selected rectangle
   const handleToggleFreeForm = useCallback(() => {
@@ -1668,8 +1515,7 @@ export const useInpainting = ({
         points: [{ x: minX, y: minY }, { x: maxX, y: maxY }],
         isFreeForm: false
       };
-      console.log('[FreeForm] Converted to regular rectangle');
-    } else {
+      } else {
       // Convert to free-form (4 independent corners)
       const corners = getRectangleCorners(selectedShape);
       updatedShape = {
@@ -1677,8 +1523,7 @@ export const useInpainting = ({
         points: corners,
         isFreeForm: true
       };
-      console.log('[FreeForm] Converted to free-form quadrilateral');
-    }
+      }
     
     const newStrokes = brushStrokes.map(s => s.id === selectedShapeId ? updatedShape : s);
     
@@ -1730,19 +1575,14 @@ export const useInpainting = ({
       isDrawing,
       brushStrokesRef: brushStrokes
     });
-    console.log('[InpaintEffect] 🔄 Stroke change effect triggered', {
-      effectId,
-      isInpaintMode,
-      strokeCount: brushStrokes.length,
-      editMode,
-      mediaId: media.id.substring(0, 8),
+    ,
       isDraggingShape,
       isDrawing
     });
     
     // Skip redraw during drag - handlePointerMove redraws manually to prevent flicker
     if (isDraggingShape) {
-      console.log('[InpaintEffect] ⏸️ Skipping redraw during drag (handled manually)');
+      ');
       return;
     }
     
@@ -1753,10 +1593,8 @@ export const useInpainting = ({
 
   // Handle entering inpaint mode
   const handleEnterInpaintMode = useCallback(() => {
-    console.log('[MobilePaintDebug] 🚀 handleEnterInpaintMode called');
-    console.log('[MobilePaintDebug] Before setIsInpaintMode - isInpaintMode:', isInpaintMode);
     setIsInpaintMode(true);
-    console.log('[MobilePaintDebug] ✅ Called setIsInpaintMode(true)');
+    ');
   }, []);
 
   // Generate inpaint
@@ -1775,25 +1613,12 @@ export const useInpainting = ({
         throw new Error('Canvas not initialized');
       }
 
-      console.log('[Inpaint] Starting inpaint generation...', {
-        mediaId: media.id,
-        prompt: inpaintPrompt,
-        numGenerations: inpaintNumGenerations,
-        strokeCount: inpaintStrokes.length
-      });
-
       // Scale mask to 1.5x the actual image size
       const actualWidth = imageDimensions?.width || maskCanvas.width;
       const actualHeight = imageDimensions?.height || maskCanvas.height;
       const scaledWidth = Math.round(actualWidth * 1.5);
       const scaledHeight = Math.round(actualHeight * 1.5);
       
-      console.log('[Inpaint] Scaling mask', {
-        displaySize: { width: maskCanvas.width, height: maskCanvas.height },
-        actualSize: { width: actualWidth, height: actualHeight },
-        scaledSize: { width: scaledWidth, height: scaledHeight }
-      });
-
       // Create a temporary canvas at 1.5x original resolution
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = scaledWidth;
@@ -1843,14 +1668,11 @@ export const useInpainting = ({
         .then(blob => new File([blob], `inpaint_mask_${media.id}_${Date.now()}.png`, { type: 'image/png' }));
       
       const maskUrl = await uploadImageToStorage(maskFile);
-      console.log('[Inpaint] Mask uploaded:', maskUrl);
-
       // Get source image URL (prefer upscaled if available)
       const sourceUrl = (media as any).upscaled_url || media.location || media.imageUrl;
 
       // Create inpaint task
-      console.log('[InpaintDebug] 📤 About to call createImageInpaintTask with:', {
-        project_id: selectedProjectId?.substring(0, 8),
+      ,
         shot_id: shotId?.substring(0, 8),
         tool_type: toolTypeOverride,
         generation_id: media.id.substring(0, 8),
@@ -1869,8 +1691,6 @@ export const useInpainting = ({
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
       });
 
-      console.log('[Inpaint] ✅ Inpaint tasks created successfully');
-      
       // Show success state
       setInpaintGenerateSuccess(true);
       
@@ -1904,25 +1724,12 @@ export const useInpainting = ({
         throw new Error('Canvas not initialized');
       }
 
-      console.log('[AnnotatedEdit] Starting annotated edit generation...', {
-        mediaId: media.id,
-        prompt: inpaintPrompt,
-        numGenerations: inpaintNumGenerations,
-        annotationCount: annotationStrokes.length
-      });
-
       // Scale mask to 1.5x the actual image size
       const actualWidth = imageDimensions?.width || maskCanvas.width;
       const actualHeight = imageDimensions?.height || maskCanvas.height;
       const scaledWidth = Math.round(actualWidth * 1.5);
       const scaledHeight = Math.round(actualHeight * 1.5);
       
-      console.log('[AnnotatedEdit] Scaling mask', {
-        displaySize: { width: maskCanvas.width, height: maskCanvas.height },
-        actualSize: { width: actualWidth, height: actualHeight },
-        scaledSize: { width: scaledWidth, height: scaledHeight }
-      });
-
       // Create a temporary canvas at 1.5x original resolution
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = scaledWidth;
@@ -1972,14 +1779,11 @@ export const useInpainting = ({
         .then(blob => new File([blob], `annotated_edit_mask_${media.id}_${Date.now()}.png`, { type: 'image/png' }));
       
       const maskUrl = await uploadImageToStorage(maskFile);
-      console.log('[AnnotatedEdit] Mask uploaded:', maskUrl);
-
       // Get source image URL (prefer upscaled if available)
       const sourceUrl = (media as any).upscaled_url || media.location || media.imageUrl;
 
       // Create annotated image edit task
-      console.log('[AnnotatedEdit] 📤 About to call createAnnotatedImageEditTask with:', {
-        project_id: selectedProjectId?.substring(0, 8),
+      ,
         shot_id: shotId?.substring(0, 8),
         tool_type: toolTypeOverride,
         generation_id: media.id.substring(0, 8),
@@ -1998,8 +1802,6 @@ export const useInpainting = ({
         loras: loras, // Pass loras if provided (e.g., In-Scene Boost)
       });
 
-      console.log('[AnnotatedEdit] ✅ Annotated edit tasks created successfully');
-      
       // Show success state
       setInpaintGenerateSuccess(true);
       

@@ -117,14 +117,11 @@ export default function HomePage() {
         // Ensure cross-origin preloading works for public Supabase storage
         (link as any).crossOrigin = 'anonymous';
         document.head.appendChild(link);
-        console.log('[VideoLoadSpeedIssue] Added <link rel="preload" as="video">', link.href);
-      } else if (link.href !== currentExample.video) {
+        } else if (link.href !== currentExample.video) {
         link.href = currentExample.video;
-        console.log('[VideoLoadSpeedIssue] Updated preload link to', link.href);
-      }
+        }
     } catch (e) {
-      console.log('[VideoLoadSpeedIssue] Failed to add preload link', e);
-    }
+      }
   }, [showPhilosophy, currentExample.video]);
 
   // Start playback immediately when pane opens to avoid delay/blink
@@ -136,15 +133,13 @@ export default function HomePage() {
     // Small delay to ensure video element is rendered, but start during animation
     const playTimeout = setTimeout(() => {
       try {
-        console.log('[VideoLoadSpeedIssue] Initiating playback immediately on pane open');
         video.currentTime = 0;
         const p = video.play();
         if (p && typeof (p as any).catch === 'function') {
-          (p as Promise<void>).catch((err) => console.log('[VideoLoadSpeedIssue] play() blocked', err));
+          (p as Promise<void>).catch((err) => blocked', err));
         }
       } catch (e) {
-        console.log('[VideoLoadSpeedIssue] Failed to start playback', e);
-      }
+        }
     }, 50); // Very small delay just to ensure DOM is ready
 
     return () => clearTimeout(playTimeout);
@@ -152,15 +147,13 @@ export default function HomePage() {
 
   // Debug ecosystem tooltip state
   useEffect(() => {
-    console.log('[EcosystemTooltip] State change - open:', ecosystemTipOpen, 'disabled:', ecosystemTipDisabled);
-  }, [ecosystemTipOpen, ecosystemTipDisabled]);
+    }, [ecosystemTipOpen, ecosystemTipDisabled]);
 
   // Close tooltip on mobile scroll
   useEffect(() => {
     if (!isMobile || !ecosystemTipOpen) return;
 
     const handleScroll = () => {
-      console.log('[EcosystemTooltip] Mobile scroll detected, closing tooltip');
       setEcosystemTipOpen(false);
       setEcosystemTipDisabled(false);
     };
@@ -295,7 +288,6 @@ export default function HomePage() {
   useEffect(() => {
     // Initialize auth session tracking
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[AuthDebug] Initial session check:', !!session?.user?.id);
       setSession(session);
     });
     
@@ -305,7 +297,6 @@ export default function HomePage() {
     
     if (authManager) {
       unsubscribe = authManager.subscribe('HomePage', (event, session) => {
-        console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
         setSession(session);
         
         // If we get a successful sign-in, navigate to tools – but avoid auto-redirect
@@ -343,20 +334,16 @@ export default function HomePage() {
             }
             // Clear flag and proceed to tools
             localStorage.removeItem('oauthInProgress');
-            console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
             navigate('/tools');
           } else if (!isHomePath) {
-            console.log('[AuthDebug] SIGNED_IN outside home, navigating to /tools');
             navigate('/tools');
           } else {
-            console.log('[AuthDebug] SIGNED_IN on home without oauth flag; staying on home');
-          }
+            }
         }
       });
     } else {
       // Fallback to direct listener if auth manager not available
       const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('[AuthDebug] Auth state change:', event, !!session?.user?.id);
         setSession(session);
         
         // If we get a successful sign-in, navigate to tools – but avoid auto-redirect
@@ -394,14 +381,11 @@ export default function HomePage() {
             }
             // Clear flag and proceed to tools
             localStorage.removeItem('oauthInProgress');
-            console.log('[AuthDebug] OAuth flow completed, navigating to /tools');
             navigate('/tools');
           } else if (!isHomePath) {
-            console.log('[AuthDebug] SIGNED_IN outside home, navigating to /tools');
             navigate('/tools');
           } else {
-            console.log('[AuthDebug] SIGNED_IN on home without oauth flag; staying on home');
-          }
+            }
         }
       });
       unsubscribe = () => listener.subscription.unsubscribe();
@@ -414,7 +398,6 @@ export default function HomePage() {
 
   const handleDiscordSignIn = async () => {
     try {
-      console.log('[AuthDebug] Starting Discord OAuth flow');
       // Mark that OAuth was user-initiated so we can safely redirect post-login
       try { localStorage.setItem('oauthInProgress', 'true'); } catch {}
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -430,8 +413,7 @@ export default function HomePage() {
         return;
       }
       
-      console.log('[AuthDebug] OAuth initiated successfully');
-    } catch (err) {
+      } catch (err) {
       console.error('[AuthDebug] Unexpected error during OAuth:', err);
       toast({ description: 'An unexpected error occurred. Please try again.' });
     }
@@ -890,21 +872,17 @@ export default function HomePage() {
                       <Tooltip
                         open={ecosystemTipOpen}
                         onOpenChange={(o) => {
-                          console.log('[EcosystemTooltip] onOpenChange:', o, 'disabled:', ecosystemTipDisabled);
                           if (!ecosystemTipDisabled) setEcosystemTipOpen(o);
                         }}
                       >
                         <TooltipTrigger asChild>
                           <span
                             onMouseEnter={() => {
-                              console.log('[EcosystemTooltip] Mouse enter, disabled:', ecosystemTipDisabled);
-                            }}
+                              }}
                             onMouseLeave={() => {
-                              console.log('[EcosystemTooltip] Mouse leave, disabled:', ecosystemTipDisabled);
                               if (ecosystemTipDisabled) setEcosystemTipDisabled(false);
                             }}
                             onClick={() => {
-                              console.log('[EcosystemTooltip] Click/Touch, current state:', ecosystemTipOpen, 'disabled:', ecosystemTipDisabled);
                               if (isMobile) {
                                 // On mobile, toggle the tooltip on click
                                 if (ecosystemTipOpen) {
@@ -926,14 +904,12 @@ export default function HomePage() {
                           align="center"
                           className="group p-2 sm:p-3 bg-wes-cream/90 border-2 border-transparent rounded-lg shadow-md"
                           onPointerEnter={() => {
-                            console.log('[EcosystemTooltip] Pointer entered content – holding open');
                             if (!isMobile) {
                               setEcosystemTipDisabled(true);
                               setEcosystemTipOpen(true);
                             }
                           }}
                           onPointerLeave={() => {
-                            console.log('[EcosystemTooltip] Pointer left content – releasing hold');
                             if (!isMobile) {
                               setEcosystemTipDisabled(false);
                               setEcosystemTipOpen(false);
@@ -944,8 +920,8 @@ export default function HomePage() {
                             <iframe
                               title="Open Source Ecosystem"
                               style={{ width: '360px', height: '270px', border: 0 }}
-                              onLoad={() => console.log('[EcosystemTooltip] Iframe loaded')}
-                              onError={() => console.log('[EcosystemTooltip] Iframe error')}
+                              onLoad={() => }
+                              onError={() => }
                               src={`/ecosystem-embed.html?scale=1.1`}
                             />
                           </div>
@@ -1110,36 +1086,28 @@ export default function HomePage() {
                       disableRemotePlayback
                       onLoadedMetadata={(e) => {
                         const v = e.currentTarget as HTMLVideoElement;
-                        console.log('[VideoLoadSpeedIssue] loadedmetadata', { duration: v.duration, readyState: v.readyState });
-                      }}
+                        }}
                       onCanPlay={(e) => {
                         const v = e.currentTarget as HTMLVideoElement;
-                        console.log('[VideoLoadSpeedIssue] canplay', { readyState: v.readyState });
-                        if (v.paused && showPhilosophy && !isPhilosophyPaneOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplay', err));
+                        if (v.paused && showPhilosophy && !isPhilosophyPaneOpening) v.play().catch((err) => failed on canplay', err));
                       }}
                       onCanPlayThrough={(e) => {
                         const v = e.currentTarget as HTMLVideoElement;
-                        console.log('[VideoLoadSpeedIssue] canplaythrough', { readyState: v.readyState });
-                        if (v.paused && showPhilosophy && !isPhilosophyPaneOpening) v.play().catch((err) => console.log('[VideoLoadSpeedIssue] play() failed on canplaythrough', err));
+                        if (v.paused && showPhilosophy && !isPhilosophyPaneOpening) v.play().catch((err) => failed on canplaythrough', err));
                       }}
                       onWaiting={() => {
-                        console.log('[VideoLoadSpeedIssue] waiting (buffering)');
+                        ');
                       }}
                       onStalled={() => {
-                        console.log('[VideoLoadSpeedIssue] stalled (network)');
+                        ');
                       }}
                       onPlaying={(e) => {
                         const v = e.currentTarget as HTMLVideoElement;
                         const quality = (v as any).getVideoPlaybackQuality ? (v as any).getVideoPlaybackQuality() : null;
                         const webkitDropped = (v as any).webkitDroppedFrameCount;
-                        console.log('[VideoLoadSpeedIssue] playing', {
-                          readyState: v.readyState,
-                          droppedFrames: quality?.droppedVideoFrames ?? webkitDropped,
-                          totalFrames: quality?.totalVideoFrames,
-                        });
-                      }}
+                        }}
                       onError={(e) => {
-                        console.log('[VideoLoadSpeedIssue] error', (e as any)?.message);
+                        ?.message);
                       }}
                       onPlay={(e) => {
                         const video = e.target as HTMLVideoElement;

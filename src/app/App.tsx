@@ -156,8 +156,6 @@ const AppInternalContent = () => {
       return;
     }
 
-    console.log(`Attempting to process drop: generationId=${generationId}, droppableType=${droppableZone.type}, droppableId=${over.id}, shotId=${droppableZone.shotId}`);
-
     try {
       if (droppableZone.type === 'shot-group') {
         const shotId = droppableZone.shotId;

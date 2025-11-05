@@ -295,12 +295,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     );
   }
 
-  console.log('[PairIndicatorDebug] ShotImageManagerMobile render:', {
-    imagesCount: currentImages.length,
-    hasOnPairClick: !!onPairClick,
-    hasPairPrompts: !!pairPrompts,
-    hasEnhancedPrompts: !!enhancedPrompts,
-    pairPromptsKeys: pairPrompts ? Object.keys(pairPrompts) : [],
+  : [],
     enhancedPromptsKeys: enhancedPrompts ? Object.keys(enhancedPrompts) : [],
   });
 
@@ -354,7 +349,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       endFrame={index * batchVideoFrames}
                       isMobile={true}
                       onPairClick={() => {
-                        console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (left)', { pairIndex: index - 1 });
+                        ', { pairIndex: index - 1 });
                         onPairClick(index - 1, {
                           index: index - 1,
                           frames: batchVideoFrames,
@@ -447,7 +442,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       endFrame={(index + 1) * batchVideoFrames}
                       isMobile={true}
                       onPairClick={() => {
-                        console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (right)', { index });
+                        ', { index });
                         onPairClick(index, {
                           index,
                           frames: batchVideoFrames,

@@ -59,8 +59,6 @@ console.warn = originalWarn;
  * Useful for debugging connection issues
  */
 export const verifyDatasetConnection = async () => {
-  console.log('[DatasetClient] Verifying connection to:', DATASET_SUPABASE_URL);
-  
   // Check if API key is configured
   if (DATASET_SUPABASE_ANON_KEY === 'PLACEHOLDER_API_KEY_REPLACE_ME') {
     const error = 'API key not configured. Please provide the correct anon key.';
@@ -80,14 +78,6 @@ export const verifyDatasetConnection = async () => {
       .eq('dataset_id', 1)
       .eq('review_status', 'approved')
       .limit(1);
-
-    console.log('[DatasetClient] Connection test result:', { 
-      data, 
-      error, 
-      count,
-      hasData: !!data,
-      dataLength: data?.length 
-    });
 
     if (error) {
       console.error('[DatasetClient] Connection error details:', {

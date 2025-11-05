@@ -75,9 +75,6 @@ class VisibilityManagerImpl {
   private initialize() {
     if (this.isInitialized) return;
     
-    console.log('[VisibilityManager] 🚀 Initializing centralized visibility manager', {
-      initialState: this.state,
-      timestamp: Date.now()
     });
 
     // Bind event handlers to preserve 'this' context
@@ -125,14 +122,7 @@ class VisibilityManagerImpl {
 
       this.updateGlobalTimestamp();
 
-      console.log('[VisibilityManager] 📱 Visibility changed', {
-        from: wasVisible ? 'visible' : 'hidden',
-        to: nowVisible ? 'visible' : 'hidden',
-        changeCount: this.state.changeCount,
-        timestamp: now,
-        subscribers: this.subscriptions.size
-      });
-    }
+      }
 
     // Notify subscribers
     this.notifySubscribers('visibilitychange', event, actuallyChanged);
@@ -147,8 +137,7 @@ class VisibilityManagerImpl {
     };
     this.updateGlobalTimestamp();
 
-    console.log('[VisibilityManager] 📱 Page show event', {
-      persisted: event && 'persisted' in event ? (event as PageTransitionEvent).persisted : false,
+    .persisted : false,
       timestamp: now,
       subscribers: this.subscriptions.size
     });
@@ -165,8 +154,7 @@ class VisibilityManagerImpl {
     };
     this.updateGlobalTimestamp();
 
-    console.log('[VisibilityManager] 📱 Page hide event', {
-      persisted: event && 'persisted' in event ? (event as PageTransitionEvent).persisted : false,
+    .persisted : false,
       timestamp: now,
       subscribers: this.subscriptions.size
     });
@@ -207,17 +195,7 @@ class VisibilityManagerImpl {
     }
 
     if (notifiedCount > 0) {
-      console.log(`[VisibilityManager] 📡 Notified ${notifiedCount} subscribers for ${eventType}`, {
-        eventType,
-        hasChange,
-        signals: {
-          isVisible: signals.isVisible,
-          justBecameVisible: signals.justBecameVisible,
-          justHidden: signals.justHidden,
-          changeCount: signals.changeCount
-        }
-      });
-    }
+      }
   }
 
   /**
@@ -246,12 +224,6 @@ class VisibilityManagerImpl {
 
     this.subscriptions.set(id, subscription);
 
-    console.log(`[VisibilityManager] ➕ Added subscription ${id}`, {
-      eventTypes: options.eventTypes || 'all',
-      includeNoChange: options.includeNoChange ?? false,
-      totalSubscriptions: this.subscriptions.size
-    });
-
     // Return unsubscribe function
     return id;
   }
@@ -263,10 +235,7 @@ class VisibilityManagerImpl {
     const existed = this.subscriptions.delete(id);
     
     if (existed) {
-      console.log(`[VisibilityManager] ➖ Removed subscription ${id}`, {
-        remainingSubscriptions: this.subscriptions.size
-      });
-    } else {
+      } else {
       console.warn(`[VisibilityManager] Attempted to remove non-existent subscription ${id}`);
     }
 
@@ -316,8 +285,7 @@ class VisibilityManagerImpl {
     this.subscriptions.clear();
     this.isInitialized = false;
 
-    console.log('[VisibilityManager] 🧹 Destroyed visibility manager');
-  }
+    }
 }
 
 // Create singleton instance

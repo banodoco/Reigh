@@ -90,8 +90,7 @@ export const DatasetBrowserModal: React.FC<DatasetBrowserModalProps> = ({
           console.error('Dataset connection failed:', result.error);
           toast.error(`Dataset connection failed: ${result.error}`);
         } else {
-          console.log('Dataset connection verified successfully');
-        }
+          }
       });
       
       fetchImages();

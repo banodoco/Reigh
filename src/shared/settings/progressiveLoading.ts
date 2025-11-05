@@ -63,13 +63,11 @@ export const getProgressiveLoadingSettings = (): ProgressiveLoadingSettings => {
 
 export const updateProgressiveLoadingSettings = (updates: Partial<ProgressiveLoadingSettings>): void => {
   globalSettings = { ...globalSettings, ...updates };
-  console.log('[ProgressiveLoading] Settings updated:', updates);
-};
+  };
 
 export const resetProgressiveLoadingSettings = (): void => {
   globalSettings = { ...DEFAULT_PROGRESSIVE_LOADING_SETTINGS };
-  console.log('[ProgressiveLoading] Settings reset to defaults');
-};
+  };
 
 // Convenience getters for commonly used settings
 export const isProgressiveLoadingEnabled = (): boolean => globalSettings.enableProgressiveImages;

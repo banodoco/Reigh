@@ -33,8 +33,7 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
     loras,
   } = params;
 
-  console.log('[AnnotatedImageEdit] Creating annotated image edit tasks:', {
-    project_id: project_id.substring(0, 8),
+  ,
     image_url: image_url.substring(0, 60),
     mask_url: mask_url.substring(0, 60),
     prompt: prompt.substring(0, 50),
@@ -42,13 +41,6 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
     generation_id: generation_id?.substring(0, 8),
     shot_id: shot_id?.substring(0, 8),
     tool_type,
-  });
-
-  console.log('[AnnotatedImageEdit] 🔍 Detailed params check:', {
-    has_shot_id: !!shot_id,
-    shot_id_value: shot_id,
-    has_tool_type: !!tool_type,
-    tool_type_value: tool_type
   });
 
   // Create multiple tasks (one per generation)
@@ -83,9 +75,7 @@ export async function createAnnotatedImageEditTask(params: CreateAnnotatedImageE
     throw new Error('Failed to create annotated image edit tasks: No tasks returned');
   }
 
-  console.log('[AnnotatedImageEdit] ✅ Annotated image edit tasks created successfully:', {
-    count: tasks.length,
-    taskIds: tasks.map(t => t.id.substring(0, 8)),
+  ),
   });
 
   return tasks[0].id; // Return first task ID for compatibility

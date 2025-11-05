@@ -120,9 +120,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
   // Debug selection state on each render (commented out for performance)
   // React.useEffect(() => {
-  //   console.log('[SelectionDebug:ShotImageManager] FINAL_VERSION_WITH_EXTRA_LOGS Component render state', {
-  //     selectedIdsCount: selectedIds.length,
-  //     selectedIds: selectedIds.map(id => id.substring(0, 8)),
+  //   ),
   //     selectedIdsFullValues: selectedIds,
   //     mobileSelectedIdsCount: mobileSelectedIds.length,
   //     mobileSelectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
@@ -166,8 +164,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Wrap setSelectedIds to force re-render
   const setSelectedIdsWithRerender = useCallback((newIds: string[] | ((prev: string[]) => string[])) => {
-    // console.log(`[DEBUG] setSelectedIdsWithRerender called`);
-    setSelectedIds(newIds);
+    // setSelectedIds(newIds);
     setRenderCounter(prev => prev + 1);
   }, []);
   
@@ -233,10 +230,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   
   // Debug lightbox state changes (must be after isMobile is declared)
   React.useEffect(() => {
-    console.log('[MobileImageItemDebug] lightboxIndex changed:', {
-      lightboxIndex,
-      hasImage: lightboxIndex !== null && !!currentImages[lightboxIndex],
-      imageId: lightboxIndex !== null && currentImages[lightboxIndex] ? (currentImages[lightboxIndex] as any).id?.substring(0, 8) : 'none',
+    .id?.substring(0, 8) : 'none',
       isMobile,
       generationMode,
       timestamp: Date.now()
@@ -248,9 +242,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   useEffect(() => {
     const handleGenerationUpdate = async (event: any) => {
       const { payloads = [] } = event.detail || {};
-      console.log('[BasedOnLineage] 🔄 Generation update batch received:', {
-        payloadCount: payloads.length,
-        timestamp: Date.now()
       });
       
       for (const payload of payloads) {
@@ -258,8 +249,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         
         if (!generationId) continue;
         
-        console.log('[BasedOnLineage] 🔍 Checking generation update:', {
-          generationId: generationId.substring(0, 8),
+        ,
           upscaleCompleted,
           hasExternalGenerations: externalGenerations.length > 0,
           hasTempDerivedGenerations: tempDerivedGenerations.length > 0
@@ -270,8 +260,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         const isInTempDerived = tempDerivedGenerations.some(gen => gen.id === generationId);
         
         if (upscaleCompleted && (isInExternal || isInTempDerived)) {
-          console.log('[BasedOnLineage] ✅ Upscale completed for external/temp generation, refetching:', {
-            generationId: generationId.substring(0, 8),
+          ,
             isInExternal,
             isInTempDerived
           });
@@ -290,8 +279,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             if (error) throw error;
             
             if (data) {
-              console.log('[BasedOnLineage] ✅ Refetched updated generation:', {
-                generationId: data.id.substring(0, 8),
+              ,
                 hasUpscaledUrl: !!data.upscaled_url,
                 upscaledUrl: data.upscaled_url?.substring(0, 60)
               });
@@ -350,8 +338,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     };
   }, [externalGenerations, tempDerivedGenerations]);
   
-  // console.log(`[DEBUG] COMPONENT BODY EXECUTING - selectedIds.length=${selectedIds.length} renderCounter=${renderCounter} isMobile=${isMobile} generationMode=${generationMode} willReturnMobile=${isMobile && generationMode === 'batch'}`);
-  const outerRef = useRef<HTMLDivElement>(null);
+  // const outerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   // Dispatch selection state to hide pane controls on mobile
@@ -380,11 +367,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Enhanced reconciliation with debouncing, tracking IDs, and timeout-based recovery
   // This prevents the component from getting stuck in inconsistent optimistic states
   useEffect(() => {
-    console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
-      newLength: images.length,
-      isOptimisticUpdate,
-      reconciliationId,
-      timestamp: Date.now()
     });
     
     // Clear any pending reconciliation timeout
@@ -394,15 +376,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     
     // If we're in the middle of an optimistic update, use debounced reconciliation
     if (isOptimisticUpdate) {
-      console.log('[DragDebug:ShotImageManager] Skipping immediate sync - optimistic update in progress');
-      
       const currentReconciliationId = reconciliationId;
       
       // Debounce reconciliation checks to prevent race conditions
       reconciliationTimeoutRef.current = setTimeout(() => {
         // Check if this reconciliation is still current
         if (currentReconciliationId !== reconciliationId) {
-          console.log('[DragDebug:ShotImageManager] Reconciliation cancelled - newer reconciliation in progress');
           return;
         }
         
@@ -411,15 +390,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         const parentOrder = images.map(img => img.shotImageEntryId).join(',');
         
         if (currentOrder === parentOrder) {
-          console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
           setIsOptimisticUpdate(false);
           // Parent is now consistent, we can sync only if different reference
           if (optimisticOrder !== images) {
             setOptimisticOrder(images);
           }
         } else {
-          console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
-          
           // Safety check: if optimistic update has been active for more than 5 seconds, force reconciliation
           const optimisticStartTime = Date.now() - 5000; // 5 seconds ago
           if (optimisticStartTime > Date.now()) {
@@ -430,13 +406,11 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         }
       }, 100); // 100ms debounce
     } else {
-      console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
       // Only update if the reference is actually different
       if (optimisticOrder !== images) {
         setOptimisticOrder(images);
       } else {
-        console.log('[DragDebug:ShotImageManager] Skipping sync - same reference');
-      }
+        }
     }
   }, [images, isOptimisticUpdate, reconciliationId, optimisticOrder]);
 
@@ -460,8 +434,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       return false;
     }
     
-    console.log('[ShotImageManager] Adding external generation to shot', {
-      generationId: generationId.substring(0, 8),
+    ,
       shotId: externalGenLightboxSelectedShot.substring(0, 8),
       projectId: selectedProjectId?.substring(0, 8),
       hasImageUrl: !!imageUrl,
@@ -494,8 +467,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       return false;
     }
     
-    console.log('[ShotImageManager] Adding external generation to shot without position', {
-      generationId: generationId.substring(0, 8),
+    ,
       shotId: externalGenLightboxSelectedShot.substring(0, 8),
       projectId: selectedProjectId?.substring(0, 8),
       hasImageUrl: !!imageUrl,
@@ -525,8 +497,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     generationId: string, 
     derivedContext?: string[]
   ) => {
-    console.log('[BasedOnLineage] 🌐 Opening external generation:',
-      '\n  targetGenerationId:', generationId.substring(0, 8),
+    ,
       '\n  currentExternalCount:', externalGenerations.length,
       '\n  currentImagesCount:', optimisticOrder.length || images.length,
       '\n  hasDerivedContext:', !!derivedContext,
@@ -538,11 +509,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const existingIndex = baseImages.findIndex(img => img.id === generationId);
     
     if (existingIndex !== -1) {
-      console.log('[ShotImageManager] ✅ Generation already in current images at index', existingIndex);
       // Set up derived navigation mode
       if (derivedContext && derivedContext.length > 0) {
-        console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
-          targetId: generationId.substring(0, 8),
+        ,
           totalDerived: derivedContext.length,
           derivedIds: derivedContext.map(id => id.substring(0, 8))
         });
@@ -551,7 +520,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           derivedGenerationIds: derivedContext
         });
       } else if (derivedNavContext !== null) {
-        console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
         setDerivedNavContext(null);
         setTempDerivedGenerations([]);
       }
@@ -562,11 +530,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Check if it's in external generations
     const externalIndex = externalGenerations.findIndex(img => img.id === generationId);
     if (externalIndex !== -1) {
-      console.log('[ShotImageManager] ✅ Generation already in external list');
       // Set up derived navigation mode
       if (derivedContext && derivedContext.length > 0) {
-        console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
-          targetId: generationId.substring(0, 8),
+        ,
           totalDerived: derivedContext.length,
           derivedIds: derivedContext.map(id => id.substring(0, 8))
         });
@@ -575,7 +541,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           derivedGenerationIds: derivedContext
         });
       } else if (derivedNavContext !== null) {
-        console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
         setDerivedNavContext(null);
         setTempDerivedGenerations([]);
       }
@@ -586,11 +551,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Check if it's in temp derived generations
     const tempDerivedIndex = tempDerivedGenerations.findIndex(img => img.id === generationId);
     if (tempDerivedIndex !== -1) {
-      console.log('[ShotImageManager] ✅ Generation already in temp derived list');
       // Set up derived navigation mode
       if (derivedContext && derivedContext.length > 0) {
-        console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
-          targetId: generationId.substring(0, 8),
+        ,
           totalDerived: derivedContext.length,
           derivedIds: derivedContext.map(id => id.substring(0, 8))
         });
@@ -599,7 +562,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           derivedGenerationIds: derivedContext
         });
       } else if (derivedNavContext !== null) {
-        console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
         setDerivedNavContext(null);
         setTempDerivedGenerations([]);
       }
@@ -610,8 +572,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Not found in any existing arrays - need to fetch
     // Set up derived navigation mode BEFORE clearing temp state
     if (derivedContext && derivedContext.length > 0) {
-      console.log('[DerivedNav] 🎯 Entering derived navigation mode', {
-        targetId: generationId.substring(0, 8),
+      ,
         totalDerived: derivedContext.length,
         derivedIds: derivedContext.map(id => id.substring(0, 8))
       });
@@ -620,7 +581,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         derivedGenerationIds: derivedContext
       });
     } else if (derivedNavContext !== null) {
-      console.log('[DerivedNav] 🚪 Exiting derived navigation mode');
       // Update lightbox index to a safe position BEFORE clearing temp derived
       // Point to end of externalGenerations (where new item will be added)
       const newIndex = baseImages.length + externalGenerations.length;
@@ -645,8 +605,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       
       if (data) {
         const dataKeys = Object.keys(data);
-        console.log('[BasedOnLineage] ✅ Fetched external generation from DB:',
-          '\n  generationId:', data.id.substring(0, 8),
+        ,
           '\n  type:', data.type,
           '\n  hasBasedOn:', !!data.based_on,
           '\n  basedOnId:', data.based_on?.substring(0, 8) || null,
@@ -694,8 +653,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // Add based_on for lineage tracking (not in GenerationRow type but needed for MediaLightbox)
         (transformedData as any).based_on = data.based_on;
         
-        console.log('[BasedOnLineage] 🔗 Built shot associations:',
-          '\n  generationId:', data.id.substring(0, 8),
+        ,
           '\n  associationsCount:', allAssociations.length,
           '\n  associations:', allAssociations.map((a: any) => ({
             shotId: a.shot_id?.substring(0, 8),
@@ -703,8 +661,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           }))
         );
         
-        console.log('[BasedOnLineage] 🔍 Transformed data BEFORE passing to MediaLightbox:',
-          '\n  generationId:', data.id.substring(0, 8),
+        ,
           '\n  hasBasedOn:', !!data.based_on,
           '\n  basedOnValue:', data.based_on?.substring(0, 8) || null,
           '\n  hasImageUrl:', !!transformedData.imageUrl,
@@ -717,31 +674,28 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // If in derived navigation mode, add to temp list (not permanent gallery)
         // Otherwise, add to external generations (shows in gallery)
         if (derivedContext && derivedContext.length > 0) {
-          console.log('[DerivedNav] 📦 Adding to TEMP derived generations (not added to gallery)');
+          ');
           setTempDerivedGenerations(prev => {
             const existingIdx = prev.findIndex(g => g.id === transformedData.id);
             if (existingIdx !== -1) {
               const newIndex = baseImages.length + externalGenerations.length + existingIdx;
-              console.log('[ShotImageManager] 🔁 Derived generation already in temp list, navigating to index', newIndex);
               requestAnimationFrame(() => setLightboxIndex(newIndex));
               return prev;
             }
 
             const updated = [...prev, transformedData];
             const newIndex = baseImages.length + externalGenerations.length + updated.length - 1;
-            console.log('[ShotImageManager] 📍 Opening derived generation at temp index', newIndex);
             requestAnimationFrame(() => setLightboxIndex(newIndex));
             return updated;
           });
         } else {
-          console.log('[DerivedNav] 📦 Adding to PERMANENT external generations (shows in gallery)');
+          ');
           // Add to external generations and get the new index immediately
           setExternalGenerations(prev => {
             // Prevent duplicates (navigate instead)
             const existingIdx = prev.findIndex(g => g.id === transformedData.id);
             if (existingIdx !== -1) {
               const newIndex = baseImages.length + existingIdx;
-              console.log('[ShotImageManager] 🔁 External generation already present, navigating to index', newIndex);
               requestAnimationFrame(() => setLightboxIndex(newIndex));
               return prev;
             }
@@ -749,7 +703,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             const updated = [...prev, transformedData];
             // Calculate index using the updated array length
             const newIndex = baseImages.length + updated.length - 1;
-            console.log('[ShotImageManager] 📍 Opening external generation at index', newIndex);
             // Use RAF to ensure DOM/state is committed before switching
             requestAnimationFrame(() => setLightboxIndex(newIndex));
             return updated;
@@ -779,10 +732,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Close lightbox if current image no longer exists (e.g., deleted)
   useEffect(() => {
     if (lightboxIndex !== null && lightboxIndex >= currentImages.length) {
-      console.log('[ShotImageManager] Current lightbox index out of bounds, closing lightbox', {
-        lightboxIndex,
-        imagesLength: currentImages.length
-      });
       setLightboxIndex(null);
       setShouldAutoEnterInpaint(false);
     }
@@ -833,17 +782,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     (ids: string[]) => {
       if (ids.length === 0) return;
       
-      console.log('[OPTIMISTIC_DELETE] Starting optimistic batch delete for mobile', {
-        idsToDelete: ids.map(id => id.substring(0, 8)),
+      ),
         totalCount: ids.length,
         currentImagesCount: currentImages.length
       });
       
       // Let parent handle optimistic updates to avoid dual state systems
-      console.log('[OPTIMISTIC_DELETE] Delegating optimistic update to parent ShotEditor');
-      
       // Clear selection and UI state for immediate feedback
-      console.log('[CLEAR_TRACE] Clearing selection in performBatchDelete');
       setMobileSelectedIds([]);
       setSelectedIds([]);
       setLastSelectedIndex(null);
@@ -865,14 +810,11 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // Individual delete function that clears selection if needed
   const handleIndividualDelete = React.useCallback(
     (id: string) => {
-      console.log('[OPTIMISTIC_DELETE] Starting optimistic individual delete for mobile', {
-        idToDelete: id.substring(0, 8),
+      ,
         currentImagesCount: currentImages.length
       });
       
       // Let parent handle optimistic updates to avoid dual state systems
-      console.log('[OPTIMISTIC_DELETE] Delegating individual delete optimistic update to parent ShotEditor');
-      
       // Clear selection if the deleted item was selected
       setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
       setMobileSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
@@ -951,7 +893,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
     // If this tap is a double-tap, also open the lightbox.
     if (timeDiff < 300 && timeDiff > 10 && isSameImage) {
-      console.log('[MobileDebug:ShotImageManager] ✅ Double-tap detected! Opening lightbox.');
       const image = currentImages[index];
       if (image?.imageUrl) {
         setLightboxIndex(index);
@@ -1025,8 +966,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Find the dragged item details
     const draggedItem = currentImages.find(img => img.shotImageEntryId === draggedItemId);
     
-    console.log('[BatchModeReorderFlow] [DRAG_START] 🚀 Batch mode drag initiated:', {
-      draggedItemId: draggedItemId.substring(0, 8),
+    ,
       draggedGenerationId: draggedItem?.id?.substring(0, 8),
       currentPosition: currentImages.findIndex(img => img.shotImageEntryId === draggedItemId),
       totalItems: currentImages.length,
@@ -1051,8 +991,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
 
     if (!isModifierPressed && !selectedIds.includes(active.id as string)) {
       // Starting a regular drag on an un-selected item -> clear previous selection
-      console.log('[DragDebug:ShotImageManager] Clearing selection during drag start');
-      console.log('[CLEAR_TRACE] Clearing selection in handleDragStart');
       setSelectedIds([]);
     setLastSelectedIndex(null);
     }
@@ -1063,8 +1001,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const draggedItemId = active.id as string;
     const targetItemId = over?.id as string;
     
-    console.log('[BatchModeReorderFlow] [DRAG_END] 🎯 Batch mode drag completed:', {
-      draggedItemId: draggedItemId.substring(0, 8),
+    ,
       targetItemId: targetItemId?.substring(0, 8),
       hasValidTarget: !!over && active.id !== over.id,
       selectedIds: selectedIds.length,
@@ -1074,13 +1011,11 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     setActiveId(null);
     
     if (!over || active.id === over.id) {
-      console.log('[BatchModeReorderFlow] [NO_CHANGE] ℹ️ No reorder needed - same position or invalid target');
       return;
     }
 
     // Safety check: ensure we have valid images and callbacks during re-renders
     if (!currentImages || currentImages.length === 0) {
-      console.log('[DragDebug:ShotImageManager] Skipping reorder - invalid state during re-render');
       return;
     }
 
@@ -1093,12 +1028,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       const draggedItem = currentImages[oldIndex];
       const targetItem = currentImages[newIndex];
       
-      console.log('[BatchModeReorderFlow] [SINGLE_ITEM_DRAG] 📍 Single item drag details:', { 
-        oldIndex, 
-        newIndex, 
-        willReorder: oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex,
-        draggedItem: {
-          generationId: draggedItem?.id?.substring(0, 8),
+      ,
           shotGenerationId: draggedItem?.shotImageEntryId?.substring(0, 8),
           timeline_frame: draggedItem?.timeline_frame
         },
@@ -1113,8 +1043,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // 1. Update optimistic order immediately for instant visual feedback
         const newOrder = arrayMove(currentImages, oldIndex, newIndex);
         
-        console.log('[BatchModeReorderFlow] [OPTIMISTIC_UPDATE] 🔄 Updating optimistic order:', {
-          originalOrder: currentImages.map((img, i) => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
+        => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
           newOrder: newOrder.map((img, i) => `${i}:${img.shotImageEntryId?.substring(0, 8)}(tf:${img.timeline_frame})`),
           timestamp: Date.now()
         });
@@ -1126,8 +1055,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         
         // 2. Notify parent so React state becomes eventually consistent
         const orderedShotImageEntryIds = newOrder.map((img) => img.shotImageEntryId);
-        console.log('[BatchModeReorderFlow] [CALLING_PARENT] 📞 Calling onImageReorder for single item:', {
-          orderedShotImageEntryIds: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
+        ),
           timestamp: Date.now()
         });
         stableOnImageReorder(orderedShotImageEntryIds);
@@ -1138,8 +1066,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     }
 
     // Multi-drag logic
-    console.log('[DragDebug:ShotImageManager] Multi-drag reorder', { selectedCount: selectedIds.length });
-
     const overIndex = currentImages.findIndex((img) => img.shotImageEntryId === over.id);
     const activeIndex = currentImages.findIndex((img) => img.shotImageEntryId === active.id);
 
@@ -1211,22 +1137,18 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const newOrder = newItems.map(img => img.shotImageEntryId).join(',');
     
     if (currentOrder === newOrder) {
-      console.log('[DragDebug:ShotImageManager] Multi-drag resulted in no change - skipping update');
       setSelectedIds([]);
     setLastSelectedIndex(null);
       return;
     }
 
     // 1. Update optimistic order immediately for instant visual feedback
-    console.log('[DragDebug:ShotImageManager] Updating optimistic order for multi-drag');
-    
     // Increment reconciliation ID to track this specific update
     setReconciliationId(prev => prev + 1);
     setIsOptimisticUpdate(true); // Flag that we're doing an optimistic update
     setOptimisticOrder(newItems);
     
     // 2. Notify parent so React state becomes eventually consistent
-    console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
     stableOnImageReorder(newItems.map((img) => img.shotImageEntryId));
     setSelectedIds([]);
     setLastSelectedIndex(null);
@@ -1248,8 +1170,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   }, [currentImages]);
 
   const handleItemClick = useCallback((imageKey: string, event: React.MouseEvent) => {
-    console.log('[SelectionDebug:ShotImageManager] handleItemClick called', {
-      imageKey: imageKey.substring(0, 8),
+    ,
       fullImageKey: imageKey,
       isMobile,
       generationMode,
@@ -1265,8 +1186,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     // Mobile behavior for batch mode
     if (isMobile && generationMode === 'batch') {
       const wasSelected = mobileSelectedIds.includes(imageKey);
-      console.log('[SelectionDebug:ShotImageManager] Mobile batch mode selection', {
-        imageKey: imageKey.substring(0, 8),
+      ,
         wasSelected,
         action: wasSelected ? 'deselect' : 'select'
       });
@@ -1275,10 +1195,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // Clicking on selected image deselects it
         setMobileSelectedIds(prev => {
           const newSelection = prev.filter(selectedId => selectedId !== imageKey);
-          console.log('[SelectionDebug:ShotImageManager] Mobile deselection result', {
-            previousCount: prev.length,
-            newCount: newSelection.length,
-            removedId: imageKey.substring(0, 8)
           });
           onSelectionChange?.(newSelection.length > 0);
           return newSelection;
@@ -1287,10 +1203,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         // Add to selection
         setMobileSelectedIds(prev => {
           const newSelection = [...prev, imageKey];
-          console.log('[SelectionDebug:ShotImageManager] Mobile selection result', {
-            previousCount: prev.length,
-            newCount: newSelection.length,
-            addedId: imageKey.substring(0, 8)
           });
           onSelectionChange?.(true);
           return newSelection;
@@ -1303,8 +1215,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const currentIndex = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === imageKey);
     
     // Desktop behavior
-    console.log('[SelectionDebug:ShotImageManager] Desktop behavior triggered', {
-      imageKey: imageKey.substring(0, 8),
+    ,
       currentIndex,
       hasModifierKey: event.metaKey || event.ctrlKey,
       lastSelectedIndex,
@@ -1314,8 +1225,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     if (event.metaKey || event.ctrlKey) {
       // Command+click behavior
       const isCurrentlySelected = selectedIds.includes(imageKey);
-      console.log('[SelectionDebug:ShotImageManager] Command/Ctrl+click behavior', {
-        imageKey: imageKey.substring(0, 8),
+      ,
         isCurrentlySelected,
         hasLastSelectedIndex: lastSelectedIndex !== null,
         willDoRangeOperation: lastSelectedIndex !== null && lastSelectedIndex !== currentIndex && selectedIds.length > 0
@@ -1324,23 +1234,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       if (lastSelectedIndex !== null && lastSelectedIndex !== currentIndex && selectedIds.length > 0) {
         // Range operation: select or deselect range between lastSelectedIndex and currentIndex
         const rangeIds = getImageRange(lastSelectedIndex, currentIndex);
-        console.log('[SelectionDebug:ShotImageManager] Range operation', {
-          fromIndex: lastSelectedIndex,
-          toIndex: currentIndex,
-          rangeSize: rangeIds.length,
-          isCurrentlySelected,
-          action: isCurrentlySelected ? 'deselect_range' : 'select_range'
-        });
-        
         if (isCurrentlySelected) {
           // Deselect range: remove all images in the range from selection
           setSelectedIds((prev) => {
             const newSelection = prev.filter(selectedId => !rangeIds.includes(selectedId));
-            console.log('[SelectionDebug:ShotImageManager] Range deselection result', {
-              previousCount: prev.length,
-              newCount: newSelection.length,
-              deselectedCount: rangeIds.length
-            });
             // Clear lastSelectedIndex if we deselected everything
             if (newSelection.length === 0) {
               setLastSelectedIndex(null);
@@ -1352,11 +1249,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           // Select range: add all images in the range to selection
           setSelectedIdsWithRerender((prev) => {
             const newSelection = Array.from(new Set([...prev, ...rangeIds]));
-            console.log('[SelectionDebug:ShotImageManager] Range selection result', {
-              previousCount: prev.length,
-              newCount: newSelection.length,
-              addedCount: rangeIds.length
-            });
             onSelectionChange?.(true);
             return newSelection;
           });
@@ -1365,8 +1257,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         }
       } else {
         // Regular Ctrl/Cmd+click: Toggle individual selection
-        console.log('[SelectionDebug:ShotImageManager] Individual toggle selection', {
-          imageKey: imageKey.substring(0, 8),
+        ,
           isCurrentlySelected,
           action: isCurrentlySelected ? 'deselect' : 'select'
         });
@@ -1375,10 +1266,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           if (isCurrentlySelected) {
             // Deselecting: remove from selection
             const newSelection = prev.filter((selectedId) => selectedId !== imageKey);
-            console.log('[SelectionDebug:ShotImageManager] Individual deselection result', {
-              previousCount: prev.length,
-              newCount: newSelection.length,
-              removedId: imageKey.substring(0, 8)
             });
             // Clear lastSelectedIndex if this was the only selected item
             if (newSelection.length === 0) {
@@ -1390,10 +1277,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             // Selecting: add to selection
             setLastSelectedIndex(currentIndex);
             const newSelection = [...prev, imageKey];
-            console.log('[SelectionDebug:ShotImageManager] Individual selection result', {
-              previousCount: prev.length,
-              newCount: newSelection.length,
-              addedId: imageKey.substring(0, 8),
+            ,
               newLastSelectedIndex: currentIndex
             });
             onSelectionChange?.(true);
@@ -1403,7 +1287,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       }
     } else {
       // Single click: Toggle individual selection (don't clear others)
-      console.log('[SelectionDebug:ShotImageManager] Regular click behavior (no modifier)', {
+      ', {
         imageKey: imageKey.substring(0, 8),
         currentIndex,
         currentlySelected: selectedIds.includes(imageKey)
@@ -1414,10 +1298,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         if (isSelected) {
           // Deselecting: remove only this item
           const newSelection = prev.filter((selectedId) => selectedId !== imageKey);
-          console.log('[SelectionDebug:ShotImageManager] Regular click deselection result', {
-            previousCount: prev.length,
-            newCount: newSelection.length,
-            removedId: imageKey.substring(0, 8)
           });
           // Clear lastSelectedIndex if this was the only selected item
           if (newSelection.length === 0) {
@@ -1430,10 +1310,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           setLastSelectedIndex(currentIndex);
           const newSelection = [...prev, imageKey];
           onSelectionChange?.(true);
-          console.log('[SelectionDebug:ShotImageManager] Regular click selection result', {
-            previousCount: prev.length,
-            newCount: newSelection.length,
-            addedId: imageKey.substring(0, 8),
+          ,
             fullAddedId: imageKey,
             newSelectionFullIds: newSelection,
             newLastSelectedIndex: currentIndex
@@ -1458,16 +1335,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       const currentId = currentImages[lightboxIndex]?.id;
       const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
       
-      console.log('[DerivedNav] ➡️ Next in derived context', {
-        currentId: currentId?.substring(0, 8),
+      ,
         currentDerivedIndex,
         totalDerived: derivedNavContext.derivedGenerationIds.length
       });
       
       if (currentDerivedIndex !== -1 && currentDerivedIndex < derivedNavContext.derivedGenerationIds.length - 1) {
         const nextId = derivedNavContext.derivedGenerationIds[currentDerivedIndex + 1];
-        console.log('[DerivedNav] 🎯 Navigating to next derived generation', {
-          nextId: nextId.substring(0, 8)
         });
         // Open next derived generation (maintains context)
         handleOpenExternalGeneration(nextId, derivedNavContext.derivedGenerationIds);
@@ -1488,16 +1362,13 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       const currentId = currentImages[lightboxIndex]?.id;
       const currentDerivedIndex = derivedNavContext.derivedGenerationIds.indexOf(currentId);
       
-      console.log('[DerivedNav] ⬅️ Previous in derived context', {
-        currentId: currentId?.substring(0, 8),
+      ,
         currentDerivedIndex,
         totalDerived: derivedNavContext.derivedGenerationIds.length
       });
       
       if (currentDerivedIndex !== -1 && currentDerivedIndex > 0) {
         const prevId = derivedNavContext.derivedGenerationIds[currentDerivedIndex - 1];
-        console.log('[DerivedNav] 🎯 Navigating to previous derived generation', {
-          prevId: prevId.substring(0, 8)
         });
         // Open previous derived generation (maintains context)
         handleOpenExternalGeneration(prevId, derivedNavContext.derivedGenerationIds);
@@ -1516,13 +1387,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // MUST be defined before any early returns to satisfy Rules of Hooks
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
     if (mobileSelectedIds.length === 0) {
-      console.log('[MobileReorder] No items selected for reordering');
       return;
     }
 
-    console.log('[MobileReorder] 🔄 STARTING mobile reorder:', {
-      selectedCount: mobileSelectedIds.length,
-      selectedIds: mobileSelectedIds.map(id => id.substring(0, 8)),
+    ),
       targetIndex,
       currentImagesLength: currentImages.length
     });
@@ -1543,7 +1411,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       }).filter(item => item.image && item.currentIndex !== -1);
 
       if (selectedItems.length === 0) {
-        console.log('[MobileReorder] No valid selected items found');
         return;
       }
 
@@ -1566,8 +1433,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       // Create ordered IDs array for the unified system
       const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
 
-      console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
-        originalOrder: currentImages.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
+      .shotImageEntryId ?? (img as any).id).substring(0, 8)),
         newOrder: orderedIds.map(id => id.substring(0, 8)),
         movedItems: selectedItems.map(item => item.id.substring(0, 8)),
         targetIndex
@@ -1583,14 +1449,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
         frame: (img as any).timeline_frame || index
       }));
 
-      console.log('[TimelineItemMoveSummary] Timeline mobile reorder completed', {
-        moveType: 'mobile_reorder',
-        positionsBefore,
-        positionsAfter,
-        attemptedMove: {
-          selectedCount: mobileSelectedIds.length,
-          selectedItems: selectedItems.map(item => ({
-            id: item.id.slice(-8),
+      ,
             fromIndex: item.currentIndex,
             toIndex: targetIndex
           })),
@@ -1605,9 +1464,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       // Clear selection after successful reorder
       setMobileSelectedIds([]);
       
-      console.log('[MobileReorder] ✅ Mobile reorder completed successfully');
-
-    } catch (error) {
+      } catch (error) {
       console.error('[MobileReorder] ❌ Mobile reorder failed:', error);
       // Don't clear selection on error so user can retry
     }
@@ -1617,15 +1474,9 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   // The frame position should be the midpoint between surrounding images
   // MUST be defined before any early returns to satisfy Rules of Hooks
   const getFramePositionForIndex = useCallback((index: number): number | undefined => {
-    console.log('[BatchDropPositionIssue] 📊 getFramePositionForIndex called:', {
-      index,
-      currentImagesLength: currentImages.length,
-      batchVideoFrames,
-      timestamp: Date.now()
     });
 
     if (currentImages.length === 0) {
-      console.log('[BatchDropPositionIssue] 🆕 NO IMAGES - RETURNING 0');
       return 0;
     }
     
@@ -1633,10 +1484,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       const firstImage = currentImages[0];
       const firstFrame = firstImage.timeline_frame ?? 0;
       const result = Math.max(0, Math.floor(firstFrame / 2));
-      console.log('[BatchDropPositionIssue] 🔝 INSERTING AT START:', {
-        firstFrame,
-        result
-      });
       return result;
     }
     
@@ -1644,10 +1491,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
       const lastImage = currentImages[currentImages.length - 1];
       const lastFrame = lastImage.timeline_frame ?? (currentImages.length - 1) * batchVideoFrames;
       const result = lastFrame + batchVideoFrames;
-      console.log('[BatchDropPositionIssue] 🔚 INSERTING AT END:', {
-        lastFrame,
-        result
-      });
       return result;
     }
     
@@ -1657,19 +1500,10 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     const nextFrame = nextImage.timeline_frame ?? index * batchVideoFrames;
     const result = Math.floor((prevFrame + nextFrame) / 2);
     
-    console.log('[BatchDropPositionIssue] 🔄 INSERTING BETWEEN:', {
-      index,
-      prevFrame,
-      nextFrame,
-      midpoint: result
-    });
-    
     return result;
   }, [currentImages, batchVideoFrames]);
 
-  console.log(`[DEBUG] Checking images condition - images.length=${images?.length} selectedIds.length=${selectedIds.length}`);
   if (!images || images.length === 0) {
-    console.log(`[DEBUG] EARLY RETURN - No images`);
     return (
       <div className="space-y-4">
         {/* Show upload UI when available */}
@@ -1728,10 +1562,8 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
     );
   }
 
-  console.log(`[DEBUG] Checking mobile condition - isMobile=${isMobile} generationMode=${generationMode} selectedIds.length=${selectedIds.length}`);
   // Mobile batch mode with selection - delegate to specialized component
   if (isMobile && generationMode === 'batch') {
-    console.log(`[DEBUG] EARLY RETURN - Using dedicated mobile component`);
     return (
       <>
         <ShotImageManagerMobile
@@ -1781,12 +1613,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             hasPrevious = lightboxIndex > 0;
           }
           
-          console.log('[ShotImageManager:Mobile] 🎬 Rendering lightbox', {
-            lightboxIndex,
-            baseImagesCount,
-            isExternalGen,
-            currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId,
-            mediaId: currentImages[lightboxIndex]?.id?.substring(0, 8),
+          ,
             mediaType: currentImages[lightboxIndex]?.type,
             allShots: allShots?.length || 0,
             onAddToShot: isExternalGen ? '✅ handleExternalGenAddToShot' : (onAddToShot ? '✅ onAddToShot' : '❌ None'),
@@ -1804,7 +1631,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               toolTypeOverride={toolTypeOverride}
               autoEnterInpaint={shouldAutoEnterInpaint}
               onClose={() => {
-                console.log('[MobileImageItemDebug] Closing lightbox, setting lightboxIndex to null');
                 setLightboxIndex(null);
                 setShouldAutoEnterInpaint(false);
                 // Clear derived navigation context when closing
@@ -1841,14 +1667,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
                 }
               }}
               onNavigateToGeneration={(generationId: string) => {
-                console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
-                  generationId: generationId.substring(0, 8),
+                ,
                   currentImagesCount: currentImages.length,
                   currentIndex: lightboxIndex
                 });
                 const index = currentImages.findIndex(img => img.id === generationId);
                 if (index !== -1) {
-                  console.log('[ShotImageManager:Mobile] ✅ Found generation at index', index);
                   setLightboxIndex(index);
                 } else {
                   console.error('[ShotImageManager:Mobile] ❌ Generation not found in current images', {
@@ -1861,7 +1685,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               allShots={allShots}
               selectedShotId={isExternalGen ? externalGenLightboxSelectedShot : selectedShotId}
               onShotChange={isExternalGen ? (shotId) => {
-                console.log('[ShotImageManager:Mobile] External gen shot changed', { shotId: shotId?.substring(0, 8) });
+                });
                 setExternalGenLightboxSelectedShot(shotId);
               } : onShotChange}
               onAddToShot={isExternalGen ? handleExternalGenAddToShot : onAddToShot}
@@ -2058,12 +1882,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
           hasPrevious = lightboxIndex > 0;
         }
         
-        console.log('[ShotImageManager:Desktop] 🎬 Rendering lightbox', {
-          lightboxIndex,
-          baseImagesCount,
-          isExternalGen,
-          currentSelectedShot: isExternalGen ? externalGenLightboxSelectedShot : selectedShotId,
-          mediaId: currentImages[lightboxIndex]?.id?.substring(0, 8),
+        ,
           mediaType: currentImages[lightboxIndex]?.type,
           allShots: allShots?.length || 0,
           onAddToShot: isExternalGen ? '✅ handleExternalGenAddToShot' : (onAddToShot ? '✅ onAddToShot' : '❌ None'),
@@ -2096,11 +1915,6 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             onPrevious={handlePrevious}
             onDelete={!readOnly ? (mediaId: string) => {
               const currentImage = currentImages[lightboxIndex];
-              console.log('[ShotImageManager] Delete from lightbox', {
-                mediaId,
-                shotImageEntryId: currentImage.shotImageEntryId,
-                isExternalGen
-              });
               // Use shotImageEntryId for deletion to target the specific shot_generations entry
               onImageDelete(currentImage.shotImageEntryId);
             } : undefined}
@@ -2128,14 +1942,12 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
               }
             }}
             onNavigateToGeneration={(generationId: string) => {
-              console.log('[ShotImageManager:Desktop] 📍 Navigate to generation', {
-                generationId: generationId.substring(0, 8),
+              ,
                 currentImagesCount: currentImages.length,
                 currentIndex: lightboxIndex
               });
               const index = currentImages.findIndex(img => img.id === generationId);
               if (index !== -1) {
-                console.log('[ShotImageManager:Desktop] ✅ Found generation at index', index);
                 setLightboxIndex(index);
               } else {
                 console.error('[ShotImageManager:Desktop] ❌ Generation not found in current images', {
@@ -2148,7 +1960,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
             allShots={allShots}
             selectedShotId={isExternalGen ? externalGenLightboxSelectedShot : selectedShotId}
             onShotChange={isExternalGen ? (shotId) => {
-              console.log('[ShotImageManager:Desktop] External gen shot changed', { shotId: shotId?.substring(0, 8) });
+              });
               setExternalGenLightboxSelectedShot(shotId);
             } : onShotChange}
             onAddToShot={isExternalGen ? handleExternalGenAddToShot : onAddToShot}

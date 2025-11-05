@@ -308,9 +308,7 @@ export const useImageGalleryStateOptimized = ({
   
   // Debug logging for lightbox state changes (reduced frequency)
   useEffect(() => {
-    console.log('[MobileDebug] activeLightboxMedia state changed:', {
-      hasMedia: !!state.activeLightboxMedia,
-      mediaId: state.activeLightboxMedia?.id?.substring(0, 8),
+    ,
       mediaType: state.activeLightboxMedia?.type,
       timestamp: Date.now()
     });
@@ -318,10 +316,6 @@ export const useImageGalleryStateOptimized = ({
   
   // Debug skeleton state changes
   useEffect(() => {
-    console.log('[SKELETON_DEBUG] State changed:', {
-      isBackfillLoading: state.isBackfillLoading,
-      backfillSkeletonCount: state.backfillSkeletonCount,
-      timestamp: Date.now()
     });
   }, [state.isBackfillLoading, state.backfillSkeletonCount]);
   
@@ -395,14 +389,6 @@ export const useImageGalleryStateOptimized = ({
     if (!isCurrentSelectionValid) {
       const newSelection = lastShotId || (simplifiedShotOptions.length > 0 ? simplifiedShotOptions[0].id : "");
       if (newSelection && newSelection !== state.selectedShotIdLocal) {
-        console.log('[ShotSelectionDebug] Fixing invalid selectedShotIdLocal:', {
-          oldSelection: state.selectedShotIdLocal,
-          newSelection,
-          lastShotId,
-          availableShots: simplifiedShotOptions.length,
-          firstShotId: simplifiedShotOptions[0]?.id,
-          context: 'invalid selection'
-        });
         actions.setSelectedShotIdLocal(newSelection);
       }
     }
@@ -421,7 +407,7 @@ export const useImageGalleryStateOptimized = ({
   useEffect(() => {
     // Clear backfill skeleton immediately when new images arrive (server pagination only)
     if (isServerPagination && state.isBackfillLoading && images.length > prevImageCountRef.current) {
-      console.log('[SKELETON_DEBUG] State reconciliation - clearing skeleton (new images detected):', {
+      :', {
         prevCount: prevImageCountRef.current,
         newCount: images.length,
         serverPage,

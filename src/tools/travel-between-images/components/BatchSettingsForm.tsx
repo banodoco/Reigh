@@ -161,14 +161,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     const isTurboModeDisabled = hasTooManyImages;
 
     // Debug logging for toggle visibility
-    console.log("[BatchSettingsForm] Auto-Create Individual Prompts toggle visibility:", {
-      isTimelineMode,
-      turboMode,
-      autoCreateIndividualPrompts,
-      shouldShow: !turboMode,
-      imageCount
-    });
-
     // Validation: Check for phaseConfig inconsistencies and warn
     React.useEffect(() => {
       if (phaseConfig && advancedMode) {

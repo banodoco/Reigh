@@ -65,11 +65,7 @@ export function useGenerationsPageLogic({
     
     // Check if any images have timeline_frame === null/undefined (i.e., unpositioned)
     const unpositionedImages = shot.images.filter(img => (img as any).timeline_frame === null || (img as any).timeline_frame === undefined);
-    console.log('[ShotFilterLogic] Shot unpositioned images check:', {
-      shotId,
-      totalImages: shot.images.length,
-      unpositionedCount: unpositionedImages.length,
-      unpositionedImageIds: unpositionedImages.map(img => img.id).slice(0, 3) // Show first 3 for debugging
+    .slice(0, 3) // Show first 3 for debugging
     });
     
     return unpositionedImages.length > 0;
@@ -80,20 +76,16 @@ export function useGenerationsPageLogic({
     // When excludePositioned is true (default), check for unpositioned images
     if (excludePositioned) {
       if (!shotHasUnpositionedImages(shotId)) {
-        console.log('[ShotFilterLogic] Shot has no unpositioned images with excludePositioned=true, defaulting to "all":', shotId);
         return 'all';
       }
-      console.log('[ShotFilterLogic] Shot has unpositioned images, defaulting to shot filter:', shotId);
       return shotId;
     }
     
     // When excludePositioned is false, check for any images
     if (!shotHasImages(shotId)) {
-      console.log('[ShotFilterLogic] Shot has no images, defaulting to "all":', shotId);
       return 'all';
     }
     
-    console.log('[ShotFilterLogic] Shot has images with excludePositioned=false, defaulting to shot filter:', shotId);
     return shotId;
   };
 
@@ -109,7 +101,6 @@ export function useGenerationsPageLogic({
 
     // If user has previously customized settings for this shot, always use them
     if (shotSettings?.userHasCustomized) {
-      console.log('[ShotFilterLogic] Using customized settings for shot:', currentShotId, shotSettings);
       return shotSettings;
     }
 
@@ -132,7 +123,6 @@ export function useGenerationsPageLogic({
       userHasCustomized: true // Mark as customized so it's never auto-reset
     };
     
-    console.log('[ShotFilterLogic] Saving user customization for shot:', currentShotId, updatedSettings);
     updateShotSettings('shot', updatedSettings);
   };
 
@@ -141,49 +131,30 @@ export function useGenerationsPageLogic({
 
   // Apply shot filter settings when current shot changes or settings are loaded
   useEffect(() => {
-    console.log('[ShotFilterLogic] Effect triggered:', {
-      currentShotId,
-      lastCurrentShotId,
-      shotsDataLength: shotsData?.length,
-      isLoadingShotSettings,
-      shotSettings
-    });
-
     // Wait for shots data to be available
     if (!shotsData?.length) {
-      console.log('[ShotFilterLogic] Waiting for shots data');
       return;
     }
 
     if (currentShotId && shotsData.some(shot => shot.id === currentShotId)) {
       // We're viewing a specific shot
-      console.log('[ShotFilterLogic] In shot context:', currentShotId);
-      
       // Don't update if we're still loading settings for this shot
       if (isLoadingShotSettings) {
-        console.log('[ShotFilterLogic] Still loading shot settings');
         return;
       }
       
       const settingsToApply = getCurrentShotSettings();
-      console.log('[ShotFilterLogic] Applying settings for shot:', {
-        currentShotId,
-        settingsToApply
-      });
-      
       setSelectedShotFilter(settingsToApply.selectedShotFilter);
       setExcludePositioned(settingsToApply.excludePositioned);
       setLastCurrentShotId(currentShotId);
       
     } else if (!currentShotId) {
       // When no shot is selected, revert to 'all' shots
-      console.log('[ShotFilterLogic] No current shot, reverting to all shots');
       setSelectedShotFilter('all');
       setExcludePositioned(true);
       setLastCurrentShotId(null);
     } else {
-      console.log('[ShotFilterLogic] Shot not found in shots data');
-    }
+      }
   }, [currentShotId, shotsData, isLoadingShotSettings, shotSettings]);
 
   // Create wrapper functions that save user customizations when called
@@ -258,17 +229,7 @@ export function useGenerationsPageLogic({
   useEffect(() => {
     // If there is no "last affected shot" but there are shots available,
     // default to the first shot in the list (which is the most recent).
-    console.log('[ADDTOSHOT] lastAffectedShotId initialization check:', {
-      lastAffectedShotId,
-      shotsDataLength: shotsData?.length,
-      firstShotId: shotsData?.[0]?.id,
-      firstShotName: shotsData?.[0]?.name,
-      currentShotId,
-      selectedShotFilter
-    });
-    
     if (!lastAffectedShotId && shotsData && shotsData.length > 0) {
-      console.log('[ADDTOSHOT] 🎯 Setting lastAffectedShotId to first shot:', shotsData[0].id);
       setLastAffectedShotId(shotsData[0].id);
     }
   }, [lastAffectedShotId, shotsData, setLastAffectedShotId, currentShotId, selectedShotFilter]);
@@ -289,9 +250,7 @@ export function useGenerationsPageLogic({
     // Fast path: minimal validation and direct execution
     const targetShotId = currentShotId || lastAffectedShotId;
     
-    console.log('[PositionFix] handleAddToShot called:', {
-      generationId,
-      imageUrl: imageUrl?.substring(0, 50) + '...',
+    + '...',
       currentShotId,
       lastAffectedShotId,
       targetShotId,
@@ -302,10 +261,6 @@ export function useGenerationsPageLogic({
     });
     
     if (!targetShotId || !selectedProjectId) {
-      console.log('[PositionFix] Missing required IDs:', {
-        targetShotId,
-        selectedProjectId
-      });
       toast.error("No shot selected", {
         description: "Please select a shot in the gallery or create one first.",
       });
@@ -315,24 +270,10 @@ export function useGenerationsPageLogic({
     // Check if we're trying to add to the same shot that's currently filtered with excludePositioned enabled
     const shouldPositionExisting = selectedShotFilter === targetShotId && excludePositioned;
     
-    console.log('[PositionFix] Positioning decision:', {
-      shouldPositionExisting,
-      selectedShotFilter,
-      targetShotId,
-      excludePositioned,
-      filterMatchesTarget: selectedShotFilter === targetShotId,
-      willUsePositionExisting: shouldPositionExisting,
-      timestamp: Date.now()
     });
     
     try {
       if (shouldPositionExisting) {
-        console.log('[PositionFix] Using positionExistingGenerationMutation with params:', {
-          shot_id: targetShotId,
-          generation_id: generationId,
-          project_id: selectedProjectId,
-        });
-        
         // Use the position existing function for items in the filtered list
         const result = await positionExistingGenerationMutation.mutateAsync({
           shot_id: targetShotId,
@@ -340,18 +281,8 @@ export function useGenerationsPageLogic({
           project_id: selectedProjectId,
         });
         
-        console.log('[PositionFix] positionExistingGenerationMutation result:', {
-          result,
-          timestamp: Date.now()
         });
       } else {
-        console.log('[PositionFix] Using regular addImageToShotMutation with params:', {
-          shot_id: targetShotId,
-          generation_id: generationId,
-          imageUrl: imageUrl,
-          project_id: selectedProjectId,
-        });
-        
         // Use the regular add function
         const result = await addImageToShotMutation.mutateAsync({
           shot_id: targetShotId,
@@ -360,13 +291,9 @@ export function useGenerationsPageLogic({
           project_id: selectedProjectId,
         });
         
-        console.log('[PositionFix] addImageToShotMutation result:', {
-          result,
-          timestamp: Date.now()
         });
       }
       
-      console.log('[PositionFix] handleAddToShot completed successfully');
       return true;
     } catch (error) {
       console.error('[ADDTOSHOT] Error:', error);

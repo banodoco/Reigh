@@ -52,8 +52,7 @@ export const useGenerationName = ({
         throw error;
       }
 
-      console.log('[VariantName] Successfully updated generation name:', {
-        generationId: media.id.substring(0, 8),
+      ,
         newName: newName || '(cleared)'
       });
 

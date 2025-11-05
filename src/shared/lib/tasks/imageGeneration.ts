@@ -137,7 +137,6 @@ export async function calculateTaskResolution(
 ): Promise<string> {
   // 1. If custom resolution is provided, use it as-is (assume it's already final)
   if (customResolution?.trim()) {
-    console.log(`[calculateTaskResolution] Using provided custom resolution: ${customResolution}`);
     return customResolution.trim();
   }
   
@@ -151,7 +150,6 @@ export async function calculateTaskResolution(
     const scaledWidth = Math.round(width * 1.5);
     const scaledHeight = Math.round(height * 1.5);
     const scaledResolution = `${scaledWidth}x${scaledHeight}`;
-    console.log(`[calculateTaskResolution] Scaling Qwen resolution from ${baseResolution} to ${scaledResolution} for style reference`);
     return scaledResolution;
   }
   
@@ -166,8 +164,6 @@ export async function calculateTaskResolution(
  * @returns Promise resolving to the created task
  */
 export async function createImageGenerationTask(params: ImageGenerationTaskParams): Promise<any> {
-  console.log("[createImageGenerationTask] Creating task with params:", params);
-
   try {
     // 1. Validate parameters
     validateImageGenerationParams(params);
@@ -235,7 +231,7 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       add_in_position: false,
     };
     
-    console.log("[createImageGenerationTask] Sending clean params to backend:", JSON.stringify(taskParamsToSend, null, 2));
+    );
     
     const result = await createTask({
       project_id: params.project_id,
@@ -243,9 +239,8 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
       params: taskParamsToSend
     });
     
-    console.log("[createImageGenerationTask] Backend returned task with params:", JSON.stringify(result?.params, null, 2));
+    );
 
-    console.log("[createImageGenerationTask] Task created successfully:", result);
     return result;
 
   } catch (error) {
@@ -262,8 +257,6 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
  * @returns Promise resolving to array of created tasks
  */
 export async function createBatchImageGenerationTasks(params: BatchImageGenerationTaskParams): Promise<any[]> {
-  console.log("[createBatchImageGenerationTasks] Creating batch tasks with params:", params);
-
   try {
     // 1. Validate parameters
     validateBatchImageGenerationParams(params);
@@ -305,8 +298,6 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
       });
     });
 
-    console.log(`[createBatchImageGenerationTasks] Creating ${taskParams.length} individual tasks`);
-
     // 4. Create all tasks in parallel (matching original behavior)
     const results = await Promise.allSettled(
       taskParams.map(taskParam => createImageGenerationTask(taskParam))
@@ -315,8 +306,6 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
     // 5. Process results and collect successes/failures
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
-
-    console.log(`[createBatchImageGenerationTasks] Batch results: ${successful} successful, ${failed} failed`);
 
     // 6. If all failed, throw the first error
     if (successful === 0) {
@@ -339,7 +328,6 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
       .map(r => r.value);
 
-    console.log(`[createBatchImageGenerationTasks] Batch completed: ${successfulResults.length} tasks created`);
     return successfulResults;
 
   } catch (error) {

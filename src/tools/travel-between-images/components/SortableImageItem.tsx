@@ -204,8 +204,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     isDragDisabled && "cursor-default"
   );
 
-  console.log('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-    imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+  || (image.id as any) || '').toString().substring(0, 8),
     isSelected,
     isDragDisabled,
     isMobile,
@@ -234,8 +233,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         const target = e.target as HTMLElement;
         const isButtonClick = target.closest('button') !== null;
         
-        console.log('[SelectionDebug:SortableImageItem] onClick triggered', {
-          imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+        || (image.id as any) || '').toString().substring(0, 8),
           isSelected,
           hasOnClickHandler: !!onClick,
           eventTarget: target?.tagName || 'unknown',
@@ -259,11 +257,9 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         setTimeout(() => {
           const element = e.currentTarget as HTMLElement;
           if (!element) {
-            console.log('[SelectionDebug:SortableImageItem] Element is null, component may have been unmounted');
             return;
           }
-          console.log('[SelectionDebug:SortableImageItem] DOM INSPECTION POST-RENDER', {
-            imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+          || (image.id as any) || '').toString().substring(0, 8),
             isSelected,
             isButtonClick,
             actualDOMClasses: element.className,

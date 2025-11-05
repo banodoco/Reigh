@@ -14,20 +14,17 @@ export const clearTimelineCache = () => {
     
     keysToRemove.forEach(key => {
       localStorage.removeItem(key);
-      console.log(`[CacheCleanup] Removed legacy timeline cache: ${key}`);
-    });
+      });
     
     // Also clear any React Query cache that might be stale
     // Force a hard refresh of the page to clear all caches
     if (keysToRemove.length > 0 || localStorage.getItem('timeline_cache_cleared') !== 'true') {
-      console.log(`[CacheCleanup] Cleared ${keysToRemove.length} legacy timeline cache entries - forcing cache invalidation`);
       localStorage.setItem('timeline_cache_cleared', 'true');
       
       // Dispatch a custom event to trigger cache invalidation
       window.dispatchEvent(new CustomEvent('timeline-cache-cleared'));
     } else {
-      console.log('[CacheCleanup] No legacy timeline cache entries found');
-    }
+      }
     
     return keysToRemove.length;
   } catch (error) {

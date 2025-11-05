@@ -60,20 +60,19 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const mountTime = useRef(Date.now());
   renderCount.current += 1;
   
-  console.log(`${DEBUG_TAG} === RENDER START #${renderCount.current} === ${Date.now() - mountTime.current}ms since mount`);
+  - mountTime.current}ms since mount`);
   
   // [Strategic Debug] Track component lifecycle
   useEffect(() => {
-    console.log(`${DEBUG_TAG} 🟢 COMPONENT MOUNTED at ${Date.now()}`);
+    }`);
     return () => {
-      console.log(`${DEBUG_TAG} 🔴 COMPONENT UNMOUNTING at ${Date.now()}`);
+      }`);
     };
   }, []);
   
   // [Strategic Debug] Track after every render to see sequence
   useEffect(() => {
-    console.log(`${DEBUG_TAG} 📋 POST-RENDER EFFECT #${renderCount.current}:`, {
-      timestamp: Date.now(),
+    ,
       allHookStates: {
         shots: { count: shots?.length, loading: isLoadingShots },
         generations: { loading: isLoadingGenerations, hasData: !!generationsResponse },
@@ -127,10 +126,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Early prefetch of public LoRAs to reduce loading time
   const publicLorasResult = useListPublicResources('lora');
   
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useListPublicResources states:`, {
-    isLoading: publicLorasResult.isLoading,
-    hasData: !!publicLorasResult.data,
-    dataLength: Array.isArray(publicLorasResult.data) ? publicLorasResult.data.length : undefined,
+  ? publicLorasResult.data.length : undefined,
     error: !!publicLorasResult.error
   });
   
@@ -155,8 +151,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
   
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - selectedProjectId:`, selectedProjectId);
-  
   // Use stable object for task queue notifier options
   const taskQueueOptions = useStableObject(() => ({
     projectId: selectedProjectId,
@@ -170,12 +164,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const [localJustQueued, setLocalJustQueued] = useState(false);
   const localQueuedTimeoutRef = useRef<number | null>(null);
   
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - taskQueueNotifier states:`, {
-    isEnqueuing,
-    justQueued,
-    taskQueueOptions
-  });
-
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
@@ -190,14 +178,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Use shots from context instead of direct hook call - this prevents loading state on revisit
   const { shots, isLoading: isLoadingShots, error: shotsError } = useShots();
   
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useShots context states:`, {
-    shotsCount: shots?.length,
-    isLoadingShots,
-    hasError: !!shotsError,
-    selectedProjectId,
-    note: 'Using context instead of direct hook call'
-  });
-
   // Use stable object to prevent recreation on every render
   const persistentStateContext = useStableObject(() => ({ 
     projectId: selectedProjectId 
@@ -210,7 +190,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // No-op since we handle persistence manually
   }, []);
   
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - Manual form state (bypassed usePersistentToolState):`, {
+  :`, {
     formStateReady,
     isFormExpanded,
     note: 'Using sessionStorage directly for instant UI'
@@ -247,23 +227,14 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   
   // Debug logging for state changes (after hook declarations)
   useEffect(() => {
-    console.log('[ShotChangeDebug] 📊 formAssociatedShotId state changed:', {
-      newValue: formAssociatedShotId,
-      timestamp: Date.now()
     });
   }, [formAssociatedShotId]);
   
   useEffect(() => {
-    console.log('[ShotChangeDebug] 📊 selectedShotFilter state changed:', {
-      newValue: selectedShotFilter,
-      timestamp: Date.now()
     });
   }, [selectedShotFilter]);
   
   useEffect(() => {
-    console.log('[ShotChangeDebug] 📊 lastAffectedShotId state changed:', {
-      newValue: lastAffectedShotId,
-      timestamp: Date.now()
     });
   }, [lastAffectedShotId]);
   
@@ -294,30 +265,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // [GalleryPollingDebug] Log when component uses the hook
   React.useEffect(() => {
-    console.log('📊 [GalleryPollingDebug:ImageGenerationToolPage] useGenerations result:', {
-      selectedProjectId,
-      currentPage,
-      itemsPerPage,
-      isLoadingGenerations,
-      hasData: !!generationsResponse,
-      itemsCount: generationsResponse?.items?.length,
-      total: generationsResponse?.total,
-      generationsFilters,
-      renderCount: renderCount.current,
-      timestamp: Date.now()
     });
   }, [generationsResponse, isLoadingGenerations, selectedProjectId, currentPage]);
-  
-  console.log(`${DEBUG_TAG} Render #${renderCount.current} - useGenerations states:`, {
-    isLoadingGenerations,
-    hasData: !!generationsResponse,
-    dataItemsCount: generationsResponse?.items?.length,
-    total: generationsResponse?.total,
-    currentPage,
-    itemsPerPage,
-    generationsFilters,
-    selectedProjectId
-  });
   
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
@@ -330,10 +279,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const cachedGenerationsData = queryClient.getQueryData(generationsQueryKey);
   const generationsQueryState = queryClient.getQueryState(generationsQueryKey);
   
-  console.log(`${DEBUG_TAG} React Query Cache Inspection:`, {
-    queryKey: generationsQueryKey,
-    hasCachedData: !!cachedGenerationsData,
-    cachedDataItemsCount: (cachedGenerationsData as any)?.items?.length,
+  ?.items?.length,
     queryState: {
       status: generationsQueryState?.status,
       fetchStatus: generationsQueryState?.fetchStatus,
@@ -398,30 +344,16 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Handle shot change from the form (one-time update)
   const handleFormShotChange = useCallback((shotId: string | null) => {
-    console.log('[ShotChangeDebug] 🎯 handleFormShotChange called in ImageGenerationToolPage:', {
-      newShotId: shotId,
-      currentFormAssociatedShotId: formAssociatedShotId,
-      currentSelectedShotFilter: selectedShotFilter,
-      currentLastAffectedShotId: lastAffectedShotId,
-      timestamp: Date.now()
     });
     
     setFormAssociatedShotId(shotId);
-    console.log('[ShotChangeDebug] ✅ setFormAssociatedShotId called with:', shotId);
-    
     // Update the shot selection in gallery items by setting lastAffectedShotId
     if (shotId) {
-      console.log('[ShotChangeDebug] 🎯 Setting lastAffectedShotId to update gallery shot selectors:', shotId);
       setLastAffectedShotId(shotId);
-      console.log('[ShotChangeDebug] ✅ setLastAffectedShotId called with:', shotId);
-      
       // Also update the gallery filter if desired
-      console.log('[ShotChangeDebug] 🎯 Updating selectedShotFilter to:', shotId);
       setSelectedShotFilter(shotId);
-      console.log('[ShotChangeDebug] ✅ setSelectedShotFilter called with:', shotId);
-    } else {
-      console.log('[ShotChangeDebug] 🎯 Shot ID is null, not updating gallery shot selectors');
-    }
+      } else {
+      }
   }, [formAssociatedShotId, selectedShotFilter, setLastAffectedShotId]);
 
   // Handle scrolling to gallery when coming from "View All" in GenerationsPane
@@ -462,8 +394,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         timeoutMs: 15000,
       });
 
-      console.log("Debug function response data:", functionData);
-
       if (!functionData || !functionData.upscaledImageUrl) {
         console.error("Debug Edge function returned unexpected data:", functionData);
         if (functionData && functionData.message && functionData.message.includes("imageUrl is missing")) {
@@ -501,15 +431,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     const generateStartTime = Date.now();
     const generateId = `gen-${generateStartTime}-${Math.random().toString(36).slice(2, 6)}`;
     
-    console.log(`[GenerationDiag:${generateId}] 🚀 GENERATION START:`, {
-      selectedProjectId,
-      generationMode: formData.generationMode,
-      promptCount: formData.prompts?.length,
-      imagesPerPrompt: formData.imagesPerPrompt,
-      hasBatchTaskParams: !!formData.batchTaskParams,
-      timestamp: generateStartTime
-    });
-
     if (!selectedProjectId) {
       toast.error("No project selected. Please select a project before generating images.");
       return;
@@ -528,7 +449,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     try {
       // Use the batch params from the form (should always be present now)
       if (batchTaskParams) {
-        console.log('[ImageGeneration] Using unified batch task creation for model:', generationMode);
         await createBatchImageGenerationTasks(batchTaskParams);
       } else {
         // This should not happen with the updated form, but provide a safety fallback
@@ -540,13 +460,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       
       const generateDuration = Date.now() - generateStartTime;
-      console.log(`[GenerationDiag:${generateId}] ✅ GENERATION COMPLETE:`, {
-        duration: `${generateDuration}ms`,
-        tasksCreated: batchTaskParams?.prompts?.length * batchTaskParams?.imagesPerPrompt || 0,
-        timestamp: Date.now()
       });
       
-      console.log('[ImageGeneration] Image generation tasks created successfully');
       setLocalJustQueued(true);
       if (localQueuedTimeoutRef.current) {
         clearTimeout(localQueuedTimeoutRef.current);
@@ -566,11 +481,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Remove the old task tracking effect - it's now handled by useTaskQueueNotifier
 
   const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string, createNew?: boolean) => {
-    console.log('[ImageFlipDebug] [ImageGenerationToolPage] handleImageSaved called', {
-      imageId,
-      newImageUrl,
-      createNew,
-      timestamp: Date.now()
     });
     
     try {
@@ -607,11 +517,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         setGeneratedImages(prevImages => [newImageWithMetadata, ...prevImages]);
       } else {
         // Update the existing database record via Supabase
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Updating database record', {
-          imageId,
-          newImageUrl,
-          projectId: selectedProjectId,
-          timestamp: Date.now()
         });
         
         await updateGenerationLocationMutation.mutateAsync({
@@ -621,8 +526,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           projectId: selectedProjectId, // Pass projectId so cache invalidation works properly
         });
 
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Database update completed, updating local state', {
-          timestamp: Date.now()
         });
 
         // Update local state with cache-busting URL
@@ -631,13 +534,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             if (img.id === imageId) {
               // Add cache-busting parameter to force browser to reload image
               const cacheBustedUrl = `${newImageUrl}?t=${Date.now()}`;
-              console.log('[ImageFlipDebug] [ImageGenerationToolPage] Updating local state for image:', {
-                imageId,
-                oldUrl: img.url,
-                newUrl: newImageUrl,
-                cacheBustedUrl,
-                urlChanged: img.url !== newImageUrl
-              });
               return { 
                 ...img, 
                 url: cacheBustedUrl,
@@ -650,8 +546,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           });
         });
         
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Local state updated, updating query cache', {
-          timestamp: Date.now()
         });
         
         // Optimistically update all cached generations lists so the gallery updates immediately
@@ -669,22 +563,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
           }
         });
         
-        console.log('[ImageFlipDebug] [ImageGenerationToolPage] Query cache updated', {
-          queriesUpdated: generationsQueries.length,
-          timestamp: Date.now()
         });
       }
 
-      console.log('[ImageFlipDebug] [ImageGenerationToolPage] Invalidating and refetching queries', {
-        timestamp: Date.now()
       });
 
       // Aggressively invalidate and refetch the generations query to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       await queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', effectiveProjectId] });
       
-      console.log('[ImageFlipDebug] [ImageGenerationToolPage] handleImageSaved completed successfully', {
-        timestamp: Date.now()
       });
       
     } catch (error) {
@@ -859,12 +746,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
 
     try {
-      console.log('[BackfillDebug] Triggering data refresh for backfill:', {
-        deletedCount,
-        currentPage,
-        itemsPerPage,
-        selectedProjectId,
-        timestamp: Date.now()
       });
 
       // Instead of fetching new data, we'll trigger a refresh of the current page
@@ -878,8 +759,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         queryKey: ['unified-generations', 'project', effectiveProjectId, currentPage, itemsPerPage, generationsFilters] 
       });
 
-      console.log('[BackfillDebug] Data refresh completed for backfill');
-      
       // Return empty array since the refresh will update the main data source
       return [];
     } catch (error) {
@@ -1173,21 +1052,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   }, []);
 
   // [Strategic Debug] Final render decision summary
-  console.log(`${DEBUG_TAG} === RENDER END #${renderCount.current} ===`, {
-    finalDecision: {
-      showFormSkeleton: hasValidFalApiKey && isFormExpanded === undefined,
-      showGallerySkeleton: isLoadingGenerations && imagesToShow.length === 0,
-      renderMainContent: hasValidFalApiKey && isFormExpanded !== undefined
-    },
-    keyStates: {
-      hasValidFalApiKey,
-      isFormExpanded,
-      formStateReady,
-      isLoadingGenerations,
-      imagesToShowLength: imagesToShow.length,
-      hasGenerationsResponse: !!generationsResponse
-    },
-    timingSinceMount: `${Date.now() - mountTime.current}ms`
+  - mountTime.current}ms`
   });
 
   return (
@@ -1214,12 +1079,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       {/* Show loading state while persistent state is loading */}
       {(() => {
         const showFormSkeleton = hasValidFalApiKey && isFormExpanded === undefined;
-        console.log(`${DEBUG_TAG} Render #${renderCount.current} - Form skeleton decision:`, {
-          showFormSkeleton,
-          hasValidFalApiKey,
-          isFormExpanded,
-          formStateReady
-        });
         return showFormSkeleton;
       })() && (
         <div className="p-6 border rounded-lg shadow-sm bg-card w-full max-w-full animate-pulse">
@@ -1274,10 +1133,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     openaiApiKey={openaiApiKey}
                     justQueued={combinedJustQueued}
                     onShotChange={(() => {
-                      console.log('[ShotChangeDebug] 🔗 Passing handleFormShotChange callback to form:', {
-                        callbackExists: !!handleFormShotChange,
-                        callbackType: typeof handleFormShotChange
-                      });
                       return handleFormShotChange;
                     })()}
                   />
@@ -1332,15 +1187,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {(() => {
               const showSkeleton = !effectiveProjectId || (isLoadingGenerations && imagesToShow.length === 0);
-              console.log(`${DEBUG_TAG} Render #${renderCount.current} - Skeleton decision:`, {
-                showSkeleton,
-                selectedProjectId,
-                isLoadingGenerations,
-                imagesToShowLength: imagesToShow.length,
-                hasGenerationsResponse: !!generationsResponse,
-                formStateReady,
-                isFormExpanded
-              });
               return showSkeleton;
             })() ? (
               <SkeletonGallery

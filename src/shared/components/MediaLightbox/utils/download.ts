@@ -6,13 +6,6 @@ import { toast } from 'sonner';
  */
 export const downloadMedia = async (url: string, mediaId: string, isVideo: boolean): Promise<void> => {
   const downloadStartTime = Date.now();
-  console.log('[PollingBreakageIssue] [MediaLightbox] Download started', {
-    mediaId,
-    displayUrl: url,
-    isVideo,
-    timestamp: downloadStartTime
-  });
-
   try {
     // Add timeout to prevent hanging downloads
     const controller = new AbortController();
@@ -37,11 +30,6 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
 
     const blob = await response.blob();
     const downloadDuration = Date.now() - downloadStartTime;
-    console.log('[PollingBreakageIssue] [MediaLightbox] Download blob received', {
-      mediaId,
-      blobSize: blob.size,
-      durationMs: downloadDuration,
-      timestamp: Date.now()
     });
 
     const objectUrl = URL.createObjectURL(blob);
@@ -69,9 +57,7 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
       } catch {}
     }, 10000);
 
-    console.log('[PollingBreakageIssue] [MediaLightbox] Download completed successfully', {
-      mediaId,
-      totalDurationMs: Date.now() - downloadStartTime,
+    - downloadStartTime,
       timestamp: Date.now()
     });
     

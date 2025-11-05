@@ -33,7 +33,7 @@ export function useTimelineFrameUpdates({ shotId, onUpdate }: UseTimelineFrameUp
     }
 
     const dragSessionId = metadata?.drag_session_id || 'no-session';
-    console.log(`[TimelineDragFlow] [DB_UPDATE] 🎯 Session: ${dragSessionId} | Updating timeline frame for shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
+    } to frame ${newTimelineFrame}`);
 
     try {
       const { data, error } = await supabase
@@ -47,11 +47,11 @@ export function useTimelineFrameUpdates({ shotId, onUpdate }: UseTimelineFrameUp
         .select();
 
       if (error) {
-        console.log(`[TimelineDragFlow] [DB_ERROR] ❌ Session: ${dragSessionId} | Database update failed for shot_generation ${shotGenerationId.substring(0, 8)}:`, error);
+        }:`, error);
         throw error;
       }
 
-      console.log(`[TimelineDragFlow] [DB_SUCCESS] ✅ Session: ${dragSessionId} | Successfully updated shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
+      } to frame ${newTimelineFrame}`);
       
       // Notify parent of update
       if (onUpdate) {
@@ -68,18 +68,15 @@ export function useTimelineFrameUpdates({ shotId, onUpdate }: UseTimelineFrameUp
   // Exchange timeline frames between two shot generations
   const exchangePositionsNoReload = useCallback(async (shotGenerationIdA: string, shotGenerationIdB: string) => {
     if (!shotId) {
-      console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] ❌ No shotId provided');
       return;
     }
 
-    console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] 🔀 Exchanging timeline frames:', {
-      shotGenA: shotGenerationIdA.substring(0, 8),
+    ,
       shotGenB: shotGenerationIdB.substring(0, 8),
       timestamp: Date.now()
     });
 
     try {
-      console.log('[BatchModeReorderFlow] [SQL_CALL] 📞 Calling exchange_timeline_frames RPC...');
       const { data, error } = await (supabase as any).rpc('exchange_timeline_frames', {
         p_shot_id: shotId,
         p_shot_generation_id_a: shotGenerationIdA,
@@ -87,12 +84,9 @@ export function useTimelineFrameUpdates({ shotId, onUpdate }: UseTimelineFrameUp
       });
 
       if (error) {
-        console.log('[BatchModeReorderFlow] [SQL_ERROR] ❌ RPC failed:', error);
         throw error;
       }
 
-      console.log('[BatchModeReorderFlow] [SQL_SUCCESS] ✅ exchange_timeline_frames completed');
-      
       // Notify parent of update
       if (onUpdate) {
         onUpdate('position_exchange');

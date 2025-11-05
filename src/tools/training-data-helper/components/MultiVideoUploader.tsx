@@ -238,8 +238,6 @@ export function MultiVideoUploader({ onUpload, isUploading, selectedBatchId }: M
           setProcessingScenes(videoFile.id);
           try {
             const scenes = await detectScenes(videoFile.file);
-            console.log(`Detected ${scenes.length} scenes for ${videoFile.file.name}:`, scenes);
-            
             // Store scene times in the video file for later use
             (videoFile as any).detectedScenes = scenes;
             processedVideos.push(videoFile);

@@ -82,17 +82,8 @@ export const useLoraSync = ({
     }
     
     const effectId = `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    console.log(`[LoRA:${effectId}] Effect triggered for shot: ${selectedShot?.id}`);
-    
     // Only run if we have everything we need and haven't initialized this shot yet
     if (!selectedShot?.id || isShotLoraSettingsLoading || hasInitializedShot === selectedShot.id || isLoadingLorasRef.current) {
-      console.log(`[LoRA:${effectId}] Skipping initialization for shot:`, selectedShot?.id, {
-        noShotId: !selectedShot?.id,
-        settingsLoading: isShotLoraSettingsLoading,
-        alreadyInitialized: hasInitializedShot === selectedShot?.id,
-        isLoadingRef: isLoadingLorasRef.current,
-        availableLorasCount: availableLoras.length
-      });
       return;
     }
     
@@ -101,34 +92,24 @@ export const useLoraSync = ({
     
     // Also ensure availableLoras are loaded
     if (!availableLoras || availableLoras.length === 0) {
-      console.log('[LoRA] Waiting for available LoRAs to load for shot:', selectedShot.id);
       return;
     }
     
     isLoadingLorasRef.current = true;
-    console.log(`[LoRA:${effectId}] Initializing LoRAs for shot:`, selectedShot.id, {
-      shotLoraSettings: shotLoraSettings,
-      projectLoraSettings: projectLoraSettings,
-      availableLorasCount: availableLoras.length
-    });
-
     const loadLorasIntoManager = (lorasToLoad: { id: string; strength: number }[], source: string) => {
-      console.log(`[LoRA] Loading ${source} LoRAs (${lorasToLoad.length}) - current selected: ${loraManager.selectedLoras.length}`);
+      - current selected: ${loraManager.selectedLoras.length}`);
       
       // Force clear all LoRAs first using setSelectedLoras for immediate effect
       if (loraManager.setSelectedLoras) {
-        console.log(`[LoRA] Clearing existing LoRAs before loading ${source}`);
         loraManager.setSelectedLoras([]);
       }
 
       // Small delay to allow state update before adding new LoRAs
       setTimeout(() => {
-        console.log(`[LoRA] Actually adding ${lorasToLoad.length} LoRAs from ${source} - current count: ${loraManager.selectedLoras.length}`);
         // Add each LoRA with proper error checking
         lorasToLoad.forEach(savedLora => {
           const availableLora = availableLoras.find(lora => lora['Model ID'] === savedLora.id);
           if (availableLora) {
-            console.log(`[LoRA] Adding LoRA: ${savedLora.id} with strength ${savedLora.strength}`);
             // Add LoRA with correct strength immediately - no separate strength change needed
             loraManager.handleAddLora(availableLora, false, savedLora.strength);
           } else {
@@ -144,11 +125,8 @@ export const useLoraSync = ({
     if (shotHasBeenConfigured) {
       // Shot has been configured - respect the saved settings (even if empty)
       if (shotLoraSettings.loras && shotLoraSettings.loras.length > 0) {
-        console.log('[LoRA] Loading existing shot LoRAs');
         loadLorasIntoManager(shotLoraSettings.loras, 'shot');
       } else {
-        console.log('[LoRA] Shot configured with no LoRAs - keeping empty');
-        
         // Clear any existing LoRAs to respect user's choice to have none
         if (loraManager.setSelectedLoras) {
           loraManager.setSelectedLoras([]);
@@ -157,16 +135,13 @@ export const useLoraSync = ({
     } 
     // Shot has never been configured - inherit from project if available
     else if (projectLoraSettings?.loras?.length > 0) {
-      console.log('[LoRA] First-time shot setup - inheriting from project settings');
-      
       // Save project LoRAs as shot LoRAs for first-time setup
       updateShotLoraSettings('shot', { loras: projectLoraSettings.loras });
       
       // Load them into the manager
       loadLorasIntoManager(projectLoraSettings.loras, 'project (inherited)');
     } else {
-      console.log('[LoRA] No LoRAs to load for this shot');
-    }
+      }
     
     setHasInitializedShot(selectedShot.id);
     isLoadingLorasRef.current = false;
@@ -197,15 +172,12 @@ export const useLoraSync = ({
     if (!hasInitializedLorasRef.current) {
       prevSelectedLorasRef.current = currentLorasKey;
       hasInitializedLorasRef.current = true;
-      console.log('[PromptRetentionDebug] [useLoraSync] Initial load - not saving, just recording state');
       return;
     }
     
     // Only save if LoRAs actually changed after initialization
     if (currentLorasKey !== prevSelectedLorasRef.current) {
       prevSelectedLorasRef.current = currentLorasKey;
-      console.log('[PromptRetentionDebug] [useLoraSync] LoRAs changed, saving:', loraManager.selectedLoras.length, 'loras');
-      
       if (loraManager.selectedLoras.length > 0) {
         const lorasToSave = loraManager.selectedLoras.map(lora => ({
           id: lora.id,

@@ -53,32 +53,24 @@ export function useVideoCountCache() {
   const setCachedCount = useCallback((shotId: string | null, count: number): void => {
     if (!shotId) return;
     cacheRef.current.set(shotId, count);
-    console.log('[VideoCountCache] Cached video count for shot:', {
-      shotId,
-      count,
-      totalCachedShots: cacheRef.current.size(),
+    ,
       timestamp: Date.now()
     });
   }, []);
   
   const clearCache = useCallback((): void => {
     cacheRef.current.clear();
-    console.log('[VideoCountCache] Cleared all cached video counts');
-  }, []);
+    }, []);
   
   const deleteCachedCount = useCallback((shotId: string | null): void => {
     if (!shotId) return;
     cacheRef.current.delete(shotId);
-    console.log('[VideoCountCache] Deleted cached count for shot:', {
-      shotId,
-      remainingCachedShots: cacheRef.current.size()
     });
   }, []);
   
   // Debug function to log cache state
   const logCacheState = useCallback((): void => {
-    console.log('[VideoCountCache] Current cache state:', {
-      size: cacheRef.current.size(),
+    ,
       cachedShotIds: cacheRef.current.getCachedShotIds(),
       timestamp: Date.now()
     });

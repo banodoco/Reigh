@@ -19,10 +19,6 @@ export const createMobileTapHandler = (
         clearTimeout(doubleTapTimeoutRef.current);
         doubleTapTimeoutRef.current = null;
       }
-      console.log('[MobilePreload] Double-tap detected - opening lightbox', {
-        originalIndex,
-        timeSinceLastTap,
-        timestamp: Date.now()
       });
       onLightboxOpen(originalIndex);
     } else {
@@ -33,19 +29,12 @@ export const createMobileTapHandler = (
       
       // NEW: Start preloading video immediately on first tap
       if (onFirstTapPreload) {
-        console.log('[MobilePreload] First tap detected - starting video preload', {
-          originalIndex,
-          timeSinceLastTap,
-          timestamp: Date.now()
         });
         onFirstTapPreload(originalIndex);
       }
       
       doubleTapTimeoutRef.current = setTimeout(() => {
         // Single tap timeout - video preloading continues in background
-        console.log('[MobilePreload] Single tap timeout - video continues preloading', {
-          originalIndex,
-          timestamp: Date.now()
         });
         doubleTapTimeoutRef.current = null;
       }, 300);
@@ -119,10 +108,6 @@ export const createTaskDetailsHandler = (
   setLightboxIndex: (index: number | null) => void
 ) => {
   return () => {
-    console.log('[TaskToggle] VideoOutputsGallery: handleShowTaskDetails called', { 
-      lightboxIndex, 
-      video: sortedVideoOutputs[lightboxIndex || 0]?.id,
-    });
     const currentVideo = sortedVideoOutputs[lightboxIndex || 0];
     if (currentVideo) {
       // Set up task details modal state first
@@ -132,12 +117,7 @@ export const createTaskDetailsHandler = (
         setShowTaskDetailsModal(true);
         // Close lightbox after modal is set to open
         setLightboxIndex(null);
-        console.log('[TaskToggle] VideoOutputsGallery: State updated for task details modal', {
-          newSelectedVideo: currentVideo.id,
-          newShowModal: true,
-          closedLightbox: true
-        });
-      }, 100);
+        }, 100);
     } else {
       console.error('[TaskToggle] VideoOutputsGallery: No current video found for lightboxIndex:', lightboxIndex);
     }

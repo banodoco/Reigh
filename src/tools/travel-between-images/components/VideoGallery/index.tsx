@@ -243,11 +243,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Reset state when shot changes to prevent stale data
   useEffect(() => {
     if (shotId !== prevShotIdRef.current) {
-      console.log('[SkeletonOptimization] Shot changed - resetting ALL state:', {
-        prevShotId: prevShotIdRef.current,
-        newShotId: shotId,
-        resettingLastGoodCount: lastGoodCountRef.current,
-        timestamp: Date.now()
       });
       
       // CRITICAL: Reset lastGoodCountRef to prevent cross-shot contamination
@@ -262,8 +257,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       if (window.mobileVideoPreloadMap) {
         try {
           window.mobileVideoPreloadMap.clear();
-          console.log('[MobilePreload] Cleared mobileVideoPreloadMap on shot change');
-        } catch {}
+          } catch {}
       }
       
       prevShotIdRef.current = shotId;
@@ -276,10 +270,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   }), []);
 
   // Debug logging for hook inputs
-  console.log('[VideoGenMissing] VideoOutputsGallery props received:', {
-    projectId,
-    shotId,
-    enabled: !!(projectId && shotId),
+  ,
     timestamp: Date.now()
   });
 
@@ -304,43 +295,29 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // DEEP DEBUG: Log every change in loading states
   useEffect(() => {
-    console.log(`[VideoGalleryPreload] DATA_LOADING_STATE_CHANGE:`, {
-      isLoadingGenerations,
-      isFetchingGenerations,
-      hasGenerationsData: !!generationsData,
-      generationsDataItems: generationsData?.items?.length || 0,
-      generationsDataTotal: generationsData?.total || 0,
-      generationsError: !!generationsError,
-      projectId,
-      shotId,
-      timestamp: Date.now()
     });
   }, [isLoadingGenerations, isFetchingGenerations, generationsData, generationsError, projectId, shotId]);
 
   // Get video outputs from unified data
   const videoOutputs = useMemo(() => {
-    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_PROCESSING:`, {
-      hasGenerationsData: !!(generationsData as any)?.items,
+    ?.items,
       itemCount: (generationsData as any)?.items?.length || 0,
       processingStarted: Date.now()
     });
 
     if (!(generationsData as any)?.items) {
-      console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_EMPTY: No generations data items`);
       return [];
     }
     
     // Debug log the raw data structure to see thumbnails
-    console.log('[ThumbnailDebug] Raw generationsData.items:', {
-      itemCount: (generationsData as any).items.length,
+    .items.length,
       firstItem: (generationsData as any).items[0],
       itemsWithThumbs: (generationsData as any).items.filter((item: any) => item.thumbUrl && item.thumbUrl !== item.url).length,
       timestamp: Date.now()
     });
     
     const transformed = transformUnifiedGenerationsData((generationsData as any).items);
-    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_TRANSFORMED:`, {
-      originalCount: (generationsData as any).items.length,
+    .items.length,
       transformedCount: transformed.length,
       transformedItems: transformed.map(item => ({
         id: item.id?.substring(0, 8),
@@ -404,12 +381,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       ? sorted.filter(video => (video as { starred?: boolean }).starred === true)
       : sorted;
     
-    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_SORTED:`, {
-      originalCount: videoOutputs.length,
-      sortedCount: sorted.length,
-      filteredCount: filtered.length,
-      showStarredOnly,
-      sortedIds: filtered.slice(0, 5).map(item => item.id?.substring(0, 8)),
+    .map(item => item.id?.substring(0, 8)),
       timestamp: Date.now()
     });
     return filtered;
@@ -438,13 +410,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   
   // DEEP DEBUG: Log pagination changes
   useEffect(() => {
-    console.log(`[VideoGalleryPreload] PAGINATION_STATE:`, {
-      currentPage,
-      totalPages,
-      itemsPerPage,
-      totalVideos: sortedVideoOutputs.length,
-      currentVideoOutputsCount: currentVideoOutputs.length,
-      currentVideoIds: currentVideoOutputs.slice(0, 3).map(item => item.id?.substring(0, 8)),
+    .map(item => item.id?.substring(0, 8)),
       timestamp: Date.now()
     });
   }, [currentPage, totalPages, currentVideoOutputs.length, sortedVideoOutputs.length]);
@@ -479,7 +445,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       // Check for cache mismatch; do NOT invalidate globally to avoid transient nulls/flicker.
       // We immediately update the per-shot cache below which resolves the mismatch.
       if (projectVideoCount !== null && projectVideoCount !== newTotal) {
-        console.log('[SkeletonOptimization] Cache mismatch detected - updating per-shot cache only (no global invalidate):', {
+        :', {
           shotId,
           projectVideoCount,
           actualTotal: newTotal,
@@ -493,7 +459,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       // Only update lastGoodCountRef if we have a positive count or it's the first time
       if (newTotal > 0 || lastGoodCountRef.current === null) {
         lastGoodCountRef.current = newTotal;
-        console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE:`, {
+        }] CACHE_UPDATE:`, {
           shotId,
           newTotal,
           lastGoodCount: lastGoodCountRef.current,
@@ -513,7 +479,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         });
         // Don't update lastGoodCountRef with 0 if we had a good count before
       } else {
-        console.log(`[SkeletonIssue:${shotId?.substring(0, 8)}] CACHE_UPDATE_SKIPPED:`, {
+        }] CACHE_UPDATE_SKIPPED:`, {
           shotId,
           newTotal,
           lastGoodCount: lastGoodCountRef.current,
@@ -532,8 +498,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // If project cache hasn't loaded yet but local shot data hints 0 videos,
   // treat the effective cached count as 0 to avoid a skeleton flicker.
   const cachedCount = (typeof cachedCountRaw === 'number') ? cachedCountRaw : (localZeroHint ? 0 : null);
-  console.log(`[VideoSkeletonDebug] GET_CACHED_COUNT for shot gallery:`, {
-    shotId: shotId?.substring(0, 8) || 'no-shot',
+  || 'no-shot',
     cachedCount,
     cachedCountRaw,
     localZeroHint,
@@ -548,8 +513,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   
   // UNIQUE DEBUG ID for tracking this specific issue
   const debugId = `[VideoSkeletonDebug]`;
-  console.log(`${debugId} SKELETON_DECISION for shot gallery:`, {
-    shotId: shotId?.substring(0, 8) || 'no-shot',
+  || 'no-shot',
     isLoadingGenerations,
     videoOutputsLength: videoOutputs.length,
     generationsError: !!generationsError,
@@ -569,18 +533,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   });
   
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
-  console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
-    showSkeletons,
-    skeletonCount,
-    isLoadingGenerations,
-    videoOutputsLength: videoOutputs.length,
-    hasEverFetched,
-    generationsError: !!generationsError,
-    logic: `isLoadingGenerations=${isLoadingGenerations} && videoOutputs.length=${videoOutputs.length} === 0 && !hasEverFetched=${!hasEverFetched}`,
-    decision: showSkeletons ? 'SHOW_SKELETONS' : 'SHOW_VIDEOS',
-    cachedCount,
-    shotId,
-    timestamp: Date.now()
   });
 
   // Enhanced empty state check - show immediately if cache says 0 OR local hint says 0, 
@@ -594,14 +546,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   );
   
   // Log empty state decision
-  console.log(`${debugId} EMPTY_STATE_DECISION:`, {
-    shouldShowEmpty,
-    isLoadingGenerations,
-    isFetchingGenerations,
-    sortedVideoOutputsLength: sortedVideoOutputs.length,
-    cachedCount,
-    effectiveZero,
-    emptyLogic: `((${sortedVideoOutputs.length} === 0 && effectiveZero=${effectiveZero}) || (!${isLoadingGenerations} && ${sortedVideoOutputs.length} === 0)) = ${shouldShowEmpty}`,
+  || (!${isLoadingGenerations} && ${sortedVideoOutputs.length} === 0)) = ${shouldShowEmpty}`,
     finalRenderDecision: shouldShowEmpty ? 'RENDER_EMPTY_STATE' : showSkeletons ? 'RENDER_SKELETONS' : 'RENDER_VIDEOS',
     note: 'isFetchingGenerations ignored to prevent flickering during background refetches',
     timestamp: Date.now()
@@ -613,9 +558,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   
   // Mobile video preload handler
   const handleMobilePreload = useCallback((index: number) => {
-    console.log('[MobilePreload] Gallery received preload request', {
-      index,
-      timestamp: Date.now()
     });
     
     // Call the VideoItem's preload function via the global map
@@ -752,10 +694,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     const hasChanged = prevShotKeyRef.current !== shotKey;
     
     if (hasChanged && prevShotKeyRef.current !== undefined) {
-      console.log('[VideoOutputsGallery] Shot changed, resetting internal state', {
-        prevShotKey: prevShotKeyRef.current,
-        newShotKey: shotKey,
-        timestamp: Date.now()
       });
       
       // Reset all internal state
@@ -925,9 +863,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           <MediaLightbox
             media={(() => {
               const media = displaySortedVideoOutputs[lightboxIndex];
-              console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
-                mediaId: media.id,
-                mediaKeys: Object.keys(media),
+              ,
                 hasStarred: 'starred' in media,
                 starredValue: (media as { starred?: boolean }).starred,
                 timestamp: Date.now()
@@ -947,8 +883,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             shotId={shotId || undefined}
             showTaskDetails={true}
             onNavigateToGeneration={(generationId: string) => {
-              console.log('[VideoGallery:DerivedNav] 📍 Navigate to generation', {
-                generationId: generationId.substring(0, 8),
+              ,
                 sortedVideoOutputsCount: sortedVideoOutputs.length,
                 externalGenerationsCount: externalGens.externalGenerations.length,
                 tempDerivedCount: externalGens.tempDerivedGenerations.length,
@@ -957,10 +892,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
               // Search in combined videos (sorted + external + derived)
               const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
               if (index !== -1) {
-                console.log('[VideoGallery:DerivedNav] ✅ Found at index', index);
                 setLightboxIndex(index);
               } else {
-                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current videos');
                 toast.info('This generation is not currently loaded');
               }
             }}
@@ -983,7 +916,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             generationId={selectedVideoForDetails.id}
             open={showTaskDetailsModal}
             onOpenChange={(open) => {
-              console.log('[TaskToggle] VideoOutputsGallery: TaskDetailsModal onOpenChange', { open, selectedVideo: selectedVideoForDetails?.id });
               if (!open) {
                 // When closing, reset both states
                 setShowTaskDetailsModal(false);

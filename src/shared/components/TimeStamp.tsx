@@ -46,14 +46,7 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
   // Debug logging for timestamp updates (development only)
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development' && updateTrigger > 0) {
-      console.log('[TimeStamp] Update triggered:', {
-        updateTrigger,
-        isVisible,
-        shouldUpdate,
-        isMobile,
-        showOnHover,
-        isHovered,
-        date: date.toISOString(),
+      ,
         timestamp: Date.now()
       });
     }

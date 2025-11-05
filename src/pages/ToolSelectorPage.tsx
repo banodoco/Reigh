@@ -127,10 +127,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   useEffect(() => {
     if (item.id === 'character-animate' || item.id === 'join-clips') {
       const isDisabled = !isVisible;
-      console.log(`[${item.id}Visibility] ToolCard:`,
-        `isVisible=${isVisible}, isDisabled=${isDisabled}, ` +
-        `hasTool=${!!item.tool}`);
-    }
+      }
   }, [item.id, isVisible, item.tool]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -303,10 +300,7 @@ const ToolSelectorPage: React.FC = () => {
 
   // Debug logging for character-animate visibility
   useEffect(() => {
-    console.log('[CharacterAnimateVisibility] Generation methods state:', 
-      `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
-      `isLoading=${isLoadingGenerationMethods}, isCloudEnabled=${isCloudGenerationEnabled}, env=${currentEnv}`);
-  }, [generationMethods, isLoadingGenerationMethods, isCloudGenerationEnabled, currentEnv]);
+    }, [generationMethods, isLoadingGenerationMethods, isCloudGenerationEnabled, currentEnv]);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -321,12 +315,6 @@ const ToolSelectorPage: React.FC = () => {
     if (toolId === 'character-animate') {
       const toolEnvironmentCheck = tool.environments.includes(currentEnv) || currentEnv === AppEnv.DEV;
       const shouldShow = toolEnvironmentCheck && isCloudGenerationEnabled;
-      
-      console.log('[CharacterAnimateVisibility] Visibility check:',
-        `isLoading=${isLoadingGenerationMethods}, ` +
-        `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
-        `isCloudEnabled=${isCloudGenerationEnabled}, envCheck=${toolEnvironmentCheck}, ` +
-        `shouldShow=${shouldShow}, FINAL=${isLoadingGenerationMethods ? false : shouldShow}`);
       
       // Hide during loading to prevent showing with fallback value
       if (isLoadingGenerationMethods) return false;

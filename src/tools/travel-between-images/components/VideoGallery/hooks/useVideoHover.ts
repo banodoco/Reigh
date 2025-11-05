@@ -14,8 +14,6 @@ export const useVideoHover = (isMobile: boolean) => {
   const handleHoverStart = useCallback((video: GenerationRow, event: React.MouseEvent) => {
     if (isMobile) return; // Don't show hover preview on mobile
     
-    console.log('[VideoGenMissing] Starting hover for video:', video.id);
-    
     // Clear any existing timeout and reset preview hover state
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
@@ -57,15 +55,11 @@ export const useVideoHover = (isMobile: boolean) => {
     setHoverPosition({ x, y, positioning });
     setHoveredVideo(video);
     
-    console.log('[VideoGenMissing] Set hovered video:', video.id, 'positioning:', positioning);
-  }, [isMobile]);
+    }, [isMobile]);
 
   const handleHoverEnd = useCallback(() => {
-    console.log('[VideoGenMissing] Hover end requested, isHoveringPreview:', isHoveringPreviewRef.current);
-    
     // If user is hovering over the preview, don't close it
     if (isHoveringPreviewRef.current) {
-      console.log('[VideoGenMissing] Keeping hover open - user is hovering preview');
       return;
     }
     
@@ -77,7 +71,6 @@ export const useVideoHover = (isMobile: boolean) => {
     hoverTimeoutRef.current = setTimeout(() => {
       // Double-check if still not hovering preview after delay
       if (!isHoveringPreviewRef.current) {
-        console.log('[VideoGenMissing] Ending hover after delay');
         setHoveredVideo(null);
         setHoverPosition(null);
         setIsInitialHover(false);
@@ -86,7 +79,6 @@ export const useVideoHover = (isMobile: boolean) => {
   }, []);
 
   const handlePreviewEnter = useCallback(() => {
-    console.log('[VideoGenMissing] Mouse entered preview');
     isHoveringPreviewRef.current = true;
     // Clear any pending close timeout
     if (hoverTimeoutRef.current) {
@@ -96,14 +88,12 @@ export const useVideoHover = (isMobile: boolean) => {
   }, []);
 
   const handlePreviewLeave = useCallback(() => {
-    console.log('[VideoGenMissing] Mouse left preview');
     isHoveringPreviewRef.current = false;
     // Close the preview after a brief delay
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
     hoverTimeoutRef.current = setTimeout(() => {
-      console.log('[VideoGenMissing] Closing preview after leaving');
       setHoveredVideo(null);
       setHoverPosition(null);
       setIsInitialHover(false);

@@ -108,20 +108,15 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   // FAST RESUME: Try to restore selectedProjectId from localStorage immediately
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(() => {
-    console.log('[ProjectContext:FastResume] ATTEMPTING localStorage restoration');
     try {
       const stored = localStorage.getItem('lastSelectedProjectId');
-      console.log(`[ProjectContext:FastResume] localStorage result: ${stored}`);
       if (stored) {
-        console.log(`[ProjectContext:FastResume] Restored selectedProjectId from localStorage: ${stored}`);
         return stored;
       } else {
-        console.log('[ProjectContext:FastResume] No stored selectedProjectId found in localStorage');
-      }
+        }
     } catch (e) {
       console.error('[ProjectContext:FastResume] localStorage access failed:', e);
     }
-    console.log('[ProjectContext:FastResume] Falling back to null selectedProjectId');
     return null;
   });
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
@@ -171,18 +166,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         lastProcessedState.userId === currentUserId;
       
       if (isDuplicateEvent) {
-        console.log(`[ProjectContext:MobileDebug] Skipping duplicate auth event: ${event}, userId: ${!!currentUserId}`);
         return;
       }
 
-      console.log(`[ProjectContext:MobileDebug] Processing auth change: ${event}, userId: ${!!currentUserId}`);
-      
       // Update user ID
       setUserId(currentUserId);
       
       // [MobileStallFix] Reset preferences loading state on meaningful auth transitions
       if (event === 'SIGNED_OUT' || (event === 'SIGNED_IN' && lastProcessedState?.event !== 'SIGNED_IN')) {
-        console.log(`[ProjectContext:MobileDebug] Resetting preferences loading state due to meaningful ${event} transition`);
         setIsLoadingPreferences(false);
         if (preferencesTimeoutRef.current) {
           clearTimeout(preferencesTimeoutRef.current);
@@ -196,8 +187,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
     const handleAuthStateChange = (event: string, session: any) => {
       authStateChangeCount++;
-      console.log(`[ProjectContext:MobileDebug] Auth change #${authStateChangeCount}:`, event, !!session?.user?.id);
-      
       // Store the latest auth state
       pendingAuthState = { event, session };
       
@@ -219,7 +208,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     };
     
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log(`[ProjectContext:MobileDebug] Initial session:`, !!session?.user?.id);
       setUserId(session?.user?.id);
       lastProcessedState = { event: 'INITIAL_SESSION', userId: session?.user?.id };
     });
@@ -252,7 +240,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserPreferences = useCallback(async () => {
     if (!userId) return;
 
-    console.log(`[ProjectContext:MobileDebug] Starting preferences fetch for user: ${userId}`);
     setIsLoadingPreferences(true);
 
     // [MobileStallFix] Set a safety timeout for mobile networks
@@ -278,7 +265,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
 
       const preferences = (data?.settings as any)?.['user-preferences'] ?? {};
-      console.log(`[ProjectContext:MobileDebug] Preferences loaded successfully`);
       setUserPreferences(preferences);
       userPreferencesRef.current = preferences;
     } catch (error) {
@@ -292,8 +278,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         preferencesTimeoutRef.current = undefined;
       }
       setIsLoadingPreferences(false);
-      console.log(`[ProjectContext:MobileDebug] Preferences loading completed`);
-    }
+      }
   }, [userId]);
 
   // Update user preferences directly
@@ -337,7 +322,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     if (userId) {
       fetchUserPreferences();
     } else {
-      console.log(`[ProjectContext:MobileDebug] No userId, clearing preferences state`);
       setUserPreferences(undefined);
       userPreferencesRef.current = undefined;
       // [MobileStallFix] Critical fix: Reset loading state when no user
@@ -364,8 +348,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     if (projectId) {
       try {
         localStorage.setItem('lastSelectedProjectId', projectId);
-        console.log(`[ProjectContext:FastResume] Saved selectedProjectId to localStorage: ${projectId}`);
-        console.log(`[ProjectContext:FastResume] Verification - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
+        }`);
       } catch (e) {
         console.error(`[ProjectContext:FastResume] Failed to save to localStorage:`, e);
       }
@@ -375,7 +358,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.warn(`[ProjectContext:FastResume] REMOVING selectedProjectId from localStorage (projectId is null)`);
         localStorage.removeItem('lastSelectedProjectId');
-        console.log(`[ProjectContext:FastResume] Verification after removal - localStorage now contains: ${localStorage.getItem('lastSelectedProjectId')}`);
+        }`);
       } catch (e) {
         console.error(`[ProjectContext:FastResume] Failed to remove from localStorage:`, e);
       }
@@ -384,7 +367,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [updateUserPreferences, selectedProjectId]);
 
   const fetchProjects = useCallback(async () => {
-    console.log(`[ProjectContext:MobileDebug] Starting projects fetch`);
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -437,7 +419,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         const mappedProject = mapDbProjectToProject(newProject);
         setProjects([mappedProject]);
         // FIXED: Use handleSetSelectedProjectId to ensure localStorage is saved
-        console.log(`[ProjectContext:FastResume] Setting default project: ${mappedProject.id}`);
         handleSetSelectedProjectId(mappedProject.id);
       } else {
         const mappedProjects = projectsData.map(mapDbProjectToProject);
@@ -449,14 +430,12 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         
         // Only update if it actually changes to avoid clobbering a valid selection and redundant writes
         if (projectIdToSelect !== selectedProjectId) {
-          console.log(`[ProjectContext:FastResume] Setting selected project (resolved): ${projectIdToSelect}`);
+          : ${projectIdToSelect}`);
           handleSetSelectedProjectId(projectIdToSelect);
         } else {
-          console.log(`[ProjectContext:FastResume] Preserving current selected project: ${selectedProjectId}`);
-        }
+          }
       }
-      console.log(`[ProjectContext:MobileDebug] Projects loaded successfully`);
-    } catch (error: any) {
+      } catch (error: any) {
       console.error('[ProjectContext] Error fetching projects via API:', {
         error,
         errorMessage: error?.message,
@@ -575,7 +554,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
               }
             });
             
-            console.log('[ProjectContext] Copying settings from current project to new project (excluding prompts and references):', {
+            :', {
               sourceProjectId: selectedProjectId,
               originalToolCount: Object.keys(currentProjectData.settings).length,
               filteredToolCount: Object.keys(settingsToInherit).length,
@@ -708,11 +687,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
   // [MobileStallFix] Enhanced project loading with fallback recovery
   useEffect(() => {
-    console.log(`[ProjectContext:MobileDebug] Project loading check - userId: ${!!userId}, isLoadingPreferences: ${isLoadingPreferences}`);
-    
     // FAST RESUME: Start loading projects as soon as we have userId (don't wait for preferences)
     if (userId) {
-      console.log(`[ProjectContext:MobileDebug] Starting project fetch immediately (removed 100ms delay)`);
+      `);
       // REMOVED: 100ms delay that was causing slow tab resume
       fetchProjects();
 
@@ -725,7 +702,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         console.warn(`[ProjectContext:MobileDebug] Projects fetch timeout, forcing recovery attempt`);
         if (isLoadingProjects) {
           // Force retry the fetch without waiting for preferences
-          console.log(`[ProjectContext:MobileDebug] Forcing projects fetch retry`);
           fetchProjects();
         }
       }, isMobileRef.current ? 15000 : 10000); // Longer timeout for mobile

@@ -513,7 +513,6 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
     }
     // Prevent multiple confetti explosions
     if (window.confettiAlreadyTriggered) {
-      console.log('[Confetti] Already triggered, skipping');
       return;
     }
     window.confettiAlreadyTriggered = true;
@@ -532,7 +531,6 @@ const CreditsResultStep: React.FC<{ choice: 'music-video' | 'something-else' | '
       const modal = document.querySelector('[data-radix-dialog-content]') as HTMLElement;
       const modalRect = modal?.getBoundingClientRect();
       if (!container || !modalRect) {
-        console.log('[Confetti] No modal/container found; skipping confetti');
         return;
       }
       
@@ -745,16 +743,12 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
   };
 
   const handleGambitChoice = async (choice: 'music-video' | 'something-else' | 'no-thanks') => {
-    console.log('[GambitChoice] User made choice:', choice);
     setUserChoice(choice);
     
     try {
       // Check if user has already been given credits
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('[GambitChoice] Checking user credits status...');
-      
       if (!user) {
-        console.log('[GambitChoice] No user found');
         setCurrentStep(6);
         return;
       }
@@ -765,19 +759,13 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
         .eq('id', user.id)
         .single();
       
-      console.log('[GambitChoice] User data:', { userData, error });
-      
       if (error || !userData) {
-        console.log('[GambitChoice] Error fetching user data, skipping to result');
         setCurrentStep(6);
         return;
       }
 
       const givenCredits = (userData as any).given_credits;
-      console.log('[GambitChoice] given_credits status:', givenCredits);
-      
       if (!givenCredits) {
-        console.log('[GambitChoice] First time user - showing loading and will grant credits with confetti');
         // First time user - show loading, grant credits, and show confetti
         setIsProcessingCredits(true);
         
@@ -798,7 +786,6 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
           });
           
           if (response.ok) {
-            console.log('[GambitChoice] Credits granted successfully');
             queryClient.invalidateQueries({ queryKey: ['credits', 'balance'] });
             queryClient.invalidateQueries({ queryKey: ['credits', 'ledger'] });
             // Mark that we should show confetti exactly once after granting credits
@@ -810,12 +797,10 @@ export const WelcomeBonusModal: React.FC<WelcomeBonusModalProps> = ({
         
         // Show loading for 1.5 seconds before showing credits result with confetti
         setTimeout(() => {
-          console.log('[GambitChoice] Timeout completed - transitioning to credits result with confetti');
           setIsProcessingCredits(false);
           setCurrentStep(6); // Go to credits result step - confetti will show if shouldShowConfetti
         }, 1500);
       } else {
-        console.log('[GambitChoice] User already has credits - skipping directly to result without confetti');
         // User already has credits - skip directly to result (no loading, no confetti)
         setCurrentStep(6);
       }

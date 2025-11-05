@@ -153,15 +153,7 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     controller.abort();
   }, timeoutMs);
 
-  console.log('[TabResumeDebug] [createTask] Invoking edge function', {
-    requestId,
-    taskType: taskParams.task_type,
-    projectId: taskParams.project_id,
-    hasParams: !!taskParams.params,
-    timestamp: startTime,
-    visibilityState: document.visibilityState,
-    hasSession: !!session,
-    sessionValid: session ? (session.expires_at * 1000 > Date.now()) : false,
+  ) : false,
     tokenPreview: session?.access_token?.slice(0, 20),
     userAgent: navigator.userAgent.slice(0, 50)
   });
@@ -181,16 +173,7 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     });
 
     const durationMs = Date.now() - startTime;
-    console.log('[TabResumeDebug] [createTask] Invoke completed', {
-      requestId,
-      durationMs,
-      slow: durationMs > 5000,
-      taskType: taskParams.task_type,
-      projectId: taskParams.project_id,
-      hasError: !!error,
-      errorMessage: error?.message,
-      dataReceived: !!data,
-      dataPreview: data ? JSON.stringify(data).slice(0, 100) : null,
+    .slice(0, 100) : null,
       timestamp: Date.now(),
       visibilityState: document.visibilityState
     });
@@ -201,8 +184,6 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
 
     // Task creation events are now handled by DataFreshnessManager via realtime events
     // No manual invalidation needed - the smart polling system handles cache updates automatically
-    console.log('[PollingBreakageIssue] [createTask] Task created - DataFreshnessManager will handle cache updates via realtime events');
-
     return data;
   } catch (err: any) {
     // Normalize abort errors for better UX

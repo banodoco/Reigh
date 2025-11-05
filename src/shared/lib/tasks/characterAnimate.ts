@@ -83,8 +83,7 @@ function buildCharacterAnimatePayload(
     : (params.seed ?? DEFAULT_CHARACTER_ANIMATE_VALUES.seed);
   
   if (params.random_seed) {
-    console.log(`[CharacterAnimate] Generated random seed: ${finalSeed}`);
-  }
+    }
 
   // Build orchestrator payload
   const orchestratorPayload: Record<string, unknown> = {
@@ -108,8 +107,6 @@ function buildCharacterAnimatePayload(
  * @returns Promise resolving to the created task
  */
 export async function createCharacterAnimateTask(params: CharacterAnimateTaskParams): Promise<any> {
-  console.log("[createCharacterAnimateTask] Creating task with params:", params);
-
   try {
     // 1. Validate parameters
     validateCharacterAnimateParams(params);
@@ -133,7 +130,6 @@ export async function createCharacterAnimateTask(params: CharacterAnimateTaskPar
       params: orchestratorPayload
     });
 
-    console.log("[createCharacterAnimateTask] Task created successfully:", result);
     return result;
 
   } catch (error) {

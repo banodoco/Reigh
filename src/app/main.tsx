@@ -36,19 +36,17 @@ if (import.meta.env.DEV) {
   (window as any).switchTheme = (themeName: 'lala-land' | 'wes-anderson' | 'cat-lounging') => {
     const { switchTheme } = require('@/shared/lib/theme-switcher');
     switchTheme(themeName);
-    console.log(`Switched to ${themeName} theme`);
-  };
+    };
   
   (window as any).getAvailableThemes = () => {
     const { getAvailableThemes } = require('@/shared/lib/theme-switcher');
     return getAvailableThemes();
   };
   
-  console.log('Theme helpers available:');
-  console.log('- switchTheme("wes-anderson")');
-  console.log('- switchTheme("lala-land")');
-  console.log('- switchTheme("cat-lounging")');
-  console.log('- getAvailableThemes()');
+  ');
+  ');
+  ');
+  ');
 }
 
 createRoot(document.getElementById('root')!).render(

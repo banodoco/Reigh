@@ -28,14 +28,7 @@ function shouldLog(): boolean {
 export function log(tag: string, ...args: any[]): void {
   if (!shouldLog()) return;
   // Group for easier collapsing in DevTools
-  // Chrome automatically collapses identical consecutive console.log lines when groupCollapsed is used.
-  // We want a simple prefix though, so stick with ordinary log.
-  // Tag is wrapped in [] to make it searchable.
-  // eslint-disable-next-line no-console
-  console.log(`[${tag}]`, ...args);
-}
-
-export function time(tag: string, label: string): void {
+  // Chrome automatically collapses identical consecutive : void {
   if (!shouldLog()) return;
   // eslint-disable-next-line no-console
   console.time(`[${tag}] ${label}`);

@@ -57,12 +57,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
 
   // Extract input images from task params
   const inputImages = useMemo(() => {
-    console.log('[SharedGenDebug] Extracting input images from task:', {
-      hasTask: !!task,
-      taskParams: task?.params,
-      fullTask: task
-    });
-    
     const cleanUrl = (url: string): string => {
       if (typeof url !== 'string') return url;
       return url.replace(/^["']|["']$/g, '');
@@ -72,38 +66,23 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     const orchestratorPayload = p.full_orchestrator_payload || {};
     const orchestratorDetails = p.orchestrator_details || {};
     
-    console.log('[SharedGenDebug] Checking locations:', {
-      'orchestratorPayload.input_images': orchestratorPayload.input_images,
-      'orchestratorDetails.input_images': orchestratorDetails.input_images,
-      'p.input_images': p.input_images,
-      'orchestratorPayload.input_image_paths_resolved': orchestratorPayload.input_image_paths_resolved,
-      'p.input_image_paths_resolved': p.input_image_paths_resolved,
-      'p.imageUrls': p.imageUrls,
-    });
-    
     // Try multiple possible locations for input images
     if (Array.isArray(orchestratorPayload.input_images) && orchestratorPayload.input_images.length > 0) {
-      console.log('[SharedGenDebug] Found images in orchestratorPayload.input_images:', orchestratorPayload.input_images);
       return orchestratorPayload.input_images.map(cleanUrl);
     }
     if (Array.isArray(orchestratorDetails.input_images) && orchestratorDetails.input_images.length > 0) {
-      console.log('[SharedGenDebug] Found images in orchestratorDetails.input_images:', orchestratorDetails.input_images);
       return orchestratorDetails.input_images.map(cleanUrl);
     }
     if (Array.isArray(p.input_images) && p.input_images.length > 0) {
-      console.log('[SharedGenDebug] Found images in p.input_images:', p.input_images);
       return p.input_images.map(cleanUrl);
     }
     if (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
-      console.log('[SharedGenDebug] Found images in p.imageUrls:', p.imageUrls);
       return p.imageUrls.map(cleanUrl);
     }
     if (Array.isArray(orchestratorPayload.input_image_paths_resolved)) {
-      console.log('[SharedGenDebug] Found images in orchestratorPayload.input_image_paths_resolved:', orchestratorPayload.input_image_paths_resolved);
       return orchestratorPayload.input_image_paths_resolved.map(cleanUrl);
     }
     if (Array.isArray(p.input_image_paths_resolved)) {
-      console.log('[SharedGenDebug] Found images in p.input_image_paths_resolved:', p.input_image_paths_resolved);
       return p.input_image_paths_resolved.map(cleanUrl);
     }
     
@@ -129,14 +108,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       ? [0, ...segmentFrames]  // Prepend 0 for first image
       : [];
     
-    console.log('[SharedGenDebug] Segment frames from task:', {
-      rawSegmentFrames: segmentFrames,
-      timelineFramesWithZero: timelineFrames,
-      orchestratorPayload_segment_frames: orchestratorPayload.segment_frames_expanded,
-      orchestratorDetails_segment_frames: orchestratorDetails.segment_frames_expanded,
-      params_segment_frames: p.segment_frames_expanded,
-    });
-
     const images = inputImages.map((url, index) => ({
       id: `shared-image-${index}`,
       shotImageEntryId: `shared-image-${index}`, // Required for Timeline component
@@ -156,13 +127,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       createdAt: new Date().toISOString(),
     }));
     
-    console.log('[SharedGenDebug] Created shotImages:', {
-      inputImagesCount: inputImages.length,
-      shotImagesCount: images.length,
-      shotImages: images,
-      generationMode: generationMode,
-      usedSegmentFrames: timelineFrames.length > 0,
-      framePositions: images.map(img => img.timeline_frame),
+    ,
     });
     
     return images;
@@ -286,12 +251,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
         return;
       }
 
-      console.log('[SharedGenerationView] Successfully copied:', {
-        newTaskId: newTask.id,
-        newGenerationId: newGeneration.id,
-        projectId
-      });
-
       setCopied(true);
       toast({
         title: "Copied to your account!",
@@ -340,12 +299,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   const videoUrl = getDisplayUrl((generation?.location || generation?.imageUrl || '') as string);
   const thumbnailUrl = generation?.thumbUrl ? getDisplayUrl(generation.thumbUrl as string) : null;
 
-  console.log('[SharedGenDebug] Rendering component with:', {
-    shotImagesLength: shotImages.length,
-    shotImages: shotImages,
-    videoUrl,
-    thumbnailUrl,
-    taskSettingsPrompt: taskSettings.prompt?.substring(0, 50),
+  ,
     taskSettingsContextFrames: taskSettings.context_frames,
   });
 

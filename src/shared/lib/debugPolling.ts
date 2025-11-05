@@ -10,8 +10,6 @@ export const debugPolling = {
    * Test basic Supabase connection
    */
   async testConnection(projectId: string) {
-    console.log('[PollingDebug] Testing Supabase connection...');
-    
     try {
       const { data, error } = await supabase
         .from('tasks')
@@ -30,7 +28,6 @@ export const debugPolling = {
         return false;
       }
       
-      console.log('[PollingDebug] Connection test passed:', { data });
       return true;
     } catch (err) {
       console.error('[PollingDebug] Connection test exception:', err);
@@ -42,8 +39,6 @@ export const debugPolling = {
    * Test the exact query that's failing
    */
   async testTaskStatusQuery(projectId: string) {
-    console.log('[PollingDebug] Testing task status query...');
-    
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     
     try {
@@ -54,7 +49,6 @@ export const debugPolling = {
         .in('status', ['Queued', 'In Progress'])
         .is('params->orchestrator_task_id_ref', null);
         
-      console.log('[PollingDebug] Executing processing tasks query...');
       const { count, error } = await processingQuery;
       
       if (error) {
@@ -69,7 +63,6 @@ export const debugPolling = {
         return false;
       }
       
-      console.log('[PollingDebug] Processing query succeeded:', { count });
       return true;
     } catch (err) {
       console.error('[PollingDebug] Query test exception:', err);
@@ -81,10 +74,7 @@ export const debugPolling = {
    * Check current page visibility state
    */
   checkPageVisibility() {
-    console.log('[PollingDebug] Page visibility state:', {
-      visibilityState: document.visibilityState,
-      hidden: document.hidden,
-      hasFocus: document.hasFocus(),
+    ,
       timestamp: Date.now()
     });
   },
@@ -93,8 +83,6 @@ export const debugPolling = {
    * Monitor React Query cache
    */
   inspectReactQueryCache(queryClient: any, projectId: string) {
-    console.log('[PollingDebug] React Query cache inspection:');
-    
     const taskStatusQueries = queryClient.getQueriesData({
       queryKey: ['task-status-counts', projectId]
     });
@@ -102,9 +90,6 @@ export const debugPolling = {
     const paginatedTaskQueries = queryClient.getQueriesData({
       queryKey: ['tasks', 'paginated', projectId]
     });
-    
-    console.log('[PollingDebug] Task status queries:', taskStatusQueries);
-    console.log('[PollingDebug] Paginated task queries:', paginatedTaskQueries);
     
     return {
       taskStatusQueries,
@@ -116,8 +101,6 @@ export const debugPolling = {
    * Full diagnostic
    */
   async runFullDiagnostic(projectId: string, queryClient?: any) {
-    console.log('[PollingDebug] 🔍 Running full polling diagnostic...');
-    
     this.checkPageVisibility();
     
     const connectionOk = await this.testConnection(projectId);
@@ -127,12 +110,7 @@ export const debugPolling = {
       this.inspectReactQueryCache(queryClient, projectId);
     }
     
-    console.log('[PollingDebug] 📊 Diagnostic summary:', {
-      projectId,
-      connectionOk,
-      queryOk,
-      visibilityState: document.visibilityState,
-      timestamp: new Date().toISOString()
+    .toISOString()
     });
     
     return {

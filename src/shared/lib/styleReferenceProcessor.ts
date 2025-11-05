@@ -12,54 +12,42 @@ import { parseRatio, ASPECT_RATIO_TO_RESOLUTION } from './aspectRatios';
  * @returns Object with scaled width and height, or null if invalid
  */
 const getScaledDimensions = (aspectRatioString: string): { width: number; height: number } | null => {
-  console.log('[StyleRefDebug] getScaledDimensions called with aspectRatioString:', aspectRatioString);
-  console.log('[StyleRefDebug] Available aspect ratios:', Object.keys(ASPECT_RATIO_TO_RESOLUTION));
+  );
   
   // Direct lookup first (handles exact matches like "1:1", "16:9", etc.)
   if (ASPECT_RATIO_TO_RESOLUTION[aspectRatioString]) {
     const resolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatioString];
     const [width, height] = resolution.split('x').map(Number);
     const scaled = { width: Math.round(width * 1.5), height: Math.round(height * 1.5) };
-    console.log('[StyleRefDebug] Direct match found:', aspectRatioString, resolution, '->', scaled);
     return scaled;
   }
   
   // Find the aspect ratio key that matches our target ratio numerically
   const targetRatio = parseRatio(aspectRatioString);
-  console.log('[StyleRefDebug] Target ratio parsed as:', targetRatio);
-  
   if (isNaN(targetRatio)) {
-    console.log('[StyleRefDebug] Invalid aspect ratio string, using fallback 1:1');
     const resolution = ASPECT_RATIO_TO_RESOLUTION['1:1'] || '670x670';
     const [width, height] = resolution.split('x').map(Number);
     const scaled = { width: Math.round(width * 1.5), height: Math.round(height * 1.5) };
-    console.log('[StyleRefDebug] Fallback dimensions:', resolution, '->', scaled);
     return scaled;
   }
 
   const aspectRatioKey = Object.keys(ASPECT_RATIO_TO_RESOLUTION).find(key => {
     const keyRatio = parseRatio(key);
     const matches = !isNaN(keyRatio) && Math.abs(keyRatio - targetRatio) < 0.001;
-    console.log('[StyleRefDebug] Checking key:', key, 'keyRatio:', keyRatio, 'matches:', matches);
     return matches;
   });
 
-  console.log('[StyleRefDebug] Found aspectRatioKey:', aspectRatioKey);
-
   if (!aspectRatioKey) {
     // Fallback to 1:1 if we can't find a match
-    console.log('[StyleRefDebug] No numerical match found, using fallback 1:1');
     const resolution = ASPECT_RATIO_TO_RESOLUTION['1:1'] || '670x670';
     const [width, height] = resolution.split('x').map(Number);
     const scaled = { width: Math.round(width * 1.5), height: Math.round(height * 1.5) };
-    console.log('[StyleRefDebug] Fallback dimensions:', resolution, '->', scaled);
     return scaled;
   }
 
   const resolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatioKey];
   const [width, height] = resolution.split('x').map(Number);
   const scaled = { width: Math.round(width * 1.5), height: Math.round(height * 1.5) };
-  console.log('[StyleRefDebug] Matched dimensions:', resolution, '->', scaled);
   return scaled;
 };
 
@@ -92,13 +80,10 @@ export const processStyleReferenceForAspectRatio = async (
 
       // Get target dimensions (1.5x project resolution) if aspect ratio string is provided
       let targetDimensions: { width: number; height: number } | null = null;
-      console.log('[StyleRefDebug] processStyleReferenceForAspectRatio called with aspectRatioString:', aspectRatioString);
       if (aspectRatioString) {
         targetDimensions = getScaledDimensions(aspectRatioString);
-        console.log('[StyleRefDebug] Target dimensions calculated:', targetDimensions);
-      } else {
-        console.log('[StyleRefDebug] No aspectRatioString provided, will use legacy behavior');
-      }
+        } else {
+        }
 
       // Calculate dimensions for the target aspect ratio
       let canvasWidth: number;
@@ -171,19 +156,13 @@ export const processStyleReferenceForAspectRatio = async (
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(canvasWidth);
       canvas.height = Math.round(canvasHeight);
-      console.log('[StyleRefDebug] Final canvas dimensions:', canvas.width, 'x', canvas.height);
-      console.log('[StyleRefDebug] Browser info:', {
-        devicePixelRatio: window.devicePixelRatio,
-        maxCanvasSize: 'unknown', // We'll see if this is an issue
-        userAgent: navigator.userAgent.slice(0, 100)
       });
       
       const ctx = canvas.getContext("2d");
       
       // Verify the context was created successfully
       if (ctx) {
-        console.log('[StyleRefDebug] Canvas context created successfully');
-      }
+        }
 
       if (!ctx) {
         reject(new Error("Failed to get canvas context"));
@@ -201,17 +180,13 @@ export const processStyleReferenceForAspectRatio = async (
       );
 
       // Debug: Check canvas dimensions after drawing
-      console.log('[StyleRefDebug] Canvas dimensions after drawing:', canvas.width, 'x', canvas.height);
-      console.log('[StyleRefDebug] Draw parameters:', { drawX, drawY, drawWidth, drawHeight });
-
       // Convert to data URL
       const processedDataURL = canvas.toDataURL('image/png'); // Use PNG to preserve transparency
       
       // Debug: Check the dataURL dimensions by creating a test image
       const testImg = new Image();
       testImg.onload = () => {
-        console.log('[StyleRefDebug] DataURL image dimensions:', testImg.width, 'x', testImg.height);
-      };
+        };
       testImg.src = processedDataURL;
       
       resolve(processedDataURL);

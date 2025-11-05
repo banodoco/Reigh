@@ -126,12 +126,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     const fromMetadata = activeLightboxMedia?.metadata?.__autoEnterEditMode as boolean | undefined;
     const result = fromMetadata ?? autoEnterEditMode ?? false;
     
-    console.log('[EditModeDebug] ImageGalleryLightbox computing effective autoEnterEditMode:', {
-      fromProps: autoEnterEditMode,
-      fromMetadata,
-      effectiveValue: result,
-      activeLightboxMediaId: activeLightboxMedia?.id,
-      timestamp: Date.now()
     });
     
     return result;
@@ -153,44 +147,20 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   
   // [ShotNavDebug] confirm plumbing into Lightbox
   React.useEffect(() => {
-    console.log('[ShotNavDebug] [ImageGalleryLightbox] props snapshot', {
-      activeLightboxMediaId: activeLightboxMedia?.id,
-      selectedShotIdLocal,
-      hasOnAddToShot: !!onAddToShot,
-      hasOnAddToShotWithoutPosition: !!onAddToShotWithoutPosition,
-      showTickForImageId,
-      showTickForSecondaryImageId,
-      hasOptimisticPositioned: !!optimisticPositionedIds,
-      hasOptimisticUnpositioned: !!optimisticUnpositionedIds,
-      hasOnNavigateToShot: !!onNavigateToShot,
-      timestamp: Date.now()
     });
   }, [activeLightboxMedia?.id, selectedShotIdLocal, onAddToShot, onAddToShotWithoutPosition, showTickForImageId, showTickForSecondaryImageId, optimisticPositionedIds, optimisticUnpositionedIds, onNavigateToShot]);
   
   // Log the callback we received
   React.useEffect(() => {
-    console.log('[ImageFlipDebug] [ImageGalleryLightbox] onImageSaved prop', {
-      hasCallback: !!onImageSaved,
-      callbackType: typeof onImageSaved,
-      callbackName: onImageSaved?.name,
-      timestamp: Date.now()
     });
   }, [onImageSaved]);
   
   // Wrap onImageSaved to add logging
   const wrappedOnImageSaved = React.useCallback(async (newImageUrl: string, createNew?: boolean) => {
-    console.log('[ImageFlipDebug] [ImageGalleryLightbox] wrappedOnImageSaved called', {
-      newImageUrl,
-      createNew,
-      hasOriginalCallback: !!onImageSaved,
-      timestamp: Date.now()
     });
     
     const result = await onImageSaved(newImageUrl, createNew);
     
-    console.log('[ImageFlipDebug] [ImageGalleryLightbox] wrappedOnImageSaved completed', {
-      result,
-      timestamp: Date.now()
     });
     
     return result;
@@ -226,11 +196,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   const starredValue = useMemo(() => {
     const foundImage = filteredImages.find(img => img.id === activeLightboxMedia?.id);
     const starred = foundImage?.starred || false;
-    console.log('[StarDebug:ImageGallery] MediaLightbox starred prop', {
-      mediaId: activeLightboxMedia?.id,
-      foundImage: !!foundImage,
-      starredValue: starred,
-      foundImageKeys: foundImage ? Object.keys(foundImage) : [],
+    : [],
       timestamp: Date.now()
     });
     return starred;
@@ -245,7 +211,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       // Only trigger on mutations that might affect starred state
       if (event.type === 'updated' && event.query.queryKey[0] === 'unified-generations') {
-        console.log('[StarPersist] 📡 Cache updated, forcing enhancedMedia recompute');
         setCacheVersion(v => v + 1);
       }
     });
@@ -268,12 +233,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           const cacheItem = (data as any).items.find((g: any) => g.id === activeLightboxMedia.id);
           if (cacheItem) {
             foundImage = cacheItem;
-            console.log('[StarPersist] 📦 Found values in React Query cache:', {
-              mediaId: activeLightboxMedia.id,
-              starred: cacheItem.starred,
-              hasUpscaledUrl: !!cacheItem.upscaled_url,
-              source: 'queryCache'
-            });
             break;
           }
         }
@@ -283,11 +242,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     const starred = foundImage?.starred || false;
     const upscaled_url = foundImage?.upscaled_url || activeLightboxMedia.upscaled_url || null;
     
-    console.log('[StarPersist] 🎨 Enhanced media created:', {
-      mediaId: activeLightboxMedia.id,
-      starred,
-      hasUpscaledUrl: !!upscaled_url,
-      foundInFilteredImages: !!filteredImages.find(img => img.id === activeLightboxMedia.id),
+    ,
       source: foundImage ? 'found' : 'default',
       cacheVersion
     });
@@ -306,24 +261,12 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   // Compute positioned/associated state from gallery source record (mirrors ImageGalleryItem logic)
   const sourceRecord = useMemo(() => {
     const found = filteredImages.find(img => img.id === activeLightboxMedia?.id);
-    console.log('[ShotNavDebug] [ImageGalleryLightbox] sourceRecord lookup', {
-      mediaId: activeLightboxMedia?.id,
-      foundRecord: !!found,
-      shot_id: found?.shot_id,
-      position: found?.position,
-      all_shot_associations: found?.all_shot_associations,
-      filteredImagesCount: filteredImages.length,
-      timestamp: Date.now()
     });
     return found;
   }, [filteredImages, activeLightboxMedia?.id]);
   
   const positionedInSelectedShot = useMemo(() => {
     if (!sourceRecord || !selectedShotIdLocal) {
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: early return undefined', {
-        hasSourceRecord: !!sourceRecord,
-        selectedShotIdLocal,
-        timestamp: Date.now()
       });
       return undefined;
     }
@@ -331,11 +274,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     let result: boolean;
     if (sourceRecord.shot_id === selectedShotIdLocal) {
       result = sourceRecord.position !== null && sourceRecord.position !== undefined;
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: direct shot_id match', {
-        shot_id: sourceRecord.shot_id,
-        position: sourceRecord.position,
-        result,
-        timestamp: Date.now()
       });
       return result;
     }
@@ -344,28 +282,16 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     if (Array.isArray(a)) {
       const m = a.find(x => x.shot_id === selectedShotIdLocal);
       result = !!(m && m.position !== null && m.position !== undefined);
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: all_shot_associations check', {
-        associationsCount: a.length,
-        foundMatch: !!m,
-        matchPosition: m?.position,
-        result,
-        timestamp: Date.now()
       });
       return result;
     }
     
-    console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: fallback false', {
-      timestamp: Date.now()
     });
     return false;
   }, [sourceRecord, selectedShotIdLocal]);
   
   const associatedWithoutPositionInSelectedShot = useMemo(() => {
     if (!sourceRecord || !selectedShotIdLocal) {
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: early return undefined', {
-        hasSourceRecord: !!sourceRecord,
-        selectedShotIdLocal,
-        timestamp: Date.now()
       });
       return undefined;
     }
@@ -373,11 +299,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     let result: boolean;
     if (sourceRecord.shot_id === selectedShotIdLocal) {
       result = sourceRecord.position === null || sourceRecord.position === undefined;
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: direct shot_id match', {
-        shot_id: sourceRecord.shot_id,
-        position: sourceRecord.position,
-        result,
-        timestamp: Date.now()
       });
       return result;
     }
@@ -386,18 +307,10 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     if (Array.isArray(a)) {
       const m = a.find(x => x.shot_id === selectedShotIdLocal);
       result = !!(m && (m.position === null || m.position === undefined));
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: all_shot_associations check', {
-        associationsCount: a.length,
-        foundMatch: !!m,
-        matchPosition: m?.position,
-        result,
-        timestamp: Date.now()
       });
       return result;
     }
     
-    console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: fallback false', {
-      timestamp: Date.now()
     });
     return false;
   }, [sourceRecord, selectedShotIdLocal]);
@@ -405,22 +318,13 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   // Log what's being passed to MediaLightbox
   useEffect(() => {
     if (activeLightboxMedia) {
-      console.log('[ShotNavDebug] [ImageGalleryLightbox] Passing to MediaLightbox', {
-        mediaId: activeLightboxMedia.id,
-        selectedShotIdLocal,
-        positionedInSelectedShot,
-        associatedWithoutPositionInSelectedShot,
-        optimisticPositionedCount: optimisticPositionedIds?.size || 0,
-        optimisticUnpositionedCount: optimisticUnpositionedIds?.size || 0,
-        timestamp: Date.now()
       });
     }
   }, [activeLightboxMedia?.id, selectedShotIdLocal, positionedInSelectedShot, associatedWithoutPositionInSelectedShot, optimisticPositionedIds, optimisticUnpositionedIds]);
 
   // Handle navigation to a specific generation by ID
   const handleNavigateToGeneration = React.useCallback((generationId: string) => {
-    console.log('[DerivedNav:Gallery] 📍 handleNavigateToGeneration called', { 
-      generationId: generationId.substring(0, 8),
+    ,
       fullGenerationId: generationId,
       hasSetActiveLightboxIndex: !!setActiveLightboxIndex,
       filteredImagesCount: filteredImages.length,
@@ -431,8 +335,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     // Find the generation in the filtered images
     const index = filteredImages.findIndex(img => img.id === generationId);
     
-    console.log('[DerivedNav:Gallery] 🔍 Search result', {
-      searchedId: generationId.substring(0, 8),
+    ,
       foundIndex: index,
       wasFound: index !== -1,
       sampleImages: filteredImages.slice(0, 3).map(img => ({
@@ -442,20 +345,16 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     });
     
     if (index !== -1) {
-      console.log('[DerivedNav:Gallery] ✅ Found generation in filtered images', { 
-        index, 
-        generationId: generationId.substring(0, 8),
+      ,
         willSetIndex: true 
       });
       
       if (setActiveLightboxIndex) {
-        console.log('[DerivedNav:Gallery] 🎯 Calling setActiveLightboxIndex', { 
-          currentMedia: activeLightboxMedia?.id.substring(0, 8),
+        ,
           toIndex: index 
         });
         setActiveLightboxIndex(index);
-        console.log('[DerivedNav:Gallery] ✨ setActiveLightboxIndex completed');
-      } else {
+        } else {
         console.error('[DerivedNav:Gallery] ❌ setActiveLightboxIndex is not available!');
       }
     } else {
@@ -473,8 +372,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
 
   // Handle opening external generation (not in current filtered list)
   const handleOpenExternalGeneration = React.useCallback(async (generationId: string, derivedContext?: string[]) => {
-    console.log('[DerivedNav:Gallery] 🌐 handleOpenExternalGeneration called', {
-      generationId: generationId.substring(0, 8),
+    ,
       hasDerivedContext: !!derivedContext,
       derivedContextLength: derivedContext?.length || 0
     });
@@ -482,17 +380,12 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     // First try to find in current filtered images
     const index = filteredImages.findIndex(img => img.id === generationId);
     if (index !== -1 && setActiveLightboxIndex) {
-      console.log('[DerivedNav:Gallery] ✅ Found in filtered images, navigating locally', {
-        index,
-        generationId: generationId.substring(0, 8)
       });
       setActiveLightboxIndex(index);
       return;
     }
 
     // Not in filtered images, fetch from Supabase and open it directly
-    console.log('[DerivedNav:Gallery] 📥 Fetching external generation from database', {
-      generationId: generationId.substring(0, 8)
     });
 
     try {
@@ -508,8 +401,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       if (error) throw error;
 
       if (data) {
-        console.log('[DerivedNav:Gallery] ✅ Fetched external generation, opening in lightbox', {
-          generationId: data.id.substring(0, 8),
+        ,
           type: data.type
         });
 
@@ -544,8 +436,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           }, {}),
         } as any;
         
-        console.log('[DerivedNav:Gallery] 🎯 Opening external generation in lightbox', {
-          generationId: transformedData.id.substring(0, 8),
+        ,
           hasBasedOn: !!basedOnValue,
           isVideo: transformedData.isVideo
         });
@@ -554,9 +445,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
         const existingIndex = filteredImages.findIndex(img => img.id === transformedData.id);
         if (existingIndex !== -1) {
           // Already exists, just navigate to it
-          console.log('[DerivedNav:Gallery] External generation already in filtered images, navigating to existing', {
-            existingIndex
-          });
           if (setActiveLightboxIndex) {
             setActiveLightboxIndex(existingIndex);
           }
@@ -567,18 +455,12 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           // callback for opening external generations.
           filteredImages.push(transformedData);
           
-          console.log('[DerivedNav:Gallery] Added external generation to filtered images', {
-            newIndex: filteredImages.length - 1,
-            totalFiltered: filteredImages.length
-          });
-          
           // Navigate to the newly added item (last index)
           if (setActiveLightboxIndex) {
             setActiveLightboxIndex(filteredImages.length - 1);
           }
         }
       } else {
-        console.log('[DerivedNav:Gallery] ⚠️ No data returned from query');
         toast.error('Generation not found');
       }
     } catch (error) {
@@ -589,13 +471,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
 
   // Debug: Log when navigation handler is created
   React.useEffect(() => {
-    console.log('[DerivedNav:Gallery] 🔧 Navigation handler state', {
-      hasHandleNavigateToGeneration: !!handleNavigateToGeneration,
-      hasHandleOpenExternalGeneration: !!handleOpenExternalGeneration,
-      hasSetActiveLightboxIndex: !!setActiveLightboxIndex,
-      filteredImagesCount: filteredImages.length,
-      handlerType: typeof handleNavigateToGeneration,
-      timestamp: Date.now()
     });
   }, [handleNavigateToGeneration, handleOpenExternalGeneration, setActiveLightboxIndex, filteredImages.length]);
 
@@ -624,7 +499,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           selectedShotId={lightboxSelectedShotId || (selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined)}
           shotId={selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined}
           onShotChange={(shotId) => {
-            console.log('[ImageGalleryLightbox] Shot selector changed to:', shotId);
             setLightboxSelectedShotId(shotId);
             onShotChange(shotId);
           }}
@@ -644,8 +518,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           starred={starredValue}
           onMagicEdit={(imageUrl, prompt, numImages) => {
             // TODO: Implement magic edit generation
-            console.log('Magic Edit:', { imageUrl, prompt, numImages });
-          }}
+            }}
           // Task details functionality - now shown on all devices including mobile
           showTaskDetails={true}
           taskDetailsData={{
@@ -664,10 +537,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           positionedInSelectedShot={positionedInSelectedShot}
           associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
           onNavigateToGeneration={(() => {
-            console.log('[DerivedNav:Gallery] 📤 Passing onNavigateToGeneration to MediaLightbox', {
-              hasHandler: !!handleNavigateToGeneration,
-              handlerType: typeof handleNavigateToGeneration,
-              mediaId: enhancedMedia?.id.substring(0, 8),
+            ,
               timestamp: Date.now()
             });
             return handleNavigateToGeneration;

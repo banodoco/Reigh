@@ -36,15 +36,7 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
   className,
   isMobile = false,
 }) => {
-  console.log('[PairIndicatorDebug] PairPromptIndicator render:', {
-    pairIndex,
-    frames,
-    startFrame,
-    endFrame,
-    hasPairPrompt: !!pairPrompt,
-    hasPairNegativePrompt: !!pairNegativePrompt,
-    hasEnhancedPrompt: !!enhancedPrompt,
-    pairPrompt: pairPrompt?.substring(0, 30),
+  ,
     pairNegativePrompt: pairNegativePrompt?.substring(0, 30),
     isMobile,
   });

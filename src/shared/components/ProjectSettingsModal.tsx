@@ -131,34 +131,26 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ isOp
   const performRecrop = async (newAspectRatio: string) => {
     if (!project?.id) return;
     
-    console.log('[ProjectSettings] 🎬 Starting recrop process for aspect ratio:', newAspectRatio);
-    
     const references = imageSettings?.references || [];
     const referencesWithOriginals = references.filter(ref => ref.styleReferenceImageOriginal);
     
     if (referencesWithOriginals.length === 0) {
-      console.log('[ProjectSettings] No references with originals to recrop');
       return;
     }
     
     try {
-      console.log('[ProjectSettings] Reprocessing', referencesWithOriginals.length, 'references with originals out of', references.length, 'total');
-      
       // Reprocess all references (no toast, button shows wait state)
       const updatedReferences = await recropAllReferences(
         references,
         newAspectRatio
       );
       
-      console.log('[ProjectSettings] Recrop complete, updating settings...');
-      
       // Save updated references
       await updateImageSettings('project', {
         references: updatedReferences
       });
       
-      console.log('[ProjectSettings] ✅ Successfully updated', references.length, 'reference images');
-    } catch (error) {
+      } catch (error) {
       console.error('[ProjectSettings] Failed to recrop references:', error);
       toast.error("Failed to update some reference images. You may need to re-upload them.");
     }

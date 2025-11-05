@@ -84,8 +84,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   // Single tap → toggles selection, Double tap → opens lightbox
   const { handleTouchStart, handleTouchEnd } = useDoubleTapWithSelection({
     onSingleTap: () => {
-      console.log('[DoubleTapFlow] 🎬 SINGLE TAP CALLBACK - TimelineItem:', {
-        itemId: image.shotImageEntryId.substring(0, 8),
+      ,
         hasTapToMove: !!onTapToMove,
         hasMobileTap: !!onMobileTap,
         readOnly
@@ -93,30 +92,26 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       
       // Prefer tap-to-move on tablets, fall back to lightbox on phones
       if (onTapToMove) {
-        console.log('[DoubleTapFlow] 🎯 Calling onTapToMove (tablet selection)');
+        ');
         onTapToMove();
       } else if (onMobileTap) {
-        console.log('[DoubleTapFlow] 📱 Calling onMobileTap (phone lightbox)');
+        ');
         // On phones without tap-to-move, single tap opens lightbox
         onMobileTap();
       } else {
-        console.log('[DoubleTapFlow] ⚠️ No handlers available for single tap!');
-      }
+        }
     },
     onDoubleTap: () => {
-      console.log('[DoubleTapFlow] 🎬 DOUBLE TAP CALLBACK - TimelineItem:', {
-        itemId: image.shotImageEntryId.substring(0, 8),
+      ,
         hasMobileTap: !!onMobileTap,
         readOnly
       });
       
       // Double-tap always opens lightbox if available
       if (onMobileTap) {
-        console.log('[DoubleTapFlow] 🚀 Calling onMobileTap to open lightbox');
         onMobileTap();
       } else {
-        console.log('[DoubleTapFlow] ⚠️ No onMobileTap handler for double-tap!');
-      }
+        }
     },
     itemId: image.shotImageEntryId,
     disabled: readOnly,
@@ -192,8 +187,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
     if (onDuplicate) {
-      console.log('[DUPLICATE_DEBUG] 🖱️ TIMELINE ITEM - DUPLICATE CLICK:', {
-        shotImageEntryId: image.shotImageEntryId.substring(0, 8),
+      ,
         framePosition_from_timeline: framePosition,
         timeline_frame_from_image: (image as any).timeline_frame,
         image_id: image.id.substring(0, 8),
@@ -209,7 +203,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
   // [Position0Debug] Only log position 0 items to reduce noise
   if (framePosition === 0) {
-    console.log(`[Position0Debug] 📍 POSITION 0 Item ${image.shotImageEntryId.substring(0, 8)} position calculation:`, {
+    } position calculation:`, {
       framePosition,
       fullMinFrames,
       fullRange,
@@ -256,8 +250,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       }}
       onMouseDown={(e) => {
         // [NonDraggableDebug] Log that we reached the TimelineItem onMouseDown handler
-        console.log('[NonDraggableDebug] 📍 TimelineItem onMouseDown FIRED:', {
-          itemId: image.shotImageEntryId.substring(0, 8),
+        ,
           framePosition,
           eventType: e.type,
           buttons: e.buttons,
@@ -269,8 +262,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         const target = e.target as HTMLElement;
         const isClickingButton = target.closest('button') || target.closest('[data-click-blocker]');
         
-        console.log('[TimelineItem] 🖱️ MOUSEDOWN on timeline item:', {
-          imageId: image.shotImageEntryId.substring(0, 8),
+        ,
           framePosition,
           isHovered,
           isDragging,
@@ -281,8 +273,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         
         // Check both the DOM and the recent click flag
         if (isClickingButton || buttonClickedRef.current) {
-          console.log('[TimelineItem] 🛑 BLOCKED by button/blocker:', {
-            itemId: image.shotImageEntryId.substring(0, 8),
+          ,
             reason: isClickingButton ? 'DOM check' : 'Recent click flag'
           });
           e.preventDefault();
@@ -290,8 +281,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           return;
         }
         
-        console.log('[TimelineItem] ✅ CALLING onMouseDown handler:', {
-          itemId: image.shotImageEntryId.substring(0, 8),
+        ,
           hasHandler: typeof onMouseDown === 'function'
         });
         onMouseDown(e, image.shotImageEntryId);

@@ -278,7 +278,7 @@ export const useAllShotGenerations = (
  * const { data: timelineImages } = useTimelineShotGenerations(shotId);
  * // TypeScript knows timelineImages have metadata
  * timelineImages?.forEach(img => {
- *   console.log(img.metadata.pair_prompt); // No type error!
+ *   // No type error!
  * });
  * ```
  */

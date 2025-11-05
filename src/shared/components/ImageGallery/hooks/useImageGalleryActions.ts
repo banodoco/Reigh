@@ -98,11 +98,7 @@ export const useImageGalleryActions = ({
       }
       
       // Debug: Check if we're in server pagination mode
-      console.log('[SKELETON_DEBUG] Delete handler - pagination check:', {
-        isServerPagination,
-        serverPage,
-        hasBackfillRequest: !!onBackfillRequest,
-        willShowSkeleton: !!(isServerPagination && serverPage && onBackfillRequest),
+      ,
         timestamp: Date.now()
       });
       
@@ -113,8 +109,7 @@ export const useImageGalleryActions = ({
         const newCount = currentCount + 1;
         deletionsCountRef.current.set(currentPageNum, newCount);
         
-        console.log('[SKELETON_DEBUG] Deletion tracked - checking conditions:', {
-          imageId: imageId.substring(0, 8),
+        ,
           page: currentPageNum,
           previousCount: currentCount,
           deletionsCount: newCount,
@@ -127,10 +122,6 @@ export const useImageGalleryActions = ({
         });
         
         // Show skeleton loading immediately for any deletion in server pagination mode
-        console.log('[SKELETON_DEBUG] Setting skeleton state ON:', {
-          newCount,
-          serverPage: currentPageNum,
-          timestamp: Date.now()
         });
         setIsBackfillLoading(true);
         setBackfillSkeletonCount(newCount);
@@ -149,21 +140,11 @@ export const useImageGalleryActions = ({
           const backfillThreshold = Math.min(3, Math.ceil(itemsPerPage / 2));
           
           if (deletionsCount >= backfillThreshold) {
-            console.log('[BackfillDebug] Triggering backfill request:', {
-              page: currentPageNum,
-              deletionsCount,
-              backfillThreshold,
-              itemsPerPage,
-              timestamp: Date.now()
             });
             
             try {
               // Skeleton loading state is already set immediately upon deletion
-              console.log('[SKELETON_DEBUG] Starting backfill request');
               const backfillItems = await onBackfillRequest(deletionsCount, currentPageNum, itemsPerPage);
-              console.log('[SKELETON_DEBUG] Backfill request completed - clearing skeleton immediately:', {
-                backfillItemsCount: backfillItems.length,
-                timestamp: Date.now()
               });
               
               // Clear skeleton immediately when backfill request completes
@@ -173,19 +154,17 @@ export const useImageGalleryActions = ({
               // Reset deletion count for this page since we've backfilled
               deletionsCountRef.current.delete(currentPageNum);
               
-              console.log('[SKELETON_DEBUG] Deletion count reset for page:', currentPageNum);
-            } catch (error) {
+              } catch (error) {
               console.error('[SKELETON_DEBUG] Backfill failed - clearing skeleton:', error);
               // Clear skeleton even if backfill fails
               setIsBackfillLoading(false);
               setBackfillSkeletonCount(0);
               // Reset deletion count even if backfill fails
               deletionsCountRef.current.delete(currentPageNum);
-              console.log('[SKELETON_DEBUG] Deletion count reset for page (after error):', currentPageNum);
+              :', currentPageNum);
               // Don't show error to user as this is a nice-to-have feature
             } finally {
-              console.log('[SKELETON_DEBUG] Backfill request finished - skeleton cleared');
-            }
+              }
           }
         }, 500); // 500ms debounce
       }
@@ -223,15 +202,11 @@ export const useImageGalleryActions = ({
   }, [markOptimisticDeleted, removeOptimisticDeleted, onDelete, activeLightboxMedia, setActiveLightboxMedia, toast, isServerPagination, serverPage, onBackfillRequest, itemsPerPage, setIsBackfillLoading, setBackfillSkeletonCount]);
 
   const handleOpenLightbox = useCallback((image: GeneratedImageWithMetadata, autoEnterEditMode = false) => {
-    console.log('[BasedOnDebug] 🎯 handleOpenLightbox called with image:');
-    console.log('  imageId:', image.id?.substring(0, 8));
-    console.log('  hasBasedOn:', !!image.based_on);
-    console.log('  basedOnValue:', image.based_on);
-    console.log('  hasBasedOnInMetadata:', !!(image.metadata?.based_on));
-    console.log('  basedOnInMetadata:', image.metadata?.based_on);
-    console.log('  imageKeys:', Object.keys(image));
-    console.log('  metadataKeys:', image.metadata ? Object.keys(image.metadata) : 'no metadata');
-    console.log('  timestamp:', Date.now());
+    );
+    );
+    );
+    : 'no metadata');
+    );
     
     // We need to map the partial `GeneratedImageWithMetadata` to a `GenerationRow` for the lightbox
     const mediaRow: GenerationRow = {
@@ -250,21 +225,19 @@ export const useImageGalleryActions = ({
       based_on: image.based_on, // Include based_on field directly on the GenerationRow
     } as GenerationRow;
     
-    console.log('[BasedOnDebug] 📤 Setting activeLightboxMedia with based_on data:');
-    console.log('  mediaRowId:', mediaRow.id?.substring(0, 8));
-    console.log('  hasBasedOnInMediaRow:', !!(mediaRow as any).based_on);
-    console.log('  basedOnInMediaRow:', (mediaRow as any).based_on);
-    console.log('  hasBasedOnInMetadata:', !!(mediaRow.metadata as any)?.based_on);
-    console.log('  basedOnInMetadata:', (mediaRow.metadata as any)?.based_on);
-    console.log('  mediaRowKeys:', Object.keys(mediaRow));
-    console.log('  metadataKeys:', mediaRow.metadata ? Object.keys(mediaRow.metadata) : 'no metadata');
-    console.log('  timestamp:', Date.now());
+    );
+    .based_on);
+    .based_on);
+    ?.based_on);
+    ?.based_on);
+    );
+    : 'no metadata');
+    );
     
     setActiveLightboxMedia(mediaRow);
     setAutoEnterEditMode(autoEnterEditMode);
     
-    console.log('[EditModeDebug] State setters called');
-  }, [setActiveLightboxMedia, setAutoEnterEditMode]);
+    }, [setActiveLightboxMedia, setAutoEnterEditMode]);
 
   const handleCloseLightbox = useCallback(() => {
     setActiveLightboxMedia(null);
@@ -273,26 +246,14 @@ export const useImageGalleryActions = ({
 
   // Conform to MediaLightbox signature: returns Promise<void> and accepts optional createNew flag
   const handleImageSaved = useCallback(async (newImageUrl: string, _createNew?: boolean): Promise<void> => {
-    console.log('[ImageFlipDebug] [ImageGalleryActions] handleImageSaved called', {
-      newImageUrl,
-      createNew: _createNew,
-      activeLightboxMediaId: activeLightboxMedia?.id,
-      hasOnImageSaved: !!onImageSaved,
-      timestamp: Date.now()
     });
     
     if (activeLightboxMedia?.id && onImageSaved) {
-      console.log('[ImageFlipDebug] [ImageGalleryActions] Calling parent onImageSaved', {
-        imageId: activeLightboxMedia.id,
-        newImageUrl,
-        timestamp: Date.now()
       });
       
       // Wrap the potentially synchronous parent handler in Promise.resolve to always return a Promise
       await Promise.resolve(onImageSaved(activeLightboxMedia.id, newImageUrl));
       
-      console.log('[ImageFlipDebug] [ImageGalleryActions] Parent onImageSaved completed', {
-        timestamp: Date.now()
       });
     } else {
       console.warn('[ImageFlipDebug] [ImageGalleryActions] Cannot save - missing requirements', {
@@ -378,7 +339,6 @@ export const useImageGalleryActions = ({
   }, [setShowTickForSecondaryImageId, secondaryTickTimeoutRef]);
 
   const handleShotChange = useCallback((shotId: string) => {
-    console.log('[ShotSelectorDebug] 🔄 handleShotChange called with:', shotId);
     setLastAffectedShotId(shotId);
     setSelectedShotIdLocal(shotId);
   }, [setLastAffectedShotId, setSelectedShotIdLocal]);
@@ -386,7 +346,6 @@ export const useImageGalleryActions = ({
   // Handle skeleton cleared callback - reset deletion count
   const handleSkeletonCleared = useCallback(() => {
     if (isServerPagination && serverPage) {
-      console.log('[SKELETON_DEBUG] Skeleton cleared callback - resetting deletion count for page:', serverPage);
       deletionsCountRef.current.delete(serverPage);
     }
   }, [isServerPagination, serverPage]);

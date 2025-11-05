@@ -33,7 +33,7 @@ export class DataFreshnessManager {
     this.state.realtimeStatus = status;
     this.state.lastStatusChange = Date.now();
 
-    console.log(`[DataFreshness] 🔄 Status change: ${previousStatus} → ${status}${reason ? ` (${reason})` : ''}`, {
+    ` : ''}`, {
       timestamp: this.state.lastStatusChange,
       timeSinceLastChange: this.state.lastStatusChange - this.state.lastStatusChange
     });
@@ -55,13 +55,6 @@ export class DataFreshnessManager {
       updatedQueries++;
     });
 
-    console.log(`[DataFreshness] 📨 Event received: ${eventType}`, {
-      affectedQueries: affectedQueries.length,
-      updatedQueries,
-      timestamp: now,
-      realtimeStatus: this.state.realtimeStatus
-    });
-
     // Notify subscribers that data freshness has changed
     this.notifySubscribers();
   }
@@ -80,10 +73,6 @@ export class DataFreshnessManager {
     if (this.state.realtimeStatus === 'connected') {
       // If realtime just connected, give it time to prove it's stable
       if (timeSinceStatusChange < 30000) {
-        console.log('[DataFreshness:Polling] ⏱️ Realtime recently connected, using backup polling', {
-          queryKey: queryKey[0],
-          timeSinceConnect: timeSinceStatusChange
-        });
         return 30000; // 30 seconds - wait for realtime to prove it's stable
       }
 
@@ -92,35 +81,24 @@ export class DataFreshnessManager {
         const eventAge = now - lastEvent;
         
         if (eventAge < 60000) { // Events within 1 minute
-          console.log('[DataFreshness:Polling] ✅ Realtime working well - DISABLING polling', {
-            queryKey: queryKey[0],
-            eventAge: Math.round(eventAge / 1000) + 's',
+          + 's',
             realtimeStatus: 'healthy'
           });
           return false; // ✨ DISABLE POLLING - realtime is working!
         } else if (eventAge < 3 * 60 * 1000) { // Events within 3 minutes
-          console.log('[DataFreshness:Polling] 🔄 Realtime events getting old, light backup polling', {
-            queryKey: queryKey[0],
-            eventAge: Math.round(eventAge / 1000) + 's'
+          + 's'
           });
           return 60000; // 60 seconds - light backup polling
         }
       }
 
       // Realtime connected but no recent events - use moderate polling
-      console.log('[DataFreshness:Polling] ⚠️ Realtime connected but no recent events, moderate polling', {
-        queryKey: queryKey[0],
-        hasEvents: !!lastEvent,
-        timeSinceConnect: Math.round(timeSinceStatusChange / 1000) + 's'
+      + 's'
       });
       return 15000; // 15 seconds - something might be wrong
     }
 
     // If realtime is disconnected or errored, use aggressive polling
-    console.log('[DataFreshness:Polling] 🔴 Realtime not connected, aggressive polling', {
-      queryKey: queryKey[0],
-      realtimeStatus: this.state.realtimeStatus
-    });
     return 5000; // 5 seconds - aggressive fallback
   }
 
@@ -171,7 +149,7 @@ export class DataFreshnessManager {
    * Clear all event history (useful for testing or project changes)
    */
   reset() {
-    console.log(`[DataFreshness] 🔄 Resetting state (had ${this.state.lastEventTimes.size} tracked queries)`);
+    `);
     this.state.lastEventTimes.clear();
     this.state.realtimeStatus = 'disconnected';
     this.state.lastStatusChange = Date.now();
@@ -186,11 +164,6 @@ export class DataFreshnessManager {
     queryKeys.forEach(queryKey => {
       const key = JSON.stringify(queryKey);
       this.state.lastEventTimes.set(key, now);
-    });
-
-    console.log(`[DataFreshness] ✅ Manually marked ${queryKeys.length} queries as fresh`, {
-      queries: queryKeys,
-      timestamp: now
     });
 
     this.notifySubscribers();

@@ -51,8 +51,6 @@ export const reconstructVideoClientSide = async (
   }
 
   onProgress("Starting client-side video reconstruction...");
-  console.log(`[ClientSideReconstruction] Starting with ${editedFrames.length} frames. Video duration: ${videoDurationSeconds}s. Target FPS: ${targetFps}. Output: ${outputWidth}x${outputHeight}`);
-
   const canvas = document.createElement('canvas');
   canvas.width = outputWidth;
   canvas.height = outputHeight;
@@ -64,7 +62,7 @@ export const reconstructVideoClientSide = async (
   }
 
   let mediaStream: MediaStream;
-  console.log(`[ClientSideReconstruction] Canvas stream will capture frames when requestFrame() is called. Visual pacing target FPS (for frame delays): ${targetFps.toFixed(2)}`);
+  is called. Visual pacing target FPS (for frame delays): ${targetFps.toFixed(2)}`);
   const videoStream = canvas.captureStream(); // No explicit frame rate
   const videoStreamTrack = videoStream.getVideoTracks()[0];
   videoStreamTrack.enabled = true;
@@ -85,8 +83,7 @@ export const reconstructVideoClientSide = async (
       const audioStreamTracks = audioDestinationNode.stream.getAudioTracks();
       if (audioStreamTracks.length > 0) {
         mediaStream = new MediaStream([videoStreamTrack, audioStreamTracks[0]]);
-        console.log("[ClientSideReconstruction] Combined video and audio streams.");
-      } else {
+        } else {
         mediaStream = new MediaStream([videoStreamTrack]);
         console.warn("[ClientSideReconstruction] Audio stream track not found, proceeding with video only.");
         onProgress("Audio track issue, reconstructing video only.");
@@ -99,8 +96,7 @@ export const reconstructVideoClientSide = async (
     }
   } else {
     mediaStream = new MediaStream([videoStreamTrack]);
-    console.log("[ClientSideReconstruction] Proceeding with video-only stream.");
-  }
+    }
 
   const recordedChunks: BlobPart[] = [];
   const mimeTypesToTry = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=h264,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/webm'];
@@ -108,7 +104,6 @@ export const reconstructVideoClientSide = async (
   for (const mimeType of mimeTypesToTry) {
       if (MediaRecorder.isTypeSupported(mimeType)) {
           selectedMimeType = mimeType;
-          console.log(`[ClientSideReconstruction] Using MIME type: ${selectedMimeType}`);
           break;
       }
   }
@@ -120,18 +115,15 @@ export const reconstructVideoClientSide = async (
   const mediaRecorder = new MediaRecorder(mediaStream, { mimeType: selectedMimeType });
 
   mediaRecorder.ondataavailable = (event) => {
-    console.log(`[ClientSideReconstruction_MediaRecorder] ondataavailable event. data size: ${event.data.size}, data type: ${event.data.type}`);
     if (event.data.size > 0) {
       recordedChunks.push(event.data);
-      console.log(`[ClientSideReconstruction_MediaRecorder] Chunk pushed. Total chunks: ${recordedChunks.length}, current chunk size: ${event.data.size}`);
-    } else {
+      } else {
       console.warn(`[ClientSideReconstruction_MediaRecorder] ondataavailable event received with 0 size data.`);
     }
   };
 
   return new Promise(async (resolve, reject) => {
     mediaRecorder.onstop = () => {
-      console.log(`[ClientSideReconstruction_MediaRecorder] onstop event. Processing ${recordedChunks.length} chunks.`);
       if (recordedChunks.length === 0) {
           console.warn("[ClientSideReconstruction_MediaRecorder] No data chunks recorded. Output video will likely be empty or invalid.");
       }
@@ -140,8 +132,6 @@ export const reconstructVideoClientSide = async (
       const reconstructedFile = new File([finalBlob], `reconstructed_client_${originalVideoName.replace(/\.[^/.]+$/, "")}.${fileExtension}`, { type: selectedMimeType });
       
       onProgress("Client-side video reconstruction complete!");
-      console.log("[ClientSideReconstruction] Reconstruction success. File:", reconstructedFile.name, "Size:", reconstructedFile.size);
-      
       if (audioSourceNode) audioSourceNode.stop();
       if (audioContextInternal && audioContextInternal.state !== 'closed') audioContextInternal.close();
       videoStreamTrack.stop();
@@ -287,7 +277,6 @@ export const saveReconstructedVideo = async ({
     const videoFileNameForSupabase = `reconstructed_${generationMode}_video_${nanoid(12)}.${videoFileExtension}`;
     videoSupabasePath = `public/${videoFileNameForSupabase}`;
 
-    console.log(`[saveReconstructedVideo] Uploading ${videoFileNameForSupabase} to Supabase. Path: ${videoSupabasePath}, Type: ${reconstructedVideoFile.type}`);
     const { error: uploadError } = await supabase.storage
       .from('image_uploads')
       .upload(videoSupabasePath, reconstructedVideoFile, {
@@ -310,9 +299,7 @@ export const saveReconstructedVideo = async ({
     }
     finalVideoUrlForDbAndDisplay = publicUrlData.publicUrl;
     
-    console.log(`[saveReconstructedVideo] ${toolTypeSuffix} video successfully uploaded to Supabase: ${finalVideoUrlForDbAndDisplay}`);
-
-  } catch (storageError: any) {
+    } catch (storageError: any) {
     console.error(`[saveReconstructedVideo] Failed to upload reconstructed ${generationMode} video to Supabase:`, storageError);
     toast.error(`Storage failed for reconstructed ${toolTypeSuffix} video: ${storageError.message}. Using local blob URL for display.`);
     finalVideoUrlForDbAndDisplay = URL.createObjectURL(reconstructedVideoFile);
@@ -334,7 +321,6 @@ export const saveReconstructedVideo = async ({
   };
 
   try {
-    console.log(`[saveReconstructedVideo] Inserting ${generationMode} video record into 'generations' table.`, metadataForDb);
     const { data: dbData, error: dbError } = await supabase
       .from('generations')
       .insert({
@@ -360,7 +346,6 @@ export const saveReconstructedVideo = async ({
       };
       setGeneratedImages((prev) => [newVideoEntry, ...prev]);
       
-      console.log(`[saveReconstructedVideo] ${toolTypeSuffix} video record saved to DB and gallery updated.`);
       return true;
     }
     console.warn(`[saveReconstructedVideo] DB insert for ${generationMode} video did not return data.`);

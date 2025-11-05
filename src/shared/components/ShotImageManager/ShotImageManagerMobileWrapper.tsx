@@ -27,24 +27,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   ...props
 }) => {
   // Debug: Log props received
-  console.log('[ShotSelectorDebug] ShotImageManagerMobileWrapper received props', {
-    component: 'ShotImageManagerMobileWrapper',
-    hasOnAddToShot: !!props.onAddToShot,
-    hasOnAddToShotWithoutPosition: !!props.onAddToShotWithoutPosition,
-    allShotsLength: props.allShots?.length || 0,
-    selectedShotId: props.selectedShotId,
-    hasOnShotChange: !!props.onShotChange,
-    generationMode: props.generationMode
-  });
-
-  console.log('[PairIndicatorDebug] ShotImageManagerMobileWrapper received pair props', {
-    component: 'ShotImageManagerMobileWrapper',
-    hasOnPairClick: !!props.onPairClick,
-    hasPairPrompts: !!props.pairPrompts,
-    hasEnhancedPrompts: !!props.enhancedPrompts,
-    hasDefaultPrompt: !!props.defaultPrompt,
-    hasDefaultNegativePrompt: !!props.defaultNegativePrompt,
-    pairPromptsKeys: props.pairPrompts ? Object.keys(props.pairPrompts) : [],
+  : [],
     enhancedPromptsKeys: props.enhancedPrompts ? Object.keys(props.enhancedPrompts) : [],
   });
 
@@ -135,7 +118,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
           ? (currentImage as any).timeline_frame === null || (currentImage as any).timeline_frame === undefined
           : undefined;
 
-        console.log('[BasedOnNav] 📊 MediaLightbox props (Mobile):', {
+        :', {
           mediaId: lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8),
           showTaskDetails: true,
           hasTaskDetailsData: !!taskDetailsData,
@@ -161,7 +144,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             toolTypeOverride={props.toolTypeOverride}
             autoEnterInpaint={lightbox.shouldAutoEnterInpaint}
             onClose={() => {
-              console.log('[BasedOnNav] 🚪 MediaLightbox onClose called (Mobile)', {
+              ', {
                 lightboxIndex: lightbox.lightboxIndex,
                 currentImagesLength: lightbox.currentImages.length,
                 hasDerivedNavContext: !!externalGens.derivedNavContext,
@@ -196,14 +179,12 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             showTaskDetails={true}
             taskDetailsData={taskDetailsData}
             onNavigateToGeneration={(generationId: string) => {
-              console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
-                generationId: generationId.substring(0, 8),
+              ,
                 currentImagesCount: lightbox.currentImages.length,
                 currentIndex: lightbox.lightboxIndex
               });
               const index = lightbox.currentImages.findIndex((img: any) => img.id === generationId);
               if (index !== -1) {
-                console.log('[ShotImageManager:Mobile] ✅ Found generation at index', index);
                 lightbox.setLightboxIndex(index);
               } else {
                 console.error('[ShotImageManager:Mobile] ❌ Generation not found in current images', {
@@ -216,24 +197,14 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             allShots={props.allShots}
             selectedShotId={isExternalGen ? externalGens.externalGenLightboxSelectedShot : (lightboxSelectedShotId || props.selectedShotId)}
             onShotChange={isExternalGen ? (shotId) => {
-              console.log('[ShotImageManager:Mobile] External gen shot changed', { shotId: shotId?.substring(0, 8) });
+              });
               externalGens.setExternalGenLightboxSelectedShot(shotId);
             } : (shotId) => {
-              console.log('[ShotImageManagerMobileWrapper] Shot selector changed to:', shotId);
               setLightboxSelectedShotId?.(shotId);
               props.onShotChange?.(shotId);
             }}
             onAddToShot={(() => {
               const result = isExternalGen ? externalGens.handleExternalGenAddToShot : props.onAddToShot;
-              console.log('[ShotSelectorDebug] ShotImageManagerMobileWrapper -> MediaLightbox onAddToShot', {
-                component: 'ShotImageManagerMobileWrapper',
-                isExternalGen,
-                propsOnAddToShot: !!props.onAddToShot,
-                externalGensHandler: !!externalGens.handleExternalGenAddToShot,
-                finalOnAddToShot: !!result,
-                allShotsLength: props.allShots?.length || 0,
-                selectedShotId: props.selectedShotId
-              });
               return result;
             })()}
             onAddToShotWithoutPosition={isExternalGen ? externalGens.handleExternalGenAddToShotWithoutPosition : props.onAddToShotWithoutPosition}

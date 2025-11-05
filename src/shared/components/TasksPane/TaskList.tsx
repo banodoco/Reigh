@@ -104,13 +104,7 @@ const TaskList: React.FC<TaskListProps> = ({
     // [TasksPaneCountMismatch] Log when local filtering hides tasks that might be counted
     try {
       const hidden = tasks.filter(t => !isTaskVisible(t.taskType));
-      console.log('[TaskList] Visible task filtering', {
-        context: 'TaskList:filter-visible-tasks',
-        activeFilter,
-        tasksCount: tasks.length,
-        visibleCount: visible.length,
-        hiddenCount: hidden.length,
-        hiddenTypesSample: hidden.slice(0, 5).map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
+      .map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
         timestamp: Date.now()
       });
     } catch {}

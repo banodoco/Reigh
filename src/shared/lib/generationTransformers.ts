@@ -163,8 +163,7 @@ export function transformGeneration(
 
   // [UpscaleDebug] Preserve existing debug logging
   if (item.upscaled_url && options.verbose) {
-    console.log('[TransformerDebug] Generation with upscaled_url:', {
-      id: baseItem.id?.substring(0, 8),
+    ,
       hasUpscaledUrl: !!baseItem.upscaled_url,
       upscaled_url: baseItem.upscaled_url?.substring(0, 60)
     });

@@ -636,7 +636,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     }
 
     const dragSessionId = metadata?.drag_session_id || 'no-session';
-    console.log(`[TimelineDragFlow] [DB_UPDATE] 🎯 Session: ${dragSessionId} | Updating timeline frame for shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
+    } to frame ${newTimelineFrame}`);
 
     // Get the item's current state BEFORE the move
     const movedItem = shotGenerations.find(sg => sg.id === shotGenerationId);
@@ -667,11 +667,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         .eq('id', shotGenerationId);
 
       if (error) {
-        console.log(`[TimelineDragFlow] [DB_ERROR] ❌ Session: ${dragSessionId} | Database update failed for shot_generation ${shotGenerationId.substring(0, 8)}:`, error);
+        }:`, error);
         throw error;
       }
 
-      console.log(`[TimelineDragFlow] [DB_SUCCESS] ✅ Session: ${dragSessionId} | Successfully updated shot_generation ${shotGenerationId.substring(0, 8)} to frame ${newTimelineFrame}`);
+      } to frame ${newTimelineFrame}`);
       
       // AFTER the database update, fetch the updated state to check if order changed
       const { data: updatedGenerations, error: fetchError } = await supabase
@@ -706,13 +706,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         // Order changed if the item's position in the sequence changed
         if (newIndex !== -1 && oldIndex !== -1 && newIndex !== oldIndex) {
           orderChanged = true;
-          console.log(`[TimelineDragFlow] [ORDER_CHANGE] 📊 Order changed: ${oldIndex} → ${newIndex}`);
-          
           // Get new neighbors
           if (newIndex > 0) newAdjacentIds.push(nonVideoGens[newIndex - 1].id);
           if (newIndex < nonVideoGens.length - 1) newAdjacentIds.push(nonVideoGens[newIndex + 1].id);
         } else {
-          console.log(`[TimelineDragFlow] [ORDER_SAME] ✓ Order unchanged (frame spacing adjusted): ${oldIndex} → ${newIndex}`);
+          : ${oldIndex} → ${newIndex}`);
         }
       }
       
@@ -748,7 +746,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           }
         }
         
-        console.log(`[TimelineDragFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (order changed):`, {
+        :`, {
           movedItem: shotGenerationId.substring(0, 8),
           oldPrevious: oldPrevious?.substring(0, 8) || 'none',
           newPrevious: newPrevious?.substring(0, 8) || 'none',
@@ -759,7 +757,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         // Clear prompts and AWAIT it to ensure consistency before UI updates
         await clearEnhancedPromptsForGenerations(itemsToClear);
       } else {
-        console.log(`[TimelineDragFlow] [SKIP_CLEAR] ⏭️ Skipping prompt clear (order unchanged, only spacing adjusted)`);
+        `);
       }
       
     } catch (err) {
@@ -851,7 +849,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       const itemsToClear = Array.from(allAffectedIds);
       
       if (itemsToClear.length > 0) {
-        console.log(`[ApplyTimelineFrames] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for ${itemsToClear.length} affected items (${changedItems.length} changed + neighbors)`);
+        `);
         clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
           console.error('[applyTimelineFrames] Error clearing enhanced prompts:', err);
         });
@@ -925,8 +923,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
 
-      console.log('[PairPrompts] ✅ Database updated successfully, now updating local state and invalidating cache');
-
       // Update local state
       setShotGenerations(prev => prev.map(sg =>
         sg.id === generationId
@@ -939,8 +935,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
       
-      console.log('[PairPrompts] ✅ Cache invalidated, all components will see the updated pair prompt');
-    } catch (err) {
+      } catch (err) {
       console.error('[updatePairPrompts] Error:', err);
       throw err;
     }
@@ -1019,8 +1014,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
   // Update pair prompts for a specific pair index
   const updatePairPromptsByIndex = useCallback(async (pairIndex: number, prompt: string, negativePrompt: string) => {
-    console.log(`[PairPrompts-SAVE] 💾 START updatePairPromptsByIndex for pair ${pairIndex}`);
-    
     // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     // This ensures pair prompt indexes match the visual pairs in the UI
     const filteredGenerations = shotGenerations.filter(sg => {
@@ -1038,10 +1031,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       return !isVideo;
     });
 
-    console.log(`[PairPrompts-SAVE] 📊 Filtered shotGenerations:`, {
-      totalGenerations: shotGenerations.length,
-      afterVideoFilter: filteredGenerations.length,
-      filteredIds: filteredGenerations.map((sg, idx) => ({
+    => ({
         arrayIndex: idx,
         shotGenId: sg.id.substring(0, 8),
         timeline_frame: sg.timeline_frame
@@ -1051,8 +1041,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     const sortedGenerations = [...filteredGenerations]
       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
 
-    console.log(`[PairPrompts-SAVE] 📊 After sorting:`, {
-      sortedIds: sortedGenerations.map((sg, idx) => ({
+    => ({
         arrayIndex: idx,
         shotGenId: sg.id.substring(0, 8),
         timeline_frame: sg.timeline_frame
@@ -1066,8 +1055,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
     // Get the first item in the pair (the one that stores the prompts)
     const firstItem = sortedGenerations[pairIndex];
-    console.log(`[PairPrompts-SAVE] 💾 Saving pair prompt for pair ${pairIndex}:`, {
-      shotGenId: firstItem.id.substring(0, 8),
+    ,
       fullShotGenId: firstItem.id,
       timeline_frame: firstItem.timeline_frame,
       prompt: prompt || '(empty)',
@@ -1077,15 +1065,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     });
     
     await updatePairPrompts(firstItem.id, prompt, negativePrompt);
-    console.log(`[PairPrompts-SAVE] ✅ COMPLETED updatePairPromptsByIndex for pair ${pairIndex}`);
-  }, [shotGenerations, updatePairPrompts]);
+    }, [shotGenerations, updatePairPrompts]);
 
   // Clear enhanced prompt for a specific pair/generation
   const clearEnhancedPrompt = useCallback(async (generationId: string) => {
     if (!shotId) return;
 
     try {
-      console.log('[EnhancedPrompts] 🧹 Clearing enhanced prompt for generation:', generationId.substring(0, 8));
+      );
 
       // Find the current generation
       const generation = shotGenerations.find(sg => sg.id === generationId);
@@ -1114,8 +1101,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         throw error;
       }
 
-      console.log('[clearEnhancedPrompt] Successfully cleared enhanced prompt');
-
       // Update local state optimistically
       setShotGenerations(prev => prev.map(sg => 
         sg.id === generationId 
@@ -1138,7 +1123,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!shotId) return;
 
     try {
-      console.log('[EnhancedPrompts] 🧹 Clearing all enhanced prompts for shot:', shotId.substring(0, 8));
+      );
 
       // Get all shot_generations for this shot
       const { data: generations, error: fetchError } = await supabase
@@ -1152,7 +1137,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       if (!generations || generations.length === 0) {
-        console.log('[EnhancedPrompts] No generations found for shot');
         return;
       }
 
@@ -1179,8 +1163,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       const results = await Promise.all(updates);
       const successCount = results.filter(r => r.success).length;
       
-      console.log(`[EnhancedPrompts] ✅ Cleared ${successCount}/${generations.length} enhanced prompts`);
-
       // Invalidate cache to refresh UI
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });

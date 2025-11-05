@@ -100,15 +100,6 @@ async function fetchShotSpecificGenerations({
   includeTaskData: boolean;
 }): Promise<UnifiedGenerationsResponse> {
   
-  console.log('[VideoGenMissing] Starting shot-specific generations fetch:', {
-    projectId,
-    shotId,
-    offset,
-    limit,
-    filters,
-    includeTaskData,
-    visibilityState: document.visibilityState,
-    timestamp: Date.now()
   });
   
   let dataQuery = supabase
@@ -148,7 +139,7 @@ async function fetchShotSpecificGenerations({
     .order('created_at', { ascending: false });
   
   // Execute single query with limit+1 to detect hasMore
-  console.log('[VideoGenMissing] Executing shot-specific query (no count)...', {
+  ...', {
     projectId,
     shotId,
     offset,
@@ -159,13 +150,6 @@ async function fetchShotSpecificGenerations({
   
   const { data, error: dataError } = await dataQuery.range(offset, offset + limit); // Fetch limit+1 items
   
-  console.log('[VideoGenMissing] Shot-specific query results:', {
-    projectId,
-    shotId,
-    dataLength: data?.length,
-    dataError: dataError?.message,
-    eliminatedCountQuery: true,
-    timestamp: Date.now()
   });
   
   if (dataError) {
@@ -184,8 +168,7 @@ async function fetchShotSpecificGenerations({
     .map((sg: any) => {
       // [UpscaleDebug] Preserve existing debug logging
       if (sg.generation?.upscaled_url) {
-        console.log('[UpscaleDebug] useUnifiedGenerations found upscaled_url:', {
-          id: sg.generation.id?.substring(0, 8),
+        ,
           upscaled_url: sg.generation.upscaled_url?.substring(0, 60)
         });
       }
@@ -194,11 +177,7 @@ async function fetchShotSpecificGenerations({
       return transformForUnifiedGenerations(sg as RawShotGeneration, includeTaskData);
     });
   
-  console.log('[VideoGenMissing] Raw transformed items before filtering:', {
-    projectId,
-    shotId,
-    totalItems: items.length,
-    videoItems: items.filter(i => i.isVideo).length,
+  .length,
     imageItems: items.filter(i => !i.isVideo).length,
     itemDetails: items.slice(0, 5).map(item => ({
       id: item.id,
@@ -235,27 +214,6 @@ async function fetchShotSpecificGenerations({
   
   const result = { items: finalItems, total: finalTotal, hasMore: finalHasMore };
   
-  console.log('[VideoGenMissing] Shot-specific fetch completed:', {
-    projectId,
-    shotId,
-    offset,
-    limit,
-    eliminatedCountQuery: true,
-    originalItemsCount,
-    filteredItemsCount: items.length,
-    finalItemsCount: finalItems.length,
-    mediaTypeFilter: filters?.mediaType,
-    dbLevelFiltering: true,
-    total: finalTotal,
-    hasMore: finalHasMore,
-    appliedFilters: {
-      mediaType: filters?.mediaType,
-      starredOnly: filters?.starredOnly,
-      excludePositioned: filters?.excludePositioned,
-      searchTerm: filters?.searchTerm
-    },
-    includeTaskData,
-    timestamp: Date.now()
   });
   
   return result;
@@ -276,25 +234,11 @@ async function fetchProjectWideGenerations({
   includeTaskData: boolean;
 }): Promise<UnifiedGenerationsResponse> {
   
-  console.log('[VideoGenMissing] Starting project-wide generations fetch:', {
-    projectId,
-    offset,
-    limit,
-    filters,
-    includeTaskData,
-    visibilityState: document.visibilityState,
-    timestamp: Date.now()
   });
   
   // Use existing fetchGenerations but extend with task data if needed
   const { fetchGenerations } = await import('./useGenerations');
   
-  console.log('[VideoGenMissing] Calling fetchGenerations...', {
-    projectId,
-    limit,
-    offset,
-    filters,
-    timestamp: Date.now()
   });
   
   const response = await fetchGenerations(projectId, limit, offset, {
@@ -303,12 +247,6 @@ async function fetchProjectWideGenerations({
     starredOnly: filters?.starredOnly,
   });
   
-  console.log('[VideoGenMissing] fetchGenerations response:', {
-    projectId,
-    totalItems: response.items.length,
-    totalCount: response.total,
-    hasMore: response.hasMore,
-    timestamp: Date.now()
   });
   
   let items: GenerationWithTask[] = response.items.map(item => ({
@@ -348,15 +286,7 @@ async function fetchProjectWideGenerations({
     hasMore: response.hasMore,
   };
   
-  console.log('[VideoGenMissing] Project-wide fetch completed:', {
-    projectId,
-    offset,
-    limit,
-    total: response.total,
-    hasMore: response.hasMore,
-    itemsReturned: items.length,
-    taskDataIncluded: includeTaskData,
-    itemsWithTaskData: includeTaskData ? items.filter(i => i.taskId).length : 0,
+  .length : 0,
     appliedFilters: filters,
     timestamp: Date.now()
   });
@@ -374,16 +304,6 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
 
   // [GalleryPollingDebug] Add comprehensive logging for useUnifiedGenerations (gated to prevent spam)
   if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
-    console.log('[GalleryPollingDebug:useUnifiedGenerations] Hook called with:', {
-      instanceId: hookInstanceIdRef.current,
-      mode: options.mode,
-      projectId: options.projectId,
-      shotId: options.shotId,
-      page: options.page,
-      limit: options.limit,
-      filters: options.filters,
-      enabled: options.enabled,
-      timestamp: Date.now()
     });
   }
   
@@ -401,20 +321,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     const cacheKeyStr = cacheKey.join(':');
     if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId) && prevCacheKeyRef.current !== cacheKeyStr) {
       prevCacheKeyRef.current = cacheKeyStr;
-      console.log('[VideoGenMissing] useUnifiedGenerations hook called:', {
-        instanceId: hookInstanceIdRef.current,
-        mode: options.mode,
-        projectId: options.projectId,
-        shotId: options.shotId,
-        page: options.page,
-        limit: options.limit,
-        filters: options.filters,
-        includeTaskData: options.includeTaskData,
-        preloadTaskData,
-        enabled: enabled && !!options.projectId,
-        cacheKey: cacheKeyStr,
-        visibilityState: document.visibilityState,
-        timestamp: Date.now(),
+      ,
       });
     }
   }
@@ -429,8 +336,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       try {
         const socket: any = (supabase as any)?.realtime?.socket;
         const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
-        console.log('[ReconnectionIssue][UnifiedGenerations] Fetch start realtime snapshot', {
-          connected: !!socket?.isConnected?.(),
+        ,
           connState: socket?.connectionState,
           channelCount: channels?.length || 0,
           topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
@@ -439,12 +345,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
         });
       } catch {}
       if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
-        console.log('[VideoGenMissing] Executing unified generations query:', {
-          instanceId: hookInstanceIdRef.current,
-          mode: options.mode,
-          projectId: options.projectId,
-          shotId: options.shotId,
-          cacheKey: cacheKey.join(':'),
+        ,
           timestamp: Date.now()
         });
       }
@@ -481,8 +382,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       try {
         const socket: any = (supabase as any)?.realtime?.socket;
         const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
-        console.log('[ReconnectionIssue][UnifiedGenerations] Success realtime snapshot', {
-          connected: !!socket?.isConnected?.(),
+        ,
           connState: socket?.connectionState,
           channelCount: channels?.length || 0,
           topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
@@ -494,12 +394,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       const sig = `${cacheKeyStr}:${(query.data as any)?.items?.length || 0}:${(query.data as any)?.total || 0}:${(query.data as any)?.hasMore ? 1 : 0}`;
       if (lastSuccessSigRef.current !== sig) {
         lastSuccessSigRef.current = sig;
-        console.log('[VideoGenMissing] Unified generations query success:', {
-          instanceId: hookInstanceIdRef.current,
-          mode: options.mode,
-          projectId: options.projectId,
-          shotId: options.shotId,
-          itemsCount: (query.data as any)?.items?.length || 0,
+        ?.items?.length || 0,
           total: (query.data as any)?.total || 0,
           hasMore: (query.data as any)?.hasMore || false,
           cacheKey: cacheKeyStr,
@@ -515,14 +410,7 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     const stateSig = `${cacheKeyStr}:${query.status}:${query.fetchStatus}:${query.isFetching ? 1 : 0}:${query.isStale ? 1 : 0}`;
     if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId) && lastStateSigRef.current !== stateSig) {
       lastStateSigRef.current = stateSig;
-      console.log('[VideoGenMissing] Query state:', {
-        instanceId: hookInstanceIdRef.current,
-        cacheKey: cacheKeyStr,
-        status: query.status,
-        fetchStatus: query.fetchStatus,
-        isFetching: query.isFetching,
-        isStale: query.isStale,
-        timestamp: Date.now(),
+      ,
       });
     }
   }, [cacheKey, query.status, query.fetchStatus, query.isFetching, query.isStale]);
@@ -654,10 +542,6 @@ export function useTaskFromUnifiedCache(generationId: string) {
       const cachedMapping = queryClient.getQueryData(['tasks', 'taskId', generationId]) as { taskId: string } | undefined;
       
       if (cachedMapping?.taskId) {
-        console.log('[gem] useTaskFromUnifiedCache: found in cache', {
-          generationId,
-          taskId: cachedMapping.taskId
-        });
         return cachedMapping;
       }
       
@@ -677,12 +561,6 @@ export function useTaskFromUnifiedCache(generationId: string) {
       }
       
       const taskId = Array.isArray(data?.tasks) && data.tasks.length > 0 ? data.tasks[0] : null;
-      console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: fetched from DB', {
-        generationId,
-        tasksArray: data?.tasks,
-        taskId,
-        hasTaskId: !!taskId
-      });
       return { taskId };
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

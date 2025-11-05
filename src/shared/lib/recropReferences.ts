@@ -33,8 +33,6 @@ export async function recropAllReferences(
   newAspectRatio: string,
   onProgress?: (current: number, total: number) => void
 ): Promise<ReferenceImage[]> {
-  console.log('[RecropReferences] 🎬 Starting batch recrop for', references.length, 'references to aspect ratio:', newAspectRatio);
-  
   const reprocessed: ReferenceImage[] = [];
   let successCount = 0;
   let skipCount = 0;
@@ -42,12 +40,6 @@ export async function recropAllReferences(
   
   for (let i = 0; i < references.length; i++) {
     const ref = references[i];
-    
-    console.log(`[RecropReferences] 📐 Processing reference ${i + 1}/${references.length}:`, {
-      id: ref.id,
-      name: ref.name,
-      hasOriginal: !!ref.styleReferenceImageOriginal
-    });
     
     // Skip if no original image
     if (!ref.styleReferenceImageOriginal) {
@@ -60,14 +52,11 @@ export async function recropAllReferences(
     
     try {
       // Fetch the original image
-      console.log(`[RecropReferences] 📥 Fetching original image for ${ref.name}...`);
       const response = await fetch(ref.styleReferenceImageOriginal);
       if (!response.ok) {
         throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
       }
       const blob = await response.blob();
-      console.log(`[RecropReferences] ✅ Fetched blob, size: ${blob.size} bytes, type: ${blob.type}`);
-      
       // Convert to data URL for processing
       const dataURL = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -75,10 +64,7 @@ export async function recropAllReferences(
         reader.onerror = () => reject(new Error('Failed to read blob as data URL'));
         reader.readAsDataURL(blob);
       });
-      console.log(`[RecropReferences] 🔄 Converted to data URL, length: ${dataURL.length} chars`);
-      
       // Reprocess for new aspect ratio
-      console.log(`[RecropReferences] ✂️ Processing image for aspect ratio: ${newAspectRatio}...`);
       const processedDataURL = await processStyleReferenceForAspectRatioString(
         dataURL,
         newAspectRatio
@@ -87,10 +73,7 @@ export async function recropAllReferences(
       if (!processedDataURL) {
         throw new Error('processStyleReferenceForAspectRatioString returned null');
       }
-      console.log(`[RecropReferences] ✅ Image processed, new length: ${processedDataURL.length} chars`);
-      
       // Upload new processed version
-      console.log(`[RecropReferences] 📤 Converting processed image to file...`);
       const processedFile = dataURLtoFile(
         processedDataURL,
         `reference-${ref.id}-${Date.now()}.png`
@@ -99,10 +82,7 @@ export async function recropAllReferences(
       if (!processedFile) {
         throw new Error('dataURLtoFile returned null');
       }
-      console.log(`[RecropReferences] 📤 Uploading processed file to storage...`);
       const newProcessedUrl = await uploadImageToStorage(processedFile);
-      console.log(`[RecropReferences] ✅ Upload complete:`, newProcessedUrl);
-      
       // Update reference with new processed URL (keep original)
       const updatedRef = {
         ...ref,
@@ -111,8 +91,6 @@ export async function recropAllReferences(
       };
       reprocessed.push(updatedRef);
       successCount++;
-      
-      console.log(`[RecropReferences] ✅ Successfully reprocessed reference ${ref.name}`);
       
       // Report progress
       onProgress?.(i + 1, references.length);
@@ -126,13 +104,6 @@ export async function recropAllReferences(
       onProgress?.(i + 1, references.length);
     }
   }
-  
-  console.log('[RecropReferences] 🏁 Batch recrop complete:', {
-    total: references.length,
-    success: successCount,
-    skipped: skipCount,
-    errors: errorCount
-  });
   
   return reprocessed;
 }

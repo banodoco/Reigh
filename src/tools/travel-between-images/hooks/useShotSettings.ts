@@ -97,8 +97,7 @@ export const useShotSettings = (
     
     // Flush pending saves when shot changes
     if (previousShotId && previousShotId !== shotId) {
-      console.log('[useShotSettings] 🔄 Shot changed, flushing pending saves:', {
-        from: previousShotId.substring(0, 8),
+      ,
         to: shotId.substring(0, 8),
         hasPendingSave: !!saveTimeoutRef.current,
         hasPendingSettings: !!pendingSettingsRef.current
@@ -114,8 +113,7 @@ export const useShotSettings = (
         
         // Only save if there are actual changes
         if (!deepEqual(settingsToFlush, oldLoadedSettings)) {
-          console.log('[useShotSettings] 💾 Flushing unsaved changes for previous shot:', {
-            previousShotId: previousShotId.substring(0, 8),
+          ,
             advancedMode: settingsToFlush.advancedMode,
             hasPhaseConfig: !!settingsToFlush.phaseConfig,
             selectedPhasePresetId: settingsToFlush.selectedPhasePresetId
@@ -150,8 +148,7 @@ export const useShotSettings = (
               if (updateError) {
                 console.error('[useShotSettings] Failed to flush save:', updateError);
               } else {
-                console.log('[useShotSettings] ✅ Flush successful for previous shot');
-              }
+                }
             } catch (err) {
               console.error('[useShotSettings] Failed to flush save:', err);
             }
@@ -185,7 +182,6 @@ export const useShotSettings = (
     // NOTE: With optimistic cache updates, this protection is now less critical since saves
     // no longer trigger automatic refetches. However, it's still valuable for manual invalidations.
     if (isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null) {
-      console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing or has pending changes');
       return;
     }
     
@@ -203,8 +199,7 @@ export const useShotSettings = (
     // Deep clone to prevent React Query cache reference sharing
     const deepClonedSettings = JSON.parse(JSON.stringify(loadedSettings));
     
-    console.log('[EnhancePromptDebug] [useShotSettings] 📥 Loading settings from database:', {
-      shotId: shotId.substring(0, 8),
+    ,
       enhancePrompt: deepClonedSettings.enhancePrompt,
       autoCreateIndividualPrompts: deepClonedSettings.autoCreateIndividualPrompts,
       advancedMode: deepClonedSettings.advancedMode,
@@ -242,12 +237,10 @@ export const useShotSettings = (
     
     // Don't save if nothing changed
     if (deepEqual(toSave, loadedSettingsRef.current)) {
-      console.log('[useShotSettings] ⏭️ Skipping save - no changes');
       return;
     }
     
-    console.log('[EnhancePromptDebug] [useShotSettings] 💾 Saving settings to database:', {
-      shotId: shotId.substring(0, 8),
+    ,
       enhancePrompt: toSave.enhancePrompt,
       autoCreateIndividualPrompts: toSave.autoCreateIndividualPrompts,
       advancedMode: toSave.advancedMode,
@@ -272,8 +265,7 @@ export const useShotSettings = (
       // Clear editing flag after successful save
       isUserEditingRef.current = false;
       
-      console.log('[useShotSettings] ✅ Save successful');
-    } catch (err) {
+      } catch (err) {
       console.error('[useShotSettings] ❌ Save failed:', err);
       setStatus('error');
       setError(err as Error);
@@ -286,9 +278,7 @@ export const useShotSettings = (
     key: K,
     value: VideoTravelSettings[K]
   ) => {
-    console.log('[EnhancePromptDebug] [useShotSettings] 📝 Field updated:', { 
-      key, 
-      value: key === 'batchVideoPrompt' && typeof value === 'string' ? value.substring(0, 50) : value,
+    : value,
       isEnhancePrompt: key === 'enhancePrompt',
       isAutoCreateIndividualPrompts: key === 'autoCreateIndividualPrompts'
     });
@@ -323,8 +313,7 @@ export const useShotSettings = (
   
   // Update multiple fields at once
   const updateFields = useCallback((updates: Partial<VideoTravelSettings>) => {
-    console.log('[EnhancePromptDebug] [useShotSettings] 📝 Multiple fields updated:', { 
-      keys: Object.keys(updates),
+    ,
       enhancePrompt: updates.enhancePrompt,
       autoCreateIndividualPrompts: updates.autoCreateIndividualPrompts,
       batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
@@ -369,7 +358,7 @@ export const useShotSettings = (
       return;
     }
     
-    console.log('[useShotSettings] 🔀 Applying settings from shot:', sourceShotId.substring(0, 8));
+    );
     setStatus('loading');
     
     try {
@@ -411,7 +400,6 @@ export const useShotSettings = (
       return;
     }
     
-    console.log('[useShotSettings] 🔀 Applying project defaults');
     setStatus('loading');
     
     try {
@@ -443,7 +431,6 @@ export const useShotSettings = (
   
   // Reset to hardcoded defaults
   const resetToDefaults = useCallback(() => {
-    console.log('[useShotSettings] 🔄 Resetting to defaults');
     const defaults = { ...DEFAULT_SETTINGS };
     setSettings(defaults);
     toast.info('Settings reset to defaults (not saved yet)');
@@ -452,7 +439,6 @@ export const useShotSettings = (
   // Revert unsaved changes
   const revert = useCallback(() => {
     if (loadedSettingsRef.current) {
-      console.log('[useShotSettings] ↩️ Reverting changes');
       setSettings(JSON.parse(JSON.stringify(loadedSettingsRef.current)));
       toast.info('Changes reverted');
     }

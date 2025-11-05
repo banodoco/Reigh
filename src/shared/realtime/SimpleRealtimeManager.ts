@@ -28,15 +28,11 @@ export class SimpleRealtimeManager {
   }
 
   private handleAuthHeal = (event: CustomEvent) => {
-    console.log('[SimpleRealtime] 🔄 Auth heal event received:', event.detail);
-    
     // If we have a project and are not currently connected, attempt to reconnect
     if (this.projectId && !this.isSubscribed && this.reconnectAttempts < this.maxReconnectAttempts) {
-      console.log('[SimpleRealtime] 🔄 Attempting reconnect due to auth heal');
       this.attemptReconnect();
     } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('[SimpleRealtime] ⏸️ Skipping auth heal reconnect - max attempts reached');
-    }
+      }
   };
 
   private async attemptReconnect() {
@@ -57,16 +53,14 @@ export class SimpleRealtimeManager {
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
     
-    console.log('[SimpleRealtime] ⏳ Reconnecting in', delay, 'ms (attempt', this.reconnectAttempts, '/', this.maxReconnectAttempts, ')');
+    ');
     
     this.reconnectTimeout = setTimeout(async () => {
       try {
         const success = await this.joinProject(this.projectId!);
         if (success) {
-          console.log('[SimpleRealtime] ✅ Reconnect successful');
           this.reconnectAttempts = 0; // Reset on success
         } else {
-          console.log('[SimpleRealtime] ❌ Reconnect failed, will retry');
           this.attemptReconnect();
         }
       } catch (error) {
@@ -77,8 +71,6 @@ export class SimpleRealtimeManager {
   }
 
   async joinProject(projectId: string): Promise<boolean> {
-    console.log('[SimpleRealtime] 🚀 Joining project:', projectId);
-    
     // Check authentication first (use getSession for local/cached check)
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -95,12 +87,10 @@ export class SimpleRealtimeManager {
       
       // Explicitly set auth token for realtime before subscribing
       if (session.access_token) {
-        console.log('[SimpleRealtime] 🔑 Setting realtime auth token');
         supabase.realtime.setAuth(session.access_token);
       }
       
-      console.log('[SimpleRealtime] ✅ Authentication verified for user:', session.user.id);
-    } catch (error) {
+      } catch (error) {
       console.error('[SimpleRealtime] ❌ Auth check failed:', error);
       dataFreshnessManager.onRealtimeStatusChange('error', 'Auth check failed');
       return false;
@@ -119,10 +109,7 @@ export class SimpleRealtimeManager {
       // Create channel following Supabase documentation pattern
       this.channel = supabase.channel(topic);
       
-      console.log('[SimpleRealtime] 📡 Channel created:', {
-        topic,
-        channelExists: !!this.channel,
-        realtimeExists: !!(supabase as any)?.realtime,
+      ?.realtime,
         socketExists: !!(supabase as any)?.realtime?.socket,
         socketReadyState: (supabase as any)?.realtime?.socket?.readyState
       });
@@ -130,21 +117,18 @@ export class SimpleRealtimeManager {
       // Add event handlers BEFORE subscribing
       this.channel
         .on('broadcast', { event: 'task-update' }, (payload: any) => {
-          console.log('[SimpleRealtime] 📨 Task update received:', payload);
           // Handle the task update
           this.handleTaskUpdate(payload);
         })
         .on('postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` }, 
           (payload: any) => {
-            console.log('[SimpleRealtime] 📨 New task:', payload);
             this.handleNewTask(payload);
           }
         )
         .on('postgres_changes', 
           { event: 'UPDATE', schema: 'public', table: 'tasks', filter: `project_id=eq.${projectId}` }, 
           (payload: any) => {
-            console.log('[SimpleRealtime] 📨 Task updated:', payload);
             this.handleTaskUpdate(payload);
           }
         )
@@ -153,14 +137,12 @@ export class SimpleRealtimeManager {
         .on('postgres_changes', 
           { event: 'INSERT', schema: 'public', table: 'shot_generations' }, 
           (payload: any) => {
-            console.log('[SimpleRealtime] 📨 Shot generation inserted:', payload);
             this.handleShotGenerationChange(payload, 'INSERT');
           }
         )
         .on('postgres_changes', 
           { event: 'UPDATE', schema: 'public', table: 'shot_generations' }, 
           (payload: any) => {
-            console.log('[SimpleRealtime] 📨 Shot generation updated:', payload);
             this.handleShotGenerationChange(payload, 'UPDATE');
           }
         )
@@ -168,7 +150,7 @@ export class SimpleRealtimeManager {
         .on('postgres_changes', 
           { event: 'UPDATE', schema: 'public', table: 'generations', filter: `project_id=eq.${projectId}` }, 
           (payload: any) => {
-            console.log('[SimpleRealtime] 📨 Generation updated (upscale/etc):', payload);
+            :', payload);
             this.handleGenerationUpdate(payload);
           }
         );
@@ -182,10 +164,7 @@ export class SimpleRealtimeManager {
 
         this.channel.subscribe((status: string) => {
           clearTimeout(timeoutId);
-          console.log('[SimpleRealtime] 📞 Status:', status);
-          
           if (status === 'SUBSCRIBED') {
-            console.log('[SimpleRealtime] ✅ Successfully subscribed');
             this.isSubscribed = true;
             this.reconnectAttempts = 0; // Reset reconnect attempts on success
             this.updateGlobalSnapshot('joined');
@@ -233,8 +212,6 @@ export class SimpleRealtimeManager {
   }
 
   async leave(): Promise<void> {
-    console.log('[SimpleRealtime] 👋 Leaving channel');
-    
     // Clear any pending reconnect timeout (unconditionally)
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -243,14 +220,12 @@ export class SimpleRealtimeManager {
     
     // Clear any pending batch timeout
     if (this.batchTimeoutId) {
-      console.log('[SimpleRealtime:Batching] 🧹 Clearing pending batch timeout on leave');
       clearTimeout(this.batchTimeoutId);
       this.batchTimeoutId = null;
     }
     
     // Clear the event queue
     if (this.eventBatchQueue.size > 0) {
-      console.log('[SimpleRealtime:Batching] 🧹 Clearing', this.eventBatchQueue.size, 'pending batched events');
       this.eventBatchQueue.clear();
     }
     
@@ -278,11 +253,6 @@ export class SimpleRealtimeManager {
     existing.push(payload);
     this.eventBatchQueue.set(eventType, existing);
 
-    console.log('[SimpleRealtime:Batching] 📦 Event queued:', {
-      eventType,
-      queueSize: existing.length,
-      totalQueues: this.eventBatchQueue.size,
-      timestamp: Date.now()
     });
 
     // Clear existing timeout if any
@@ -302,12 +272,10 @@ export class SimpleRealtimeManager {
    */
   private processBatchedEvents() {
     if (this.eventBatchQueue.size === 0) {
-      console.log('[SimpleRealtime:Batching] ✅ No events to process');
       return;
     }
 
-    console.log('[SimpleRealtime:Batching] 🚀 Processing batched events:', {
-      eventTypes: Array.from(this.eventBatchQueue.keys()),
+    ),
       totalEvents: Array.from(this.eventBatchQueue.values()).reduce((sum, arr) => sum + arr.length, 0),
       breakdown: Array.from(this.eventBatchQueue.entries()).map(([type, events]) => ({
         type,
@@ -341,9 +309,6 @@ export class SimpleRealtimeManager {
     // Update global snapshot with latest event time
     this.updateGlobalSnapshot('joined', Date.now());
 
-    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched task updates:', {
-      count: payloads.length,
-      timestamp: Date.now()
     });
 
     // Report consolidated event to freshness manager
@@ -375,9 +340,6 @@ export class SimpleRealtimeManager {
     // Update global snapshot with latest event time
     this.updateGlobalSnapshot('joined', Date.now());
 
-    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched new tasks:', {
-      count: payloads.length,
-      timestamp: Date.now()
     });
 
     // Report consolidated event to freshness manager
@@ -407,9 +369,6 @@ export class SimpleRealtimeManager {
     // Update global snapshot with latest event time
     this.updateGlobalSnapshot('joined', Date.now());
 
-    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched shot generation changes:', {
-      count: payloads.length,
-      timestamp: Date.now()
     });
 
     // Collect unique shot IDs affected by this batch
@@ -420,9 +379,7 @@ export class SimpleRealtimeManager {
       }
     });
 
-    console.log('[SimpleRealtime:Batching] 🎯 Affected shots in batch:', {
-      count: affectedShotIds.size,
-      shotIds: Array.from(affectedShotIds).map(id => id.substring(0, 8))
+    .map(id => id.substring(0, 8))
     });
 
     // Report consolidated event to freshness manager for all affected shots
@@ -454,9 +411,7 @@ export class SimpleRealtimeManager {
     // Update global snapshot with latest event time
     this.updateGlobalSnapshot('joined', Date.now());
 
-    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched generation updates:', {
-      count: payloads.length,
-      upscaleCompletions: payloads.filter((p: any) => p.upscaleCompleted).length,
+    => p.upscaleCompleted).length,
       timestamp: Date.now()
     });
 
@@ -507,9 +462,7 @@ export class SimpleRealtimeManager {
     // For UPDATE: care if position changed (added, removed, or moved)
     const shouldInvalidate = eventType === 'INSERT' ? isNowPositioned : (isNowPositioned || wasPositioned || positionChanged);
     
-    console.log('[SimpleRealtime] 🎯 Shot generation change analysis:', {
-      eventType,
-      shotId: shotId?.substring(0, 8),
+    ,
       timelineFrame,
       oldTimelineFrame,
       isNowPositioned,
@@ -519,7 +472,6 @@ export class SimpleRealtimeManager {
     });
     
     if (!shouldInvalidate) {
-      console.log('[SimpleRealtime] ⏭️  Skipping invalidation - no positioned image changes');
       return;
     }
     
@@ -529,7 +481,7 @@ export class SimpleRealtimeManager {
     }
     
     // Batch this event to prevent conflicts with optimistic updates during drag operations
-    console.log('[SimpleRealtime:Batching] 📦 Batching shot generation change for shot:', shotId.substring(0, 8));
+    );
     this.batchEvent('shot-generation-change', { ...payload, eventType, shotId, isPositioned: isNowPositioned });
   }
 
@@ -543,8 +495,7 @@ export class SimpleRealtimeManager {
     // Check if upscaled_url was added
     const upscaleCompleted = !oldUpscaledUrl && upscaledUrl;
     
-    console.log('[SimpleRealtime] 🎯 Generation update analysis:', {
-      generationId: generationId?.substring(0, 8),
+    ,
       upscaleCompleted,
       upscaledUrl: upscaledUrl ? 'present' : 'none',
       oldUpscaledUrl: oldUpscaledUrl ? 'present' : 'none'
@@ -556,7 +507,7 @@ export class SimpleRealtimeManager {
     }
     
     // Invalidate queries to pick up the upscaled_url
-    console.log('[SimpleRealtime:Batching] 📦 Batching generation update:', generationId.substring(0, 8));
+    );
     this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted });
   }
 
@@ -582,7 +533,6 @@ export class SimpleRealtimeManager {
   }
 
   reset() {
-    console.log('[SimpleRealtime] 🔄 Resetting connection state');
     this.reconnectAttempts = 0;
     
     // Clear any pending reconnect timeout (unconditionally)

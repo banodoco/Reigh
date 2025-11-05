@@ -33,18 +33,16 @@ const loadUserSettingsCached = async (userId: string) => {
   
   // Return fresh cached data
   if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    console.log(`[useUserUIState] ⚡ Using cached settings for user ${userId} (saved DB call!)`);
+    `);
     return cached.data;
   }
   
   // If there's already a loading request, wait for it
   if (cached?.loading) {
-    console.log(`[useUserUIState] Waiting for existing request for user ${userId}`);
     return await cached.loading;
   }
   
   // Make new database call and cache the promise
-  console.log(`[useUserUIState] Fetching fresh settings for user ${userId}`);
   const loadingPromise = supabase
     .from('users')
     .select('settings')
@@ -133,7 +131,6 @@ export function useUserUIState<K extends keyof UISettings>(
       if (error) {
         console.error('[useUserUIState] Error saving fallback to database:', error);
       } else {
-        console.log(`[useUserUIState] Successfully saved fallback for key "${key}"`);
         // Invalidate cache so other components see the backfilled values
         const cacheKey = `user_settings_${userId}`;
         settingsCache.delete(cacheKey);
@@ -214,7 +211,6 @@ export function useUserUIState<K extends keyof UISettings>(
         } else {
           // Key doesn't exist in database - this is an existing user who hasn't set preferences yet
           // Save fallback values to backfill them (only runs when completely empty)
-          console.log(`[useUserUIState] No value found for key "${key}", saving fallback to database`);
           const normalizedFallback = normalizeIfGenerationMethods(fallback);
           setValue(normalizedFallback); // Set normalized fallback immediately for responsive UI
           
@@ -293,8 +289,7 @@ export function useUserUIState<K extends keyof UISettings>(
           // Invalidate cache so other components see the update
           const cacheKey = `user_settings_${userId}`;
           settingsCache.delete(cacheKey);
-          console.log(`[useUserUIState] Cache invalidated for user ${userId} after update`);
-        }
+          }
       } catch (error) {
         console.error('[useUserUIState] Error in update:', error);
       }

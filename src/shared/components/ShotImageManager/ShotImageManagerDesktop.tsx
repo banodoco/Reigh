@@ -45,24 +45,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   ...props
 }) => {
   // Debug: Log props received
-  console.log('[ShotSelectorDebug] ShotImageManagerDesktop received props', {
-    component: 'ShotImageManagerDesktop',
-    hasOnAddToShot: !!props.onAddToShot,
-    hasOnAddToShotWithoutPosition: !!props.onAddToShotWithoutPosition,
-    allShotsLength: props.allShots?.length || 0,
-    selectedShotId: props.selectedShotId,
-    hasOnShotChange: !!props.onShotChange,
-    generationMode: props.generationMode
-  });
-
-  console.log('[PairIndicatorDebug] ShotImageManagerDesktop received pair props', {
-    component: 'ShotImageManagerDesktop',
-    hasOnPairClick: !!props.onPairClick,
-    hasPairPrompts: !!props.pairPrompts,
-    hasEnhancedPrompts: !!props.enhancedPrompts,
-    hasDefaultPrompt: !!props.defaultPrompt,
-    hasDefaultNegativePrompt: !!props.defaultNegativePrompt,
-    pairPromptsKeys: props.pairPrompts ? Object.keys(props.pairPrompts) : [],
+  : [],
     enhancedPromptsKeys: props.enhancedPrompts ? Object.keys(props.enhancedPrompts) : [],
   });
 
@@ -189,7 +172,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             ? (currentImage as any).timeline_frame === null || (currentImage as any).timeline_frame === undefined
             : undefined;
 
-          console.log('[BasedOnNav] 📊 MediaLightbox props (Desktop):', {
+          :', {
             mediaId: lightbox.currentImages[lightbox.lightboxIndex]?.id.substring(0, 8),
             showTaskDetails: true,
             hasTaskDetailsData: !!taskDetailsData,
@@ -216,7 +199,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               toolTypeOverride={props.toolTypeOverride}
               autoEnterInpaint={lightbox.shouldAutoEnterInpaint}
               onClose={() => {
-                console.log('[BasedOnNav] 🚪 MediaLightbox onClose called (Desktop)', {
+                ', {
                   lightboxIndex: lightbox.lightboxIndex,
                   currentImagesLength: lightbox.currentImages.length,
                   hasDerivedNavContext: !!externalGens.derivedNavContext,
@@ -267,21 +250,11 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               onShotChange={isExternalGen ? (shotId) => {
                 externalGens.setExternalGenLightboxSelectedShot(shotId);
               } : (shotId) => {
-                console.log('[ShotImageManagerDesktop] Shot selector changed to:', shotId);
                 setLightboxSelectedShotId?.(shotId);
                 props.onShotChange?.(shotId);
               }}
               onAddToShot={(() => {
                 const result = isExternalGen ? externalGens.handleExternalGenAddToShot : props.onAddToShot;
-                console.log('[ShotSelectorDebug] ShotImageManagerDesktop -> MediaLightbox onAddToShot', {
-                  component: 'ShotImageManagerDesktop',
-                  isExternalGen,
-                  propsOnAddToShot: !!props.onAddToShot,
-                  externalGensHandler: !!externalGens.handleExternalGenAddToShot,
-                  finalOnAddToShot: !!result,
-                  allShotsLength: props.allShots?.length || 0,
-                  selectedShotId: props.selectedShotId
-                });
                 return result;
               })()}
               onAddToShotWithoutPosition={isExternalGen ? externalGens.handleExternalGenAddToShotWithoutPosition : props.onAddToShotWithoutPosition}

@@ -144,9 +144,6 @@ const JoinClipsPage: React.FC = () => {
     if (videosViewJustEnabled && videosData?.items) {
       // Data has loaded, clear the flag
       setVideosViewJustEnabled(false);
-      console.log('[JoinClips] Data loaded, clearing videosViewJustEnabled flag', {
-        itemsCount: videosData.items.length,
-        timestamp: Date.now()
       });
     }
   }, [videosViewJustEnabled, videosData?.items]);
@@ -541,8 +538,6 @@ const JoinClipsPage: React.FC = () => {
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
       };
       
-      console.log('[JoinClips] Creating task with params:', taskParams);
-      
       const result = await createJoinClipsTask(taskParams);
       return result;
     },
@@ -670,7 +665,7 @@ const JoinClipsPage: React.FC = () => {
                         startingVideoLoaded ? 'opacity-100' : 'opacity-0'
                       )}
                       onLoadedData={() => {
-                        console.log('[JoinClips] Starting video onLoadedData fired', { url: startingVideo.url, timestamp: Date.now() });
+                        });
                         setStartingVideoLoaded(true);
                       }}
                     />
@@ -844,7 +839,7 @@ const JoinClipsPage: React.FC = () => {
                         endingVideoLoaded ? 'opacity-100' : 'opacity-0'
                       )}
                       onLoadedData={() => {
-                        console.log('[JoinClips] Ending video onLoadedData fired', { url: endingVideo.url, timestamp: Date.now() });
+                        });
                         setEndingVideoLoaded(true);
                       }}
                     />

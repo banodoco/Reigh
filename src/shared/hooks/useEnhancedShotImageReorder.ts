@@ -51,16 +51,13 @@ export const useEnhancedShotImageReorder = (
       return;
     }
 
-    console.log('[BatchModeReorderFlow] [HANDLE_REORDER] 🎯 useEnhancedShotImageReorder.handleReorder called:', {
-      shotId: shotId.substring(0, 8),
+    ,
       orderedShotImageEntryIds: orderedShotImageEntryIds.map(id => id.substring(0, 8)),
       totalItems: orderedShotImageEntryIds.length,
       timestamp: Date.now()
     });
 
-    console.log('[useEnhancedShotImageReorder] Handling timeline-frame-based reorder:', {
-      shotId,
-      orderedIds: orderedShotImageEntryIds.map(id => id.substring(0, 8))
+    )
     });
 
     try {
@@ -91,8 +88,7 @@ export const useEnhancedShotImageReorder = (
       }
       
       // 🔍 DIAGNOSTIC: Log the full data structure to understand duplicates
-      console.log('[BatchModeReorderFlow] [DATA_STRUCTURE] 📊 Current data structure analysis:', {
-        currentImages: currentImages.map((img, index) => ({
+      => ({
           index,
           shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
           generationId: img.id?.substring(0, 8),
@@ -188,10 +184,7 @@ export const useEnhancedShotImageReorder = (
         }
       }
 
-      console.log('[BatchModeReorderFlow] [CHANGES_DETECTED] 📋 Timeline-frame-based changes detected:', {
-        changesCount: changes.length,
-        changes: changes.map(c => ({
-          shotImageEntryId: c.shotImageEntryId.substring(0, 8),
+      ,
           generationId: c.generationId.substring(0, 8),
           oldPos: c.oldPos,
           newPos: c.newPos,
@@ -203,20 +196,16 @@ export const useEnhancedShotImageReorder = (
       });
 
       if (changes.length === 0) {
-        console.log('[useEnhancedShotImageReorder] No changes detected');
         return;
       }
 
       // Build sequential swaps to transform current order into desired order
       // This handles any permutation (simple swaps, complex chains, duplicate generation_ids)
-      console.log('[BatchModeReorderFlow] [SEQUENTIAL_SWAPS] 🔄 Building sequential swap sequence...');
-      
       // Create working arrays with shot_generation IDs (the unique identifiers we need for swaps)
       const currentOrderIds = currentImages.map(img => img.shotImageEntryId);
       const desiredOrderIds = [...orderedShotImageEntryIds]; // Copy to avoid mutation
       
-      console.log('[BatchModeReorderFlow] [ORDER_COMPARISON] 📋 Comparing orders:', {
-        currentOrder: currentOrderIds.map(id => id.substring(0, 8)),
+      ),
         desiredOrder: desiredOrderIds.map(id => id.substring(0, 8)),
         timestamp: Date.now()
       });
@@ -233,10 +222,7 @@ export const useEnhancedShotImageReorder = (
       
       const { swapSequence, finalOrder, noChangesNeeded } = reorderAnalysis;
       
-      console.log('[BatchModeReorderFlow] [SWAP_SEQUENCE] 📝 Generated swap sequence:', {
-        totalSwaps: swapSequence.length,
-        noChangesNeeded,
-        swaps: swapSequence.map((swap, i) => ({
+      => ({
           step: i + 1,
           itemA: swap.shotGenIdA.substring(0, 8),
           itemB: swap.shotGenIdB.substring(0, 8),
@@ -248,12 +234,9 @@ export const useEnhancedShotImageReorder = (
       
       // Execute the swap sequence
       if (!noChangesNeeded && swapSequence.length > 0) {
-        console.log('[BatchModeReorderFlow] [EXECUTING_SWAPS] 🚀 Executing sequential swaps...');
-        
         for (let i = 0; i < swapSequence.length; i++) {
           const swap = swapSequence[i];
-          console.log('[BatchModeReorderFlow] [SWAP_STEP] 🔀 Step', i + 1, 'of', swapSequence.length, ':', {
-            itemA: swap.shotGenIdA.substring(0, 8),
+          ,
             itemB: swap.shotGenIdB.substring(0, 8),
             reason: swap.reason
           });
@@ -261,11 +244,9 @@ export const useEnhancedShotImageReorder = (
           await exchangePositionsNoReload(swap.shotGenIdA, swap.shotGenIdB);
         }
         
-        console.log('[BatchModeReorderFlow] [SWAPS_COMPLETE] ✅ All swaps completed, reloading positions...');
         await loadPositions({ reason: 'reorder' });
       } else {
-        console.log('[BatchModeReorderFlow] [NO_SWAPS_NEEDED] ℹ️ No swaps needed - order already correct');
-      }
+        }
 
       // Reordering completed successfully - no toast needed for smooth UX
 
@@ -289,8 +270,7 @@ export const useEnhancedShotImageReorder = (
         throw new Error('Item not found for deletion');
       }
 
-      console.log('[PositionSystemDebug] 🗑️ Deleting individual duplicate item:', {
-        shotImageEntryId: shotImageEntryId.substring(0, 8),
+      ,
         generationId: targetItem.generation_id.substring(0, 8),
         timeline_frame: targetItem.timeline_frame
       });

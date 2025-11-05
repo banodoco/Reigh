@@ -90,13 +90,11 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
   // Update local state when preferences load for the first time
   React.useEffect(() => {
     if (autoTopupPreferences && !hasInitialized) {
-      console.log('[AutoTopup:Init] Initializing auto-top-up state from preferences:', autoTopupPreferences);
       setLocalAutoTopupEnabled(autoTopupPreferences.enabled);
       setLocalAutoTopupThreshold(autoTopupPreferences.threshold || 10);
       
       // If user has a saved auto-top-up amount, use that as the purchase amount
       if (autoTopupPreferences.amount && autoTopupPreferences.amount !== 50) {
-        console.log('[AutoTopup:Init] Setting purchase amount from saved auto-top-up amount:', autoTopupPreferences.amount);
         setPurchaseAmount(autoTopupPreferences.amount);
       }
       
@@ -159,14 +157,12 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     // 3. Purchase amount changes
     if (hasInitialized && autoTopupPreferences && autoTopupPreferences.threshold === 10 && purchaseAmount !== 50) {
       const defaultThreshold = Math.max(1, Math.floor(purchaseAmount / 5));
-      console.log('[AutoTopup:Threshold] Auto-updating threshold for new user:', { purchaseAmount, defaultThreshold });
       setLocalAutoTopupThreshold(defaultThreshold);
     }
   }, [purchaseAmount, hasInitialized, autoTopupPreferences]);
 
   // Handle auto-top-up preference changes
   const handleAutoTopupToggle = (enabled: boolean) => {
-    console.log('[AutoTopup:Toggle] Checkbox clicked:', { enabled, currentLocal: localAutoTopupEnabled });
     setLocalAutoTopupEnabled(enabled);
     
     // Immediately save preference changes
@@ -175,7 +171,6 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
       amount: purchaseAmount, // Use the purchase amount from the slider above
       threshold: localAutoTopupThreshold,
     };
-    console.log('[AutoTopup:Save] Saving preferences:', saveData);
     updateAutoTopup(saveData);
   };
 
@@ -198,12 +193,6 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
       // Auto-calculate new threshold as 1/5 of purchase amount (minimum 1)
       const newThreshold = Math.max(1, Math.floor(amount / 5));
       
-      console.log('[AutoTopup:Purchase] Updating auto-top-up amount and threshold:', { 
-        amount, 
-        newThreshold, 
-        previousThreshold: localAutoTopupThreshold 
-      });
-      
       // Update local state immediately for UI responsiveness
       setLocalAutoTopupThreshold(newThreshold);
       
@@ -225,15 +214,6 @@ const CreditsManagement: React.FC<CreditsManagementProps> = ({ initialTab = 'pur
     const enabled = localAutoTopupEnabled;
     
     // Debug logging (keeping for now)
-    console.log('[AutoTopup:State] State computation:', {
-      serverEnabled: autoTopupPreferences.enabled,
-      localEnabled: enabled,
-      setupCompleted,
-      finalState: enabled && setupCompleted ? 'active' : 
-                   !enabled && setupCompleted ? 'setup-but-disabled' : 
-                   enabled && !setupCompleted ? 'enabled-but-not-setup' : 'not-setup'
-    });
-    
     if (enabled && setupCompleted) return 'active';
     if (!enabled && setupCompleted) return 'setup-but-disabled';
     if (enabled && !setupCompleted) return 'enabled-but-not-setup';

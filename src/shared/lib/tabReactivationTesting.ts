@@ -11,7 +11,6 @@ export function initTabReactivationTesting() {
 
   // Manual trigger for testing
   (window as any).__TAB_REACTIVATION_TEST__ = () => {
-    console.log('[TabReactivation] Manual test triggered');
     const trigger = (window as any).__TRIGGER_REALTIME_BOUNDARY_SWAP__;
     if (trigger) {
       trigger();
@@ -112,7 +111,6 @@ export function initTabReactivationTesting() {
       timestamp: Date.now()
     };
 
-    console.log('[TabReactivation] Current status:', summary);
     return summary;
   };
 
@@ -125,7 +123,7 @@ export function initTabReactivationTesting() {
     }
 
     if (enable) {
-      console.log('[TabReactivation] Starting continuous monitoring (every 10s)');
+      ');
       monitorInterval = setInterval(() => {
         const status = (window as any).__TAB_REACTIVATION_STATUS__();
         if (status.healthStatus !== 'HEALTHY') {
@@ -138,8 +136,7 @@ export function initTabReactivationTesting() {
     }
   };
 
-  console.log('[TabReactivation] Testing utilities initialized. Available commands:');
-  console.log('- __TAB_REACTIVATION_TEST__() - Manual boundary swap');
-  console.log('- __TAB_REACTIVATION_STATUS__() - Check observer health');
-  console.log('- __TAB_REACTIVATION_MONITOR__(true/false) - Toggle monitoring');
+  - Manual boundary swap');
+  - Check observer health');
+  - Toggle monitoring');
 }

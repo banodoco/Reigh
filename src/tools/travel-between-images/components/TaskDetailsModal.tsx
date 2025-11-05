@@ -105,7 +105,6 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         if (cancelled) return;
 
         if (!result.taskId) {
-            console.log(`[TaskDetailsModal] No task ID found for generation ID: ${generationId}`);
             setTaskId(null);
             return;
         }

@@ -40,12 +40,6 @@ export const useShotCreation = ({
 
   // Handle quick create and add shot
   const handleQuickCreateAndAdd = useCallback(async () => {
-    console.log('[VisitShotDebug] handleQuickCreateAndAdd called', {
-      hasSelectedProjectId: !!selectedProjectId,
-      allShotsLength: allShots.length,
-      mediaId: media.id
-    });
-    
     if (!selectedProjectId) {
       console.error('[VisitShotDebug] No project selected');
       return;
@@ -57,12 +51,6 @@ export const useShotCreation = ({
     
     setIsCreatingShot(true);
     try {
-      console.log('[VisitShotDebug] Creating shot WITH image using atomic operation:', {
-        shotName: newShotName,
-        projectId: selectedProjectId,
-        generationId: media.id
-      });
-      
       // Use atomic database function to create shot and add image in one operation
       // This is the same approach as ImageGalleryItem
       const result = await createShotWithImageMutation.mutateAsync({
@@ -70,8 +58,6 @@ export const useShotCreation = ({
         shotName: newShotName,
         generationId: media.id
       });
-      
-      console.log('[VisitShotDebug] Atomic shot creation result:', result);
       
       // Set success state with real shot ID
       setQuickCreateSuccess({
@@ -95,22 +81,13 @@ export const useShotCreation = ({
 
   // Handle quick create success navigation
   const handleQuickCreateSuccess = useCallback(() => {
-    console.log('[VisitShotDebug] 2. MediaLightbox handleQuickCreateSuccess called', {
-      quickCreateSuccess,
-      hasOnNavigateToShot: !!onNavigateToShot,
-      allShotsCount: allShots?.length || 0,
-      timestamp: Date.now()
     });
 
     if (quickCreateSuccess.shotId && onNavigateToShot) {
       // Try to find the shot in the list first (we only have id/name here)
       const shotOption = allShots?.find(s => s.id === quickCreateSuccess.shotId);
       
-      console.log('[VisitShotDebug] 3. MediaLightbox shot search result', {
-        shotId: quickCreateSuccess.shotId,
-        foundInList: !!shotOption,
-        shotOption: shotOption ? { id: shotOption.id, name: shotOption.name } : null,
-        allShots: allShots?.map(s => ({ id: s.id, name: s.name })) || []
+      ) || []
       });
 
       if (shotOption) {
@@ -121,7 +98,6 @@ export const useShotCreation = ({
           images: [],
           position: 0,
         };
-        console.log('[VisitShotDebug] 4a. MediaLightbox calling onNavigateToShot with found shot', minimalShot);
         onNavigateToShot(minimalShot);
       } else {
         // Fallback when shot not in list yet
@@ -131,18 +107,12 @@ export const useShotCreation = ({
           images: [],
           position: 0,
         };
-        console.log('[VisitShotDebug] 4b. MediaLightbox calling onNavigateToShot with fallback shot', minimalShot);
         onNavigateToShot(minimalShot);
       }
     } else {
-      console.log('[VisitShotDebug] 4c. MediaLightbox not navigating - missing requirements', {
-        hasShotId: !!quickCreateSuccess.shotId,
-        hasOnNavigateToShot: !!onNavigateToShot
-      });
-    }
+      }
     
     // Clear the success state
-    console.log('[VisitShotDebug] 5. MediaLightbox clearing success state');
     setQuickCreateSuccess({ isSuccessful: false, shotId: null, shotName: null });
   }, [quickCreateSuccess, onNavigateToShot, allShots]);
 

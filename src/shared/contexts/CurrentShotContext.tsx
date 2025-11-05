@@ -13,8 +13,7 @@ export const CurrentShotProvider: React.FC<{ children: ReactNode }> = ({ childre
   // Debug: Log when currentShotId changes (only in development)
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[ShotFilterAutoSelectIssue] currentShotId changed:', currentShotId);
-    }
+      }
   }, [currentShotId]);
 
   // Memoize setCurrentShotId to prevent recreating the function

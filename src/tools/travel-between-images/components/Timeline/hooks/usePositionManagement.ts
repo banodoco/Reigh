@@ -136,11 +136,10 @@ export function usePositionManagement({
     if (positionLockRef.current.isLocked) {
       const timeSinceLock = Date.now() - positionLockRef.current.lockTimestamp;
       if (timeSinceLock < 5000) { // 5 second maximum lock duration
-        console.log(`[TIMELINE_TRACK] [POSITION_LOCK] 🔒 Using locked positions instead of fresh data (${timeSinceLock}ms since lock)`);
+        `);
         return positionLockRef.current.lockedPositions;
       } else {
         // Auto-unlock after timeout
-        console.log(`[TIMELINE_TRACK] [POSITION_UNLOCK] 🔓 Auto-unlocking positions after ${timeSinceLock}ms timeout`);
         positionLockRef.current.isLocked = false;
       }
     }
@@ -171,8 +170,7 @@ export function usePositionManagement({
       
       // [Position0Debug] Log the mapping process to find why position 0 items are lost
       if (sg.timeline_frame === 0) {
-        console.log(`[Position0Debug] 🔍 Processing position 0 shotGeneration:`, {
-          shotGenerationId: sg.id.substring(0, 8),
+        ,
           generationId: sg.generation_id?.substring(0, 8),
           timeline_frame: sg.timeline_frame,
           matchingImage: matchingImage ? {
@@ -191,7 +189,7 @@ export function usePositionManagement({
           // [Position0Debug] Check if we're about to overwrite a position 0 item
           const existingPosition = positions.get(matchingImage.shotImageEntryId);
           if (existingPosition === 0 && sg.timeline_frame !== 0) {
-            console.log(`[Position0Debug] 🚨 OVERWRITING POSITION 0! Item ${matchingImage.shotImageEntryId.substring(0, 8)} had position 0, now setting to ${sg.timeline_frame}`, {
+            } had position 0, now setting to ${sg.timeline_frame}`, {
               shotGenerationId: sg.id.substring(0, 8),
               generationId: sg.generation_id?.substring(0, 8),
               oldPosition: existingPosition,
@@ -203,8 +201,7 @@ export function usePositionManagement({
           
           // [Position0Debug] Log position 0 items being added to positions map
           if (sg.timeline_frame === 0) {
-            console.log(`[Position0Debug] ✅ Position 0 item added to positions map:`, {
-              shotImageEntryId: matchingImage.shotImageEntryId.substring(0, 8),
+            ,
               timeline_frame: sg.timeline_frame,
               positionsMapSize: positions.size
             });
@@ -216,7 +213,7 @@ export function usePositionManagement({
           // [Position0Debug] Check if we're about to overwrite a position 0 item with fallback
           const existingPosition = positions.get(matchingImage.shotImageEntryId);
           if (existingPosition === 0) {
-            console.log(`[Position0Debug] 🚨 OVERWRITING POSITION 0 WITH FALLBACK! Item ${matchingImage.shotImageEntryId.substring(0, 8)} had position 0, now setting to ${maxFrame + 50}`, {
+            } had position 0, now setting to ${maxFrame + 50}`, {
               shotGenerationId: sg.id.substring(0, 8),
               generationId: sg.generation_id?.substring(0, 8),
               oldPosition: existingPosition,
@@ -227,8 +224,7 @@ export function usePositionManagement({
           positions.set(matchingImage.shotImageEntryId, maxFrame + 50);
         }
       } else if (sg.timeline_frame === 0) {
-        console.log(`[Position0Debug] ❌ No matching image found for position 0 shotGeneration:`, {
-          shotGenerationId: sg.id.substring(0, 8),
+        ,
           generationId: sg.generation_id?.substring(0, 8),
           timeline_frame: sg.timeline_frame
         });
@@ -253,7 +249,7 @@ export function usePositionManagement({
       
       if (dbChanges.length > 0) {
         dbChanges.forEach(change => {
-          console.log(`[TIMELINE_TRACK] [DB_UPDATE] 🗄️ Item ${change.id} position updated from database: ${change.oldPos} → ${change.newPos} (Δ${change.newPos - change.oldPos})`);
+          `);
         });
       }
       
@@ -265,9 +261,7 @@ export function usePositionManagement({
     
     // [Position0Debug] Log final positions map before returning
     const position0InFinalMap = Array.from(positions.entries()).filter(([id, pos]) => pos === 0);
-    console.log(`[Position0Debug] 🏁 Final framePositions map before return:`, {
-      totalItems: positions.size,
-      position0Items: position0InFinalMap.map(([id, pos]) => ({
+    => ({
         shotImageEntryId: id.substring(0, 8),
         position: pos
       })),
@@ -307,22 +301,18 @@ export function usePositionManagement({
     }
 
     // 🎯 MOVEMENT TRACKING: Log display position source changes
-    console.log(`[TIMELINE_TRACK] [DISPLAY_SOURCE] 🖥️ Using ${source} positions (${selectedPositions.size} items)`);
+    `);
 
     // [Position0Debug] Only log if there are position 0 items or if we're missing expected position 0 items
     const position0Items = Array.from(selectedPositions.entries()).filter(([id, pos]) => pos === 0);
     
     if (position0Items.length > 0) {
-      console.log(`[Position0Debug] 📊 POSITION 0 FOUND in ${source}:`, {
-        position0Items: position0Items.map(([id, pos]) => ({ id: id.substring(0, 8), position: pos }))
+      => ({ id: id.substring(0, 8), position: pos }))
       });
     } else {
       // Check if we should have position 0 items but don't
       const allPositions = Array.from(selectedPositions.entries()).sort((a, b) => a[1] - b[1]);
-      console.log(`[Position0Debug] 📊 NO POSITION 0 in ${source}:`, {
-        totalItems: selectedPositions.size,
-        minPosition: allPositions.length > 0 ? allPositions[0][1] : null,
-        first3Items: allPositions.slice(0, 3).map(([id, pos]) => ({ id: id.substring(0, 8), position: pos }))
+      .map(([id, pos]) => ({ id: id.substring(0, 8), position: pos }))
       });
     }
 
@@ -442,14 +432,14 @@ export function usePositionManagement({
             while (Array.from(resolvedPositions.values()).includes(newPos)) {
               newPos++;
             }
-            console.log(`[TimelineDragFlow] [DUPLICATE_RESOLUTION] 📍 Session: ${(window as any).__CURRENT_DRAG_SESSION__ || 'no-session'} | Auto-resolving: ${duplicateIds[i]} ${duplicatePos} → ${newPos}`);
+            .__CURRENT_DRAG_SESSION__ || 'no-session'} | Auto-resolving: ${duplicateIds[i]} ${duplicatePos} → ${newPos}`);
             resolvedPositions.set(fullId, newPos);
           }
         }
       }
       newPositions = resolvedPositions;
       
-      console.log(`[TimelineDragFlow] [DUPLICATE_RESOLUTION_COMPLETE] ✅ Session: ${(window as any).__CURRENT_DRAG_SESSION__ || 'no-session'} | Resolved all duplicates, proceeding with ${newPositions.size} unique positions`);
+      .__CURRENT_DRAG_SESSION__ || 'no-session'} | Resolved all duplicates, proceeding with ${newPositions.size} unique positions`);
     }
 
     // Find what actually changed
@@ -473,14 +463,12 @@ export function usePositionManagement({
 
     // 🎯 MOVEMENT TRACKING: Log every position change
     positionChanges.forEach(change => {
-      console.log(`[TIMELINE_TRACK] [ITEM_MOVE] 📍 Item ${change.id} moved: ${change.oldPos} → ${change.newPos} (Δ${change.newPos - change.oldPos})`);
+      `);
     });
     
     // 🎯 DEBUG: Log the full ID mapping to check for ID confusion
     if (positionChanges.length > 0) {
-      console.log(`[TIMELINE_TRACK] [ID_MAPPING] 🔍 Full ID mapping for moved items:`, 
-        positionChanges.map(change => {
-          const fullId = Array.from(newPositions.keys()).find(id => id.substring(0, 8) === change.id);
+      ).find(id => id.substring(0, 8) === change.id);
           return `${change.id} → ${fullId}`;
         }).join(', '));
     }
@@ -496,8 +484,6 @@ export function usePositionManagement({
       lockedPositions: new Map(newPositions),
       lockTimestamp: Date.now()
     };
-    console.log(`[TIMELINE_TRACK] [POSITION_LOCK] 🔒 Positions locked to prevent race conditions`);
-
     // Update UI immediately for smooth experience
     setStablePositions(new Map(newPositions), 'position-update');
     setIsPersistingPositions(true);
@@ -549,8 +535,6 @@ export function usePositionManagement({
       setTimeout(() => {
         // 🔓 POSITION UNLOCK: Release the position lock
         positionLockRef.current.isLocked = false;
-        console.log(`[TIMELINE_TRACK] [POSITION_UNLOCK] 🔓 Positions unlocked after database update completed`);
-        
         setIsPersistingPositions(false);
         timelineDebugger.logPositionUpdate('Position persistence completed - invalidations now allowed', {
           shotId,

@@ -121,8 +121,7 @@ const performanceMonitor = {
           thumbnailOnlyPreload: true,
           preloadStrategy: current.preloadStrategy === 'aggressive' ? 'moderate' : 'conservative'
         };
-        console.log('[ImageLoadingDebug][SmartPreload] Adapted to more conservative strategy due to performance');
-      }
+        }
     }
   }
 };
@@ -363,7 +362,7 @@ export const smartCleanupOldPages = (
       
       // If the detected page is very different from the passed page, use the detected one
       if (Math.abs(detectedPage - currentPage) > 1) {
-        console.log(`[ImageLoadingDebug][CacheCleanup] Auto-correcting page: passed=${currentPage}, detected=${detectedPage} (using detected)`);
+        `);
         actualCurrentPage = detectedPage;
       }
     }
@@ -371,27 +370,13 @@ export const smartCleanupOldPages = (
     // Generate unique cleanup ID for tracking
     const cleanupId = `cleanup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Starting smart cleanup:`, {
-      passedPage: currentPage,
-      actualCurrentPage,
-      projectId,
-      baseQueryKey,
-      timestamp: new Date().toISOString()
+    .toISOString()
     });
     
     const config = performanceMonitor.currentConfig;
     const keepRange = Math.floor(config.maxCachedPages / 2);
     
-    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup configuration:`, {
-      maxCachedPages: config.maxCachedPages,
-      keepRange,
-      strategy: config.preloadStrategy
-    });
-    
-    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Found cached queries:`, {
-      totalQueries: allQueries.length,
-      generationQueries: generationQueries.length,
-      pages: generationQueries.map(entry => entry.query.queryKey[entry.pageIndex]).sort((a, b) => a - b)
+    .sort((a, b) => a - b)
     });
 
     // Sort by page distance from current page
@@ -406,9 +391,7 @@ export const smartCleanupOldPages = (
       .filter(item => item.distance > keepRange)
       .sort((a, b) => b.distance - a.distance); // Remove most distant first
 
-    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup analysis:`, {
-      keepRange,
-      pagesToKeep: queriesWithDistance.filter(item => item.distance <= keepRange).map(item => item.page),
+    .map(item => item.page),
       pagesToRemove: queriesToRemove.map(item => item.page),
       totalToRemove: queriesToRemove.length
     });
@@ -431,14 +414,13 @@ export const smartCleanupOldPages = (
             const imageCount = queryData.items.length;
             totalImagesCleared += imageCount;
             
-            console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Clearing image cache flags for page ${page} (${imageCount} images)`);
+            `);
             
             // Clear cache using centralized manager (this should be fast)
             clearCacheForImages(queryData.items);
           }
           
           // Remove query from cache
-          console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Removing query cache for page ${page}:`, query.queryKey);
           queryClient.removeQueries({ queryKey: query.queryKey });
           
           removedCount++;
@@ -474,13 +456,6 @@ export const smartCleanupOldPages = (
     actualCurrentPage: number, 
     config: any
   ) => {
-    console.log(`[ImageLoadingDebug][CacheCleanup:${cleanupId}] Cleanup complete:`, {
-      queriesRemoved: removedCount,
-      imagesCleared: totalImagesCleared,
-      queriesKept: generationQueries.length - removedCount,
-      maxCachedPages: config.maxCachedPages
-    });
-    
     // Log user-friendly cache summary for easy validation
     const remainingPages = [...new Set(queriesWithDistance
       .filter(item => item.distance <= keepRange)
@@ -521,8 +496,7 @@ export const triggerImageGarbageCollection = () => {
     // Only available in Chrome with --js-flags="--expose-gc"
     try {
       (window as any).gc();
-      console.log('[ImageLoadingDebug][SmartCleanup] Manual garbage collection triggered');
-    } catch (e) {
+      } catch (e) {
       // Ignore if not available
     }
   }
@@ -560,20 +534,11 @@ export const smartPreloadImages = (
 ) => {
   const preloadId = `smartpreload-${priority}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
   
-  console.log(`🚀 [PAGELOADINGDEBUG] [PRELOAD:${preloadId}] ${priority} page: ${cachedData?.items?.length || 0} images`);
-  
   if (!cachedData?.items) {
-    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] No cached data available`);
     return;
   }
   
   const config = performanceMonitor.currentConfig;
-  
-  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Performance config:`, {
-    preloadStrategy: config.preloadStrategy,
-    maxConcurrentPreloads: config.maxConcurrentPreloads,
-    thumbnailOnlyPreload: config.thumbnailOnlyPreload
-  });
   
   // Determine how many images to preload based on strategy
   const maxImages = (() => {
@@ -585,25 +550,15 @@ export const smartPreloadImages = (
     }
   })();
   
-  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Strategy calculation:`, {
-    strategy: config.preloadStrategy,
-    availableItems: cachedData.items.length,
-    maxImages,
-    willProceed: maxImages > 0
-  });
-  
   if (maxImages === 0) {
-    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] No images to preload (maxImages = 0)`);
+    `);
     return;
   }
   
   const imagesToPreload = cachedData.items.slice(0, maxImages);
   const priorityScore = priority === 'next' ? 100 : 50;
   
-  console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Preload batch prepared:`, {
-    imagesToPreload: imagesToPreload.length,
-    priorityScore,
-    imageIds: imagesToPreload.slice(0, 3).map((img: any) => img.id) // Show first 3 IDs
+  .map((img: any) => img.id) // Show first 3 IDs
   });
   
   let queuedCount = 0;
@@ -614,7 +569,6 @@ export const smartPreloadImages = (
   imagesToPreload.forEach((img: any, idx: number) => {
     // Skip if this prefetch is no longer current
     if (prefetchOperationsRef.current.currentPrefetchId !== currentPrefetchId) {
-      console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Skipping image ${idx} - prefetch ID changed`);
       skippedCount++;
       return;
     }
@@ -622,7 +576,6 @@ export const smartPreloadImages = (
     // Check if already cached
     const isCached = isImageCached(img);
     if (isCached) {
-      console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Image ${idx} already cached:`, img.id);
       alreadyCachedCount++;
       return;
     }
@@ -635,9 +588,7 @@ export const smartPreloadImages = (
     // Use slightly slower timing than current page (25ms) to avoid resource conflicts
     const progressiveDelay = idx < 3 ? 0 : (idx - 2) * 60;
     
-    console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Scheduling image ${idx} with ${progressiveDelay}ms delay:`, {
-      imageId: img.id,
-      url: imageUrl.substring(0, 80) + '...',
+    + '...',
       thumbnailOnly: config.thumbnailOnlyPreload
     });
     
@@ -657,7 +608,6 @@ export const smartPreloadImages = (
         itemPriority,
         () => {
           // Success callback
-          console.log(`[ImageLoadingDebug][SmartPreload:${preloadId}] Successfully preloaded image:`, img.id);
           setImageCacheStatus(img, true);
         },
         () => {
@@ -692,8 +642,7 @@ export const smartPreloadImages = (
     queuedCount++;
   });
   
-  console.log(`📊 [PAGELOADINGDEBUG] [PRELOAD:${preloadId}] Complete: ${queuedCount} queued, ${alreadyCachedCount} cached, ${skippedCount} skipped`);
-};
+  };
 
 interface PreloadOperation {
   images: HTMLImageElement[];
@@ -829,22 +778,13 @@ export const useAdjacentPagePreloading = ({
   // Main preloading effect with smart configuration
   useEffect(() => {
     if (!enabled || isLightboxOpen) {
-      console.log('[AdjacentPreload] Disabled or lightbox open - skipping preload effect', {
-        enabled,
-        isLightboxOpen
-      });
       return;
     }
     
     // Generate unique session ID for this preload session
     const preloadSessionId = `preload-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Starting preload session:`, {
-      page: isServerPagination ? serverPage : page,
-      isServerPagination,
-      totalFilteredItems,
-      itemsPerPage,
-      timestamp: new Date().toISOString()
+    .toISOString()
     });
     
     // Cancel any existing preloads immediately
@@ -854,23 +794,13 @@ export const useAdjacentPagePreloading = ({
     const config = performanceMonitor.currentConfig;
     globalPreloadQueue.updateConcurrency(config.maxConcurrentPreloads);
     
-    console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Device configuration:`, {
-      strategy: config.preloadStrategy,
-      maxCachedPages: config.maxCachedPages,
-      maxConcurrentPreloads: config.maxConcurrentPreloads,
-      thumbnailOnlyPreload: config.thumbnailOnlyPreload,
-      debounceTime: config.debounceTime
-    });
-    
     // Smart debounce based on strategy
     const debounceTime = config.debounceTime;
     
     // Debounce preloading to avoid excessive operations on rapid page changes
-    console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Starting debounced preload timer (${debounceTime}ms)`);
+    `);
     const preloadTimer = performanceMonitoredTimeout(() => {
       const timeoutStartTime = performance.now();
-      console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Debounce timer fired - calculating adjacent pages`);
-      
       const totalPages = Math.max(1, Math.ceil(totalFilteredItems / itemsPerPage));
       const currentPageForPreload = isServerPagination ? (serverPage! - 1) : page;
       
@@ -880,15 +810,6 @@ export const useAdjacentPagePreloading = ({
       
       const prevPage = shouldPreloadPrev ? currentPageForPreload - 1 : null;
       const nextPage = shouldPreloadNext ? currentPageForPreload + 1 : null;
-      
-      console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Page calculation:`, {
-        currentPageForPreload,
-        totalPages,
-        prevPage,
-        nextPage,
-        shouldPreloadPrev,
-        shouldPreloadNext
-      });
       
       // Create unique page ID for this preload session
       const pageId = `${currentPageForPreload}-${Date.now()}`;
@@ -900,15 +821,9 @@ export const useAdjacentPagePreloading = ({
           const serverPrevPage = prevPage !== null ? prevPage + 1 : null; // Convert back to 1-based
           const serverNextPage = nextPage !== null ? nextPage + 1 : null;
           
-          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Server pagination - calling onPrefetchAdjacentPages:`, {
-            serverPrevPage,
-            serverNextPage
-          });
-          
           onPrefetchAdjacentPages(serverPrevPage, serverNextPage);
         } else {
-          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Server pagination - no adjacent pages to preload`);
-        }
+          }
       } else {
         // For client-side pagination, preload adjacent page images directly
         if (allImages.length > 0 && (shouldPreloadPrev || shouldPreloadNext)) {
@@ -922,21 +837,9 @@ export const useAdjacentPagePreloading = ({
             ? allImages.slice((currentPageForPreload + 1) * itemsPerPage, (currentPageForPreload + 2) * itemsPerPage)
             : [];
           
-          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Client pagination - preloading adjacent images:`, {
-            prevPageImagesCount: prevPageImages.length,
-            nextPageImagesCount: nextPageImages.length,
-            allImagesTotal: allImages.length,
-            pageId
-          });
-          
           preloadClientSidePages(prevPageImages, nextPageImages, pageId, preloadOperationsRef.current);
         } else {
-          console.log(`[ImageLoadingDebug][AdjacentPreload:${preloadSessionId}] Client pagination - no images to preload:`, {
-            allImagesLength: allImages.length,
-            shouldPreloadPrev,
-            shouldPreloadNext
-          });
-        }
+          }
       }
       
       // Monitor setTimeout execution time
@@ -967,7 +870,6 @@ export const useAdjacentPagePreloading = ({
   // Clear cache on project change
   useEffect(() => {
     if (projectId) {
-      console.log(`[AdjacentPagePreloading] Project changed to ${projectId}, clearing image cache`);
       clearCacheForProjectSwitch('project switch in adjacent page preloading');
       
       // Also clear the global preload queue to start fresh

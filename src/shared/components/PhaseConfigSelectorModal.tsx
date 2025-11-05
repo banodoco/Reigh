@@ -101,10 +101,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
 
   // Combine all presets (my presets + public presets)
   const allPresets = useMemo(() => {
-    console.log('[PhaseConfigModal] Combining presets:', {
-      myPresetsCount: myPresetsResource.data?.length || 0,
-      publicPresetsCount: publicPresetsResource.data?.length || 0,
-      myPresetIds: myPresetIds.map(id => id.substring(0, 8)),
+    ),
       timestamp: Date.now()
     });
     
@@ -119,9 +116,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
       _isMyPreset: myPresetIds.includes(r.id)
     }));
     
-    console.log('[PhaseConfigModal] Preset details:', {
-      myPresets: myPresets.map(p => ({
-        id: p.id.substring(0, 8),
+    ,
         name: p.metadata.name,
         isPublic: p.metadata.is_public,
         userId: p.userId?.substring(0, 8)
@@ -142,10 +137,7 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
     myPresets.forEach(preset => presetMap.set(preset.id, preset));
     
     const combined = Array.from(presetMap.values());
-    console.log('[PhaseConfigModal] Combined presets:', {
-      totalCount: combined.length,
-      presets: combined.map(p => ({
-        id: p.id.substring(0, 8),
+    ,
         name: p.metadata.name,
         isPublic: p.metadata.is_public,
         _isMyPreset: p._isMyPreset

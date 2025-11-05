@@ -68,8 +68,7 @@ export function useDoubleTapWithSelection({
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
     
-    console.log('[DoubleTapFlow] 👆 Touch START:', {
-      itemId: itemId.substring(0, 8),
+    ,
       position: { x: touch.clientX, y: touch.clientY },
       disabled,
       timestamp: Date.now()
@@ -78,9 +77,6 @@ export function useDoubleTapWithSelection({
   
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (disabled || !touchStartPosRef.current) {
-      console.log('[DoubleTapFlow] ⚠️ Touch END ignored:', {
-        reason: disabled ? 'disabled' : 'no_touch_start',
-        itemId: itemId.substring(0, 8)
       });
       return;
     }
@@ -89,8 +85,7 @@ export function useDoubleTapWithSelection({
     const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
     const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
     
-    console.log('[DoubleTapFlow] 👆 Touch END:', {
-      itemId: itemId.substring(0, 8),
+    ,
       movement: { deltaX, deltaY },
       scrollThreshold,
       position: { x: touch.clientX, y: touch.clientY }
@@ -98,8 +93,7 @@ export function useDoubleTapWithSelection({
     
     // Scroll detection: Ignore tap if user scrolled
     if (deltaX > scrollThreshold || deltaY > scrollThreshold) {
-      console.log('[DoubleTapFlow] 📜 SCROLL DETECTED - Ignoring tap:', {
-        itemId: itemId.substring(0, 8),
+      ,
         deltaX,
         deltaY,
         threshold: scrollThreshold
@@ -114,8 +108,7 @@ export function useDoubleTapWithSelection({
     const timeDiff = lastTapTime === 0 ? Infinity : now - lastTapTime; // Handle initial state
     const isSameItem = lastTappedIdRef.current === itemId;
     
-    console.log('[DoubleTapFlow] 🔍 Tap analysis:', {
-      itemId: itemId.substring(0, 8),
+    ,
       timeSinceLastTap: timeDiff === Infinity ? 'FIRST_TAP' : timeDiff,
       isSameItem,
       lastTappedId: lastTappedIdRef.current?.substring(0, 8),
@@ -126,8 +119,7 @@ export function useDoubleTapWithSelection({
     
     // Double-tap detection: < 300ms between taps on same item
     if (timeDiff > 10 && timeDiff < doubleTapThreshold && isSameItem) {
-      console.log('[DoubleTapFlow] 👆👆 DOUBLE-TAP DETECTED!', {
-        itemId: itemId.substring(0, 8),
+      ,
         timeDiff,
         threshold: doubleTapThreshold
       });
@@ -143,14 +135,11 @@ export function useDoubleTapWithSelection({
       lastTappedIdRef.current = null;
       touchStartPosRef.current = null;
       
-      console.log('[DoubleTapFlow] ✅ Double-tap handler executed, refs reset');
       return;
     }
     
     
     // Single tap: Execute IMMEDIATELY for instant visual feedback
-    console.log('[DoubleTapFlow] ✅ Executing single-tap action IMMEDIATELY', {
-      itemId: itemId.substring(0, 8)
     });
     
     onSingleTap();

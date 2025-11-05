@@ -189,20 +189,16 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
       setUploadProgress(0);
 
       // Extract metadata
-      console.log('[BatchGuidanceVideo] Extracting metadata...');
       const metadata = await extractVideoMetadata(file);
-      console.log('[BatchGuidanceVideo] Metadata extracted:', metadata);
       setUploadProgress(25);
 
       // Upload to storage
-      console.log('[BatchGuidanceVideo] Uploading to storage...');
       const uploadedVideoUrl = await uploadVideoToStorage(
         file,
         projectId,
         shotId,
         (progress) => setUploadProgress(25 + (progress * 0.75)) // Map 0-100 to 25-100
       );
-      console.log('[BatchGuidanceVideo] Upload complete:', uploadedVideoUrl);
       setUploadProgress(100);
 
       // Notify parent

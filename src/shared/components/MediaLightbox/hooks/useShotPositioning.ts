@@ -88,11 +88,7 @@ export const useShotPositioning = ({
 
   // [ShotNavDebug] Log computed positioned state
   useEffect(() => {
-    console.log('[ShotNavDebug] [MediaLightbox] isAlreadyPositionedInSelectedShot computed', {
-      mediaId: media?.id,
-      selectedShotId,
-      value: isAlreadyPositionedInSelectedShot,
-      mediaShotId: (media as any)?.shot_id,
+    ?.shot_id,
       mediaPosition: (media as any)?.position,
       optimisticHas: optimisticPositionedIds?.has(media?.id || ''),
       override: positionedInSelectedShot,
@@ -103,13 +99,6 @@ export const useShotPositioning = ({
   const handleAddToShot = async () => {
     if (!onAddToShot || !selectedShotId) return;
     
-    console.log('[ShotNavDebug] [MediaLightbox] handleAddToShot click', {
-      mediaId: media?.id,
-      selectedShotId,
-      isAlreadyPositionedInSelectedShot,
-      hasOnNavigateToShot: !!onNavigateToShot,
-      allShotsCount: allShots?.length,
-      timestamp: Date.now()
     });
 
     // If already positioned in shot, navigate to the shot
@@ -121,7 +110,7 @@ export const useShotPositioning = ({
         images: [],
         position: 0,
       };
-      console.log('[ShotNavDebug] [MediaLightbox] Navigating to shot (with position)', {
+      ', {
         minimalShot,
         usedFrom: targetShotOption ? 'fromList' : 'fallback',
         via: onNavigateToShot ? 'onNavigateToShot' : 'navigateToShot+onClose',
@@ -136,20 +125,15 @@ export const useShotPositioning = ({
       return;
     }
     
-    console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShot', {
-      mediaId: media?.id,
-      imageUrl: (media?.imageUrl || '').slice(0, 120),
+    .slice(0, 120),
       thumbUrl: (media?.thumbUrl || '').slice(0, 120),
       timestamp: Date.now()
     });
     const success = await onAddToShot(media.id, media.imageUrl, media.thumbUrl);
-    console.log('[ShotNavDebug] [MediaLightbox] onAddToShot result', { success, timestamp: Date.now() });
+    });
     if (success) {
       onShowTick?.(media.id);
       onOptimisticPositioned?.(media.id);
-      console.log('[ShotNavDebug] [MediaLightbox] Positioned optimistic + tick applied', {
-        mediaId: media?.id,
-        timestamp: Date.now()
       });
     }
   };
@@ -187,11 +171,7 @@ export const useShotPositioning = ({
 
   // [ShotNavDebug] Log computed unpositioned state
   useEffect(() => {
-    console.log('[ShotNavDebug] [MediaLightbox] isAlreadyAssociatedWithoutPosition computed', {
-      mediaId: media?.id,
-      selectedShotId,
-      value: isAlreadyAssociatedWithoutPosition,
-      mediaShotId: (media as any)?.shot_id,
+    ?.shot_id,
       mediaPosition: (media as any)?.position,
       optimisticHas: optimisticUnpositionedIds?.has(media?.id || ''),
       override: associatedWithoutPositionInSelectedShot,
@@ -202,13 +182,6 @@ export const useShotPositioning = ({
   const handleAddToShotWithoutPosition = async () => {
     if (!onAddToShotWithoutPosition || !selectedShotId) return;
 
-    console.log('[ShotNavDebug] [MediaLightbox] handleAddToShotWithoutPosition click', {
-      mediaId: media?.id,
-      selectedShotId,
-      isAlreadyAssociatedWithoutPosition,
-      hasOnNavigateToShot: !!onNavigateToShot,
-      allShotsCount: allShots?.length,
-      timestamp: Date.now()
     });
     
     // If already associated without position, navigate to the shot
@@ -220,7 +193,7 @@ export const useShotPositioning = ({
         images: [],
         position: 0,
       };
-      console.log('[ShotNavDebug] [MediaLightbox] Navigating to shot (without position)', {
+      ', {
         minimalShot,
         usedFrom: targetShotOption ? 'fromList' : 'fallback',
         via: onNavigateToShot ? 'onNavigateToShot' : 'navigateToShot+onClose',
@@ -235,20 +208,15 @@ export const useShotPositioning = ({
       return;
     }
     
-    console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShotWithoutPosition', {
-      mediaId: media?.id,
-      imageUrl: (media?.imageUrl || '').slice(0, 120),
+    .slice(0, 120),
       thumbUrl: (media?.thumbUrl || '').slice(0, 120),
       timestamp: Date.now()
     });
     const success = await onAddToShotWithoutPosition(media.id, media.imageUrl, media.thumbUrl);
-    console.log('[ShotNavDebug] [MediaLightbox] onAddToShotWithoutPosition result', { success, timestamp: Date.now() });
+    });
     if (success) {
       onShowSecondaryTick?.(media.id);
       onOptimisticUnpositioned?.(media.id);
-      console.log('[ShotNavDebug] [MediaLightbox] Unpositioned optimistic + tick applied', {
-        mediaId: media?.id,
-        timestamp: Date.now()
       });
     }
   };

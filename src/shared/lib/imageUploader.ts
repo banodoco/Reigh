@@ -29,7 +29,7 @@ export const uploadImageToStorage = async (
 
   // Add debug logging for large file uploads
   const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-  console.log(`[ImageUploadDebug] Starting upload for ${file.name} (${fileSizeMB}MB) to path: ${filePath} (max retries: ${maxRetries})`);
+  to path: ${filePath} (max retries: ${maxRetries})`);
   
   let lastError: any;
   
@@ -37,8 +37,6 @@ export const uploadImageToStorage = async (
     const uploadStartTime = Date.now();
     
     try {
-      console.log(`[ImageUploadDebug] Upload attempt ${attempt}/${maxRetries} for ${file.name}`);
-      
       let data: any, error: any;
       
       // Use XHR for progress tracking if callback is provided
@@ -127,12 +125,9 @@ export const uploadImageToStorage = async (
         
         // Wait before retrying (exponential backoff: 1s, 2s, 4s...)
         const waitTime = 1000 * Math.pow(2, attempt - 1);
-        console.log(`[ImageUploadDebug] Waiting ${waitTime}ms before retry ${attempt + 1} for ${file.name}`);
         await wait(waitTime);
         continue;
       }
-
-      console.log(`[ImageUploadDebug] Upload successful for ${file.name} in ${uploadDuration}ms on attempt ${attempt}`);
 
       if (!data || !data.path) {
         console.error(`[ImageUploadDebug] No data or path returned for ${file.name}`);
@@ -149,7 +144,6 @@ export const uploadImageToStorage = async (
         throw new Error('Failed to obtain a public URL for the uploaded image.');
       }
 
-      console.log(`[ImageUploadDebug] Upload complete for ${file.name}: ${publicUrl}`);
       return publicUrl;
       
     } catch (uploadError: any) {
@@ -174,7 +168,6 @@ export const uploadImageToStorage = async (
       
       // Wait before retrying (exponential backoff)
       const waitTime = 1000 * Math.pow(2, attempt - 1);
-      console.log(`[ImageUploadDebug] Waiting ${waitTime}ms before retry ${attempt + 1} for ${file.name}`);
       await wait(waitTime);
     }
   }

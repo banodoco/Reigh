@@ -58,8 +58,6 @@ export const useReferences = ({
         throw new Error('No image URL available');
       }
 
-      console.log('[AddToReferences] Starting to add image to references:', imageUrl);
-
       // Fetch the image as blob
       const response = await fetch(imageUrl);
       if (!response.ok) {
@@ -74,16 +72,9 @@ export const useReferences = ({
       const originalUploadedUrl = await uploadImageToStorage(originalFile);
       
       // Generate and upload thumbnail for grid display
-      console.log('[AddToReferences] Generating thumbnail for reference image...');
       let thumbnailUrl: string | null = null;
       try {
         const thumbnailResult = await generateClientThumbnail(originalFile, 300, 0.8);
-        console.log('[AddToReferences] Thumbnail generated:', {
-          width: thumbnailResult.thumbnailWidth,
-          height: thumbnailResult.thumbnailHeight,
-          size: thumbnailResult.thumbnailBlob.size
-        });
-        
         // Upload thumbnail to storage
         const timestamp = Date.now();
         const randomString = Math.random().toString(36).substring(2, 10);
@@ -106,8 +97,7 @@ export const useReferences = ({
             .from('image_uploads')
             .getPublicUrl(thumbnailPath);
           thumbnailUrl = thumbnailUrlData.publicUrl;
-          console.log('[AddToReferences] Thumbnail uploaded successfully:', thumbnailUrl);
-        }
+          }
       } catch (thumbnailError) {
         console.error('[AddToReferences] Error generating thumbnail:', thumbnailError);
         // Use original as fallback
@@ -125,8 +115,6 @@ export const useReferences = ({
       // Process the image to match project aspect ratio
       let processedDataURL = dataURL;
       const { aspectRatio } = await resolveProjectResolution(selectedProjectId);
-      console.log('[AddToReferences] Processing for aspect ratio:', aspectRatio);
-      
       const processed = await processStyleReferenceForAspectRatioString(dataURL, aspectRatio);
       if (processed) {
         processedDataURL = processed;
@@ -161,8 +149,6 @@ export const useReferences = ({
         updatedAt: new Date().toISOString()
       };
       
-      console.log('[AddToReferences] Created new reference:', newReference);
-      
       // Determine the effective shot ID (use 'none' for null shot)
       const effectiveShotId = selectedShotId || 'none';
       
@@ -174,8 +160,6 @@ export const useReferences = ({
           [effectiveShotId]: newReference.id
         }
       });
-      
-      console.log('[AddToReferences] Successfully added and selected reference for shot:', effectiveShotId);
       
       // Show success state
       setAddToReferencesSuccess(true);

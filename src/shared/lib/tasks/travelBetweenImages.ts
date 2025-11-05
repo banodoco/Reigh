@@ -170,8 +170,7 @@ function buildTravelBetweenImagesPayload(
     : (params.seed ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.seed);
   
   if (params.random_seed) {
-    console.log(`[RandomSeed] Generated random seed: ${finalSeed}`);
-  }
+    }
 
   // Build orchestrator payload matching the original edge function structure
   const orchestratorPayload: Record<string, unknown> = {
@@ -211,15 +210,6 @@ function buildTravelBetweenImagesPayload(
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator
-  console.log("[EnhancePromptDebug] ⚠️ Task Creation - Value being sent to orchestrator:", {
-    enhance_prompt_in_orchestratorPayload: orchestratorPayload.enhance_prompt,
-    enhance_prompt_in_params: params.enhance_prompt,
-    enhance_prompt_default: DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
-    was_params_value_undefined: params.enhance_prompt === undefined,
-    was_params_value_null: params.enhance_prompt === null,
-    WARNING: orchestratorPayload.enhance_prompt === true ? '⚠️ enhance_prompt is TRUE - check if this is intentional' : '✅ enhance_prompt is false'
-  });
-
   // Add structure video parameters if provided
   if (params.structure_video_path) {
     orchestratorPayload.structure_video_path = params.structure_video_path;
@@ -240,14 +230,12 @@ function buildTravelBetweenImagesPayload(
   // Add phase_config if provided (for advanced mode)
   if (params.phase_config) {
     orchestratorPayload.phase_config = params.phase_config;
-    console.log("[createTravelBetweenImagesTask] Including phase_config in orchestrator payload:", params.phase_config);
-  }
+    }
 
   // Add selected_phase_preset_id if provided (for UI state restoration)
   if (params.selected_phase_preset_id) {
     orchestratorPayload.selected_phase_preset_id = params.selected_phase_preset_id;
-    console.log("[createTravelBetweenImagesTask] Including selected_phase_preset_id in orchestrator payload:", params.selected_phase_preset_id);
-  }
+    }
 
   return orchestratorPayload;
 }
@@ -260,13 +248,6 @@ function buildTravelBetweenImagesPayload(
  * @returns Promise resolving to the created task
  */
 export async function createTravelBetweenImagesTask(params: TravelBetweenImagesTaskParams): Promise<any> {
-  console.log("[EnhancePromptDebug] Creating task with params:", params);
-  console.log("[EnhancePromptDebug] enhance_prompt parameter received:", {
-    enhance_prompt: params.enhance_prompt,
-    default_enhance_prompt: DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt,
-    will_be_set_to: params.enhance_prompt ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.enhance_prompt
-  });
-
   try {
     // 1. Validate parameters
     validateTravelBetweenImagesParams(params);
@@ -293,12 +274,6 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
   const isTurboMode = params.turbo_mode === true;
   const taskType = isTurboMode ? 'wan_2_2_i2v' : 'travel_orchestrator';
     
-    console.log("[createTravelBetweenImagesTask] Task type determination:", {
-      modelName: params.model_name,
-      turboMode: isTurboMode,
-      taskType
-    });
-
     // Create task using unified create-task function (no task_id - let DB auto-generate)
     const result = await createTask({
       project_id: params.project_id,
@@ -310,7 +285,6 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       }
     });
 
-    console.log("[createTravelBetweenImagesTask] Task created successfully:", result);
     return result;
 
   } catch (error) {

@@ -128,20 +128,17 @@ export const DerivedGenerationsGrid: React.FC<DerivedGenerationsGridProps> = ({
             key={derived.id}
             className="relative aspect-square group overflow-hidden rounded border border-border hover:border-primary transition-colors cursor-pointer"
             onClick={async () => {
-              console.log('[BasedOnNav] 🖼️ DerivedGenerationsGrid thumbnail clicked', {
-                derivedId: derived.id.substring(0, 8),
+              ,
                 currentMediaId: currentMediaId.substring(0, 8),
                 derivedGenerationsCount: derivedGenerations?.length,
                 timestamp: Date.now()
               });
               
-              console.log('[BasedOnNav] 🎯 Calling onNavigate WITH derivedContext to enter derived mode');
               await onNavigate(
                 derived.id,
                 derivedGenerations?.map(d => d.id) || []
               );
-              console.log('[BasedOnNav] ✅ onNavigate completed');
-            }}
+              }}
           >
             <img
               src={derived.thumbUrl}

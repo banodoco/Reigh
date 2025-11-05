@@ -68,16 +68,9 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   const [imageLoadError, setImageLoadError] = useState(false);
 
   // [Performance] Disabled excessive logging
-  // console.log(`[ShotImage-${index}] Rendering image:`, {
-  //   imageUrl, thumbUrl, displayUrl, hasImageUrl: !!imageUrl,
-  //   hasThumbUrl: !!thumbUrl, hasDisplayUrl: !!displayUrl,
-  //   isImageCached, imageLoaded, shouldLoad
-  // });
-
-  const handleImageLoad = () => {
+  // const handleImageLoad = () => {
     // [Performance] Only log errors, not successful loads
-    // console.log(`[ShotImage-${index}] Image loaded successfully`);
-    setImageLoaded(true);
+    // setImageLoaded(true);
     // Mark image as cached in centralized cache to prevent future skeletons
     setImageCacheStatus(image, true);
   };
@@ -391,7 +384,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
 
   // [Performance] Disabled excessive logging that was causing render cascades
   // Debug logging
-  // console.log(`[VideoShotDisplay] Shot "${shot.name}" (index ${shotIndex}):`, {
+  // :`, {
   //   totalImages: shot.images?.length || 0, imagesOnly: imagesOnly.length,
   //   imagesToShow: imagesToShow.length, shouldLoadImages, isPriority: shotIndex < 3,
   //   shotImages: shot.images?.map(img => ({ id: img.id, type: img.type,

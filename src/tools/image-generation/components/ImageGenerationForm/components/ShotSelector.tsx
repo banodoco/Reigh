@@ -70,15 +70,9 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           <Select
             value={associatedShotId || "none"}
             onValueChange={(value) => {
-              console.log('[ShotChangeDebug] 🎯 ShotSelector onValueChange triggered:', {
-                newValue: value,
-                currentAssociatedShotId: associatedShotId,
-                hasOnChangeShot: !!onChangeShot,
-                timestamp: Date.now()
               });
               onChangeShot(value);
-              console.log('[ShotChangeDebug] ✅ onChangeShot called with:', value);
-            }}
+              }}
             disabled={!hasApiKey || isGenerating}
           >
             <SelectTrigger id="associatedShot" className="inline-flex w-full min-w-[200px]">

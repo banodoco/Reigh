@@ -112,7 +112,6 @@ const HeaderComponent: React.FC<HeaderProps> = ({
           // Revert on error by invalidating all shots caches
           queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
         } else {
-          console.log('[AspectRatioChange] Cleared custom dimensions, reset to dimensionSource: firstImage');
           // Invalidate tool settings to refresh UI with cleared custom dimensions
           queryClient.invalidateQueries({ queryKey: ['toolSettings', 'travel-between-images', 'shot', selectedShot.id] });
         }

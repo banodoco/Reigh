@@ -36,8 +36,7 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
       hasTriedAutoplayRef.current = true;
       video.play().catch((error) => {
         // Autoplay may be blocked; user can tap play
-        console.log('[LightboxStart] Autoplay prevented on canplay:', error);
-      });
+        });
     };
 
     video.addEventListener('play', handlePlay);
@@ -65,8 +64,7 @@ const SimpleVideoPlayer: React.FC<SimpleVideoPlayerProps> = ({
 
     if (video.paused) {
       video.play().catch((error) => {
-        console.log('Play failed:', error);
-      });
+        });
     } else {
       video.pause();
     }

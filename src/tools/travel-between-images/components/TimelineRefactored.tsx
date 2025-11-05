@@ -361,8 +361,7 @@ const Timeline: React.FC<TimelineProps> = ({
           hasNext={hasNext}
           hasPrevious={hasPrevious}
           onNavigateToGeneration={(generationId: string) => {
-            console.log('[TimelineRefactored:DerivedNav] 📍 Navigate to generation', {
-              generationId: generationId.substring(0, 8),
+            ,
               timelineImagesCount: images.length,
               externalGenerationsCount: externalGens.externalGenerations.length,
               tempDerivedCount: externalGens.tempDerivedGenerations.length,
@@ -371,10 +370,8 @@ const Timeline: React.FC<TimelineProps> = ({
             // Search in combined images (timeline + external + derived)
             const index = currentImages.findIndex((img: any) => img.id === generationId);
             if (index !== -1) {
-              console.log('[TimelineRefactored:DerivedNav] ✅ Found at index', index);
               openLightbox(index);
             } else {
-              console.log('[TimelineRefactored:DerivedNav] ⚠️ Not found in current images');
               toast.info('This generation is not currently loaded');
             }
           }}

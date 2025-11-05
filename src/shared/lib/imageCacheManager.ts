@@ -41,12 +41,7 @@ export const setImageCacheStatus = (image: any, isCached: boolean = true): void 
   
   // Only log when state changes to reduce noise
   if (prevState !== isCached) {
-    console.log(`[ImageCacheManager] Cache status changed:`, {
-      imageId,
-      from: prevState ?? 'unknown',
-      to: isCached,
-      cacheSize: globalImageCache.size,
-      timestamp: new Date().toISOString()
+    .toISOString()
     });
   }
 };
@@ -70,12 +65,7 @@ const isImageCachedLegacy = (image: any): boolean => {
   
   // Occasional debug logging (reduced noise)
   if (Math.random() < CACHE_DEBUG_LOG_RATE) {
-    console.log(`[ImageCacheManager] Cache check:`, {
-      imageId,
-      isCached,
-      cacheSize: globalImageCache.size
-    });
-  }
+    }
   
   return isCached;
 };
@@ -111,11 +101,7 @@ export const setMultipleImageCacheStatus = (images: Array<{ image: any; isCached
   });
   
   if (changedCount > 0) {
-    console.log(`[ImageCacheManager] Batch cache update:`, {
-      totalProcessed: images.length,
-      changedCount,
-      cacheSize: globalImageCache.size,
-      timestamp: new Date().toISOString()
+    .toISOString()
     });
   }
 };
@@ -134,8 +120,7 @@ export const removeCachedImages = (imageIds: string[]): number => {
   });
   
   if (removedCount > 0) {
-    console.log(`[ImageCacheManager] Removed ${removedCount} images from cache, new size: ${globalImageCache.size}`);
-  }
+    }
   
   return removedCount;
 };
@@ -175,8 +160,7 @@ export const clearAllCache = (): void => {
   const prevSize = globalImageCache.size;
   globalImageCache.clear();
   
-  console.log(`[ImageCacheManager] Cleared entire cache, removed ${prevSize} entries`);
-};
+  };
 
 /**
  * Clear cache for project switch - removes all cached images to ensure fresh content
@@ -185,7 +169,6 @@ export const clearCacheForProjectSwitch = (reason: string = 'project switch'): n
   const prevSize = globalImageCache.size;
   globalImageCache.clear();
   
-  console.log(`[ImageCacheManager] Cleared cache for ${reason}, removed ${prevSize} entries`);
   return prevSize;
 };
 
@@ -208,8 +191,7 @@ export const performMemoryAwareCleanup = (maxEntries: number = 1000): number => 
   }
   
   if (removedCount > 0) {
-    console.log(`[ImageCacheManager] Memory cleanup: removed ${removedCount} oldest entries, cache size now: ${globalImageCache.size}`);
-  }
+    }
   
   return removedCount;
 };
@@ -241,8 +223,7 @@ export const keepOnlyInCache = (imagesToKeep: any[]): number => {
   });
   
   if (removedCount > 0) {
-    console.log(`[ImageCacheManager] Cleanup: kept ${idsToKeep.size}, removed ${removedCount}, new cache size: ${globalImageCache.size}`);
-  }
+    }
   
   return removedCount;
 };
@@ -276,12 +257,7 @@ export const isImageCached = (urlOrImage: string | any): boolean => {
   
   // Occasional debug logging (reduced noise)
   if (Math.random() < CACHE_DEBUG_LOG_RATE) {
-    console.log(`[ImageCacheManager] Cache check:`, {
-      imageId,
-      isCached,
-      cacheSize: globalImageCache.size
-    });
-  }
+    }
   
   return isCached;
 };
@@ -316,7 +292,6 @@ export const getUrlCacheMetadata = (url: string): { loadedAt: number; width?: nu
 export const clearUrlCache = (): number => {
   const prevSize = urlCache.size;
   urlCache.clear();
-  console.log(`[ImageCacheManager] Cleared URL cache, removed ${prevSize} entries`);
   return prevSize;
 };
 
@@ -335,8 +310,7 @@ export const cleanupUrlCache = (maxAge: number = 30 * 60 * 1000): number => {
   });
   
   if (removedCount > 0) {
-    console.log(`[ImageCacheManager] Cleaned up ${removedCount} old URL cache entries`);
-  }
+    }
   
   return removedCount;
 };

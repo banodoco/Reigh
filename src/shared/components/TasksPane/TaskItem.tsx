@@ -226,8 +226,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         .single();
       
       if (!taskCheckError && taskCheck) {
-        console.log(`[TaskFetchGeneration] Debug: Task ${task.id} generation_created flag:`, taskCheck.generation_created);
-      }
+        }
       
       // Debug: Check if any generation exists with this output location (project agnostic)
       const { data: anyGeneration, error: anyGenerationError } = await supabase
@@ -237,17 +236,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         .maybeSingle();
       
       if (!anyGenerationError && anyGeneration) {
-        console.log(`[TaskFetchGeneration] Debug: Found generation with location ${task.outputLocation}:`, {
-          id: anyGeneration.id,
-          project_id: anyGeneration.project_id,
-          expected_project_id: task.projectId,
-          project_match: anyGeneration.project_id === task.projectId
-        });
-      } else if (anyGenerationError) {
+        } else if (anyGenerationError) {
         console.error(`[TaskFetchGeneration] Debug: Error checking for any generation:`, anyGenerationError);
       } else {
-        console.log(`[TaskFetchGeneration] Debug: No generation found with location ${task.outputLocation}`);
-      }
+        }
       
       const { data, error } = await supabase
         .from('generations')
@@ -309,8 +301,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     }));
     
     // Log what's in actualGeneration to understand what data we have
-    console.log('[TasksPane:AddToShot] 📦 Creating generationData from actualGeneration:', {
-      taskId: task.id.substring(0, 8),
+    ,
       generationId: actualGeneration.id.substring(0, 8),
       hasBasedOnAtTopLevel: !!(actualGeneration as any).based_on,
       basedOnAtTopLevel: (actualGeneration as any).based_on?.substring(0, 8) || 'null',
@@ -479,8 +470,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     queryFn: async () => {
       if (!cascadedTaskId) return null;
       
-      console.log('[TaskItem] Fetching cascaded task error for:', cascadedTaskId);
-      
       const { data, error } = await supabase
         .from('tasks')
         .select('error_message, task_type')
@@ -491,12 +480,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         console.error('[TaskItem] Failed to fetch cascaded task error:', error);
         return null;
       }
-      
-      console.log('[TaskItem] Cascaded task data:', {
-        task_type: data?.task_type,
-        has_error_message: !!data?.error_message,
-        error_message: data?.error_message
-      });
       
       return data;
     },
@@ -549,9 +532,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
 
   // Fetch tasks directly for progress checking - no more deprecated useListTasks
   const handleCheckProgress = async () => {
-    console.log('[TaskProgressDebug] Check Progress clicked for task:', task.id, 'taskType:', task.taskType);
-    console.log('[PollingBreakageIssue] TaskItem progress check - using direct API call instead of deprecated useListTasks');
-    
     if (!selectedProjectId) {
       console.error('[TaskProgressDebug] No project selected');
       return;
@@ -568,13 +548,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         
       if (error) throw error;
       
-      console.log('[TaskProgressDebug] Fetched tasks for progress:', tasks?.length || 0);
-      console.log('[PollingBreakageIssue] TaskItem progress check completed successfully');
-      
       if (tasks) {
         computeAndShowProgress(tasks as any);
       } else {
-        console.log('[TaskProgressDebug] No data available for progress computation');
         toast({
           title: "Error",
           description: "Failed to load tasks for progress computation",
@@ -593,16 +569,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   };
 
   const computeAndShowProgress = (tasksData: Task[]) => {
-    console.log('[TaskProgressDebug] computeAndShowProgress called with', tasksData.length, 'tasks');
     const pRoot: any = typeof task.params === 'string' ? JSON.parse(task.params) : task.params || {};
-    console.log('[TaskProgressDebug] Task params parsed:', pRoot);
     const orchestratorDetails = pRoot.orchestrator_details || {};
-    console.log('[TaskProgressDebug] orchestratorDetails:', orchestratorDetails);
     const orchestratorId = orchestratorDetails.orchestrator_task_id || pRoot.orchestrator_task_id || pRoot.task_id || task.id;
-    console.log('[TaskProgressDebug] orchestratorId resolved to:', orchestratorId);
     const orchestratorRunId = orchestratorDetails.run_id || pRoot.orchestrator_run_id;
-    console.log('[TaskProgressDebug] orchestratorRunId:', orchestratorRunId);
-
     const subtasks = tasksData.filter((t) => {
       const p: any = typeof t.params === 'string' ? JSON.parse(t.params) : t.params || {};
       const matchesOrchestrator = (
@@ -610,31 +580,24 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         && t.id !== task.id
       );
       if (matchesOrchestrator) {
-        console.log('[TaskProgressDebug] Found subtask:', t.id, 'status:', t.status, 'taskType:', t.taskType, 'params:', p);
-      }
+        }
       return (
         (p.orchestrator_task_id_ref === orchestratorId || p.orchestrator_task_id === orchestratorId || p.orchestrator_task_id_ref === task.id || p.orchestrator_task_id === task.id || (orchestratorRunId && p.orchestrator_run_id === orchestratorRunId))
         && t.id !== task.id
       );
     });
 
-    console.log('[TaskProgressDebug] Found', subtasks.length, 'subtasks');
-    
     let percent = 0;
     
     if (subtasks.length === 0) {
-      console.log('[TaskProgressDebug] No subtasks found yet, showing 0% progress');
       percent = 0;
     } else {
       // Progress is based on the ratio of completed subtasks to (total subtasks - 1)
       const completed = subtasks.filter((t) => t.status === 'Complete').length;
-      console.log('[TaskProgressDebug] Completed subtasks:', completed);
       const denominator = Math.max(subtasks.length - 1, 1); // Avoid divide-by-zero and remove the final stitch task
-      console.log('[TaskProgressDebug] Denominator:', denominator);
-
       const rawPercent = (completed / denominator) * 100;
       percent = Math.round(Math.min(rawPercent, 100));
-      console.log('[TaskProgressDebug] Calculated progress:', percent, '% (raw:', rawPercent, ')');
+      ');
     }
 
     toast({ title: 'Progress', description: `${percent}% Complete`, variant: 'default' });
@@ -1014,15 +977,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   // IMPORTANT: This useEffect must be called before any conditional returns to follow Rules of Hooks
   React.useEffect(() => {
     if (taskInfo.isImageTask) {
-      console.log('[TaskTooltipDebug] Single image task tooltip analysis:', {
-        taskId: task.id,
-        taskType: task.taskType,
-        status: task.status,
-        hasActualGeneration: !!actualGeneration,
-        actualGenerationData: actualGeneration ? {
-          id: actualGeneration.id,
-          hasMetadata: !!actualGeneration.metadata,
-          metadataKeys: actualGeneration.metadata ? Object.keys(actualGeneration.metadata) : [],
+      : [],
           location: actualGeneration.location,
           metadata: actualGeneration.metadata
         } : null,

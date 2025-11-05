@@ -105,10 +105,9 @@ export const useImageGalleryPagination = ({
     // Generate unique navigation ID for tracking
     const navId = `nav-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    console.log(`🔄 [PAGELOADINGDEBUG] [NAV:${navId}] ${direction.toUpperCase()} pressed: ${isServerPagination ? serverPage : page} → ${newPage} (${isServerPagination ? 'server' : 'client'} mode)`);
+    } pressed: ${isServerPagination ? serverPage : page} → ${newPage} (${isServerPagination ? 'server' : 'client'} mode)`);
     
     if (loadingButton) {
-      console.log(`❌ [PAGELOADINGDEBUG] [NAV:${navId}] BLOCKED - ${loadingButton} button still loading`);
       return;
     } // Prevent multiple clicks while any button is loading
     
@@ -128,13 +127,13 @@ export const useImageGalleryPagination = ({
     const shouldShowGalleryLoading = !isAdjacentPage || !enableAdjacentPagePreloading;
     
     if (shouldShowGalleryLoading) {
-      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Loading state: ON (${isAdjacentPage ? 'preloading disabled' : 'distant page'})`);
+      `);
       setIsGalleryLoading(true); // Show loading state for distant pages or when preloading disabled
     } else {
       // For adjacent pages, set a shorter fallback timeout since images should be preloaded
-      console.log(`⚡ [PAGELOADINGDEBUG] [NAV:${navId}] Loading state: DELAYED (adjacent page, likely preloaded)`);
+      `);
       const fallbackTimeout = setTimeout(() => {
-        console.log(`⏰ [PAGELOADINGDEBUG] [NAV:${navId}] Fallback loading activated (50ms elapsed)`);
+        `);
         setIsGalleryLoading(true);
       }, 50); // Reduced from 200ms - shorter timeout for preloaded pages
       
@@ -154,20 +153,17 @@ export const useImageGalleryPagination = ({
     
     // Gallery loading safety timeout (longer since it depends on progressive loading)
     safetyTimeoutRef.current = setTimeout(() => {
-      console.log(`🚨 [PAGELOADINGDEBUG] [NAV:${navId}] GALLERY SAFETY TIMEOUT - progressive loading failed after 1.5s`);
       setIsGalleryLoading(false);
       safetyTimeoutRef.current = null;
     }, 1500);
     
     if (isServerPagination && onServerPageChange) {
       // Server-side pagination: notify the parent, which will handle scrolling.
-      console.log(`📡 [PAGELOADINGDEBUG] [NAV:${navId}] Calling server pagination handler`);
       onServerPageChange(newPage, fromBottom); 
       
       // For server pagination, clear button loading on a shorter timeout to prevent stuck states
       // The progressive loading will handle the gallery loading state separately
       const buttonTimeout = setTimeout(() => {
-        console.log(`🔘 [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination button timeout - clearing button loading`);
         console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
           navId,
           reason: 'Server pagination timeout (800ms)',
@@ -176,14 +172,11 @@ export const useImageGalleryPagination = ({
         setLoadingButton(null);
       }, 800); // Shorter timeout for better UX
       
-      console.log(`⏳ [PAGELOADINGDEBUG] [NAV:${navId}] Server pagination initiated - waiting for data...`);
-    } else {
+      } else {
       // Client-side pagination - show loading longer for bottom buttons
       const loadingDelay = fromBottom ? 300 : 100;
-      console.log(`🖥️ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination - updating local page state`);
       setPage(newPage);
       setTimeout(() => {
-        console.log(`✅ [PAGELOADINGDEBUG] [NAV:${navId}] Client pagination completed`);
         console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
           navId,
           reason: `Client pagination timeout (${loadingDelay}ms)`,
@@ -197,7 +190,7 @@ export const useImageGalleryPagination = ({
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
           const targetPosition = rect.top + scrollTop - (isMobile ? 80 : 20); // Account for mobile nav/header
           
-          console.log(`📜 [PAGELOADINGDEBUG] [NAV:${navId}] Auto-scrolling to top (bottom button used)`);
+          `);
           window.scrollTo({
             top: Math.max(0, targetPosition), // Ensure we don't scroll above page top
             behavior: 'smooth'

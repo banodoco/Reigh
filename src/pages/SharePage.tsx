@@ -126,8 +126,7 @@ const SharePage: React.FC = () => {
       supabase.rpc('increment_share_view_count', {
         share_slug_param: shareId
       }).then(() => {
-        console.log('[SharePage] View count incremented');
-      }).catch((err) => {
+        }).catch((err) => {
         console.warn('[SharePage] Failed to increment view count:', err);
       });
 

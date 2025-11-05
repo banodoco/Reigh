@@ -40,13 +40,6 @@ export const imageLoadingDebugger = {
    */
   getProgressiveState: () => {
     // This would need to be called from console to access recent logs
-    console.log('🔍 Progressive Loading Diagnostic:');
-    console.log('Look for recent [ProgressiveDebug] logs to see:');
-    console.log('- Effect trigger frequency');
-    console.log('- Session overlap');
-    console.log('- onImagesReady callback execution');
-    console.log('- Image reveal progression');
-    
     return {
       instruction: 'Check console logs for [ProgressiveDebug] entries',
       tip: 'Look for multiple sessions running simultaneously or rapid effect triggers'
@@ -99,8 +92,6 @@ export const imageLoadingDebugger = {
     }
     
     // Check for duplicate progressive loading sessions (look for overlapping logs)
-    console.log('🚨 Check console for overlapping [ProgressiveDebug] sessions');
-    
     return {
       issues,
       recommendations: [
@@ -120,14 +111,8 @@ export const imageLoadingDebugger = {
     console.group('🖼️ Image Loading Diagnostics');
     
     const galleryState = imageLoadingDebugger.getGalleryState();
-    console.log('📊 Gallery State:', galleryState);
-    
     const cacheState = imageLoadingDebugger.getCacheState();
-    console.log('💾 Cache State:', cacheState);
-    
     const diagnosis = imageLoadingDebugger.diagnoseStuckPage();
-    console.log('🔍 Diagnosis:', diagnosis);
-    
     console.groupEnd();
     
     // Return summary for easy access

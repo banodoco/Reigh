@@ -507,10 +507,6 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
             // Extract URL from the huggingface_url property
             const loraUrl = ((lora as any).huggingface_url as string) || '';
             
-            console.log('[PhaseConfig] Adding LoRA from search:', { 
-              lora, 
-              loraUrl,
-              loraKeys: Object.keys(lora)
             });
             
             const newPhases = [...phaseConfig.phases];

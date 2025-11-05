@@ -67,8 +67,7 @@ export function useQueryDebugLogging<TData = unknown>(
       logData.total = getTotalCount(query.data);
     }
 
-    console.log(`[GalleryPollingDebug:${hookName}] Query result updated:`, logData);
-  }, [query.data, query.isLoading, query.isFetching, query.isError, query.error, query.status, query.fetchStatus, hookName, context, getItemsCount, getTotalCount]);
+    }, [query.data, query.isLoading, query.isFetching, query.isError, query.error, query.status, query.fetchStatus, hookName, context, getItemsCount, getTotalCount]);
 
   // Track data signature changes if enabled
   const dataSignature = React.useMemo(() => {
@@ -82,11 +81,7 @@ export function useQueryDebugLogging<TData = unknown>(
       const totalCount = getTotalCount ? getTotalCount(query.data) : 'unknown';
       
       if (itemsCount && itemsCount > 0) {
-        console.log(`🎯 [GalleryPollingDebug:${hookName}] NEW DATA RECEIVED:`, {
-          ...context,
-          itemsCount,
-          total: totalCount,
-          dataSignature: dataSignature.substring(0, 100) + '...',
+        + '...',
           wasTriggeredByPolling: query.isFetching && !query.isLoading,
           timestamp: Date.now()
         });
@@ -156,10 +151,6 @@ export function useComponentDataLogging(
   context: Record<string, any> = {}
 ) {
   React.useEffect(() => {
-    console.log(`📊 [GalleryPollingDebug:${componentName}] Hook data consumed:`, {
-      ...context,
-      hasData: !!data,
-      timestamp: Date.now()
     });
   }, [data, componentName, context]);
 }

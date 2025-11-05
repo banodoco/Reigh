@@ -76,10 +76,6 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
 
   // Load last saved prompt and settings when panel opens
   useEffect(() => {
-    console.log('[TaskDetailsSidebar] MagicEditPanel: Loading saved prompt', {
-      hasShotGenerationId: !!shotGenerationId,
-      isLoadingMetadata,
-      timestamp: Date.now()
     });
     
     if (shotGenerationId && !isLoadingMetadata) {
@@ -87,7 +83,6 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
       const lastSettings = getLastSettings();
       
       if (lastPrompt && !magicEditPrompt) {
-        console.log('[TaskDetailsSidebar] MagicEditPanel: Restoring saved prompt');
         setMagicEditPrompt(lastPrompt);
         setMagicEditNumImages(lastSettings.numImages);
         setIsInSceneBoostEnabled(lastSettings.isInSceneBoostEnabled);
@@ -100,7 +95,6 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
     if (magicEditShotId && shots) {
       const shotExists = shots.some(shot => shot.id === magicEditShotId);
       if (!shotExists) {
-        console.log('[TaskDetailsSidebar] MagicEditPanel: Selected shot no longer exists, resetting');
         setMagicEditShotId(null);
       }
     }
@@ -137,11 +131,7 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
         based_on: shotGenerationId, // Track source generation for lineage
       };
       
-      console.log(`[TaskDetailsSidebar] MagicEditPanel: Creating tasks with shot_id: ${shotId}, tool_type: ${toolTypeOverride}`);
-
       const results = await createBatchMagicEditTasks(batchParams);
-      
-      console.log(`[TaskDetailsSidebar] MagicEditPanel: Created ${results.length} magic edit tasks`);
       
       // Save the prompt to shot generation metadata if we have the context
       if (shotGenerationId && currentShotId) {
@@ -152,8 +142,7 @@ export const MagicEditControlsPanel: React.FC<MagicEditControlsPanelProps> = ({
             false,
             isInSceneBoostEnabled
           );
-          console.log('[TaskDetailsSidebar] MagicEditPanel: Saved prompt to metadata');
-        } catch (error) {
+          } catch (error) {
           console.error('[TaskDetailsSidebar] MagicEditPanel: Failed to save prompt', error);
         }
       }

@@ -14,11 +14,6 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
   
   // Enhanced reconciliation with debouncing, tracking IDs, and timeout-based recovery
   useEffect(() => {
-    console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
-      newLength: images.length,
-      isOptimisticUpdate,
-      reconciliationId,
-      timestamp: Date.now()
     });
     
     // Clear any pending reconciliation timeout
@@ -28,15 +23,12 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
     
     // If we're in the middle of an optimistic update, use debounced reconciliation
     if (isOptimisticUpdate) {
-      console.log('[DragDebug:ShotImageManager] Skipping immediate sync - optimistic update in progress');
-      
       const currentReconciliationId = reconciliationId;
       
       // Debounce reconciliation checks to prevent race conditions
       reconciliationTimeoutRef.current = setTimeout(() => {
         // Check if this reconciliation is still current
         if (currentReconciliationId !== reconciliationId) {
-          console.log('[DragDebug:ShotImageManager] Reconciliation cancelled - newer reconciliation in progress');
           return;
         }
         
@@ -45,14 +37,11 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
         const parentOrder = images.map(img => img.shotImageEntryId).join(',');
         
         if (currentOrder === parentOrder) {
-          console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');
           setIsOptimisticUpdate(false);
           if (optimisticOrder !== images) {
             setOptimisticOrder(images);
           }
         } else {
-          console.log('[DragDebug:ShotImageManager] Parent still has stale data - keeping optimistic order');
-          
           // Safety check: if optimistic update has been active for more than 5 seconds, force reconciliation
           const optimisticStartTime = Date.now() - OPTIMISTIC_UPDATE_TIMEOUT;
           if (optimisticStartTime > Date.now()) {
@@ -63,12 +52,10 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
         }
       }, 100); // 100ms debounce
     } else {
-      console.log('[DragDebug:ShotImageManager] Normal sync from parent props');
       if (optimisticOrder !== images) {
         setOptimisticOrder(images);
       } else {
-        console.log('[DragDebug:ShotImageManager] Skipping sync - same reference');
-      }
+        }
     }
   }, [images, isOptimisticUpdate, reconciliationId, optimisticOrder]);
   

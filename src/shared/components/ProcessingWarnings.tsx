@@ -60,25 +60,8 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   const generationDisabled = !inCloudChecked && !onComputerChecked;
 
   // DEBUG: Log warning conditions to help diagnose desktop issues
-  console.log('[ProcessingWarningsDesktopDebug] Warning conditions:', {
-    isLoadingBalance,
-    isLoadingTokens,
-    isLoadingGenerationMethods,
-    balance: balance?.balance,
-    hasCredits,
-    tokensCount: tokens.length,
-    hasValidToken,
-    generationMethods,
-    inCloudChecked,
-    onComputerChecked,
-    generationDisabled,
-    noCreditsButCloudEnabled: inCloudChecked && !hasCredits,
-    shouldShowFinalWarning: !hasCredits && !hasValidToken
-  });
-
   // 1. Generation disabled takes absolute top priority - check this even while loading
   if (generationDisabled) {
-    console.log('[ProcessingWarningsDesktopDebug] Showing GENERATION DISABLED warning');
     return (
       <div className="animate-in slide-in-from-top-2 fade-in duration-300" style={{ marginTop: '1.75rem' }}>
         <div className="container mx-auto px-4 md:px-6 mt-4">
@@ -105,7 +88,6 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
 
   // Avoid showing any other warnings while data is loading.
   if (isLoadingBalance || isLoadingTokens || isLoadingGenerationMethods) {
-    console.log('[ProcessingWarningsDesktopDebug] Still loading, not showing warnings');
     return null;
   }
 
@@ -113,7 +95,6 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   const noCreditsButCloudEnabled = inCloudChecked && !hasCredits;
 
   if (noCreditsButCloudEnabled) {
-    console.log('[ProcessingWarningsDesktopDebug] Showing NO CREDITS BUT CLOUD ENABLED warning');
     return (
       <div className="animate-in slide-in-from-top-2 fade-in duration-300" style={{ marginTop: '1.75rem' }}>
         <div className="container mx-auto px-4 md:px-6 mt-4">
@@ -150,7 +131,6 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
   const onlyLocalEnabled = onComputerChecked && !inCloudChecked && !hasValidToken;
   
   if (onlyLocalEnabled) {
-    console.log('[ProcessingWarningsDesktopDebug] Showing LOCAL PROCESSING NO TOKEN warning');
     return (
       <div className="animate-in slide-in-from-top-2 fade-in duration-300" style={{ marginTop: '1.75rem' }}>
         <div className="container mx-auto px-4 md:px-6 mt-4">
@@ -177,11 +157,9 @@ export const GlobalProcessingWarning: React.FC<ProcessingWarningsProps> = ({ onO
 
   // 4. Show general warning if user can't process anything
   if (hasCredits || hasValidToken) {
-    console.log('[ProcessingWarningsDesktopDebug] NOT showing warning because hasCredits or hasValidToken is true');
     return null;
   }
   
-  console.log('[ProcessingWarningsDesktopDebug] Showing FALLBACK warning - no credits and no valid token');
   return (
     <div className="animate-in slide-in-from-top-2 fade-in duration-300" style={{ marginTop: '1.75rem' }}>
       <div className="container mx-auto px-4 md:px-6 mt-4">

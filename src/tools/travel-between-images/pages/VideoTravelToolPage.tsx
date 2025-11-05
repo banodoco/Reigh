@@ -129,7 +129,7 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Only log first 5 renders and every 10th render after that to reduce noise
   if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
-    console.log(`${VIDEO_DEBUG_TAG} === RENDER START #${videoRenderCount.current} === ${Date.now() - videoMountTime.current}ms since mount`);
+    - videoMountTime.current}ms since mount`);
   }
   
   const navigate = useNavigate();
@@ -156,12 +156,6 @@ const VideoTravelToolPage: React.FC = () => {
   React.useEffect(() => {
     if (!hasLoggedCacheState.current && selectedProjectId && getShotVideoCount) {
       hasLoggedCacheState.current = true;
-      console.log('[ProjectVideoCountsDebug] Cache state in VideoTravelToolPage:', {
-        selectedProjectId,
-        isLoadingProjectCounts,
-        projectCountsError: projectCountsError?.message,
-        getShotVideoCountExists: !!getShotVideoCount,
-        timestamp: Date.now()
       });
     }
   }, [selectedProjectId, getShotVideoCount, isLoadingProjectCounts, projectCountsError]);
@@ -194,11 +188,7 @@ const VideoTravelToolPage: React.FC = () => {
 
   // [VideoTravelDebug] Log the data loading states - reduced frequency
   if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
-    console.log(`${VIDEO_DEBUG_TAG} Data loading states:`, {
-      shotsCount: shots?.length,
-      shotsLoadingRaw,
-      selectedProjectId,
-      fromContext: 'useVideoTravelData->useShots(context)'
+    '
     });
   }
 
@@ -207,15 +197,13 @@ const VideoTravelToolPage: React.FC = () => {
   React.useEffect(() => {
     if (shots && shots.length > 0 && !hasLoggedShots.current) {
       hasLoggedShots.current = true;
-      console.log(`${VIDEO_DEBUG_TAG} === SHOTS BEING PASSED TO DISPLAY ===`, {
-        shotsArrayLength: shots.length,
-        querySource: 'useVideoTravelData->useShots()',
+      ',
         timestamp: Date.now()
       });
       
       // [VideoTravelDebug] Log first 3 shots only to reduce noise
       shots.slice(0, 3).forEach((shot, index) => {
-        console.log(`${VIDEO_DEBUG_TAG} Passing ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${shot.position}`);
+        }) - Position: ${shot.position}`);
       });
     }
   }, [shots]);
@@ -254,7 +242,6 @@ const VideoTravelToolPage: React.FC = () => {
   
   // ✅ NEW: Immediate save handler using hook - much simpler!
   const handleBlurSave = useCallback(() => {
-    console.log('[PhaseConfigTrack] 🔵 Blur save triggered - saving immediately');
     shotSettings.saveImmediate();
   }, [shotSettings]);
 
@@ -267,7 +254,6 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings]);
 
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
-    console.log('[BatchVideoSteps] User changing steps to:', steps);
     shotSettings.updateField('batchVideoSteps', steps);
   }, [shotSettings]);
 
@@ -294,7 +280,6 @@ const VideoTravelToolPage: React.FC = () => {
   const handleTurboModeChange = useCallback((turbo: boolean) => {
     // When enabling turbo mode, automatically disable advanced mode
     if (turbo && shotSettings.settings?.advancedMode) {
-      console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode and clearing preset');
       shotSettings.updateFields({
         turboMode: turbo,
         advancedMode: false,
@@ -310,10 +295,7 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings]);
 
   const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
-    console.log('[MotionMode] User changing motion mode:', {
-      from: shotSettings.settings?.motionMode,
-      to: mode,
-      shotId: selectedShot?.id?.substring(0, 8),
+    ,
       timestamp: Date.now()
     });
     
@@ -321,7 +303,6 @@ const VideoTravelToolPage: React.FC = () => {
     if (mode === 'advanced' || mode === 'presets') {
       const currentPhaseConfig = shotSettings.settings?.phaseConfig;
       if (!currentPhaseConfig) {
-        console.log('[MotionMode] Initializing phaseConfig for advanced/presets mode');
         shotSettings.updateFields({
           motionMode: mode,
           advancedMode: true,
@@ -346,27 +327,22 @@ const VideoTravelToolPage: React.FC = () => {
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
     // Prevent enabling advanced mode when turbo mode is on
     if (advanced && shotSettings.settings?.turboMode) {
-      console.log('[PhaseConfigTrack] ⚠️ Cannot enable advanced mode while turbo mode is active');
       return;
     }
     
-    console.log('[PhaseConfigTrack] 🎚️ User toggling advancedMode:', {
-      to: advanced,
-      shotId: selectedShot?.id?.substring(0, 8),
+    ,
       timestamp: Date.now()
     });
     
     // When turning on advanced mode, initialize phaseConfig if needed
     const currentPhaseConfig = shotSettings.settings?.phaseConfig;
     if (advanced && !currentPhaseConfig) {
-      console.log('[PhaseConfigTrack] Initializing phaseConfig to DEFAULT_PHASE_CONFIG');
       shotSettings.updateFields({
         advancedMode: advanced,
         phaseConfig: DEFAULT_PHASE_CONFIG
       });
     } else if (!advanced) {
       // When turning OFF advanced mode, clear the preset reference
-      console.log('[PhaseConfigTrack] Disabling advanced mode and clearing preset reference');
       shotSettings.updateFields({
         advancedMode: advanced,
         selectedPhasePresetId: null
@@ -386,8 +362,7 @@ const VideoTravelToolPage: React.FC = () => {
       ? { ...config, model_switch_phase: 1 }
       : config;
     
-    console.log('[PhaseConfigTrack] 📝 User changed phase config:', {
-      shotId: selectedShot?.id?.substring(0, 8),
+    ,
       num_phases: adjustedConfig.num_phases,
       model_switch_phase: adjustedConfig.model_switch_phase,
       phases_array_length: adjustedConfig.phases?.length,
@@ -407,8 +382,7 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings, selectedShot?.id]);
 
   const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => {
-    console.log('[PhasePreset] User selected preset:', {
-      presetId: presetId.substring(0, 8),
+    ,
       shotId: selectedShot?.id?.substring(0, 8),
       presetPromptPrefix: presetPromptPrefix || '(none)',
       timestamp: Date.now()
@@ -428,9 +402,7 @@ const VideoTravelToolPage: React.FC = () => {
         : presetPromptPrefix;
       fieldsToUpdate.textBeforePrompts = newTextBefore;
       
-      console.log('[PhasePreset] Merging preset prompt prefix:', {
-        presetPrefix: presetPromptPrefix,
-        currentText: currentTextBefore || '(empty)',
+      ',
         newText: newTextBefore
       });
     }
@@ -440,8 +412,7 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings, selectedShot?.id]);
 
   const handlePhasePresetRemove = useCallback(() => {
-    console.log('[PhasePreset] User removed preset:', {
-      shotId: selectedShot?.id?.substring(0, 8),
+    ,
       timestamp: Date.now()
     });
     
@@ -541,7 +512,6 @@ const VideoTravelToolPage: React.FC = () => {
           console.error('[VideoTravelToolPage] Error fetching shot:', error);
           // Shot doesn't exist or user doesn't have access - redirect to main view
           if (!cancelled) {
-            console.log(`[VideoTravelToolPage] Shot ${hashShotId} not accessible, redirecting to main view`);
             navigate('/tools/travel-between-images', { replace: true });
           }
           return;
@@ -571,12 +541,7 @@ const VideoTravelToolPage: React.FC = () => {
     const loadingStateKey = `${loading}-${shotsLoadingRaw}-${initializingFromHash}`;
     if (lastLoadingState.current !== loadingStateKey) {
       lastLoadingState.current = loadingStateKey;
-      console.log(`${VIDEO_DEBUG_TAG} Final loading decision:`, {
-        loading,
-        shotsLoadingRaw,
-        initializingFromHash
-      });
-    }
+      }
     return loading;
   }, [shotsLoadingRaw, initializingFromHash]);
 
@@ -612,9 +577,7 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Debug: Log enhance_prompt value whenever it changes
   React.useEffect(() => {
-    console.log('[EnhancePromptDebug] 🔍 Current enhancePrompt value from shotSettings:', {
-      enhancePrompt,
-      shotId: selectedShot?.id?.substring(0, 8),
+    ,
       shotSettingsRaw: shotSettings.settings?.enhancePrompt,
       advancedMode,
       timestamp: Date.now()
@@ -649,12 +612,6 @@ const VideoTravelToolPage: React.FC = () => {
   const handleToggleVideosView = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const willShowVideos = !showVideosView;
     
-    console.log('[VideoSkeletonDebug] === TOGGLE START ===', {
-      from: showVideosView ? 'videos' : 'shots',
-      to: willShowVideos ? 'videos' : 'shots',
-      willShowVideos,
-      currentShowVideosView: showVideosView,
-      timestamp: Date.now()
     });
     
     setShowVideosView(willShowVideos);
@@ -662,8 +619,7 @@ const VideoTravelToolPage: React.FC = () => {
     // Set flag when switching TO videos view to prevent empty state flash
     if (willShowVideos) {
       setVideosViewJustEnabled(true);
-      console.log('[VideoSkeletonDebug] Setting videosViewJustEnabled=true to show skeletons during transition');
-    }
+      }
     
     // Clear search when switching views
     if (willShowVideos) {
@@ -748,15 +704,6 @@ const VideoTravelToolPage: React.FC = () => {
   // [VideoSkeletonDebug] Log query state changes to understand skeleton logic
   React.useEffect(() => {
     const vd: any = videosData as any;
-    console.log('[VideoSkeletonDebug] useGenerations state changed:', {
-      showVideosView,
-      videosLoading,
-      videosFetching,
-      hasVideosData: !!vd,
-      videosDataTotal: vd?.total,
-      videosDataItemsLength: vd?.items?.length,
-      videosError: videosError?.message,
-      timestamp: Date.now()
     });
   }, [showVideosView, videosLoading, videosFetching, videosData, videosError]);
 
@@ -766,10 +713,6 @@ const VideoTravelToolPage: React.FC = () => {
     if (showVideosView && videosViewJustEnabled && vd?.items) {
       // Data has loaded, clear the flag
       setVideosViewJustEnabled(false);
-      console.log('[VideoSkeletonDebug] Data loaded, clearing videosViewJustEnabled flag', {
-        itemsCount: vd.items.length,
-        videosDataTotal: vd.total,
-        timestamp: Date.now()
       });
     }
   }, [showVideosView, videosViewJustEnabled, videosData]);
@@ -778,9 +721,7 @@ const VideoTravelToolPage: React.FC = () => {
   React.useEffect(() => {
     const vd: any = videosData as any;
     if (showVideosView && vd?.items) {
-      console.log('[VideoThumbnailIssue] VideoTravelToolPage passing to ImageGallery:', {
-        itemsCount: vd.items.length,
-        sampleItems: vd.items.slice(0, 3).map((item: any) => ({
+      .map((item: any) => ({
           id: item.id?.substring(0, 8),
           url: item.url?.substring(0, 50) + '...',
           thumbUrl: item.thumbUrl?.substring(0, 50) + '...',
@@ -826,10 +767,7 @@ const VideoTravelToolPage: React.FC = () => {
       const currentState = `${preloaderState.isProcessingQueue}-${preloaderState.queueLength}-${preloaderState.cacheUtilization}`;
       if (lastPreloaderState.current !== currentState) {
         lastPreloaderState.current = currentState;
-        console.log(`${VIDEO_DEBUG_TAG} Preloader state:`, {
-          isProcessing: preloaderState.isProcessingQueue,
-          queueLength: preloaderState.queueLength,
-          cacheUtilization: `${preloaderState.preloadedProjectUrls}/${preloaderState.targetCacheSize} (${preloaderState.cacheUtilization}%)`,
+        `,
           selectedProjectId
         });
       }
@@ -860,14 +798,12 @@ const VideoTravelToolPage: React.FC = () => {
     if (hashShotId && selectedShot?.id !== hashShotId) {
       const matchingShot = shots.find((s) => s.id === hashShotId);
       if (matchingShot) {
-        console.log('[ShotFilterAutoSelectIssue] Setting shot from hash:', hashShotId);
         setSelectedShot(matchingShot);
         setCurrentShotId(matchingShot.id);
         // Return early to allow state update before sync
         return;
       } else {
         // Shot from hash doesn't exist - redirect to main view
-        console.log(`[VideoTravelTool] Shot ${hashShotId} not found, redirecting to main view`);
         setSelectedShot(null);
         setCurrentShotId(null);
         navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
@@ -930,7 +866,6 @@ const VideoTravelToolPage: React.FC = () => {
   // Auto-disable turbo mode when cloud generation is disabled
   useEffect(() => {
     if (!isCloudGenerationEnabled && turboMode) {
-      console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
       shotSettingsRef.current.updateField('turboMode', false);
     }
   }, [isCloudGenerationEnabled, turboMode]);
@@ -938,7 +873,6 @@ const VideoTravelToolPage: React.FC = () => {
   // Auto-disable advanced mode when turbo mode is on
   useEffect(() => {
     if (turboMode && advancedMode) {
-      console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
       shotSettingsRef.current.updateFields({
         advancedMode: false,
         selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
@@ -986,8 +920,6 @@ const VideoTravelToolPage: React.FC = () => {
   // Helper to signal that a shot operation has occurred
   // This is called after mutations complete to prevent immediate query refetch
   const signalShotOperation = useCallback(() => {
-    console.log('[OperationTracking] Shot operation detected, disabling query refetch for 100ms');
-    
     // Clear any existing timeout
     if (operationTimeoutRef.current) {
       clearTimeout(operationTimeoutRef.current);
@@ -1000,7 +932,6 @@ const VideoTravelToolPage: React.FC = () => {
     // 100ms is enough for React's batch updates + timeline's immediate state updates
     // Much faster than the previous 1000ms approach
     operationTimeoutRef.current = setTimeout(() => {
-      console.log('[OperationTracking] Re-enabling query refetch after safe period');
       setIsShotOperationInProgress(false);
       operationTimeoutRef.current = null;
     }, 100);
@@ -1025,8 +956,7 @@ const VideoTravelToolPage: React.FC = () => {
       
       // Only react to mutations affecting the currently selected shot
       if (shotId === selectedShot.id) {
-        console.log('[OperationTracking] External mutation detected for current shot:', {
-          shotId: shotId.substring(0, 8),
+        ,
           mutationType,
           source: 'CustomEvent'
         });
@@ -1107,7 +1037,6 @@ const VideoTravelToolPage: React.FC = () => {
         setSelectedShot(shotToSelect);
       } else {
         // Shot not found, redirect to main view
-        console.log(`[VideoTravelTool] Shot ${currentShotId} not found, redirecting to main view`);
         startTransition(() => {
           setSelectedShot(null);
           setCurrentShotId(null);
@@ -1274,7 +1203,6 @@ const VideoTravelToolPage: React.FC = () => {
       if (shotLoraSettings?.loras !== undefined) {
         // Save LoRAs from the current shot to the new shot using Supabase directly
         // This happens before the shot editor loads, so it will use these LoRAs
-        console.log('[VideoTravelToolPage] Saving current shot LoRAs to new shot:', shotLoraSettings.loras);
         (async () => {
           try {
             const { data: currentShot } = await supabase
@@ -1322,8 +1250,7 @@ const VideoTravelToolPage: React.FC = () => {
   // Debug: Manual refresh function
   // const handleManualRefresh = () => {
   //   if (selectedProjectId) {
-  //     console.log(`[ManualRefresh] Force refreshing shots data for project ${selectedProjectId}`);
-  //     queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+  //     //     queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
   //     refetchShots();
   //   }
   // };
@@ -1411,7 +1338,6 @@ const VideoTravelToolPage: React.FC = () => {
   // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
   if (hashShotId && shots && !shots.find(s => s.id === hashShotId)) {
     // Shots have loaded but the hashShotId doesn't exist - redirect to main view
-    console.log(`[VideoTravelToolPage] Hash shot ${hashShotId} not found in loaded shots, redirecting`);
     navigate('/tools/travel-between-images', { replace: true });
     return null;
   }
@@ -1437,22 +1363,7 @@ const VideoTravelToolPage: React.FC = () => {
               // Use actual count if available, otherwise default to 12
               const skeletonCount = (vd?.total) || 12;
               
-              console.log('[VideoSkeletonDebug] === RENDER DECISION ===', {
-                showVideosView,
-                selectedProjectId,
-                videosLoading,
-                videosFetching,
-                hasValidData,
-                videosViewJustEnabled,
-                shouldShowSkeleton,
-                skeletonCount,
-                videosDataTotal: vd?.total,
-                videosDataItemsLength: vd?.items?.length,
-                decisionBreakdown: {
-                  condition1_noProject: !selectedProjectId,
-                  condition2_loadingNoData: isLoadingOrFetching && !hasValidData,
-                  condition3_justEnabled: videosViewJustEnabled,
-                  result: `${!selectedProjectId} || (${isLoadingOrFetching} && ${!hasValidData}) || ${videosViewJustEnabled} = ${shouldShowSkeleton}`
+              || ${videosViewJustEnabled} = ${shouldShowSkeleton}`
                 },
                 willRender: shouldShowSkeleton ? 'SKELETON' : 'GALLERY',
                 timestamp: Date.now()

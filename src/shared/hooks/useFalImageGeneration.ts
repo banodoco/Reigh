@@ -61,7 +61,6 @@ const defaultFalModelId = "fal-ai/flux-general";
 // Updated helper function to map aspect ratio strings to Fal-compatible image_size values
 const mapAspectRatioToFalImageSize = (aspectRatio?: string): string | undefined => {
   if (!aspectRatio) {
-    console.log("[mapAspectRatioToFalImageSize] No aspect ratio provided, using Fal default for image_size.");
     return undefined; 
   }
 
@@ -115,7 +114,6 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
 
   const createGenerationTask = useCallback(
     async (params: FalImageGenerationParams, selectedProjectId: string): Promise<CreatedTaskInfo | null> => {
-      console.log("[useFalImageGeneration] createGenerationTask CALLED for API.");
       if (!selectedProjectId) {
         toast.error("No project selected. Cannot create task.");
         return null;
@@ -256,7 +254,7 @@ export const useFalImageGeneration = (): UseFalImageGenerationResult => {
         }
 
         const taskIdStr = String(taskId);
-        console.log(`[useFalImageGeneration] Task created via Supabase (type: ${toolType}):`, { taskId: taskIdStr });
+        :`, { taskId: taskIdStr });
 
         return { taskId: taskIdStr };
 
@@ -286,7 +284,7 @@ export const initializeGlobalFalClient = () => {
   if (API_KEY) {
     try {
       fal.config({ credentials: API_KEY });
-      console.log("[FalClientConfig] Fal client configured globally (e.g., by useFalImageGeneration or EditTravel).");
+      .");
     } catch (e) {
       console.error("[FalClientConfig] Error configuring Fal client globally:", e);
     }
@@ -310,7 +308,6 @@ export const initializeGlobalFalClient = () => {
   if (API_KEY) {
     try {
         // fal.config({ credentials: API_KEY });
-        console.log("[useFalImageGeneration] Fal client initialized with stored/default key.");
         falInitialized = true;
     } catch (e) {
         console.error("[useFalImageGeneration] Error initializing Fal client:", e);

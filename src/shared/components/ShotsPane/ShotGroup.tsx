@@ -120,8 +120,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   // const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
   //   e.preventDefault();
   //   e.stopPropagation();
-  //   console.log(`[ShotGroup:${shot.id}] handleDragEnter: File entered. Items:`, e.dataTransfer.items.length, e.dataTransfer.types);
-  //   if (e.dataTransfer.types.includes('Files')) {
+  //   //   if (e.dataTransfer.types.includes('Files')) {
   //     setIsFileOver(true);
   //   }
   // };
@@ -140,8 +139,7 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   // const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
   //   e.preventDefault();
   //   e.stopPropagation();
-  //   console.log(`[ShotGroup:${shot.id}] handleDragLeave: File left.`);
-  //   if (e.currentTarget.contains(e.relatedTarget as Node)) {
+  //   //   if (e.currentTarget.contains(e.relatedTarget as Node)) {
   //       return;
   //   }
   //   setIsFileOver(false);
@@ -151,12 +149,9 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
   //   e.preventDefault();
   //   e.stopPropagation();
   //   setIsFileOver(false);
-  //   console.log(`[ShotGroup:${shot.id}] handleDrop: File dropped. Items:`, e.dataTransfer.files.length);
-
-  //   const files = Array.from(e.dataTransfer.files);
+  //   //   const files = Array.from(e.dataTransfer.files);
   //   if (files.length === 0) {
-  //     console.log(`[ShotGroup:${shot.id}] handleDrop: No files found in drop event.`);
-  //     return;
+  //     //     return;
   //   }
 
   //   const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];

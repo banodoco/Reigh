@@ -74,17 +74,7 @@ export const useLayoutMode = ({
   // Debug layout
   useEffect(() => {
     if (isSpecialEditMode) {
-      console.log('[TaskDetailsSidebar] 🎨 Special edit mode layout:', {
-        isInpaintMode,
-        isMagicEditMode,
-        isSpecialEditMode,
-        isTabletOrLarger,
-        isPortrait,
-        shouldShowSidePanel,
-        windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'unknown',
-        windowHeight: typeof window !== 'undefined' ? window.innerHeight : 'unknown'
-      });
-    }
+      }
   }, [isInpaintMode, isMagicEditMode, isSpecialEditMode, isTabletOrLarger, isPortrait, shouldShowSidePanel]);
 
   return {

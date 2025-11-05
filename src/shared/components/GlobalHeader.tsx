@@ -154,12 +154,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
   useEffect(() => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
-      console.log(`[GlobalHeader:MobileDebug] State - loading: ${isLoadingProjects}, projects: ${projects.length}, selected: ${selectedProjectId}`);
-      
       // Check for stall condition
       if (isLoadingProjects && projects.length === 0) {
-        console.log(`[GlobalHeader:MobileDebug] Mobile showing skeleton/loading state`);
-      } else if (!isLoadingProjects && projects.length === 0) {
+        } else if (!isLoadingProjects && projects.length === 0) {
         console.warn(`[GlobalHeader:MobileDebug] Mobile showing 'no projects' - potential stall!`);
       } else if (projects.length > 0 && !selectedProjectId) {
         console.warn(`[GlobalHeader:MobileDebug] Mobile has projects but no selection - potential issue!`);

@@ -107,7 +107,6 @@ export const TaskDetailsSection: React.FC<TaskDetailsSectionProps> = ({
                     if (onNavigateToGeneration) {
                       onNavigateToGeneration(derived.id);
                     } else {
-                      console.log('[DerivedGeneration] Clicked:', derived.id);
                       toast.info('Navigation requires parent support');
                     }
                   }}

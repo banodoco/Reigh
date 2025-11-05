@@ -126,20 +126,13 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   useEffect(() => {
     if (!videoMetadata && !isExtractingMetadata && !extractedMetadata) {
       setIsExtractingMetadata(true);
-      console.log('[GuidanceVideoStrip] 🎬 Extracting metadata from URL:', videoUrl.substring(0, 100) + '...');
+      + '...');
       extractVideoMetadataFromUrl(videoUrl)
         .then(metadata => {
-          console.log('[GuidanceVideoStrip] ✅ Metadata extracted successfully:', {
-            duration: metadata.duration_seconds,
-            frameRate: metadata.frame_rate,
-            totalFrames: metadata.total_frames,
-            dimensions: `${metadata.width}x${metadata.height}`
-          });
           setExtractedMetadata(metadata);
           
           // Save extracted metadata back to database via callback
           if (onMetadataExtracted) {
-            console.log('[GuidanceVideoStrip] 💾 Calling onMetadataExtracted to save metadata to database');
             onMetadataExtracted(metadata);
           }
         })
@@ -206,17 +199,10 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     
     // CRITICAL: Don't start extraction until we have metadata!
     if (!effectiveMetadata) {
-      console.log('[GuidanceVideoStrip] ⏳ Waiting for metadata before extracting frames...');
       return;
     }
 
     const extractFrames = async () => {
-      console.log('[GuidanceVideoStrip] 🎞️ Starting frame extraction:', {
-        treatment,
-        totalFrames: effectiveMetadata.total_frames,
-        frameRate: effectiveMetadata.frame_rate,
-        duration: effectiveMetadata.duration_seconds
-      });
       setIsExtractingFrames(true);
       // Don't set isVideoReady to false - keep old frames visible during re-extraction
       
@@ -358,8 +344,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           setIsVideoReady(true);
         }
         setIsExtractingFrames(false);
-        console.log('[GuidanceVideoStrip] Frame extraction complete for', treatment, 'mode');
-      } catch (error) {
+        } catch (error) {
         console.error('[GuidanceVideoStrip] Error extracting frames:', error);
         // Keep existing frames on error, don't clear them
         setIsExtractingFrames(false);
@@ -367,7 +352,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     };
 
     const handleLoadedMetadata = () => {
-      console.log('[GuidanceVideoStrip] Video metadata loaded');
       extractFrames();
     };
 
@@ -418,10 +402,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       const isBlank = transparentRatio > 0.95;
       
       if (isBlank) {
-        console.log('[GuidanceVideoStrip] Canvas detected as blank:', {
-          transparentPixels: transparentCount,
-          totalPixels,
-          ratio: transparentRatio.toFixed(2)
         });
       }
       
@@ -461,8 +441,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       if (previewCanvas.width !== video.videoWidth || previewCanvas.height !== video.videoHeight) {
         previewCanvas.width = video.videoWidth;
         previewCanvas.height = video.videoHeight;
-        console.log('[GuidanceVideoStrip] Set canvas size:', video.videoWidth, 'x', video.videoHeight);
-      }
+        }
       
       // Clear and draw the current frame
       previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
@@ -480,7 +459,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       }
       
       lastDrawnFrameRef.current = frame;
-      console.log('[GuidanceVideoStrip] Successfully drew frame', frame);
       return true;
     } catch (error) {
       console.error('[GuidanceVideoStrip] Error drawing frame', frame, ':', error);
@@ -493,11 +471,10 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
   const ensureVideoReady = useCallback(async (video: HTMLVideoElement): Promise<boolean> => {
     // If video is ready, return immediately
     if (video.readyState >= 2) {
-      console.log('[GuidanceVideoStrip] Video already ready, readyState:', video.readyState);
       return true;
     }
     
-    console.log('[GuidanceVideoStrip] Video not ready (readyState:', video.readyState, '), waiting...');
+    , waiting...');
     
     // Wait for video to become ready
     return new Promise<boolean>((resolve) => {
@@ -505,7 +482,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         video.removeEventListener('canplay', handleCanPlay);
         video.removeEventListener('loadeddata', handleCanPlay);
         video.removeEventListener('canplaythrough', handleCanPlay);
-        console.log('[GuidanceVideoStrip] Video became ready, readyState:', video.readyState);
         resolve(true);
       };
       
@@ -586,8 +562,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           const handleSeeked = () => {
           video.removeEventListener('seeked', handleSeeked);
           
-          console.log('[GuidanceVideoStrip] Seeked event fired for frame', frame, 'at time', video.currentTime);
-          
           // Draw the frame
           const success = drawVideoFrame(video, frame);
           if (!success) {
@@ -598,8 +572,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
               videoHeight: video.videoHeight
             });
               } else {
-            console.log('[GuidanceVideoStrip] Successfully drew frame', frame);
-          }
+            }
           
           resolve();
         };
@@ -654,7 +627,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     lastBlankCheckRef.current = now;
     
     // Log stack trace to see what's calling this
-    console.log('[GuidanceVideoStrip] Reset seeking state', new Error().stack);
+    .stack);
   }, []);
   
   const handleMouseMove = useCallback((e: React.MouseEvent) => {

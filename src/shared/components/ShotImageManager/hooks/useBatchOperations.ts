@@ -41,14 +41,12 @@ export function useBatchOperations({
   const performBatchDelete = useCallback((ids: string[]) => {
     if (ids.length === 0) return;
     
-    console.log('[OPTIMISTIC_DELETE] Starting optimistic batch delete', {
-      idsToDelete: ids.map(id => id.substring(0, 8)),
+    ),
       totalCount: ids.length,
       currentImagesCount: currentImages.length
     });
     
     // Clear selection and UI state for immediate feedback
-    console.log('[CLEAR_TRACE] Clearing selection in performBatchDelete');
     setMobileSelectedIds([]);
     setSelectedIds([]);
     setLastSelectedIndex(null);
@@ -66,8 +64,7 @@ export function useBatchOperations({
   
   // Individual delete function that clears selection if needed
   const handleIndividualDelete = useCallback((id: string) => {
-    console.log('[OPTIMISTIC_DELETE] Starting optimistic individual delete', {
-      idToDelete: id.substring(0, 8),
+    ,
       currentImagesCount: currentImages.length
     });
     

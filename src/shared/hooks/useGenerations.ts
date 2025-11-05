@@ -180,11 +180,7 @@ export async function fetchGenerations(
         .map(sg => sg.generation_id) || [];
       
       // Debug logging for excludePositioned filtering
-      console.log('[ExcludePositionedDebug] Filtering shot generations:', {
-        shotId: filters.shotId,
-        excludePositioned: filters.excludePositioned,
-        totalShotGenerations: shotGenerations?.length || 0,
-        positionedCount: shotGenerations?.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length || 0,
+      .length || 0,
         unpositionedCount: unpositionedIds.length,
         unpositionedSample: unpositionedIds.slice(0, 3),
         allTimelineFrames: shotGenerations?.map(sg => ({ id: sg.generation_id, timeline_frame: sg.timeline_frame })).slice(0, 5)
@@ -213,10 +209,7 @@ export async function fetchGenerations(
   }
 
   // [UpscaleDebug] ALWAYS log to confirm function is running
-  console.log('[UpscaleDebug] ===== fetchGenerations called =====', {
-    projectId,
-    totalItems: data?.length || 0,
-    itemsWithUpscaledUrl: data?.filter((item: any) => item.upscaled_url).length || 0,
+  => item.upscaled_url).length || 0,
     allItemIds: data?.slice(0, 3).map((item: any) => ({
       id: item.id?.substring(0, 8),
       hasUpscaledUrl: !!item.upscaled_url,
@@ -244,8 +237,7 @@ export async function fetchGenerations(
   const items = finalData?.map((item: any) => {
     // [UpscaleDebug] Preserve existing debug logging
     if (item.upscaled_url) {
-      console.log('[UpscaleDebug] Processing item with upscaled_url:', {
-        id: item.id?.substring(0, 8),
+      ,
         upscaled_url: item.upscaled_url?.substring(0, 60)
       });
     }
@@ -325,10 +317,6 @@ async function createGeneration(params: {
  * Star/unstar a generation using direct Supabase call
  */
 async function toggleGenerationStar(id: string, starred: boolean): Promise<void> {
-  console.log('[StarPersist] 🚀 Starting database UPDATE', { 
-    id, 
-    starred, 
-    timestamp: Date.now() 
   });
 
   const { data, error } = await supabase
@@ -337,14 +325,6 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
     .eq('id', id)
     .select('id, starred'); // Select to verify update
 
-  console.log('[StarPersist] 📊 Database UPDATE response', { 
-    id, 
-    starred, 
-    responseData: data,
-    hasData: !!data,
-    dataLength: data?.length,
-    error: error?.message,
-    timestamp: Date.now() 
   });
 
   if (error) {
@@ -361,11 +341,6 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
     throw new Error(`Failed to update generation: No rows updated (possible RLS policy issue)`);
   }
 
-  console.log('[StarPersist] ✅ Database UPDATE successful', { 
-    id, 
-    starred, 
-    updatedData: data[0],
-    timestamp: Date.now() 
   });
 }
 
@@ -503,10 +478,7 @@ export function useCreateGeneration() {
 export async function fetchDerivedGenerations(
   sourceGenerationId: string | null
 ): Promise<GeneratedImageWithMetadata[]> {
-  console.log('[BasedOnDebug] fetchDerivedGenerations called', { sourceGenerationId });
-  
   if (!sourceGenerationId) {
-    console.log('[BasedOnDebug] fetchDerivedGenerations returning empty - no sourceGenerationId');
     return [];
   }
   
@@ -533,10 +505,7 @@ export async function fetchDerivedGenerations(
     throw error;
   }
   
-  console.log('[BasedOnDebug] fetchDerivedGenerations result', {
-    sourceGenerationId,
-    count: data?.length || 0,
-    data: data?.map(d => ({ id: d.id, based_on: (d as any).based_on }))
+  .based_on }))
   });
   
   // Fetch counts of generations based on each derived generation
@@ -565,15 +534,11 @@ export async function fetchDerivedGenerations(
     const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
     
     // Debug based_on field
-    console.log('[BasedOnDebug] 🔍 useGenerations mapping item:');
-    console.log('  itemId:', item.id?.substring(0, 8));
-    console.log('  hasBasedOnField:', !!item.based_on);
-    console.log('  basedOnValue:', item.based_on);
-    console.log('  hasBasedOnInParams:', !!(item.params?.based_on));
-    console.log('  basedOnInParams:', item.params?.based_on);
-    console.log('  allItemKeys:', Object.keys(item));
-    console.log('  paramsKeys:', item.params ? Object.keys(item.params) : 'no params');
-    console.log('  timestamp:', Date.now());
+    );
+    );
+    );
+    : 'no params');
+    );
     
     const baseItem: GeneratedImageWithMetadata = {
       id: item.id,
@@ -595,10 +560,8 @@ export async function fetchDerivedGenerations(
       based_on: item.based_on || item.params?.based_on || null, // Include based_on from database or params
     };
     
-    console.log('[BasedOnDebug] ✅ Created baseItem:');
-    console.log('  baseItemId:', baseItem.id?.substring(0, 8));
-    console.log('  baseItem.based_on:', baseItem.based_on);
-    console.log('  baseItemKeys:', Object.keys(baseItem));
+    );
+    );
     
     // Include shot association data
     const shotGenerations = item.shot_generations || [];
@@ -670,10 +633,7 @@ export function useDerivedGenerations(
 export async function fetchSourceGeneration(
   sourceGenerationId: string | null
 ): Promise<GeneratedImageWithMetadata | null> {
-  console.log('[BasedOnDebug] fetchSourceGeneration called', { sourceGenerationId });
-  
   if (!sourceGenerationId) {
-    console.log('[BasedOnDebug] fetchSourceGeneration returning null - no sourceGenerationId');
     return null;
   }
   
@@ -698,12 +658,6 @@ export async function fetchSourceGeneration(
     console.error('[BasedOnDebug] fetchSourceGeneration error or no data', { error, hasData: !!data });
     return null;
   }
-  
-  console.log('[BasedOnDebug] fetchSourceGeneration found generation', {
-    id: data.id,
-    hasLocation: !!data.location,
-    hasThumbnail: !!data.thumbnail_url
-  });
   
   const item = data;
   const mainUrl = item.location;
@@ -786,12 +740,9 @@ export function useToggleGenerationStar() {
 
   return useMutation({
     mutationFn: ({ id, starred, shotId }: { id: string; starred: boolean; shotId?: string }) => {
-      console.log('[StarPersist] 🔵 Mutation function called', { id, starred, shotId });
       return toggleGenerationStar(id, starred);
     },
     onMutate: async ({ id, starred, shotId }) => {
-      console.log('[StarPersist] 🟡 onMutate: Optimistically updating caches', { id, starred, shotId });
-      
       // Cancel outgoing refetches so they don't overwrite our optimistic update
       await Promise.all([
         queryClient.cancelQueries({ queryKey: ['unified-generations'] }),
@@ -806,11 +757,7 @@ export function useToggleGenerationStar() {
 
       // 1) Optimistically update all generations-list caches
       const generationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
-      console.log('[StarPersist] 📊 Found generations queries to update:', {
-        queriesCount: generationsQueries.length,
-        generationId: id,
-        newStarred: starred,
-        queryKeys: generationsQueries.map(([key]) => key)
+      => key)
       });
       
       generationsQueries.forEach(([queryKey, data]) => {
@@ -823,25 +770,17 @@ export function useToggleGenerationStar() {
             items: (data as any).items.map((g: any) => (g.id === id ? { ...g, starred } : g)),
           };
           
-          console.log('[StarPersist] 🎨 Updating generations cache:', { 
-            queryKey, 
-            itemsCount: updated.items.length,
-            foundItem: !!oldItem,
-            oldStarred: oldItem?.starred,
-            newStarred: starred,
-            updatedItem: updated.items.find((g: any) => g.id === id)
+          => g.id === id)
           });
           
           queryClient.setQueryData(queryKey, updated);
         } else {
-          console.log('[StarPersist] ⚠️ Skipping query (no items):', { queryKey, hasData: !!data, dataKeys: data ? Object.keys(data) : [] });
+          :', { queryKey, hasData: !!data, dataKeys: data ? Object.keys(data) : [] });
         }
       });
 
       // 2) Optimistically update all shots caches so star reflects in Shot views / timelines
       const shotsQueries = queryClient.getQueriesData({ queryKey: ['shots'] });
-      console.log('[StarDebug:useToggleGenerationStar] Found shots queries:', shotsQueries.length);
-      
       shotsQueries.forEach(([queryKey, data]) => {
         if (Array.isArray(data)) {
           previousShotsQueries.set(queryKey, data);
@@ -851,7 +790,7 @@ export function useToggleGenerationStar() {
             const updatedImages = shot.images.map((img: any) => (img.id === id ? { ...img, starred } : img));
             const hasUpdates = updatedImages.some((img: any, idx: number) => img.starred !== shot.images[idx].starred);
             if (hasUpdates) {
-              console.log('[StarDebug:useToggleGenerationStar] Updating shot images for shot', shot.id, { updatedCount: updatedImages.filter((img: any) => img.starred).length });
+              => img.starred).length });
             }
             return {
               ...shot,
@@ -868,34 +807,20 @@ export function useToggleGenerationStar() {
         const previousData = queryClient.getQueryData(queryKey);
 
         if (previousData && Array.isArray(previousData)) {
-          console.log('[StarPersist] 🎯 Found EXACT all-shot-generations query:', { queryKey });
           previousAllShotGenerationsQueries.set(queryKey, previousData);
 
           const updatedGenerations = previousData.map((gen: any) => {
             if (gen.id === id) {
-              console.log('[StarPersist] 🎨 Optimistically updating all-shot-generations cache', {
-                queryKey,
-                generationId: id,
-                oldStarred: gen.starred,
-                newStarred: starred
-              });
               return { ...gen, starred };
             }
             return gen;
           });
           queryClient.setQueryData(queryKey, updatedGenerations);
         } else {
-          console.log('[StarPersist] ⚠️ Could not find EXACT all-shot-generations query in cache for key:', { queryKey, hasPreviousData: !!previousData, isArray: Array.isArray(previousData) });
+          });
         }
       } else {
-        console.log('[StarPersist] ⚠️ No shotId provided, skipping all-shot-generations cache update.');
-      }
-
-      console.log('[StarDebug:useToggleGenerationStar] onMutate complete', { 
-        generationsQueriesUpdated: previousGenerationsQueries.size,
-        shotsQueriesUpdated: previousShotsQueries.size,
-        allShotGenerationsQueriesUpdated: previousAllShotGenerationsQueries.size 
-      });
+        }
 
       return { previousGenerationsQueries, previousShotsQueries, previousAllShotGenerationsQueries };
     },
@@ -926,26 +851,18 @@ export function useToggleGenerationStar() {
       toast.error(error.message || 'Failed to toggle star');
     },
     onSuccess: (data, variables) => {
-      console.log('[StarPersist] ✅ onSuccess: Mutation completed successfully', { 
-        variables, 
-        data,
-        willWaitForRealtime: true 
-      });
       // Emit domain event for generation star toggle
       // Generation star toggle events are now handled by DataFreshnessManager via realtime events
       
       // Emit custom event so Timeline knows to refetch star data
       if (variables.shotId) {
-        console.log('[StarPersist] 📢 Emitting star-updated event for shot:', variables.shotId);
         window.dispatchEvent(new CustomEvent('generation-star-updated', { 
           detail: { generationId: variables.id, shotId: variables.shotId, starred: variables.starred }
         }));
       }
       
-      console.log('[StarPersist] ✨ Optimistic updates complete - all caches updated');
-    },
+      },
     onSettled: () => {
-      console.log('[StarPersist] 🏁 onSettled: Mutation lifecycle complete');
-    },
+      },
   });
 }

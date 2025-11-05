@@ -114,7 +114,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   // Clear skeleton immediately when new images arrive
   React.useEffect(() => {
     if (isBackfillLoading && paginatedImages.length > prevPaginatedLengthRef.current) {
-      console.log('[SKELETON_DEBUG] Direct effect - clearing skeleton (new images detected):', {
+      :', {
         prevLength: prevPaginatedLengthRef.current,
         newLength: paginatedImages.length,
         isBackfillLoading,
@@ -125,7 +125,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
       
       // Notify the actions hook to reset deletion count
       if (onSkeletonCleared) {
-        console.log('[SKELETON_DEBUG] Direct effect - calling onSkeletonCleared callback');
         onSkeletonCleared();
       }
     }
@@ -135,19 +134,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   // [VideoSkeletonDebug] Track grid render and loading/skeleton decisions for video gallery context
   React.useEffect(() => {
     // Heuristic: in videos view, mediaType is enforced at parent; here we just log state
-    console.log('[VideoSkeletonDebug] ImageGalleryGrid render state:', {
-      paginatedImagesLength: paginatedImages.length,
-      filteredImagesLength: filteredImages.length,
-      imagesLength: images.length,
-      isGalleryLoading,
-      isServerPagination,
-      isBackfillLoading,
-      backfillSkeletonCount,
-      itemsPerPage,
-      page,
-      serverPage,
-      hasFilters,
-      timestamp: Date.now()
     });
   }, [paginatedImages.length, filteredImages.length, images.length, isGalleryLoading, isServerPagination, isBackfillLoading, backfillSkeletonCount, itemsPerPage, page, serverPage, hasFilters]);
 
@@ -221,10 +207,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
             isLightboxOpen={isLightboxOpen}
             instanceId={`gallery-${isServerPagination ? (serverPage || 1) : page}`}
             onImagesReady={() => {
-              console.log(`🎯 [PAGELOADINGDEBUG] [GALLERY] Images ready - clearing gallery loading state`);
-              console.log('[SKELETON_DEBUG] ProgressiveLoadingManager onImagesReady fired:', {
-                isBackfillLoading,
-                hasSetters: !!(setIsBackfillLoading && setBackfillSkeletonCount),
+              ,
                 paginatedImagesLength: paginatedImages.length,
                 timestamp: Date.now()
               });
@@ -234,7 +217,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
               
               // If we were showing backfill skeletons, hide them as soon as real images appear
               if (isBackfillLoading && setIsBackfillLoading) {
-                console.log('[SKELETON_DEBUG] ProgressiveLoadingManager - clearing skeleton (images ready):', {
+                :', {
                   isBackfillLoading,
                   hasSetters: !!(setIsBackfillLoading && setBackfillSkeletonCount),
                   timestamp: Date.now()
@@ -245,7 +228,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
 
               // Only clear button loading for server pagination - client pagination handles this separately
               if (isServerPagination) {
-                console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
                 if (lastClearedButtonRef.current !== 'cleared') {
                   console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
                     reason: 'Server pagination images ready',
@@ -278,8 +260,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                     
                     // Debug logging disabled for performance (was causing excessive re-renders)
                     // if (index < 8 || (loadingStrategy.shouldLoadInInitialBatch && !shouldShow)) {
-                    //   console.log(`[GalleryDebug] 🖼️ Image ${index} render:`, {
-                    //     imageId: image.id?.substring(0, 8),
+                    //   ,
                     //     shouldShow,
                     //     batchGroup: loadingStrategy.batchGroup,
                     //     shouldLoadInInitialBatch: loadingStrategy.shouldLoadInInitialBatch,
@@ -306,11 +287,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                   
                   {/* Backfill skeleton items - matching ImageGalleryItem design */}
                   {isBackfillLoading && backfillSkeletonCount > 0 && (() => {
-                    console.log('[SKELETON_DEBUG] Rendering skeleton items:', {
-                      isBackfillLoading,
-                      backfillSkeletonCount,
-                      paginatedImagesLength: paginatedImages.length,
-                      timestamp: Date.now()
                     });
                     return Array.from({ length: backfillSkeletonCount }).map((_, index) => {
                       const skeletonIndex = paginatedImages.length + index;

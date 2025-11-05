@@ -161,13 +161,6 @@ function buildMagicEditTaskParams(
   // Always add add_in_position as false for magic edit tasks (unpositioned by default)
   taskParams.add_in_position = false;
   
-  console.log('[MagicEditTaskDebug] Creating magic edit task with params:', {
-    shot_id: params.shot_id,
-    add_in_position: false,
-    tool_type: params.tool_type,
-    taskParams: taskParams
-  });
-
   // Add tool_type override if provided (for generation association)
   if (params.tool_type) {
     taskParams.tool_type = params.tool_type;
@@ -194,8 +187,6 @@ function buildMagicEditTaskParams(
  * @returns Promise resolving to the created task
  */
 export async function createMagicEditTask(params: MagicEditTaskParams): Promise<any> {
-  console.log("[createMagicEditTask] Creating task with params:", params);
-
   try {
     // 1. Validate parameters
     validateMagicEditParams(params);
@@ -216,7 +207,6 @@ export async function createMagicEditTask(params: MagicEditTaskParams): Promise<
       params: taskParams,
     });
 
-    console.log("[createMagicEditTask] Task created successfully:", result);
     return result;
 
   } catch (error) {
@@ -233,8 +223,6 @@ export async function createMagicEditTask(params: MagicEditTaskParams): Promise<
  * @returns Promise resolving to array of created tasks
  */
 export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams): Promise<any[]> {
-  console.log("[createBatchMagicEditTasks] Creating batch tasks with params:", params);
-
   try {
     // 1. Validate parameters
     validateBatchMagicEditParams(params);
@@ -269,8 +257,6 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
       } as MagicEditTaskParams;
     });
 
-    console.log(`[createBatchMagicEditTasks] Creating ${taskParams.length} individual tasks`);
-
     // 4. Create all tasks in parallel
     const results = await Promise.allSettled(
       taskParams.map(taskParam => createMagicEditTask(taskParam))
@@ -279,8 +265,6 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
     // 5. Process results and collect successes/failures
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
-
-    console.log(`[createBatchMagicEditTasks] Batch results: ${successful} successful, ${failed} failed`);
 
     // 6. If all failed, throw the first error
     if (successful === 0) {
@@ -303,7 +287,6 @@ export async function createBatchMagicEditTasks(params: BatchMagicEditTaskParams
       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
       .map(r => r.value);
 
-    console.log(`[createBatchMagicEditTasks] Batch completed: ${successfulResults.length} tasks created`);
     return successfulResults;
 
   } catch (error) {

@@ -33,13 +33,7 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
 
   // [ShotReorderDebug] Log shots context data changes
   React.useEffect(() => {
-    console.log(`${REORDER_DEBUG_TAG} ShotsContext data updated:`, {
-      selectedProjectId,
-      shotsCount: shots?.length || 0,
-      isLoading,
-      error: error?.message,
-      shotsData: shots?.map(s => ({ 
-        id: s.id.substring(0, 8), 
+    , 
         position: s.position, 
         name: s.name,
         imagesCount: s.images?.length || 0,
@@ -50,8 +44,7 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
     
     // [ShotImageDebug] Log detailed image data for first few shots
     if (shots && shots.length > 0) {
-      console.log('[ShotImageDebug] First 3 shots with image details:', 
-        shots.slice(0, 3).map(shot => ({
+      .map(shot => ({
           shotId: shot.id.substring(0, 8),
           shotName: shot.name,
           imagesCount: shot.images?.length || 0,
@@ -70,9 +63,6 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
 
   // [ShotReorderDebug] Log refetch calls
   const debugRefetch = React.useCallback(() => {
-    console.log(`${REORDER_DEBUG_TAG} ShotsContext refetch called:`, {
-      selectedProjectId,
-      timestamp: Date.now()
     });
     return refetch();
   }, [refetch, selectedProjectId]);

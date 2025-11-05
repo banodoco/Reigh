@@ -61,8 +61,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
   }, [images.length, shotId]);
 
   const openLightbox = useCallback((index: number) => {
-    console.log('[DoubleTapFlow] 🎭 openLightbox called:', {
-      shotId: shotId.substring(0, 8),
+    ,
       requestedIndex: index,
       totalImages: images.length,
       isValidIndex: index >= 0 && index < images.length,
@@ -70,8 +69,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
     });
     
     if (index >= 0 && index < images.length) {
-      console.log('[DoubleTapFlow] ✅ LIGHTBOX OPENING:', {
-        shotId: shotId.substring(0, 8),
+      ,
         index,
         imageId: images[index]?.shotImageEntryId?.substring(0, 8)
       });
@@ -84,11 +82,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
       });
       setLightboxIndex(index);
     } else {
-      console.log('[DoubleTapFlow] ❌ INVALID INDEX - Cannot open lightbox:', {
-        index,
-        totalImages: images.length
-      });
-    }
+      }
   }, [images, shotId]);
 
   const openLightboxWithInpaint = useCallback((index: number) => {
@@ -115,21 +109,18 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
 
   // Handle mobile tap - now called by useDoubleTapWithSelection hook
   const handleMobileTap = useCallback((idx: number) => {
-    console.log('[DoubleTapFlow] 🎭 useLightbox handleMobileTap called:', {
-      shotId: shotId.substring(0, 8),
+    ,
       imageIndex: idx,
       isMobile,
       imagesCount: images.length
     });
     
     if (!isMobile) {
-      console.log('[DoubleTapFlow] ⚠️ Not mobile - ignoring tap');
       return;
     }
 
     // Since this is now called by useDoubleTapWithSelection, we don't need
     // double-tap detection here anymore - just open the lightbox
-    console.log('[DoubleTapFlow] ✅ Opening lightbox at index:', idx);
     openLightbox(idx);
   }, [isMobile, shotId, openLightbox, images.length]);
 

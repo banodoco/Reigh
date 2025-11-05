@@ -24,10 +24,7 @@ export function useWelcomeBonus() {
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        console.log('[WelcomeBonus] User check:', user?.id);
-
         if (!user) {
-          console.log('[WelcomeBonus] No user found');
           return;
         }
 
@@ -39,31 +36,23 @@ export function useWelcomeBonus() {
           .eq('id', user.id)
           .single();
         
-        console.log('[WelcomeBonus] Query result:', { userData, error });
-        
         if (error) {
-          console.log('[WelcomeBonus] Query error:', error);
           return;
         }
         
         if (!userData) {
-          console.log('[WelcomeBonus] No user data found');
           return;
         }
 
         const givenCredits = (userData as any).given_credits;
-        console.log('[WelcomeBonus] given_credits value:', givenCredits);
-
         // If user hasn't received welcome credits yet, show the modal
         // Type assertion needed because given_credits isn't in generated types yet
         if (!givenCredits) {
-          console.log('[WelcomeBonus] Showing modal - user eligible');
           timeoutId = setTimeout(() => {
             setShowModal(true);
           }, 500);
         } else {
-          console.log('[WelcomeBonus] User already has credits, not showing modal');
-        }
+          }
 
       } catch (error) {
         console.error('[WelcomeBonus] Unexpected error:', error);
