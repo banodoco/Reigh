@@ -38,26 +38,16 @@ export const useUnifiedDrop = ({
   const getDragType = useCallback((e: React.DragEvent<HTMLDivElement>): DragType => {
     const types = Array.from(e.dataTransfer.types);
     
-    console.log('[BatchDropPositionIssue] 🔍 getDragType - dataTransfer.types:', {
-      types,
-      hasFiles: types.includes('Files'),
-      hasGeneration: types.includes('application/x-generation'),
-      timestamp: Date.now()
-    });
-    
     // Check for generation data first (more specific)
     if (types.includes('application/x-generation')) {
-      console.log('[BatchDropPositionIssue] ✅ DETECTED: generation');
       return 'generation';
     }
     
     // Check for files
     if (types.includes('Files')) {
-      console.log('[BatchDropPositionIssue] ✅ DETECTED: file');
       return 'file';
     }
     
-    console.log('[BatchDropPositionIssue] ❌ DETECTED: none');
     return 'none';
   }, []);
 
@@ -67,21 +57,10 @@ export const useUnifiedDrop = ({
     
     const dragType = getDragType(e);
     
-    console.log('[BatchDropPositionIssue] 🚀 handleDragEnter:', {
-      dragType,
-      hasImageDropHandler: !!onImageDrop,
-      hasGenerationDropHandler: !!onGenerationDrop,
-      timestamp: Date.now()
-    });
-    
     if (dragType === 'file' && onImageDrop) {
-      console.log('[BatchDropPositionIssue] 📁 FILE DRAG ENTER - Setting isFileOver=true');
       setIsFileOver(true);
     } else if (dragType === 'generation' && onGenerationDrop) {
-      console.log('[BatchDropPositionIssue] 🖼️ GENERATION DRAG ENTER - Setting isGenerationOver=true');
       setIsGenerationOver(true);
-    } else {
-      console.log('[BatchDropPositionIssue] ⚠️ DRAG ENTER - No handler for this type');
     }
   }, [getDragType, onImageDrop, onGenerationDrop]);
 
@@ -90,12 +69,6 @@ export const useUnifiedDrop = ({
     e.stopPropagation();
     
     const dragType = getDragType(e);
-    
-    console.log('[BatchDropPositionIssue] 🔄 handleDragOver:', {
-      dragType,
-      hasContainerRef: !!containerRef.current,
-      timestamp: Date.now()
-    });
     
     if (dragType !== 'none' && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -106,19 +79,15 @@ export const useUnifiedDrop = ({
       if (dragType === 'file' && onImageDrop) {
         setIsFileOver(true);
         e.dataTransfer.dropEffect = 'copy';
-        console.log('[BatchDropPositionIssue] 📁 FILE OVER - dropEffect=copy');
       } else if (dragType === 'generation' && onGenerationDrop) {
         setIsGenerationOver(true);
         e.dataTransfer.dropEffect = 'copy';
-        console.log('[BatchDropPositionIssue] 🖼️ GENERATION OVER - dropEffect=copy');
       } else {
         e.dataTransfer.dropEffect = 'none';
-        console.log('[BatchDropPositionIssue] ⚠️ NO HANDLER - dropEffect=none');
       }
     } else {
       e.dataTransfer.dropEffect = 'none';
       setDropTargetFrame(null);
-      console.log('[BatchDropPositionIssue] ❌ DRAG OVER - Invalid dragType or no container');
     }
   }, [getDragType, onImageDrop, onGenerationDrop, fullMin, fullRange]);
 
@@ -143,14 +112,6 @@ export const useUnifiedDrop = ({
     const dragType = getDragType(e);
     const targetFrame = dropTargetFrame;
     
-    console.log('[BatchDropPositionIssue] 💥 DROP EVENT:', {
-      dragType,
-      targetFrame,
-      hasImageDropHandler: !!onImageDrop,
-      hasGenerationDropHandler: !!onGenerationDrop,
-      timestamp: Date.now()
-    });
-    
     // Reset state
     setIsFileOver(false);
     setIsGenerationOver(false);
@@ -160,15 +121,7 @@ export const useUnifiedDrop = ({
     if (dragType === 'file' && onImageDrop) {
       const files = Array.from(e.dataTransfer.files);
       
-      console.log('[BatchDropPositionIssue] 📁 FILE DROP:', {
-        fileCount: files.length,
-        fileNames: files.map(f => f.name),
-        targetFrame,
-        timestamp: Date.now()
-      });
-      
       if (files.length === 0) {
-        console.log('[BatchDropPositionIssue] ⚠️ FILE DROP - Empty files array');
         return;
       }
 
@@ -177,24 +130,16 @@ export const useUnifiedDrop = ({
         if (validImageTypes.includes(file.type)) {
           return true;
         }
-        console.log('[BatchDropPositionIssue] ❌ FILE DROP - Invalid type:', file.type);
         toast.error(`Invalid file type for ${file.name}. Only JPEG, PNG, and WebP are supported.`);
         return false;
       });
 
       if (validFiles.length === 0) {
-        console.log('[BatchDropPositionIssue] ❌ FILE DROP - No valid files');
         return;
       }
 
       try {
-        console.log('[BatchDropPositionIssue] 📤 FILE DROP - CALLING onImageDrop:', {
-          validFileCount: validFiles.length,
-          targetFrame,
-          timestamp: Date.now()
-        });
         await onImageDrop(validFiles, targetFrame ?? undefined);
-        console.log('[BatchDropPositionIssue] ✅ FILE DROP - onImageDrop completed');
       } catch (error) {
         console.error('[BatchDropPositionIssue] ❌ FILE DROP - Error:', error);
         toast.error(`Failed to add images: ${(error as Error).message}`);
@@ -203,16 +148,8 @@ export const useUnifiedDrop = ({
     
     // Handle generation drops (from GenerationsPane)
     else if (dragType === 'generation' && onGenerationDrop) {
-      console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - Starting...');
-      
       try {
         const dataString = e.dataTransfer.getData('application/x-generation');
-        
-        console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - dataString:', {
-          hasData: !!dataString,
-          dataLength: dataString?.length,
-          timestamp: Date.now()
-        });
         
         if (!dataString) {
           console.error('[BatchDropPositionIssue] ❌ GENERATION DROP - No data found');
@@ -221,21 +158,11 @@ export const useUnifiedDrop = ({
         
         const data: GenerationDropData = JSON.parse(dataString);
         
-        console.log('[BatchDropPositionIssue] 🖼️ GENERATION DROP - CALLING onGenerationDrop:', {
-          generationId: data.generationId?.substring(0, 8),
-          targetFrame,
-          hasImageUrl: !!data.imageUrl,
-          timestamp: Date.now()
-        });
-        
         await onGenerationDrop(data.generationId, data.imageUrl, data.thumbUrl, targetFrame ?? undefined);
-        console.log('[BatchDropPositionIssue] ✅ GENERATION DROP - onGenerationDrop completed');
       } catch (error) {
         console.error('[BatchDropPositionIssue] ❌ GENERATION DROP - Error:', error);
         toast.error(`Failed to add generation: ${(error as Error).message}`);
       }
-    } else {
-      console.log('[BatchDropPositionIssue] ⚠️ DROP - No handler matched dragType:', dragType);
     }
   }, [getDragType, onImageDrop, onGenerationDrop, dropTargetFrame]);
 
