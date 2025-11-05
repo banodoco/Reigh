@@ -45,26 +45,6 @@ export const calculateGridDropPosition = (
   // Clamp to valid range (can insert at end, which is itemCount)
   targetIndex = Math.max(0, Math.min(targetIndex, itemCount));
 
-  console.log('[GridPosition] Calculated drop position:', {
-    mouseX,
-    mouseY,
-    relativeX,
-    relativeY,
-    containerRect: {
-      left: containerRect.left,
-      top: containerRect.top,
-      width: containerRect.width,
-      height: containerRect.height
-    },
-    columns,
-    columnWidth,
-    column,
-    row,
-    estimatedItemHeight,
-    targetIndex,
-    itemCount
-  });
-
   return targetIndex;
 };
 

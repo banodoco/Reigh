@@ -118,15 +118,6 @@ export const useZoom = ({ fullMin, fullMax, fullRange, containerRef }: UseZoomPr
         // Map to the new coordinate system, preserving the relative viewing position
         const newZoomCenter = fullMin + (relativePosition * fullRange);
         
-        console.log('[ZoomPreserve] Coordinate system changed, adjusting zoom center:', {
-          oldSystem: { fullMin: prev.fullMin, fullMax: prev.fullMax, fullRange: prev.fullRange },
-          newSystem: { fullMin, fullMax, fullRange },
-          oldZoomCenter: zoomCenter,
-          newZoomCenter,
-          relativePosition: relativePosition.toFixed(3),
-          zoomLevel
-        });
-        
         // Don't trigger isZooming flag since this is a coordinate system adjustment, not a user action
         setZoomCenter(newZoomCenter);
       }
