@@ -325,79 +325,30 @@ export const applyFluidTimeline = (
     if (limitedMovementAmount > 0 && prevGapViolation && prevItem) {
       // Right drag stretching gap to the left → only shift the immediately previous item
       itemsToShift = [prevItem];
-      console.log('[BoundaryCollisionDebug] 🔁 ADJACENT SHIFT (RIGHT DRAG, PREV GAP): shifting only adjacent previous item', {
-        draggedId: draggedId.substring(0, 8),
-        prevItem: { id: prevItem[0].substring(0,8), pos: prevItem[1] },
-        originalDraggedIndex,
-        itemsToShift: itemsToShift.map(([id, pos]) => ({ id: id.substring(0,8), pos }))
-      });
     } else if (limitedMovementAmount < 0 && nextGapViolation && nextItem) {
       // Left drag stretching gap to the right → only shift the immediately next item
       itemsToShift = [nextItem];
-      console.log('[BoundaryCollisionDebug] 🔁 ADJACENT SHIFT (LEFT DRAG, NEXT GAP): shifting only adjacent next item', {
-        draggedId: draggedId.substring(0, 8),
-        nextItem: { id: nextItem[0].substring(0,8), pos: nextItem[1] },
-        originalDraggedIndex,
-        itemsToShift: itemsToShift.map(([id, pos]) => ({ id: id.substring(0,8), pos }))
-      });
     } else {
       // Default: no shifting for normal drag operations
       itemsToShift = [];
-      console.log('[BoundaryCollisionDebug] ✅ NO SHIFT NEEDED: Normal drag operation within constraints', {
-        draggedId: draggedId.substring(0, 8),
-        limitedMovementAmount,
-        prevGapViolation,
-        nextGapViolation
-      });
     }
   }
-
-  console.log('[FluidTimelineCore] 🌊 APPLYING TIMELINE SHIFT:', {
-    draggedId: draggedId.substring(0, 8),
-    shiftDirection: shiftDirection > 0 ? 'RIGHT' : 'LEFT',
-    shiftAmount,
-    violationTypes: violations.map(v => v.type),
-    itemsToShift: itemsToShift.map(([id, pos]) => ({
-      id: id.substring(0, 8),
-      oldPos: pos,
-      newPos: pos + (shiftAmount * shiftDirection)
-    })),
-    boundaryCollisionDetected: violations.some(v => v.type === 'BOUNDARY_COLLISION')
-  });
 
   // Shift items by the required amount
   itemsToShift.forEach(([id, pos]) => {
     const newPos = pos + (shiftAmount * shiftDirection);
     result.set(id, newPos);
-    
-    // 🎯 MOVEMENT TRACKING: Log fluid timeline shifts
-    console.log(`[TIMELINE_TRACK] [FLUID_SHIFT] 🌊 Item ${id.substring(0, 8)} shifted by fluid timeline: ${pos} → ${newPos} (Δ${newPos - pos})`);
   });
 
   // Check if after shifting, the dragged item would cross another item
   // Use ORIGINAL positions for collision detection, not the shifted positions
   const wouldCrossAfterShift = wouldCrossItem(draggedId, limitedTargetFrame, positions, limitedMovementAmount);
 
-  console.log('[FluidTimelineCore] 🚧 COLLISION DETECTION:', {
-    draggedId: draggedId.substring(0, 8),
-    wouldCrossAfterShift,
-    movementDirection: limitedMovementAmount > 0 ? 'RIGHT' : 'LEFT',
-    limitedTargetFrame
-  });
-
   if (wouldCrossAfterShift) {
     // Find the new adjacent item after shifting (use original positions for this check)
     const nextItemAfterShift = findNextItemInDirection(draggedId, limitedTargetFrame, positions, limitedMovementAmount);
 
     if (nextItemAfterShift) {
-      console.log('[FluidTimelineCore] ⚡ CONSTRAINT APPLICATION - Would cross item:', {
-        draggedId: draggedId.substring(0, 8),
-        crossingItem: {
-          id: nextItemAfterShift.id.substring(0, 8),
-          pos: nextItemAfterShift.pos
-        }
-      });
-
       // Apply gap constraint between dragged item and new adjacent item
       // For rightward drags, allow the dragged item to move past the next item
       // For leftward drags, allow the dragged item to move past the previous item
@@ -413,25 +364,11 @@ export const applyFluidTimeline = (
         ? Math.min(limitedTargetFrame, constraint)
         : Math.max(limitedTargetFrame, constraint);
 
-      console.log('[FluidTimelineCore] 🔒 APPLYING CONSTRAINT:', {
-        draggedId: draggedId.substring(0, 8),
-        limitedTargetFrame,
-        constraint,
-        constrainedPos,
-        constraintType: limitedMovementAmount > 0 ? 'MIN_CONSTRAINT' : 'MAX_CONSTRAINT'
-      });
-
       result.set(draggedId, constrainedPos);
 
       // Re-apply shifting with the constrained position
       const finalShiftAmount = Math.abs(constrainedPos - limitedTargetFrame);
       const finalShiftDirection = limitedMovementAmount > 0 ? 1 : -1;
-
-      console.log('[FluidTimelineCore] 🔄 RE-APPLYING SHIFT WITH CONSTRAINT:', {
-        draggedId: draggedId.substring(0, 8),
-        finalShiftAmount,
-        finalShiftDirection: finalShiftDirection > 0 ? 'RIGHT' : 'LEFT'
-      });
 
       // Get the current positions after constraint (they may have changed)
       const currentPositions = [...result.entries()]
@@ -441,93 +378,12 @@ export const applyFluidTimeline = (
       const newDraggedIndex = currentPositions.findIndex(([id, _]) => id === draggedId);
       const finalItemsToShift = currentPositions.slice(newDraggedIndex + 1);
 
-      console.log('[FluidTimelineCore] 📋 FINAL SHIFT ITEMS:', {
-        finalItemsToShift: finalItemsToShift.map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          oldPos: pos,
-          newPos: pos + (finalShiftAmount * finalShiftDirection)
-        }))
-      });
-
       finalItemsToShift.forEach(([id, pos]) => {
         const newPos = pos + (finalShiftAmount * finalShiftDirection);
         result.set(id, newPos);
       });
     }
   }
-
-  // COMPREHENSIVE FLUID TIMELINE RESULT - Complete analysis of what happened
-  console.log('[FLUID_TIMELINE_RESULT] ✅ FLUID TIMELINE OPERATION COMPLETE:', {
-    // Operation Summary
-    operation: {
-      draggedId: draggedId.substring(0, 8),
-      originalPos,
-      targetFrame,
-      limitedTargetFrame,
-      finalPos: result.get(draggedId),
-      actualMovement: result.get(draggedId) - originalPos,
-      limitedMovement: limitedTargetFrame - originalPos
-    },
-
-    // Movement Analysis
-    movement: {
-      rawMovementAmount: movementAmount,
-      limitedMovementAmount,
-      movementLimited: movementAmount !== limitedMovementAmount,
-      limitReason: Math.abs(movementAmount) > 50 ? 'MAX_LIMIT_REACHED' : 'WITHIN_LIMITS',
-      effectiveMovement: result.get(draggedId) - originalPos
-    },
-
-    // Shifting Analysis
-    shifting: {
-      needsShift,
-      shiftAmount,
-      shiftDirection: limitedMovementAmount > 0 ? 'RIGHT' : 'LEFT',
-      itemsShifted: itemsToShift.length,
-      totalItemsAffected: 1 + itemsToShift.length,
-      shiftReason: violations.length > 0 ? 'VIOLATIONS' : 'FLUID_ENHANCEMENT',
-      shiftType: violations.length > 0 ? 'CORRECTIVE' : 'ENHANCEMENT'
-    },
-
-    // Constraint Analysis
-    constraints: {
-      wouldCross: false, // Will be calculated after actual shifting
-      constraintApplied: 'PENDING_CALCULATION',
-      constraintType: 'PENDING_CALCULATION',
-      finalPositionAfterConstraints: result.get(draggedId)
-    },
-
-    // Complete Position Changes
-    positions: {
-      before: Array.from(positions.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-      after: Array.from(result.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-      changes: Array.from(result.entries())
-        .filter(([id, pos]) => pos !== (positions.get(id) ?? 0))
-        .map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          oldPos: positions.get(id) ?? 0,
-          newPos: pos,
-          delta: pos - (positions.get(id) ?? 0),
-          itemType: id === draggedId ? 'DRAGGED_ITEM' : 'SHIFTED_ITEM'
-        }))
-    },
-
-    // Context and Limits
-    context: {
-      contextFrames,
-      maxGap,
-      containerWidth: 1000
-    },
-
-    // Timing
-    timestamp: new Date().toISOString()
-  });
 
   return result;
 };
@@ -549,14 +405,6 @@ export const findClosestValidPosition = (
 ): number => {
   const originalPos = framePositions.get(activeId) ?? 0;
 
-  console.log('[SnapToPosition] 🎯 FIND CLOSEST VALID POSITION - Starting snap calculation:', {
-    activeId: activeId.substring(0, 8),
-    targetFrame,
-    originalPos,
-    contextFrames,
-    timestamp: new Date().toISOString()
-  });
-
   // Helper to validate position with frame 0 reassignment logic
   const validateWithFrame0Logic = (testFrame: number): boolean => {
     const testMap = new Map(framePositions);
@@ -573,35 +421,13 @@ export const findClosestValidPosition = (
       }
     }
 
-    const isValid = validateGaps(testMap, contextFrames);
-
-    if (!isValid) {
-      console.log('[SnapToPosition] ❌ POSITION INVALID:', {
-        activeId: activeId.substring(0, 8),
-        testFrame,
-        violations: []
-      });
-    }
-
-    return isValid;
+    return validateGaps(testMap, contextFrames);
   };
 
   // First check if target is valid
   if (validateWithFrame0Logic(targetFrame)) {
-    console.log('[SnapToPosition] ✅ TARGET VALID - No snapping needed:', {
-      activeId: activeId.substring(0, 8),
-      targetFrame,
-      originalPos
-    });
     return targetFrame;
   }
-
-  console.log('[SnapToPosition] 🔍 TARGET INVALID - Starting binary search for valid position:', {
-    activeId: activeId.substring(0, 8),
-    targetFrame,
-    originalPos,
-    searchRange: { low: Math.min(originalPos, targetFrame), high: Math.max(originalPos, targetFrame) }
-  });
 
   // Binary search for closest valid position
   const direction = targetFrame > originalPos ? 1 : -1;
@@ -615,17 +441,8 @@ export const findClosestValidPosition = (
     const mid = Math.round((low + high) / 2);
     iterations++;
 
-    console.log(`[SnapToPosition] 🔄 BINARY SEARCH ITERATION ${iterations}:`, {
-      activeId: activeId.substring(0, 8),
-      low,
-      high,
-      mid,
-      direction: direction > 0 ? 'RIGHT' : 'LEFT'
-    });
-
     if (validateWithFrame0Logic(mid)) {
       best = mid;
-      console.log(`[SnapToPosition] ✅ VALID POSITION FOUND: ${mid} (best: ${best})`);
 
       if (direction > 0) {
         low = mid + 1;
@@ -633,8 +450,6 @@ export const findClosestValidPosition = (
         high = mid - 1;
       }
     } else {
-      console.log(`[SnapToPosition] ❌ POSITION INVALID: ${mid}`);
-
       if (direction > 0) {
         high = mid - 1;
       } else {
@@ -642,15 +457,6 @@ export const findClosestValidPosition = (
       }
     }
   }
-
-  console.log('[SnapToPosition] ✅ BINARY SEARCH COMPLETE:', {
-    activeId: activeId.substring(0, 8),
-    targetFrame,
-    originalPos,
-    snappedTo: best,
-    snapDelta: best - targetFrame,
-    iterations
-  });
 
   return best;
 };
@@ -673,26 +479,6 @@ export const getTimelineDimensions = (framePositions: Map<string, number>) => {
   // NO LEFT-SIDE PADDING - timeline starts exactly at the first image position (or 0)
   const fullMin = Math.min(0, staticMin);
   const fullRange = Math.max(fullMax - fullMin, 1); // Ensure minimum range of 1 to avoid division by zero
-
-  // DEBUG: Log coordinate system calculation for position 0 visibility debugging
-  if (positions.includes(0)) {
-    console.log('[NoPaddingFix] 🎯 Timeline dimensions calculated with NO PADDING:', {
-      positions: positions.sort((a, b) => a - b),
-      staticMin,
-      staticMax,
-      fullMin,
-      fullMax,
-      fullRange,
-      noPadding: 'Timeline ends exactly at last image position',
-      position0PixelCalculation: {
-        framePosition: 0,
-        fullMinFrames: fullMin,
-        formula: `60 + ((0 - ${fullMin}) / ${fullRange}) * effectiveWidth`,
-        normalizedPosition: (0 - fullMin) / fullRange,
-        shouldBeAtStart: fullMin === 0 && staticMin === 0
-      }
-    });
-  }
 
   return { fullMin, fullMax, fullRange };
 };
