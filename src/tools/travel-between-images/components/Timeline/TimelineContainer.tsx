@@ -125,13 +125,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   autoCreateIndividualPrompts,
   hasNoImages = false
 }) => {
-  // TOP-LEVEL PAIR PROMPTS DEBUG
-  console.error('[PAIR_PROMPTS_DATA] pairPromptsExists:', !!pairPrompts);
-  console.error('[PAIR_PROMPTS_DATA] pairPromptsKeys:', pairPrompts ? Object.keys(pairPrompts) : 'NONE');
-  console.error('[PAIR_PROMPTS_DATA] pairPromptsCount:', pairPrompts ? Object.keys(pairPrompts).length : 0);
-  console.error('[PAIR_PROMPTS_DATA] firstPrompt:', pairPrompts?.[0]);
-  console.error('[PAIR_PROMPTS_DATA] allPrompts:', pairPrompts);
-  
   // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(50);
   const maxGap = Math.max(1, 81 - contextFrames);
@@ -225,12 +218,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
   // Tap-to-move hook (for tablets only)
   const handleTapToMoveAction = React.useCallback(async (imageId: string, targetFrame: number) => {
-    console.log('[TapToMove] Moving item:', {
-      imageId: imageId.substring(0, 8),
-      targetFrame,
-      currentFrame: framePositions.get(imageId)
-    });
-    
     // Create new positions map with the moved item at target position
     const intermediatePositions = new Map(framePositions);
     intermediatePositions.set(imageId, targetFrame);
@@ -247,20 +234,11 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       fullMax
     );
     
-    console.log('[TapToMove] Final positions after fluid timeline:', {
-      imageId: imageId.substring(0, 8),
-      targetFrame,
-      finalFrame: finalPositions.get(imageId),
-      totalItems: finalPositions.size
-    });
-    
     // Update positions via setFramePositions which handles database update
     // NOTE: We do NOT call onImageReorder because it would trigger the disabled
     // useUpdateShotImageOrder hook. setFramePositions already updates the database
     // via updateTimelineFrame in the position management system.
     await setFramePositions(finalPositions);
-    
-    console.log('[TapToMove] Position update completed');
   }, [framePositions, setFramePositions, contextFrames, fullMin, fullMax]);
   
   const tapToMove = useTapToMove({
@@ -303,7 +281,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     
     if (!scrollContainer || !timelineContainer) {
       // Fallback to fullMin if refs not available
-      console.log('[ZoomFix] No refs available, falling back to fullMin');
       handleZoomIn(fullMin);
       return;
     }
@@ -320,17 +297,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     const viewportCenterFraction = scrollWidth > 0 ? viewportCenterPixel / scrollWidth : 0;
     const viewportCenterFrame = fullMin + (viewportCenterFraction * fullRange);
     
-    console.log('[ZoomFix] Zoom In - preserving viewport center:', {
-      scrollLeft,
-      scrollWidth,
-      viewportWidth,
-      viewportCenterPixel,
-      viewportCenterFraction: viewportCenterFraction.toFixed(3),
-      viewportCenterFrame: viewportCenterFrame.toFixed(1),
-      fullMin,
-      fullRange
-    });
-    
     // Zoom anchored to the current viewport center
     handleZoomIn(viewportCenterFrame);
   };
@@ -342,7 +308,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     
     if (!scrollContainer || !timelineContainer) {
       // Fallback to fullMin if refs not available
-      console.log('[ZoomFix] No refs available, falling back to fullMin');
       handleZoomOut(fullMin);
       return;
     }
@@ -358,17 +323,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     // Convert pixel position to frame position
     const viewportCenterFraction = scrollWidth > 0 ? viewportCenterPixel / scrollWidth : 0;
     const viewportCenterFrame = fullMin + (viewportCenterFraction * fullRange);
-    
-    console.log('[ZoomFix] Zoom Out - preserving viewport center:', {
-      scrollLeft,
-      scrollWidth,
-      viewportWidth,
-      viewportCenterPixel,
-      viewportCenterFraction: viewportCenterFraction.toFixed(3),
-      viewportCenterFrame: viewportCenterFrame.toFixed(1),
-      fullMin,
-      fullRange
-    });
     
     // Zoom anchored to the current viewport center
     handleZoomOut(viewportCenterFrame);
@@ -699,7 +653,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             pathValue: structureVideoPath ? structureVideoPath.substring(0, 60) + '...' : null,
             willRender: shotId && projectId && onStructureVideoChange && !!structureVideoPath
           };
-          console.error('[StructureVideoDebug] 🎬 TimelineContainer render check:', conditionCheck);
           return null;
         })()}
         {shotId && projectId && onStructureVideoChange && (
@@ -722,7 +675,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               }}
               onMetadataExtracted={(metadata) => {
                 // Save extracted metadata back to database (backup when metadata wasn't saved initially)
-                console.log('[TimelineContainer] 💾 Saving extracted metadata back to database');
                 onStructureVideoChange(structureVideoPath, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
               }}
               fullMin={fullMin}
@@ -947,31 +899,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             const framePosition = currentPositions.get(image.shotImageEntryId) ?? idx * 50;
             const isDragging = dragState.isDragging && dragState.activeId === image.shotImageEntryId;
 
-            // [Position0Debug] Track position lookup failures for item 50bbb119
-            if (image.shotImageEntryId.startsWith('50bbb119')) {
-              console.log(`[Position0Debug] 🔍 Position lookup for item 50bbb119:`, {
-                shotImageEntryId: image.shotImageEntryId,
-                framePosition,
-                fromCurrentPositions: currentPositions.has(image.shotImageEntryId),
-                currentPositionsValue: currentPositions.get(image.shotImageEntryId),
-                fallbackCalculation: !currentPositions.has(image.shotImageEntryId) ? `${idx} * 50 = ${idx * 50}` : null,
-                currentPositionsSize: currentPositions.size,
-                allCurrentPositionsKeys: Array.from(currentPositions.keys()).map(k => k.substring(0, 8))
-              });
-            }
-
-            // [Position0Debug] Only log position 0 items to reduce noise
-            if (framePosition === 0) {
-              console.log(`[Position0Debug] 🎬 POSITION 0 ITEM RENDERING:`, {
-                idx,
-                imageId: image.shotImageEntryId.substring(0, 8),
-                framePosition,
-                coordinateSystem: { fullMin, fullMax, fullRange },
-                fromCurrentPositions: currentPositions.has(image.shotImageEntryId),
-                currentPositionsValue: currentPositions.get(image.shotImageEntryId)
-              });
-            }
-
             return (
               <TimelineItem
                 key={image.shotImageEntryId}
@@ -983,12 +910,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 onMouseDown={readOnly ? undefined : (e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
                 onDoubleClick={isMobile && !isTablet ? undefined : () => handleDesktopDoubleClick(idx)}
                 onMobileTap={isMobile ? () => {
-                  console.log('[DoubleTapFlow] 📲 TimelineContainer handleMobileTap called:', {
-                    itemId: image.shotImageEntryId.substring(0, 8),
-                    index: idx,
-                    isMobile,
-                    isTablet
-                  });
                   handleMobileTap(idx);
                 } : undefined}
                 zoomLevel={zoomLevel}
