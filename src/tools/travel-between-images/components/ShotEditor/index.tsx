@@ -37,7 +37,6 @@ import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
 import { getDimensions, DEFAULT_RESOLUTION } from './utils/dimension-utils';
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
-import { supabase } from '@/integrations/supabase/client';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
 import { useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';

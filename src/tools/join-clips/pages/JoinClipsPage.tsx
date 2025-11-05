@@ -5,6 +5,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
 import { Upload, Film, X, Play } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +50,7 @@ const JoinClipsPage: React.FC = () => {
   const [startingVideo, setStartingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [endingVideo, setEndingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
   const [prompt, setPrompt] = useState('');
+  const [negativePrompt, setNegativePrompt] = useState('');
   const [isUploadingStarting, setIsUploadingStarting] = useState(false);
   const [isUploadingEnding, setIsUploadingEnding] = useState(false);
   
@@ -63,6 +65,7 @@ const JoinClipsPage: React.FC = () => {
   // Local state for generation parameters
   const [contextFrameCount, setContextFrameCount] = useState(10);
   const [gapFrameCount, setGapFrameCount] = useState(33);
+  const [replaceMode, setReplaceMode] = useState(true);
   
   const startingVideoInputRef = useRef<HTMLInputElement>(null);
   const endingVideoInputRef = useRef<HTMLInputElement>(null);
@@ -182,8 +185,14 @@ const JoinClipsPage: React.FC = () => {
     if (settings?.gapFrameCount !== undefined) {
       setGapFrameCount(settings.gapFrameCount);
     }
+    if (settings?.replaceMode !== undefined) {
+      setReplaceMode(settings.replaceMode);
+    }
     if (settings?.prompt !== undefined) {
       setPrompt(settings.prompt);
+    }
+    if (settings?.negativePrompt !== undefined) {
+      setNegativePrompt(settings.negativePrompt);
     }
   }, [settings]);
   
@@ -532,6 +541,7 @@ const JoinClipsPage: React.FC = () => {
         prompt: prompt,
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
+        replace_mode: replaceMode,
         model: settings?.model || 'lightning_baseline_2_2_2',
         num_inference_steps: settings?.numInferenceSteps || 6,
         guidance_scale: settings?.guidanceScale || 3.0,
@@ -749,6 +759,24 @@ const JoinClipsPage: React.FC = () => {
                 }}
               />
               <p className="text-xs text-muted-foreground text-center">to generate</p>
+              
+              {/* Replace Mode Toggle */}
+              <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                <Label htmlFor="replaceMode" className="text-xs text-center flex-1">
+                  Replace Frames
+                </Label>
+                <Switch
+                  id="replaceMode"
+                  checked={!replaceMode}
+                  onCheckedChange={(checked) => {
+                    setReplaceMode(!checked);
+                    updateSettings('project', { ...settings, replaceMode: !checked });
+                  }}
+                />
+                <Label htmlFor="replaceMode" className="text-xs text-center flex-1">
+                  Generate New
+                </Label>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="contextFrameCount" className="text-sm">
@@ -903,81 +931,119 @@ const JoinClipsPage: React.FC = () => {
         </div>
 
         {/* Frame Controls - Mobile Only (shown below videos) */}
-        <div className="md:hidden grid grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="gapFrameCountMobile" className="text-sm">
-                Gap Frames
-              </Label>
-              <span className="text-sm font-medium">{gapFrameCount}</span>
+        <div className="md:hidden space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="gapFrameCountMobile" className="text-sm">
+                  Gap Frames
+                </Label>
+                <span className="text-sm font-medium">{gapFrameCount}</span>
+              </div>
+              <Slider
+                id="gapFrameCountMobile"
+                min={1}
+                max={Math.max(1, 81 - (contextFrameCount * 2))}
+                step={1}
+                value={[Math.max(1, gapFrameCount)]}
+                onValueChange={(values) => {
+                  const val = Math.max(1, values[0]);
+                  setGapFrameCount(val);
+                  updateSettings('project', { ...settings, gapFrameCount: val });
+                }}
+              />
+              <p className="text-xs text-muted-foreground text-center">to generate</p>
             </div>
-            <Slider
-              id="gapFrameCountMobile"
-              min={1}
-              max={Math.max(1, 81 - (contextFrameCount * 2))}
-              step={1}
-              value={[Math.max(1, gapFrameCount)]}
-              onValueChange={(values) => {
-                const val = Math.max(1, values[0]);
-                setGapFrameCount(val);
-                updateSettings('project', { ...settings, gapFrameCount: val });
-              }}
-            />
-            <p className="text-xs text-muted-foreground text-center">to generate</p>
+            <div className="space-y-2">
+              <Label htmlFor="contextFrameCountMobile" className="text-sm">
+                Context Frames
+              </Label>
+              <Input
+                id="contextFrameCountMobile"
+                type="number"
+                min={1}
+                max={30}
+                value={contextFrameCount}
+                onChange={(e) => {
+                  const val = Math.max(1, parseInt(e.target.value) || 1);
+                  if (!isNaN(val) && val > 0) {
+                    setContextFrameCount(val);
+                    // Ensure gap frames doesn't exceed limit
+                    const maxGap = Math.max(1, 81 - (val * 2));
+                    const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
+                    if (gapFrameCount > maxGap) {
+                      setGapFrameCount(maxGap);
+                    }
+                    
+                    // Debounce settings update to prevent glitchiness
+                    if (contextFramesTimerRef.current) {
+                      clearTimeout(contextFramesTimerRef.current);
+                    }
+                    contextFramesTimerRef.current = setTimeout(() => {
+                      updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
+                    }, 300);
+                  }
+                }}
+                className="text-center"
+              />
+              <p className="text-xs text-muted-foreground text-center">from each clip</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="contextFrameCountMobile" className="text-sm">
-              Context Frames
+          
+          {/* Replace Mode Toggle - Mobile */}
+          <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
+            <Label htmlFor="replaceModeMobile" className="text-sm text-center flex-1">
+              Replace Frames
             </Label>
-            <Input
-              id="contextFrameCountMobile"
-              type="number"
-              min={1}
-              max={30}
-              value={contextFrameCount}
-              onChange={(e) => {
-                const val = Math.max(1, parseInt(e.target.value) || 1);
-                if (!isNaN(val) && val > 0) {
-                  setContextFrameCount(val);
-                  // Ensure gap frames doesn't exceed limit
-                  const maxGap = Math.max(1, 81 - (val * 2));
-                  const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                  if (gapFrameCount > maxGap) {
-                    setGapFrameCount(maxGap);
-                  }
-                  
-                  // Debounce settings update to prevent glitchiness
-                  if (contextFramesTimerRef.current) {
-                    clearTimeout(contextFramesTimerRef.current);
-                  }
-                  contextFramesTimerRef.current = setTimeout(() => {
-                    updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
-                  }, 300);
-                }
+            <Switch
+              id="replaceModeMobile"
+              checked={!replaceMode}
+              onCheckedChange={(checked) => {
+                setReplaceMode(!checked);
+                updateSettings('project', { ...settings, replaceMode: !checked });
               }}
-              className="text-center"
             />
-            <p className="text-xs text-muted-foreground text-center">from each clip</p>
+            <Label htmlFor="replaceModeMobile" className="text-sm text-center flex-1">
+              Generate New
+            </Label>
           </div>
         </div>
 
         {/* Prompt and LoRA Section - Side by Side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Prompt Section */}
-          <div className="space-y-2">
-            <Label htmlFor="prompt">Transition Prompt (Optional)</Label>
-            <Textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => {
-                const newPrompt = e.target.value;
-                setPrompt(newPrompt);
-                updateSettings('project', { ...settings, prompt: newPrompt });
-              }}
-              placeholder="Describe the transition between clips (optional)"
-              rows={2}
-              className="resize-none"
-            />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="prompt">Transition Prompt (Optional)</Label>
+              <Textarea
+                id="prompt"
+                value={prompt}
+                onChange={(e) => {
+                  const newPrompt = e.target.value;
+                  setPrompt(newPrompt);
+                  updateSettings('project', { ...settings, prompt: newPrompt });
+                }}
+                placeholder="Describe the transition between clips (optional)"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="negativePrompt">Negative Prompt</Label>
+              <Textarea
+                id="negativePrompt"
+                value={negativePrompt}
+                onChange={(e) => {
+                  const newNegativePrompt = e.target.value;
+                  setNegativePrompt(newNegativePrompt);
+                  updateSettings('project', { ...settings, negativePrompt: newNegativePrompt });
+                }}
+                placeholder="Describe what to avoid in the transition (optional)"
+                rows={2}
+                className="resize-none"
+              />
+            </div>
           </div>
 
           {/* LoRA Section */}

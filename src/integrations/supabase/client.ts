@@ -15,70 +15,83 @@ import { maybeAutoLogin } from '@/integrations/supabase/dev/autoLogin';
 // Install window-only instrumentation BEFORE any client creation
 installWindowOnlyInstrumentation();
 
-let supabase: ReturnType<typeof createClient<Database>>;
-
-try {
-  supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-    realtime: {
-      params: { eventsPerSecond: 10 },
-      heartbeatIntervalMs: 30000,
-      reconnectAfterMs: (tries: number) => Math.min(tries * 1000, 10000),
-    },
-    global: {
-      fetch: (url: string, options: RequestInit = {}) => {
-        const isEdgeFunction = url.includes('/functions/v1/');
-        const isStorageUpload = url.includes('/storage/v1/object/');
-        const isAuthRequest = url.includes('/auth/v1/');
-        const isRestRequest = url.includes('/rest/v1/');
-        if (!isEdgeFunction && !isStorageUpload) {
-          return fetch(url, options);
-        }
-        const controller = new AbortController();
-        const timeoutMs = isEdgeFunction ? 60000 : 30000;
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-        let composedSignal = controller.signal;
-        if ((options as any).signal && 'signal' in options && (options as any).signal instanceof AbortSignal) {
-          const existingSignal = (options as any).signal as AbortSignal;
-          const composedController = new AbortController();
-          const onAbort = () => composedController.abort();
-          controller.signal.addEventListener('abort', onAbort);
-          existingSignal.addEventListener('abort', onAbort);
-          composedSignal = composedController.signal;
-        }
-        return fetch(url, { ...options, signal: composedSignal }).finally(() => clearTimeout(timeoutId));
-      },
-    },
-    db: { schema: 'public' },
-  });
-} catch (error: any) {
-  console.error('Supabase client creation failed:', error);
-  throw error;
-}
-
-// Expose client globally for diagnostics
-try {
-  if (typeof window !== 'undefined') {
-    (window as any).supabase = supabase;
+// Singleton pattern to prevent HMR-related duplicate declarations
+// Store the client on window to avoid redeclaration errors during HMR
+const getOrCreateSupabaseClient = (): ReturnType<typeof createClient<Database>> => {
+  // Check if we already have a client from a previous module execution
+  if (typeof window !== 'undefined' && (window as any).__supabase_client__) {
+    console.log('[Supabase] Reusing existing client from window (HMR reload detected)');
+    return (window as any).__supabase_client__;
   }
-} catch {}
 
-// Initialize centralized reconnect scheduler
-getReconnectScheduler();
+  console.log('[Supabase] Creating new client');
+  
+  let client: ReturnType<typeof createClient<Database>>;
+  
+  try {
+    client = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      realtime: {
+        params: { eventsPerSecond: 10 },
+        heartbeatIntervalMs: 30000,
+        reconnectAfterMs: (tries: number) => Math.min(tries * 1000, 10000),
+      },
+      global: {
+        fetch: (url: string, options: RequestInit = {}) => {
+          const isEdgeFunction = url.includes('/functions/v1/');
+          const isStorageUpload = url.includes('/storage/v1/object/');
+          const isAuthRequest = url.includes('/auth/v1/');
+          const isRestRequest = url.includes('/rest/v1/');
+          if (!isEdgeFunction && !isStorageUpload) {
+            return fetch(url, options);
+          }
+          const controller = new AbortController();
+          const timeoutMs = isEdgeFunction ? 60000 : 30000;
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+          let composedSignal = controller.signal;
+          if ((options as any).signal && 'signal' in options && (options as any).signal instanceof AbortSignal) {
+            const existingSignal = (options as any).signal as AbortSignal;
+            const composedController = new AbortController();
+            const onAbort = () => composedController.abort();
+            controller.signal.addEventListener('abort', onAbort);
+            existingSignal.addEventListener('abort', onAbort);
+            composedSignal = composedController.signal;
+          }
+          return fetch(url, { ...options, signal: composedSignal }).finally(() => clearTimeout(timeoutId));
+        },
+      },
+      db: { schema: 'public' },
+    });
+  } catch (error: any) {
+    console.error('Supabase client creation failed:', error);
+    throw error;
+  }
 
-// Initialize centralized auth state manager
-initAuthStateManager(supabase);
+  // Store on window to reuse on HMR and for diagnostics
+  if (typeof window !== 'undefined') {
+    (window as any).__supabase_client__ = client;
+    (window as any).supabase = client;
+  }
 
-// Install realtime instrumentation after client creation
-installRealtimeInstrumentation(supabase);
+  // Initialize centralized reconnect scheduler
+  getReconnectScheduler();
 
-// Dev auto-login
-maybeAutoLogin(supabase);
+  // Initialize centralized auth state manager
+  initAuthStateManager(client);
 
-export { supabase };
+  // Install realtime instrumentation after client creation
+  installRealtimeInstrumentation(client);
 
+  // Dev auto-login
+  maybeAutoLogin(client);
 
+  return client;
+};
+
+// Export the client directly from the function call
+// This avoids top-level variable declarations that cause HMR issues
+export const supabase = getOrCreateSupabaseClient();

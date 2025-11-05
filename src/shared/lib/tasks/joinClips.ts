@@ -18,6 +18,7 @@ export interface JoinClipsTaskParams {
   // Optional parameters with defaults
   context_frame_count?: number;
   gap_frame_count?: number;
+  replace_mode?: boolean; // Replace frames (true) or generate new frames (false)
   model?: string;
   num_inference_steps?: number;
   guidance_scale?: number;
@@ -35,6 +36,7 @@ export interface JoinClipsTaskParams {
 const DEFAULT_JOIN_CLIPS_VALUES = {
   context_frame_count: 8,
   gap_frame_count: 53,
+  replace_mode: true,
   model: 'lightning_baseline_2_2_2',
   num_inference_steps: 6,
   guidance_scale: 3.0,
@@ -90,6 +92,7 @@ function buildJoinClipsPayload(
     prompt: params.prompt,
     context_frame_count: params.context_frame_count ?? DEFAULT_JOIN_CLIPS_VALUES.context_frame_count,
     gap_frame_count: params.gap_frame_count ?? DEFAULT_JOIN_CLIPS_VALUES.gap_frame_count,
+    replace_mode: params.replace_mode ?? DEFAULT_JOIN_CLIPS_VALUES.replace_mode,
     model: params.model ?? DEFAULT_JOIN_CLIPS_VALUES.model,
     num_inference_steps: params.num_inference_steps ?? DEFAULT_JOIN_CLIPS_VALUES.num_inference_steps,
     guidance_scale: params.guidance_scale ?? DEFAULT_JOIN_CLIPS_VALUES.guidance_scale,

@@ -5,6 +5,7 @@ export const joinClipsSettings = {
   defaults: {
     contextFrameCount: 10,
     gapFrameCount: 33,
+    replaceMode: true, // Replace frames (true) or generate new frames (false)
     model: 'lightning_baseline_2_2_2' as const,
     numInferenceSteps: 6,
     guidanceScale: 3.0,

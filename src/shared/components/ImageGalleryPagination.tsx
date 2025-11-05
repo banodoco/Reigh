@@ -89,7 +89,7 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
   }, [isBottom]);
 
   // Don't render if conditions not met - AFTER all hooks
-  if (totalPages <= 1 || reducedSpacing || hidePagination) {
+  if (totalPages <= 1 || hidePagination) {
     return null;
   }
 
