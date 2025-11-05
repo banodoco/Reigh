@@ -134,16 +134,6 @@ export const useTimelineDrag = ({
     const targetFrame = calculateTargetFrame(currentMousePosRef.current.x, containerRect);
     const finalPosition = calculateFinalPosition(targetFrame);
 
-    console.log('[FluidTimelineDebug] 🚀 CALCULATE DRAG PREVIEW - Starting preview calculation:', {
-      itemId: dragState.activeId.substring(0, 8),
-      targetFrame,
-      finalPosition,
-      originalPos: framePositions.get(dragState.activeId) ?? 0,
-      contextFrames,
-      coordinate_source: 'currentMousePosRef.current.x',
-      timestamp: new Date().toISOString()
-    });
-
     const newPositions = new Map(framePositions);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
 
@@ -396,133 +386,11 @@ export const useTimelineDrag = ({
       isBlocked: true
     });
 
-    console.log('[DragLifecycle] 📍 FINAL MOUSE POSITION CAPTURED:', {
-      itemId: dragState.activeId.substring(0, 8),
-      finalX: e.clientX,
-      finalY: e.clientY,
-      targetFrame: calculateTargetFrame(e.clientX, containerRect),
-      timestamp: new Date().toISOString()
-    });
-
-    console.log('[MouseUpDebug] 🖱️ MOUSE UP - Calculating final drop position:', {
-      e_clientX: e.clientX,
-      dragState_currentX: dragState.currentX,
-      dragState_startX: dragState.startX,
-      dragState_originalFramePos: dragState.originalFramePos,
-      timestamp: e.timeStamp,
-      coordinate_mismatch: e.clientX !== dragState.currentX ? 'MISMATCH!' : 'MATCH'
-    });
-
     // Calculate final positions using the last known drag position (for consistency)
     const finalTargetFrame = calculateTargetFrame(currentMousePosRef.current?.x ?? e.clientX, containerRect);
-    console.log('[MouseUpDebug] 📊 FINAL TARGET FRAME CALCULATION:', {
-      e_clientX: e.clientX,
-      finalTargetFrame,
-      dragState_currentX: dragState.currentX,
-      dragState_startX: dragState.startX,
-      expectedDelta: e.clientX - dragState.startX,
-      usedDelta: dragState.currentX - dragState.startX,
-      coordinate_source: 'dragState.currentX (for consistency)'
-    });
 
     const finalPositions = calculateDragPreviewWithPosition(currentMousePosRef.current?.x ?? e.clientX);
     const finalPos = finalPositions.get(dragState.activeId) ?? dragState.originalFramePos;
-    const finalDeltaX = dragState.currentX - dragState.startX;
-    const finalFrameDelta = finalPos - dragState.originalFramePos;
-
-    console.log('[MouseUpDebug] 📋 FINAL POSITIONS CALCULATED:', {
-      finalTargetFrame,
-      finalPos,
-      finalDeltaX,
-      finalFrameDelta,
-      positionsCount: finalPositions.size,
-      timestamp: new Date().toISOString()
-    });
-
-    // COMPREHENSIVE FINAL DROP ANALYSIS - All info in one place
-    console.log('[FINAL_DROP_ANALYSIS] 🎯 FINAL DROP OPERATION SUMMARY:', {
-      // Item Movement
-      itemId: dragState.activeId.substring(0, 8),
-      originalPos: dragState.originalFramePos,
-      finalPos,
-      frameDelta: finalFrameDelta,
-      positionChanged: finalPos !== dragState.originalFramePos,
-
-      // Mouse Position at Drop
-      mouse: {
-        dropX: e.clientX,
-        dropY: e.clientY,
-        usedX: dragState.currentX, // Used for calculation consistency
-        startX: dragState.startX,
-        startY: dragState.startY,
-        totalDeltaX: finalDeltaX,
-        totalDeltaY: e.clientY - dragState.startY,
-        coordinate_source: 'dragState.currentX (consistent with drag preview)'
-      },
-
-      // Drag State at Completion
-      dragState: {
-        isDragging: dragState.isDragging,
-        activeId: dragState.activeId?.substring(0, 8),
-        startX: dragState.startX,
-        currentX: dragState.currentX,
-        originalFramePos: dragState.originalFramePos
-      },
-
-      // Frame Calculations
-      calculations: {
-        finalTargetFrame,
-        finalPos,
-        maxSingleMove: 50,
-        contextFrames,
-        maxGap: calculateMaxGap(contextFrames)
-      },
-
-      // Position Analysis
-      positions: {
-        before: Array.from(framePositions.entries()).map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          pos
-        })),
-        after: Array.from(finalPositions.entries()).map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          pos
-        })),
-        changes: Array.from(finalPositions.entries())
-          .filter(([id, pos]) => pos !== (framePositions.get(id) ?? 0))
-          .map(([id, pos]) => ({
-            id: id.substring(0, 8),
-            oldPos: framePositions.get(id) ?? 0,
-            newPos: pos,
-            delta: pos - (framePositions.get(id) ?? 0)
-          }))
-      },
-
-      // Context and Limits
-      limits: {
-        contextFrames,
-        maxGap: calculateMaxGap(contextFrames),
-        fullMin,
-        fullRange,
-        containerWidth: 1000
-      },
-
-      // Timing
-      timestamp: e.timeStamp,
-      timestampISO: new Date().toISOString()
-    });
-
-    console.log('[DragLifecycle] 📊 DRAG COMPLETION - Calculating final positions:', {
-      itemId: dragState.activeId.substring(0, 8),
-      originalPos: dragState.originalFramePos,
-      finalPos,
-      positionChanged: finalPos !== dragState.originalFramePos,
-      allPositions: Array.from(finalPositions.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-      timestamp: new Date().toISOString()
-    });
 
     log('TimelineDragDebug', 'end', {
       id: dragState.activeId,
@@ -532,50 +400,12 @@ export const useTimelineDrag = ({
 
     // Apply final positions immediately to avoid any momentary fallback to database positions
     (async () => {
-      console.log('[TimelineDragFix] 🚀 SETFRAMEPOSITIONS CALL IMMINENT - About to call setFramePositions:', {
-        itemId: dragState.activeId.substring(0, 8),
-        positionsCount: finalPositions.size,
-        positionsToApply: Array.from(finalPositions.entries()).map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          pos
-        })),
-        originalPositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          pos
-        })),
-        positionChanges: Array.from(finalPositions.entries())
-          .filter(([id, newPos]) => (framePositions.get(id) ?? 0) !== newPos)
-          .map(([id, newPos]) => ({
-            id: id.substring(0, 8),
-            oldPos: framePositions.get(id) ?? 0,
-            newPos,
-            delta: newPos - (framePositions.get(id) ?? 0)
-          })),
-        timestamp: new Date().toISOString(),
-        setFramePositionsFunction: typeof setFramePositions
-      });
-
       try {
         await setFramePositions(finalPositions);
 
-        console.log('[TimelineDragFix] ✅ SETFRAMEPOSITIONS CALL COMPLETED SUCCESSFULLY:', {
-          itemId: dragState.activeId.substring(0, 8),
-          finalPositionsCount: finalPositions.size,
-          timestamp: new Date().toISOString()
-        });
-
-        console.log('[TimelineDragFix] ✅ POSITIONS APPLIED - SKIPPING image order update during drag:', {
-          itemId: dragState.activeId.substring(0, 8),
-          finalPos,
-          timestamp: new Date().toISOString(),
-          reason: 'Timeline drag already set timeline_frame values - order update would overwrite them'
-        });
-
-        // 🎯 DRAG TRACKING: Log every drag completion
-        console.log(`[TimelineDragFlow] [DRAG_COMPLETE] ✅ Session: ${dragState.dragSessionId || 'unknown'} | Item ${dragState.activeId.substring(0, 8)} drag completed: ${dragState.originalFramePos} → ${finalPos}`);
         (window as any).__CURRENT_DRAG_SESSION__ = null;
         
-        // 🎯 DEBUG: Log all position changes to identify wrong item movements
+        // 🚨 CONFLICT DETECTION: Check for duplicate final positions
         const allChanges = Array.from(finalPositions.entries())
           .filter(([id, newPos]) => (framePositions.get(id) ?? 0) !== newPos)
           .map(([id, newPos]) => ({
@@ -586,9 +416,6 @@ export const useTimelineDrag = ({
           }));
         
         if (allChanges.length > 1) {
-          console.log(`[TimelineDragFlow] [MULTI_ITEM_MOVE] ⚠️ Session: ${dragState.dragSessionId || 'unknown'} | Multiple items moving in single drag:`, allChanges);
-          
-          // 🚨 CONFLICT DETECTION: Check for duplicate final positions
           const finalPositionCounts = new Map<number, string[]>();
           for (const change of allChanges) {
             if (!finalPositionCounts.has(change.newPos)) {
@@ -605,13 +432,6 @@ export const useTimelineDrag = ({
               finalConflicts.map(([pos, ids]) => `Frame ${pos}: [${ids.join(', ')}]`));
           }
         }
-        
-        console.log('[DragLifecycle] 🎉 DRAG COMPLETE - All updates finished:', {
-          itemId: dragState.activeId.substring(0, 8),
-          finalPos,
-          positionsUpdated: finalPositions.size,
-          timestamp: new Date().toISOString()
-        });
         
         log('TimelineDragDebug', 'drag_complete', {
           id: dragState.activeId,
@@ -749,7 +569,6 @@ export const useTimelineDrag = ({
 
     // CRITICAL: Reset drag in progress flag after applying positions to prevent flicker
     if (setIsDragInProgress) {
-      console.log('[TimelineMovementDebug] 🏁 DRAG ENDED - Setting isDragInProgress = false');
       setIsDragInProgress(false);
     }
 
@@ -789,42 +608,6 @@ export const useTimelineDrag = ({
     ? calculateFinalPosition(calculateTargetFrame(dragState.currentX, containerRect))
     : null;
 
-  // GROUND TRUTH COORDINATE ANALYSIS
-  if (dragState.isDragging && dragState.activeId) {
-    const rawOffsetX = dragState.currentX - dragState.startX;
-    const frameBasedOffset_actual = currentDragFrame !== null ?
-      ((currentDragFrame - dragState.originalFramePos) / fullRange) * (containerRect?.width || 1000) : 0;
-
-    console.log('[GroundTruthAnalysis] 🎯 DOM-BASED COORDINATE SYSTEM:', {
-      itemId: dragState.activeId.substring(0, 8),
-
-      // Mouse movement
-      mouseDelta: rawOffsetX,
-      currentX: dragState.currentX,
-      startX: dragState.startX,
-
-      // Frame calculations with actual container width
-      currentFrame: currentDragFrame,
-      originalFrame: dragState.originalFramePos,
-      frameDelta: currentDragFrame ? currentDragFrame - dragState.originalFramePos : 0,
-
-      // DOM-based calculations
-      containerWidth: containerRect?.width || 1000,
-      frameBasedOffset_dom: frameBasedOffset_actual,
-      syncDifference_dom: rawOffsetX - frameBasedOffset_actual,
-
-      // Analysis
-      coordinate_systems: {
-        approach: 'DOM_GROUND_TRUTH',
-        mouse_space: 'clientX_coordinates',
-        calculation_space: 'actual_container_dimensions',
-        visual_space: 'getBoundingClientRect',
-        consistency_check: Math.abs(rawOffsetX - frameBasedOffset_actual) < 5 ? 'GOOD' : 'MISMATCH'
-      },
-
-      timestamp: new Date().toISOString()
-    });
-  }
 
   const swapTargetId = currentDragFrame !== null && dragState.activeId
     ? [...framePositions.entries()].find(
