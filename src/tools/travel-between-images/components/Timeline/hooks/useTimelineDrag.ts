@@ -233,28 +233,10 @@ export const useTimelineDrag = ({
   ]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, imageId: string, containerRef: React.RefObject<HTMLDivElement>) => {
-    // [NonDraggableDebug] Log EVERY mousedown attempt to track non-draggable items
-    console.log('[NonDraggableDebug] 🖱️ MOUSEDOWN EVENT RECEIVED:', {
-      itemId: imageId.substring(0, 8),
-      eventType: e.type,
-      buttons: e.buttons,
-      button: e.button,
-      clientX: e.clientX,
-      clientY: e.clientY,
-      target: (e.target as HTMLElement)?.tagName,
-      currentTarget: (e.currentTarget as HTMLElement)?.tagName,
-      timestamp: Date.now()
-    });
-
     // Don't preventDefault immediately - allow double-click to work
     // We'll prevent text selection via CSS user-select: none instead
     const container = containerRef.current;
     if (!container) {
-      console.log('[NonDraggableDebug] ❌ NO CONTAINER REF:', {
-        itemId: imageId.substring(0, 8),
-        containerRefExists: !!containerRef,
-        containerRefCurrent: !!containerRef.current
-      });
       return;
     }
 
@@ -269,27 +251,6 @@ export const useTimelineDrag = ({
     // 🎯 DRAG TRACKING: Log every drag start with common identifier
     const dragSessionId = `drag_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     (window as any).__CURRENT_DRAG_SESSION__ = dragSessionId;
-    console.log(`[TimelineDragFlow] [DRAG_START] 🖱️ Session: ${dragSessionId} | Item ${imageId.substring(0, 8)} drag initiated at frame ${framePositions.get(imageId) ?? 0}`);
-    
-    console.log('[TimelineDragFix] 🎯 DRAG START DETECTED:', {
-      itemId: imageId.substring(0, 8),
-      buttons: e.buttons,
-      isDragging: dragState.isDragging,
-      timeSinceLastUp,
-      timestamp: e.timeStamp,
-      isBlocked: dragRefsRef.current.isBlocked,
-      clientX: e.clientX,
-      clientY: e.clientY,
-      framePosition: framePositions.get(imageId) ?? 0,
-      contextFrames,
-      maxGap: calculateMaxGap(contextFrames),
-      framePositionsCount: framePositions.size,
-      framePositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-      willStartDrag: e.buttons === 1 && !dragState.isDragging && !dragRefsRef.current.isBlocked && timeSinceLastUp >= 50
-    });
 
     log('TimelineDragDebug', 'mousedown', {
       id: imageId,
@@ -301,32 +262,6 @@ export const useTimelineDrag = ({
     });
 
     if (e.buttons !== 1 || dragState.isDragging || dragRefsRef.current.isBlocked || timeSinceLastUp < 50) {
-      console.log('[NonDraggableDebug] ❌ DRAG BLOCKED - Conditions not met:', {
-        itemId: imageId.substring(0, 8),
-        reasons: {
-          wrongButton: e.buttons !== 1,
-          alreadyDragging: dragState.isDragging,
-          isBlocked: dragRefsRef.current.isBlocked,
-          tooSoon: timeSinceLastUp < 50
-        },
-        details: {
-          buttons: e.buttons,
-          isDragging: dragState.isDragging,
-          isBlocked: dragRefsRef.current.isBlocked,
-          timeSinceLastUp,
-          lastMouseUpTime: dragRefsRef.current.lastMouseUpTime
-        }
-      });
-      console.log('[DragLifecycle] ❌ DRAG BLOCKED - Drag not allowed:', {
-        itemId: imageId.substring(0, 8),
-        buttons: e.buttons,
-        isDragging: dragState.isDragging,
-        isBlocked: dragRefsRef.current.isBlocked,
-        timeSinceLastUp,
-        reason: e.buttons !== 1 ? 'wrong_button' :
-                dragState.isDragging ? 'already_dragging' :
-                dragRefsRef.current.isBlocked ? 'blocked' : 'too_soon_after_last_drag (50ms)'
-      });
 
       log('TimelineDragDebug', 'mousedown_blocked', {
         id: imageId,
@@ -349,60 +284,8 @@ export const useTimelineDrag = ({
     const prevItem = currentIndex > 0 ? sortedPositions[currentIndex - 1] : null;
     const nextItem = currentIndex < sortedPositions.length - 1 ? sortedPositions[currentIndex + 1] : null;
 
-    // COMPREHENSIVE DRAG START ANALYSIS - All info in one place
-    console.log('[DRAG_START_ANALYSIS] 🎯 DRAG SESSION INITIALIZATION:', {
-      // Item Info
-      itemId: imageId.substring(0, 8),
-      originalFramePos: framePos,
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-
-      // Adjacent Items Analysis
-      adjacentItems: {
-        prev: prevItem ? {
-          id: prevItem[0].substring(0, 8),
-          pos: prevItem[1],
-          gap: framePos - prevItem[1]
-        } : null,
-        next: nextItem ? {
-          id: nextItem[0].substring(0, 8),
-          pos: nextItem[1],
-          gap: nextItem[1] - framePos
-        } : null
-      },
-
-      // Initial State
-      initialDragState: {
-        isDragging: true,
-        activeId: imageId.substring(0, 8),
-        startX: e.clientX,
-        startY: e.clientY,
-        currentX: e.clientX,
-        currentY: e.clientY,
-        originalFramePos: framePos
-      },
-
-      // Context and Limits
-      contextFrames,
-      maxGap: calculateMaxGap(contextFrames),
-      fullMin,
-      fullRange,
-      containerWidth: 1000,
-
-      // Timeline Overview
-      timelineItems: Array.from(framePositions.entries()).map(([id, pos]) => ({
-        id: id.substring(0, 8),
-        pos
-      })),
-
-      // Timing
-      timestamp: e.timeStamp,
-      timestampISO: new Date().toISOString()
-    });
-
     // CRITICAL: Set drag in progress flag to prevent query invalidation reloads
     if (setIsDragInProgress) {
-      console.log('[TimelineMovementDebug] 🚀 DRAG STARTED - Setting isDragInProgress = true to prevent query reloads');
       setIsDragInProgress(true);
     }
 
@@ -436,22 +319,10 @@ export const useTimelineDrag = ({
     if (!dragState.hasMovedPastThreshold) {
       if (distance < DRAG_THRESHOLD) {
         // Haven't moved far enough yet, don't process this as a drag
-        console.log('[DragThreshold] 🚫 Mouse moved but below threshold:', {
-          distance: distance.toFixed(2),
-          threshold: DRAG_THRESHOLD,
-          deltaX: deltaX.toFixed(2),
-          deltaY: deltaY.toFixed(2)
-        });
         return;
       }
       
       // Crossed the threshold! Now we can start the actual drag
-      console.log('[DragThreshold] ✅ Drag threshold crossed:', {
-        distance: distance.toFixed(2),
-        threshold: DRAG_THRESHOLD,
-        itemId: dragState.activeId?.substring(0, 8)
-      });
-      
       setDragState(prev => ({
         ...prev,
         hasMovedPastThreshold: true,
@@ -470,82 +341,9 @@ export const useTimelineDrag = ({
     // Update the ref with the most current mouse position (instantly available)
     currentMousePosRef.current = { x: e.clientX, y: e.clientY };
 
-    console.log('[TimelineDragFix] 🖱️ MOUSE MOVE DURING DRAG:', {
-      itemId: dragState.activeId?.substring(0, 8),
-      clientX: e.clientX,
-      clientY: e.clientY,
-      currentX: e.clientX,
-      startX: dragState.startX,
-      deltaX: e.clientX - dragState.startX,
-      targetFrame: calculateTargetFrame(e.clientX, containerRect),
-      timestamp: e.timeStamp
-    });
-
-    // DOM-based debugging for mouse movement
-    if (containerRect) {
-      console.log('[GroundTruthMouseMove] 🖱️ DOM-BASED MOUSE TRACKING:', {
-        clientX: e.clientX,
-        containerLeft: containerRect.left,
-        relativeX: e.clientX - containerRect.left,
-        approach: 'DOM_GROUND_TRUTH',
-        timestamp: new Date().toISOString()
-      });
-    }
-
     if (dragState.activeId) {
       const targetFrame = calculateTargetFrame(e.clientX, containerRect);
       const finalPosition = calculateFinalPosition(targetFrame);
-      const deltaX = e.clientX - dragState.startX;
-      const frameDelta = finalPosition - dragState.originalFramePos;
-
-      // COMPREHENSIVE DRAG ANALYSIS - All info in one place
-      console.log('[DRAG_ANALYSIS] 🎯 DRAG OPERATION SUMMARY:', {
-        // Item Info
-        itemId: dragState.activeId.substring(0, 8),
-        originalPos: dragState.originalFramePos,
-        targetFrame,
-        finalPosition,
-        frameDelta,
-
-      // Mouse Position Data
-      mouse: {
-        currentX: e.clientX,
-        currentY: e.clientY,
-        refX: currentMousePosRef.current?.x ?? e.clientX,
-        startX: dragState.startX,
-        startY: dragState.startY,
-        deltaX,
-        deltaY: e.clientY - dragState.startY,
-        coordinate_source: 'currentMousePosRef.current.x (instantly available)'
-      },
-
-        // Drag State
-        dragState: {
-          isDragging: dragState.isDragging,
-          activeId: dragState.activeId?.substring(0, 8),
-          startX: dragState.startX,
-          currentX: dragState.currentX,
-          originalFramePos: dragState.originalFramePos
-        },
-
-        // Context
-        contextFrames,
-        maxGap: calculateMaxGap(contextFrames),
-        fullMin,
-        fullRange,
-
-        // Calculations
-        calculations: {
-          targetFrame,
-          finalPosition,
-          wouldSnap: targetFrame !== finalPosition,
-          snapAmount: finalPosition - targetFrame
-        },
-
-        // Timing
-        timestamp: e.timeStamp,
-        timestampISO: new Date().toISOString()
-      });
 
       log('TimelineDragDebug', 'move', {
         id: dragState.activeId,
@@ -557,38 +355,13 @@ export const useTimelineDrag = ({
   }, [dragState.isDragging, dragState.activeId, dragState.originalFramePos, dragState.startX, dragState.currentX, calculateTargetFrame, calculateFinalPosition, contextFrames, fullMin, fullRange]);
 
   const handleMouseUp = useCallback((e: MouseEvent, containerRef: React.RefObject<HTMLDivElement>) => {
-    console.log('[TimelineDragFix] 🎯 MOUSE UP CALLED:', {
-      isDragging: dragState.isDragging,
-      activeId: dragState.activeId,
-      hasMovedPastThreshold: dragState.hasMovedPastThreshold,
-      timestamp: e.timeStamp,
-      clientX: e.clientX,
-      clientY: e.clientY,
-      containerRef_exists: !!containerRef.current,
-      setFramePositionsAvailable: typeof setFramePositions === 'function'
-    });
-
     if (!dragState.isDragging || !dragState.activeId) {
-      console.log('[TimelineDragFix] ❌ MOUSE UP - No active drag or no active ID:', {
-        isDragging: dragState.isDragging,
-        activeId: dragState.activeId,
-        timestamp: e.timeStamp
-      });
       return;
     }
 
     // If we never crossed the drag threshold, this was just a click (or double-click)
     // Cancel the drag without applying any changes
     if (!dragState.hasMovedPastThreshold) {
-      console.log('[DragThreshold] 🎯 Mouse up before crossing threshold - treating as click, not drag:', {
-        itemId: dragState.activeId.substring(0, 8),
-        startX: dragState.startX,
-        startY: dragState.startY,
-        endX: e.clientX,
-        endY: e.clientY,
-        distance: Math.sqrt(Math.pow(e.clientX - dragState.startX, 2) + Math.pow(e.clientY - dragState.startY, 2)).toFixed(2)
-      });
-
       // Reset drag state without applying any changes
       setDragState({
         isDragging: false,
@@ -606,22 +379,11 @@ export const useTimelineDrag = ({
 
       // Reset drag in progress flag
       if (setIsDragInProgress) {
-        console.log('[TimelineMovementDebug] 🏁 DRAG CANCELLED (below threshold) - Setting isDragInProgress = false');
         setIsDragInProgress(false);
       }
 
       return;
     }
-
-    console.log('[TimelineMoveFlow] 🎯 MOUSE UP - Starting position update:', {
-      itemId: dragState.activeId.substring(0, 8),
-      originalPos: dragState.originalFramePos,
-      timestamp: e.timeStamp,
-      finalMouseX: e.clientX,
-      finalMouseY: e.clientY,
-      dragState_currentX: dragState.currentX,
-      dragState_startX: dragState.startX
-    });
 
     // Immediately block new drags to prevent cascading
     const now = Date.now();
