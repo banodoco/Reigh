@@ -46,29 +46,15 @@ export const useShotGenerations = (
       // Transform to match GenerationRow interface
       const items: GenerationRow[] = (data || [])
         .filter(sg => sg.generation)
-        .map(sg => {
-          // [MagicEditTaskDebug] Log magic edit generations from database
-          if (sg.generation?.type === 'image_edit' || sg.generation?.params?.tool_type === 'magic-edit') {
-            console.log('[MagicEditTaskDebug] Magic edit generation from database:', {
-              generation_id: sg.generation?.id?.substring(0, 8),
-              shot_generation_id: sg.id.substring(0, 8),
-              timeline_frame: sg.timeline_frame,
-              type: sg.generation?.type,
-              tool_type: sg.generation?.params?.tool_type,
-              created_at: sg.generation?.created_at
-            });
-          }
-          
-          return {
-            ...sg.generation,
-            shotImageEntryId: sg.id,
-            shot_generation_id: sg.id,
-            position: Math.floor((sg.timeline_frame ?? 0) / 50),
-            timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
-            imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-            thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
-          };
-        });
+        .map(sg => ({
+          ...sg.generation,
+          shotImageEntryId: sg.id,
+          shot_generation_id: sg.id,
+          position: Math.floor((sg.timeline_frame ?? 0) / 50),
+          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
+          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
+          thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
+        }));
 
       return {
         items,
@@ -187,30 +173,6 @@ export const useAllShotGenerations = (
     return !!stableShotId;
   }, [stableShotId, options?.disableRefetch]);
   
-  // [VideoLoadSpeedIssue] Enhanced logging to track when hook is called
-  const lastLogRef = React.useRef(0);
-  const now = Date.now();
-  if (now - lastLogRef.current > 500) { // Reduced to every 500ms to catch rapid calls
-    console.log('[VideoLoadSpeedIssue] useAllShotGenerations hook called:', { 
-      shotId: stableShotId, 
-      enabled: isEnabled,
-      disableRefetch: options?.disableRefetch,
-      timestamp: now 
-    });
-    lastLogRef.current = now;
-  }
-  
-  // Throttle logging to avoid infinite loop spam
-  const lastLogRef2 = React.useRef(0);
-  if (now - lastLogRef2.current > 1000) { // Log max once per second
-    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { 
-      shotId: stableShotId, 
-      disableRefetch: options?.disableRefetch,
-      timestamp: now 
-    });
-    lastLogRef2.current = now;
-  }
-
   return useQuery({
     queryKey: ['unified-generations', 'shot', stableShotId],
     enabled: isEnabled,
@@ -222,7 +184,6 @@ export const useAllShotGenerations = (
     queryFn: async ({ signal }) => {
       // Don't throw immediately on abort - let the fetch fail naturally
       // This prevents the "signal is aborted without reason" error from being thrown manually
-      console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
       let allGenerations: any[] = [];
       let offset = 0;
       const INITIAL_LOAD = 200; // Fast initial load for first 200 items
@@ -266,27 +227,6 @@ export const useAllShotGenerations = (
       }
 
       // [StarPersist] Log raw data structure from Supabase
-      if (initialData && initialData.length > 0) {
-        console.log('[StarPersist] 🔍 RAW Supabase data (before transformation):', {
-          shotId,
-          firstRawItem: initialData[0],
-          firstRawItemKeys: Object.keys(initialData[0]),
-          generationData: initialData[0].generation,
-          generationKeys: initialData[0].generation ? Object.keys(initialData[0].generation) : 'no generation',
-          hasStarredInGeneration: initialData[0].generation ? 'starred' in initialData[0].generation : false,
-          starredValue: initialData[0].generation?.starred
-        });
-      }
-
-      // PERFORMANCE OPTIMIZATION: For large shots, only load first 200 items initially
-      // This provides instant loading for shots with 100+ images
-      // Background loading removed to prevent 8+ second delays
-      console.log('[PERF] Large shot optimization - using initial batch only for faster rendering:', {
-        shotId,
-        initialDataLength: initialData?.length || 0,
-        skippingBackgroundLoad: true
-      });
-
       // Transform to match GenerationRow interface
       const result = allGenerations
         .filter(sg => sg.generation)
@@ -300,29 +240,6 @@ export const useAllShotGenerations = (
           imageUrl: sg.generation?.location,
           thumbUrl: sg.generation?.location,
         }));
-
-      console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn completed', { 
-        shotId, 
-        resultCount: result.length,
-        videoCount: result.filter(r => r.type === 'video').length,
-        timestamp: Date.now() 
-      });
-      
-      // [StarPersist] Log first item to verify starred field is present
-      if (result.length > 0) {
-        console.log('[StarPersist] 📊 Sample shot generation data structure:', {
-          shotId,
-          firstItem: {
-            id: result[0].id,
-            shotImageEntryId: result[0].shotImageEntryId,
-            shot_generation_id: result[0].shot_generation_id,
-            starred: result[0].starred,
-            hasStarredField: 'starred' in result[0],
-            starredType: typeof result[0].starred,
-            allKeys: Object.keys(result[0])
-          }
-        });
-      }
 
       return result;
     },
@@ -339,11 +256,7 @@ export const useAllShotGenerations = (
       return failureCount < 2;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 3000),
-    meta: {
-      onInvalidate: () => {
-        console.log('[VideoLoadSpeedIssue] useAllShotGenerations query invalidated for shotId:', shotId);
-      }
-    }
+    meta: {}
   });
 };
 
@@ -382,16 +295,7 @@ export const useTimelineShotGenerations = (
     if (!baseQuery.data) return undefined;
     
     // Filter to only timeline generations (positioned + has metadata)
-    const filtered = baseQuery.data.filter(isTimelineGeneration);
-    
-    console.log('[useTimelineShotGenerations] Filtered timeline generations:', {
-      shotId,
-      totalGenerations: baseQuery.data.length,
-      timelineGenerations: filtered.length,
-      filteredOut: baseQuery.data.length - filtered.length
-    });
-    
-    return filtered;
+    return baseQuery.data.filter(isTimelineGeneration);
   }, [baseQuery.data, shotId]);
   
   return {

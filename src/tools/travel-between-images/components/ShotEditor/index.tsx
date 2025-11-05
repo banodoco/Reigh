@@ -170,61 +170,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [selectedShot?.id, hasInitializedStructureVideo]);
 
-  // Log current structure video state values whenever they change
-  useEffect(() => {
-    console.error('[StructureVideoDebug] 📺 Current structure video state:', {
-      path: structureVideoPath ? structureVideoPath.substring(0, 60) + '...' : null,
-      hasPath: !!structureVideoPath,
-      hasMetadata: !!structureVideoMetadata,
-      treatment: structureVideoTreatment,
-      motionStrength: structureVideoMotionStrength,
-      type: structureVideoType,
-      selectedShotId: selectedShot?.id?.substring(0, 8)
-    });
-  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType, selectedShot?.id]);
-
   // Load structure video from settings when shot loads
   useEffect(() => {
-    // USE console.error so this shows in production
-    console.error('[ShotEditor] 🎬 STRUCTURE VIDEO INIT CHECK:', {
-      hasInitializedStructureVideo,
-      isStructureVideoSettingsLoading,
-      selectedShotId: selectedShot?.id?.substring(0, 8),
-      hasStructureVideoSettings: !!structureVideoSettings,
-      settingsPath: structureVideoSettings?.path || 'NO PATH',
-      willInitialize: !hasInitializedStructureVideo && !isStructureVideoSettingsLoading && !!selectedShot?.id
-    });
-    
     if (!hasInitializedStructureVideo && !isStructureVideoSettingsLoading && selectedShot?.id) {
       // Only check for path - metadata is optional and can be null
       if (structureVideoSettings?.path) {
-        console.error('[ShotEditor] ✅ Loading structure video from settings:', {
-          path: structureVideoSettings.path,
-          pathPreview: structureVideoSettings.path.substring(0, 80) + '...',
-          hasMetadata: !!structureVideoSettings.metadata,
-          treatment: structureVideoSettings.treatment,
-          motionStrength: structureVideoSettings.motionStrength,
-          structureType: structureVideoSettings.structureType
-        });
-        console.error('[StructureVideoDebug] 🔄 About to set state from DB:', {
-          path: structureVideoSettings.path.substring(0, 60) + '...',
-          treatment: structureVideoSettings.treatment || 'adjust',
-          motionStrength: structureVideoSettings.motionStrength ?? 1.0,
-          structureType: structureVideoSettings.structureType || 'flow'
-        });
         setStructureVideoPath(structureVideoSettings.path);
         setStructureVideoMetadata(structureVideoSettings.metadata || null);
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
-        console.error('[StructureVideoDebug] ✅ State set from DB complete');
       } else {
         // No saved structure video - initialize with defaults
-        console.error('[ShotEditor] ⚠️  No structure video in settings, initializing to defaults:', {
-          settingsRaw: structureVideoSettings,
-          hasSettingsObject: !!structureVideoSettings,
-          settingsKeys: structureVideoSettings ? Object.keys(structureVideoSettings) : []
-        });
         setStructureVideoPath(null);
         setStructureVideoMetadata(null);
         setStructureVideoTreatment('adjust');
@@ -243,46 +200,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => {
-    console.log('[ShotEditor] [DEBUG] handleStructureVideoChange called:', {
-      videoPath: videoPath ? videoPath.substring(0, 50) + '...' : null,
-      hasMetadata: !!metadata,
-      metadataDetails: metadata ? { totalFrames: metadata.total_frames, frameRate: metadata.frame_rate } : null,
-      treatment,
-      motionStrength,
-      structureType,
-      previousStructureType: structureVideoType // Show what it was before
-    });
-    
-    console.error('[StructureVideoDebug] 🔄 Setting state values:', {
-      videoPath: videoPath ? videoPath.substring(0, 60) + '...' : null,
-      hasMetadata: !!metadata,
-      treatment,
-      motionStrength,
-      structureType
-    });
-    
     setStructureVideoPath(videoPath);
     setStructureVideoMetadata(metadata); // Always update, even if null (important for clearing old metadata)
     setStructureVideoTreatment(treatment);
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);
-    
-    console.error('[StructureVideoDebug] ✅ State setters called successfully');
 
     // Save to database
     if (videoPath) {
       // Save structure video (metadata is optional - can be fetched later from path)
-      console.error('[ShotEditor] 💾 SAVING structure video to database:', { 
-        path: videoPath,
-        pathPreview: videoPath.substring(0, 80) + '...',
-        hasMetadata: !!metadata,
-        treatment,
-        motionStrength,
-        structureType,
-        toolId: 'travel-structure-video',
-        scope: 'shot',
-        selectedShotId: selectedShot?.id?.substring(0, 8)
-      });
       updateStructureVideoSettings('shot', {
         path: videoPath,
         metadata: metadata || null,
@@ -290,10 +216,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength,
         structureType
       });
-      console.error('[ShotEditor] ✅ Structure video save requested');
     } else {
       // Clear structure video - explicitly set fields to null to ensure deletion
-      console.error('[ShotEditor] 🗑️  CLEARING structure video from database');
       updateStructureVideoSettings('shot', {
         path: null,
         metadata: null,
@@ -301,7 +225,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength: null,
         structureType: null
       });
-      console.error('[ShotEditor] ✅ Structure video clear requested');
     }
   }, [updateStructureVideoSettings]);
 
@@ -322,7 +245,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const shot = shots.find(s => s.id === shotId);
       if (shot && shot.images && shot.images.length === 0) {
         // This shot doesn't have images loaded yet - could prefetch here
-        console.log('[PERF] Could prefetch shot data for:', shotId);
+        // Placeholder for potential prefetch logic
       }
     });
   }, [shots, selectedShotId]);
@@ -344,16 +267,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use a stable null value to prevent React Query from re-executing
   const queryKey = shouldLoadDetailedData ? selectedShotId : null;
   
-  console.log('[VideoLoadSpeedIssue] ShotEditor optimization decision:', {
-    selectedShotId,
-    contextImagesCount: contextImages.length,
-    hasContextData,
-    shouldLoadDetailedData,
-    queryKey,
-    willQueryDatabase: shouldLoadDetailedData,
-    timestamp: Date.now()
-  });
-  
   // CRITICAL: Only call useAllShotGenerations when we genuinely need detailed data
   // Using disabled query when context data is available
   const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(queryKey);
@@ -364,34 +277,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     fullShotImages.length > 0 ? fullShotImages : contextImages,
     [fullShotImages, contextImages]
   );
-
-  
-  // [VideoLoadSpeedIssue] Track image data loading progress
-  React.useEffect(() => {
-    console.log('[VideoLoadSpeedIssue] ShotEditor image data update:', {
-      selectedShotId,
-      contextImagesCount: contextImages.length,
-      fullShotImagesCount: fullShotImages.length,
-      orderedShotImagesCount: orderedShotImages.length,
-      isLoadingFullImages,
-      hasContextData,
-      shouldLoadDetailedData,
-      timestamp: Date.now(),
-      dataSource: hasContextData ? 'context' : 'detailed_query',
-      optimizationActive: hasContextData,
-      // [VideoLoadSpeedIssue] DEBUG: Check if context images are being filtered somewhere
-      contextImagesSample: contextImages.slice(0, 3).map(img => ({
-        id: img.id,
-        position: Math.floor(((img as any).timeline_frame ?? 0) / 50),
-        imageUrl: !!img.imageUrl
-      })),
-      orderedImagesSample: orderedShotImages.slice(0, 3).map(img => ({
-        id: img.id,
-        position: Math.floor(((img as any).timeline_frame ?? 0) / 50),
-        imageUrl: !!img.imageUrl
-      }))
-    });
-  }, [selectedShotId, contextImages.length, fullShotImages.length, orderedShotImages.length, isLoadingFullImages, hasContextData, shouldLoadDetailedData]);
   const updateShotImageOrderMutation = useUpdateShotImageOrder();
   
   // Flag to skip next prop sync after successful operations
@@ -1334,20 +1219,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const removeImageFromShotMutation = useRemoveImageFromShot();
 
   const applySettingsFromTask = useCallback(async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
-    console.log('[ApplySettings] 🎬 === APPLY SETTINGS FROM TASK START ===', {
-      taskId: taskId.substring(0, 8),
-      replaceImages,
-      inputImagesCount: inputImages.length,
-      timestamp: Date.now()
-    });
-    console.error('[ApplySettings] 🚀 STARTING - Apply These Settings clicked', {
-      taskId: taskId.substring(0, 8),
-      replaceImages,
-      inputImagesCount: inputImages.length,
-      currentGenerationMode: generationMode,
-      currentShotId: selectedShot?.id?.substring(0, 8)
-    });
-    
     let pairPromptSnapshot: Array<{
       id: string;
       timeline_frame: number | null;
@@ -1368,8 +1239,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // Step 2: Extract all settings
       const settings = ApplySettingsService.extractSettings(taskData);
-      
-      console.log('[ApplySettings] 🔧 === APPLYING SETTINGS ===');
       
       // Step 3: Build context with all callbacks and current state
       const context: ApplySettingsService.ApplyContext = {
@@ -1430,17 +1299,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // CRITICAL: Reload shotGenerations so prompts can be applied to the NEW images
       if (replaceImages && inputImages.length > 0) {
-        console.error('[ApplySettings] 🔄 BEFORE RELOAD - Current shotGenerations:', {
-          count: shotGenerations.length,
-          ids: shotGenerations.map(sg => ({
-            id: sg.id.substring(0, 8),
-            timeline_frame: sg.timeline_frame,
-            has_metadata: !!sg.metadata,
-            has_pair_prompt: !!sg.metadata?.pair_prompt
-          }))
-        });
-        
-        console.error('[ApplySettings] 🔄 Images replaced - invalidating cache and reloading...');
         // Invalidate (not remove) cache to mark data as stale
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShot.id] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShot.id] });
@@ -1470,22 +1328,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           console.error('[ApplySettings] ❌ Error fetching fresh shot generations after replacement:', freshGensError);
         } else {
           pairPromptSnapshot = freshGens || [];
-          console.error('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
-            count: pairPromptSnapshot.length,
-            ids: pairPromptSnapshot.map(sg => ({
-              id: sg.id.substring(0, 8),
-              timeline_frame: sg.timeline_frame,
-              has_metadata: !!sg.metadata,
-              has_pair_prompt: !!sg.metadata?.pair_prompt,
-              generation_type: sg.generation?.type,
-              isVideo: sg.generation?.type === 'video' ||
-                       sg.generation?.type === 'video_travel_output' ||
-                       (sg.generation?.location?.endsWith?.('.mp4') ?? false)
-            }))
-          });
         }
-        
-        console.error('[ApplySettings] 💡 updatePairPromptsByIndex will use current hook state (should match DB)');
       }
 
       if ((!pairPromptSnapshot || pairPromptSnapshot.length === 0) && selectedShot?.id) {
@@ -1510,11 +1353,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           console.error('[ApplySettings] ❌ Failed to fetch pair prompt snapshot:', snapshotError);
         } else {
           pairPromptSnapshot = snapshotRows || [];
-          console.error('[ApplySettings] 📦 Loaded snapshot for pair prompt updates:', {
-            count: pairPromptSnapshot.length,
-            replaceImages,
-            inputImagesCount: inputImages.length
-          });
         }
       }
 
@@ -1535,17 +1373,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
       if (preparedPairPromptTargets.length === 0) {
-        console.error('[ApplySettings] ⚠️ No positioned non-video shot_generations available for pair prompt updates.', {
+        console.warn('[ApplySettings] No positioned non-video shot_generations available for pair prompt updates.', {
           replaceImages,
           snapshotCount: pairPromptSnapshot.length,
           originalShotGenerationCount: shotGenerations.length
         });
       } else {
-        console.error('[ApplySettings] 🧮 Pair prompt snapshot ready for updates:', {
-          totalItems: preparedPairPromptTargets.length,
-          totalPairs: Math.max(0, preparedPairPromptTargets.length - 1)
-        });
-
         context.updatePairPromptsByIndex = async (pairIndex: number, prompt: string, negativePrompt: string) => {
           const trimmedPrompt = (prompt ?? '').trim();
           const trimmedNegative = (negativePrompt ?? '').trim();
@@ -1560,14 +1393,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             });
             return;
           }
-
-          console.error('[ApplySettings] 💾 Saving pair prompt via snapshot updater:', {
-            pairIndex,
-            shotGenerationId: target.id.substring(0, 8),
-            timeline_frame: target.timeline_frame,
-            promptPreview: trimmedPrompt ? `${trimmedPrompt.substring(0, 40)}...` : '(empty)',
-            negativePromptPreview: trimmedNegative ? `${trimmedNegative.substring(0, 40)}...` : '(empty)'
-          });
 
           const updatedMetadata = {
             ...(target.metadata || {}),
@@ -1589,11 +1414,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             throw pairUpdateError;
           }
 
-          console.error('[ApplySettings] ✅ Pair prompt saved via snapshot updater:', {
-            pairIndex,
-            shotGenerationId: target.id.substring(0, 8)
-          });
-
           target.metadata = updatedMetadata;
         };
       }
@@ -1609,68 +1429,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       results.push(await ApplySettingsService.applyLoRAs(settings, context));
       results.push(await ApplySettingsService.applyStructureVideo(settings, context, taskData));
       
-      console.log('[ApplySettings] 🎉 === APPLY SETTINGS COMPLETE ===', {
-        taskId: taskId.substring(0, 8),
-        timestamp: Date.now()
-      });
-      
       // Production-friendly summary with ALL details
       const failedResults = results.filter(r => !r.success);
       const successfulResults = results.filter(r => r.success);
       
-      console.error('[ApplySettings] 📊 COMPLETE SUMMARY - All values extracted and applied:', {
-        taskId: taskId.substring(0, 8),
-        extractedValues: {
-          prompt: settings.prompt ? `"${settings.prompt.substring(0, 60)}..."` : 'undefined',
-          prompts: settings.prompts ? `${settings.prompts.length} prompts` : 'undefined',
-          negativePrompt: settings.negativePrompt || 'undefined',
-          model: settings.model || 'undefined',
-          steps: settings.steps || 'undefined',
-          frames: settings.frames || 'undefined',
-          context: settings.context || 'undefined',
-          generationMode: settings.generationMode || 'undefined',
-          advancedMode: settings.advancedMode !== undefined ? settings.advancedMode : 'undefined',
-          motionMode: settings.motionMode || 'undefined',
-          turboMode: settings.turboMode !== undefined ? settings.turboMode : 'undefined',
-          enhancePrompt: settings.enhancePrompt !== undefined ? settings.enhancePrompt : 'undefined',
-          amountOfMotion: settings.amountOfMotion || 'undefined',
-          lorasCount: settings.loras?.length || 0,
-          structureVideo: {
-            path: settings.structureVideoPath || 'NOT SET',
-            type: settings.structureVideoType || 'undefined',
-            treatment: settings.structureVideoTreatment || 'undefined',
-            motionStrength: settings.structureVideoMotionStrength || 'undefined',
-            inOrchestrator: taskData.orchestrator.structure_video_path ? 'YES' : 'NO',
-            inParams: taskData.params.structure_video_path ? 'YES' : 'NO',
-          }
-        },
-        applicationStatus: {
-          promptApplied: typeof settings.prompt === 'string' && settings.prompt.trim(),
-          individualPromptsApplied: !!(settings.prompts && settings.prompts.length > 1 && generationMode === 'timeline'),
-          structureVideoAttempted: !!(taskData.orchestrator.hasOwnProperty('structure_video_path') || taskData.params.hasOwnProperty('structure_video_path')),
-          structureVideoApplied: !!(settings.structureVideoPath && (taskData.orchestrator.hasOwnProperty('structure_video_path') || taskData.params.hasOwnProperty('structure_video_path'))),
-          imagesReplaced: replaceImages && selectedShot?.id && projectId && inputImages.length > 0
-        },
-        results: {
-          successful: successfulResults.length,
-          failed: failedResults.length,
-          failures: failedResults.map(r => ({ setting: r.settingName, error: r.error }))
-        },
-        settings: {
-          generationMode,
-          replaceImages,
-          inputImagesCount: inputImages.length
-        }
-      });
-      
       // Force reload shotGenerations to show updated pair prompts in UI
-      console.error('[ApplySettings] 🔄 Final reload - invalidating cache to refresh UI...');
       // Invalidate cache and wait for DB writes to complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShot.id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShot.id] });
       await new Promise(resolve => setTimeout(resolve, 200));
       await loadPositions({ silent: true });
-      console.error('[ApplySettings] ✅ Final reload complete - pair prompts should now be visible');
     } catch (e) {
       console.error('[ApplySettings] ❌ === FAILED TO APPLY SETTINGS ===', e);
     }
