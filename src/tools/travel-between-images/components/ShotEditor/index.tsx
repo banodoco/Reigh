@@ -850,10 +850,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // PERFORMANCE BOOST: Allow ready state if we have images + critical settings
     // Don't wait for UI/LoRA settings to prevent 8+ second delays
     if (hasImageData && criticalSettingsReady) {
-      console.log('[PERF] Fast-track ready state - images available', {
-        shotId: selectedShot?.id,
-        imagesCount: contextImages.length
-      });
       actions.setModeReady(true);
       return;
     }
@@ -967,7 +963,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   useEffect(() => {
     const targetModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
     if (steerableMotionSettings.model_name !== targetModel) {
-      console.log(`[ShotEditor] Setting model based on turbo mode: ${targetModel} (turbo: ${turboMode})`);
       onSteerableMotionSettingsChange({ 
         model_name: targetModel
       });
@@ -1035,12 +1030,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   React.useEffect(() => {
     if (dataFlowKey !== lastDataFlowKeyRef.current) {
-      console.log('[VideoLoadSpeedIssue] ShotEditor data flow change:', {
-        selectedShotId,
-        orderedShotImagesCount: orderedShotImages.length,
-        localOrderedShotImagesCount: localOrderedShotImages.length,
-        timestamp: Date.now()
-      });
       lastDataFlowKeyRef.current = dataFlowKey;
     }
   }, [dataFlowKey, selectedShotId, orderedShotImages.length, localOrderedShotImages.length]);
@@ -1054,19 +1043,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // This ensures timeline positions and video generation use the same dataset
     const sourceImages = orderedShotImages || [];
     
-    // OPTIMIZED: Only log when significant changes occur
-    const processingKey = `${selectedShotId}-${sourceImages.length}`;
-    if (processingKey !== lastProcessingKeyRef.current) {
-      console.log('[PROFILING] ShotEditor - Image processing decision:', {
-        selectedShotId,
-        sourceImagesCount: sourceImages.length,
-        contextImagesCount: contextImages.length,
-        isModeReady: state.isModeReady,
-        timestamp: Date.now()
-      });
-      lastProcessingKeyRef.current = processingKey;
-    }
-    
     // EXACT same logic as ShotsPane:
     // 1. Filter by position (has valid position)
     // 2. Filter out videos (like ShotsPane does)
@@ -1074,20 +1050,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const filtered = sourceImages
       .filter(img => {
         const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
-        
-        // [MagicEditTaskDebug] Log magic edit generations to see their timeline_frame values
-        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
-          console.log('[MagicEditTaskDebug] Magic edit generation filtering:', {
-            id: img.id.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
-            timeline_frame: (img as any).timeline_frame,
-            hasTimelineFrame,
-            willBeIncludedInTimeline: hasTimelineFrame,
-            type: img.type,
-            tool_type: (img as any).params?.tool_type
-          });
-        }
-        
         return hasTimelineFrame;
       })
       .filter(img => {
@@ -1104,18 +1066,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         return frameA - frameB;
       });
     
-    // OPTIMIZED: Only log filtering results when they change significantly
-    const filteringKey = `${selectedShotId}-${sourceImages.length}-${filtered.length}`;
-    if (filteringKey !== lastFilteringKeyRef.current) {
-      console.log('[VideoLoadSpeedIssue] EXACT ShotsPane filtering results:', {
-        selectedShotId,
-        sourceCount: sourceImages.length,
-        filteredCount: filtered.length,
-        timestamp: Date.now()
-      });
-      lastFilteringKeyRef.current = filteringKey;
-    }
-    
     return filtered;
   }, [orderedShotImages, selectedShotId]);
   
@@ -1125,7 +1075,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Auto-disable turbo mode when there are more than 2 images
   useEffect(() => {
     if (simpleFilteredImages.length > 2 && turboMode) {
-      console.log(`[ShotEditor] Auto-disabling turbo mode - too many images (${simpleFilteredImages.length} > 2)`);
       onTurboModeChange(false);
     }
   }, [simpleFilteredImages.length, turboMode, onTurboModeChange]);
@@ -1148,25 +1097,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         selectedModel = 'lightning_baseline_2_2_2';
       }
       
-      console.log('[ModelSelection] Advanced Mode - Selected model based on phases:', {
-        numPhases,
-        selectedModel,
-        advancedMode,
-        timestamp: Date.now()
-      });
-      
       return selectedModel;
     }
     
     // In normal mode, use turbo mode setting
     const selectedModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
-    
-    console.log('[ModelSelection] Normal Mode - Selected model based on turbo:', {
-      turboMode,
-      selectedModel,
-      advancedMode: false,
-      timestamp: Date.now()
-    });
     
     return selectedModel;
   };
@@ -1518,7 +1453,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setSteerableMotionJustQueued(false);
 
     // CRITICAL: Refresh shot data from database before task submission to ensure we have the latest images
-    console.log('[TaskSubmission] Refreshing shot data before video generation...');
     try {
       // Invalidate and wait for fresh data
       queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
@@ -1528,8 +1462,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (onShotImagesUpdate) {
         onShotImagesUpdate();
       }
-      
-      console.log('[TaskSubmission] Shot data refreshed successfully');
       
       // Small delay to ensure state propagation completes
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -1547,25 +1479,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Priority 1: Check if shot has an aspect ratio set
     if (selectedShot?.aspect_ratio) {
       resolution = ASPECT_RATIO_TO_RESOLUTION[selectedShot.aspect_ratio];
-      console.log('[Resolution] Using shot aspect ratio:', {
-        aspectRatio: selectedShot.aspect_ratio,
-        resolution
-      });
     }
 
     // Priority 2: If no shot aspect ratio, fall back to project aspect ratio
     if (!resolution && effectiveAspectRatio) {
       resolution = ASPECT_RATIO_TO_RESOLUTION[effectiveAspectRatio];
-      console.log('[Resolution] Using project aspect ratio:', {
-        aspectRatio: effectiveAspectRatio,
-        resolution
-      });
     }
 
     // Priority 3: Use default resolution if nothing else is set
     if (!resolution) {
       resolution = DEFAULT_RESOLUTION;
-      console.log('[Resolution] Using default resolution:', resolution);
     }
 
     // Use getDisplayUrl to convert relative paths to absolute URLs
