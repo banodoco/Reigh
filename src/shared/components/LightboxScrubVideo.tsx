@@ -127,7 +127,6 @@ const LightboxScrubVideo: React.FC<LightboxScrubVideoProps> = ({
         setIsVideoPlaying(true); // Mark as playing when play succeeds
         logAutoplayAttempt(autoplayContext, videoSrc, true);
       }).catch((error) => {
-        console.error('[PollingBreakageIssue] [LightboxScrubVideo] Play promise rejected', {
           error: error.message,
           videoSrc,
           timestamp: Date.now()

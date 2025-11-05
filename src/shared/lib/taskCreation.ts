@@ -143,7 +143,6 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
   const timeoutMs = 20000; // 20s safety timeout to avoid indefinite UI stall
   const controller = new AbortController();
   const timeout = setTimeout(() => {
-    console.warn('[PollingBreakageIssue] [createTask] Aborting invoke due to timeout', {
       requestId,
       timeoutMs,
       taskType: taskParams.task_type,
@@ -190,7 +189,6 @@ export async function createTask(taskParams: BaseTaskParams): Promise<any> {
     if (err?.name === 'AbortError') {
       throw new Error('Task creation timed out. Please try again.');
     }
-    console.error('[TabResumeDebug] [createTask] Invoke failed', {
       requestId,
       taskType: taskParams.task_type,
       projectId: taskParams.project_id,

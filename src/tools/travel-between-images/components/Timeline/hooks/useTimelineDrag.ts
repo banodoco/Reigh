@@ -428,7 +428,6 @@ export const useTimelineDrag = ({
             .filter(([pos, ids]) => ids.length > 1);
             
           if (finalConflicts.length > 0) {
-            console.error(`[TimelineDragFlow] [FINAL_CONFLICTS] 💥 Multiple items ended up at same positions after drag:`, 
               finalConflicts.map(([pos, ids]) => `Frame ${pos}: [${ids.join(', ')}]`));
           }
         }
@@ -439,13 +438,11 @@ export const useTimelineDrag = ({
           orderUpdated: true
         });
       } catch (error) {
-        console.error('[TimelineMoveFlow] ❌ ERROR APPLYING POSITIONS:', {
           itemId: dragState.activeId.substring(0, 8),
           error: error instanceof Error ? error.message : error,
           finalPos,
           stackTrace: error instanceof Error ? error.stack : undefined
         });
-        console.error('[TimelineDragDebug] Error applying drag results:', error);
       }
     })();
 

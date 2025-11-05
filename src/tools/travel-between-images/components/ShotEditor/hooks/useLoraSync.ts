@@ -113,7 +113,6 @@ export const useLoraSync = ({
             // Add LoRA with correct strength immediately - no separate strength change needed
             loraManager.handleAddLora(availableLora, false, savedLora.strength);
           } else {
-            console.warn(`[LoRA] LoRA ${savedLora.id} not found in available LoRAs`);
           }
         });
       }, 100); // Allow state clearing to complete before adding

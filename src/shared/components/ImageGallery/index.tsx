@@ -248,7 +248,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
       // Now we close the lightbox from the component that owns its state
       actionsHook.handleCloseLightbox();
       } catch (error) {
-      console.error('[VisitShotDebug] ERROR in ImageGallery handleNavigateToShot:', error);
     }
   };
 
@@ -269,14 +268,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     // Find the shot object from the shot ID
     const shot = simplifiedShotOptions.find(s => s.id === shotId);
     if (!shot) {
-      console.error('[VisitShotDebug] ERROR: Shot not found for ID:', shotId);
       return;
     }
     
     // Convert the simplified shot to a full Shot object
     const fullShot = allShots.find(s => s.id === shotId);
     if (!fullShot) {
-      console.error('[VisitShotDebug] ERROR: Full shot not found for ID:', shotId);
       return;
     }
     
@@ -285,7 +282,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     try {
       navigateToShot(fullShot);
       } catch (error) {
-      console.error('[VisitShotDebug] ERROR in ImageGallery handleVisitShotFromNotifier:', error);
     }
   }, [simplifiedShotOptions, allShots, navigateToShot]);
   
@@ -538,7 +534,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
     if (index >= 0 && index < filteredImages.length) {
       actionsHook.handleOpenLightbox(filteredImages[index]);
       } else {
-      console.warn('[BasedOnDebug] Invalid index for navigation', { index, filteredImagesLength: filteredImages.length });
     }
   }, [actionsHook.handleOpenLightbox]);
 
@@ -566,7 +561,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
         stateHook.setActiveLightboxMedia(null);
         }, 100);
     } else {
-      console.error('[TaskToggle] ImageGallery: No active lightbox media found');
     }
   }, [stateHook.activeLightboxMedia, stateHook.setSelectedImageForDetails, stateHook.setShowTaskDetailsModal, stateHook.setActiveLightboxMedia]);
 

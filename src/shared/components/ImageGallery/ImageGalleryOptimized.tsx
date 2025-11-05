@@ -276,7 +276,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
       // Now we close the lightbox from the component that owns its state
       actionsHook.handleCloseLightbox();
       } catch (error) {
-      console.error('[VisitShotDebug] ERROR in ImageGallery handleNavigateToShot:', error);
     }
   }, [navigateToShot, actionsHook.handleCloseLightbox]);
 
@@ -287,14 +286,12 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     // Find the shot object from the shot ID
     const shot = simplifiedShotOptions.find(s => s.id === shotId);
     if (!shot) {
-      console.error('[VisitShotDebug] ERROR: Shot not found for ID:', shotId);
       return;
     }
     
     // Convert the simplified shot to a full Shot object
     const fullShot = allShots.find(s => s.id === shotId);
     if (!fullShot) {
-      console.error('[VisitShotDebug] ERROR: Full shot not found for ID:', shotId);
       return;
     }
     
@@ -303,7 +300,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
     try {
       navigateToShot(fullShot);
       } catch (error) {
-      console.error('[VisitShotDebug] ERROR in ImageGallery handleVisitShotFromNotifier:', error);
     }
   }, [simplifiedShotOptions, allShots, navigateToShot]);
 
@@ -416,7 +412,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
       actionsHook.handleOpenLightbox(filteredImages[index]);
       ');
     } else {
-      console.warn('[BasedOnDebug] Invalid index for navigation (Optimized)', { index, filteredImagesLength: filteredImages.length });
     }
   }, [actionsHook.handleOpenLightbox]);
 
@@ -444,7 +439,6 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
         stateHook.setActiveLightboxMedia(null);
         }, 100);
     } else {
-      console.error('[TaskToggle] ImageGallery: No active lightbox media found');
     }
   }, [stateHook.state.activeLightboxMedia, stateHook.setSelectedImageForDetails, stateHook.setShowTaskDetailsModal, stateHook.setActiveLightboxMedia]);
 

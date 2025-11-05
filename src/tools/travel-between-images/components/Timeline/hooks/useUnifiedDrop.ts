@@ -141,7 +141,6 @@ export const useUnifiedDrop = ({
       try {
         await onImageDrop(validFiles, targetFrame ?? undefined);
       } catch (error) {
-        console.error('[BatchDropPositionIssue] ❌ FILE DROP - Error:', error);
         toast.error(`Failed to add images: ${(error as Error).message}`);
       }
     }
@@ -152,7 +151,6 @@ export const useUnifiedDrop = ({
         const dataString = e.dataTransfer.getData('application/x-generation');
         
         if (!dataString) {
-          console.error('[BatchDropPositionIssue] ❌ GENERATION DROP - No data found');
           return;
         }
         
@@ -160,7 +158,6 @@ export const useUnifiedDrop = ({
         
         await onGenerationDrop(data.generationId, data.imageUrl, data.thumbUrl, targetFrame ?? undefined);
       } catch (error) {
-        console.error('[BatchDropPositionIssue] ❌ GENERATION DROP - Error:', error);
         toast.error(`Failed to add generation: ${(error as Error).message}`);
       }
     }

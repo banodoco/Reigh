@@ -125,7 +125,6 @@ const GenerationsPage: React.FC = () => {
   // Handle backfill request to fill empty spaces after deletions
   const handleBackfillRequest = useCallback(async (deletedCount: number, currentPage: number, itemsPerPage: number) => {
     if (!selectedProjectId) {
-      console.warn('[BackfillDebug] No project selected for backfill');
       return [];
     }
 
@@ -151,7 +150,6 @@ const GenerationsPage: React.FC = () => {
       // Return empty array since the refresh will update the main data source
       return [];
     } catch (error) {
-      console.error('[BackfillDebug] Failed to refresh data for backfill:', error);
       return [];
     }
   }, [selectedProjectId, queryClient, mediaTypeFilter, selectedShotFilter, excludePositioned, starredOnly]);

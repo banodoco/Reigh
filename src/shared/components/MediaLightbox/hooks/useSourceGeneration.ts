@@ -87,7 +87,6 @@ export const useSourceGeneration = ({
           setSourceGenerationData(null);
         }
       } catch (error) {
-        console.error('[BasedOnDebug] ❌ Failed to fetch source generation:', error);
         // Don't show toast - this is a non-critical feature
         setSourceGenerationData(null);
       }

@@ -93,14 +93,12 @@ export const useImageFlip = ({
             if (blob) {
               resolve(blob);
             } else {
-              console.error('[ImageFlipDebug] Canvas to blob conversion failed');
               reject(new Error('Canvas to Blob conversion failed'));
             }
           }, 'image/png');
         };
 
         img.onerror = (err) => {
-          console.error('[ImageFlipDebug] Image load error', err);
           reject(err);
         };
 
@@ -134,10 +132,8 @@ export const useImageFlip = ({
         // Close the lightbox on successful save
         onClose();
       } else {
-        console.warn('[ImageFlipDebug] No onImageSaved callback provided');
       }
     } catch (error) {
-      console.error('[ImageFlipDebug] Error during save process:', {
         error,
         errorMessage: error instanceof Error ? error.message : String(error),
         errorStack: error instanceof Error ? error.stack : undefined,

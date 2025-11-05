@@ -137,7 +137,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           }
         })
         .catch(error => {
-          console.error('[GuidanceVideoStrip] ❌ Failed to extract metadata:', error);
         })
         .finally(() => {
           setIsExtractingMetadata(false);
@@ -238,20 +237,17 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         
         // Validate inputs before extraction to prevent NaN/Infinity errors
         if (numFrames < 1) {
-          console.error('[GuidanceVideoStrip] Invalid numFrames:', numFrames);
           setIsExtractingFrames(false);
           return;
         }
         
         if (!effectiveMetadata.total_frames || effectiveMetadata.total_frames < 1) {
-          console.error('[GuidanceVideoStrip] Invalid total_frames:', effectiveMetadata.total_frames);
           setIsExtractingFrames(false);
           return;
         }
         
         const timelineFrameCount = fullMax - fullMin;
         if (!isFinite(timelineFrameCount) || timelineFrameCount < 0) {
-          console.error('[GuidanceVideoStrip] Invalid timelineFrameCount:', { fullMax, fullMin, timelineFrameCount });
           setIsExtractingFrames(false);
           return;
         }
@@ -261,7 +257,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         
         if (!ctx) {
-          console.error('[GuidanceVideoStrip] Failed to get canvas context');
           setIsExtractingFrames(false);
           return;
         }
@@ -287,7 +282,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           
           // Validate frameIndex after calculation
           if (!isFinite(frameIndex) || frameIndex < 0) {
-            console.error('[GuidanceVideoStrip] Invalid frameIndex calculated:', { 
               i, 
               numFrames, 
               treatment, 
@@ -300,7 +294,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           
           // Validate frame_rate to prevent NaN/Infinity errors
           if (!effectiveMetadata.frame_rate || effectiveMetadata.frame_rate <= 0 || !isFinite(effectiveMetadata.frame_rate)) {
-            console.error('[GuidanceVideoStrip] Invalid frame_rate:', effectiveMetadata.frame_rate);
             throw new Error(`Invalid video frame rate: ${effectiveMetadata.frame_rate}`);
           }
           
@@ -308,7 +301,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           
           // Additional safety check for currentTime value
           if (!isFinite(timeInSeconds) || timeInSeconds < 0) {
-            console.error('[GuidanceVideoStrip] Invalid time value:', { frameIndex, frame_rate: effectiveMetadata.frame_rate, timeInSeconds });
             throw new Error(`Invalid time value calculated: ${timeInSeconds}`);
           }
           
@@ -345,7 +337,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         }
         setIsExtractingFrames(false);
         } catch (error) {
-        console.error('[GuidanceVideoStrip] Error extracting frames:', error);
         // Keep existing frames on error, don't clear them
         setIsExtractingFrames(false);
       }
@@ -356,7 +347,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     };
 
     const handleError = (e: Event) => {
-      console.error('[GuidanceVideoStrip] Video load error:', e);
       setIsVideoReady(false);
       setIsExtractingFrames(false);
     };
@@ -407,14 +397,12 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       
       return isBlank;
     } catch (error) {
-      console.error('[GuidanceVideoStrip] Error checking canvas blank:', error);
       return true;
     }
   }, []);
 
   const drawVideoFrame = useCallback((video: HTMLVideoElement, frame: number, forceRetry: boolean = false) => {
     if (!previewCanvasRef.current) {
-      console.warn('[GuidanceVideoStrip] No canvas ref for frame', frame);
       return false;
     }
     
@@ -422,17 +410,14 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     const previewCtx = previewCanvas.getContext('2d', { willReadFrequently: true });
     
     if (!previewCtx) {
-      console.warn('[GuidanceVideoStrip] No canvas context for frame', frame);
       return false;
     }
     
     if (video.readyState < 2) {
-      console.warn('[GuidanceVideoStrip] Video not ready to draw frame', frame, 'readyState:', video.readyState);
       return false;
     }
     
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      console.warn('[GuidanceVideoStrip] Video has no dimensions for frame', frame);
       return false;
     }
     
@@ -451,7 +436,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       if (!forceRetry) {
         const blank = isCanvasBlank(previewCanvas);
         if (blank) {
-          console.warn('[GuidanceVideoStrip] Canvas appears blank after draw for frame', frame);
           // Reset seeking state to allow retry
           seekingRef.current = false;
           return false;
@@ -461,7 +445,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       lastDrawnFrameRef.current = frame;
       return true;
     } catch (error) {
-      console.error('[GuidanceVideoStrip] Error drawing frame', frame, ':', error);
       // On error, reset seeking state to allow recovery
       seekingRef.current = false;
       return false;
@@ -497,7 +480,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         
         // Only log as warning if truly problematic (no metadata)
         if (video.readyState < 1) {
-          console.warn('[GuidanceVideoStrip] Video timeout with no metadata (readyState:', video.readyState, '), retrying...');
           video.load(); // Force reload
           resolve(false);
         } else {
@@ -542,7 +524,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
       // Ensure video is ready for seeking - wait if needed
       const ready = await ensureVideoReady(video);
       if (!ready) {
-        console.warn('[GuidanceVideoStrip] Video could not become ready for seeking');
         return;
       }
       
@@ -565,7 +546,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           // Draw the frame
           const success = drawVideoFrame(video, frame);
           if (!success) {
-            console.warn('[GuidanceVideoStrip] Failed to draw frame', frame, 'after seeked event', {
               readyState: video.readyState,
               currentTime: video.currentTime,
               videoWidth: video.videoWidth,
@@ -579,7 +559,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         
         const handleError = (e: Event) => {
           video.removeEventListener('error', handleError);
-          console.error('[GuidanceVideoStrip] Video error during seek to frame', frame, e);
             resolve();
           };
           
@@ -598,7 +577,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
           }, 500);
         });
     } catch (error) {
-      console.error('[GuidanceVideoStrip] Seek error:', error);
     } finally {
       seekingRef.current = false;
       
@@ -617,7 +595,6 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
     
     // Prevent rapid-fire resets (must be at least 100ms apart)
     if (timeSinceLastReset < 100) {
-      console.warn('[GuidanceVideoStrip] Ignoring reset - too soon after last reset (', timeSinceLastReset, 'ms)');
       return;
     }
     

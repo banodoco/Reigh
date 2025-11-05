@@ -59,7 +59,6 @@ export const useImageGalleryPagination = ({
 
   // CRITICAL: Track loadingButton state changes to debug disabled buttons
   useEffect(() => {
-    console.warn(`[ReconnectionIssue][UI_LOADING_STATE] loadingButton state changed`, {
       loadingButton,
       isServerPagination,
       buttonsDisabled: loadingButton !== null,
@@ -112,7 +111,6 @@ export const useImageGalleryPagination = ({
     } // Prevent multiple clicks while any button is loading
     
     setLoadingButton(direction);
-    console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Setting loadingButton to "${direction}" - buttons will be disabled`, {
       navId,
       direction,
       isServerPagination,
@@ -164,7 +162,6 @@ export const useImageGalleryPagination = ({
       // For server pagination, clear button loading on a shorter timeout to prevent stuck states
       // The progressive loading will handle the gallery loading state separately
       const buttonTimeout = setTimeout(() => {
-        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
           navId,
           reason: 'Server pagination timeout (800ms)',
           timestamp: Date.now()
@@ -177,7 +174,6 @@ export const useImageGalleryPagination = ({
       const loadingDelay = fromBottom ? 300 : 100;
       setPage(newPage);
       setTimeout(() => {
-        console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton via timeout - buttons will be re-enabled`, {
           navId,
           reason: `Client pagination timeout (${loadingDelay}ms)`,
           timestamp: Date.now()

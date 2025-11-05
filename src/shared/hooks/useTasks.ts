@@ -181,7 +181,6 @@ export const useListTasks = (params: ListTasksParams) => {
   const { projectId, status } = params;
   
   // Add warning for large datasets
-  console.warn('[PollingBreakageIssue] useListTasks is DEPRECATED for performance reasons. Use usePaginatedTasks instead.');
   
   return useQuery<Task[], Error>({
     queryKey: [TASKS_QUERY_KEY, projectId, status],
@@ -208,7 +207,6 @@ export const useListTasks = (params: ListTasksParams) => {
       const { data, error } = await query;
 
       if (error) {
-        console.error('[PollingBreakageIssue] useListTasks query error:', {
           projectId,
           status,
           error,
@@ -363,7 +361,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       });
       
       if (countError) {
-        console.error('[TaskPollingDebug] Count query failed:', {
           projectId,
           page,
           error: countError,
@@ -372,7 +369,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         throw countError;
       }
       if (dataError) {
-        console.error('[TaskPollingDebug] Data query failed:', {
           projectId,
           page,
           error: dataError,
@@ -773,7 +769,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       if (processingResult.status === 'fulfilled') {
         const { count, error } = processingResult.value;
         if (error) {
-          console.error('[PollingBreakageIssue] useTaskStatusCounts query error (processing):', {
             projectId,
             error,
             errorMessage: error.message,
@@ -786,7 +781,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           processingCount = count || 0;
         }
       } else {
-        console.error('[PollingBreakageIssue] Processing query promise rejected:', {
           projectId,
           reason: processingResult.reason,
           timestamp: Date.now()
@@ -798,7 +792,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       if (successResult.status === 'fulfilled') {
         const { count, error } = successResult.value;
         if (error) {
-          console.error('[PollingBreakageIssue] useTaskStatusCounts query error (success):', {
             projectId,
             error,
             errorMessage: error.message,
@@ -811,7 +804,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           successCount = count || 0;
         }
       } else {
-        console.error('[PollingBreakageIssue] Success query promise rejected:', {
           projectId,
           reason: successResult.reason,
           timestamp: Date.now()
@@ -823,7 +815,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
       if (failureResult.status === 'fulfilled') {
         const { count, error } = failureResult.value;
         if (error) {
-          console.error('[PollingBreakageIssue] useTaskStatusCounts query error (failure):', {
             projectId,
             error,
             errorMessage: error.message,
@@ -836,7 +827,6 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           failureCount = count || 0;
         }
       } else {
-        console.error('[PollingBreakageIssue] Failure query promise rejected:', {
           projectId,
           reason: failureResult.reason,
           timestamp: Date.now()

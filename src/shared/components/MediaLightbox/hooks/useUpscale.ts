@@ -61,7 +61,6 @@ export const useUpscale = ({
       try {
         localStorage.removeItem(`upscale-pending-${media.id}`);
         } catch (e) {
-        console.error('[ImageUpscale] ❌ Error removing pending state:', e);
       }
     } else {
       }
@@ -93,11 +92,9 @@ export const useUpscale = ({
       try {
         localStorage.setItem(`upscale-pending-${media.id}`, 'true');
         } catch (e) {
-        console.error('[ImageUpscale] ❌ Error setting pending state:', e);
       }
       
     } catch (error) {
-      console.error('[ImageUpscale] Error creating upscale task:', error);
       toast.error('Failed to create upscale task');
     } finally {
       setIsUpscaling(false);

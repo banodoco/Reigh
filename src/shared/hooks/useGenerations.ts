@@ -501,7 +501,6 @@ export async function fetchDerivedGenerations(
     .order('created_at', { ascending: false });
   
   if (error) {
-    console.error('[BasedOnDebug] fetchDerivedGenerations error', error);
     throw error;
   }
   
@@ -655,7 +654,6 @@ export async function fetchSourceGeneration(
     .single();
   
   if (error || !data) {
-    console.error('[BasedOnDebug] fetchSourceGeneration error or no data', { error, hasData: !!data });
     return null;
   }
   

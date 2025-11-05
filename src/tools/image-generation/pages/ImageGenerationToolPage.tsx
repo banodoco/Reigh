@@ -586,7 +586,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         timestamp: Date.now()
       };
       
-      console.error("[ImageFlipDebug] [ImageGenerationToolPage] Error in handleImageSaved:");
       console.error("Error message:", errorMessage);
       console.error("Full error details:", errorDetails);
       console.error("Raw error:", error);
@@ -741,7 +740,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Handle backfill request to fill empty spaces after deletions
   const handleBackfillRequest = useCallback(async (deletedCount: number, currentPage: number, itemsPerPage: number): Promise<GeneratedImageWithMetadata[]> => {
     if (!selectedProjectId) {
-      console.warn('[BackfillDebug] No project selected for backfill');
       return [];
     }
 
@@ -762,7 +760,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       // Return empty array since the refresh will update the main data source
       return [];
     } catch (error) {
-      console.error('[BackfillDebug] Failed to refresh data for backfill:', error);
       return [];
     }
   }, [selectedProjectId, queryClient, generationsFilters]);

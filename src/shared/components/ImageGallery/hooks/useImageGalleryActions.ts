@@ -155,7 +155,6 @@ export const useImageGalleryActions = ({
               deletionsCountRef.current.delete(currentPageNum);
               
               } catch (error) {
-              console.error('[SKELETON_DEBUG] Backfill failed - clearing skeleton:', error);
               // Clear skeleton even if backfill fails
               setIsBackfillLoading(false);
               setBackfillSkeletonCount(0);
@@ -256,7 +255,6 @@ export const useImageGalleryActions = ({
       
       });
     } else {
-      console.warn('[ImageFlipDebug] [ImageGalleryActions] Cannot save - missing requirements', {
         hasActiveLightboxMediaId: !!activeLightboxMedia?.id,
         hasOnImageSaved: !!onImageSaved,
         activeLightboxMedia,

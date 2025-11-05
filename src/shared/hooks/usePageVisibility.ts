@@ -38,7 +38,6 @@ export function usePageVisibility() {
 
           // Additional context for React Query behavior
           if (signals.justHidden) {
-            console.warn(`[PollingBreakageIssue] ⚠️ Page became hidden - React Query will pause refetchInterval polling unless refetchIntervalInBackground is enabled`);
           } else if (signals.justBecameVisible) {
             }
         }

@@ -119,7 +119,6 @@ export const useVideoGalleryPreloader = (options?: {
         .range(startIndex, endIndex);
 
       if (error) {
-        console.warn('[VideoGalleryPreload] Failed to fetch thumbnail URLs:', error);
         return [];
       }
 
@@ -141,7 +140,6 @@ export const useVideoGalleryPreloader = (options?: {
       :`, urls.slice(0, 3));
       return urls;
     } catch (error) {
-      console.warn('[VideoGalleryPreload] Error building thumbnail URLs:', error);
       return [];
     }
   }, [selectedProjectId]);
@@ -179,7 +177,6 @@ export const useVideoGalleryPreloader = (options?: {
       try {
         await Promise.all(batch.map(task => task()));
       } catch (error) {
-        console.warn('[VideoGalleryPreload] Batch processing error:', error);
       }
 
       // Schedule next batch with idle callback for better performance

@@ -76,13 +76,11 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   };
 
   const handleImageError = () => {
-    console.error(`[ShotImageDebug] Image failed to load:`, { displayUrl, index, shotImageEntryId: image.shotImageEntryId });
     setImageLoadError(true);
   };
 
   // Don't render anything if we don't have a valid URL
   if (!displayUrl) {
-    console.warn(`[ShotImageDebug] No valid URL found for image:`, { 
       image: {
         shotImageEntryId: image.shotImageEntryId,
         imageUrl: image.imageUrl,

@@ -10,7 +10,6 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
     // Add timeout to prevent hanging downloads
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.warn('[PollingBreakageIssue] [MediaLightbox] Download timeout, aborting', {
         mediaId,
         timeoutMs: 15000,
         timestamp: Date.now()
@@ -63,7 +62,6 @@ export const downloadMedia = async (url: string, mediaId: string, isVideo: boole
     
   } catch (error: any) {
     const errorDuration = Date.now() - downloadStartTime;
-    console.error('[PollingBreakageIssue] [MediaLightbox] Download failed', {
       mediaId,
       error: error.message,
       errorName: error.name,

@@ -164,7 +164,6 @@ export const useGenerationActions = ({
           thumbnailUrl = uploadResult.thumbnailUrl;
           
           } catch (thumbnailError) {
-          console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${file.name}:`, thumbnailError);
           // Fallback to original upload flow without thumbnail
           const imageUrl = await uploadImageToStorage(fileToUpload);
           finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
@@ -549,7 +548,6 @@ export const useGenerationActions = ({
       // 5. Refresh the shot data, which will trigger Timeline to update
       onShotImagesUpdate();
       } catch (error) {
-      console.error('[AddImagesDebug] ❌ Error adding images to timeline:', error);
       // Let Timeline component handle the error display via re-throw
       throw error; 
     } finally {
@@ -716,12 +714,10 @@ export const useGenerationActions = ({
           });
           
           if (queryError) {
-            console.error('[BatchDropPositionIssue] ❌ QUERY ERROR:', queryError);
             throw queryError;
           }
           
           if (!shotGenRecords || shotGenRecords.length === 0) {
-            console.warn('[BatchDropPositionIssue] ⚠️ NO RECORDS FOUND - RETRYING...');
             await new Promise(resolve => setTimeout(resolve, 500));
             
             const { data: retryRecords, error: retryError } = await supabase
@@ -731,7 +727,6 @@ export const useGenerationActions = ({
               .in('generation_id', result.generationIds);
             
             if (retryError || !retryRecords || retryRecords.length === 0) {
-              console.error('[BatchDropPositionIssue] ❌ STILL NO RECORDS AFTER RETRY');
               return;
             }
             
@@ -740,7 +735,6 @@ export const useGenerationActions = ({
             const updatePromises = result.generationIds.map(async (genId, index) => {
               const shotGenRecord = retryRecords.find(r => r.generation_id === genId);
               if (!shotGenRecord) {
-                console.warn('[BatchDropPositionIssue] ⚠️ NO RECORD FOR GENERATION:', genId.substring(0, 8));
                 return { success: false, genId };
               }
               
@@ -756,7 +750,6 @@ export const useGenerationActions = ({
                 .eq('id', shotGenRecord.id);
               
               if (updateError) {
-                console.error('[BatchDropPositionIssue] ❌ UPDATE ERROR:', updateError);
                 return { success: false, genId, error: updateError };
               }
               
@@ -781,7 +774,6 @@ export const useGenerationActions = ({
           const updatePromises = result.generationIds.map(async (genId, index) => {
             const shotGenRecord = shotGenRecords.find(r => r.generation_id === genId);
             if (!shotGenRecord) {
-              console.warn('[BatchDropPositionIssue] ⚠️ NO RECORD FOR GENERATION:', genId.substring(0, 8));
               return { success: false, genId };
             }
             
@@ -797,7 +789,6 @@ export const useGenerationActions = ({
               .eq('id', shotGenRecord.id);
             
             if (updateError) {
-              console.error('[BatchDropPositionIssue] ❌ UPDATE ERROR:', updateError);
               return { success: false, genId, error: updateError };
             }
             
@@ -819,7 +810,6 @@ export const useGenerationActions = ({
           });
           
         } catch (dbError) {
-          console.error('[BatchDropPositionIssue] ❌ DATABASE UPDATE ERROR:', dbError);
         }
       } else {
         }
@@ -827,7 +817,6 @@ export const useGenerationActions = ({
       await onShotImagesUpdate();
       
       } catch (error) {
-      console.error('[BatchDropPositionIssue] ❌ ERROR:', error);
       toast.error(`Failed to add images: ${(error as Error).message}`);
       throw error;
     } finally {

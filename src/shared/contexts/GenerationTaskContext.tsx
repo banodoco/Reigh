@@ -53,7 +53,6 @@ export function GenerationTaskProvider({
       });
       });
     } catch (error) {
-      console.warn('[VideoGenMissing] Preloader failed', { error });
     }
   }, [queryClient, isPreloadingEnabled, preloadBatchSize, preloadDelay]);
 

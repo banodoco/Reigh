@@ -119,7 +119,6 @@ export const createTaskDetailsHandler = (
         setLightboxIndex(null);
         }, 100);
     } else {
-      console.error('[TaskToggle] VideoOutputsGallery: No current video found for lightboxIndex:', lightboxIndex);
     }
   };
 };

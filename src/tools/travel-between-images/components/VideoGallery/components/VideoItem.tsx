@@ -740,7 +740,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   fallback: 'Will show video loading directly',
                   timestamp: Date.now()
                 });
-                console.warn(`[VideoGalleryPreload] THUMBNAIL_FAILED - URL: ${video.thumbUrl}`);
               }
             }}
           />

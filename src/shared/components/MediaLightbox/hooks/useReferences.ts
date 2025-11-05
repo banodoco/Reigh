@@ -89,7 +89,6 @@ export const useReferences = ({
           });
         
         if (thumbnailUploadError) {
-          console.error('[AddToReferences] Thumbnail upload error:', thumbnailUploadError);
           // Use original as fallback
           thumbnailUrl = originalUploadedUrl;
         } else {
@@ -99,7 +98,6 @@ export const useReferences = ({
           thumbnailUrl = thumbnailUrlData.publicUrl;
           }
       } catch (thumbnailError) {
-        console.error('[AddToReferences] Error generating thumbnail:', thumbnailError);
         // Use original as fallback
         thumbnailUrl = originalUploadedUrl;
       }
@@ -170,7 +168,6 @@ export const useReferences = ({
       }, 2000);
       
     } catch (error) {
-      console.error('[AddToReferences] Error adding to references:', error);
       toast.error('Failed to add to references');
     } finally {
       setIsAddingToReferences(false);

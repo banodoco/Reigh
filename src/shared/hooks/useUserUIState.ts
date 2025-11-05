@@ -129,7 +129,6 @@ export function useUserUIState<K extends keyof UISettings>(
       ]) as any;
       
       if (error) {
-        console.error('[useUserUIState] Error saving fallback to database:', error);
       } else {
         // Invalidate cache so other components see the backfilled values
         const cacheKey = `user_settings_${userId}`;
@@ -137,7 +136,6 @@ export function useUserUIState<K extends keyof UISettings>(
         setValue(fallbackToSave); // Update local state after successful save
       }
     } catch (error) {
-      console.error('[useUserUIState] Error in saveFallbackToDatabase:', error);
     }
   };
 
@@ -147,7 +145,6 @@ export function useUserUIState<K extends keyof UISettings>(
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.warn('[useUserUIState] No authenticated user');
           setIsLoading(false);
           return;
         }
@@ -157,7 +154,6 @@ export function useUserUIState<K extends keyof UISettings>(
         const { data, error } = await loadUserSettingsCached(user.id);
 
         if (error) {
-          console.error('[useUserUIState] Error loading settings:', error);
           setIsLoading(false);
           return;
         }
@@ -199,13 +195,11 @@ export function useUserUIState<K extends keyof UISettings>(
                 .eq('id', user.id);
 
               if (saveError) {
-                console.error('[useUserUIState] Error backfilling/normalizing fields:', saveError);
               } else {
                 const cacheKey = `user_settings_${user.id}`;
                 settingsCache.delete(cacheKey);
               }
             } catch (e) {
-              console.error('[useUserUIState] Unexpected error during backfill/normalize:', e);
             }
           }
         } else {
@@ -216,13 +210,11 @@ export function useUserUIState<K extends keyof UISettings>(
           
           // Save to database in background (don't block loading)
           saveFallbackToDatabase(user.id, data?.settings || {}).catch(error => {
-            console.error(`[useUserUIState] Failed to save fallback for key "${key}":`, error);
           });
         }
         
         setIsLoading(false);
       } catch (error) {
-        console.error('[useUserUIState] Error in loadUserSettings:', error);
         setIsLoading(false);
       }
     };
@@ -284,14 +276,12 @@ export function useUserUIState<K extends keyof UISettings>(
           .eq('id', userId);
 
         if (error) {
-          console.error('[useUserUIState] Error saving settings:', error);
         } else {
           // Invalidate cache so other components see the update
           const cacheKey = `user_settings_${userId}`;
           settingsCache.delete(cacheKey);
           }
       } catch (error) {
-        console.error('[useUserUIState] Error in update:', error);
       }
     }, 200);
   };

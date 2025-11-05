@@ -419,7 +419,6 @@ export function usePositionManagement({
       .filter(([pos, ids]) => ids.length > 1);
     
     if (duplicates.length > 0) {
-      console.error(`[TimelineDragFlow] [DUPLICATE_PREVENTION] ❌ Session: ${(window as any).__CURRENT_DRAG_SESSION__ || 'no-session'} | Attempted to set duplicate timeline_frame values:`, 
         duplicates.map(([pos, ids]) => `${pos}: [${ids.join(', ')}]`).join(', '));
       
       // Auto-resolve duplicates before proceeding
@@ -518,7 +517,6 @@ export function usePositionManagement({
               drag_session_id: (window as any).__CURRENT_DRAG_SESSION__ || 'unknown'
             });
           } else {
-            console.error(`[TimelineDragFlow] [MAPPING_ERROR] ❌ Could not find shot_generation for change.id: ${change.id}, matchingImage.id: ${matchingImage.id}`);
           }
         }
       }

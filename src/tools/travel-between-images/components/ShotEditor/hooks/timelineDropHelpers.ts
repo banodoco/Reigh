@@ -144,7 +144,6 @@ export const calculateNextAvailableFrame = async (
   });
 
   if (error) {
-    console.error('[AddImagesDebug] ❌ Error fetching shot generations for position calculation:', error);
     // Default to 0 if query fails
     return 0;
   }
@@ -226,7 +225,6 @@ export const queryShotGenerationRecords = async (
     .in('generation_id', generationIds);
   
   if (queryError) {
-    console.error('[AddImagesDebug] ❌ Error querying shot_generation records:', queryError);
     throw queryError;
   }
   
@@ -242,7 +240,6 @@ export const queryShotGenerationRecords = async (
   );
   
   if (recordsWithPositions && recordsWithPositions.length > 0) {
-    console.warn('[AddImagesDebug] ⚠️ UNEXPECTED: Records have timeline_frame values despite skipAutoPosition!', {
       count: recordsWithPositions.length,
       unexpectedPositions: recordsWithPositions.map(r => r.timeline_frame)
     });
@@ -252,7 +249,6 @@ export const queryShotGenerationRecords = async (
   
   // If no records found, retry once after 500ms
   if (!shotGenRecords || shotGenRecords.length === 0) {
-    console.warn('[AddImagesDebug] ⚠️ No shot_generation records found yet, retrying...');
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const { data: retryRecords, error: retryQueryError } = await supabase
@@ -262,12 +258,10 @@ export const queryShotGenerationRecords = async (
       .in('generation_id', generationIds);
     
     if (retryQueryError) {
-      console.error('[AddImagesDebug] ❌ Retry query error:', retryQueryError);
       throw retryQueryError;
     }
     
     if (!retryRecords || retryRecords.length === 0) {
-      console.error('[AddImagesDebug] ❌ Still no records found after retry');
       throw new Error('Shot generation records not found after retry');
     }
     
@@ -283,7 +277,6 @@ export const queryShotGenerationRecords = async (
     );
     
     if (retryRecordsWithPositions.length > 0) {
-      console.warn('[AddImagesDebug] ⚠️ Retry: Records already have AUTO-ASSIGNED timeline_frame values!', {
         count: retryRecordsWithPositions.length,
         autoAssignedPositions: retryRecordsWithPositions.map(r => r.timeline_frame)
       });
@@ -308,7 +301,6 @@ export const batchUpdateTimelineFrames = async (
     const shotGenRecord = shotGenRecords.find(r => r.generation_id === genId);
     
     if (!shotGenRecord) {
-      console.warn('[AddImagesDebug] ⚠️ No shot_generation found for generation:', genId.substring(0, 8));
       return { 
         success: false, 
         genId, 
@@ -408,7 +400,6 @@ export const persistTimelinePositions = async (
     const errors = results.filter(r => !r.success);
     
     if (errors.length > 0) {
-      console.error('[AddImagesDebug] ❌ Errors updating positions:', errors);
       toast.error(`Failed to set ${errors.length} timeline position(s)`);
       throw new Error(`Failed to update ${errors.length} position(s)`);
     }
@@ -417,7 +408,6 @@ export const persistTimelinePositions = async (
     await verifyPositionUpdates(shotId, generationIds);
     
   } catch (dbError) {
-    console.error('[AddImagesDebug] ❌ Exception writing positions to database:', dbError);
     throw dbError;
   }
 };

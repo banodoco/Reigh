@@ -127,7 +127,6 @@ export const useInpainting = ({
         .single();
       
       if (error) {
-        console.warn('[EditMode] Failed to load edit mode from DB:', error);
         return null;
       }
       
@@ -139,7 +138,6 @@ export const useInpainting = ({
       
       return null;
     } catch (err) {
-      console.warn('[EditMode] Error loading from DB:', err);
       return null;
     }
   }, []);
@@ -155,7 +153,6 @@ export const useInpainting = ({
         .single();
       
       if (fetchError) {
-        console.warn('[EditMode] Failed to fetch current params:', fetchError);
         return;
       }
       
@@ -175,12 +172,10 @@ export const useInpainting = ({
         .eq('id', generationId);
       
       if (updateError) {
-        console.warn('[EditMode] Failed to save edit mode to DB:', updateError);
       } else {
         , mode });
       }
     } catch (err) {
-      console.warn('[EditMode] Error saving to DB:', err);
     }
   }, []);
 

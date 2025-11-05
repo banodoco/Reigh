@@ -56,14 +56,6 @@ const PairRegion: React.FC<PairRegionProps> = ({
   autoCreateIndividualPrompts,
   onClearEnhancedPrompt,
 }) => {
-  // TOP-LEVEL DEBUG: What prompts does this pair region receive?
-  console.error('[PairRegion] PROMPT DATA - pairIndex:', index);
-  console.error('[PairRegion] PROMPT DATA - pairPrompt:', pairPrompt);
-  console.error('[PairRegion] PROMPT DATA - pairNegativePrompt:', pairNegativePrompt);
-  console.error('[PairRegion] PROMPT DATA - enhancedPrompt:', enhancedPrompt);
-  console.error('[PairRegion] PROMPT DATA - defaultPrompt:', defaultPrompt);
-  console.error('[PairRegion] PROMPT DATA - defaultNegativePrompt:', defaultNegativePrompt);
-  
   const pairColorSchemes = [
     { bg: 'bg-blue-50', border: 'border-blue-300', context: 'bg-blue-200/60', text: 'text-blue-700', line: 'bg-blue-400' },
     { bg: 'bg-emerald-50', border: 'border-emerald-300', context: 'bg-emerald-200/60', text: 'text-emerald-700', line: 'bg-emerald-400' },

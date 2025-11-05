@@ -1679,7 +1679,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       // Final validation check before sending to backend
       if (numPhases !== phasesLength || numPhases !== stepsLength) {
-        console.error('[PhaseConfigDebug] CRITICAL: Inconsistent phase config about to be sent!', {
           num_phases: numPhases,
           phases_array_length: phasesLength,
           steps_array_length: stepsLength,
@@ -1963,7 +1962,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 // Call parent callback to update other related data
                 onShotImagesUpdate();
               } catch (error) {
-                console.error('[ImageFlipDebug] [ShotEditor] Error in onImageSaved:', {
                   error,
                   errorMessage: error instanceof Error ? error.message : String(error),
                   errorStack: error instanceof Error ? error.stack : undefined,

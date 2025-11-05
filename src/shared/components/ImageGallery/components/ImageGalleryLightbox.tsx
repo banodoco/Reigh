@@ -355,10 +355,8 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
         });
         setActiveLightboxIndex(index);
         } else {
-        console.error('[DerivedNav:Gallery] ❌ setActiveLightboxIndex is not available!');
       }
     } else {
-      console.error('[DerivedNav:Gallery] ❌ Generation not found in current filtered set', {
         searchedId: generationId.substring(0, 8),
         fullGenerationId: generationId,
         filteredImagesCount: filteredImages.length,
@@ -464,7 +462,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
         toast.error('Generation not found');
       }
     } catch (error) {
-      console.error('[DerivedNav:Gallery] ❌ Failed to fetch external generation:', error);
       toast.error('Failed to load generation');
     }
   }, [filteredImages, setActiveLightboxIndex]);

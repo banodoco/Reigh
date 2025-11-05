@@ -153,7 +153,6 @@ async function fetchShotSpecificGenerations({
   });
   
   if (dataError) {
-    console.error('[VideoGenMissing] Shot-specific data query failed:', {
       projectId,
       shotId,
       error: dataError,
@@ -420,7 +419,6 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
       try {
         const socket: any = (supabase as any)?.realtime?.socket;
         const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
-        console.warn('[ReconnectionIssue][UnifiedGenerations] Error realtime snapshot', {
           connected: !!socket?.isConnected?.(),
           connState: socket?.connectionState,
           channelCount: channels?.length || 0,
@@ -429,7 +427,6 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
           timestamp: Date.now(),
         });
       } catch {}
-      console.error('[VideoGenMissing] Unified generations query error:', {
         mode: options.mode,
         projectId: options.projectId,
         shotId: options.shotId,
@@ -460,7 +457,6 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   // Track query state changes for UI update debugging
   React.useEffect(() => {
     if (options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
-      console.warn('[ReconnectionIssue][UI_UPDATE_TRACE] UnifiedGenerations query state change', {
         instanceId: hookInstanceIdRef.current,
         cacheKey: cacheKey.join(':'),
         status: query.status,

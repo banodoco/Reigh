@@ -559,7 +559,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       }
     } catch (error) {
       console.error('[TaskProgressDebug] Error fetching tasks for progress:', error);
-      console.error('[PollingBreakageIssue] TaskItem progress check failed:', error);
       toast({
         title: "Error",
         description: "Failed to load tasks for progress computation",

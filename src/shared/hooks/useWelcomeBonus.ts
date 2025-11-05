@@ -55,7 +55,6 @@ export function useWelcomeBonus() {
           }
 
       } catch (error) {
-        console.error('[WelcomeBonus] Unexpected error:', error);
       } finally {
         setIsChecking(false);
       }

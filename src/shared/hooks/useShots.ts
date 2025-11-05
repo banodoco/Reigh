@@ -375,7 +375,6 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         const { data: shotGenerations, error: sgError } = await query;
         
         if (sgError) {
-          console.error('[ShotImageDebug] Error loading shot generations:', sgError, { shotId: shot.id });
           throw sgError;
         }
         
@@ -1665,7 +1664,6 @@ export const useHandleExternalImageDrop = () => {
             thumbnailUrl = uploadResult.thumbnailUrl;
             
             } catch (thumbnailError) {
-            console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${imageFile.name}:`, thumbnailError);
             // Fallback to original upload flow without thumbnail (with progress tracking)
             imageUrl = await uploadImageToStorage(
               imageFile,

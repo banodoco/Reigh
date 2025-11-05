@@ -41,7 +41,6 @@ export const useShotCreation = ({
   // Handle quick create and add shot
   const handleQuickCreateAndAdd = useCallback(async () => {
     if (!selectedProjectId) {
-      console.error('[VisitShotDebug] No project selected');
       return;
     }
     
@@ -72,7 +71,6 @@ export const useShotCreation = ({
       }, 5000);
       
     } catch (error) {
-      console.error('[VisitShotDebug] Error in atomic shot creation:', error);
       toast.error('Failed to create shot and add image');
     } finally {
       setIsCreatingShot(false);
