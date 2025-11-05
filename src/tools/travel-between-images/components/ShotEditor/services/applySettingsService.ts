@@ -120,8 +120,6 @@ export interface ApplyContext {
 // ==================== Fetch Task ====================
 
 export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
-  console.log('[ApplySettings] 📡 Fetching task from database...');
-  
   const { data: taskRow, error } = await supabase
     .from('tasks')
     .select('*')
@@ -133,34 +131,10 @@ export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
     return null;
   }
   
-  console.log('[ApplySettings] ✅ Task fetched successfully');
-  
   const params: any = taskRow.params || {};
   // FIX: Structure video is stored in orchestrator_details (new format), 
   // fallback to full_orchestrator_payload (old format)
   const orchestrator: any = params.orchestrator_details || params.full_orchestrator_payload || {};
-  
-  // USE console.error so this shows in production logs
-  console.error('[ApplySettings] 🔍 TASK DATA STRUCTURE:', {
-    hasParams: !!params,
-    hasOrchestratorDetails: !!params.orchestrator_details,
-    hasFullOrchestratorPayload: !!params.full_orchestrator_payload,
-    usingOrchestrator: params.orchestrator_details ? 'orchestrator_details' : (params.full_orchestrator_payload ? 'full_orchestrator_payload' : 'none'),
-    paramsKeys: Object.keys(params).slice(0, 15),
-    orchestratorKeys: Object.keys(orchestrator).slice(0, 15),
-    structureVideoPath: orchestrator.structure_video_path || 'NOT FOUND',
-    basePromptsInOrchestratorDetails: params.orchestrator_details?.base_prompts_expanded,
-    basePromptsInFullPayload: params.full_orchestrator_payload?.base_prompts_expanded,
-    basePromptsInSelectedOrchestrator: orchestrator.base_prompts_expanded,
-    // MOST SUSPECT: Show actual orchestrator content for structure video fields
-    orchestrator_structure_fields: {
-      structure_video_path: orchestrator.structure_video_path,
-      structure_video_treatment: orchestrator.structure_video_treatment,
-      structure_video_motion_strength: orchestrator.structure_video_motion_strength,
-      structure_video_type: orchestrator.structure_video_type,
-      structure_type: orchestrator.structure_type,  // Alternative field name
-    }
-  });
   
   return { params, orchestrator };
 };
@@ -233,41 +207,9 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
   };
   
   // USE console.error for structure video fields so they show in production
-  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (STRUCTURE VIDEO):', {
-    structureVideo: {
-      path: extracted.structureVideoPath || 'NOT SET',
-      type: extracted.structureVideoType,
-      treatment: extracted.structureVideoTreatment,
-      motionStrength: extracted.structureVideoMotionStrength,
-      pathLength: extracted.structureVideoPath?.length || 0,
-      pathPreview: extracted.structureVideoPath ? extracted.structureVideoPath.substring(0, 80) + '...' : 'NULL'
-    },
-    segmentFramesExpanded: extracted.segmentFramesExpanded,
-    hasPhaseConfig: !!extracted.phaseConfig,
-  });
-  
-  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (PROMPTS):', {
-    prompt: extracted.prompt ? `"${extracted.prompt.substring(0, 50)}..."` : undefined,
-    prompts: extracted.prompts ? `${extracted.prompts.length} prompts` : undefined,
-    promptsArray: extracted.prompts?.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
-    negativePrompt: extracted.negativePrompt ? `"${extracted.negativePrompt.substring(0, 30)}..."` : undefined,
-    model: extracted.model,
-    steps: extracted.steps,
-    frames: extracted.frames,
-    context: extracted.context,
-    generationMode: extracted.generationMode,
-    advancedMode: extracted.advancedMode,
-    motionMode: extracted.motionMode,
-    turboMode: extracted.turboMode,
-    enhancePrompt: extracted.enhancePrompt,
-    amountOfMotion: extracted.amountOfMotion,
-    hasLoras: !!(extracted.loras && extracted.loras.length > 0),
-    lorasCount: extracted.loras?.length,
-  });
-  
   // Log warning if structure video appears to exist but wasn't extracted
   if ((taskData.orchestrator.structure_video_path || taskData.params.structure_video_path) && !extracted.structureVideoPath) {
-    console.error('[ApplySettings] ⚠️  Structure video in task params but extraction failed:', {
+    console.warn('[ApplySettings] ⚠️  Structure video in task params but extraction failed:', {
       orchestratorValue: taskData.orchestrator.structure_video_path,
       paramsValue: taskData.params.structure_video_path,
       extractedValue: extracted.structureVideoPath,
@@ -304,100 +246,39 @@ export const applyPromptSettings = async (
 ): Promise<ApplyResult> => {
   // Apply main prompt
   if (typeof settings.prompt === 'string' && settings.prompt.trim()) {
-    console.error('[ApplySettings] 💬 Applying main prompt:', {
-      prompt: `"${settings.prompt.substring(0, 60)}..."`,
-      length: settings.prompt.length
-    });
     context.onBatchVideoPromptChange(settings.prompt);
-  } else {
-    console.error('[ApplySettings] ⏭️  Skipping main prompt (undefined, empty, or not string)');
   }
   
   // Apply individual prompts to pair configs (regardless of current mode)
   // These prompts populate the pair fields whether you're in batch or timeline mode
   if (settings.prompts && settings.prompts.length > 1 && context.updatePairPromptsByIndex) {
-    console.error('[ApplySettings] 📝 === APPLYING INDIVIDUAL PROMPTS TO PAIR CONFIGS ===');
-    console.error('[ApplySettings] 📝 Prompt application details:', {
-      promptCount: settings.prompts.length,
-      hasNegativePrompts: !!(settings.negativePrompts && settings.negativePrompts.length > 0),
-      currentMode: context.currentGenerationMode,
-      hasCallback: !!context.updatePairPromptsByIndex,
-      prompts: settings.prompts.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
-      promptsRaw: settings.prompts, // Show the actual raw values
-      note: 'Prompts applied regardless of current mode'
-    });
-    
     const errors: string[] = [];
     const successes: number[] = [];
     
     for (let i = 0; i < settings.prompts.length; i++) {
-      const rawPrompt = settings.prompts[i];
-      console.error(`[ApplySettings] 🔍 Processing pair ${i}:`, {
-        rawValue: rawPrompt,
-        typeOf: typeof rawPrompt,
-        isString: typeof rawPrompt === 'string',
-        isNull: rawPrompt === null,
-        isUndefined: rawPrompt === undefined,
-        length: rawPrompt?.length,
-        afterTrim: rawPrompt?.trim?.(),
-        afterTrimLength: rawPrompt?.trim?.().length
-      });
       const pairPrompt = settings.prompts[i]?.trim();
       const pairNegativePrompt = settings.negativePrompts?.[i]?.trim() || '';
       
       if (pairPrompt) {
-        console.error(`[ApplySettings] 📝 Applying prompt for pair ${i}:`, {
-          prompt: `"${pairPrompt.substring(0, 40)}..."`,
-          promptLength: pairPrompt.length,
-          hasNegativePrompt: !!pairNegativePrompt
-        });
-        
         try {
           await context.updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
           successes.push(i);
-          console.error(`[ApplySettings] ✅ Successfully saved prompt for pair ${i}`);
         } catch (e) {
           const error = `Failed to apply prompt for pair ${i}: ${e}`;
           console.error(`[ApplySettings] ❌ ${error}`, e);
           errors.push(error);
         }
-      } else {
-        console.error(`[ApplySettings] ⏭️ Skipping pair ${i} - empty prompt`);
       }
     }
-    
-    console.error('[ApplySettings] 📊 PAIR PROMPTS APPLICATION SUMMARY:', {
-      totalPrompts: settings.prompts.length,
-      successCount: successes.length,
-      errorCount: errors.length,
-      skippedCount: settings.prompts.length - successes.length - errors.length,
-      successIndexes: successes,
-      errors: errors
-    });
     
     if (errors.length > 0) {
       return { success: false, settingName: 'prompts', error: errors.join('; ') };
     }
-  } else {
-    console.error('[ApplySettings] ⏭️ SKIPPING INDIVIDUAL PROMPTS:', {
-      hasPrompts: !!settings.prompts,
-      promptsLength: settings.prompts?.length,
-      hasCallback: !!context.updatePairPromptsByIndex,
-      reason: !settings.prompts ? 'no prompts' : 
-              settings.prompts.length <= 1 ? 'only 1 or fewer prompts' : 
-              !context.updatePairPromptsByIndex ? 'callback not available' : 'unknown'
-    });
   }
   
   // Apply negative prompt
   if (settings.negativePrompt !== undefined) {
-    console.log('[ApplySettings] 🚫 Applying negative prompt:', {
-      hasContent: !!settings.negativePrompt,
-      willClear: !settings.negativePrompt
-    });
     context.onSteerableMotionSettingsChange({ negative_prompt: settings.negativePrompt || '' });
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping negative prompt (undefined)');
   }
   
   return { success: true, settingName: 'prompts' };
@@ -409,35 +290,17 @@ export const applyGenerationSettings = async (
 ): Promise<ApplyResult> => {
   // Apply frames
   if (typeof settings.frames === 'number' && !Number.isNaN(settings.frames)) {
-    console.log('[ApplySettings] 🎞️  Applying frames:', {
-      frames: settings.frames,
-      currentFrames: context.batchVideoFrames
-    });
     context.onBatchVideoFramesChange(settings.frames);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping frames (invalid or undefined)');
   }
   
   // Apply context
   if (typeof settings.context === 'number' && !Number.isNaN(settings.context)) {
-    console.log('[ApplySettings] 🔗 Applying context:', {
-      context: settings.context,
-      currentContext: context.batchVideoContext
-    });
     context.onBatchVideoContextChange(settings.context);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping context (invalid or undefined)');
   }
   
   // Apply steps
   if (typeof settings.steps === 'number' && !Number.isNaN(settings.steps)) {
-    console.log('[ApplySettings] 👣 Applying steps:', {
-      steps: settings.steps,
-      currentSteps: context.batchVideoSteps
-    });
     context.onBatchVideoStepsChange(settings.steps);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping steps (invalid or undefined)');
   }
   
   return { success: true, settingName: 'generation' };
@@ -449,36 +312,17 @@ export const applyModeSettings = async (
 ): Promise<ApplyResult> => {
   // Apply generation mode
   if (settings.generationMode && (settings.generationMode === 'batch' || settings.generationMode === 'timeline')) {
-    console.log('[ApplySettings] 🎬 Applying generation mode:', {
-      from: context.currentGenerationMode,
-      to: settings.generationMode
-    });
     context.onGenerationModeChange(settings.generationMode);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping generation mode (invalid or undefined)');
   }
   
   // Apply advanced mode
   if (settings.advancedMode !== undefined) {
-    console.log('[ApplySettings] 🎛️  Applying advanced mode:', {
-      from: context.currentAdvancedMode,
-      to: settings.advancedMode,
-      hasPhaseConfig: !!settings.phaseConfig
-    });
     context.onAdvancedModeChange(settings.advancedMode);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping advanced mode (undefined)');
   }
   
   // Apply motion mode
   if (settings.motionMode !== undefined && context.onMotionModeChange) {
-    console.log('[ApplySettings] 🎨 Applying motion mode:', {
-      from: context.motionMode,
-      to: settings.motionMode
-    });
     context.onMotionModeChange(settings.motionMode);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping motion mode (undefined or no handler)');
   }
   
   return { success: true, settingName: 'modes' };
@@ -490,55 +334,26 @@ export const applyAdvancedModeSettings = async (
 ): Promise<ApplyResult> => {
   // Apply phase config
   if (settings.phaseConfig) {
-    console.log('[ApplySettings] ⚙️  Applying phase configuration:', {
-      num_phases: settings.phaseConfig.num_phases,
-      phases_count: settings.phaseConfig.phases?.length,
-      steps_per_phase: settings.phaseConfig.steps_per_phase,
-      flow_shift: settings.phaseConfig.flow_shift,
-      model_switch_phase: settings.phaseConfig.model_switch_phase,
-      sample_solver: settings.phaseConfig.sample_solver
-    });
     context.onPhaseConfigChange(settings.phaseConfig);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping phase config (undefined)');
   }
   
   // Apply phase preset ID
   if (settings.selectedPhasePresetId !== undefined) {
-    console.log('[ApplySettings] 📌 Applying phase preset ID:', {
-      presetId: settings.selectedPhasePresetId ? settings.selectedPhasePresetId.substring(0, 8) : null
-    });
-    
     if (settings.selectedPhasePresetId && context.onPhasePresetSelect && settings.phaseConfig) {
       context.onPhasePresetSelect(settings.selectedPhasePresetId, settings.phaseConfig);
     } else if (!settings.selectedPhasePresetId && context.onPhasePresetRemove) {
-      console.log('[ApplySettings] 🗑️  Clearing preset (task had no preset selected)');
       context.onPhasePresetRemove();
     }
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping phase preset ID (undefined)');
   }
   
   // Apply turbo mode
   if (settings.turboMode !== undefined && context.onTurboModeChange) {
-    console.log('[ApplySettings] ⚡ Applying turbo mode:', {
-      from: context.turboMode,
-      to: settings.turboMode
-    });
     context.onTurboModeChange(settings.turboMode);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping turbo mode (undefined or no handler)');
   }
   
   // Apply enhance prompt
   if (settings.enhancePrompt !== undefined && context.onEnhancePromptChange) {
-    console.log('[ApplySettings] ✨ Applying enhance prompt:', {
-      from: context.enhancePrompt,
-      to: settings.enhancePrompt
-    });
     context.onEnhancePromptChange(settings.enhancePrompt);
-  } else {
-    console.log('[ApplySettings] ⏭️  Skipping enhance prompt (undefined or no handler)');
   }
   
   return { success: true, settingName: 'advancedMode' };
