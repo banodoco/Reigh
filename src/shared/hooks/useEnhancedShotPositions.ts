@@ -240,19 +240,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // This prevents unpositioned items (timeline_frame = NULL) from appearing on timeline
       const positionedImages = images.filter(img => {
         const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined;
-        
-        // [MagicEditTaskDebug] Log filtering decisions for magic edit generations
-        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
-          console.log('[MagicEditTaskDebug] Timeline mode filtering magic edit generation:', {
-            id: img.id?.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
-            timeline_frame: img.timeline_frame,
-            hasTimelineFrame,
-            willAppearOnTimeline: hasTimelineFrame,
-            type: img.type
-          });
-        }
-        
         return hasTimelineFrame;
       });
       
@@ -267,19 +254,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // Unpositioned items should only appear in the dedicated unpositioned filter
       const positionedImages = images.filter(img => {
         const hasTimelineFrame = img.timeline_frame !== null && img.timeline_frame !== undefined;
-        
-        // [MagicEditTaskDebug] Log filtering decisions for magic edit generations in batch mode
-        if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
-          console.log('[MagicEditTaskDebug] Batch mode filtering magic edit generation:', {
-            id: img.id?.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
-            timeline_frame: img.timeline_frame,
-            hasTimelineFrame,
-            willAppearInBatch: hasTimelineFrame,
-            type: img.type
-          });
-        }
-        
         return hasTimelineFrame;
       });
       
@@ -297,8 +271,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!shotId || shotGenerationIds.length === 0) return;
 
     try {
-      console.log('[EnhancedPrompts-Position] 🧹 Clearing enhanced prompts for generations:', shotGenerationIds.map(id => id.substring(0, 8)));
-
       // Get the generations and their metadata
       const { data: generations, error: fetchError } = await supabase
         .from('shot_generations')
@@ -312,7 +284,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       }
 
       if (!generations || generations.length === 0) {
-        console.log('[EnhancedPrompts-Position] No generations found to clear');
         return;
       }
 
@@ -336,10 +307,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         return { id: gen.id, success: !updateError };
       });
 
-      const results = await Promise.all(updates);
-      const successCount = results.filter(r => r.success).length;
-      
-      console.log(`[EnhancedPrompts-Position] ✅ Cleared ${successCount}/${generations.length} enhanced prompts`);
+      await Promise.all(updates);
 
       // Invalidate cache to refresh UI
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
@@ -475,15 +443,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           itemsToClear.add(itemBeforeB);
         }
         
-        console.log(`[ExchangePositions] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (next neighbor changed):`, {
-          itemA: itemA.id.substring(0, 8),
-          itemB: itemB.id.substring(0, 8),
-          itemBeforeA: itemBeforeA?.substring(0, 8) || 'none',
-          itemBeforeB: itemBeforeB?.substring(0, 8) || 'none',
-          totalToClear: itemsToClear.size,
-          note: 'Exchange swaps positions, so both items and their predecessors affected'
-        });
-        
         clearEnhancedPromptsForGenerations(Array.from(itemsToClear)).catch(err => {
           console.error('[exchangePositions] Error clearing enhanced prompts:', err);
         });
@@ -501,7 +460,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   // Exchange positions without reloading (for batch operations)
   const exchangePositionsNoReload = useCallback(async (shotGenerationIdA: string, shotGenerationIdB: string) => {
     if (!shotId) {
-      console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] ❌ No shotId provided');
       return;
     }
 
@@ -512,25 +470,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     const frameA = itemA?.timeline_frame || 0;
     const frameB = itemB?.timeline_frame || 0;
 
-    console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] 🔀 Exchanging timeline frames:', {
-      shotGenA: shotGenerationIdA.substring(0, 8),
-      shotGenB: shotGenerationIdB.substring(0, 8),
-      genA: itemA?.generation_id?.substring(0, 8),
-      genB: itemB?.generation_id?.substring(0, 8),
-      frameA,
-      frameB,
-      willSkip: frameA === frameB,
-      timestamp: Date.now()
-    });
-
     // Skip no-op exchange (items already have same timeline_frame)
     if (frameA === frameB) {
-      console.log('[BatchModeReorderFlow] [EXCHANGE_NO_RELOAD] ⏭️ Skipping - same timeline_frame');
       return;
     }
 
     try {
-      console.log('[BatchModeReorderFlow] [SQL_CALL] 📞 Calling exchange_timeline_frames RPC...');
       // Use exchange_timeline_frames with shot_generation IDs for precise targeting
       const { data, error } = await (supabase as any).rpc('exchange_timeline_frames', {
         p_shot_id: shotId,
@@ -539,11 +484,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       });
 
       if (error) {
-        console.log('[BatchModeReorderFlow] [SQL_ERROR] ❌ RPC failed:', error);
         throw error;
       }
-
-      console.log('[BatchModeReorderFlow] [SQL_SUCCESS] ✅ exchange_timeline_frames completed');
       
       // Clear enhanced prompts for both swapped items AND items whose next changed
       // Since pair prompts are stored on first item, clear items whose NEXT changed
@@ -563,15 +505,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         itemsToClear.add(itemBeforeB);
       }
       
-      console.log(`[BatchModeReorderFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (next neighbor changed):`, {
-        itemA: shotGenerationIdA.substring(0, 8),
-        itemB: shotGenerationIdB.substring(0, 8),
-        itemBeforeA: itemBeforeA?.substring(0, 8) || 'none',
-        itemBeforeB: itemBeforeB?.substring(0, 8) || 'none',
-        totalToClear: itemsToClear.size,
-        note: 'Exchange swaps positions, so both items and their predecessors affected'
-      });
-      
       clearEnhancedPromptsForGenerations(Array.from(itemsToClear)).catch(err => {
         console.error('[exchangePositionsNoReload] Error clearing enhanced prompts:', err);
       });
@@ -588,62 +521,22 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   // Batch exchange positions - performs multiple exchanges then reloads once
   const batchExchangePositions = useCallback(async (exchanges: Array<{ shotGenerationIdA: string; shotGenerationIdB: string }>) => {
     if (!shotId) {
-      console.log('[BatchModeReorderFlow] [BATCH_EXCHANGE] ❌ No shotId provided');
       return;
     }
 
     if (exchanges.length === 0) {
-      console.log('[BatchModeReorderFlow] [BATCH_EXCHANGE] ❌ No exchanges provided');
       return;
     }
 
-    console.log('[BatchModeReorderFlow] [BATCH_EXCHANGE] 🚀 Starting batch exchange positions:', {
-      shotId: shotId.substring(0, 8),
-      exchangeCount: exchanges.length,
-      exchanges: exchanges.map(ex => ({
-        shotGenA: ex.shotGenerationIdA.substring(0, 8),
-        shotGenB: ex.shotGenerationIdB.substring(0, 8)
-      })),
-      timestamp: Date.now()
-    });
-
-
-    // [TimelineItemMoveSummary] - Log batch position exchanges
-    const positionsBefore = shotGenerations
-      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
-      .map((gen, index) => ({
-        id: gen.generation_id.slice(-8),
-        shotGenId: gen.id.slice(-8),
-        timelineFrame: gen.timeline_frame
-      }));
-
     try {
       // Perform all exchanges without reloading positions each time
-      console.log('[BatchModeReorderFlow] [EXCHANGES_START] 🔄 Starting individual exchanges...');
       for (let i = 0; i < exchanges.length; i++) {
         const exchange = exchanges[i];
-        console.log('[BatchModeReorderFlow] [EXCHANGE_ITEM] 🔀 Processing exchange', i + 1, 'of', exchanges.length, ':', {
-          shotGenA: exchange.shotGenerationIdA.substring(0, 8),
-          shotGenB: exchange.shotGenerationIdB.substring(0, 8)
-        });
         await exchangePositionsNoReload(exchange.shotGenerationIdA, exchange.shotGenerationIdB);
-        console.log('[BatchModeReorderFlow] [EXCHANGE_COMPLETE] ✅ Exchange', i + 1, 'completed');
       }
 
-      console.log('[BatchModeReorderFlow] [RELOAD_POSITIONS] 🔄 All exchanges complete, reloading positions...');
       // Single reload after all exchanges are done
       await loadPositions({ reason: 'reorder' });
-      console.log('[BatchModeReorderFlow] [RELOAD_COMPLETE] ✅ Position reload completed');
-
-      // Log the batch exchange summary after reload
-      const positionsAfter = shotGenerations
-        .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
-        .map((gen, index) => ({
-          id: gen.generation_id.slice(-8),
-          shotGenId: gen.id.slice(-8),
-          timelineFrame: gen.timeline_frame
-        }));
-
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to batch exchange positions';
