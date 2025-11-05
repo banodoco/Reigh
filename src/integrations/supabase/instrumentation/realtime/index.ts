@@ -19,16 +19,17 @@ export function installRealtimeInstrumentationLegacy(supabase: any) {
       Object.defineProperty(realtime, 'socket', {
         get() { return _socket; },
         set(value) {
-          const before = captureRealtimeSnapshot();
-          if (_socket && !value) {
-            console.error('[RealtimeCorruptionTrace] 🎯 realtime.socket SET TO NULL!', { previousValue: _socket, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, corruptionTimeline: [...__CORRUPTION_TIMELINE__], timestamp: Date.now() });
-            addCorruptionEvent('SOCKET_SET_TO_NULL', { previousValue: _socket, newValue: value });
-          } else if (!_socket && value) {
-            ?.readyState, url: (value as any)?.url, realtimeStateBefore: before, timestamp: Date.now() });
-            addCorruptionEvent('SOCKET_SET_TO_WEBSOCKET', { newValue: value });
-          } else if (_socket !== value) {
-            console.error('[RealtimeCorruptionTrace] 🔄 realtime.socket REPLACED:', { previousValue: _socket, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, timestamp: Date.now() });
-            addCorruptionEvent('SOCKET_REPLACED', { previousValue: _socket, newValue: value });
+          if (__CORRUPTION_TRACE_ENABLED__) {
+            const before = captureRealtimeSnapshot();
+            if (_socket && !value) {
+              console.warn('[RealtimeCorruptionTrace] realtime.socket SET TO NULL', { previousValue: _socket, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, corruptionTimeline: [...__CORRUPTION_TIMELINE__], timestamp: Date.now() });
+              addCorruptionEvent('SOCKET_SET_TO_NULL', { previousValue: _socket, newValue: value });
+            } else if (!_socket && value) {
+              addCorruptionEvent('SOCKET_SET_TO_WEBSOCKET', { newValue: value });
+            } else if (_socket !== value) {
+              console.warn('[RealtimeCorruptionTrace] realtime.socket REPLACED', { previousValue: _socket, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, timestamp: Date.now() });
+              addCorruptionEvent('SOCKET_REPLACED', { previousValue: _socket, newValue: value });
+            }
           }
           _socket = value as any;
         },
@@ -40,16 +41,17 @@ export function installRealtimeInstrumentationLegacy(supabase: any) {
         Object.defineProperty(realtime.conn, 'transport', {
           get() { return _transport; },
           set(value) {
-            const before = captureRealtimeSnapshot();
-            if (_transport && !value) {
-              console.error('[RealtimeCorruptionTrace] 🎯 conn.transport SET TO NULL!', { previousValue: _transport, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, corruptionTimeline: [...__CORRUPTION_TIMELINE__], timestamp: Date.now() });
-              addCorruptionEvent('TRANSPORT_SET_TO_NULL', { previousValue: _transport, newValue: value });
-            } else if (!_transport && value) {
-              ?.readyState, url: (value as any)?.url, realtimeStateBefore: before, timestamp: Date.now() });
-              addCorruptionEvent('TRANSPORT_SET_TO_WEBSOCKET', { newValue: value });
-            } else if (_transport !== value) {
-              console.error('[RealtimeCorruptionTrace] 🔄 conn.transport REPLACED:', { previousValue: _transport, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, timestamp: Date.now() });
-              addCorruptionEvent('TRANSPORT_REPLACED', { previousValue: _transport, newValue: value });
+            if (__CORRUPTION_TRACE_ENABLED__) {
+              const before = captureRealtimeSnapshot();
+              if (_transport && !value) {
+                console.warn('[RealtimeCorruptionTrace] conn.transport SET TO NULL', { previousValue: _transport, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, corruptionTimeline: [...__CORRUPTION_TIMELINE__], timestamp: Date.now() });
+                addCorruptionEvent('TRANSPORT_SET_TO_NULL', { previousValue: _transport, newValue: value });
+              } else if (!_transport && value) {
+                addCorruptionEvent('TRANSPORT_SET_TO_WEBSOCKET', { newValue: value });
+              } else if (_transport !== value) {
+                console.warn('[RealtimeCorruptionTrace] conn.transport REPLACED', { previousValue: _transport, newValue: value, stackTrace: new Error().stack, realtimeStateBefore: before, timestamp: Date.now() });
+                addCorruptionEvent('TRANSPORT_REPLACED', { previousValue: _transport, newValue: value });
+              }
             }
             _transport = value as any;
           },

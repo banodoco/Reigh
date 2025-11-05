@@ -31,14 +31,14 @@ export function installWindowOnlyInstrumentationLegacy() {
       };
 
       if (source && source.includes('supabase-js.js') && lineno === 2372) {
-        console.error('[RealtimeCorruptionTrace] 🎯 SUPABASE ERROR CAPTURED!', {
+        console.warn('[RealtimeCorruptionTrace] SUPABASE ERROR CAPTURED', {
           ...errorInfo,
           realtimeSnapshot: captureRealtimeSnapshot(),
           corruptionTimeline: [...__CORRUPTION_TIMELINE__]
         });
         addCorruptionEvent('SUPABASE_ERROR_2372', errorInfo);
       } else if (message && (String(message).includes('supabase') || String(message).includes('realtime') || String(message).includes('websocket'))) {
-        console.error('[RealtimeCorruptionTrace] 🔍 RELATED ERROR:', errorInfo);
+        console.warn('[RealtimeCorruptionTrace] RELATED ERROR', errorInfo);
         addCorruptionEvent('RELATED_ERROR', errorInfo);
       }
 
