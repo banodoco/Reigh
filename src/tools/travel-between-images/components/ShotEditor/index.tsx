@@ -457,19 +457,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const optimizedImages = state.localOrderedShotImages
         .filter(img => img.timeline_frame !== undefined && img.timeline_frame !== null);
       if (optimizedImages.length === state.localOrderedShotImages.length) {
-        console.log('[TimelineWarmup] Using cached localOrderedShotImages for initial render', {
-          shotId: selectedShotId,
-          count: optimizedImages.length
-        });
         return optimizedImages;
       }
       const fallback = orderedShotImages.map(serverImg => {
         const localMatch = state.localOrderedShotImages.find(img => img.id === serverImg.id);
         return localMatch ? { ...localMatch, timeline_frame: serverImg.timeline_frame } : serverImg;
-      });
-      console.log('[TimelineWarmup] Merging local and server images for initial render', {
-        shotId: selectedShotId,
-        count: fallback.length
       });
       return fallback;
     }
@@ -610,7 +602,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Check refs are ready and notify
     const checkRefs = () => {
       if (videoGalleryRef.current && ctaContainerRef.current && refsReady === 0) {
-        console.log('[ShotEditor] Refs are now ready, triggering observer setup');
         setRefsReady(1);
       }
     };
@@ -629,11 +620,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     const galleryEl = videoGalleryRef.current;
     const ctaEl = ctaContainerRef.current;
     if (!galleryEl || !ctaEl) {
-      console.log('[ShotEditor] Refs not ready yet, waiting...', { galleryEl: !!galleryEl, ctaEl: !!ctaEl });
       return;
     }
-    
-    console.log('[ShotEditor] Setting up IntersectionObservers for floating CTA');
     
     let hasScrolledPastGallery = false;
     let isOriginalCtaVisible = false;
@@ -694,13 +682,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Update state immediately with initial values
     updateFloatingState();
-    
-    console.log('[ShotEditor] Initial floating state:', { 
-      hasScrolledPastGallery, 
-      isOriginalCtaVisible, 
-      hasActiveSelection,
-      shouldFloat: hasScrolledPastGallery && !isOriginalCtaVisible && !hasActiveSelection
-    });
     
     return () => {
       galleryObserver.disconnect();
@@ -786,7 +767,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         excludePositioned: settings.excludePositioned ?? true,
         userHasCustomized: true // Mark as customized since this is being called programmatically
       };
-      console.log('[ShotEditor] Updating GenerationsPane settings:', updatedSettings);
       updateShotGenerationsPaneSettings('shot', updatedSettings);
     }
   };
@@ -804,14 +784,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Conservative timeouts to handle poor network conditions gracefully
     // Only trigger recovery for genuinely stuck queries, not slow networks
     const timeoutMs = isMobile ? 8000 : 6000;
-    
-    console.log(`[ShotEditor] Settings loading timeout started: ${timeoutMs}ms for shot ${selectedShot?.id}`, {
-      settingsLoading,
-      isShotUISettingsLoading,
-      isShotLoraSettingsLoading,
-      isMobile,
-      shotId: selectedShot?.id
-    });
     
     // Give ALL settings queries a reasonable grace period before timing-out
     const fallbackTimer = setTimeout(() => {
@@ -916,7 +888,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // CRITICAL: Wait until settings finish loading before tracking changes
     // This prevents treating initial load changes as user actions
     if (isShotUISettingsLoading || settingsLoading) {
-      console.log('[PromptRetentionDebug] [ShotEditor] Settings still loading - skipping step auto-adjustment');
       return;
     }
     
@@ -925,7 +896,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       hasInitializedStepsRef.current = true;
       prevAcceleratedRef.current = accelerated;
       prevModelRef.current = steerableMotionSettings.model_name;
-      console.log('[PromptRetentionDebug] [ShotEditor] Settings loaded - recording initial state, NOT auto-adjusting steps');
       return;
     }
     
@@ -934,12 +904,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Only auto-adjust steps when accelerated mode or model changes (not manual user input)
     if (acceleratedChanged || modelChanged) {
-      console.log('[PromptRetentionDebug] [ShotEditor] Model/accelerated changed - auto-adjusting steps', {
-        acceleratedChanged,
-        modelChanged,
-        from: prevAcceleratedRef.current,
-        to: accelerated
-      });
       updateStepsForCurrentSettings();
     }
     
@@ -951,7 +915,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Reset initialization flag when shot changes
   useEffect(() => {
     hasInitializedStepsRef.current = false;
-    console.log('[PromptRetentionDebug] [ShotEditor] Shot changed - resetting step adjustment initialization');
   }, [selectedShot?.id]);
   
   const setAccelerated = useCallback((value: boolean) => {
