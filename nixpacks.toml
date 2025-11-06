@@ -8,4 +8,10 @@ cmd = "npm ci"
 cmd = "npm run build"
 
 [start]
-cmd = "npm run start:railway" 
+cmd = "npm run start:railway"
+
+# Override the default build command for the Deno provider.
+# When Nixpacks auto-detects Deno files, it will run this harmless
+# command instead of the failing 'deno cache'.
+[providers.deno]
+buildCmd = "echo 'Deno provider detected, but build is being handled by Node.js.'" 
