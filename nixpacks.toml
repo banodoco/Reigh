@@ -1,13 +1,11 @@
-providers = []
-
 [phases.setup]
 nixPkgs = ["nodejs_20", "openssl"]
 
 [phases.install]
-cmd = "npm ci"
+cmds = ["npm ci"]
 
 [phases.build]
-cmd = "npm run build"
+cmds = ["npm run build"]
 
 [start]
 cmd = "npm run serve" 
