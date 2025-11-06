@@ -212,37 +212,64 @@ export async function fetchGenerations(
       excludePositioned: filters.excludePositioned,
       offset,
       limit,
-      strategy: 'SERVER-SIDE PAGINATION with .in() filter'
+      strategy: 'SERVER-SIDE PAGINATION with .in() filter',
+      timestamp: Date.now()
     });
     
     // Get shot associations for filtering
+    const shotGenStartTime = Date.now();
     const { data: shotGenerations, error: sgError } = await supabase
       .from('shot_generations')
       .select('generation_id, timeline_frame')
       .eq('shot_id', filters.shotId);
     
-    if (sgError) throw sgError;
-    
-    console.log('[ShotFilterPagination] 📊 Shot generations for DATA query:', {
-      totalCount: shotGenerations?.length || 0,
-      sample: shotGenerations?.slice(0, 3).map(sg => ({ 
-        id: sg.generation_id.substring(0, 8), 
-        frame: sg.timeline_frame 
-      }))
+    console.log('[ShotFilterPagination] ⏱️ shot_generations query completed:', {
+      duration: `${Date.now() - shotGenStartTime}ms`,
+      hasError: !!sgError,
+      errorMessage: sgError?.message,
+      errorDetails: sgError,
+      resultCount: shotGenerations?.length || 0
     });
     
-    let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
+    if (sgError) {
+      console.error('[ShotFilterPagination] ❌ shot_generations query FAILED:', {
+        error: sgError,
+        message: sgError.message,
+        details: sgError.details,
+        hint: sgError.hint,
+        code: sgError.code
+      });
+      throw sgError;
+    }
+    
+    if (!shotGenerations) {
+      console.error('[ShotFilterPagination] ❌ shot_generations returned null/undefined');
+      return { items: [], total: 0, hasMore: false };
+    }
+    
+    console.log('[ShotFilterPagination] 📊 Shot generations for DATA query:', {
+      totalCount: shotGenerations.length,
+      sample: shotGenerations.slice(0, 5).map(sg => ({ 
+        id: sg.generation_id?.substring(0, 8) || 'NO_ID', 
+        frame: sg.timeline_frame 
+      })),
+      allIds: shotGenerations.map(sg => sg.generation_id?.substring(0, 8)).join(', ')
+    });
+    
+    let generationIds = shotGenerations.map(sg => sg.generation_id).filter(Boolean);
     
     // Filter by timeline_frame if excludePositioned is true
     if (filters.excludePositioned) {
       const unpositionedIds = shotGenerations
-        ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
-        .map(sg => sg.generation_id) || [];
+        .filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
+        .map(sg => sg.generation_id)
+        .filter(Boolean);
       
       console.log('[ShotFilterPagination] 🎯 Filtering to unpositioned only (DATA):', {
         beforeFilter: generationIds.length,
         afterFilter: unpositionedIds.length,
-        positionedCount: shotGenerations?.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length || 0
+        positionedCount: shotGenerations.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length,
+        removedIds: generationIds.filter(id => !unpositionedIds.includes(id)).map(id => id.substring(0, 8))
       });
       
       generationIds = unpositionedIds;
@@ -250,17 +277,22 @@ export async function fetchGenerations(
     
     console.log('[ShotFilterPagination] ✅ Final generation IDs for DATA query:', {
       count: generationIds.length,
-      sample: generationIds.slice(0, 5).map(id => id.substring(0, 8)),
+      requestedOffset: offset,
+      requestedLimit: fetchLimit,
       willFetchRange: `${offset}-${offset + fetchLimit - 1}`,
+      idsForPage: generationIds.slice(offset, offset + fetchLimit).map(id => id.substring(0, 8)),
+      allIdsFirst10: generationIds.slice(0, 10).map(id => id.substring(0, 8)),
       note: 'Using ORDER BY created_at + .range() for consistent pagination'
     });
     
-    if (generationIds.length > 0) {
-      dataQuery = dataQuery.in('id', generationIds);
-    } else {
-      console.log('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
-      // No generations for this shot/filter combination
+    if (generationIds.length === 0) {
+      console.warn('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
       return { items: [], total: 0, hasMore: false };
+    }
+    
+    if (generationIds.length > 0) {
+      console.log('[ShotFilterPagination] 🔧 Adding .in() filter to query with', generationIds.length, 'IDs');
+      dataQuery = dataQuery.in('id', generationIds);
     }
   }
 
@@ -269,25 +301,55 @@ export async function fetchGenerations(
   
   // Execute query with standard server-side pagination
   // The ORDER BY ensures consistent ordering even when using .in() filter
+  console.log('[ShotFilterPagination] 🚀 Executing main query with:', {
+    offset,
+    fetchLimit,
+    range: `${offset}-${offset + fetchLimit - 1}`,
+    hasFilters: !!filters,
+    timestamp: Date.now()
+  });
+  
+  const queryStartTime = Date.now();
   const { data, error } = await dataQuery
     .order('created_at', { ascending: false })
     .range(offset, offset + fetchLimit - 1);
   
-  console.log('[ShotFilterPagination] 📦 Query executed, raw results:', {
+  const queryDuration = Date.now() - queryStartTime;
+  
+  console.log('[ShotFilterPagination] 📦 Main query completed:', {
+    duration: `${queryDuration}ms`,
     itemsReturned: data?.length || 0,
     hasError: !!error,
     errorMessage: error?.message,
+    errorDetails: error,
     offset,
     fetchLimit,
     range: `${offset}-${offset + fetchLimit - 1}`,
     firstItemId: data?.[0]?.id?.substring(0, 8),
     lastItemId: data?.[data.length - 1]?.id?.substring(0, 8),
+    allReturnedIds: data?.map(d => d.id?.substring(0, 8)).join(', '),
     WARNING: data?.length === 0 ? '⚠️ EMPTY RESULT SET - This page will show as empty!' : null
   });
   
   if (error) {
-    console.error('[ShotFilterPagination] ❌ Query error:', error);
+    console.error('[ShotFilterPagination] ❌ Main query FAILED:', {
+      error,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      queryParams: {
+        offset,
+        limit: fetchLimit,
+        filters
+      }
+    });
     throw error;
+  }
+  
+  if (!data) {
+    console.error('[ShotFilterPagination] ❌ Main query returned null/undefined');
+    return { items: [], total: totalCount, hasMore: false };
   }
 
   // [UpscaleDebug] ALWAYS log to confirm function is running
@@ -343,10 +405,15 @@ export async function fetchGenerations(
     limit,
     filters: {
       shotId: filters?.shotId?.substring(0, 8),
-      excludePositioned: filters?.excludePositioned
+      excludePositioned: filters?.excludePositioned,
+      toolType: filters?.toolType,
+      mediaType: filters?.mediaType
     },
     firstItemId: items[0]?.id?.substring(0, 8),
     lastItemId: items[items.length - 1]?.id?.substring(0, 8),
+    allItemIds: items.map(i => i.id?.substring(0, 8)).join(', '),
+    expectedRange: `${offset}-${offset + limit - 1}`,
+    WARNING: items.length === 0 ? '⚠️⚠️⚠️ RETURNING EMPTY ARRAY - UI WILL SHOW NO ITEMS!' : null,
     timestamp: Date.now()
   });
 
