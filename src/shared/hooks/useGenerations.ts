@@ -212,8 +212,15 @@ export async function fetchGenerations(
       throw countError;
     }
     console.error('[ShotFilterPagination] No error, continuing...');
-    totalCount = count || 0;
-    console.error('[ShotFilterPagination] Total count set to:', totalCount);
+    console.error('[ShotFilterPagination] Count value is:', count);
+    console.error('[ShotFilterPagination] Count type:', typeof count);
+    try {
+      totalCount = count || 0;
+      console.error('[ShotFilterPagination] Total count set to:', totalCount);
+    } catch (e) {
+      console.error('[ShotFilterPagination] ❌ ERROR setting totalCount:', e);
+      throw e;
+    }
   } else {
     console.error('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
   }
@@ -519,6 +526,11 @@ export async function fetchGenerations(
     timestamp: Date.now()
   });
 
+  console.error('[ShotFilterPagination] 🎉 FUNCTION COMPLETE - About to return');
+  console.error('[ShotFilterPagination] Final items count:', items.length);
+  console.error('[ShotFilterPagination] Final total:', totalCount);
+  console.error('[ShotFilterPagination] Final hasMore:', hasMore);
+  
   return { items, total: totalCount, hasMore };
 }
 
