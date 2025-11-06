@@ -69,6 +69,8 @@ const JoinClipsPage: React.FC = () => {
   const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
   
   // Global settings
+  const [globalPrompt, setGlobalPrompt] = useState('');
+  const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
   const [negativePrompt, setNegativePrompt] = useState('');
   const [contextFrameCount, setContextFrameCount] = useState(10);
   const [gapFrameCount, setGapFrameCount] = useState(33);
@@ -188,6 +190,9 @@ const JoinClipsPage: React.FC = () => {
     if (settings?.negativePrompt !== undefined) {
       setNegativePrompt(settings.negativePrompt);
     }
+    if (settings?.prompt !== undefined) {
+      setGlobalPrompt(settings.prompt);
+    }
   }, [settings]);
   
   // Initialize clips from settings (legacy two-video support) or create 2 empty slots
@@ -198,7 +203,7 @@ const JoinClipsPage: React.FC = () => {
       if (settings.startingVideoUrl) {
         initialClips.push({
           id: crypto.randomUUID(),
-          url: settings.startingVideoUrl,
+        url: settings.startingVideoUrl,
           posterUrl: settings.startingVideoPosterUrl,
           loaded: false,
           playing: false
@@ -208,7 +213,7 @@ const JoinClipsPage: React.FC = () => {
       if (settings.endingVideoUrl) {
         initialClips.push({
           id: crypto.randomUUID(),
-          url: settings.endingVideoUrl,
+        url: settings.endingVideoUrl,
           posterUrl: settings.endingVideoPosterUrl,
           loaded: false,
           playing: false
@@ -264,16 +269,16 @@ const JoinClipsPage: React.FC = () => {
   useEffect(() => {
     clips.forEach(clip => {
       const video = videoRefs.current[clip.id];
-      if (video) {
-        const preventPlay = () => video.pause();
-        video.addEventListener('play', preventPlay);
-        video.pause();
-        
-        return () => video.removeEventListener('play', preventPlay);
-      }
+    if (video) {
+      const preventPlay = () => video.pause();
+      video.addEventListener('play', preventPlay);
+      video.pause();
+
+      return () => video.removeEventListener('play', preventPlay);
+    }
     });
   }, [clips]);
-  
+
   // Track scroll state
   useEffect(() => {
     const handleScroll = () => {
@@ -288,7 +293,7 @@ const JoinClipsPage: React.FC = () => {
   
   // Helper to upload video
   const uploadVideoFile = async (
-    file: File,
+    file: File, 
     clipId: string
   ): Promise<{ videoUrl: string; posterUrl: string } | null> => {
     if (!file.type.startsWith('video/')) {
@@ -471,9 +476,25 @@ const JoinClipsPage: React.FC = () => {
       
       // Build per-join settings (one for each transition)
       const perJoinSettings = validClips.slice(1).map((clip, index) => {
-        const transitionPrompt = transitionPrompts.find(p => p.id === clip.id);
+        let finalPrompt = '';
+        
+        if (useIndividualPrompts) {
+          // Individual prompts mode: combine individual + global
+          const individualPrompt = transitionPrompts.find(p => p.id === clip.id)?.prompt || '';
+          if (individualPrompt && globalPrompt) {
+            finalPrompt = `${individualPrompt}. ${globalPrompt}`;
+          } else if (individualPrompt) {
+            finalPrompt = individualPrompt;
+          } else {
+            finalPrompt = globalPrompt;
+          }
+        } else {
+          // Global prompt only mode
+          finalPrompt = globalPrompt;
+        }
+        
         return {
-          prompt: transitionPrompt?.prompt || ''
+          prompt: finalPrompt
         };
       });
       
@@ -557,7 +578,7 @@ const JoinClipsPage: React.FC = () => {
     <PageFadeIn>
       <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
+        <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
           <Button
             onClick={handleAddClip}
             variant="outline"
@@ -598,7 +619,7 @@ const JoinClipsPage: React.FC = () => {
                       className={cn(
                         "aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative",
                         draggingOverClipId === clip.id 
-                          ? 'border-primary bg-primary/10' 
+                  ? 'border-primary bg-primary/10' 
                           : 'border-border hover:border-primary/50',
                         !clip.url && uploadingClipId !== clip.id ? 'cursor-pointer' : ''
                       )}
@@ -609,17 +630,17 @@ const JoinClipsPage: React.FC = () => {
                       onClick={() => !clip.url && uploadingClipId !== clip.id && fileInputRefs.current[clip.id]?.click()}
                     >
                       {uploadingClipId === clip.id ? (
-                        <UploadingVideoState />
+                <UploadingVideoState />
                       ) : clip.url ? (
-                        <>
+                <>
                           {!clip.loaded && <VideoContainerSkeleton />}
                           {!clip.playing && clip.posterUrl ? (
-                            <>
-                              <img
+                    <>
+                      <img
                                 src={clip.posterUrl}
-                                alt="Video poster"
-                                className={cn(
-                                  'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
+                        alt="Video poster"
+                        className={cn(
+                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                                   clip.loaded ? 'opacity-100' : 'opacity-0'
                                 )}
                                 onLoad={() => {
@@ -628,8 +649,8 @@ const JoinClipsPage: React.FC = () => {
                                   ));
                                 }}
                               />
-                              <div 
-                                className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
                                 onClick={() => {
                                   setClips(prev => prev.map(c => 
                                     c.id === clip.id ? { ...c, playing: true } : c
@@ -638,35 +659,35 @@ const JoinClipsPage: React.FC = () => {
                               >
                                 <div className="bg-black/50 rounded-full p-3 hover:bg-black/70 transition-colors">
                                   <Play className="h-8 w-8 text-white" fill="white" />
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <video
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <video
                               ref={el => { videoRefs.current[clip.id] = el; }}
                               src={clip.url}
-                              controls
+                      controls
                               autoPlay={clip.playing}
-                              preload="metadata"
-                              playsInline
-                              muted
-                              className={cn(
-                                'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
+                      preload="metadata"
+                      playsInline
+                      muted
+                      className={cn(
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
                                 clip.loaded ? 'opacity-100' : 'opacity-0'
-                              )}
-                              onLoadedData={() => {
+                      )}
+                      onLoadedData={() => {
                                 setClips(prev => prev.map(c => 
                                   c.id === clip.id ? { ...c, loaded: true } : c
                                 ));
-                              }}
-                            />
-                          )}
-                          <Button
-                            variant="destructive"
-                            size="icon"
+                      }}
+                    />
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="icon"
                             className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg z-10"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                    onClick={(e) => {
+                      e.stopPropagation();
                               setClips(prev => prev.map(c => 
                                 c.id === clip.id ? { ...c, url: '', posterUrl: undefined, loaded: false, playing: false } : c
                               ));
@@ -674,16 +695,16 @@ const JoinClipsPage: React.FC = () => {
                             disabled={uploadingClipId === clip.id}
                           >
                             <X className="h-3 w-3" />
-                          </Button>
+                  </Button>
                           {draggingOverClipId === clip.id && !isScrolling && (
-                            <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
                               <p className="text-sm font-medium text-foreground">Drop to replace</p>
-                            </div>
-                          )}
-                        </>
-                      ) : !settingsLoaded ? (
-                        <VideoContainerSkeleton />
-                      ) : (
+                    </div>
+                  )}
+                </>
+              ) : !settingsLoaded ? (
+                <VideoContainerSkeleton />
+              ) : (
                         <div className="text-center p-4 pointer-events-none">
                           <Film className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                           <p className="text-xs text-muted-foreground mb-1">
@@ -691,140 +712,181 @@ const JoinClipsPage: React.FC = () => {
                           </p>
                           <p className="text-[10px] text-muted-foreground">
                             {draggingOverClipId === clip.id ? '' : 'MP4, WebM, MOV'}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      ref={el => { fileInputRefs.current[clip.id] = el; }}
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      onChange={(e) => handleVideoUpload(e, clip.id)}
-                    />
+                  </p>
                 </div>
-                
-                {/* Transition Prompt (if not last clip) */}
-                {index < clips.length - 1 && (
+              )}
+            </div>
+            <input
+                      ref={el => { fileInputRefs.current[clip.id] = el; }}
+              type="file"
+              accept="video/*"
+              className="hidden"
+                      onChange={(e) => handleVideoUpload(e, clip.id)}
+            />
+          </div>
+
+                {/* Transition Prompt (if not last clip and individual prompts enabled) */}
+                {index < clips.length - 1 && useIndividualPrompts && (
                   <div className="space-y-2 pt-2 border-t">
                     <Label htmlFor={`prompt-${clips[index + 1].id}`} className="text-xs text-muted-foreground">
                       Transition to Clip #{index + 2}
-                    </Label>
+                </Label>
                     <Textarea
                       id={`prompt-${clips[index + 1].id}`}
                       value={transitionPrompts.find(p => p.id === clips[index + 1].id)?.prompt || ''}
                       onChange={(e) => handlePromptChange(clips[index + 1].id, e.target.value)}
-                      placeholder="Describe transition (optional)"
+                      placeholder="Additional details for this transition (optional)"
                       rows={2}
                       className="resize-none text-sm"
                     />
-                  </div>
-                )}
               </div>
+                )}
+            </div>
             </div>
           ))
         }
-        </div>
+          </div>
 
         {/* Global Settings */}
         <div className="space-y-6 pt-6 border-t">
           <h2 className="text-xl font-medium">Global Settings</h2>
             
-            {/* Frame Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+          {/* Frame Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
                   <Label htmlFor="gapFrameCount" className="text-sm">
-                    Gap Frames
-                  </Label>
-                  <span className="text-sm font-medium">{gapFrameCount}</span>
-                </div>
-                <Slider
-                  id="gapFrameCount"
-                  min={1}
-                  max={Math.max(1, 81 - (contextFrameCount * 2))}
-                  step={1}
-                  value={[Math.max(1, gapFrameCount)]}
-                  onValueChange={(values) => {
-                    const val = Math.max(1, values[0]);
-                    setGapFrameCount(val);
-                    updateSettings('project', { ...settings, gapFrameCount: val });
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">Frames to generate in each transition</p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="contextFrameCount" className="text-sm">
-                  Context Frames
+                  Gap Frames
                 </Label>
-                <Input
-                  id="contextFrameCount"
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={contextFrameCount}
-                  onChange={(e) => {
-                    const val = Math.max(1, parseInt(e.target.value) || 1);
-                    if (!isNaN(val) && val > 0) {
-                      setContextFrameCount(val);
-                      const maxGap = Math.max(1, 81 - (val * 2));
-                      const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                      if (gapFrameCount > maxGap) {
-                        setGapFrameCount(maxGap);
-                      }
-                      
-                      if (contextFramesTimerRef.current) {
-                        clearTimeout(contextFramesTimerRef.current);
-                      }
-                      contextFramesTimerRef.current = setTimeout(() => {
-                        updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
-                      }, 300);
-                    }
-                  }}
-                  className="text-center"
-                />
-                <p className="text-xs text-muted-foreground">Context frames from each clip</p>
+                <span className="text-sm font-medium">{gapFrameCount}</span>
               </div>
+              <Slider
+                  id="gapFrameCount"
+                min={1}
+                max={Math.max(1, 81 - (contextFrameCount * 2))}
+                step={1}
+                value={[Math.max(1, gapFrameCount)]}
+                onValueChange={(values) => {
+                  const val = Math.max(1, values[0]);
+                  setGapFrameCount(val);
+                  updateSettings('project', { ...settings, gapFrameCount: val });
+                }}
+              />
+                <p className="text-xs text-muted-foreground">Frames to generate in each transition</p>
+            </div>
               
+            <div className="space-y-2">
+                <Label htmlFor="contextFrameCount" className="text-sm">
+                Context Frames
+              </Label>
+              <Input
+                  id="contextFrameCount"
+                type="number"
+                min={1}
+                max={30}
+                value={contextFrameCount}
+                onChange={(e) => {
+                  const val = Math.max(1, parseInt(e.target.value) || 1);
+                  if (!isNaN(val) && val > 0) {
+                    setContextFrameCount(val);
+                    const maxGap = Math.max(1, 81 - (val * 2));
+                    const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
+                    if (gapFrameCount > maxGap) {
+                      setGapFrameCount(maxGap);
+                    }
+                    
+                    if (contextFramesTimerRef.current) {
+                      clearTimeout(contextFramesTimerRef.current);
+                    }
+                    contextFramesTimerRef.current = setTimeout(() => {
+                      updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
+                    }, 300);
+                  }
+                }}
+                className="text-center"
+              />
+                <p className="text-xs text-muted-foreground">Context frames from each clip</p>
+          </div>
+          
               <div className="flex flex-col justify-center space-y-2">
-                <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
+          <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
                   <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
-                    Replace Frames
-                  </Label>
-                  <Switch
+              Replace Frames
+            </Label>
+            <Switch
                     id="replaceMode"
-                    checked={!replaceMode}
-                    onCheckedChange={(checked) => {
-                      setReplaceMode(!checked);
-                      updateSettings('project', { ...settings, replaceMode: !checked });
-                    }}
-                  />
+              checked={!replaceMode}
+              onCheckedChange={(checked) => {
+                setReplaceMode(!checked);
+                updateSettings('project', { ...settings, replaceMode: !checked });
+              }}
+            />
                   <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
-                    Generate New
-                  </Label>
+              Generate New
+            </Label>
+                </div>
+          </div>
+        </div>
+
+            {/* Prompts and LoRA */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                {/* Global Prompt */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="globalPrompt">Global Prompt</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="useIndividualPrompts" className="text-xs text-muted-foreground cursor-pointer">
+                        Set individually
+                      </Label>
+                      <Switch
+                        id="useIndividualPrompts"
+                        checked={useIndividualPrompts}
+                        onCheckedChange={setUseIndividualPrompts}
+                      />
+                    </div>
+                  </div>
+                  <Textarea
+                    id="globalPrompt"
+                    value={globalPrompt}
+                    onChange={(e) => {
+                      const newGlobalPrompt = e.target.value;
+                      setGlobalPrompt(newGlobalPrompt);
+                      updateSettings('project', { ...settings, prompt: newGlobalPrompt });
+                    }}
+                    placeholder={useIndividualPrompts 
+                      ? "Appended to each individual transition prompt" 
+                      : "Describe what you want for all transitions"
+                    }
+                    rows={3}
+                    className="resize-none"
+                  />
+                  {useIndividualPrompts && (
+                    <p className="text-xs text-muted-foreground">
+                      💡 This will be inserted after each individual prompt
+                    </p>
+                  )}
+                </div>
+                
+                {/* Negative Prompt */}
+                <div className="space-y-2">
+                  <Label htmlFor="negativePrompt">Negative Prompt</Label>
+                  <Textarea
+                    id="negativePrompt"
+                    value={negativePrompt}
+                    onChange={(e) => {
+                      const newNegativePrompt = e.target.value;
+                      setNegativePrompt(newNegativePrompt);
+                      updateSettings('project', { ...settings, negativePrompt: newNegativePrompt });
+                    }}
+                    placeholder="What to avoid in all transitions (optional)"
+                    rows={3}
+                    className="resize-none"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Negative Prompt and LoRA */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="negativePrompt">Global Negative Prompt</Label>
-                <Textarea
-                  id="negativePrompt"
-                  value={negativePrompt}
-                  onChange={(e) => {
-                    const newNegativePrompt = e.target.value;
-                    setNegativePrompt(newNegativePrompt);
-                    updateSettings('project', { ...settings, negativePrompt: newNegativePrompt });
-                  }}
-                  placeholder="What to avoid in all transitions (optional)"
-                  rows={3}
-                  className="resize-none"
-                />
-              </div>
-
+              {/* LoRA Section */}
               <div className="space-y-2">
                 <LoraManager
                   availableLoras={availableLoras}
@@ -841,19 +903,19 @@ const JoinClipsPage: React.FC = () => {
 
         {/* Generate Button */}
         <div className="flex justify-center">
-            <Button
-              onClick={handleGenerate}
+          <Button
+            onClick={handleGenerate}
               disabled={clips.filter(c => c.url).length < 2 || generateJoinClipsMutation.isPending || showSuccessState}
               className="w-full max-w-md"
-              size="lg"
-              variant={showSuccessState ? 'default' : 'default'}
-            >
-              {generateJoinClipsMutation.isPending 
-                ? 'Creating Task...' 
-                : showSuccessState 
-                ? '✓ Task Created!' 
+            size="lg"
+            variant={showSuccessState ? 'default' : 'default'}
+          >
+            {generateJoinClipsMutation.isPending 
+              ? 'Creating Task...' 
+              : showSuccessState 
+              ? '✓ Task Created!' 
                 : `Generate (${clips.filter(c => c.url).length - 1} transition${clips.filter(c => c.url).length - 1 !== 1 ? 's' : ''})`}
-            </Button>
+          </Button>
         </div>
 
         {/* Results Gallery */}
