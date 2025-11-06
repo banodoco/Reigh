@@ -86,9 +86,13 @@ export async function fetchGenerations(
   let shotFilterGenerationIds: string[] | null = null;
   let usedChunkedCounting = false;
   
+  console.error('[ShotFilterPagination] 🔍 Shot filter check for COUNT');
+  console.error('[ShotFilterPagination] Has shotId?:', !!filters?.shotId);
+  console.error('[ShotFilterPagination] shotId value:', filters?.shotId);
+  
   // Apply shot filter if provided
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] 🔍 Applying shot filter to COUNT query');
+    console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query');
     console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
     console.error('[ShotFilterPagination] Exclude positioned:', filters.excludePositioned);
     
@@ -133,6 +137,7 @@ export async function fetchGenerations(
     
     // Store for use in data query
     shotFilterGenerationIds = generationIds;
+    console.error('[ShotFilterPagination] 📌 Stored shotFilterGenerationIds for data query:', generationIds.length, 'IDs');
     
     // 🔧 FIX: Chunk large ID arrays to avoid Postgres IN clause limits
     // Postgres has a limit on the number of parameters in an IN clause (~1000)
@@ -261,11 +266,17 @@ export async function fetchGenerations(
   }
 
   // Apply shot filter to data query - use IDs we already fetched
+  console.error('[ShotFilterPagination] 🔍 DATA query shot filter check');
+  console.error('[ShotFilterPagination] Has shotId filter?:', !!filters?.shotId);
+  console.error('[ShotFilterPagination] shotId value:', filters?.shotId?.substring(0, 8));
+  console.error('[ShotFilterPagination] shotFilterGenerationIds set?:', !!shotFilterGenerationIds);
+  console.error('[ShotFilterPagination] shotFilterGenerationIds count:', shotFilterGenerationIds?.length);
+  
   if (filters?.shotId && shotFilterGenerationIds) {
     const generationIds = shotFilterGenerationIds;
     const CHUNK_SIZE = 500;
     
-    console.error('[ShotFilterPagination] 🔍 Applying shot filter to DATA query');
+    console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query');
     console.error('[ShotFilterPagination] ID count:', generationIds.length);
     console.error('[ShotFilterPagination] Offset:', offset);
     console.error('[ShotFilterPagination] Limit:', limit);
@@ -388,14 +399,13 @@ export async function fetchGenerations(
   
   // Execute query with standard server-side pagination
   // The ORDER BY ensures consistent ordering even when using .in() filter
-  console.error('[ShotFilterPagination] 🚀 Executing main query with:', {
-    offset,
-    fetchLimit,
-    range: `${offset}-${offset + fetchLimit - 1}`,
-    hasFilters: !!filters,
-    hasShotFilter: !!filters?.shotId,
-    timestamp: Date.now()
-  });
+  console.error('[ShotFilterPagination] 🚀 About to execute main query');
+  console.error('[ShotFilterPagination] Offset:', offset);
+  console.error('[ShotFilterPagination] Fetch limit:', fetchLimit);
+  console.error('[ShotFilterPagination] Range:', `${offset}-${offset + fetchLimit - 1}`);
+  console.error('[ShotFilterPagination] Has filters?:', !!filters);
+  console.error('[ShotFilterPagination] Has shot filter?:', !!filters?.shotId);
+  console.error('[ShotFilterPagination] Note: This should NOT execute if large shot filter returned early');
   
   const queryStartTime = Date.now();
   const { data, error } = await dataQuery
