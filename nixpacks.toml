@@ -1,6 +1,9 @@
 [phases.setup]
 nixPkgs = ["nodejs_20", "bun", "openssl"]
 
+[phases.install]
+cmd = "npm ci"
+
 [phases.build]
 cmd = "npm run build"
 

@@ -1,0 +1,5 @@
+# Ignore Deno files - we don't need them for frontend build
+src/integrations/supabase/instrumentation/
+deno.json
+deno.lock
+
