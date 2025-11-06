@@ -50,7 +50,9 @@ export async function fetchGenerations(
     .eq('project_id', projectId);
 
   // Apply server-side filters to count query
-  if (filters?.toolType) {
+  // NOTE: Skip tool type filter when shot filter is active - shot filter takes precedence
+  // Users want to see ALL generations in a shot, not just ones from the current tool
+  if (filters?.toolType && !filters?.shotId) {
     // Filter by tool type in metadata
     if (filters.toolType === 'image-generation') {
       // Filter by tool_type in params for image-generation
@@ -172,7 +174,8 @@ export async function fetchGenerations(
     .eq('project_id', projectId);
 
   // Apply same filters to data query
-  if (filters?.toolType) {
+  // NOTE: Skip tool type filter when shot filter is active - shot filter takes precedence
+  if (filters?.toolType && !filters?.shotId) {
     if (filters.toolType === 'image-generation') {
       // Filter by tool_type in params for image-generation
       dataQuery = dataQuery.eq('params->>tool_type', 'image-generation');
