@@ -273,12 +273,17 @@ export async function fetchGenerations(
     // 🔧 FIX: For large ID sets, we need to use chunked querying
     // Cannot use .in() with 1000+ IDs due to Postgres parameter limits
     if (generationIds.length > CHUNK_SIZE) {
-      console.error('[ShotFilterPagination] 🔄 Large ID set for DATA query, using chunked fetch');
-      console.error('[ShotFilterPagination] Will fetch in', Math.ceil(generationIds.length / CHUNK_SIZE), 'chunks');
+      console.error('[ShotFilterPagination] 🔄 Large ID set for DATA query, using optimized chunked fetch');
+      console.error('[ShotFilterPagination] Total IDs:', generationIds.length);
       
-      // Strategy: Fetch all matching records in chunks, then sort and paginate client-side
-      // This is necessary because we can't use .in() with 1000+ IDs
-      let allItems: any[] = [];
+      // OPTIMIZED Strategy: 
+      // 1. Fetch ONLY id + created_at for all matching records (lightweight)
+      // 2. Sort by created_at client-side
+      // 3. Get IDs for the specific page needed
+      // 4. Fetch full data for ONLY those page IDs (small query)
+      
+      console.error('[ShotFilterPagination] Step 1: Fetching lightweight id+timestamp data');
+      let allIdTimestamps: Array<{ id: string; created_at: string }> = [];
       const chunks = Math.ceil(generationIds.length / CHUNK_SIZE);
       
       for (let i = 0; i < chunks; i++) {
@@ -286,55 +291,88 @@ export async function fetchGenerations(
         const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
         const chunk = generationIds.slice(start, end);
         
-        console.error(`[ShotFilterPagination] Fetching DATA chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        console.error(`[ShotFilterPagination] Fetching timestamps chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
         
-        // Build query for this chunk
+        // Fetch ONLY id and created_at (very lightweight)
         let chunkQuery = supabase
           .from('generations')
-          .select(`
-            id,
-            type,
-            params,
-            status,
-            created_at,
-            output,
-            error,
-            user_id,
-            starred
-          `)
+          .select('id, created_at')
           .eq('user_id', userId)
-          .in('id', chunk)
-          .order('created_at', { ascending: false });
+          .in('id', chunk);
         
         const { data: chunkData, error: chunkError } = await chunkQuery;
         
         if (chunkError) {
-          console.error(`[ShotFilterPagination] ❌ DATA chunk ${i + 1} error:`, chunkError);
+          console.error(`[ShotFilterPagination] ❌ Timestamp chunk ${i + 1} error:`, chunkError);
           throw chunkError;
         }
         
         if (chunkData) {
-          allItems = allItems.concat(chunkData);
-          console.error(`[ShotFilterPagination] DATA chunk ${i + 1} fetched:`, chunkData.length, 'items');
+          allIdTimestamps = allIdTimestamps.concat(chunkData);
+          console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1} fetched:`, chunkData.length, 'records');
         }
       }
       
-      console.error('[ShotFilterPagination] 📦 All chunks fetched');
-      console.error('[ShotFilterPagination] Total items:', allItems.length);
+      console.error('[ShotFilterPagination] Step 2: Sorting by created_at');
+      console.error('[ShotFilterPagination] Total records:', allIdTimestamps.length);
       
       // Sort by created_at descending (same as ORDER BY in query)
-      allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      allIdTimestamps.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      // Apply pagination client-side
-      const paginatedItems = allItems.slice(offset, offset + limit);
-      const hasMore = allItems.length > offset + limit;
+      // Get IDs for the specific page
+      const pageIdTimestamps = allIdTimestamps.slice(offset, offset + limit);
+      const pageIds = pageIdTimestamps.map(item => item.id);
       
-      console.error('[ShotFilterPagination] 📄 Paginated results');
-      console.error('[ShotFilterPagination] Page items:', paginatedItems.length);
-      console.error('[ShotFilterPagination] Has more:', hasMore);
+      console.error('[ShotFilterPagination] Step 3: Identified page IDs');
+      console.error('[ShotFilterPagination] Page IDs count:', pageIds.length);
+      console.error('[ShotFilterPagination] Sample page IDs:', pageIds.slice(0, 5).map(id => id.substring(0, 8)));
+      
+      if (pageIds.length === 0) {
+        console.error('[ShotFilterPagination] No items for this page');
+        return {
+          items: [],
+          total: totalCount,
+          hasMore: false
+        };
+      }
+      
+      // Fetch full data for ONLY the page IDs (small query, no chunking needed)
+      console.error('[ShotFilterPagination] Step 4: Fetching full data for page IDs');
+      const { data: pageItems, error: pageError } = await supabase
+        .from('generations')
+        .select(`
+          id,
+          type,
+          params,
+          status,
+          created_at,
+          output,
+          error,
+          user_id,
+          starred
+        `)
+        .in('id', pageIds);
+      
+      if (pageError) {
+        console.error('[ShotFilterPagination] ❌ Page data fetch error:', pageError);
+        throw pageError;
+      }
+      
+      console.error('[ShotFilterPagination] Page data fetched:', pageItems?.length || 0, 'items');
+      
+      // Sort page items to match the order from our sorted timestamps
+      const sortedPageItems = pageIds
+        .map(id => pageItems?.find(item => item.id === id))
+        .filter(Boolean);
+      
+      const hasMore = allIdTimestamps.length > offset + limit;
+      
+      console.error('[ShotFilterPagination] ✅ Optimized pagination complete');
+      console.error('[ShotFilterPagination] Returned items:', sortedPageItems.length);
+      console.error('[ShotFilterPagination] Has more pages:', hasMore);
       
       return {
-        items: paginatedItems,
+        items: sortedPageItems,
         total: totalCount,
         hasMore
       };
