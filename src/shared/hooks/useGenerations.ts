@@ -82,12 +82,15 @@ export async function fetchGenerations(
     countQuery = countQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
+  // Store shot filter IDs for later use in data query
+  let shotFilterGenerationIds: string[] | null = null;
+  let usedChunkedCounting = false;
+  
   // Apply shot filter if provided
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] 🔍 Applying shot filter to COUNT query:', {
-      shotId: filters.shotId.substring(0, 8),
-      excludePositioned: filters.excludePositioned
-    });
+    console.error('[ShotFilterPagination] 🔍 Applying shot filter to COUNT query');
+    console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
+    console.error('[ShotFilterPagination] Exclude positioned:', filters.excludePositioned);
     
     // Get generation IDs associated with this shot
     const { data: shotGenerations, error: sgError } = await supabase
@@ -95,25 +98,14 @@ export async function fetchGenerations(
       .select('generation_id, timeline_frame')
       .eq('shot_id', filters.shotId);
     
-    console.error('[ShotFilterPagination] 📊 Shot generations COUNT lookup result:', {
-      hasError: !!sgError,
-      errorMessage: sgError?.message,
-      errorDetails: sgError?.details,
-      resultCount: shotGenerations?.length || 0
-    });
+    console.error('[ShotFilterPagination] 📊 Shot generations lookup completed');
+    console.error('[ShotFilterPagination] Has error:', !!sgError);
+    console.error('[ShotFilterPagination] Result count:', shotGenerations?.length || 0);
     
     if (sgError) {
-      console.error('[ShotFilterPagination] ❌ Shot generations COUNT lookup failed:', sgError);
+      console.error('[ShotFilterPagination] ❌ Shot generations lookup failed:', sgError);
       throw sgError;
     }
-    
-    console.log('[ShotFilterPagination] 📊 Shot generations for COUNT query:', {
-      totalCount: shotGenerations?.length || 0,
-      sample: shotGenerations?.slice(0, 3).map(sg => ({ 
-        id: sg.generation_id.substring(0, 8), 
-        frame: sg.timeline_frame 
-      }))
-    });
     
     let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
     
@@ -123,33 +115,80 @@ export async function fetchGenerations(
         ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
         .map(sg => sg.generation_id) || [];
       
-      console.log('[ShotFilterPagination] 🎯 Filtering to unpositioned only:', {
-        beforeFilter: generationIds.length,
-        afterFilter: unpositionedIds.length
-      });
+      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only');
+      console.error('[ShotFilterPagination] Before filter:', generationIds.length);
+      console.error('[ShotFilterPagination] After filter:', unpositionedIds.length);
       
       generationIds = unpositionedIds;
     }
     
-    console.log('[ShotFilterPagination] ✅ Final generation IDs for COUNT:', {
-      count: generationIds.length,
-      sample: generationIds.slice(0, 5).map(id => id.substring(0, 8))
-    });
+    console.error('[ShotFilterPagination] ✅ Final generation IDs');
+    console.error('[ShotFilterPagination] ID count:', generationIds.length);
+    console.error('[ShotFilterPagination] Sample IDs:', generationIds.slice(0, 5).map(id => id.substring(0, 8)));
     
-    if (generationIds.length > 0) {
-      countQuery = countQuery.in('id', generationIds);
-    } else {
-      console.log('[ShotFilterPagination] ⚠️ No generations found for shot filter, returning empty');
-      // No generations for this shot
+    if (generationIds.length === 0) {
+      console.error('[ShotFilterPagination] ⚠️ No generations found for shot filter, returning empty');
       return { items: [], total: 0, hasMore: false };
+    }
+    
+    // Store for use in data query
+    shotFilterGenerationIds = generationIds;
+    
+    // 🔧 FIX: Chunk large ID arrays to avoid Postgres IN clause limits
+    // Postgres has a limit on the number of parameters in an IN clause (~1000)
+    const CHUNK_SIZE = 500; // Use 500 to be safe
+    
+    if (generationIds.length > CHUNK_SIZE) {
+      console.error('[ShotFilterPagination] 🔄 Large ID set detected, using chunked count');
+      console.error('[ShotFilterPagination] Total IDs:', generationIds.length);
+      console.error('[ShotFilterPagination] Chunk size:', CHUNK_SIZE);
+      
+      usedChunkedCounting = true;
+      
+      // For large ID sets, count by summing chunks
+      let chunkCount = 0;
+      const chunks = Math.ceil(generationIds.length / CHUNK_SIZE);
+      console.error('[ShotFilterPagination] Number of chunks:', chunks);
+      
+      for (let i = 0; i < chunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
+        const chunk = generationIds.slice(start, end);
+        
+        console.error(`[ShotFilterPagination] Processing chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        
+        // Create a fresh query for each chunk
+        let chunkQuery = supabase
+          .from('generations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .in('id', chunk);
+        
+        const { count: chunkCountResult, error: chunkError } = await chunkQuery;
+        
+        if (chunkError) {
+          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error:`, chunkError);
+          throw chunkError;
+        }
+        
+        chunkCount += chunkCountResult || 0;
+        console.error(`[ShotFilterPagination] Chunk ${i + 1} count:`, chunkCountResult);
+      }
+      
+      console.error('[ShotFilterPagination] 📊 Total count from chunks:', chunkCount);
+      totalCount = chunkCount;
+    } else {
+      // Small ID set, use normal IN clause
+      console.error('[ShotFilterPagination] Using standard IN clause (<= 500 IDs)');
+      countQuery = countQuery.in('id', generationIds);
     }
   }
 
   // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
   // DISABLED: Enable full count for accurate pagination
-  const shouldSkipCount = false; // limit <= 100 && !filters?.searchTerm?.trim();
+  // Also skip if we already counted via chunking
+  const shouldSkipCount = usedChunkedCounting; // || (limit <= 100 && !filters?.searchTerm?.trim());
   
-  let totalCount = 0;
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
     console.error('[ShotFilterPagination] 🔢 Count query completed');
@@ -221,94 +260,87 @@ export async function fetchGenerations(
     dataQuery = dataQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
-  // Apply shot filter to data query
-  // Use server-side pagination with .in() filter - ORDER BY ensures consistent results
-  if (filters?.shotId) {
-    console.error('[ShotFilterPagination] 🔍 Applying shot filter to DATA query:', {
-      shotId: filters.shotId.substring(0, 8),
-      excludePositioned: filters.excludePositioned,
-      offset,
-      limit,
-      strategy: 'SERVER-SIDE PAGINATION with .in() filter',
-      timestamp: Date.now()
-    });
+  // Apply shot filter to data query - use IDs we already fetched
+  if (filters?.shotId && shotFilterGenerationIds) {
+    const generationIds = shotFilterGenerationIds;
+    const CHUNK_SIZE = 500;
     
-    // Get shot associations for filtering
-    const shotGenStartTime = Date.now();
-    const { data: shotGenerations, error: sgError } = await supabase
-      .from('shot_generations')
-      .select('generation_id, timeline_frame')
-      .eq('shot_id', filters.shotId);
+    console.error('[ShotFilterPagination] 🔍 Applying shot filter to DATA query');
+    console.error('[ShotFilterPagination] ID count:', generationIds.length);
+    console.error('[ShotFilterPagination] Offset:', offset);
+    console.error('[ShotFilterPagination] Limit:', limit);
     
-    console.error('[ShotFilterPagination] ⏱️ shot_generations query completed:', {
-      duration: `${Date.now() - shotGenStartTime}ms`,
-      hasError: !!sgError,
-      errorMessage: sgError?.message,
-      errorDetails: sgError,
-      resultCount: shotGenerations?.length || 0
-    });
-    
-    if (sgError) {
-      console.error('[ShotFilterPagination] ❌ shot_generations query FAILED:', {
-        error: sgError,
-        message: sgError.message,
-        details: sgError.details,
-        hint: sgError.hint,
-        code: sgError.code
-      });
-      throw sgError;
-    }
-    
-    if (!shotGenerations) {
-      console.error('[ShotFilterPagination] ❌ shot_generations returned null/undefined');
-      return { items: [], total: 0, hasMore: false };
-    }
-    
-    console.error('[ShotFilterPagination] 📊 Shot generations for DATA query:', {
-      totalCount: shotGenerations.length,
-      sample: shotGenerations.slice(0, 5).map(sg => ({ 
-        id: sg.generation_id?.substring(0, 8) || 'NO_ID', 
-        frame: sg.timeline_frame 
-      })),
-      allIds: shotGenerations.map(sg => sg.generation_id?.substring(0, 8)).join(', ')
-    });
-    
-    let generationIds = shotGenerations.map(sg => sg.generation_id).filter(Boolean);
-    
-    // Filter by timeline_frame if excludePositioned is true
-    if (filters.excludePositioned) {
-      const unpositionedIds = shotGenerations
-        .filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
-        .map(sg => sg.generation_id)
-        .filter(Boolean);
+    // 🔧 FIX: For large ID sets, we need to use chunked querying
+    // Cannot use .in() with 1000+ IDs due to Postgres parameter limits
+    if (generationIds.length > CHUNK_SIZE) {
+      console.error('[ShotFilterPagination] 🔄 Large ID set for DATA query, using chunked fetch');
+      console.error('[ShotFilterPagination] Will fetch in', Math.ceil(generationIds.length / CHUNK_SIZE), 'chunks');
       
-      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (DATA):', {
-        beforeFilter: generationIds.length,
-        afterFilter: unpositionedIds.length,
-        positionedCount: shotGenerations.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length,
-        removedIds: generationIds.filter(id => !unpositionedIds.includes(id)).map(id => id.substring(0, 8))
-      });
+      // Strategy: Fetch all matching records in chunks, then sort and paginate client-side
+      // This is necessary because we can't use .in() with 1000+ IDs
+      let allItems: any[] = [];
+      const chunks = Math.ceil(generationIds.length / CHUNK_SIZE);
       
-      generationIds = unpositionedIds;
-    }
-    
-    console.error('[ShotFilterPagination] ✅ Final generation IDs for DATA query:', {
-      count: generationIds.length,
-      requestedOffset: offset,
-      requestedLimit: fetchLimit,
-      willFetchRange: `${offset}-${offset + fetchLimit - 1}`,
-      idsForPage: generationIds.slice(offset, offset + fetchLimit).map(id => id.substring(0, 8)),
-      allIdsFirst10: generationIds.slice(0, 10).map(id => id.substring(0, 8)),
-      note: 'Using ORDER BY created_at + .range() for consistent pagination'
-    });
-    
-    if (generationIds.length === 0) {
-      console.error('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
-      return { items: [], total: 0, hasMore: false };
-    }
-    
-    if (generationIds.length > 0) {
-      console.error('[ShotFilterPagination] 🔧 Adding .in() filter to query with', generationIds.length, 'IDs');
+      for (let i = 0; i < chunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
+        const chunk = generationIds.slice(start, end);
+        
+        console.error(`[ShotFilterPagination] Fetching DATA chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        
+        // Build query for this chunk
+        let chunkQuery = supabase
+          .from('generations')
+          .select(`
+            id,
+            type,
+            params,
+            status,
+            created_at,
+            output,
+            error,
+            user_id,
+            starred
+          `)
+          .eq('user_id', userId)
+          .in('id', chunk)
+          .order('created_at', { ascending: false });
+        
+        const { data: chunkData, error: chunkError } = await chunkQuery;
+        
+        if (chunkError) {
+          console.error(`[ShotFilterPagination] ❌ DATA chunk ${i + 1} error:`, chunkError);
+          throw chunkError;
+        }
+        
+        if (chunkData) {
+          allItems = allItems.concat(chunkData);
+          console.error(`[ShotFilterPagination] DATA chunk ${i + 1} fetched:`, chunkData.length, 'items');
+        }
+      }
+      
+      console.error('[ShotFilterPagination] 📦 All chunks fetched');
+      console.error('[ShotFilterPagination] Total items:', allItems.length);
+      
+      // Sort by created_at descending (same as ORDER BY in query)
+      allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Apply pagination client-side
+      const paginatedItems = allItems.slice(offset, offset + limit);
+      const hasMore = allItems.length > offset + limit;
+      
+      console.error('[ShotFilterPagination] 📄 Paginated results');
+      console.error('[ShotFilterPagination] Page items:', paginatedItems.length);
+      console.error('[ShotFilterPagination] Has more:', hasMore);
+      
+      return {
+        items: paginatedItems,
+        total: totalCount,
+        hasMore
+      };
+    } else {
+      // Small ID set, use normal IN clause
+      console.error('[ShotFilterPagination] Using standard IN clause for DATA query (<= 500 IDs)');
       dataQuery = dataQuery.in('id', generationIds);
     }
   }
