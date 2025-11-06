@@ -492,7 +492,7 @@ const ImageGalleryOptimized: React.FC<ImageGalleryProps> = React.memo((props) =>
 
   return (
     <TooltipProvider>
-      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} pb-[52px]`}>
+      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} pb-[62px]`}>
         {/* Header section with pagination and filters */}
         <div ref={stateHook.galleryTopRef}>
           <ImageGalleryHeader
