@@ -6,6 +6,11 @@ cmd = "npm ci"
 
 [phases.build]
 cmd = "npm run build"
+dependsOn = ["install"]
 
 [phases.start]
-cmd = "npm run serve" 
+cmd = "npm run serve"
+
+[providers]
+node = true
+deno = false 
