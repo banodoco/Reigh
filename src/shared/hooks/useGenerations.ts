@@ -205,19 +205,14 @@ export async function fetchGenerations(
   }
 
   // Apply shot filter to data query
-  // CRITICAL: When filtering by shot, we CANNOT use .range() on the filtered query
-  // because .in() doesn't preserve order. Instead, we fetch all matching IDs,
-  // get full generation data, then handle pagination client-side.
-  let shouldSkipDatabasePagination = false;
-  let allGenerationIdsForShot: string[] = [];
-  
+  // Use server-side pagination with .in() filter - ORDER BY ensures consistent results
   if (filters?.shotId) {
     console.log('[ShotFilterPagination] 🔍 Applying shot filter to DATA query:', {
       shotId: filters.shotId.substring(0, 8),
       excludePositioned: filters.excludePositioned,
       offset,
       limit,
-      strategy: 'CLIENT-SIDE PAGINATION'
+      strategy: 'SERVER-SIDE PAGINATION with .in() filter'
     });
     
     // Get shot associations for filtering
@@ -256,13 +251,12 @@ export async function fetchGenerations(
     console.log('[ShotFilterPagination] ✅ Final generation IDs for DATA query:', {
       count: generationIds.length,
       sample: generationIds.slice(0, 5).map(id => id.substring(0, 8)),
-      note: 'Will fetch ALL matching generations, then paginate client-side'
+      willFetchRange: `${offset}-${offset + fetchLimit - 1}`,
+      note: 'Using ORDER BY created_at + .range() for consistent pagination'
     });
     
     if (generationIds.length > 0) {
       dataQuery = dataQuery.in('id', generationIds);
-      shouldSkipDatabasePagination = true; // Don't use .range() - we'll paginate client-side
-      allGenerationIdsForShot = generationIds;
     } else {
       console.log('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
       // No generations for this shot/filter combination
@@ -273,20 +267,11 @@ export async function fetchGenerations(
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
   
-  // Execute query - skip .range() if we're doing client-side pagination
-  let data, error;
-  if (shouldSkipDatabasePagination) {
-    console.log('[ShotFilterPagination] ⚡ Fetching ALL generations for shot (no database .range())');
-    const result = await dataQuery.order('created_at', { ascending: false });
-    data = result.data;
-    error = result.error;
-  } else {
-    const result = await dataQuery
-      .order('created_at', { ascending: false })
-      .range(offset, offset + fetchLimit - 1);
-    data = result.data;
-    error = result.error;
-  }
+  // Execute query with standard server-side pagination
+  // The ORDER BY ensures consistent ordering even when using .in() filter
+  const { data, error } = await dataQuery
+    .order('created_at', { ascending: false })
+    .range(offset, offset + fetchLimit - 1);
   
   console.log('[ShotFilterPagination] 📦 Query executed, raw results:', {
     itemsReturned: data?.length || 0,
@@ -322,24 +307,7 @@ export async function fetchGenerations(
   let finalData = data || [];
   let hasMore = false;
   
-  // Handle client-side pagination for shot filters
-  if (shouldSkipDatabasePagination) {
-    console.log('[ShotFilterPagination] ✂️ Applying client-side pagination:', {
-      totalFetched: finalData.length,
-      offset,
-      limit,
-      willSlice: `[${offset}:${offset + limit}]`
-    });
-    
-    // Pagination is handled client-side since .in() doesn't preserve order
-    finalData = finalData.slice(offset, offset + limit);
-    hasMore = (offset + limit) < totalCount;
-    
-    console.log('[ShotFilterPagination] ✅ Client-side pagination complete:', {
-      itemsAfterSlice: finalData.length,
-      hasMore
-    });
-  } else if (shouldSkipCount) {
+  if (shouldSkipCount) {
     // Fast pagination: detect hasMore by checking if we got limit+1 items
     hasMore = finalData.length > limit;
     if (hasMore) {
