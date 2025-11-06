@@ -640,7 +640,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = (props) => {
 
   return (
     <TooltipProvider>
-      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${reducedSpacing ? 'pb-8' : 'pb-8'}`}>
+      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} pb-[42px]`}>
         {/* Header section with pagination and filters */}
         <div ref={stateHook.galleryTopRef}>
           <ImageGalleryHeader
