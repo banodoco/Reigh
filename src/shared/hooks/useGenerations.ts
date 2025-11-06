@@ -161,7 +161,8 @@ export async function fetchGenerations(
         const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
         const chunk = generationIds.slice(start, end);
         
-        console.error(`[ShotFilterPagination] Processing chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        console.error(`[ShotFilterPagination] 📦 Processing chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Building query...`);
         
         // Create a fresh query for each chunk
         let chunkQuery = supabase
@@ -170,15 +171,25 @@ export async function fetchGenerations(
           .eq('user_id', userId)
           .in('id', chunk);
         
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query built, executing...`);
+        const chunkStartTime = Date.now();
+        
         const { count: chunkCountResult, error: chunkError } = await chunkQuery;
+        
+        const chunkDuration = Date.now() - chunkStartTime;
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query completed in ${chunkDuration}ms`);
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Has error:`, !!chunkError);
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Count result:`, chunkCountResult);
         
         if (chunkError) {
           console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error:`, chunkError);
+          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error message:`, chunkError.message);
+          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error details:`, chunkError.details);
           throw chunkError;
         }
         
         chunkCount += chunkCountResult || 0;
-        console.error(`[ShotFilterPagination] Chunk ${i + 1} count:`, chunkCountResult);
+        console.error(`[ShotFilterPagination] ✅ Chunk ${i + 1} complete. Running total:`, chunkCount);
       }
       
       console.error('[ShotFilterPagination] 📊 Total count from chunks:', chunkCount);
@@ -314,7 +325,8 @@ export async function fetchGenerations(
         const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
         const chunk = generationIds.slice(start, end);
         
-        console.error(`[ShotFilterPagination] Fetching timestamps chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        console.error(`[ShotFilterPagination] 📦 Fetching timestamps chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Building query...`);
         
         // Fetch ONLY id and created_at (very lightweight)
         let chunkQuery = supabase
@@ -323,16 +335,25 @@ export async function fetchGenerations(
           .eq('user_id', userId)
           .in('id', chunk);
         
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Executing query...`);
+        const chunkStartTime = Date.now();
+        
         const { data: chunkData, error: chunkError } = await chunkQuery;
+        
+        const chunkDuration = Date.now() - chunkStartTime;
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Completed in ${chunkDuration}ms`);
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Has error:`, !!chunkError);
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Data count:`, chunkData?.length || 0);
         
         if (chunkError) {
           console.error(`[ShotFilterPagination] ❌ Timestamp chunk ${i + 1} error:`, chunkError);
+          console.error(`[ShotFilterPagination] ❌ Timestamp chunk ${i + 1} error message:`, chunkError.message);
           throw chunkError;
         }
         
         if (chunkData) {
           allIdTimestamps = allIdTimestamps.concat(chunkData);
-          console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1} fetched:`, chunkData.length, 'records');
+          console.error(`[ShotFilterPagination] ✅ Timestamp chunk ${i + 1} added. Total records:`, allIdTimestamps.length);
         }
       }
       
