@@ -85,6 +85,7 @@ export async function fetchGenerations(
   // Store shot filter IDs for later use in data query
   let shotFilterGenerationIds: string[] | null = null;
   let usedChunkedCounting = false;
+  let totalCount = 0; // Total count of matching items
   
   console.error('[ShotFilterPagination] 🔍 Shot filter check for COUNT');
   console.error('[ShotFilterPagination] Has shotId?:', !!filters?.shotId);
