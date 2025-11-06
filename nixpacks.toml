@@ -7,7 +7,7 @@ cmd = "npm ci"
 cmd = "npm run build"
 
 [start]
-cmd = "npm run start:railway"
+cmd = "npm run serve"
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl", "bun"] 
+nixPkgs = ["nodejs_20", "openssl"] 

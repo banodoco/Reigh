@@ -30,7 +30,7 @@ export async function fetchGenerations(
   hasMore: boolean;
 }> {
   
-  console.log('[ShotFilterPagination] 🚀 fetchGenerations called:', {
+  console.error('[ShotFilterPagination] 🚀 fetchGenerations called:', {
     projectId: projectId?.substring(0, 8),
     limit,
     offset,
@@ -39,7 +39,7 @@ export async function fetchGenerations(
   });
   
   if (!projectId) {
-    console.log('[ShotFilterPagination] ❌ No projectId, returning empty');
+    console.error('[ShotFilterPagination] ❌ No projectId, returning empty');
     return { items: [], total: 0, hasMore: false };
   }
   
@@ -142,7 +142,7 @@ export async function fetchGenerations(
   let totalCount = 0;
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
-    console.log('[ShotFilterPagination] 🔢 Count query result:', {
+    console.error('[ShotFilterPagination] 🔢 Count query result:', {
       count,
       hasError: !!countError,
       errorMessage: countError?.message
@@ -152,7 +152,7 @@ export async function fetchGenerations(
     }
     totalCount = count || 0;
   } else {
-    console.log('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
+    console.error('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
   }
 
   // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
@@ -207,7 +207,7 @@ export async function fetchGenerations(
   // Apply shot filter to data query
   // Use server-side pagination with .in() filter - ORDER BY ensures consistent results
   if (filters?.shotId) {
-    console.log('[ShotFilterPagination] 🔍 Applying shot filter to DATA query:', {
+    console.error('[ShotFilterPagination] 🔍 Applying shot filter to DATA query:', {
       shotId: filters.shotId.substring(0, 8),
       excludePositioned: filters.excludePositioned,
       offset,
@@ -223,7 +223,7 @@ export async function fetchGenerations(
       .select('generation_id, timeline_frame')
       .eq('shot_id', filters.shotId);
     
-    console.log('[ShotFilterPagination] ⏱️ shot_generations query completed:', {
+    console.error('[ShotFilterPagination] ⏱️ shot_generations query completed:', {
       duration: `${Date.now() - shotGenStartTime}ms`,
       hasError: !!sgError,
       errorMessage: sgError?.message,
@@ -247,7 +247,7 @@ export async function fetchGenerations(
       return { items: [], total: 0, hasMore: false };
     }
     
-    console.log('[ShotFilterPagination] 📊 Shot generations for DATA query:', {
+    console.error('[ShotFilterPagination] 📊 Shot generations for DATA query:', {
       totalCount: shotGenerations.length,
       sample: shotGenerations.slice(0, 5).map(sg => ({ 
         id: sg.generation_id?.substring(0, 8) || 'NO_ID', 
@@ -265,7 +265,7 @@ export async function fetchGenerations(
         .map(sg => sg.generation_id)
         .filter(Boolean);
       
-      console.log('[ShotFilterPagination] 🎯 Filtering to unpositioned only (DATA):', {
+      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (DATA):', {
         beforeFilter: generationIds.length,
         afterFilter: unpositionedIds.length,
         positionedCount: shotGenerations.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length,
@@ -275,7 +275,7 @@ export async function fetchGenerations(
       generationIds = unpositionedIds;
     }
     
-    console.log('[ShotFilterPagination] ✅ Final generation IDs for DATA query:', {
+    console.error('[ShotFilterPagination] ✅ Final generation IDs for DATA query:', {
       count: generationIds.length,
       requestedOffset: offset,
       requestedLimit: fetchLimit,
@@ -286,12 +286,12 @@ export async function fetchGenerations(
     });
     
     if (generationIds.length === 0) {
-      console.warn('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
+      console.error('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
       return { items: [], total: 0, hasMore: false };
     }
     
     if (generationIds.length > 0) {
-      console.log('[ShotFilterPagination] 🔧 Adding .in() filter to query with', generationIds.length, 'IDs');
+      console.error('[ShotFilterPagination] 🔧 Adding .in() filter to query with', generationIds.length, 'IDs');
       dataQuery = dataQuery.in('id', generationIds);
     }
   }
@@ -301,11 +301,12 @@ export async function fetchGenerations(
   
   // Execute query with standard server-side pagination
   // The ORDER BY ensures consistent ordering even when using .in() filter
-  console.log('[ShotFilterPagination] 🚀 Executing main query with:', {
+  console.error('[ShotFilterPagination] 🚀 Executing main query with:', {
     offset,
     fetchLimit,
     range: `${offset}-${offset + fetchLimit - 1}`,
     hasFilters: !!filters,
+    hasShotFilter: !!filters?.shotId,
     timestamp: Date.now()
   });
   
@@ -316,7 +317,7 @@ export async function fetchGenerations(
   
   const queryDuration = Date.now() - queryStartTime;
   
-  console.log('[ShotFilterPagination] 📦 Main query completed:', {
+  console.error('[ShotFilterPagination] 📦 Main query completed:', {
     duration: `${queryDuration}ms`,
     itemsReturned: data?.length || 0,
     hasError: !!error,
@@ -397,7 +398,7 @@ export async function fetchGenerations(
     });
   }) || [];
 
-  console.log('[ShotFilterPagination] 🎉 fetchGenerations returning:', {
+  console.error('[ShotFilterPagination] 🎉 fetchGenerations returning:', {
     itemsCount: items.length,
     totalCount,
     hasMore,

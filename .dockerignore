@@ -1,0 +1,48 @@
+# Dependencies
+node_modules
+bun.lockb
+
+# Build outputs
+dist
+.vite
+.turbo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files (should be set via Railway env vars)
+.env
+.env.local
+.env.*.local
+
+# Debug SQL files (not needed in production)
+*.sql
+!supabase/migrations/*.sql
+!supabase/**/*.sql
+
+# Documentation
+docs
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Other
+.DS_Store
+coverage
+.cache
+
