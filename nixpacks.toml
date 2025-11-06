@@ -10,4 +10,4 @@ cmd = "npm run build"
 cmd = "npm run start:railway"
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl"] 
+nixPkgs = ["nodejs_20", "openssl", "bun"] 
