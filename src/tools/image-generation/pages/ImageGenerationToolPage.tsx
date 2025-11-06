@@ -343,32 +343,38 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   });
 
+  // Track all currentPage changes
+  useEffect(() => {
+    console.log('[ShotFilterPagination] 📍 currentPage state changed to:', currentPage);
+  }, [currentPage]);
+
   // Reset to page 1 when shot filter or position filter changes
   useEffect(() => {
+    console.log('[ShotFilterPagination] 📄 Filter changed (shot/excludePositioned), resetting to page 1:', {
+      selectedShotFilter,
+      excludePositioned
+    });
     setIsFilterChange(true);
     setCurrentPage(1);
   }, [selectedShotFilter, excludePositioned]);
 
   // Reset to page 1 when media type or starred filter changes
   useEffect(() => {
+    console.log('[ShotFilterPagination] 📄 Filter changed (media/starred), resetting to page 1');
     setIsFilterChange(true);
     setCurrentPage(1);
   }, [mediaTypeFilter, starredOnly]);
 
-  // Reset to page 1 when tool type filter changes
-  useEffect(() => {
-    setIsFilterChange(true);
-    setCurrentPage(1);
-  }, []);
-
   // Reset to page 1 when search term changes
   useEffect(() => {
+    console.log('[ShotFilterPagination] 📄 Filter changed (search), resetting to page 1');
     setIsFilterChange(true);
     setCurrentPage(1);
   }, [searchTerm]);
 
   // Reset to page 1 when tool type filter changes
   useEffect(() => {
+    console.log('[ShotFilterPagination] 📄 Filter changed (toolType), resetting to page 1');
     setIsFilterChange(true);
     setCurrentPage(1);
   }, [toolTypeFilterEnabled]);

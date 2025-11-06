@@ -277,7 +277,8 @@ export async function fetchGenerations(
     fetchLimit,
     range: `${offset}-${offset + fetchLimit - 1}`,
     firstItemId: data?.[0]?.id?.substring(0, 8),
-    lastItemId: data?.[data.length - 1]?.id?.substring(0, 8)
+    lastItemId: data?.[data.length - 1]?.id?.substring(0, 8),
+    WARNING: data?.length === 0 ? '⚠️ EMPTY RESULT SET - This page will show as empty!' : null
   });
   
   if (error) {
