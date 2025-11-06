@@ -375,7 +375,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   // Update last known total when we get valid data
   useEffect(() => {
-    if (generationsResponse?.total !== undefined && generationsResponse.total > 0) {
+    if (generationsResponse?.total !== undefined) {
       setLastKnownTotal(generationsResponse.total);
     }
   }, [generationsResponse?.total]);
