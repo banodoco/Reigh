@@ -163,33 +163,42 @@ export async function fetchGenerations(
         
         console.error(`[ShotFilterPagination] 📦 Processing chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
         console.error(`[ShotFilterPagination] Chunk ${i + 1}: Building query...`);
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: userId =`, userId);
+        console.error(`[ShotFilterPagination] Chunk ${i + 1}: chunk IDs =`, chunk.slice(0, 3).map(id => id.substring(0, 8)));
         
-        // Create a fresh query for each chunk
-        let chunkQuery = supabase
-          .from('generations')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .in('id', chunk);
-        
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query built, executing...`);
-        const chunkStartTime = Date.now();
-        
-        const { count: chunkCountResult, error: chunkError } = await chunkQuery;
-        
-        const chunkDuration = Date.now() - chunkStartTime;
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query completed in ${chunkDuration}ms`);
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Has error:`, !!chunkError);
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Count result:`, chunkCountResult);
-        
-        if (chunkError) {
-          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error:`, chunkError);
-          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error message:`, chunkError.message);
-          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error details:`, chunkError.details);
-          throw chunkError;
+        try {
+          // Create a fresh query for each chunk
+          let chunkQuery = supabase
+            .from('generations')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .in('id', chunk);
+          
+          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query built successfully, executing...`);
+          const chunkStartTime = Date.now();
+          
+          const { count: chunkCountResult, error: chunkError } = await chunkQuery;
+          
+          const chunkDuration = Date.now() - chunkStartTime;
+          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query completed in ${chunkDuration}ms`);
+          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Has error:`, !!chunkError);
+          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Count result:`, chunkCountResult);
+          
+          if (chunkError) {
+            console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error:`, chunkError);
+            console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error message:`, chunkError.message);
+            console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error details:`, chunkError.details);
+            throw chunkError;
+          }
+          
+          chunkCount += chunkCountResult || 0;
+          console.error(`[ShotFilterPagination] ✅ Chunk ${i + 1} complete. Running total:`, chunkCount);
+        } catch (error) {
+          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} UNEXPECTED ERROR:`, error);
+          console.error(`[ShotFilterPagination] ❌ Error type:`, typeof error);
+          console.error(`[ShotFilterPagination] ❌ Error string:`, String(error));
+          throw error;
         }
-        
-        chunkCount += chunkCountResult || 0;
-        console.error(`[ShotFilterPagination] ✅ Chunk ${i + 1} complete. Running total:`, chunkCount);
       }
       
       console.error('[ShotFilterPagination] 📊 Total count from chunks:', chunkCount);
