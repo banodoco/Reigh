@@ -1,14 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "bun", "openssl"]
+nixPkgs = ["nodejs_20", "openssl"]
 
 [phases.install]
 cmd = "npm ci"
 
 [phases.build]
 cmd = "npm run build"
-dependsOn = ["install"]
 
-[phases.start]
-cmd = "npm run serve"
-
-providers = ["node"] 
+[start]
+cmd = "npm run start:railway" 
