@@ -84,7 +84,7 @@ export async function fetchGenerations(
 
   // Apply shot filter if provided
   if (filters?.shotId) {
-    console.log('[ShotFilterPagination] 🔍 Applying shot filter to COUNT query:', {
+    console.error('[ShotFilterPagination] 🔍 Applying shot filter to COUNT query:', {
       shotId: filters.shotId.substring(0, 8),
       excludePositioned: filters.excludePositioned
     });
@@ -95,7 +95,17 @@ export async function fetchGenerations(
       .select('generation_id, timeline_frame')
       .eq('shot_id', filters.shotId);
     
-    if (sgError) throw sgError;
+    console.error('[ShotFilterPagination] 📊 Shot generations COUNT lookup result:', {
+      hasError: !!sgError,
+      errorMessage: sgError?.message,
+      errorDetails: sgError?.details,
+      resultCount: shotGenerations?.length || 0
+    });
+    
+    if (sgError) {
+      console.error('[ShotFilterPagination] ❌ Shot generations COUNT lookup failed:', sgError);
+      throw sgError;
+    }
     
     console.log('[ShotFilterPagination] 📊 Shot generations for COUNT query:', {
       totalCount: shotGenerations?.length || 0,
@@ -142,15 +152,22 @@ export async function fetchGenerations(
   let totalCount = 0;
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
-    console.error('[ShotFilterPagination] 🔢 Count query result:', {
-      count,
-      hasError: !!countError,
-      errorMessage: countError?.message
-    });
+    console.error('[ShotFilterPagination] 🔢 Count query completed');
+    console.error('[ShotFilterPagination] Count:', count);
+    console.error('[ShotFilterPagination] Has Error:', !!countError);
     if (countError) {
+      console.error('[ShotFilterPagination] ❌ COUNT QUERY ERROR DETECTED');
+      console.error('[ShotFilterPagination] Error message:', countError?.message);
+      console.error('[ShotFilterPagination] Error details:', countError?.details);
+      console.error('[ShotFilterPagination] Error hint:', countError?.hint);
+      console.error('[ShotFilterPagination] Error code:', countError?.code);
+      console.error('[ShotFilterPagination] Full error object:', countError);
+      console.error('[ShotFilterPagination] Error JSON:', JSON.stringify(countError));
+      console.error('[ShotFilterPagination] Applied filters:', filters);
       throw countError;
     }
     totalCount = count || 0;
+    console.error('[ShotFilterPagination] Total count set to:', totalCount);
   } else {
     console.error('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
   }

@@ -132,10 +132,10 @@ export const ToolTypeFilter: React.FC<ToolTypeFilterProps> = ({
             )}
             {isMobile ? (
               <span className="text-center leading-tight">
-                All<br />media
+                All<br />tools
               </span>
             ) : (
-              'All media'
+              'All tools'
             )}
           </button>
         </div>
