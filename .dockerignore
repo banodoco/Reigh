@@ -1,6 +1,6 @@
 # Dependencies
 node_modules
-bun.lockb
+bun.lock
 
 # Build outputs
 dist

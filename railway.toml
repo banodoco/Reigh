@@ -4,7 +4,7 @@ builder = "nixpacks"
 [deploy]
 healthcheckPath = "/"
 restartPolicyType = "on_failure"
-startCommand = "npm run start:railway"
+startCommand = "npm run serve"
 
 [environments.production.variables]
 NODE_ENV = "production" 
