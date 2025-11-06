@@ -199,6 +199,7 @@ export async function fetchGenerations(
     console.error('[ShotFilterPagination] 🔢 Count query completed');
     console.error('[ShotFilterPagination] Count:', count);
     console.error('[ShotFilterPagination] Has Error:', !!countError);
+    console.error('[ShotFilterPagination] About to check if error exists...');
     if (countError) {
       console.error('[ShotFilterPagination] ❌ COUNT QUERY ERROR DETECTED');
       console.error('[ShotFilterPagination] Error message:', countError?.message);
@@ -210,11 +211,14 @@ export async function fetchGenerations(
       console.error('[ShotFilterPagination] Applied filters:', filters);
       throw countError;
     }
+    console.error('[ShotFilterPagination] No error, continuing...');
     totalCount = count || 0;
     console.error('[ShotFilterPagination] Total count set to:', totalCount);
   } else {
     console.error('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
   }
+  
+  console.error('[ShotFilterPagination] ✅ Count phase complete, starting data query setup');
 
   // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
   let dataQuery = supabase
