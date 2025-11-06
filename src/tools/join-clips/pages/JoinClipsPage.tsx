@@ -801,6 +801,7 @@ const JoinClipsPage: React.FC = () => {
                       onChange={(e) => handleVideoUpload(e, clip.id)}
             />
           </div>
+        </div>
 
                 {/* Transition Prompt (if not last clip and individual prompts enabled) */}
                 {index < clips.length - 1 && useIndividualPrompts && (
@@ -816,12 +817,11 @@ const JoinClipsPage: React.FC = () => {
                       rows={2}
                       className="resize-none text-sm"
                     />
-              </div>
+                  </div>
                 )}
-            </div>
-            </div>
-          ))
-        }
+              </div>
+            ))
+          }
           </div>
         )}
 

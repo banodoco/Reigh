@@ -823,6 +823,19 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const scrollPosRef = useRef<number>(0);
 
   const handleServerPageChange = useCallback((page: number, fromBottom?: boolean) => {
+    console.log('[ShotFilterPagination] 🔄 Page change requested:', {
+      newPage: page,
+      currentPage,
+      fromBottom,
+      currentFilters: {
+        shotFilter: selectedShotFilter,
+        excludePositioned,
+        toolTypeEnabled: toolTypeFilterEnabled,
+        mediaType: mediaTypeFilter
+      },
+      timestamp: Date.now()
+    });
+    
     if (!fromBottom) {
       scrollPosRef.current = window.scrollY;
     }
@@ -832,7 +845,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     // REMOVED: Don't clear images - this interferes with progressive loading
     // The gallery's internal loading state handles the transition better
     // setGeneratedImages([]);
-  }, []);
+  }, [currentPage, selectedShotFilter, excludePositioned, toolTypeFilterEnabled, mediaTypeFilter]);
 
   // Handle media type filter change
   const handleMediaTypeFilterChange = useCallback((newMediaType: 'all' | 'image' | 'video') => {

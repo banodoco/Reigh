@@ -30,7 +30,16 @@ export async function fetchGenerations(
   hasMore: boolean;
 }> {
   
+  console.log('[ShotFilterPagination] 🚀 fetchGenerations called:', {
+    projectId: projectId?.substring(0, 8),
+    limit,
+    offset,
+    filters,
+    timestamp: Date.now()
+  });
+  
   if (!projectId) {
+    console.log('[ShotFilterPagination] ❌ No projectId, returning empty');
     return { items: [], total: 0, hasMore: false };
   }
   
@@ -73,6 +82,11 @@ export async function fetchGenerations(
 
   // Apply shot filter if provided
   if (filters?.shotId) {
+    console.log('[ShotFilterPagination] 🔍 Applying shot filter to COUNT query:', {
+      shotId: filters.shotId.substring(0, 8),
+      excludePositioned: filters.excludePositioned
+    });
+    
     // Get generation IDs associated with this shot
     const { data: shotGenerations, error: sgError } = await supabase
       .from('shot_generations')
@@ -81,6 +95,14 @@ export async function fetchGenerations(
     
     if (sgError) throw sgError;
     
+    console.log('[ShotFilterPagination] 📊 Shot generations for COUNT query:', {
+      totalCount: shotGenerations?.length || 0,
+      sample: shotGenerations?.slice(0, 3).map(sg => ({ 
+        id: sg.generation_id.substring(0, 8), 
+        frame: sg.timeline_frame 
+      }))
+    });
+    
     let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
     
     // Filter by timeline_frame if excludePositioned is true
@@ -88,12 +110,24 @@ export async function fetchGenerations(
       const unpositionedIds = shotGenerations
         ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
         .map(sg => sg.generation_id) || [];
+      
+      console.log('[ShotFilterPagination] 🎯 Filtering to unpositioned only:', {
+        beforeFilter: generationIds.length,
+        afterFilter: unpositionedIds.length
+      });
+      
       generationIds = unpositionedIds;
     }
+    
+    console.log('[ShotFilterPagination] ✅ Final generation IDs for COUNT:', {
+      count: generationIds.length,
+      sample: generationIds.slice(0, 5).map(id => id.substring(0, 8))
+    });
     
     if (generationIds.length > 0) {
       countQuery = countQuery.in('id', generationIds);
     } else {
+      console.log('[ShotFilterPagination] ⚠️ No generations found for shot filter, returning empty');
       // No generations for this shot
       return { items: [], total: 0, hasMore: false };
     }
@@ -106,11 +140,17 @@ export async function fetchGenerations(
   let totalCount = 0;
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
+    console.log('[ShotFilterPagination] 🔢 Count query result:', {
+      count,
+      hasError: !!countError,
+      errorMessage: countError?.message
+    });
     if (countError) {
       throw countError;
     }
     totalCount = count || 0;
   } else {
+    console.log('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
   }
 
   // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
@@ -163,6 +203,13 @@ export async function fetchGenerations(
 
   // Apply shot filter to data query
   if (filters?.shotId) {
+    console.log('[ShotFilterPagination] 🔍 Applying shot filter to DATA query:', {
+      shotId: filters.shotId.substring(0, 8),
+      excludePositioned: filters.excludePositioned,
+      offset,
+      limit
+    });
+    
     // Get shot associations for filtering
     const { data: shotGenerations, error: sgError } = await supabase
       .from('shot_generations')
@@ -170,6 +217,14 @@ export async function fetchGenerations(
       .eq('shot_id', filters.shotId);
     
     if (sgError) throw sgError;
+    
+    console.log('[ShotFilterPagination] 📊 Shot generations for DATA query:', {
+      totalCount: shotGenerations?.length || 0,
+      sample: shotGenerations?.slice(0, 3).map(sg => ({ 
+        id: sg.generation_id.substring(0, 8), 
+        frame: sg.timeline_frame 
+      }))
+    });
     
     let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
     
@@ -179,23 +234,26 @@ export async function fetchGenerations(
         ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
         .map(sg => sg.generation_id) || [];
       
-      // Debug logging for excludePositioned filtering
-      console.log('[ExcludePositionedDebug] Filtering shot generations:', {
-        shotId: filters.shotId,
-        excludePositioned: filters.excludePositioned,
-        totalShotGenerations: shotGenerations?.length || 0,
-        positionedCount: shotGenerations?.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length || 0,
-        unpositionedCount: unpositionedIds.length,
-        unpositionedSample: unpositionedIds.slice(0, 3),
-        allTimelineFrames: shotGenerations?.map(sg => ({ id: sg.generation_id, timeline_frame: sg.timeline_frame })).slice(0, 5)
+      console.log('[ShotFilterPagination] 🎯 Filtering to unpositioned only (DATA):', {
+        beforeFilter: generationIds.length,
+        afterFilter: unpositionedIds.length,
+        positionedCount: shotGenerations?.filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined).length || 0
       });
       
       generationIds = unpositionedIds;
     }
     
+    console.log('[ShotFilterPagination] ✅ Final generation IDs for DATA query:', {
+      count: generationIds.length,
+      sample: generationIds.slice(0, 5).map(id => id.substring(0, 8)),
+      willFetchRange: `${offset}-${offset + fetchLimit - 1}`,
+      requestedLimit: fetchLimit
+    });
+    
     if (generationIds.length > 0) {
       dataQuery = dataQuery.in('id', generationIds);
     } else {
+      console.log('[ShotFilterPagination] ⚠️ No generations found for shot filter (DATA), returning empty');
       // No generations for this shot/filter combination
       return { items: [], total: 0, hasMore: false };
     }
@@ -208,7 +266,19 @@ export async function fetchGenerations(
     .order('created_at', { ascending: false })
     .range(offset, offset + fetchLimit - 1);
   
+  console.log('[ShotFilterPagination] 📦 Query executed, raw results:', {
+    itemsReturned: data?.length || 0,
+    hasError: !!error,
+    errorMessage: error?.message,
+    offset,
+    fetchLimit,
+    range: `${offset}-${offset + fetchLimit - 1}`,
+    firstItemId: data?.[0]?.id?.substring(0, 8),
+    lastItemId: data?.[data.length - 1]?.id?.substring(0, 8)
+  });
+  
   if (error) {
+    console.error('[ShotFilterPagination] ❌ Query error:', error);
     throw error;
   }
 
@@ -257,6 +327,20 @@ export async function fetchGenerations(
     });
   }) || [];
 
+  console.log('[ShotFilterPagination] 🎉 fetchGenerations returning:', {
+    itemsCount: items.length,
+    totalCount,
+    hasMore,
+    offset,
+    limit,
+    filters: {
+      shotId: filters?.shotId?.substring(0, 8),
+      excludePositioned: filters?.excludePositioned
+    },
+    firstItemId: items[0]?.id?.substring(0, 8),
+    lastItemId: items[items.length - 1]?.id?.substring(0, 8),
+    timestamp: Date.now()
+  });
 
   return { items, total: totalCount, hasMore };
 }
