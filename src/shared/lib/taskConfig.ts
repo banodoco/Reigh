@@ -84,12 +84,21 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfig> = {
   },
 
   // Video joining tasks
-  join_clips: {
+  join_clips_orchestrator: {
     isVisible: true,
     displayName: 'Join Clips',
+    supportsProgress: true,
     canCancel: true,
-    category: 'generation',
-    description: 'Join two video clips with AI-generated transitions'
+    category: 'orchestration',
+    description: 'Main orchestrator for join clips workflows with multiple videos'
+  },
+
+  // Hidden join clips subtasks
+  join_clips_segment: {
+    isVisible: false,
+    canCancel: true,
+    category: 'processing',
+    description: 'Individual join segment generation (part of join clips workflow)'
   },
 
   // Add more task types as needed...

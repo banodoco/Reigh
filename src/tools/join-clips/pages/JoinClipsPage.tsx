@@ -6,7 +6,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
-import { Upload, Film, X, Play } from 'lucide-react';
+import { Upload, Film, X, Play, Plus, GripVertical, Trash2 } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,6 +24,21 @@ import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
+
+// Types for clip management
+interface VideoClip {
+  id: string;
+  url: string;
+  posterUrl?: string;
+  file?: File;
+  loaded: boolean;
+  playing: boolean;
+}
+
+interface TransitionPrompt {
+  id: string; // ID of the clip AFTER this transition (so prompt between clip N and N+1 has id of clip N+1)
+  prompt: string;
+}
 
 // Video container skeleton loader
 const VideoContainerSkeleton: React.FC = () => (
@@ -46,46 +61,36 @@ const JoinClipsPage: React.FC = () => {
   const { selectedProjectId } = useProject();
   const isMobile = useIsMobile();
   
-  // Local state for inputs
-  const [startingVideo, setStartingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
-  const [endingVideo, setEndingVideo] = useState<{ url: string; posterUrl?: string; file?: File } | null>(null);
-  const [prompt, setPrompt] = useState('');
+  // Local state for clips list
+  const [clips, setClips] = useState<VideoClip[]>([]);
+  const [uploadingClipId, setUploadingClipId] = useState<string | null>(null);
+  
+  // Transition prompts (one for each pair)
+  const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
+  
+  // Global settings
   const [negativePrompt, setNegativePrompt] = useState('');
-  const [isUploadingStarting, setIsUploadingStarting] = useState(false);
-  const [isUploadingEnding, setIsUploadingEnding] = useState(false);
-  
-  // Loading states for smooth transitions
-  const [startingVideoLoaded, setStartingVideoLoaded] = useState(false);
-  const [endingVideoLoaded, setEndingVideoLoaded] = useState(false);
-  
-  // Playing states - track if user has pressed play
-  const [startingVideoPlaying, setStartingVideoPlaying] = useState(false);
-  const [endingVideoPlaying, setEndingVideoPlaying] = useState(false);
-  
-  // Local state for generation parameters
   const [contextFrameCount, setContextFrameCount] = useState(10);
   const [gapFrameCount, setGapFrameCount] = useState(33);
   const [replaceMode, setReplaceMode] = useState(true);
   
-  const startingVideoInputRef = useRef<HTMLInputElement>(null);
-  const endingVideoInputRef = useRef<HTMLInputElement>(null);
+  // Refs for file inputs (we'll create them dynamically)
+  const fileInputRefs = useRef<{ [clipId: string]: HTMLInputElement | null }>({});
   
-  // Video refs for forcefully pausing
-  const startingVideoRef = useRef<HTMLVideoElement>(null);
-  const endingVideoRef = useRef<HTMLVideoElement>(null);
+  // Refs for video elements
+  const videoRefs = useRef<{ [clipId: string]: HTMLVideoElement | null }>({});
   
-  // Debounce timer for context frames updates (number input fires rapidly on hold)
+  // Debounce timer for context frames updates
   const contextFramesTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Track when we've just triggered a generation to prevent empty state flash
+  // Track when we've just triggered a generation
   const [videosViewJustEnabled, setVideosViewJustEnabled] = useState<boolean>(false);
   
   // Track success state for button feedback
   const [showSuccessState, setShowSuccessState] = useState(false);
   
-  // Track drag state and scroll state separately to prevent mobile scroll conflicts
-  const [isDraggingOverStarting, setIsDraggingOverStarting] = useState(false);
-  const [isDraggingOverEnding, setIsDraggingOverEnding] = useState(false);
+  // Track drag state per clip
+  const [draggingOverClipId, setDraggingOverClipId] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   
   // Load settings
@@ -98,7 +103,6 @@ const JoinClipsPage: React.FC = () => {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   
   useEffect(() => {
-    // Mark settings as loaded after initial mount
     if (settings !== undefined) {
       setSettingsLoaded(true);
     }
@@ -113,7 +117,7 @@ const JoinClipsPage: React.FC = () => {
   const publicLorasResult = useListPublicResources('lora');
   const availableLoras = ((publicLorasResult.data || []) as any[]).map(resource => resource.metadata || {}) as LoraModel[];
   
-  // Initialize LoRA manager with project persistence
+  // Initialize LoRA manager
   const loraManager = useLoraManager(availableLoras, {
     projectId: selectedProjectId || undefined,
     persistenceScope: 'project',
@@ -121,40 +125,33 @@ const JoinClipsPage: React.FC = () => {
     persistenceKey: 'join-clips',
   });
   
-  // Fetch all videos generated with join-clips tool type
-  // Disable polling to prevent gallery flicker (join-clips tasks are long-running)
+  // Fetch all videos
   const generationsQuery = useGenerations(
     selectedProjectId, 
-    1, // page
-    100, // limit
-    !!selectedProjectId, // only enable when project is selected
+    1,
+    100,
+    !!selectedProjectId,
     {
       toolType: 'join-clips',
       mediaType: 'video'
     },
     {
-      disablePolling: true // Prevent periodic refetching that causes flicker
+      disablePolling: true
     }
   );
   
   const videosData = generationsQuery.data as GenerationsPaginatedResponse | undefined;
   const videosLoading = generationsQuery.isLoading;
   const videosFetching = generationsQuery.isFetching;
-  const videosError = generationsQuery.error;
   
   // Clear videosViewJustEnabled flag when data loads
   useEffect(() => {
     if (videosViewJustEnabled && videosData?.items) {
-      // Data has loaded, clear the flag
       setVideosViewJustEnabled(false);
-      console.log('[JoinClips] Data loaded, clearing videosViewJustEnabled flag', {
-        itemsCount: videosData.items.length,
-        timestamp: Date.now()
-      });
     }
   }, [videosViewJustEnabled, videosData?.items]);
   
-  // Refresh gallery when returning to the page (since polling is disabled)
+  // Refresh gallery when returning to the page
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && selectedProjectId) {
@@ -168,7 +165,7 @@ const JoinClipsPage: React.FC = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [selectedProjectId, queryClient]);
   
-  // Cleanup debounce timer on unmount
+  // Cleanup debounce timer
   useEffect(() => {
     return () => {
       if (contextFramesTimerRef.current) {
@@ -188,83 +185,111 @@ const JoinClipsPage: React.FC = () => {
     if (settings?.replaceMode !== undefined) {
       setReplaceMode(settings.replaceMode);
     }
-    if (settings?.prompt !== undefined) {
-      setPrompt(settings.prompt);
-    }
     if (settings?.negativePrompt !== undefined) {
       setNegativePrompt(settings.negativePrompt);
     }
   }, [settings]);
   
-  // Load saved input videos from settings
+  // Initialize clips from settings (legacy two-video support) or create 2 empty slots
   useEffect(() => {
-    if (settings?.startingVideoUrl && !startingVideo) {
-      setStartingVideo({ 
-        url: settings.startingVideoUrl,
-        posterUrl: settings.startingVideoPosterUrl 
-      });
-    }
-    if (settings?.endingVideoUrl && !endingVideo) {
-      setEndingVideo({ 
-        url: settings.endingVideoUrl,
-        posterUrl: settings.endingVideoPosterUrl 
-      });
-    }
-  }, [settings?.startingVideoUrl, settings?.endingVideoUrl, settings?.startingVideoPosterUrl, settings?.endingVideoPosterUrl]);
-  
-  // Add timeout fallback for video loading on mobile
-  useEffect(() => {
-    if (startingVideo && !startingVideoLoaded) {
-      const timer = setTimeout(() => {
-        setStartingVideoLoaded(true);
-      }, 3000); // Show video after 3 seconds even if not fully loaded
-      return () => clearTimeout(timer);
-    }
-  }, [startingVideo, startingVideoLoaded]);
-  
-  useEffect(() => {
-    if (endingVideo && !endingVideoLoaded) {
-      const timer = setTimeout(() => {
-        setEndingVideoLoaded(true);
-      }, 3000); // Show video after 3 seconds even if not fully loaded
-      return () => clearTimeout(timer);
-    }
-  }, [endingVideo, endingVideoLoaded]);
-
-  // The definitive fix for preventing autoplay on mobile browsers
-  useEffect(() => {
-    const video = startingVideoRef.current;
-    if (video) {
-      // Prevent play events from doing anything
-      const preventPlay = () => video.pause();
-      video.addEventListener('play', preventPlay);
+    if (settings && settingsLoaded && clips.length === 0) {
+      const initialClips: VideoClip[] = [];
       
-      // Ensure it's paused on mount and on src change
-      video.pause();
-
-      return () => video.removeEventListener('play', preventPlay);
+      if (settings.startingVideoUrl) {
+        initialClips.push({
+          id: crypto.randomUUID(),
+          url: settings.startingVideoUrl,
+          posterUrl: settings.startingVideoPosterUrl,
+          loaded: false,
+          playing: false
+        });
+      }
+      
+      if (settings.endingVideoUrl) {
+        initialClips.push({
+          id: crypto.randomUUID(),
+          url: settings.endingVideoUrl,
+          posterUrl: settings.endingVideoPosterUrl,
+          loaded: false,
+          playing: false
+        });
+      }
+      
+      // If we have saved clips, use them and set prompts
+      if (initialClips.length > 0) {
+        setClips(initialClips);
+        
+        // Initialize transition prompts
+        if (initialClips.length >= 2 && settings.prompt) {
+          setTransitionPrompts([{
+            id: initialClips[1].id,
+            prompt: settings.prompt
+          }]);
+        }
+      } else {
+        // No saved clips - create 2 empty slots to start
+        const emptyClip1 = {
+          id: crypto.randomUUID(),
+          url: '',
+          loaded: false,
+          playing: false
+        };
+        const emptyClip2 = {
+          id: crypto.randomUUID(),
+          url: '',
+          loaded: false,
+          playing: false
+        };
+        setClips([emptyClip1, emptyClip2]);
+      }
     }
-  }, [startingVideo]); // Re-run when the video source changes
-
-  useEffect(() => {
-    const video = endingVideoRef.current;
-    if (video) {
-      // Prevent play events from doing anything
-      const preventPlay = () => video.pause();
-      video.addEventListener('play', preventPlay);
-
-      // Ensure it's paused on mount and on src change
-      video.pause();
-
-      return () => video.removeEventListener('play', preventPlay);
-    }
-  }, [endingVideo]); // Re-run when the video source changes
+  }, [settings, settingsLoaded, clips.length]);
   
-  // Helper function to upload a video file and extract poster frame
+  // Auto-add empty slot when all slots are filled
+  useEffect(() => {
+    // Only auto-add if we have clips and ALL of them have videos
+    if (clips.length > 0 && clips.every(clip => clip.url)) {
+      console.log('[JoinClips] All slots filled, adding new empty slot');
+      const newClipId = crypto.randomUUID();
+      setClips(prev => [...prev, {
+        id: newClipId,
+        url: '',
+        loaded: false,
+        playing: false
+      }]);
+    }
+  }, [clips]);
+  
+  // Prevent autoplay on mobile
+  useEffect(() => {
+    clips.forEach(clip => {
+      const video = videoRefs.current[clip.id];
+      if (video) {
+        const preventPlay = () => video.pause();
+        video.addEventListener('play', preventPlay);
+        video.pause();
+        
+        return () => video.removeEventListener('play', preventPlay);
+      }
+    });
+  }, [clips]);
+  
+  // Track scroll state
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolling(true);
+      const timer = setTimeout(() => setIsScrolling(false), 200);
+      return () => clearTimeout(timer);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  // Helper to upload video
   const uploadVideoFile = async (
-    file: File, 
-    type: 'starting' | 'ending',
-    setUploading: (value: boolean) => void
+    file: File,
+    clipId: string
   ): Promise<{ videoUrl: string; posterUrl: string } | null> => {
     if (!file.type.startsWith('video/')) {
       toast({
@@ -275,19 +300,16 @@ const JoinClipsPage: React.FC = () => {
       return null;
     }
     
-    setUploading(true);
+    setUploadingClipId(clipId);
     try {
-      // Extract poster frame
       const posterBlob = await extractVideoPosterFrame(file);
       
-      // Upload video to Supabase storage
       const fileExt = file.name.split('.').pop() || 'mp4';
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
-      const fileName = `join-clips/${selectedProjectId}/${timestamp}-${type}-${randomId}.${fileExt}`;
-      const posterFileName = `join-clips/${selectedProjectId}/${timestamp}-${type}-${randomId}-poster.jpg`;
+      const fileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}.${fileExt}`;
+      const posterFileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}-poster.jpg`;
       
-      // Upload video
       const { data: videoData, error: videoError } = await supabase.storage
         .from('image_uploads')
         .upload(fileName, file, {
@@ -297,7 +319,6 @@ const JoinClipsPage: React.FC = () => {
       
       if (videoError) throw videoError;
       
-      // Upload poster image
       const { data: posterData, error: posterError } = await supabase.storage
         .from('image_uploads')
         .upload(posterFileName, posterBlob, {
@@ -308,7 +329,6 @@ const JoinClipsPage: React.FC = () => {
       
       if (posterError) throw posterError;
       
-      // Get public URLs
       const { data: { publicUrl: videoUrl } } = supabase.storage
         .from('image_uploads')
         .getPublicUrl(fileName);
@@ -319,7 +339,7 @@ const JoinClipsPage: React.FC = () => {
       
       toast({
         title: 'Video uploaded',
-        description: `Your ${type} video has been saved`,
+        description: 'Your video has been saved',
       });
       
       return { videoUrl, posterUrl };
@@ -332,213 +352,141 @@ const JoinClipsPage: React.FC = () => {
       });
       return null;
     } finally {
-      setUploading(false);
+      setUploadingClipId(null);
     }
   };
   
-  // Handle starting video upload
-  const handleStartingVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Add new clip slot
+  const handleAddClip = () => {
+    const newClipId = crypto.randomUUID();
+    setClips(prev => [...prev, {
+      id: newClipId,
+      url: '',
+      loaded: false,
+      playing: false
+    }]);
+  };
+  
+  // Remove clip
+  const handleRemoveClip = (clipId: string) => {
+    setClips(prev => prev.filter(c => c.id !== clipId));
+    // Remove any transition prompts associated with this clip
+    setTransitionPrompts(prev => prev.filter(p => p.id !== clipId));
+  };
+  
+  // Handle video upload for a specific clip
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>, clipId: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const result = await uploadVideoFile(file, 'starting', setIsUploadingStarting);
+    const result = await uploadVideoFile(file, clipId);
     if (!result) return;
     
-    // Reset loaded and playing state
-    setStartingVideoLoaded(false);
-    setStartingVideoPlaying(false);
-    setStartingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
-    
-    // Save URLs to project settings for persistence
-    if (selectedProjectId) {
-      updateSettings('project', { 
-        ...settings, 
-        startingVideoUrl: result.videoUrl,
-        startingVideoPosterUrl: result.posterUrl
-      });
-    }
+    setClips(prev => prev.map(clip => 
+      clip.id === clipId
+        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, file, loaded: false, playing: false }
+        : clip
+    ));
   };
   
-  // Handle ending video upload
-  const handleEndingVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const result = await uploadVideoFile(file, 'ending', setIsUploadingEnding);
-    if (!result) return;
-    
-    // Reset loaded and playing state
-    setEndingVideoLoaded(false);
-    setEndingVideoPlaying(false);
-    setEndingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
-    
-    // Save URLs to project settings for persistence
-    if (selectedProjectId) {
-      updateSettings('project', { 
-        ...settings, 
-        endingVideoUrl: result.videoUrl,
-        endingVideoPosterUrl: result.posterUrl
-      });
-    }
-  };
-  
-  // Drag and drop handlers for starting video
-  const handleStartingDragOver = (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent, clipId: string) => {
+    if (isScrolling) return;
     e.preventDefault();
     e.stopPropagation();
   };
   
-  const handleStartingDragEnter = (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
+  const handleDragEnter = (e: React.DragEvent, clipId: string) => {
+    if (isScrolling) return;
     e.preventDefault();
     e.stopPropagation();
     
-    // Check if dragged item is a video
     const items = Array.from(e.dataTransfer.items);
     const hasValidVideo = items.some(item => 
       item.kind === 'file' && item.type.startsWith('video/')
     );
     
     if (hasValidVideo) {
-      setIsDraggingOverStarting(true);
+      setDraggingOverClipId(clipId);
     }
   };
   
-  const handleStartingDragLeave = (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
+  const handleDragLeave = (e: React.DragEvent, clipId: string) => {
+    if (isScrolling) return;
     e.preventDefault();
     e.stopPropagation();
-    // Check if we're actually leaving the drop zone (not just entering a child element)
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX;
     const y = e.clientY;
     if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
-      setIsDraggingOverStarting(false);
+      setDraggingOverClipId(null);
     }
   };
   
-  const handleStartingDrop = async (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
+  const handleDrop = async (e: React.DragEvent, clipId: string) => {
+    if (isScrolling) return;
     e.preventDefault();
     e.stopPropagation();
-    setIsDraggingOverStarting(false);
+    setDraggingOverClipId(null);
     
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     
-    const result = await uploadVideoFile(file, 'starting', setIsUploadingStarting);
+    const result = await uploadVideoFile(file, clipId);
     if (!result) return;
     
-    // Reset loaded and playing state
-    setStartingVideoLoaded(false);
-    setStartingVideoPlaying(false);
-    setStartingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
-    
-    // Save URLs to project settings for persistence
-    if (selectedProjectId) {
-      updateSettings('project', { 
-        ...settings, 
-        startingVideoUrl: result.videoUrl,
-        startingVideoPosterUrl: result.posterUrl
-      });
-    }
+    setClips(prev => prev.map(clip => 
+      clip.id === clipId
+        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, file, loaded: false, playing: false }
+        : clip
+    ));
   };
   
-  // Drag and drop handlers for ending video
-  const handleEndingDragOver = (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
-    e.preventDefault();
-    e.stopPropagation();
+  // Update transition prompt
+  const handlePromptChange = (clipId: string, prompt: string) => {
+    setTransitionPrompts(prev => {
+      const existing = prev.find(p => p.id === clipId);
+      if (existing) {
+        return prev.map(p => p.id === clipId ? { ...p, prompt } : p);
+      } else {
+        return [...prev, { id: clipId, prompt }];
+      }
+    });
   };
   
-  const handleEndingDragEnter = (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Check if dragged item is a video
-    const items = Array.from(e.dataTransfer.items);
-    const hasValidVideo = items.some(item => 
-      item.kind === 'file' && item.type.startsWith('video/')
-    );
-    
-    if (hasValidVideo) {
-      setIsDraggingOverEnding(true);
-    }
-  };
-  
-  const handleEndingDragLeave = (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
-    e.preventDefault();
-    e.stopPropagation();
-    // Check if we're actually leaving the drop zone (not just entering a child element)
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
-      setIsDraggingOverEnding(false);
-    }
-  };
-  
-  const handleEndingDrop = async (e: React.DragEvent) => {
-    if (isScrolling) return; // Prevent drag during scroll
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingOverEnding(false);
-    
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    
-    const result = await uploadVideoFile(file, 'ending', setIsUploadingEnding);
-    if (!result) return;
-    
-    // Reset loaded and playing state
-    setEndingVideoLoaded(false);
-    setEndingVideoPlaying(false);
-    setEndingVideo({ url: result.videoUrl, posterUrl: result.posterUrl, file });
-    
-    // Save URLs to project settings for persistence
-    if (selectedProjectId) {
-      updateSettings('project', { 
-        ...settings, 
-        endingVideoUrl: result.videoUrl,
-        endingVideoPosterUrl: result.posterUrl
-      });
-    }
-  };
-
-  // Track scroll state to prevent drag conflicts
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolling(true);
-      const timer = setTimeout(() => setIsScrolling(false), 200);
-      return () => clearTimeout(timer);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-  
-  // Generate join clips mutation
+  // Generate mutation
   const generateJoinClipsMutation = useMutation({
     mutationFn: async () => {
-      if (!startingVideo) throw new Error('No starting video');
-      if (!endingVideo) throw new Error('No ending video');
       if (!selectedProjectId) throw new Error('No project selected');
+      if (clips.length < 2) throw new Error('At least 2 clips required');
       
-      // Convert selected LoRAs to the format expected by the task
+      const validClips = clips.filter(c => c.url);
+      if (validClips.length < 2) throw new Error('At least 2 clips with videos required');
+      
+      // Build clips array
+      const clipsForTask = validClips.map(clip => ({
+        url: clip.url
+      }));
+      
+      // Build per-join settings (one for each transition)
+      const perJoinSettings = validClips.slice(1).map((clip, index) => {
+        const transitionPrompt = transitionPrompts.find(p => p.id === clip.id);
+        return {
+          prompt: transitionPrompt?.prompt || ''
+        };
+      });
+      
+      // Convert selected LoRAs
       const lorasForTask = loraManager.selectedLoras.map(lora => ({
         path: lora.path,
         strength: lora.strength,
       }));
       
-      // Create task using the join clips task creation utility
       const taskParams: import('@/shared/lib/tasks/joinClips').JoinClipsTaskParams = {
         project_id: selectedProjectId,
-        starting_video_path: startingVideo.url,
-        ending_video_path: endingVideo.url,
-        prompt: prompt,
+        clips: clipsForTask,
+        per_join_settings: perJoinSettings,
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
@@ -546,7 +494,7 @@ const JoinClipsPage: React.FC = () => {
         num_inference_steps: settings?.numInferenceSteps || 6,
         guidance_scale: settings?.guidanceScale || 3.0,
         seed: settings?.seed || -1,
-        negative_prompt: settings?.negativePrompt || '',
+        negative_prompt: negativePrompt,
         priority: settings?.priority || 0,
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
       };
@@ -556,20 +504,17 @@ const JoinClipsPage: React.FC = () => {
       const result = await createJoinClipsTask(taskParams);
       return result;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast({
         title: 'Task created',
         description: 'Your join clips task has been queued',
       });
       
-      // Show success state on button
       setShowSuccessState(true);
       setTimeout(() => setShowSuccessState(false), 3000);
       
-      // Set flag to indicate we just created a task
       setVideosViewJustEnabled(true);
       
-      // Invalidate both tasks and generations queries
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ 
         queryKey: ['unified-generations', 'project', selectedProjectId]
@@ -586,19 +531,12 @@ const JoinClipsPage: React.FC = () => {
   });
   
   const handleGenerate = () => {
-    if (!startingVideo) {
-      toast({
-        title: 'Missing starting video',
-        description: 'Please upload a starting video first',
-        variant: 'destructive',
-      });
-      return;
-    }
+    const validClips = clips.filter(c => c.url);
     
-    if (!endingVideo) {
+    if (validClips.length < 2) {
       toast({
-        title: 'Missing ending video',
-        description: 'Please upload an ending video',
+        title: 'Need at least 2 clips',
+        description: 'Please upload at least 2 videos to join',
         variant: 'destructive',
       });
       return;
@@ -618,476 +556,313 @@ const JoinClipsPage: React.FC = () => {
   return (
     <PageFadeIn>
       <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-6">
-        <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
+          <Button
+            onClick={handleAddClip}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Clip
+          </Button>
+        </div>
         
-        {/* Input Videos with Frame Controls in Center */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-6 items-start">
-          {/* Starting Video */}
-          <div className="space-y-3">
-            <Label className="text-lg font-medium">
-              🎬 Starting Video
-            </Label>
-            <div 
-              className={`aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative ${
-                isDraggingOverStarting 
-                  ? 'border-primary bg-primary/10' 
-                  : 'border-border hover:border-primary/50'
-              } ${!startingVideo && !isUploadingStarting ? 'cursor-pointer' : ''}`}
-              onDragOver={handleStartingDragOver}
-              onDragEnter={handleStartingDragEnter}
-              onDragLeave={handleStartingDragLeave}
-              onDrop={handleStartingDrop}
-              onClick={() => !startingVideo && !isUploadingStarting && startingVideoInputRef.current?.click()}
-            >
-              {isUploadingStarting ? (
-                <UploadingVideoState />
-              ) : startingVideo ? (
-                <>
-                  {!startingVideoLoaded && <VideoContainerSkeleton />}
-                  {/* Show poster image or video based on playing state */}
-                  {!startingVideoPlaying && startingVideo.posterUrl ? (
-                    <>
-                      <img
-                        src={startingVideo.posterUrl}
-                        alt="Video poster"
-                        className={cn(
-                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                          startingVideoLoaded ? 'opacity-100' : 'opacity-0'
-                        )}
-                        onLoad={() => setStartingVideoLoaded(true)}
-                      />
-                      {/* Play button overlay */}
-                      <div 
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
-                        onClick={() => setStartingVideoPlaying(true)}
-                      >
-                        <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
-                          <Play className="h-12 w-12 text-white" fill="white" />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <video
-                      ref={startingVideoRef}
-                      src={startingVideo.url}
-                      controls
-                      autoPlay={startingVideoPlaying}
-                      preload="metadata"
-                      playsInline
-                      muted
-                      className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                        startingVideoLoaded ? 'opacity-100' : 'opacity-0'
-                      )}
-                      onLoadedData={() => {
-                        console.log('[JoinClips] Starting video onLoadedData fired', { url: startingVideo.url, timestamp: Date.now() });
-                        setStartingVideoLoaded(true);
-                      }}
-                    />
+        {/* Clips Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {clips.map((clip, index) => (
+            <div key={clip.id} className="space-y-3">
+              {/* Clip Card */}
+              <div className="relative border rounded-lg p-3 space-y-3 bg-card">
+                {/* Header with number and remove button */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium text-muted-foreground">Clip #{index + 1}</div>
+                  </div>
+                  {clips.length > 2 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveClip(clip.id)}
+                      className="h-6 w-6 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   )}
-                  {/* Remove button */}
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setStartingVideo(null);
-                      setStartingVideoLoaded(false);
-                      setStartingVideoPlaying(false);
-                      if (selectedProjectId) {
-                        updateSettings('project', { 
-                          ...settings, 
-                          startingVideoUrl: undefined,
-                          startingVideoPosterUrl: undefined 
-                        });
-                      }
-                    }}
-                    disabled={isUploadingStarting}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  {isDraggingOverStarting && !isScrolling && (
-                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-                      <p className="text-lg font-medium text-foreground">Drop to replace</p>
-                    </div>
-                  )}
-                </>
-              ) : !settingsLoaded ? (
-                // Show skeleton while settings are loading
-                <VideoContainerSkeleton />
-              ) : (
-                <div className="text-center p-6 pointer-events-none">
-                  <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {isDraggingOverStarting ? 'Drop video here' : 'Drag & drop or click to upload'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isDraggingOverStarting ? '' : 'MP4, WebM, MOV supported'}
-                  </p>
                 </div>
-              )}
-            </div>
-            <input
-              ref={startingVideoInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={handleStartingVideoUpload}
-            />
-          </div>
-
-          {/* Frame Controls - Centered Between Videos */}
-          <div className="hidden md:flex flex-col space-y-4 px-4 min-w-[200px] justify-center self-center mt-16">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gapFrameCount" className="text-sm">
-                  Gap Frames
-                </Label>
-                <span className="text-sm font-medium">{gapFrameCount}</span>
+                
+                {/* Video Container */}
+                <div className="space-y-2">
+                    <div 
+                      className={cn(
+                        "aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative",
+                        draggingOverClipId === clip.id 
+                          ? 'border-primary bg-primary/10' 
+                          : 'border-border hover:border-primary/50',
+                        !clip.url && uploadingClipId !== clip.id ? 'cursor-pointer' : ''
+                      )}
+                      onDragOver={(e) => handleDragOver(e, clip.id)}
+                      onDragEnter={(e) => handleDragEnter(e, clip.id)}
+                      onDragLeave={(e) => handleDragLeave(e, clip.id)}
+                      onDrop={(e) => handleDrop(e, clip.id)}
+                      onClick={() => !clip.url && uploadingClipId !== clip.id && fileInputRefs.current[clip.id]?.click()}
+                    >
+                      {uploadingClipId === clip.id ? (
+                        <UploadingVideoState />
+                      ) : clip.url ? (
+                        <>
+                          {!clip.loaded && <VideoContainerSkeleton />}
+                          {!clip.playing && clip.posterUrl ? (
+                            <>
+                              <img
+                                src={clip.posterUrl}
+                                alt="Video poster"
+                                className={cn(
+                                  'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
+                                  clip.loaded ? 'opacity-100' : 'opacity-0'
+                                )}
+                                onLoad={() => {
+                                  setClips(prev => prev.map(c => 
+                                    c.id === clip.id ? { ...c, loaded: true } : c
+                                  ));
+                                }}
+                              />
+                              <div 
+                                className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
+                                onClick={() => {
+                                  setClips(prev => prev.map(c => 
+                                    c.id === clip.id ? { ...c, playing: true } : c
+                                  ));
+                                }}
+                              >
+                                <div className="bg-black/50 rounded-full p-3 hover:bg-black/70 transition-colors">
+                                  <Play className="h-8 w-8 text-white" fill="white" />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <video
+                              ref={el => { videoRefs.current[clip.id] = el; }}
+                              src={clip.url}
+                              controls
+                              autoPlay={clip.playing}
+                              preload="metadata"
+                              playsInline
+                              muted
+                              className={cn(
+                                'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
+                                clip.loaded ? 'opacity-100' : 'opacity-0'
+                              )}
+                              onLoadedData={() => {
+                                setClips(prev => prev.map(c => 
+                                  c.id === clip.id ? { ...c, loaded: true } : c
+                                ));
+                              }}
+                            />
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClips(prev => prev.map(c => 
+                                c.id === clip.id ? { ...c, url: '', posterUrl: undefined, loaded: false, playing: false } : c
+                              ));
+                            }}
+                            disabled={uploadingClipId === clip.id}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                          {draggingOverClipId === clip.id && !isScrolling && (
+                            <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                              <p className="text-sm font-medium text-foreground">Drop to replace</p>
+                            </div>
+                          )}
+                        </>
+                      ) : !settingsLoaded ? (
+                        <VideoContainerSkeleton />
+                      ) : (
+                        <div className="text-center p-4 pointer-events-none">
+                          <Film className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {draggingOverClipId === clip.id ? 'Drop video here' : 'Click or drop to upload'}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {draggingOverClipId === clip.id ? '' : 'MP4, WebM, MOV'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      ref={el => { fileInputRefs.current[clip.id] = el; }}
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => handleVideoUpload(e, clip.id)}
+                    />
+                </div>
+                
+                {/* Transition Prompt (if not last clip) */}
+                {index < clips.length - 1 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label htmlFor={`prompt-${clips[index + 1].id}`} className="text-xs text-muted-foreground">
+                      Transition to Clip #{index + 2}
+                    </Label>
+                    <Textarea
+                      id={`prompt-${clips[index + 1].id}`}
+                      value={transitionPrompts.find(p => p.id === clips[index + 1].id)?.prompt || ''}
+                      onChange={(e) => handlePromptChange(clips[index + 1].id, e.target.value)}
+                      placeholder="Describe transition (optional)"
+                      rows={2}
+                      className="resize-none text-sm"
+                    />
+                  </div>
+                )}
               </div>
-              <Slider
-                id="gapFrameCount"
-                min={1}
-                max={Math.max(1, 81 - (contextFrameCount * 2))}
-                step={1}
-                value={[Math.max(1, gapFrameCount)]}
-                onValueChange={(values) => {
-                  const val = Math.max(1, values[0]);
-                  setGapFrameCount(val);
-                  updateSettings('project', { ...settings, gapFrameCount: val });
-                }}
-              />
-              <p className="text-xs text-muted-foreground text-center">to generate</p>
-              
-              {/* Replace Mode Toggle */}
-              <div className="flex items-center justify-between gap-2 pt-2 border-t">
-                <Label htmlFor="replaceMode" className="text-xs text-center flex-1">
-                  Replace Frames
-                </Label>
-                <Switch
-                  id="replaceMode"
-                  checked={!replaceMode}
-                  onCheckedChange={(checked) => {
-                    setReplaceMode(!checked);
-                    updateSettings('project', { ...settings, replaceMode: !checked });
+            </div>
+          ))
+        }
+        </div>
+
+        {/* Global Settings */}
+        <div className="space-y-6 pt-6 border-t">
+          <h2 className="text-xl font-medium">Global Settings</h2>
+            
+            {/* Frame Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="gapFrameCount" className="text-sm">
+                    Gap Frames
+                  </Label>
+                  <span className="text-sm font-medium">{gapFrameCount}</span>
+                </div>
+                <Slider
+                  id="gapFrameCount"
+                  min={1}
+                  max={Math.max(1, 81 - (contextFrameCount * 2))}
+                  step={1}
+                  value={[Math.max(1, gapFrameCount)]}
+                  onValueChange={(values) => {
+                    const val = Math.max(1, values[0]);
+                    setGapFrameCount(val);
+                    updateSettings('project', { ...settings, gapFrameCount: val });
                   }}
                 />
-                <Label htmlFor="replaceMode" className="text-xs text-center flex-1">
-                  Generate New
-                </Label>
+                <p className="text-xs text-muted-foreground">Frames to generate in each transition</p>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contextFrameCount" className="text-sm">
-                Context Frames
-              </Label>
-              <Input
-                id="contextFrameCount"
-                type="number"
-                min={1}
-                max={30}
-                value={contextFrameCount}
-                onChange={(e) => {
-                  const val = Math.max(1, parseInt(e.target.value) || 1);
-                  if (!isNaN(val) && val > 0) {
-                    setContextFrameCount(val);
-                    // Ensure gap frames doesn't exceed limit
-                    const maxGap = Math.max(1, 81 - (val * 2));
-                    const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                    if (gapFrameCount > maxGap) {
-                      setGapFrameCount(maxGap);
-                    }
-                    
-                    // Debounce settings update to prevent glitchiness
-                    if (contextFramesTimerRef.current) {
-                      clearTimeout(contextFramesTimerRef.current);
-                    }
-                    contextFramesTimerRef.current = setTimeout(() => {
-                      updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
-                    }, 300);
-                  }
-                }}
-                className="text-center"
-              />
-              <p className="text-xs text-muted-foreground text-center">from each clip</p>
-            </div>
-          </div>
-
-          {/* Ending Video */}
-          <div className="space-y-3">
-            <Label className="text-lg font-medium">
-              🎬 Ending Video
-            </Label>
-            <div 
-              className={`aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative ${
-                isDraggingOverEnding 
-                  ? 'border-primary bg-primary/10' 
-                  : 'border-border hover:border-primary/50'
-              } ${!endingVideo && !isUploadingEnding ? 'cursor-pointer' : ''}`}
-              onDragOver={handleEndingDragOver}
-              onDragEnter={handleEndingDragEnter}
-              onDragLeave={handleEndingDragLeave}
-              onDrop={handleEndingDrop}
-              onClick={() => !endingVideo && !isUploadingEnding && endingVideoInputRef.current?.click()}
-            >
-              {isUploadingEnding ? (
-                <UploadingVideoState />
-              ) : endingVideo ? (
-                <>
-                  {!endingVideoLoaded && <VideoContainerSkeleton />}
-                  {/* Show poster image or video based on playing state */}
-                  {!endingVideoPlaying && endingVideo.posterUrl ? (
-                    <>
-                      <img
-                        src={endingVideo.posterUrl}
-                        alt="Video poster"
-                        className={cn(
-                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                          endingVideoLoaded ? 'opacity-100' : 'opacity-0'
-                        )}
-                        onLoad={() => setEndingVideoLoaded(true)}
-                      />
-                      {/* Play button overlay */}
-                      <div 
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
-                        onClick={() => setEndingVideoPlaying(true)}
-                      >
-                        <div className="bg-black/50 rounded-full p-4 hover:bg-black/70 transition-colors">
-                          <Play className="h-12 w-12 text-white" fill="white" />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <video
-                      ref={endingVideoRef}
-                      src={endingVideo.url}
-                      controls
-                      autoPlay={endingVideoPlaying}
-                      preload="metadata"
-                      playsInline
-                      muted
-                      className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                        endingVideoLoaded ? 'opacity-100' : 'opacity-0'
-                      )}
-                      onLoadedData={() => {
-                        console.log('[JoinClips] Ending video onLoadedData fired', { url: endingVideo.url, timestamp: Date.now() });
-                        setEndingVideoLoaded(true);
-                      }}
-                    />
-                  )}
-                  {/* Remove button */}
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEndingVideo(null);
-                      setEndingVideoLoaded(false);
-                      setEndingVideoPlaying(false);
-                      if (selectedProjectId) {
-                        updateSettings('project', { 
-                          ...settings, 
-                          endingVideoUrl: undefined,
-                          endingVideoPosterUrl: undefined 
-                        });
+              
+              <div className="space-y-2">
+                <Label htmlFor="contextFrameCount" className="text-sm">
+                  Context Frames
+                </Label>
+                <Input
+                  id="contextFrameCount"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={contextFrameCount}
+                  onChange={(e) => {
+                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                    if (!isNaN(val) && val > 0) {
+                      setContextFrameCount(val);
+                      const maxGap = Math.max(1, 81 - (val * 2));
+                      const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
+                      if (gapFrameCount > maxGap) {
+                        setGapFrameCount(maxGap);
                       }
-                    }}
-                    disabled={isUploadingEnding}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  {isDraggingOverEnding && !isScrolling && (
-                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-                      <p className="text-lg font-medium text-foreground">Drop to replace</p>
-                    </div>
-                  )}
-                </>
-              ) : !settingsLoaded ? (
-                // Show skeleton while settings are loading
-                <VideoContainerSkeleton />
-              ) : (
-                <div className="text-center p-6 pointer-events-none">
-                  <Film className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {isDraggingOverEnding ? 'Drop video here' : 'Drag & drop or click to upload'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isDraggingOverEnding ? '' : 'MP4, WebM, MOV supported'}
-                  </p>
-                </div>
-              )}
-            </div>
-            <input
-              ref={endingVideoInputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={handleEndingVideoUpload}
-            />
-          </div>
-        </div>
-
-        {/* Frame Controls - Mobile Only (shown below videos) */}
-        <div className="md:hidden space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="gapFrameCountMobile" className="text-sm">
-                  Gap Frames
-                </Label>
-                <span className="text-sm font-medium">{gapFrameCount}</span>
+                      
+                      if (contextFramesTimerRef.current) {
+                        clearTimeout(contextFramesTimerRef.current);
+                      }
+                      contextFramesTimerRef.current = setTimeout(() => {
+                        updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
+                      }, 300);
+                    }
+                  }}
+                  className="text-center"
+                />
+                <p className="text-xs text-muted-foreground">Context frames from each clip</p>
               </div>
-              <Slider
-                id="gapFrameCountMobile"
-                min={1}
-                max={Math.max(1, 81 - (contextFrameCount * 2))}
-                step={1}
-                value={[Math.max(1, gapFrameCount)]}
-                onValueChange={(values) => {
-                  const val = Math.max(1, values[0]);
-                  setGapFrameCount(val);
-                  updateSettings('project', { ...settings, gapFrameCount: val });
-                }}
-              />
-              <p className="text-xs text-muted-foreground text-center">to generate</p>
+              
+              <div className="flex flex-col justify-center space-y-2">
+                <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
+                  <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
+                    Replace Frames
+                  </Label>
+                  <Switch
+                    id="replaceMode"
+                    checked={!replaceMode}
+                    onCheckedChange={(checked) => {
+                      setReplaceMode(!checked);
+                      updateSettings('project', { ...settings, replaceMode: !checked });
+                    }}
+                  />
+                  <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
+                    Generate New
+                  </Label>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="contextFrameCountMobile" className="text-sm">
-                Context Frames
-              </Label>
-              <Input
-                id="contextFrameCountMobile"
-                type="number"
-                min={1}
-                max={30}
-                value={contextFrameCount}
-                onChange={(e) => {
-                  const val = Math.max(1, parseInt(e.target.value) || 1);
-                  if (!isNaN(val) && val > 0) {
-                    setContextFrameCount(val);
-                    // Ensure gap frames doesn't exceed limit
-                    const maxGap = Math.max(1, 81 - (val * 2));
-                    const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                    if (gapFrameCount > maxGap) {
-                      setGapFrameCount(maxGap);
-                    }
-                    
-                    // Debounce settings update to prevent glitchiness
-                    if (contextFramesTimerRef.current) {
-                      clearTimeout(contextFramesTimerRef.current);
-                    }
-                    contextFramesTimerRef.current = setTimeout(() => {
-                      updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
-                    }, 300);
-                  }
-                }}
-                className="text-center"
-              />
-              <p className="text-xs text-muted-foreground text-center">from each clip</p>
-            </div>
-          </div>
-          
-          {/* Replace Mode Toggle - Mobile */}
-          <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
-            <Label htmlFor="replaceModeMobile" className="text-sm text-center flex-1">
-              Replace Frames
-            </Label>
-            <Switch
-              id="replaceModeMobile"
-              checked={!replaceMode}
-              onCheckedChange={(checked) => {
-                setReplaceMode(!checked);
-                updateSettings('project', { ...settings, replaceMode: !checked });
-              }}
-            />
-            <Label htmlFor="replaceModeMobile" className="text-sm text-center flex-1">
-              Generate New
-            </Label>
-          </div>
-        </div>
 
-        {/* Prompt and LoRA Section - Side by Side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Prompt Section */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="prompt">Transition Prompt (Optional)</Label>
-              <Textarea
-                id="prompt"
-                value={prompt}
-                onChange={(e) => {
-                  const newPrompt = e.target.value;
-                  setPrompt(newPrompt);
-                  updateSettings('project', { ...settings, prompt: newPrompt });
-                }}
-                placeholder="Describe the transition between clips (optional)"
-                rows={2}
-                className="resize-none"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="negativePrompt">Negative Prompt</Label>
-              <Textarea
-                id="negativePrompt"
-                value={negativePrompt}
-                onChange={(e) => {
-                  const newNegativePrompt = e.target.value;
-                  setNegativePrompt(newNegativePrompt);
-                  updateSettings('project', { ...settings, negativePrompt: newNegativePrompt });
-                }}
-                placeholder="Describe what to avoid in the transition (optional)"
-                rows={2}
-                className="resize-none"
-              />
-            </div>
-          </div>
+            {/* Negative Prompt and LoRA */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="negativePrompt">Global Negative Prompt</Label>
+                <Textarea
+                  id="negativePrompt"
+                  value={negativePrompt}
+                  onChange={(e) => {
+                    const newNegativePrompt = e.target.value;
+                    setNegativePrompt(newNegativePrompt);
+                    updateSettings('project', { ...settings, negativePrompt: newNegativePrompt });
+                  }}
+                  placeholder="What to avoid in all transitions (optional)"
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
 
-          {/* LoRA Section */}
-          <div className="space-y-2">
-            <LoraManager
-              availableLoras={availableLoras}
-              projectId={selectedProjectId || undefined}
-              persistenceScope="project"
-              enableProjectPersistence={true}
-              persistenceKey="join-clips"
-              title="LoRA Models (Optional)"
-              addButtonText="Add or Manage LoRAs"
-            />
-          </div>
+              <div className="space-y-2">
+                <LoraManager
+                  availableLoras={availableLoras}
+                  projectId={selectedProjectId || undefined}
+                  persistenceScope="project"
+                  enableProjectPersistence={true}
+                  persistenceKey="join-clips"
+                  title="LoRA Models (Optional)"
+                  addButtonText="Add or Manage LoRAs"
+                />
+              </div>
+            </div>
         </div>
 
         {/* Generate Button */}
         <div className="flex justify-center">
-          <Button
-            onClick={handleGenerate}
-            disabled={!startingVideo || !endingVideo || generateJoinClipsMutation.isPending || showSuccessState}
-            className="w-full max-w-[33.333%]"
-            size="lg"
-            variant={showSuccessState ? 'default' : 'default'}
-          >
-            {generateJoinClipsMutation.isPending 
-              ? 'Creating Task...' 
-              : showSuccessState 
-              ? '✓ Task Created!' 
-              : 'Generate'}
-          </Button>
+            <Button
+              onClick={handleGenerate}
+              disabled={clips.filter(c => c.url).length < 2 || generateJoinClipsMutation.isPending || showSuccessState}
+              className="w-full max-w-md"
+              size="lg"
+              variant={showSuccessState ? 'default' : 'default'}
+            >
+              {generateJoinClipsMutation.isPending 
+                ? 'Creating Task...' 
+                : showSuccessState 
+                ? '✓ Task Created!' 
+                : `Generate (${clips.filter(c => c.url).length - 1} transition${clips.filter(c => c.url).length - 1 !== 1 ? 's' : ''})`}
+            </Button>
         </div>
 
         {/* Results Gallery */}
         {(() => {
           const hasValidData = videosData?.items && videosData.items.length > 0;
           const isLoadingOrFetching = videosLoading || videosFetching;
-          
-          // Show skeleton when loading for the first time (no data yet) or when just enabled
-          // Don't show skeleton during refetches when we already have data (prevents flicker)
           const shouldShowSkeleton = (isLoadingOrFetching && !hasValidData) || videosViewJustEnabled;
           
           if (shouldShowSkeleton) {
-            // Use actual count if available, otherwise default to 6 for initial load
             const skeletonCount = videosData?.items?.length || 6;
             return (
               <div className="space-y-4 pt-4 border-t">
@@ -1113,8 +888,8 @@ const JoinClipsPage: React.FC = () => {
                 <ImageGallery
                   images={videosData.items || []}
                   allShots={[]}
-                  onAddToLastShot={async () => false} // No-op for video gallery
-                  onAddToLastShotWithoutPosition={async () => false} // No-op for video gallery
+                  onAddToLastShot={async () => false}
+                  onAddToLastShotWithoutPosition={async () => false}
                   currentToolType="join-clips"
                   initialMediaTypeFilter="video"
                   initialToolTypeFilter={true}
@@ -1122,7 +897,7 @@ const JoinClipsPage: React.FC = () => {
                   showShotFilter={false}
                   initialShotFilter="all"
                   columnsPerRow={3}
-                  itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
+                  itemsPerPage={isMobile ? 20 : 12}
                   reducedSpacing={true}
                   hidePagination={videosData.items.length <= (isMobile ? 20 : 12)}
                 />
@@ -1130,7 +905,6 @@ const JoinClipsPage: React.FC = () => {
             );
           }
           
-          // Only show empty state when not loading and no data
           if (!isLoadingOrFetching) {
             return (
               <div className="text-sm text-muted-foreground text-center pt-4 border-t">
@@ -1139,7 +913,6 @@ const JoinClipsPage: React.FC = () => {
             );
           }
           
-          // While loading for the first time, don't show anything
           return null;
         })()}
       </div>
@@ -1148,4 +921,3 @@ const JoinClipsPage: React.FC = () => {
 };
 
 export default JoinClipsPage;
-

@@ -1,5 +1,6 @@
--- Add join_clips task type to support video clip joining with AI-generated transitions
+-- Add join_clips_segment task type to support video clip joining with AI-generated transitions
 -- This task type needs to be registered in task_types table for the generation trigger to process it
+-- Renamed from join_clips to join_clips_segment to match orchestrator pattern (like travel_segment)
 
 INSERT INTO task_types (
   name,
@@ -15,13 +16,13 @@ INSERT INTO task_types (
   cost_factors,
   is_active
 ) VALUES (
-  'join_clips',
+  'join_clips_segment',
   'gpu',                                           -- GPU-based video generation service
   'generation',                                    -- CRITICAL: Must be 'generation' for trigger to process
   'join-clips',                                    -- Tool type for filtering generations
   'video',                                         -- Produces video output
-  'Join Clips',
-  'Join two video clips with AI-generated transitions using VACE',
+  'Join Clips Segment',
+  'Individual join segment generation (part of join clips orchestrator workflow)',
   'per_second',                                    -- Billed per second of generated video
   0.000001,                                       -- Minimal unit cost (required field, not used for per_second)
   0.027800,                                       -- $0.0278 per second (same as travel_segment)
@@ -53,8 +54,8 @@ SELECT
   cost_factors,
   is_active
 FROM task_types 
-WHERE name = 'join_clips';
+WHERE name = 'join_clips_segment';
 
 -- Log confirmation
-SELECT 'Added join_clips task type with generation category for trigger processing' as status;
+SELECT 'Added join_clips_segment task type with generation category for trigger processing' as status;
 

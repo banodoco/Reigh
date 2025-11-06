@@ -97,11 +97,15 @@ export type Database = {
       generations: {
         Row: {
           based_on: string | null
+          child_order: number | null
+          children: Json | null
           created_at: string
           id: string
+          is_child: boolean
           location: string | null
           name: string | null
           params: Json | null
+          parent_generation_id: string | null
           project_id: string
           starred: boolean
           tasks: Json | null
@@ -112,11 +116,15 @@ export type Database = {
         }
         Insert: {
           based_on?: string | null
+          child_order?: number | null
+          children?: Json | null
           created_at?: string
           id?: string
+          is_child?: boolean
           location?: string | null
           name?: string | null
           params?: Json | null
+          parent_generation_id?: string | null
           project_id: string
           starred?: boolean
           tasks?: Json | null
@@ -127,11 +135,15 @@ export type Database = {
         }
         Update: {
           based_on?: string | null
+          child_order?: number | null
+          children?: Json | null
           created_at?: string
           id?: string
+          is_child?: boolean
           location?: string | null
           name?: string | null
           params?: Json | null
+          parent_generation_id?: string | null
           project_id?: string
           starred?: boolean
           tasks?: Json | null
@@ -144,6 +156,13 @@ export type Database = {
           {
             foreignKeyName: "generations_based_on_fkey"
             columns: ["based_on"]
+            isOneToOne: false
+            referencedRelation: "generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generations_parent_generation_id_fkey"
+            columns: ["parent_generation_id"]
             isOneToOne: false
             referencedRelation: "generations"
             referencedColumns: ["id"]

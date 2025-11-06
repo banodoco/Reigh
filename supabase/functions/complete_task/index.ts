@@ -743,23 +743,30 @@ serve(async (req)=>{
         return;
       }
       
-      // Resolve tool_type with potential override from params
-      const toolTypeInfo = await resolveToolType(supabaseAdmin, taskData.task_type, taskData.params);
-      
-      if (!toolTypeInfo) {
-        console.error(`[GenMigration] Failed to resolve tool_type for task ${taskIdString}`);
+      // CRITICAL: Skip generation creation for sub-tasks (segments) - only orchestrators create generations
+      // Sub-tasks are identified by having orchestrator_task_id_ref in their params
+      const isSubTask = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
+      if (isSubTask) {
+        console.log(`[GenMigration] Task ${taskIdString} is a sub-task of orchestrator ${isSubTask} - skipping generation creation (parent will create it)`);
       } else {
-        const { toolType, category: taskCategory, contentType } = toolTypeInfo;
-        console.log(`[GenMigration] Task ${taskIdString} resolved to category: ${taskCategory}, tool_type: ${toolType}, content_type: ${contentType}`);
+        // Not a sub-task - proceed with generation creation logic
+        // Resolve tool_type with potential override from params
+        const toolTypeInfo = await resolveToolType(supabaseAdmin, taskData.task_type, taskData.params);
+        
+        if (!toolTypeInfo) {
+          console.error(`[GenMigration] Failed to resolve tool_type for task ${taskIdString}`);
+        } else {
+          const { toolType, category: taskCategory, contentType } = toolTypeInfo;
+          console.log(`[GenMigration] Task ${taskIdString} resolved to category: ${taskCategory}, tool_type: ${toolType}, content_type: ${contentType}`);
 
-        // Create combined task data with resolved tool_type and content_type (used by multiple branches)
-        const combinedTaskData = {
-          ...taskData,
-          tool_type: toolType,
-          content_type: contentType
-        };
+          // Create combined task data with resolved tool_type and content_type (used by multiple branches)
+          const combinedTaskData = {
+            ...taskData,
+            tool_type: toolType,
+            content_type: contentType
+          };
 
-        if (taskCategory === 'generation') {
+          if (taskCategory === 'generation') {
           console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
           try {
             await createGenerationFromTask(
@@ -870,8 +877,45 @@ serve(async (req)=>{
               thumbnailUrl || undefined
             );
           }
+        } else if (taskCategory === 'orchestration') {
+          // Special handling for orchestrator tasks: create generation for the final orchestrated output
+          console.log(`[Orchestrator] Processing orchestrator task ${taskIdString} (task_type: ${taskData.task_type})`);
+          
+          // Only create generation if there's an actual output (video/image file)
+          // Some orchestrators might just coordinate without producing their own output
+          if (publicUrl && contentType) {
+            console.log(`[Orchestrator] Creating generation for orchestrator output: ${publicUrl} (type: ${contentType})`);
+            
+            try {
+              const newGenerationId = crypto.randomUUID();
+              const generationRecord = {
+                id: newGenerationId,
+                tasks: [taskIdString],
+                params: {
+                  ...taskData.params,
+                  tool_type: toolType,
+                  orchestrator_type: taskData.task_type, // Track which orchestrator created this
+                },
+                location: publicUrl,
+                type: contentType, // Use content_type from task_types (e.g., 'video' for join_clips_orchestrator)
+                project_id: taskData.project_id,
+                thumbnail_url: thumbnailUrl,
+                name: taskData.params?.generation_name || taskData.params?.orchestrator_details?.generation_name,
+                created_at: new Date().toISOString()
+              };
+              
+              const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
+              console.log(`[Orchestrator] Created generation ${newGeneration.id} for orchestrator task ${taskIdString}`);
+            } catch (genError) {
+              console.error(`[Orchestrator] Error creating generation for orchestrator task ${taskIdString}:`, genError);
+              // Don't fail the task - the output is still in output_location
+            }
+          } else {
+            console.log(`[Orchestrator] Skipping generation creation - no output file (orchestrator may only coordinate)`);
+          }
         } else {
           console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
+        }
         }
       }
     } else {

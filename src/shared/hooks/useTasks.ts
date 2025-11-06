@@ -661,7 +661,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
 
 /**
  * Cancel a task using direct Supabase call
- * For travel_orchestrator tasks, also cancels all subtasks
+ * For orchestrator tasks (travel_orchestrator, join_clips_orchestrator, etc.), also cancels all subtasks
  */
 async function cancelTask(taskId: string): Promise<void> {
   // First, get the task to check if it's an orchestrator
@@ -688,8 +688,8 @@ async function cancelTask(taskId: string): Promise<void> {
     throw new Error(`Failed to cancel task: ${cancelError.message}`);
   }
 
-  // If it's a travel_orchestrator, cancel all subtasks
-  if (task && task.task_type === 'travel_orchestrator') {
+  // If it's an orchestrator task, cancel all subtasks
+  if (task && task.task_type?.includes('orchestrator')) {
     // Find all subtasks that reference this orchestrator
     const { data: subtasks, error: subtaskFetchError } = await supabase
       .from('tasks')
@@ -724,7 +724,7 @@ async function cancelTask(taskId: string): Promise<void> {
 
 /**
  * Cancel all pending tasks for a project using direct Supabase call
- * For travel_orchestrator tasks, also cancels their subtasks
+ * For orchestrator tasks (travel_orchestrator, join_clips_orchestrator, etc.), also cancels their subtasks
  */
 async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTasksResponse> {
   // First, get all pending tasks to check for orchestrators
@@ -746,7 +746,7 @@ async function cancelPendingTasks(projectId: string): Promise<CancelAllPendingTa
 
   // Find orchestrator tasks
   const orchestratorIds = pendingTasks
-    ?.filter(task => task.task_type === 'travel_orchestrator')
+    ?.filter(task => task.task_type?.includes('orchestrator'))
     .map(task => task.id) || [];
 
   // If there are orchestrators, find their subtasks
