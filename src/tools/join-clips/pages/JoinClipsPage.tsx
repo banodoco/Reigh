@@ -17,6 +17,7 @@ import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
 import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { LoraManager } from '@/shared/components/LoraManager';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
@@ -24,6 +25,7 @@ import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
+import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
 
 // Types for clip management
 interface VideoClip {
@@ -65,16 +67,23 @@ const JoinClipsPage: React.FC = () => {
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [uploadingClipId, setUploadingClipId] = useState<string | null>(null);
   
-  // Transition prompts (one for each pair)
+  // Transition prompts (one for each pair) - still managed locally as they're tied to clip IDs
   const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
   
-  // Global settings
-  const [globalPrompt, setGlobalPrompt] = useState('');
+  // Use settings hook for all persisted settings
+  const joinSettings = useJoinClipsSettings(selectedProjectId);
+  
+  // Derive all settings from hook
+  const {
+    prompt: globalPrompt = '',
+    negativePrompt = '',
+    contextFrameCount = 10,
+    gapFrameCount = 33,
+    replaceMode = true,
+  } = joinSettings.settings;
+  
+  // Local UI state (not persisted)
   const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
-  const [negativePrompt, setNegativePrompt] = useState('');
-  const [contextFrameCount, setContextFrameCount] = useState(10);
-  const [gapFrameCount, setGapFrameCount] = useState(33);
-  const [replaceMode, setReplaceMode] = useState(true);
   
   // Refs for file inputs (we'll create them dynamically)
   const fileInputRefs = useRef<{ [clipId: string]: HTMLInputElement | null }>({});
@@ -95,20 +104,9 @@ const JoinClipsPage: React.FC = () => {
   const [draggingOverClipId, setDraggingOverClipId] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
   
-  // Load settings
-  const { settings, update: updateSettings } = useToolSettings<JoinClipsSettings>(
-    'join-clips',
-    { projectId: selectedProjectId || null, enabled: !!selectedProjectId }
-  );
-  
+  // Settings are now managed by joinSettings hook above
   // Track whether settings have completed their initial load
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
-  
-  useEffect(() => {
-    if (settings !== undefined) {
-      setSettingsLoaded(true);
-    }
-  }, [settings]);
+  const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
   
   // Get current project for aspect ratio
   const { projects } = useProject();
@@ -176,61 +174,70 @@ const JoinClipsPage: React.FC = () => {
     };
   }, []);
   
-  // Initialize parameters from settings
-  useEffect(() => {
-    if (settings?.contextFrameCount !== undefined) {
-      setContextFrameCount(settings.contextFrameCount);
-    }
-    if (settings?.gapFrameCount !== undefined) {
-      setGapFrameCount(settings.gapFrameCount);
-    }
-    if (settings?.replaceMode !== undefined) {
-      setReplaceMode(settings.replaceMode);
-    }
-    if (settings?.negativePrompt !== undefined) {
-      setNegativePrompt(settings.negativePrompt);
-    }
-    if (settings?.prompt !== undefined) {
-      setGlobalPrompt(settings.prompt);
-    }
-  }, [settings]);
+  // Settings sync is now handled automatically by useJoinClipsSettings hook
   
-  // Initialize clips from settings (legacy two-video support) or create 2 empty slots
+  // Initialize clips from settings or create 2 empty slots
   useEffect(() => {
-    if (settings && settingsLoaded && clips.length === 0) {
+    if (joinSettings.settings && settingsLoaded && clips.length === 0) {
       const initialClips: VideoClip[] = [];
       
-      if (settings.startingVideoUrl) {
-        initialClips.push({
-          id: crypto.randomUUID(),
-        url: settings.startingVideoUrl,
-          posterUrl: settings.startingVideoPosterUrl,
-          loaded: false,
-          playing: false
+      // First, try loading from new multi-clip format
+      if (joinSettings.settings.clips && joinSettings.settings.clips.length > 0) {
+        joinSettings.settings.clips.forEach((clip) => {
+          if (clip.url) {
+            initialClips.push({
+              id: crypto.randomUUID(),
+              url: clip.url,
+              posterUrl: clip.posterUrl,
+              loaded: false,
+              playing: false
+            });
+          }
         });
-      }
-      
-      if (settings.endingVideoUrl) {
-        initialClips.push({
-          id: crypto.randomUUID(),
-        url: settings.endingVideoUrl,
-          posterUrl: settings.endingVideoPosterUrl,
-          loaded: false,
-          playing: false
-        });
-      }
-      
-      // If we have saved clips, use them and set prompts
-      if (initialClips.length > 0) {
-        setClips(initialClips);
         
-        // Initialize transition prompts
-        if (initialClips.length >= 2 && settings.prompt) {
+        // Load transition prompts
+        if (joinSettings.settings.transitionPrompts && joinSettings.settings.transitionPrompts.length > 0) {
+          const prompts = joinSettings.settings.transitionPrompts.map((tp) => ({
+            id: initialClips[tp.clipIndex]?.id || '',
+            prompt: tp.prompt
+          })).filter(p => p.id); // Filter out invalid ones
+          setTransitionPrompts(prompts);
+        }
+      }
+      // Fallback to legacy two-video format
+      else if (joinSettings.settings.startingVideoUrl || joinSettings.settings.endingVideoUrl) {
+        if (joinSettings.settings.startingVideoUrl) {
+          initialClips.push({
+            id: crypto.randomUUID(),
+            url: joinSettings.settings.startingVideoUrl,
+            posterUrl: joinSettings.settings.startingVideoPosterUrl,
+            loaded: false,
+            playing: false
+          });
+        }
+        
+        if (joinSettings.settings.endingVideoUrl) {
+          initialClips.push({
+            id: crypto.randomUUID(),
+            url: joinSettings.settings.endingVideoUrl,
+            posterUrl: joinSettings.settings.endingVideoPosterUrl,
+            loaded: false,
+            playing: false
+          });
+        }
+        
+        // Initialize transition prompts from legacy format
+        if (initialClips.length >= 2 && joinSettings.settings.prompt) {
           setTransitionPrompts([{
             id: initialClips[1].id,
-            prompt: settings.prompt
+            prompt: joinSettings.settings.prompt
           }]);
         }
+      }
+      
+      // If we have saved clips, use them
+      if (initialClips.length > 0) {
+        setClips(initialClips);
       } else {
         // No saved clips - create 2 empty slots to start
         const emptyClip1 = {
@@ -248,7 +255,44 @@ const JoinClipsPage: React.FC = () => {
         setClips([emptyClip1, emptyClip2]);
       }
     }
-  }, [settings, settingsLoaded, clips.length]);
+  }, [joinSettings.settings, settingsLoaded, clips.length]);
+  
+  // Persist clips to settings whenever they change
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    
+    // Only persist clips that have videos
+    const clipsToSave = clips
+      .filter(clip => clip.url)
+      .map(clip => ({
+        url: clip.url,
+        posterUrl: clip.posterUrl
+      }));
+    
+    // Convert transitionPrompts to indexed format for persistence
+    const promptsToSave = transitionPrompts
+      .map(tp => {
+        const clipIndex = clips.findIndex(c => c.id === tp.id);
+        if (clipIndex > 0 && tp.prompt) { // clipIndex > 0 because prompts are for transitions (clip 1->2, etc)
+          return { clipIndex, prompt: tp.prompt };
+        }
+        return null;
+      })
+      .filter((p): p is { clipIndex: number; prompt: string } => p !== null);
+    
+    // Check if values actually changed before updating
+    const currentClipsJson = JSON.stringify(joinSettings.settings.clips || []);
+    const newClipsJson = JSON.stringify(clipsToSave);
+    const currentPromptsJson = JSON.stringify(joinSettings.settings.transitionPrompts || []);
+    const newPromptsJson = JSON.stringify(promptsToSave);
+    
+    if (currentClipsJson !== newClipsJson || currentPromptsJson !== newPromptsJson) {
+      joinSettings.updateFields({
+        clips: clipsToSave,
+        transitionPrompts: promptsToSave
+      });
+    }
+  }, [clips, transitionPrompts, settingsLoaded, joinSettings]);
   
   // Auto-add empty slot when all slots are filled
   useEffect(() => {
@@ -511,12 +555,12 @@ const JoinClipsPage: React.FC = () => {
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
-        model: settings?.model || 'lightning_baseline_2_2_2',
-        num_inference_steps: settings?.numInferenceSteps || 6,
-        guidance_scale: settings?.guidanceScale || 3.0,
-        seed: settings?.seed || -1,
+        model: joinSettings.settings.model || 'lightning_baseline_2_2_2',
+        num_inference_steps: joinSettings.settings.numInferenceSteps || 6,
+        guidance_scale: joinSettings.settings.guidanceScale || 3.0,
+        seed: joinSettings.settings.seed || -1,
         negative_prompt: negativePrompt,
-        priority: settings?.priority || 0,
+        priority: joinSettings.settings.priority || 0,
         ...(lorasForTask.length > 0 && { loras: lorasForTask }),
       };
       
@@ -577,21 +621,54 @@ const JoinClipsPage: React.FC = () => {
   return (
     <PageFadeIn>
       <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
-          <Button
-            onClick={handleAddClip}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Clip
-          </Button>
+          <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
+          {joinSettings.status === 'loading' ? (
+            <Skeleton className="h-9 w-24" />
+          ) : (
+            <Button
+              onClick={handleAddClip}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Clip
+            </Button>
+          )}
         </div>
         
         {/* Clips Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {joinSettings.status === 'loading' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="space-y-3">
+                <div className="relative border rounded-lg p-3 space-y-3 bg-card">
+                  {/* Header skeleton */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-5 w-16" />
+                    </div>
+                    <Skeleton className="h-6 w-6" />
+                  </div>
+                  
+                  {/* Video container skeleton */}
+                  <div className="space-y-2">
+                    <div className="aspect-video bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center">
+                      <div className="text-center space-y-2">
+                        <Skeleton className="h-8 w-8 rounded-full mx-auto" />
+                        <Skeleton className="h-4 w-32 mx-auto" />
+                        <Skeleton className="h-3 w-24 mx-auto" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {clips.map((clip, index) => (
             <div key={clip.id} className="space-y-3">
               {/* Clip Card */}
@@ -600,21 +677,21 @@ const JoinClipsPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="text-sm font-medium text-muted-foreground">Clip #{index + 1}</div>
-                  </div>
+                      </div>
                   {clips.length > 2 && (
-                    <Button
+                  <Button
                       variant="ghost"
-                      size="icon"
+                    size="icon"
                       onClick={() => handleRemoveClip(clip.id)}
                       className="h-6 w-6 text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-3 w-3" />
-                    </Button>
+                  </Button>
                   )}
-                </div>
-                
+          </div>
+
                 {/* Video Container */}
-                <div className="space-y-2">
+            <div className="space-y-2">
                     <div 
                       className={cn(
                         "aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative",
@@ -746,6 +823,7 @@ const JoinClipsPage: React.FC = () => {
           ))
         }
           </div>
+        )}
 
         {/* Global Settings */}
         <div className="space-y-6 pt-6 border-t">
@@ -768,8 +846,7 @@ const JoinClipsPage: React.FC = () => {
                 value={[Math.max(1, gapFrameCount)]}
                 onValueChange={(values) => {
                   const val = Math.max(1, values[0]);
-                  setGapFrameCount(val);
-                  updateSettings('project', { ...settings, gapFrameCount: val });
+                  joinSettings.updateField('gapFrameCount', val);
                 }}
               />
                 <p className="text-xs text-muted-foreground">Frames to generate in each transition</p>
@@ -788,18 +865,17 @@ const JoinClipsPage: React.FC = () => {
                 onChange={(e) => {
                   const val = Math.max(1, parseInt(e.target.value) || 1);
                   if (!isNaN(val) && val > 0) {
-                    setContextFrameCount(val);
                     const maxGap = Math.max(1, 81 - (val * 2));
                     const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                    if (gapFrameCount > maxGap) {
-                      setGapFrameCount(maxGap);
-                    }
                     
                     if (contextFramesTimerRef.current) {
                       clearTimeout(contextFramesTimerRef.current);
                     }
                     contextFramesTimerRef.current = setTimeout(() => {
-                      updateSettings('project', { ...settings, contextFrameCount: val, gapFrameCount: newGapFrames });
+                      joinSettings.updateFields({ 
+                        contextFrameCount: val, 
+                        gapFrameCount: newGapFrames 
+                      });
                     }, 300);
                   }
                 }}
@@ -817,8 +893,7 @@ const JoinClipsPage: React.FC = () => {
                     id="replaceMode"
               checked={!replaceMode}
               onCheckedChange={(checked) => {
-                setReplaceMode(!checked);
-                updateSettings('project', { ...settings, replaceMode: !checked });
+                joinSettings.updateField('replaceMode', !checked);
               }}
             />
                   <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
@@ -829,10 +904,10 @@ const JoinClipsPage: React.FC = () => {
         </div>
 
             {/* Prompts and LoRA */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
                 {/* Global Prompt */}
-                <div className="space-y-2">
+            <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="globalPrompt">Global Prompt</Label>
                     <div className="flex items-center gap-2">
@@ -846,59 +921,55 @@ const JoinClipsPage: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <Textarea
+              <Textarea
                     id="globalPrompt"
                     value={globalPrompt}
-                    onChange={(e) => {
-                      const newGlobalPrompt = e.target.value;
-                      setGlobalPrompt(newGlobalPrompt);
-                      updateSettings('project', { ...settings, prompt: newGlobalPrompt });
+                  onChange={(e) => {
+                      joinSettings.updateField('prompt', e.target.value);
                     }}
                     placeholder={useIndividualPrompts 
                       ? "Appended to each individual transition prompt" 
                       : "Describe what you want for all transitions"
                     }
                     rows={3}
-                    className="resize-none"
-                  />
+                className="resize-none"
+              />
                   {useIndividualPrompts && (
                     <p className="text-xs text-muted-foreground">
                       💡 This will be inserted after each individual prompt
                     </p>
                   )}
-                </div>
-                
+            </div>
+            
                 {/* Negative Prompt */}
-                <div className="space-y-2">
-                  <Label htmlFor="negativePrompt">Negative Prompt</Label>
-                  <Textarea
-                    id="negativePrompt"
-                    value={negativePrompt}
-                    onChange={(e) => {
-                      const newNegativePrompt = e.target.value;
-                      setNegativePrompt(newNegativePrompt);
-                      updateSettings('project', { ...settings, negativePrompt: newNegativePrompt });
+            <div className="space-y-2">
+              <Label htmlFor="negativePrompt">Negative Prompt</Label>
+              <Textarea
+                id="negativePrompt"
+                value={negativePrompt}
+                onChange={(e) => {
+                      joinSettings.updateField('negativePrompt', e.target.value);
                     }}
                     placeholder="What to avoid in all transitions (optional)"
                     rows={3}
-                    className="resize-none"
-                  />
-                </div>
-              </div>
-
-              {/* LoRA Section */}
-              <div className="space-y-2">
-                <LoraManager
-                  availableLoras={availableLoras}
-                  projectId={selectedProjectId || undefined}
-                  persistenceScope="project"
-                  enableProjectPersistence={true}
-                  persistenceKey="join-clips"
-                  title="LoRA Models (Optional)"
-                  addButtonText="Add or Manage LoRAs"
-                />
-              </div>
+                className="resize-none"
+              />
             </div>
+          </div>
+
+          {/* LoRA Section */}
+          <div className="space-y-2">
+            <LoraManager
+              availableLoras={availableLoras}
+              projectId={selectedProjectId || undefined}
+              persistenceScope="project"
+              enableProjectPersistence={true}
+              persistenceKey="join-clips"
+              title="LoRA Models (Optional)"
+              addButtonText="Add or Manage LoRAs"
+            />
+              </div>
+          </div>
         </div>
 
         {/* Generate Button */}

@@ -1,4 +1,5 @@
-providers = ["node"]
+[phases.setup]
+nixPkgs = ["nodejs_20", "bun", "openssl"]
 
 [phases.build]
 cmd = "npm run build"

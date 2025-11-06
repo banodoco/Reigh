@@ -14,10 +14,14 @@ export const joinClipsSettings = {
     priority: 0,
     prompt: '', // User's current prompt (persisted per project)
     randomSeed: true,
+    // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,
     endingVideoUrl: undefined as string | undefined,
     endingVideoPosterUrl: undefined as string | undefined,
+    // New multi-clip format
+    clips: [] as Array<{ url: string; posterUrl?: string }>,
+    transitionPrompts: [] as Array<{ clipIndex: number; prompt: string }>, // Prompts for each transition
     loras: [] as Array<{ id: string; strength: number }>, // Saved LoRA configurations
     hasEverSetLoras: false as boolean, // Track if user has ever set LoRAs
   },
