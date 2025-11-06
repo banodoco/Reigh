@@ -11,6 +11,4 @@ dependsOn = ["install"]
 [phases.start]
 cmd = "npm run serve"
 
-[providers]
-node = true
-deno = false 
+providers = ["node"] 
