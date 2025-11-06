@@ -1210,7 +1210,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   });
 
   return (
-    <PageFadeIn className="pb-16 sm:pb-20">
+    <PageFadeIn>
 
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
