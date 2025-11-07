@@ -82,114 +82,35 @@ export async function fetchGenerations(
     countQuery = countQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
-  // Store shot filter IDs for later use in data query
-  let shotFilterGenerationIds: string[] | null = null;
-  let usedChunkedCounting = false;
+  // 🚀 NEW APPROACH: Use denormalized shot_id column for fast filtering
+  // No more multi-step fetching from shot_generations!
   let totalCount = 0; // Total count of matching items
   
   console.error('[ShotFilterPagination] 🔍 Shot filter check for COUNT');
   console.error('[ShotFilterPagination] Has shotId?:', !!filters?.shotId);
   console.error('[ShotFilterPagination] shotId value:', filters?.shotId);
 
-  // Apply shot filter if provided
+  // Apply shot filter if provided - now just a simple WHERE clause!
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query');
+    console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query (using denormalized shot_id)');
     console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
     console.error('[ShotFilterPagination] Exclude positioned:', filters.excludePositioned);
     
-    // First, get the count from shot_generations (fast, no row limit on count)
-    const countQueryStart = Date.now();
-    const { count: shotGenCount, error: countError } = await supabase
-      .from('shot_generations')
-      .select('generation_id', { count: 'exact', head: true })
-      .eq('shot_id', filters.shotId);
+    // Add shot_id filter to count query (uses index: idx_generations_shot_id)
+    countQuery = countQuery.eq('shot_id', filters.shotId);
     
-    console.error('[ShotFilterPagination] 📊 Shot generations COUNT completed in', Date.now() - countQueryStart, 'ms');
-    console.error('[ShotFilterPagination] Has count error:', !!countError);
-    console.error('[ShotFilterPagination] Total shot generations:', shotGenCount);
-    
-    if (countError) {
-      console.error('[ShotFilterPagination] ❌ Shot generations count failed:', countError);
-      throw countError;
-    }
-    
-    // Now fetch ALL generation IDs (paginated if needed)
-    console.error('[ShotFilterPagination] Fetching ALL generation IDs...');
-    let allShotGenerations: Array<{ generation_id: string; timeline_frame: number | null }> = [];
-    const PAGE_SIZE = 1000;
-    const totalPages = Math.ceil((shotGenCount || 0) / PAGE_SIZE);
-    
-    for (let page = 0; page < totalPages; page++) {
-      const start = page * PAGE_SIZE;
-      const end = start + PAGE_SIZE - 1;
-      
-      console.error(`[ShotFilterPagination] Fetching shot_generations page ${page + 1}/${totalPages} (${start}-${end})`);
-      
-      const { data: pageData, error: pageError } = await supabase
-        .from('shot_generations')
-        .select('generation_id, timeline_frame')
-        .eq('shot_id', filters.shotId)
-        .range(start, end);
-      
-      if (pageError) {
-        console.error('[ShotFilterPagination] ❌ Shot generations page fetch failed:', pageError);
-        throw pageError;
-      }
-      
-      if (pageData) {
-        allShotGenerations = allShotGenerations.concat(pageData);
-        console.error(`[ShotFilterPagination] Page ${page + 1} fetched:`, pageData.length, 'records. Total so far:', allShotGenerations.length);
-      }
-    }
-    
-    const shotGenerations = allShotGenerations;
-    
-    console.error('[ShotFilterPagination] 📊 All shot generations fetched');
-    console.error('[ShotFilterPagination] Total fetched:', shotGenerations?.length || 0);
-    
-    let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
-    
-    // Filter by timeline_frame if excludePositioned is true
+    // Add positioned filter if needed (uses index: idx_generations_shot_timeline)
     if (filters.excludePositioned) {
-      const unpositionedIds = shotGenerations
-        ?.filter(sg => sg.timeline_frame === null || sg.timeline_frame === undefined)
-        .map(sg => sg.generation_id) || [];
-      
-      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only');
-      console.error('[ShotFilterPagination] Before filter:', generationIds.length);
-      console.error('[ShotFilterPagination] After filter:', unpositionedIds.length);
-      
-      generationIds = unpositionedIds;
+      countQuery = countQuery.is('timeline_frame', null);
+      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (timeline_frame IS NULL)');
     }
     
-    console.error('[ShotFilterPagination] ✅ Final generation IDs');
-    console.error('[ShotFilterPagination] ID count:', generationIds.length);
-    console.error('[ShotFilterPagination] Sample IDs:', generationIds.slice(0, 5).map(id => id.substring(0, 8)));
-    
-    if (generationIds.length === 0) {
-      console.error('[ShotFilterPagination] ⚠️ No generations found for shot filter, returning empty');
-      return { items: [], total: 0, hasMore: false };
-    }
-    
-    // Store for use in data query
-    shotFilterGenerationIds = generationIds;
-    console.error('[ShotFilterPagination] 📌 Stored shotFilterGenerationIds for data query:', generationIds.length, 'IDs');
-    
-    // 🔧 FIX: We fetched all generation IDs from shot_generations (paginated if needed)
-    // Now we have the exact count after filtering
-    console.error('[ShotFilterPagination] Using generation IDs count directly');
-    console.error('[ShotFilterPagination] Total IDs after filtering:', generationIds.length);
-    
-    usedChunkedCounting = true;
-    totalCount = generationIds.length; // Exact count after filtering for positioned/unpositioned
-    
-    console.error('[ShotFilterPagination] 📊 Total count set to:', totalCount);
+    console.error('[ShotFilterPagination] 📊 Shot filter applied to count query (using denormalized columns)');
   }
 
   // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
   // DISABLED: Enable full count for accurate pagination
-  // Also skip if we already counted via chunking
-  const shouldSkipCount = usedChunkedCounting; // || (limit <= 100 && !filters?.searchTerm?.trim());
+  const shouldSkipCount = false; // limit <= 100 && !filters?.searchTerm?.trim();
   
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
@@ -273,161 +194,39 @@ export async function fetchGenerations(
     dataQuery = dataQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
-  // Apply shot filter to data query - use IDs we already fetched
+  // Apply shot filter to data query - now just a simple WHERE clause!
   console.error('[ShotFilterPagination] 🔍 DATA query shot filter check');
   console.error('[ShotFilterPagination] Has shotId filter?:', !!filters?.shotId);
   console.error('[ShotFilterPagination] shotId value:', filters?.shotId?.substring(0, 8));
-  console.error('[ShotFilterPagination] shotFilterGenerationIds set?:', !!shotFilterGenerationIds);
-  console.error('[ShotFilterPagination] shotFilterGenerationIds count:', shotFilterGenerationIds?.length);
   
-  if (filters?.shotId && shotFilterGenerationIds) {
-    const generationIds = shotFilterGenerationIds;
-    const CHUNK_SIZE = 500; // Postgres IN clause limit
-    
-    console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query');
-    console.error('[ShotFilterPagination] ID count:', generationIds.length);
+  if (filters?.shotId) {
+    console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query (using denormalized shot_id)');
+    console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
     console.error('[ShotFilterPagination] Offset:', offset);
     console.error('[ShotFilterPagination] Limit:', limit);
     
-    // 🔧 FIX: For large ID sets, we need to use chunked querying
-    // Cannot use .in() with 1000+ IDs due to Postgres parameter limits
-    if (generationIds.length > CHUNK_SIZE) {
-      console.error('[ShotFilterPagination] 🔄 Large ID set for DATA query, using optimized chunked fetch');
-      console.error('[ShotFilterPagination] Total IDs:', generationIds.length);
-      
-      // OPTIMIZED Strategy: 
-      // 1. Fetch ONLY id + created_at for all matching records (lightweight)
-      // 2. Sort by created_at client-side
-      // 3. Get IDs for the specific page needed
-      // 4. Fetch full data for ONLY those page IDs (small query)
-      
-      console.error('[ShotFilterPagination] Step 1: Fetching lightweight id+timestamp data');
-      let allIdTimestamps: Array<{ id: string; created_at: string }> = [];
-      const chunks = Math.ceil(generationIds.length / CHUNK_SIZE);
-      
-      for (let i = 0; i < chunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
-        const chunk = generationIds.slice(start, end);
-        
-        console.error(`[ShotFilterPagination] 📦 Fetching timestamps chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step A - About to build query`);
-        
-        // Fetch ONLY id and created_at (very lightweight)
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step B - Calling supabase.from`);
-        let chunkQuery = supabase
-          .from('generations')
-          .select('id, created_at')
-          .eq('user_id', userId)
-          .in('id', chunk);
-        
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step C - Query built`);
-        const chunkStartTime = Date.now();
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step D - About to await query`);
-        
-        const { data: chunkData, error: chunkError } = await chunkQuery;
-        
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step E - Query returned`);
-        
-        const chunkDuration = Date.now() - chunkStartTime;
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Completed in ${chunkDuration}ms`);
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Has error:`, !!chunkError);
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Data count:`, chunkData?.length || 0);
-        
-        if (chunkError) {
-          console.error(`[ShotFilterPagination] ❌ Timestamp chunk ${i + 1} error:`, chunkError);
-          console.error(`[ShotFilterPagination] ❌ Timestamp chunk ${i + 1} error message:`, chunkError.message);
-          throw chunkError;
-        }
-        
-        if (chunkData) {
-          allIdTimestamps = allIdTimestamps.concat(chunkData);
-          console.error(`[ShotFilterPagination] ✅ Timestamp chunk ${i + 1} added. Total records:`, allIdTimestamps.length);
-        }
-      }
-      
-      console.error('[ShotFilterPagination] Step 2: Sorting by created_at');
-      console.error('[ShotFilterPagination] Total records:', allIdTimestamps.length);
-      
-      // Sort by created_at descending (same as ORDER BY in query)
-      allIdTimestamps.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      // Get IDs for the specific page
-      const pageIdTimestamps = allIdTimestamps.slice(offset, offset + limit);
-      const pageIds = pageIdTimestamps.map(item => item.id);
-      
-      console.error('[ShotFilterPagination] Step 3: Identified page IDs');
-      console.error('[ShotFilterPagination] Page IDs count:', pageIds.length);
-      console.error('[ShotFilterPagination] Sample page IDs:', pageIds.slice(0, 5).map(id => id.substring(0, 8)));
-      
-      if (pageIds.length === 0) {
-        console.error('[ShotFilterPagination] No items for this page');
-        return {
-          items: [],
-          total: totalCount,
-          hasMore: false
-        };
-      }
-      
-      // Fetch full data for ONLY the page IDs (small query, no chunking needed)
-      console.error('[ShotFilterPagination] Step 4: Fetching full data for page IDs');
-      const { data: pageItems, error: pageError } = await supabase
-        .from('generations')
-        .select(`
-          id,
-          type,
-          params,
-          status,
-          created_at,
-          output,
-          error,
-          user_id,
-          starred
-        `)
-        .in('id', pageIds);
-      
-      if (pageError) {
-        console.error('[ShotFilterPagination] ❌ Page data fetch error:', pageError);
-        throw pageError;
-      }
-      
-      console.error('[ShotFilterPagination] Page data fetched:', pageItems?.length || 0, 'items');
-      
-      // Sort page items to match the order from our sorted timestamps
-      const sortedPageItems = pageIds
-        .map(id => pageItems?.find(item => item.id === id))
-        .filter(Boolean);
-      
-      const hasMore = allIdTimestamps.length > offset + limit;
-      
-      console.error('[ShotFilterPagination] ✅ Optimized pagination complete');
-      console.error('[ShotFilterPagination] Returned items:', sortedPageItems.length);
-      console.error('[ShotFilterPagination] Has more pages:', hasMore);
-      
-      return {
-        items: sortedPageItems,
-        total: totalCount,
-        hasMore
-      };
-    } else {
-      // Small ID set, use normal IN clause
-      console.error('[ShotFilterPagination] Using standard IN clause for DATA query (<= 500 IDs)');
-      dataQuery = dataQuery.in('id', generationIds);
+    // Add shot_id filter to data query (uses index: idx_generations_shot_id)
+    dataQuery = dataQuery.eq('shot_id', filters.shotId);
+    
+    // Add positioned filter if needed (uses index: idx_generations_shot_timeline)
+    if (filters.excludePositioned) {
+      dataQuery = dataQuery.is('timeline_frame', null);
+      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (timeline_frame IS NULL)');
     }
+    
+    console.error('[ShotFilterPagination] 📊 Shot filter applied to data query (using denormalized columns)');
   }
 
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
   
   // Execute query with standard server-side pagination
-  // The ORDER BY ensures consistent ordering even when using .in() filter
   console.error('[ShotFilterPagination] 🚀 About to execute main query');
   console.error('[ShotFilterPagination] Offset:', offset);
   console.error('[ShotFilterPagination] Fetch limit:', fetchLimit);
   console.error('[ShotFilterPagination] Range:', `${offset}-${offset + fetchLimit - 1}`);
   console.error('[ShotFilterPagination] Has filters?:', !!filters);
   console.error('[ShotFilterPagination] Has shot filter?:', !!filters?.shotId);
-  console.error('[ShotFilterPagination] Note: This should NOT execute if large shot filter returned early');
   
   const queryStartTime = Date.now();
   const { data, error } = await dataQuery
