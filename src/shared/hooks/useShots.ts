@@ -129,20 +129,28 @@ export const useDuplicateShot = () => {
         throw new Error('Project ID is required to duplicate a shot.');
       }
 
-      // Get the shot to duplicate
+      // Get the shot to duplicate (only fetch positioned shot_generations)
       const { data: originalShot, error: fetchError } = await supabase
         .from('shots')
-        .select(`
-          *,
-          shot_generations(
-            *,
-            generation:generations(*)
-          )
-        `)
+        .select('*, name, position, project_id')
         .eq('id', shotId)
         .single();
       
       if (fetchError || !originalShot) throw new Error('Shot not found');
+      
+      // Fetch ONLY positioned, non-video shot_generations separately for efficiency
+      const { data: positionedShotGens, error: sgError } = await supabase
+        .from('shot_generations')
+        .select(`
+          generation_id,
+          timeline_frame,
+          generation:generations(type, location)
+        `)
+        .eq('shot_id', shotId)
+        .not('timeline_frame', 'is', null) // Only positioned items
+        .order('timeline_frame', { ascending: true });
+      
+      if (sgError) throw sgError;
       
       // Create new shot at position right after the original
       const { shot: newShot } = await createShot.mutateAsync({
@@ -152,36 +160,37 @@ export const useDuplicateShot = () => {
         position: ((originalShot as any).position || 0) + 1
       }) as { shot: Shot };
       
-      // Copy only non-video images that have a timeline_frame to the new shot
-      if (originalShot.shot_generations && originalShot.shot_generations.length > 0) {
-        for (const sg of originalShot.shot_generations) {
-          // Skip video outputs
-          const generation = sg.generation;
-          if (generation && (
-            generation.type === 'video_travel_output' ||
-            (generation.location && generation.location.endsWith('.mp4'))
-          )) {
-            continue; // Skip this video output
-          }
+      // Batch insert all positioned non-video shot_generations
+      if (positionedShotGens && positionedShotGens.length > 0) {
+        // Filter out videos
+        const nonVideoShotGens = positionedShotGens.filter(sg => {
+          const gen = sg.generation as any;
+          return gen && !(
+            gen.type === 'video_travel_output' ||
+            (gen.location && gen.location.endsWith('.mp4'))
+          );
+        });
+        
+        if (nonVideoShotGens.length > 0) {
+          console.log(`[DuplicateShot] Batch inserting ${nonVideoShotGens.length} shot_generations...`);
           
-          // Skip shot_generations without a timeline_frame
-          if (sg.timeline_frame === null || sg.timeline_frame === undefined) {
-            continue;
-          }
+          // Single batch insert instead of loop
+          const shotGenerationsToInsert = nonVideoShotGens.map(sg => ({
+            shot_id: newShot.id,
+            generation_id: sg.generation_id,
+            timeline_frame: sg.timeline_frame
+          }));
           
-          // Directly insert shot_generation with the preserved timeline_frame
-          const { error: insertError } = await supabase
+          const { error: batchInsertError } = await supabase
             .from('shot_generations')
-            .insert({
-              shot_id: newShot.id,
-              generation_id: sg.generation_id,
-              timeline_frame: sg.timeline_frame
-            });
+            .insert(shotGenerationsToInsert);
           
-          if (insertError) {
-            console.error('Error inserting shot_generation during duplication:', insertError);
-            throw insertError;
+          if (batchInsertError) {
+            console.error('[DuplicateShot] Batch insert failed:', batchInsertError);
+            throw batchInsertError;
           }
+          
+          console.log(`[DuplicateShot] ✅ Successfully duplicated ${nonVideoShotGens.length} shot_generations`);
         }
       }
       
