@@ -90,7 +90,7 @@ export async function fetchGenerations(
   console.error('[ShotFilterPagination] 🔍 Shot filter check for COUNT');
   console.error('[ShotFilterPagination] Has shotId?:', !!filters?.shotId);
   console.error('[ShotFilterPagination] shotId value:', filters?.shotId);
-  
+
   // Apply shot filter if provided
   if (filters?.shotId) {
     console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query');
@@ -140,71 +140,21 @@ export async function fetchGenerations(
     shotFilterGenerationIds = generationIds;
     console.error('[ShotFilterPagination] 📌 Stored shotFilterGenerationIds for data query:', generationIds.length, 'IDs');
     
-    // 🔧 FIX: Chunk large ID arrays to avoid Postgres IN clause limits
-    // Postgres has a limit on the number of parameters in an IN clause (~1000)
+    // 🔧 FIX: For large ID arrays, just use the count we already have from shot_generations
+    // We already fetched all the generation IDs from shot_generations, so we know the exact count
     const CHUNK_SIZE = 500; // Use 500 to be safe
     
     if (generationIds.length > CHUNK_SIZE) {
-      console.error('[ShotFilterPagination] 🔄 Large ID set detected, using chunked count');
+      console.error('[ShotFilterPagination] 🔄 Large ID set detected');
       console.error('[ShotFilterPagination] Total IDs:', generationIds.length);
-      console.error('[ShotFilterPagination] Chunk size:', CHUNK_SIZE);
+      console.error('[ShotFilterPagination] Using ID count directly (skipping database count query)');
       
       usedChunkedCounting = true;
+      totalCount = generationIds.length; // We already have the exact count!
       
-      // For large ID sets, count by summing chunks
-      let chunkCount = 0;
-      const chunks = Math.ceil(generationIds.length / CHUNK_SIZE);
-      console.error('[ShotFilterPagination] Number of chunks:', chunks);
-      
-      for (let i = 0; i < chunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const end = Math.min((i + 1) * CHUNK_SIZE, generationIds.length);
-        const chunk = generationIds.slice(start, end);
-        
-        console.error(`[ShotFilterPagination] 📦 Processing chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: Building query...`);
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: userId =`, userId);
-        console.error(`[ShotFilterPagination] Chunk ${i + 1}: chunk IDs =`, chunk.slice(0, 3).map(id => id.substring(0, 8)));
-        
-        try {
-          // Create a fresh query for each chunk
-          let chunkQuery = supabase
-            .from('generations')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .in('id', chunk);
-          
-          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query built successfully, executing...`);
-          const chunkStartTime = Date.now();
-          
-          const { count: chunkCountResult, error: chunkError } = await chunkQuery;
-          
-          const chunkDuration = Date.now() - chunkStartTime;
-          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Query completed in ${chunkDuration}ms`);
-          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Has error:`, !!chunkError);
-          console.error(`[ShotFilterPagination] Chunk ${i + 1}: Count result:`, chunkCountResult);
-          
-          if (chunkError) {
-            console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error:`, chunkError);
-            console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error message:`, chunkError.message);
-            console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} error details:`, chunkError.details);
-            throw chunkError;
-          }
-          
-          chunkCount += chunkCountResult || 0;
-          console.error(`[ShotFilterPagination] ✅ Chunk ${i + 1} complete. Running total:`, chunkCount);
-        } catch (error) {
-          console.error(`[ShotFilterPagination] ❌ Chunk ${i + 1} UNEXPECTED ERROR:`, error);
-          console.error(`[ShotFilterPagination] ❌ Error type:`, typeof error);
-          console.error(`[ShotFilterPagination] ❌ Error string:`, String(error));
-          throw error;
-        }
-      }
-      
-      console.error('[ShotFilterPagination] 📊 Total count from chunks:', chunkCount);
-      totalCount = chunkCount;
+      console.error('[ShotFilterPagination] 📊 Total count set to:', totalCount);
     } else {
-      // Small ID set, use normal IN clause
+      // Small ID set, use normal IN clause for count
       console.error('[ShotFilterPagination] Using standard IN clause (<= 500 IDs)');
       countQuery = countQuery.in('id', generationIds);
     }
@@ -236,7 +186,7 @@ export async function fetchGenerations(
     console.error('[ShotFilterPagination] Count value is:', count);
     console.error('[ShotFilterPagination] Count type:', typeof count);
     try {
-      totalCount = count || 0;
+    totalCount = count || 0;
       console.error('[ShotFilterPagination] Total count set to:', totalCount);
     } catch (e) {
       console.error('[ShotFilterPagination] ❌ ERROR setting totalCount:', e);
@@ -561,7 +511,7 @@ export async function fetchGenerations(
   console.error('[ShotFilterPagination] Final items count:', items.length);
   console.error('[ShotFilterPagination] Final total:', totalCount);
   console.error('[ShotFilterPagination] Final hasMore:', hasMore);
-  
+
   return { items, total: totalCount, hasMore };
 }
 
