@@ -255,7 +255,10 @@ export const useProgressiveImage = (
             });
           })
           .catch((err) => {
-            console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
+            // Only log non-abort errors (abort is expected during navigation)
+            if (err.message !== 'Session aborted') {
+              console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
+            }
             safeSetState(session, () => {
               setPhase('error');
               setError(err.message);
@@ -333,7 +336,10 @@ export const useProgressiveImage = (
               }
             })
             .catch((err) => {
-              console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
+              // Only log non-abort errors (abort is expected during navigation)
+              if (err.message !== 'Session aborted') {
+                console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
+              }
               safeSetState(session, () => {
                 setError(err.message);
                 // Keep showing thumbnail on full image error

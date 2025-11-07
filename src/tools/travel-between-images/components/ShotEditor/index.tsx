@@ -169,61 +169,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [selectedShot?.id, hasInitializedStructureVideo]);
 
-  // Log current structure video state values whenever they change
-  useEffect(() => {
-    console.error('[StructureVideoDebug] 📺 Current structure video state:', {
-      path: structureVideoPath ? structureVideoPath.substring(0, 60) + '...' : null,
-      hasPath: !!structureVideoPath,
-      hasMetadata: !!structureVideoMetadata,
-      treatment: structureVideoTreatment,
-      motionStrength: structureVideoMotionStrength,
-      type: structureVideoType,
-      selectedShotId: selectedShot?.id?.substring(0, 8)
-    });
-  }, [structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType, selectedShot?.id]);
-
   // Load structure video from settings when shot loads
   useEffect(() => {
-    // USE console.error so this shows in production
-    console.error('[ShotEditor] 🎬 STRUCTURE VIDEO INIT CHECK:', {
-      hasInitializedStructureVideo,
-      isStructureVideoSettingsLoading,
-      selectedShotId: selectedShot?.id?.substring(0, 8),
-      hasStructureVideoSettings: !!structureVideoSettings,
-      settingsPath: structureVideoSettings?.path || 'NO PATH',
-      willInitialize: !hasInitializedStructureVideo && !isStructureVideoSettingsLoading && !!selectedShot?.id
-    });
-    
     if (!hasInitializedStructureVideo && !isStructureVideoSettingsLoading && selectedShot?.id) {
       // Only check for path - metadata is optional and can be null
       if (structureVideoSettings?.path) {
-        console.error('[ShotEditor] ✅ Loading structure video from settings:', {
-          path: structureVideoSettings.path,
-          pathPreview: structureVideoSettings.path.substring(0, 80) + '...',
-          hasMetadata: !!structureVideoSettings.metadata,
-          treatment: structureVideoSettings.treatment,
-          motionStrength: structureVideoSettings.motionStrength,
-          structureType: structureVideoSettings.structureType
-        });
-        console.error('[StructureVideoDebug] 🔄 About to set state from DB:', {
-          path: structureVideoSettings.path.substring(0, 60) + '...',
-          treatment: structureVideoSettings.treatment || 'adjust',
-          motionStrength: structureVideoSettings.motionStrength ?? 1.0,
-          structureType: structureVideoSettings.structureType || 'flow'
-        });
         setStructureVideoPath(structureVideoSettings.path);
         setStructureVideoMetadata(structureVideoSettings.metadata || null);
         setStructureVideoTreatment(structureVideoSettings.treatment || 'adjust');
         setStructureVideoMotionStrength(structureVideoSettings.motionStrength ?? 1.0);
         setStructureVideoType(structureVideoSettings.structureType || 'flow');
-        console.error('[StructureVideoDebug] ✅ State set from DB complete');
       } else {
         // No saved structure video - initialize with defaults
-        console.error('[ShotEditor] ⚠️  No structure video in settings, initializing to defaults:', {
-          settingsRaw: structureVideoSettings,
-          hasSettingsObject: !!structureVideoSettings,
-          settingsKeys: structureVideoSettings ? Object.keys(structureVideoSettings) : []
-        });
         setStructureVideoPath(null);
         setStructureVideoMetadata(null);
         setStructureVideoTreatment('adjust');
