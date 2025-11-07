@@ -980,21 +980,21 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
     try {
       // TOP-LEVEL DEBUG: Database UPDATE for pair prompts
-      console.log('[updatePairPrompts] DATABASE UPDATE START - generationId:', generationId.substring(0, 8));
-      console.log('[updatePairPrompts] DATABASE UPDATE START - pairPrompt:', pairPrompt);
-      console.log('[updatePairPrompts] DATABASE UPDATE START - pairNegativePrompt:', pairNegativePrompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE START - generationId:', generationId.substring(0, 8));
+      console.error('[updatePairPrompts] DATABASE UPDATE START - pairPrompt:', pairPrompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE START - pairNegativePrompt:', pairNegativePrompt);
 
       // Find the current generation
       const generation = shotGenerations.find(sg => sg.id === generationId);
       if (!generation) {
-        console.error('[updatePairPrompts] ❌ Generation not found:', generationId.substring(0, 8));
+        console.error('[updatePairPrompts] ERROR - Generation not found:', generationId.substring(0, 8));
         throw new Error(`Generation ${generationId} not found`);
       }
 
-      console.log('[updatePairPrompts] FOUND generation:', generation.id.substring(0, 8));
-      console.log('[updatePairPrompts] CURRENT metadata.pair_prompt:', generation.metadata?.pair_prompt);
-      console.log('[updatePairPrompts] CURRENT metadata.pair_negative_prompt:', generation.metadata?.pair_negative_prompt);
-      console.log('[updatePairPrompts] CURRENT metadata.enhanced_prompt:', generation.metadata?.enhanced_prompt);
+      console.error('[updatePairPrompts] FOUND generation:', generation.id.substring(0, 8));
+      console.error('[updatePairPrompts] CURRENT metadata.pair_prompt:', generation.metadata?.pair_prompt);
+      console.error('[updatePairPrompts] CURRENT metadata.pair_negative_prompt:', generation.metadata?.pair_negative_prompt);
+      console.error('[updatePairPrompts] CURRENT metadata.enhanced_prompt:', generation.metadata?.enhanced_prompt);
 
       // Update metadata with pair prompts
       // CRITICAL: Clear enhanced_prompt when user manually edits pair_prompt

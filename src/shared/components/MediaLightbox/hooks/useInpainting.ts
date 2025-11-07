@@ -1028,7 +1028,7 @@ export const useInpainting = ({
     if (canvas) {
       const canvasStyle = window.getComputedStyle(canvas);
       const bufferVsDisplay = canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight;
-      console.log('[InpaintDraw] 📊 Canvas style check', {
+      console.error('[InpaintDraw] 📊 Canvas style check', {
         zIndex: canvasStyle.zIndex,
         opacity: canvasStyle.opacity,
         display: canvasStyle.display,
@@ -1505,7 +1505,7 @@ export const useInpainting = ({
       };
       
       const canvas = displayCanvasRef.current;
-      console.log('[InpointPointer] ✅ New stroke created', {
+      console.error('[InpointPointer] ✅ New stroke created', {
         id: newStroke.id.substring(0, 8),
         shapeType: newStroke.shapeType,
         pointCount: newStroke.points.length,
