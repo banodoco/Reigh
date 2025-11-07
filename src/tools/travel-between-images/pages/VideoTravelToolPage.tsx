@@ -646,36 +646,38 @@ const VideoTravelToolPage: React.FC = () => {
   // Listen for shot duplication to provide visual feedback
   useEffect(() => {
     const handleShotDuplicated = (event: CustomEvent) => {
-      const { shotId, shotName } = event.detail || {};
-      console.log('[ShotDuplicate] Shot duplicated, providing visual feedback:', { shotId: shotId?.substring(0, 8), shotName });
-      
-      // 1. Switch to "Newest First" to show the new shot at the top
-      setShotSortMode('newest');
-      
-      // 2. Scroll to top after DOM updates (use setTimeout to wait for sort to apply)
-      setTimeout(() => {
-        // Try multiple scroll targets to ensure it works
-        const scrollToTop = () => {
-          // First try scrolling the window
+      try {
+        const { shotId, shotName } = event.detail || {};
+        console.log('[ShotDuplicate] Shot duplicated, providing visual feedback:', { shotId: shotId?.substring(0, 8), shotName });
+        
+        if (!shotId) {
+          console.warn('[ShotDuplicate] No shotId provided in event');
+          return;
+        }
+        
+        // 1. Switch to "Newest First" to show the new shot at the top
+        setShotSortMode('newest');
+        
+        // 2. After DOM updates, scroll to top and apply highlight
+        setTimeout(() => {
+          // Scroll to top
           window.scrollTo({ top: 0, behavior: 'smooth' });
           
-          // Also try main container if it exists
           if (mainContainerRef.current) {
             mainContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
           }
           
-          // Also try scrolling the document element
           document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
-        };
-        
-        scrollToTop();
-      }, 100); // Wait for sort mode to apply and DOM to update
-      
-      // 3. Highlight the shot for 2 seconds
-      setHighlightedShotId(shotId);
-      setTimeout(() => {
-        setHighlightedShotId(null);
-      }, 2000);
+          
+          // 3. Apply highlight immediately after scroll starts (shot is now in position)
+          setHighlightedShotId(shotId);
+          setTimeout(() => {
+            setHighlightedShotId(null);
+          }, 2000);
+        }, 100); // Wait for cache updates and sort mode to apply
+      } catch (error) {
+        console.error('[ShotDuplicate] Error handling shot-duplicated event:', error);
+      }
     };
     
     window.addEventListener('shot-duplicated' as any, handleShotDuplicated as EventListener);

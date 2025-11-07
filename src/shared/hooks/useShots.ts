@@ -198,8 +198,13 @@ export const useDuplicateShot = () => {
     },
     onMutate: async ({ projectId, newName, shotId }) => {
       if (!projectId) return { previousShots: [], projectId: null };
+      
+      // Cancel all shots queries to prevent race conditions
       await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
+      
+      // Get data from the primary cache key used by ShotsContext (maxImagesPerShot: 0)
+      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId, 0]) || 
+                           queryClient.getQueryData<Shot[]>(['shots', projectId]);
 
       // Create an optimistic shot for immediate UI feedback
       const originalShot = previousShots?.find(s => s.id === shotId);
@@ -222,7 +227,7 @@ export const useDuplicateShot = () => {
           position: ((originalShot as any).position || 0) + 1, // Position after the original shot
         };
 
-        queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
+        const applyOptimisticUpdate = (oldShots: Shot[] = []) => {
           // Insert the duplicate at the correct position in the ordered list
           // Since shots are ordered by position (ascending), find the insertion point
           const insertionIndex = oldShots.findIndex(shot => 
@@ -246,15 +251,21 @@ export const useDuplicateShot = () => {
             updatedShots.splice(insertionIndex, 0, optimisticDuplicatedShot);
             return updatedShots;
           }
-        });
+        };
+        
+        // Update all cache key variants
+        queryClient.setQueryData<Shot[]>(['shots', projectId, 0], applyOptimisticUpdate);
+        queryClient.setQueryData<Shot[]>(['shots', projectId, 5], applyOptimisticUpdate);
+        queryClient.setQueryData<Shot[]>(['shots', projectId], applyOptimisticUpdate);
       }
 
       return { previousShots, projectId };
     },
     onSuccess: (newShot, { projectId }) => {
       if (projectId) {
-        // First, explicitly remove any optimistic shots and replace with real data
-        queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
+        // Update all shot cache variants (with different maxImagesPerShot values)
+        // This ensures ShotsContext and other consumers get updated
+        const updateShotCache = (oldShots: Shot[] = []) => {
           // Remove ALL optimistic shots (in case there are multiple)
           const shotsWithoutOptimistic = oldShots.filter(shot => 
             !shot.id.startsWith('optimistic-duplicate-') && 
@@ -276,23 +287,36 @@ export const useDuplicateShot = () => {
             updatedShots.splice(insertionIndex, 0, newShot);
             return updatedShots;
           }
-        });
+        };
+        
+        // Update all common cache key variants to prevent context errors
+        queryClient.setQueryData<Shot[]>(['shots', projectId, 0], updateShotCache);
+        queryClient.setQueryData<Shot[]>(['shots', projectId, 5], updateShotCache);
+        queryClient.setQueryData<Shot[]>(['shots', projectId], updateShotCache);
         
         // Also ensure the shot is properly cached individually
         queryClient.setQueryData(['shot', newShot.id], newShot);
         
-        // Invalidate to ensure fresh data
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-        
         // Emit event for UI to react (switch to Newest First, scroll, highlight)
-        window.dispatchEvent(new CustomEvent('shot-duplicated', {
-          detail: { shotId: newShot.id, shotName: newShot.name }
-        }));
+        // Do this in a microtask to ensure cache updates are complete
+        Promise.resolve().then(() => {
+          window.dispatchEvent(new CustomEvent('shot-duplicated', {
+            detail: { shotId: newShot.id, shotName: newShot.name }
+          }));
+        });
+        
+        // Invalidate after a delay to allow UI to update first
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        }, 100);
       }
     },
     onError: (err, { projectId }, context) => {
       console.error('Optimistic update failed, rolling back for duplicateShot:', err);
       if (context?.previousShots && projectId) {
+        // Rollback all cache key variants
+        queryClient.setQueryData<Shot[]>(['shots', projectId, 0], context.previousShots);
+        queryClient.setQueryData<Shot[]>(['shots', projectId, 5], context.previousShots);
         queryClient.setQueryData<Shot[]>(['shots', projectId], context.previousShots);
       }
     },
