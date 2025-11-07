@@ -202,10 +202,21 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       if (replaceImages && inputImages.length > 0) {
         console.log('[ApplySettings] Step 4b: Images replaced, reloading...');
         
-        // Invalidate cache
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
-        queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
-        console.log('[ApplySettings] - Queries invalidated');
+        try {
+          // Invalidate cache
+          console.log('[ApplySettings] - About to invalidate unified-generations query...');
+          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
+          console.log('[ApplySettings] - unified-generations invalidated');
+          
+          console.log('[ApplySettings] - About to invalidate shot-generations query...');
+          queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
+          console.log('[ApplySettings] - shot-generations invalidated');
+          
+          console.log('[ApplySettings] - Both queries invalidated successfully');
+        } catch (invalidateError) {
+          console.error('[ApplySettings] ❌ Error during query invalidation:', invalidateError);
+          throw invalidateError;
+        }
         
         await new Promise(resolve => setTimeout(resolve, 50));
         console.log('[ApplySettings] - 50ms delay complete');
