@@ -90,22 +90,26 @@ export async function fetchGenerations(
   console.error('[ShotFilterPagination] Has shotId?:', !!filters?.shotId);
   console.error('[ShotFilterPagination] shotId value:', filters?.shotId);
 
-  // Apply shot filter if provided - now just a simple WHERE clause!
+  // Apply shot filter if provided - using JSONB shot_data column
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query (using denormalized shot_id)');
+    console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query (using JSONB shot_data)');
     console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
     console.error('[ShotFilterPagination] Exclude positioned:', filters.excludePositioned);
     
-    // Add shot_id filter to count query (uses index: idx_generations_shot_id)
-    countQuery = countQuery.eq('shot_id', filters.shotId);
+    // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
+    // shot_data->'shot_id' checks if the key exists (returns the value or null if key missing)
+    // We want: WHERE shot_data->'shot_id' IS NOT NULL (meaning key exists)
+    countQuery = countQuery.not(`shot_data->${filters.shotId}`, 'is', null);
     
-    // Add positioned filter if needed (uses index: idx_generations_shot_timeline)
+    // Add positioned filter if needed
     if (filters.excludePositioned) {
-      countQuery = countQuery.is('timeline_frame', null);
-      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (timeline_frame IS NULL)');
+      // Filter to only unpositioned: shot_data->>'shot_id' IS NULL
+      // ->> returns as text, and JSON null becomes SQL NULL
+      countQuery = countQuery.is(`shot_data->>${filters.shotId}`, null);
+      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (shot_data->>shot_id IS NULL)');
     }
     
-    console.error('[ShotFilterPagination] 📊 Shot filter applied to count query (using denormalized columns)');
+    console.error('[ShotFilterPagination] 📊 Shot filter applied to count query (using JSONB)');
   }
 
   // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
@@ -194,27 +198,27 @@ export async function fetchGenerations(
     dataQuery = dataQuery.ilike('params->originalParams->orchestrator_details->>prompt', searchPattern);
   }
 
-  // Apply shot filter to data query - now just a simple WHERE clause!
+  // Apply shot filter to data query - using JSONB shot_data column
   console.error('[ShotFilterPagination] 🔍 DATA query shot filter check');
   console.error('[ShotFilterPagination] Has shotId filter?:', !!filters?.shotId);
   console.error('[ShotFilterPagination] shotId value:', filters?.shotId?.substring(0, 8));
   
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query (using denormalized shot_id)');
+    console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query (using JSONB shot_data)');
     console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
     console.error('[ShotFilterPagination] Offset:', offset);
     console.error('[ShotFilterPagination] Limit:', limit);
     
-    // Add shot_id filter to data query (uses index: idx_generations_shot_id)
-    dataQuery = dataQuery.eq('shot_id', filters.shotId);
+    // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
+    dataQuery = dataQuery.not(`shot_data->${filters.shotId}`, 'is', null);
     
-    // Add positioned filter if needed (uses index: idx_generations_shot_timeline)
+    // Add positioned filter if needed
     if (filters.excludePositioned) {
-      dataQuery = dataQuery.is('timeline_frame', null);
-      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (timeline_frame IS NULL)');
+      dataQuery = dataQuery.is(`shot_data->>${filters.shotId}`, null);
+      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (shot_data->>shot_id IS NULL)');
     }
     
-    console.error('[ShotFilterPagination] 📊 Shot filter applied to data query (using denormalized columns)');
+    console.error('[ShotFilterPagination] 📊 Shot filter applied to data query (using JSONB)');
   }
 
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
