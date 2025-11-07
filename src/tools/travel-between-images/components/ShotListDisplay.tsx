@@ -30,6 +30,7 @@ interface ShotListDisplayProps {
   onCreateNewShot?: () => void;
   shots?: Shot[]; // Optional - if not provided, will use context
   sortMode?: 'ordered' | 'newest' | 'oldest'; // Sort mode for shots
+  highlightedShotId?: string | null; // Shot to highlight for visual feedback
 }
 
 
@@ -39,6 +40,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
   onCreateNewShot,
   shots: propShots,
   sortMode = 'ordered',
+  highlightedShotId,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -434,6 +436,7 @@ const ShotListDisplay: React.FC<ShotListDisplayProps> = ({
                 shouldLoadImages={true} // Always load images since they're from context
                 shotIndex={index}
                 projectAspectRatio={currentProject?.aspectRatio}
+                isHighlighted={highlightedShotId === shot.id}
               />
             );
           })}

@@ -4,7 +4,7 @@ import { useUpdateShotName, useDeleteShot, useDuplicateShot } from '../../../sha
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
-import { Pencil, Trash2, Check, X, Copy, GripVertical } from 'lucide-react'; // Icons
+import { Pencil, Trash2, Check, X, Copy, GripVertical, Loader2 } from 'lucide-react'; // Icons
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/shared/components/ui/alert-dialog';
@@ -28,6 +28,7 @@ interface VideoShotDisplayProps {
   shouldLoadImages?: boolean;
   shotIndex?: number;
   projectAspectRatio?: string;
+  isHighlighted?: boolean;
 }
 
 // Component for individual shot image with loading state
@@ -231,7 +232,7 @@ const PlaceholderBlock: React.FC<PlaceholderBlockProps> = ({ index, projectAspec
   );
 };
 
-const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio }) => {
+const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot, currentProjectId, dragHandleProps, dragDisabledReason, shouldLoadImages = true, shotIndex = 0, projectAspectRatio, isHighlighted = false }) => {
   // Click ripple effect
   const { triggerRipple, rippleStyles, isRippleActive } = useClickRipple();
   
@@ -349,9 +350,9 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   const handleDuplicateShot = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (!currentProjectId) {
-      toast.error('Cannot duplicate shot: Project ID is missing.');
       return;
     }
+    
     try {
       await duplicateShotMutation.mutateAsync({
         shotId: shot.id,
@@ -402,7 +403,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
     <>
       <div 
         key={shot.id} 
-        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 hover:scale-105 transition-all duration-700 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''}`}
+        className={`click-ripple group min-h-48 p-4 border rounded-lg bg-card/50 hover:bg-card/80 hover:shadow-wes-hover hover:border-primary/30 hover:scale-105 transition-all duration-700 relative cursor-pointer flex flex-col ${isRippleActive ? 'ripple-active' : ''} ${isHighlighted ? 'ring-4 ring-blue-500 ring-opacity-75 shadow-[0_0_30px_rgba(59,130,246,0.6)] scale-105 animate-pulse' : ''}`}
         style={rippleStyles}
         onPointerDown={handleRippleTrigger}
         onClick={onSelectShot}
@@ -486,9 +487,13 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
               onClick={handleDuplicateShot} 
               className="h-8 w-8" 
               disabled={duplicateShotMutation.isPending}
-              title="Duplicate shot"
+              title={duplicateShotMutation.isPending ? "Duplicating..." : "Duplicate shot"}
             >
-              <Copy className="h-4 w-4" />
+              {duplicateShotMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
             </Button>
             <Button variant="ghost" size="icon" onClick={handleDeleteShot} className="text-destructive hover:text-destructive-foreground hover:bg-destructive h-8 w-8">
               <Trash2 className="h-4 w-4" />

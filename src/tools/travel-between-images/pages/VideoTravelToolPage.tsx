@@ -640,6 +640,50 @@ const VideoTravelToolPage: React.FC = () => {
   // Sort mode for shots
   const [shotSortMode, setShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('ordered');
   
+  // Track highlighted shot for duplication feedback
+  const [highlightedShotId, setHighlightedShotId] = useState<string | null>(null);
+  
+  // Listen for shot duplication to provide visual feedback
+  useEffect(() => {
+    const handleShotDuplicated = (event: CustomEvent) => {
+      const { shotId, shotName } = event.detail || {};
+      console.log('[ShotDuplicate] Shot duplicated, providing visual feedback:', { shotId: shotId?.substring(0, 8), shotName });
+      
+      // 1. Switch to "Newest First" to show the new shot at the top
+      setShotSortMode('newest');
+      
+      // 2. Scroll to top after DOM updates (use setTimeout to wait for sort to apply)
+      setTimeout(() => {
+        // Try multiple scroll targets to ensure it works
+        const scrollToTop = () => {
+          // First try scrolling the window
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          
+          // Also try main container if it exists
+          if (mainContainerRef.current) {
+            mainContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          
+          // Also try scrolling the document element
+          document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        
+        scrollToTop();
+      }, 100); // Wait for sort mode to apply and DOM to update
+      
+      // 3. Highlight the shot for 2 seconds
+      setHighlightedShotId(shotId);
+      setTimeout(() => {
+        setHighlightedShotId(null);
+      }, 2000);
+    };
+    
+    window.addEventListener('shot-duplicated' as any, handleShotDuplicated as EventListener);
+    return () => {
+      window.removeEventListener('shot-duplicated' as any, handleShotDuplicated as EventListener);
+    };
+  }, []);
+  
   // Search helper functions
   const clearSearch = useCallback(() => {
     setShotSearchQuery('');
@@ -1499,6 +1543,7 @@ const VideoTravelToolPage: React.FC = () => {
                 onCreateNewShot={handleCreateNewShot}
                 shots={filteredShots}
                 sortMode={shotSortMode}
+                highlightedShotId={highlightedShotId}
               />
             )
           )}

@@ -139,12 +139,12 @@ export const useDuplicateShot = () => {
       if (fetchError || !originalShot) throw new Error('Shot not found');
       
       // Create new shot at position right after the original
-      const { shot: newShot } = await createShot.mutateAsync({
+      const { shot: newShot } = (await createShot.mutateAsync({
         name: newName || originalShot.name + ' Copy',
         projectId: projectId,
         shouldSelectAfterCreation: false,
         position: ((originalShot as any).position || 0) + 1
-      }) as { shot: Shot };
+      })) as any as { shot: Shot };
       
       // Use server-side function to copy shot_generations (no client data transfer!)
       console.log(`[DuplicateShot] 🚀 Calling server-side duplication function...`);
@@ -152,12 +152,12 @@ export const useDuplicateShot = () => {
         .rpc('duplicate_shot_generations', {
           p_source_shot_id: shotId,
           p_target_shot_id: newShot.id
-        });
-      
+            });
+          
       if (duplicateError) {
         console.error('[DuplicateShot] Server-side duplication failed:', duplicateError);
         throw duplicateError;
-      }
+          }
       
       console.log(`[DuplicateShot] ✅ Duplication complete:`, {
         inserted: stats?.[0]?.inserted_count || 0,
@@ -283,6 +283,11 @@ export const useDuplicateShot = () => {
         
         // Invalidate to ensure fresh data
         queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        
+        // Emit event for UI to react (switch to Newest First, scroll, highlight)
+        window.dispatchEvent(new CustomEvent('shot-duplicated', {
+          detail: { shotId: newShot.id, shotName: newShot.name }
+        }));
       }
     },
     onError: (err, { projectId }, context) => {

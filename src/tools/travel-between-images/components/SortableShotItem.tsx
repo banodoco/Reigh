@@ -13,6 +13,7 @@ interface SortableShotItemProps {
   shouldLoadImages?: boolean;
   shotIndex?: number;
   projectAspectRatio?: string;
+  isHighlighted?: boolean;
 }
 
 const SortableShotItem: React.FC<SortableShotItemProps> = ({
@@ -24,6 +25,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
   shouldLoadImages = true,
   shotIndex = 0,
   projectAspectRatio,
+  isHighlighted = false,
 }) => {
   // [ShotReorderDebug] Debug tag for shot reordering issues
   const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
@@ -78,6 +80,7 @@ const SortableShotItem: React.FC<SortableShotItemProps> = ({
         shouldLoadImages={shouldLoadImages}
         shotIndex={shotIndex}
         projectAspectRatio={projectAspectRatio}
+        isHighlighted={isHighlighted}
       />
     </div>
   );

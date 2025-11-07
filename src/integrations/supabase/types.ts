@@ -1176,6 +1176,17 @@ export type Database = {
           timeline_frame: number
         }[]
       }
+      duplicate_shot_generations: {
+        Args: {
+          p_source_shot_id: string
+          p_target_shot_id: string
+        }
+        Returns: {
+          inserted_count: number
+          skipped_videos: number
+          skipped_unpositioned: number
+        }[]
+      }
       analyze_task_availability_service_role: {
         Args: { p_include_active?: boolean; p_run_type?: string }
         Returns: {
