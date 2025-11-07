@@ -19,16 +19,8 @@ export const useVideoLoader = (
   const hasTriggeredLoadRef = useRef(false);
 
   const logVideoEvent = useCallback((phase: string, extraData: Record<string, any> = {}) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🎬 [VideoLifecycle] Video ${index + 1} - ${phase}:`, {
-        videoId: video.id,
-        phase,
-        position: index + 1,
-        timestamp: Date.now(),
-        ...extraData
-      });
-    }
-  }, [video.id, index]);
+    // Logging removed - too verbose (was logging 10+ times per video)
+  }, []);
 
   const triggerLoadOnce = useCallback((reason: string) => {
     if (process.env.NODE_ENV === 'development') {
