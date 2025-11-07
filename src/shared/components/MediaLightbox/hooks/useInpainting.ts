@@ -602,7 +602,6 @@ export const useInpainting = ({
   useEffect(() => {
     // Skip if we're in the middle of a media transition (prevents accidental scaling)
     if (isMediaTransitioningRef.current) {
-      console.log('[InpaintCanvas] ⏸️ Skipping canvas init during media transition');
       return;
     }
     
