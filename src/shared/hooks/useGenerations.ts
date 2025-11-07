@@ -97,20 +97,55 @@ export async function fetchGenerations(
     console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
     console.error('[ShotFilterPagination] Exclude positioned:', filters.excludePositioned);
     
-    // Get generation IDs associated with this shot
-    const { data: shotGenerations, error: sgError } = await supabase
+    // First, get the count from shot_generations (fast, no row limit on count)
+    const countQueryStart = Date.now();
+    const { count: shotGenCount, error: countError } = await supabase
       .from('shot_generations')
-      .select('generation_id, timeline_frame')
+      .select('generation_id', { count: 'exact', head: true })
       .eq('shot_id', filters.shotId);
     
-    console.error('[ShotFilterPagination] 📊 Shot generations lookup completed');
-    console.error('[ShotFilterPagination] Has error:', !!sgError);
-    console.error('[ShotFilterPagination] Result count:', shotGenerations?.length || 0);
+    console.error('[ShotFilterPagination] 📊 Shot generations COUNT completed in', Date.now() - countQueryStart, 'ms');
+    console.error('[ShotFilterPagination] Has count error:', !!countError);
+    console.error('[ShotFilterPagination] Total shot generations:', shotGenCount);
     
-    if (sgError) {
-      console.error('[ShotFilterPagination] ❌ Shot generations lookup failed:', sgError);
-      throw sgError;
+    if (countError) {
+      console.error('[ShotFilterPagination] ❌ Shot generations count failed:', countError);
+      throw countError;
     }
+    
+    // Now fetch ALL generation IDs (paginated if needed)
+    console.error('[ShotFilterPagination] Fetching ALL generation IDs...');
+    let allShotGenerations: Array<{ generation_id: string; timeline_frame: number | null }> = [];
+    const PAGE_SIZE = 1000;
+    const totalPages = Math.ceil((shotGenCount || 0) / PAGE_SIZE);
+    
+    for (let page = 0; page < totalPages; page++) {
+      const start = page * PAGE_SIZE;
+      const end = start + PAGE_SIZE - 1;
+      
+      console.error(`[ShotFilterPagination] Fetching shot_generations page ${page + 1}/${totalPages} (${start}-${end})`);
+      
+      const { data: pageData, error: pageError } = await supabase
+        .from('shot_generations')
+        .select('generation_id, timeline_frame')
+        .eq('shot_id', filters.shotId)
+        .range(start, end);
+      
+      if (pageError) {
+        console.error('[ShotFilterPagination] ❌ Shot generations page fetch failed:', pageError);
+        throw pageError;
+      }
+      
+      if (pageData) {
+        allShotGenerations = allShotGenerations.concat(pageData);
+        console.error(`[ShotFilterPagination] Page ${page + 1} fetched:`, pageData.length, 'records. Total so far:', allShotGenerations.length);
+      }
+    }
+    
+    const shotGenerations = allShotGenerations;
+    
+    console.error('[ShotFilterPagination] 📊 All shot generations fetched');
+    console.error('[ShotFilterPagination] Total fetched:', shotGenerations?.length || 0);
     
     let generationIds = shotGenerations?.map(sg => sg.generation_id) || [];
     
@@ -140,24 +175,15 @@ export async function fetchGenerations(
     shotFilterGenerationIds = generationIds;
     console.error('[ShotFilterPagination] 📌 Stored shotFilterGenerationIds for data query:', generationIds.length, 'IDs');
     
-    // 🔧 FIX: For large ID arrays, just use the count we already have from shot_generations
-    // We already fetched all the generation IDs from shot_generations, so we know the exact count
-    const CHUNK_SIZE = 500; // Use 500 to be safe
+    // 🔧 FIX: We fetched all generation IDs from shot_generations (paginated if needed)
+    // Now we have the exact count after filtering
+    console.error('[ShotFilterPagination] Using generation IDs count directly');
+    console.error('[ShotFilterPagination] Total IDs after filtering:', generationIds.length);
     
-    if (generationIds.length > CHUNK_SIZE) {
-      console.error('[ShotFilterPagination] 🔄 Large ID set detected');
-      console.error('[ShotFilterPagination] Total IDs:', generationIds.length);
-      console.error('[ShotFilterPagination] Using ID count directly (skipping database count query)');
-      
-      usedChunkedCounting = true;
-      totalCount = generationIds.length; // We already have the exact count!
-      
-      console.error('[ShotFilterPagination] 📊 Total count set to:', totalCount);
-    } else {
-      // Small ID set, use normal IN clause for count
-      console.error('[ShotFilterPagination] Using standard IN clause (<= 500 IDs)');
-      countQuery = countQuery.in('id', generationIds);
-    }
+    usedChunkedCounting = true;
+    totalCount = generationIds.length; // Exact count after filtering for positioned/unpositioned
+    
+    console.error('[ShotFilterPagination] 📊 Total count set to:', totalCount);
   }
 
   // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
@@ -256,7 +282,7 @@ export async function fetchGenerations(
   
   if (filters?.shotId && shotFilterGenerationIds) {
     const generationIds = shotFilterGenerationIds;
-    const CHUNK_SIZE = 500;
+    const CHUNK_SIZE = 500; // Postgres IN clause limit
     
     console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query');
     console.error('[ShotFilterPagination] ID count:', generationIds.length);
