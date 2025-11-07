@@ -348,36 +348,22 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     console.log('[ShotFilterPagination] 📍 currentPage state changed to:', currentPage);
   }, [currentPage]);
 
-  // Reset to page 1 when shot filter or position filter changes
+  // 🔧 FIX: Consolidate all filter resets into ONE useEffect to prevent query cancellation cascade
+  // Previously, 4 separate useEffects would fire sequentially on mount, each cancelling the previous query
+  // Shot filter queries are slow (~2-3s) and would get cancelled before completing
   useEffect(() => {
-    console.log('[ShotFilterPagination] 📄 Filter changed (shot/excludePositioned), resetting to page 1:', {
+    console.log('[ShotFilterPagination] 📄 ANY filter changed, resetting to page 1:', {
       selectedShotFilter,
-      excludePositioned
+      excludePositioned,
+      mediaTypeFilter,
+      starredOnly,
+      searchTerm,
+      toolTypeFilterEnabled
     });
-    setIsFilterChange(true);
-    setCurrentPage(1);
-  }, [selectedShotFilter, excludePositioned]);
 
-  // Reset to page 1 when media type or starred filter changes
-  useEffect(() => {
-    console.log('[ShotFilterPagination] 📄 Filter changed (media/starred), resetting to page 1');
     setIsFilterChange(true);
     setCurrentPage(1);
-  }, [mediaTypeFilter, starredOnly]);
-
-  // Reset to page 1 when search term changes
-  useEffect(() => {
-    console.log('[ShotFilterPagination] 📄 Filter changed (search), resetting to page 1');
-    setIsFilterChange(true);
-    setCurrentPage(1);
-  }, [searchTerm]);
-
-  // Reset to page 1 when tool type filter changes
-  useEffect(() => {
-    console.log('[ShotFilterPagination] 📄 Filter changed (toolType), resetting to page 1');
-    setIsFilterChange(true);
-    setCurrentPage(1);
-  }, [toolTypeFilterEnabled]);
+  }, [selectedShotFilter, excludePositioned, mediaTypeFilter, starredOnly, searchTerm, toolTypeFilterEnabled]);
 
   // Update last known total when we get valid data
   useEffect(() => {
