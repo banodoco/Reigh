@@ -120,41 +120,60 @@ export interface ApplyContext {
 // ==================== Fetch Task ====================
 
 export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
+  // AGGRESSIVE DEBUG: Store progress globally so we can inspect in console
+  (window as any).__applySettingsDebug = { step: 'START', taskId, timestamp: Date.now() };
+  
   console.error('[ApplySettings:fetchTask] 🚨 START - Fetching task from database');
   console.error('[ApplySettings:fetchTask] TaskId:', taskId);
   console.error('[ApplySettings:fetchTask] Full taskId:', taskId);
   console.error('[ApplySettings:fetchTask] Supabase client exists:', !!supabase);
+  console.error('[ApplySettings:fetchTask] Type of supabase:', typeof supabase);
+  console.error('[ApplySettings:fetchTask] Supabase.from type:', typeof supabase?.from);
   console.error('[ApplySettings:fetchTask] About to call supabase.from()...');
+  
+  (window as any).__applySettingsDebug.step = 'BEFORE_FROM';
   
   let data, error;
   try {
-    console.error('[ApplySettings:fetchTask] Line 129 - calling supabase.from(tasks)...');
+    (window as any).__applySettingsDebug.step = 'CALLING_FROM';
+    console.error('[ApplySettings:fetchTask] Line 138 - calling supabase.from(tasks)...');
     const fromTasks = supabase.from('tasks');
-    console.error('[ApplySettings:fetchTask] Line 130 - from(tasks) returned, calling .select()...');
     
+    (window as any).__applySettingsDebug.step = 'CALLING_SELECT';
+    console.error('[ApplySettings:fetchTask] Line 142 - from(tasks) returned, calling .select()...');
     const selectQuery = fromTasks.select('*');
-    console.error('[ApplySettings:fetchTask] Line 131 - .select() returned, calling .eq()...');
     
+    (window as any).__applySettingsDebug.step = 'CALLING_EQ';
+    console.error('[ApplySettings:fetchTask] Line 146 - .select() returned, calling .eq()...');
     const eqQuery = selectQuery.eq('id', taskId);
-    console.error('[ApplySettings:fetchTask] Line 132 - .eq() returned, calling .single()...');
     
+    (window as any).__applySettingsDebug.step = 'CALLING_SINGLE';
+    console.error('[ApplySettings:fetchTask] Line 150 - .eq() returned, calling .single()...');
     const singleQuery = eqQuery.single();
-    console.error('[ApplySettings:fetchTask] Line 133 - .single() returned, setting up timeout race...');
+    
+    (window as any).__applySettingsDebug.step = 'SETTING_UP_TIMEOUT';
+    console.error('[ApplySettings:fetchTask] Line 154 - .single() returned, setting up timeout race...');
     
     // Add timeout to prevent infinite hang
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
+        (window as any).__applySettingsDebug.step = 'TIMEOUT_FIRED';
         console.error('[ApplySettings:fetchTask] ⏰ TIMEOUT TRIGGERED - query took >10s');
         reject(new Error('Task fetch timed out after 10 seconds'));
       }, 10000);
     });
     
-    console.error('[ApplySettings:fetchTask] Line 139 - awaiting Promise.race()...');
+    (window as any).__applySettingsDebug.step = 'AWAITING_RACE';
+    console.error('[ApplySettings:fetchTask] Line 165 - awaiting Promise.race()...');
     const result = await Promise.race([singleQuery, timeoutPromise]);
-    console.error('[ApplySettings:fetchTask] Line 140 - Promise.race() resolved!');
+    
+    (window as any).__applySettingsDebug.step = 'RACE_RESOLVED';
+    console.error('[ApplySettings:fetchTask] Line 168 - Promise.race() resolved!');
     
     data = result.data;
     error = result.error;
+    
+    (window as any).__applySettingsDebug.step = 'RESULT_EXTRACTED';
     console.error('[ApplySettings:fetchTask] Result extracted:', { hasData: !!data, hasError: !!error });
   } catch (queryError) {
     console.error('[ApplySettings:fetchTask] ❌ EXCEPTION CAUGHT:', queryError);
