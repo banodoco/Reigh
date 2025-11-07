@@ -205,17 +205,6 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
       const projectSettings = (projectResult.data?.settings?.[toolId] as any) ?? {};
       const shotSettings = (shotResult.data?.settings?.[toolId] as any) ?? {};
 
-      console.log('[PromptRetentionDebug] [fetchToolSettingsSupabase] Loading from DB:', {
-        toolId,
-        shotId: ctx.shotId?.substring(0, 8),
-        projectId: ctx.projectId?.substring(0, 8),
-        hasUserSettings: Object.keys(userSettings).length > 0,
-        hasProjectSettings: Object.keys(projectSettings).length > 0,
-        hasShotSettings: Object.keys(shotSettings).length > 0,
-        shotSettingsKeys: Object.keys(shotSettings),
-        shotPrompt: shotSettings.batchVideoPrompt?.substring(0, 50)
-      });
-
       // Merge in priority order: defaults → user → project → shot
       const merged = deepMerge(
         {},
@@ -224,12 +213,6 @@ async function fetchToolSettingsSupabase(toolId: string, ctx: ToolSettingsContex
         projectSettings,
         shotSettings
       );
-      
-      console.log('[PromptRetentionDebug] [fetchToolSettingsSupabase] Merged result:', {
-        toolId,
-        mergedKeys: Object.keys(merged).length,
-        mergedPrompt: merged.batchVideoPrompt?.substring(0, 50)
-      });
       
       return merged;
     })();
@@ -336,18 +319,6 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     const currentToolSettings = currentSettings[toolId] ?? {};
     const updatedToolSettings = deepMerge({}, currentToolSettings, patch);
 
-    console.log('[PromptRetentionDebug] [updateToolSettingsSupabase] Saving to DB:', {
-      scope,
-      toolId,
-      id: id.substring(0, 8),
-      patchKeys: Object.keys(patch),
-      patch: patch, // Full patch to see what's being saved
-      updatedKeys: Object.keys(updatedToolSettings).length,
-      hasPrompt: 'batchVideoPrompt' in updatedToolSettings,
-      promptValue: updatedToolSettings.batchVideoPrompt?.substring(0, 50)
-    });
-    console.trace('[PromptRetentionDebug] [updateToolSettingsSupabase] Save triggered from:');
-
     // Use atomic PostgreSQL function to update settings
     // This is much faster than update() because it happens in a single DB operation
     const { error: rpcError } = await supabase.rpc('update_tool_settings_atomic', {
@@ -360,8 +331,6 @@ export async function updateToolSettingsSupabase(params: UpdateToolSettingsParam
     if (rpcError) {
       throw new Error(`Failed to update ${scope} settings: ${rpcError.message}`);
     }
-
-    console.log('[PromptRetentionDebug] [updateToolSettingsSupabase] ✅ Save successful');
 
     // CRITICAL: Return the full merged settings, not just the patch
     // This ensures the cache gets the exact same data that was saved to the DB
@@ -504,29 +473,11 @@ export function useToolSettings<T>(
       queryClient.setQueryData<T>(
         ['toolSettings', toolId, projectId, shotId],
         (oldData) => {
-          console.log('[PromptRetentionDebug] [useToolSettings] Cache update:', {
-            toolId,
-            oldDataKeys: oldData ? Object.keys(oldData).length : 0,
-            oldPrompt: (oldData as any)?.batchVideoPrompt?.substring(0, 50),
-            fullMergedKeys: Object.keys(fullMergedSettings).length,
-            fullMergedPrompt: (fullMergedSettings as any)?.batchVideoPrompt?.substring(0, 50)
-          });
-          
           if (!oldData) return fullMergedSettings as T;
           // Merge the updated shot settings over the existing cache (which includes defaults)
-          const merged = deepMerge({}, oldData, fullMergedSettings) as T;
-          
-          console.log('[PromptRetentionDebug] [useToolSettings] After merge:', {
-            toolId,
-            mergedKeys: Object.keys(merged).length,
-            mergedPrompt: (merged as any)?.batchVideoPrompt?.substring(0, 50)
-          });
-          
-          return merged;
+          return deepMerge({}, oldData, fullMergedSettings) as T;
         }
       );
-      
-      console.log('[useToolSettings] Cache optimistically updated with merged settings for', toolId);
     },
     onError: (error: Error) => {
       // Don't log or show errors for cancelled requests during task cancellation

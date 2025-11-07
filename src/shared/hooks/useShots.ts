@@ -307,7 +307,7 @@ export const useDuplicateShot = () => {
         
         // Invalidate after a delay to allow UI to update first
         setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
         }, 100);
       }
     },

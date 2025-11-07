@@ -1187,6 +1187,15 @@ export type Database = {
           skipped_unpositioned: number
         }[]
       }
+      update_tool_settings_atomic: {
+        Args: {
+          p_table_name: string
+          p_id: string
+          p_tool_id: string
+          p_settings: Record<string, any>
+        }
+        Returns: void
+      }
       analyze_task_availability_service_role: {
         Args: { p_include_active?: boolean; p_run_type?: string }
         Returns: {

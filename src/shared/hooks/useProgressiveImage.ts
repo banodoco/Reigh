@@ -257,7 +257,7 @@ export const useProgressiveImage = (
           .catch((err) => {
             // Only log non-abort errors (abort is expected during navigation)
             if (err.message !== 'Session aborted') {
-              console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
+            console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
             }
             safeSetState(session, () => {
               setPhase('error');
@@ -338,7 +338,7 @@ export const useProgressiveImage = (
             .catch((err) => {
               // Only log non-abort errors (abort is expected during navigation)
               if (err.message !== 'Session aborted') {
-                console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
+              console.error('[ThumbToFullTransition] ❌ Full image load failed:', err.message);
               }
               safeSetState(session, () => {
                 setError(err.message);

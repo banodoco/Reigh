@@ -598,115 +598,79 @@ export const useInpainting = ({
     }));
   }, []);
 
-  // Initialize canvas when entering inpaint mode
+  // Track last initialized media to avoid redundant effect runs
+  const lastInitializedMediaRef = useRef<string | null>(null);
+  
+  // Initialize canvas when entering inpaint mode OR when media changes while in inpaint mode
   useEffect(() => {
-    // Skip if we're in the middle of a media transition (prevents accidental scaling)
-    if (isMediaTransitioningRef.current) {
+    // Early bailouts for performance
+    if (!isInpaintMode) {
+      // Reset tracking when leaving inpaint mode
+      lastInitializedMediaRef.current = null;
       return;
     }
     
-    console.error('[InpaintCanvas] 🔄 Canvas initialization effect triggered', {
-      isInpaintMode,
-      hasDisplayCanvas: !!displayCanvasRef.current,
-      hasMaskCanvas: !!maskCanvasRef.current,
-      hasImageContainer: !!imageContainerRef.current,
-      mediaId: media.id.substring(0, 8),
-      imageLocation: media.location?.substring(0, 50),
-      imageDimensions
-    });
+    // Skip if we're in the middle of a media transition
+    if (isMediaTransitioningRef.current) return;
     
-    if (isInpaintMode && displayCanvasRef.current && maskCanvasRef.current && imageContainerRef.current) {
-      const container = imageContainerRef.current;
-      const img = container.querySelector('img');
-      
-      console.log('[InpaintPaint] 🖼️ Found image', { hasImg: !!img });
-      
-      if (img) {
-        const rect = img.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        
-        // Set canvas size to match displayed image
-        const canvas = displayCanvasRef.current;
-        const maskCanvas = maskCanvasRef.current;
-        
-        const newWidth = Math.round(rect.width);
-        const newHeight = Math.round(rect.height);
-        
-        // Skip if canvas is already the right size (prevents constant reinits during layout settling)
-        if (canvas.width === newWidth && canvas.height === newHeight) {
-          console.log('[InpaintCanvas] ⏸️ Canvas already correct size, skipping reinit', {
-            size: { width: newWidth, height: newHeight }
-          });
-          return;
-        }
-        
-        // If canvas size is changing and we have existing strokes, scale them
-        const prevSize = prevCanvasSizeRef.current;
-        if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
-          console.log('[InpaintResize] Canvas size changed, scaling strokes', {
-            from: prevSize,
-            to: { width: newWidth, height: newHeight }
-          });
-          
-          // Scale both inpaint and annotation strokes
-          if (inpaintStrokes.length > 0) {
-            const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
-            setInpaintStrokes(scaledInpaintStrokes);
-          }
-          
-          if (annotationStrokes.length > 0) {
-            const scaledAnnotationStrokes = scaleStrokes(annotationStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
-            setAnnotationStrokes(scaledAnnotationStrokes);
-          }
-        }
-        
-        // Update canvas dimensions
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        canvas.style.left = `${rect.left - containerRect.left}px`;
-        canvas.style.top = `${rect.top - containerRect.top}px`;
-        canvas.style.width = `${newWidth}px`;
-        canvas.style.height = `${newHeight}px`;
-        
-        maskCanvas.width = newWidth;
-        maskCanvas.height = newHeight;
-        
-        // Store new size for future comparisons
-        prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
-        
-        console.error('[InpaintCanvas] ✅ Canvas initialized', {
-          bufferSize: { width: canvas.width, height: canvas.height },
-          styleSize: { width: canvas.style.width, height: canvas.style.height },
-          offsetSize: { width: canvas.offsetWidth, height: canvas.offsetHeight },
-          imgRect: { width: rect.width, height: rect.height },
-          position: { left: canvas.style.left, top: canvas.style.top },
-          inpaintStrokes: inpaintStrokes.length,
-          annotationStrokes: annotationStrokes.length
-        });
-        console.log('[InpaintCanvas] ✅ Canvas initialized successfully', {
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
-          canvasStyleLeft: canvas.style.left,
-          canvasStyleTop: canvas.style.top,
-          canvasStyleWidth: canvas.style.width,
-          canvasStyleHeight: canvas.style.height,
-          imgRect: { width: rect.width, height: rect.height, left: rect.left, top: rect.top },
-          containerRect: { left: containerRect.left, top: containerRect.top },
-          inpaintStrokeCount: inpaintStrokes.length,
-          annotationStrokeCount: annotationStrokes.length
-        });
-      } else {
-        console.log('[InpaintCanvas] ❌ No image found in container');
-      }
-    } else {
-      console.log('[InpaintCanvas] ⚠️ Skipping init - missing requirements', {
-        isInpaintMode,
-        hasDisplayCanvas: !!displayCanvasRef.current,
-        hasMaskCanvas: !!maskCanvasRef.current,
-        hasImageContainer: !!imageContainerRef.current
-      });
+    // Skip if we've already initialized this media (prevents redundant runs)
+    if (lastInitializedMediaRef.current === media.id) return;
+    
+    // All required refs must be ready
+    if (!displayCanvasRef.current || !maskCanvasRef.current || !imageContainerRef.current) return;
+    
+    const container = imageContainerRef.current;
+    const img = container.querySelector('img');
+    
+    if (!img) return;
+    
+    const rect = img.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    
+    const canvas = displayCanvasRef.current;
+    const maskCanvas = maskCanvasRef.current;
+    
+    const newWidth = Math.round(rect.width);
+    const newHeight = Math.round(rect.height);
+    
+    // Skip if canvas is already the right size (prevents constant reinits during layout settling)
+    if (canvas.width === newWidth && canvas.height === newHeight) {
+      lastInitializedMediaRef.current = media.id;
+      return;
     }
-  }, [isInpaintMode, media.location, media.id]); // Canvas size from getBoundingClientRect, not imageDimensions (which changes constantly)
+    
+    // If canvas size is changing and we have existing strokes, scale them
+    const prevSize = prevCanvasSizeRef.current;
+    if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
+      // Scale both inpaint and annotation strokes
+      if (inpaintStrokes.length > 0) {
+        const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+        setInpaintStrokes(scaledInpaintStrokes);
+      }
+      
+      if (annotationStrokes.length > 0) {
+        const scaledAnnotationStrokes = scaleStrokes(annotationStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+        setAnnotationStrokes(scaledAnnotationStrokes);
+      }
+    }
+    
+    // Update canvas dimensions
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    canvas.style.left = `${rect.left - containerRect.left}px`;
+    canvas.style.top = `${rect.top - containerRect.top}px`;
+    canvas.style.width = `${newWidth}px`;
+    canvas.style.height = `${newHeight}px`;
+    
+    maskCanvas.width = newWidth;
+    maskCanvas.height = newHeight;
+    
+    // Store new size for future comparisons
+    prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
+    
+    // Mark this media as initialized
+    lastInitializedMediaRef.current = media.id;
+  }, [isInpaintMode, media.id]); // Only re-run when mode or media changes
 
   // Handle window resize to keep canvas aligned with image
   const handleResize = useCallback(() => {
@@ -1719,29 +1683,8 @@ export const useInpainting = ({
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
     const effectId = Math.random().toString(36).slice(2, 6);
-    console.error('[InpaintEffect] 🔄 Stroke change effect triggered', {
-      effectId,
-      isInpaintMode,
-      strokeCount: brushStrokes.length,
-      editMode,
-      mediaId: media.id.substring(0, 8),
-      isDraggingShape,
-      isDrawing,
-      brushStrokesRef: brushStrokes
-    });
-    console.log('[InpaintEffect] 🔄 Stroke change effect triggered', {
-      effectId,
-      isInpaintMode,
-      strokeCount: brushStrokes.length,
-      editMode,
-      mediaId: media.id.substring(0, 8),
-      isDraggingShape,
-      isDrawing
-    });
-    
     // Skip redraw during drag - handlePointerMove redraws manually to prevent flicker
     if (isDraggingShape) {
-      console.log('[InpaintEffect] ⏸️ Skipping redraw during drag (handled manually)');
       return;
     }
     
