@@ -200,14 +200,21 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       
       // CRITICAL: Reload shotGenerations if images were replaced
       if (replaceImages && inputImages.length > 0) {
+        console.log('[ApplySettings] Step 4b: Images replaced, reloading...');
+        
         // Invalidate cache
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
+        console.log('[ApplySettings] - Queries invalidated');
         
         await new Promise(resolve => setTimeout(resolve, 50));
+        console.log('[ApplySettings] - 50ms delay complete');
+        
         await ctx.loadPositions({ silent: true });
+        console.log('[ApplySettings] - Load positions complete');
         
         // Query DB for fresh data
+        console.log('[ApplySettings] - Fetching fresh shot_generations from DB...');
         const { data: freshGens, error: freshGensError } = await supabase
           .from('shot_generations')
           .select(`
@@ -221,15 +228,21 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
           .order('timeline_frame', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: true });
 
+        console.log('[ApplySettings] - Fresh data query complete:', { hasData: !!freshGens, hasError: !!freshGensError, count: freshGens?.length });
+        
         if (freshGensError) {
           console.error('[ApplySettings] Error fetching fresh data:', freshGensError);
         } else {
           pairPromptSnapshot = freshGens || [];
+          console.log('[ApplySettings] - Pair prompt snapshot set:', pairPromptSnapshot.length, 'items');
         }
+      } else {
+        console.log('[ApplySettings] Step 4b: No image replacement, skipping reload');
       }
 
       // Get snapshot if not loaded yet
       if ((!pairPromptSnapshot || pairPromptSnapshot.length === 0) && ctx.selectedShot?.id) {
+        console.log('[ApplySettings] Step 4c: Loading snapshot (not loaded yet)...');
         const { data: snapshotRows } = await supabase
           .from('shot_generations')
           .select(`id, timeline_frame, metadata, generation:generations(id, type, location)`)
@@ -239,9 +252,13 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
           .order('created_at', { ascending: true });
         
         pairPromptSnapshot = snapshotRows || [];
+        console.log('[ApplySettings] - Snapshot loaded:', pairPromptSnapshot.length, 'items');
+      } else {
+        console.log('[ApplySettings] Step 4c: Snapshot already loaded, skipping');
       }
 
       // Filter and sort snapshot
+      console.log('[ApplySettings] Step 4d: Filtering and sorting snapshot...');
       let preparedPairPromptTargets = pairPromptSnapshot
         .filter(row => {
           const generation = (row as any)?.generation;
@@ -251,9 +268,11 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
           return !isVideo;
         })
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+      
+      console.log('[ApplySettings] - Filtered to', preparedPairPromptTargets.length, 'non-video items');
 
       // Step 5: Apply settings (using actual exported functions)
-      console.log('[ApplySettings] Step 5: Applying settings...');
+      console.log('[ApplySettings] 🚀 Step 5: Starting settings application...');
       
       results.push(await ApplySettingsService.applyModelSettings(settings, applyContext));
       console.log('[ApplySettings] - Model settings done');
