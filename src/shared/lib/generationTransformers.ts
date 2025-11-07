@@ -32,6 +32,9 @@ export interface RawGeneration {
   based_on?: string | null;
   upscaled_url?: string | null;
   name?: string | null;
+  // NEW: JSONB column mapping shot_id -> timeline_frame
+  shot_data?: Record<string, number | null>;
+  // DEPRECATED: Old join format (for backwards compatibility)
   shot_generations?: Array<{
     shot_id: string;
     timeline_frame: number | null;
@@ -170,8 +173,20 @@ export function transformGeneration(
     });
   }
 
-  // Handle shot associations from LEFT JOIN
-  const shotGenerations = item.shot_generations || [];
+  // Handle shot associations - prefer JSONB shot_data over JOIN shot_generations
+  let shotGenerations: Array<{ shot_id: string; timeline_frame: number | null }> = [];
+  
+  // Convert JSONB shot_data to array format (NEW approach)
+  if (item.shot_data && Object.keys(item.shot_data).length > 0) {
+    shotGenerations = Object.entries(item.shot_data).map(([shotId, frame]) => ({
+      shot_id: shotId,
+      timeline_frame: frame,
+    }));
+  } 
+  // Fall back to shot_generations join (OLD approach, for backwards compatibility)
+  else if (item.shot_generations) {
+    shotGenerations = item.shot_generations;
+  }
   
   // If shot context is provided via options, use it
   if (options.shotImageEntryId || options.timeline_frame !== undefined) {

@@ -163,7 +163,7 @@ export async function fetchGenerations(
       tasks,
       based_on,
       upscaled_url,
-      shot_generations(shot_id, timeline_frame)
+      shot_data
     `)
     .eq('project_id', projectId);
 
