@@ -30,16 +30,7 @@ export async function fetchGenerations(
   hasMore: boolean;
 }> {
   
-  console.error('[ShotFilterPagination] 🚀 fetchGenerations called:', {
-    projectId: projectId?.substring(0, 8),
-    limit,
-    offset,
-    filters,
-    timestamp: Date.now()
-  });
-  
   if (!projectId) {
-    console.error('[ShotFilterPagination] ❌ No projectId, returning empty');
     return { items: [], total: 0, hasMore: false };
   }
   
@@ -85,16 +76,9 @@ export async function fetchGenerations(
   // 🚀 NEW APPROACH: Use denormalized shot_id column for fast filtering
   // No more multi-step fetching from shot_generations!
   let totalCount = 0; // Total count of matching items
-  
-  console.error('[ShotFilterPagination] 🔍 Shot filter check for COUNT');
-  console.error('[ShotFilterPagination] Has shotId?:', !!filters?.shotId);
-  console.error('[ShotFilterPagination] shotId value:', filters?.shotId);
 
   // Apply shot filter if provided - using JSONB shot_data column
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] ✅ Applying shot filter to COUNT query (using JSONB shot_data)');
-    console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
-    console.error('[ShotFilterPagination] Exclude positioned:', filters.excludePositioned);
     
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
     // shot_data->'shot_id' checks if the key exists (returns the value or null if key missing)
@@ -106,10 +90,7 @@ export async function fetchGenerations(
       // Filter to only unpositioned: shot_data->>'shot_id' IS NULL
       // ->> returns as text, and JSON null becomes SQL NULL
       countQuery = countQuery.is(`shot_data->>${filters.shotId}`, null);
-      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (shot_data->>shot_id IS NULL)');
     }
-    
-    console.error('[ShotFilterPagination] 📊 Shot filter applied to count query (using JSONB)');
   }
 
   // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
@@ -118,36 +99,11 @@ export async function fetchGenerations(
   
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
-    console.error('[ShotFilterPagination] 🔢 Count query completed');
-    console.error('[ShotFilterPagination] Count:', count);
-    console.error('[ShotFilterPagination] Has Error:', !!countError);
-    console.error('[ShotFilterPagination] About to check if error exists...');
     if (countError) {
-      console.error('[ShotFilterPagination] ❌ COUNT QUERY ERROR DETECTED');
-      console.error('[ShotFilterPagination] Error message:', countError?.message);
-      console.error('[ShotFilterPagination] Error details:', countError?.details);
-      console.error('[ShotFilterPagination] Error hint:', countError?.hint);
-      console.error('[ShotFilterPagination] Error code:', countError?.code);
-      console.error('[ShotFilterPagination] Full error object:', countError);
-      console.error('[ShotFilterPagination] Error JSON:', JSON.stringify(countError));
-      console.error('[ShotFilterPagination] Applied filters:', filters);
       throw countError;
     }
-    console.error('[ShotFilterPagination] No error, continuing...');
-    console.error('[ShotFilterPagination] Count value is:', count);
-    console.error('[ShotFilterPagination] Count type:', typeof count);
-    try {
     totalCount = count || 0;
-      console.error('[ShotFilterPagination] Total count set to:', totalCount);
-    } catch (e) {
-      console.error('[ShotFilterPagination] ❌ ERROR setting totalCount:', e);
-      throw e;
-    }
-  } else {
-    console.error('[ShotFilterPagination] ⚡ Skipped count query (using limit+1 pattern)');
   }
-  
-  console.error('[ShotFilterPagination] ✅ Count phase complete, starting data query setup');
 
   // 🚀 PERFORMANCE FIX: Optimize query - select only needed fields
   let dataQuery = supabase
@@ -199,79 +155,29 @@ export async function fetchGenerations(
   }
 
   // Apply shot filter to data query - using JSONB shot_data column
-  console.error('[ShotFilterPagination] 🔍 DATA query shot filter check');
-  console.error('[ShotFilterPagination] Has shotId filter?:', !!filters?.shotId);
-  console.error('[ShotFilterPagination] shotId value:', filters?.shotId?.substring(0, 8));
-  
   if (filters?.shotId) {
-    console.error('[ShotFilterPagination] ✅ Applying shot filter to DATA query (using JSONB shot_data)');
-    console.error('[ShotFilterPagination] Shot ID:', filters.shotId.substring(0, 8));
-    console.error('[ShotFilterPagination] Offset:', offset);
-    console.error('[ShotFilterPagination] Limit:', limit);
-    
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
     dataQuery = dataQuery.not(`shot_data->${filters.shotId}`, 'is', null);
     
     // Add positioned filter if needed
     if (filters.excludePositioned) {
       dataQuery = dataQuery.is(`shot_data->>${filters.shotId}`, null);
-      console.error('[ShotFilterPagination] 🎯 Filtering to unpositioned only (shot_data->>shot_id IS NULL)');
     }
-    
-    console.error('[ShotFilterPagination] 📊 Shot filter applied to data query (using JSONB)');
   }
 
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
   
   // Execute query with standard server-side pagination
-  console.error('[ShotFilterPagination] 🚀 About to execute main query');
-  console.error('[ShotFilterPagination] Offset:', offset);
-  console.error('[ShotFilterPagination] Fetch limit:', fetchLimit);
-  console.error('[ShotFilterPagination] Range:', `${offset}-${offset + fetchLimit - 1}`);
-  console.error('[ShotFilterPagination] Has filters?:', !!filters);
-  console.error('[ShotFilterPagination] Has shot filter?:', !!filters?.shotId);
-  
-  const queryStartTime = Date.now();
   const { data, error } = await dataQuery
     .order('created_at', { ascending: false })
     .range(offset, offset + fetchLimit - 1);
   
-  const queryDuration = Date.now() - queryStartTime;
-  
-  console.error('[ShotFilterPagination] 📦 Main query completed:', {
-    duration: `${queryDuration}ms`,
-    itemsReturned: data?.length || 0,
-    hasError: !!error,
-    errorMessage: error?.message,
-    errorDetails: error,
-    offset,
-    fetchLimit,
-    range: `${offset}-${offset + fetchLimit - 1}`,
-    firstItemId: data?.[0]?.id?.substring(0, 8),
-    lastItemId: data?.[data.length - 1]?.id?.substring(0, 8),
-    allReturnedIds: data?.map(d => d.id?.substring(0, 8)).join(', '),
-    WARNING: data?.length === 0 ? '⚠️ EMPTY RESULT SET - This page will show as empty!' : null
-  });
-  
   if (error) {
-    console.error('[ShotFilterPagination] ❌ Main query FAILED:', {
-      error,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-      queryParams: {
-        offset,
-        limit: fetchLimit,
-        filters
-      }
-    });
     throw error;
   }
   
   if (!data) {
-    console.error('[ShotFilterPagination] ❌ Main query returned null/undefined');
     return { items: [], total: totalCount, hasMore: false };
   }
 
@@ -319,31 +225,6 @@ export async function fetchGenerations(
       verbose: !!item.upscaled_url, // Enable verbose logging for upscaled items
     });
   }) || [];
-
-  console.error('[ShotFilterPagination] 🎉 fetchGenerations returning:', {
-    itemsCount: items.length,
-    totalCount,
-    hasMore,
-    offset,
-    limit,
-    filters: {
-      shotId: filters?.shotId?.substring(0, 8),
-      excludePositioned: filters?.excludePositioned,
-      toolType: filters?.toolType,
-      mediaType: filters?.mediaType
-    },
-    firstItemId: items[0]?.id?.substring(0, 8),
-    lastItemId: items[items.length - 1]?.id?.substring(0, 8),
-    allItemIds: items.map(i => i.id?.substring(0, 8)).join(', '),
-    expectedRange: `${offset}-${offset + limit - 1}`,
-    WARNING: items.length === 0 ? '⚠️⚠️⚠️ RETURNING EMPTY ARRAY - UI WILL SHOW NO ITEMS!' : null,
-    timestamp: Date.now()
-  });
-
-  console.error('[ShotFilterPagination] 🎉 FUNCTION COMPLETE - About to return');
-  console.error('[ShotFilterPagination] Final items count:', items.length);
-  console.error('[ShotFilterPagination] Final total:', totalCount);
-  console.error('[ShotFilterPagination] Final hasMore:', hasMore);
 
   return { items, total: totalCount, hasMore };
 }

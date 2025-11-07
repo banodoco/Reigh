@@ -74,7 +74,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
   ];
   const colorScheme = pairColorSchemes[index % pairColorSchemes.length];
 
-  // Check if there's a custom prompt for this pair (includes enhanced prompts)
+  // Check if there's a custom prompt OR enhanced prompt for this pair
   const hasCustomPrompt = (pairPrompt && pairPrompt.trim()) || (pairNegativePrompt && pairNegativePrompt.trim()) || (enhancedPrompt && enhancedPrompt.trim());
 
   return (

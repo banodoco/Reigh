@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Sparkles } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { cn } from '@/shared/lib/utils';
 
@@ -60,8 +60,8 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
   ];
   const colorScheme = pairColorSchemes[pairIndex % pairColorSchemes.length];
 
-  // Check if there's a custom prompt for this pair
-  const hasCustomPrompt = (pairPrompt && pairPrompt.trim()) || (pairNegativePrompt && pairNegativePrompt.trim());
+  // Check if there's a custom prompt OR enhanced prompt for this pair
+  const hasCustomPrompt = (pairPrompt && pairPrompt.trim()) || (pairNegativePrompt && pairNegativePrompt.trim()) || (enhancedPrompt && enhancedPrompt.trim());
 
   return (
     <div className={cn("flex items-center justify-center", className)}>
@@ -85,21 +85,13 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
               Pair {pairIndex + 1}
             </span>
             {!isMobile && (
-              <>
-                <MessageSquare 
-                  className={cn(
-                    "h-3 w-3",
-                    hasCustomPrompt ? colorScheme.text : 'text-gray-400',
-                    hasCustomPrompt ? 'opacity-100' : 'opacity-60'
-                  )}
-                />
-                {enhancedPrompt && enhancedPrompt.trim() && (
-                  <Sparkles 
-                    className={cn("h-3 w-3", colorScheme.text, "opacity-100")}
-                    title="Has enhanced prompt"
-                  />
+              <MessageSquare 
+                className={cn(
+                  "h-3 w-3",
+                  hasCustomPrompt ? colorScheme.text : 'text-gray-400',
+                  hasCustomPrompt ? 'opacity-100' : 'opacity-60'
                 )}
-              </>
+              />
             )}
           </button>
         </TooltipTrigger>
