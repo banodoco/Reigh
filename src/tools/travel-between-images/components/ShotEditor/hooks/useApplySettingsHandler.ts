@@ -201,6 +201,9 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       // CRITICAL: Reload shotGenerations if images were replaced
       if (replaceImages && inputImages.length > 0) {
         console.log('[ApplySettings] Step 4b: Images replaced, reloading...');
+        console.log('[ApplySettings] - queryClient exists:', !!queryClient);
+        console.log('[ApplySettings] - queryClient type:', typeof queryClient);
+        console.log('[ApplySettings] - queryClient.invalidateQueries type:', typeof queryClient?.invalidateQueries);
         
         try {
           // Invalidate cache
