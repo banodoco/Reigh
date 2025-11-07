@@ -116,9 +116,17 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
 
     try {
       // Step 1: Fetch task from database
-      const taskData = await ApplySettingsService.fetchTask(taskId);
+      let taskData;
+      try {
+        taskData = await ApplySettingsService.fetchTask(taskId);
+        console.log('[ApplySettings] fetchTask returned:', { hasData: !!taskData, dataType: typeof taskData });
+      } catch (fetchError) {
+        console.error('[ApplySettings] ❌ fetchTask threw error:', fetchError);
+        throw fetchError;
+      }
+      
       if (!taskData) {
-        console.error('[ApplySettings] ❌ Task not found or fetch failed');
+        console.error('[ApplySettings] ❌ Task not found (returned null/undefined)');
         return;
       }
       console.log('[ApplySettings] ✅ Task data fetched successfully');
