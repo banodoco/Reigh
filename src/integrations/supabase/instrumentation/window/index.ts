@@ -38,7 +38,7 @@ export function installWindowOnlyInstrumentationLegacy() {
         });
         addCorruptionEvent('SUPABASE_ERROR_2372', errorInfo);
       } else if (message && (String(message).includes('supabase') || String(message).includes('realtime') || String(message).includes('websocket'))) {
-        console.error('[RealtimeCorruptionTrace] 🔍 RELATED ERROR:', errorInfo);
+        console.log('[RealtimeCorruptionTrace] 🔍 RELATED ERROR:', errorInfo);
         addCorruptionEvent('RELATED_ERROR', errorInfo);
       }
 

@@ -88,10 +88,12 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
   
   // Return stable callback that reads from ref
   return useCallback(async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
+    const startTime = Date.now();
+    console.log('[ApplySettings] 🎬 Starting apply settings from task');
+    
     // Get latest values from ref (no stale closures!)
     const ctx = contextRef.current;
     
-    console.log('[ApplySettings] 🎬 Starting apply settings from task');
     console.log('[ApplySettings] Context check:', {
       hasCtx: !!ctx,
       hasProjectId: !!ctx.projectId,
@@ -100,7 +102,8 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       hasCallbacks: !!ctx.onBatchVideoPromptChange,
       taskId: taskId.substring(0, 8),
       replaceImages,
-      inputImagesCount: inputImages.length
+      inputImagesCount: inputImages.length,
+      timestamp: startTime
     });
     
     let pairPromptSnapshot: Array<{
@@ -277,17 +280,29 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       console.log('[ApplySettings] ✅ Complete:', `${successCount}/${results.length} categories applied`);
       
       // Force reload
+      console.log('[ApplySettings] Step 7: Force reload...');
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
       await new Promise(resolve => setTimeout(resolve, 200));
       await ctx.loadPositions({ silent: true });
       
+      const duration = Date.now() - startTime;
+      console.log('[ApplySettings] 🎉 FULLY COMPLETE:', {
+        duration: `${duration}ms`,
+        successCount,
+        totalSteps: results.length,
+        timestamp: Date.now()
+      });
+      
     } catch (e) {
-      console.error('[ApplySettings] Failed to apply settings:', e);
+      const duration = Date.now() - startTime;
+      console.error('[ApplySettings] ❌ Failed to apply settings:', e);
       console.error('[ApplySettings] Error details:', {
         error: e,
         message: e instanceof Error ? e.message : String(e),
-        stack: e instanceof Error ? e.stack : undefined
+        stack: e instanceof Error ? e.stack : undefined,
+        duration: `${duration}ms`,
+        failedAt: 'See logs above for last successful step'
       });
     }
   }, [queryClient]); // ✅ Only depends on queryClient (stable)

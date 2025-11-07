@@ -32,7 +32,6 @@ import { ShotEditorProps, GenerationsPaneSettings, DEFAULT_STEERABLE_MOTION_SETT
 import { useShotEditorState } from './state/useShotEditorState';
 import { useGenerationActions } from './hooks/useGenerationActions';
 import { useLoraSync } from './hooks/useLoraSync';
-import { useApplySettingsHandler } from './hooks/useApplySettingsHandler';
 import { Header } from './ui/Header';
 import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
@@ -224,12 +223,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     setStructureVideoMotionStrength(motionStrength);
     setStructureVideoType(structureType);
     
-    console.error('[StructureVideoDebug] ✅ State setters called successfully');
+    console.log('[StructureVideoDebug] ✅ State setters called successfully');
 
     // Save to database
     if (videoPath) {
       // Save structure video (metadata is optional - can be fetched later from path)
-      console.error('[ShotEditor] 💾 SAVING structure video to database:', { 
+      console.log('[ShotEditor] 💾 SAVING structure video to database:', { 
         path: videoPath,
         pathPreview: videoPath.substring(0, 80) + '...',
         hasMetadata: !!metadata,
@@ -247,7 +246,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength,
         structureType
       });
-      console.error('[ShotEditor] ✅ Structure video save requested');
+      console.log('[ShotEditor] ✅ Structure video save requested');
     } else {
       // Clear structure video - explicitly set fields to null to ensure deletion
       console.error('[ShotEditor] 🗑️  CLEARING structure video from database');
@@ -258,7 +257,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         motionStrength: null,
         structureType: null
       });
-      console.error('[ShotEditor] ✅ Structure video clear requested');
+      console.log('[ShotEditor] ✅ Structure video clear requested');
     }
   }, [updateStructureVideoSettings]);
 
@@ -1290,57 +1289,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const addImageToShotMutation = useAddImageToShot();
   const removeImageFromShotMutation = useRemoveImageFromShot();
 
-  // Import the stable callback hook at the top if not already done
-  // This will be added to imports
-  
-  // Use stable callback hook to prevent VideoItem re-renders
-  const applySettingsFromTask = useApplySettingsHandler({
-    projectId,
-    selectedShotId: selectedShot?.id || '',
-    simpleFilteredImages,
-    selectedShot,
-    availableLoras,
-    onBatchVideoPromptChange,
-    onSteerableMotionSettingsChange,
-    onBatchVideoFramesChange,
-    onBatchVideoContextChange,
-    onBatchVideoStepsChange,
-    onDimensionSourceChange,
-    onCustomWidthChange,
-    onCustomHeightChange,
-    onGenerationModeChange,
-    onAdvancedModeChange,
-    onMotionModeChange,
-    onPhaseConfigChange,
-    onPhasePresetSelect,
-    onPhasePresetRemove,
-    onTurboModeChange,
-    onEnhancePromptChange,
-    onAmountOfMotionChange,
-    onTextBeforePromptsChange,
-    onTextAfterPromptsChange,
-    handleStructureVideoChange,
-    generationMode,
-    advancedMode,
-    motionMode,
-    turboMode,
-    enhancePrompt,
-    amountOfMotion,
-    textBeforePrompts,
-    textAfterPrompts,
-    batchVideoSteps,
-    batchVideoFrames,
-    batchVideoContext,
-    steerableMotionSettings,
-    loraManager,
-    addImageToShotMutation,
-    removeImageFromShotMutation,
-    updatePairPromptsByIndex,
-    loadPositions,
-  });
-
-  // OLD IMPLEMENTATION - Replaced with stable hook above
-  /*
   const applySettingsFromTask = useCallback(async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
     console.log('[ApplySettings] 🎬 === APPLY SETTINGS FROM TASK START ===', {
       taskId: taskId.substring(0, 8),
@@ -1478,7 +1426,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
           console.error('[ApplySettings] ❌ Error fetching fresh shot generations after replacement:', freshGensError);
         } else {
           pairPromptSnapshot = freshGens || [];
-          console.error('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
+          console.log('[ApplySettings] ✅ AFTER RELOAD - Fresh data from DB:', {
             count: pairPromptSnapshot.length,
             ids: pairPromptSnapshot.map(sg => ({
               id: sg.id.substring(0, 8),
@@ -1569,7 +1517,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             return;
           }
 
-          console.error('[ApplySettings] 💾 Saving pair prompt via snapshot updater:', {
+          console.log('[ApplySettings] 💾 Saving pair prompt via snapshot updater:', {
             pairIndex,
             shotGenerationId: target.id.substring(0, 8),
             timeline_frame: target.timeline_frame,
@@ -1597,7 +1545,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             throw pairUpdateError;
           }
 
-          console.error('[ApplySettings] ✅ Pair prompt saved via snapshot updater:', {
+          console.log('[ApplySettings] ✅ Pair prompt saved via snapshot updater:', {
             pairIndex,
             shotGenerationId: target.id.substring(0, 8)
           });
@@ -1626,7 +1574,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const failedResults = results.filter(r => !r.success);
       const successfulResults = results.filter(r => r.success);
       
-      console.error('[ApplySettings] 📊 COMPLETE SUMMARY - All values extracted and applied:', {
+      console.log('[ApplySettings] 📊 COMPLETE SUMMARY - All values extracted and applied:', {
         taskId: taskId.substring(0, 8),
         extractedValues: {
           prompt: settings.prompt ? `"${settings.prompt.substring(0, 60)}..."` : 'undefined',
@@ -1678,7 +1626,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShot.id] });
       await new Promise(resolve => setTimeout(resolve, 200));
       await loadPositions({ silent: true });
-      console.error('[ApplySettings] ✅ Final reload complete - pair prompts should now be visible');
+      console.log('[ApplySettings] ✅ Final reload complete - pair prompts should now be visible');
     } catch (e) {
       console.error('[ApplySettings] ❌ === FAILED TO APPLY SETTINGS ===', e);
     }
@@ -1725,7 +1673,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     updatePairPromptsByIndex,
     loadPositions,
   ]);
-  */
 
 
   // Early return check after all hooks are called (Rules of Hooks)

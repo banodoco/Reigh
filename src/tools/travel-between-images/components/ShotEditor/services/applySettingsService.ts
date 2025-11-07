@@ -121,19 +121,45 @@ export interface ApplyContext {
 
 export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
   console.log('[ApplySettings] 📡 Fetching task from database...');
+  console.log('[ApplySettings] TaskId:', taskId.substring(0, 8));
+  console.log('[ApplySettings] About to call supabase.from(tasks).select...');
   
-  const { data: taskRow, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('id', taskId)
-    .single();
+  let data, error;
+  try {
+    console.log('[ApplySettings] Creating query promise...');
+    const queryPromise = supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', taskId)
+      .single();
+    
+    console.log('[ApplySettings] Query promise created, awaiting with 10s timeout...');
+    
+    // Add timeout to prevent infinite hang
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Task fetch timed out after 10 seconds')), 10000)
+    );
+    
+    const result = await Promise.race([queryPromise, timeoutPromise]);
+    
+    data = result.data;
+    error = result.error;
+    console.log('[ApplySettings] Supabase query completed:', { hasData: !!data, hasError: !!error });
+  } catch (queryError) {
+    console.error('[ApplySettings] ❌ Supabase query threw exception:', queryError);
+    console.error('[ApplySettings] ❌ Exception type:', queryError instanceof Error ? 'Error' : typeof queryError);
+    console.error('[ApplySettings] ❌ Exception message:', queryError instanceof Error ? queryError.message : String(queryError));
+    return null;
+  }
   
-  if (error || !taskRow) {
+  if (error || !data) {
     console.error('[ApplySettings] ❌ Failed to fetch task:', error);
     return null;
   }
   
   console.log('[ApplySettings] ✅ Task fetched successfully');
+  
+  const taskRow = data;
   
   const params: any = taskRow.params || {};
   // FIX: Structure video is stored in orchestrator_details (new format), 
@@ -141,7 +167,7 @@ export const fetchTask = async (taskId: string): Promise<TaskData | null> => {
   const orchestrator: any = params.orchestrator_details || params.full_orchestrator_payload || {};
   
   // USE console.error so this shows in production logs
-  console.error('[ApplySettings] 🔍 TASK DATA STRUCTURE:', {
+  console.log('[ApplySettings] 🔍 TASK DATA STRUCTURE:', {
     hasParams: !!params,
     hasOrchestratorDetails: !!params.orchestrator_details,
     hasFullOrchestratorPayload: !!params.full_orchestrator_payload,
@@ -233,7 +259,7 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
   };
   
   // USE console.error for structure video fields so they show in production
-  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (STRUCTURE VIDEO):', {
+  console.log('[ApplySettings] 📋 EXTRACTED SETTINGS (STRUCTURE VIDEO):', {
     structureVideo: {
       path: extracted.structureVideoPath || 'NOT SET',
       type: extracted.structureVideoType,
@@ -246,7 +272,7 @@ export const extractSettings = (taskData: TaskData): ExtractedSettings => {
     hasPhaseConfig: !!extracted.phaseConfig,
   });
   
-  console.error('[ApplySettings] 📋 EXTRACTED SETTINGS (PROMPTS):', {
+  console.log('[ApplySettings] 📋 EXTRACTED SETTINGS (PROMPTS):', {
     prompt: extracted.prompt ? `"${extracted.prompt.substring(0, 50)}..."` : undefined,
     prompts: extracted.prompts ? `${extracted.prompts.length} prompts` : undefined,
     promptsArray: extracted.prompts?.map((p, i) => `[${i}] "${p?.substring(0, 30)}..."`),
@@ -304,20 +330,20 @@ export const applyPromptSettings = async (
 ): Promise<ApplyResult> => {
   // Apply main prompt
   if (typeof settings.prompt === 'string' && settings.prompt.trim()) {
-    console.error('[ApplySettings] 💬 Applying main prompt:', {
+    console.log('[ApplySettings] 💬 Applying main prompt:', {
       prompt: `"${settings.prompt.substring(0, 60)}..."`,
       length: settings.prompt.length
     });
     context.onBatchVideoPromptChange(settings.prompt);
   } else {
-    console.error('[ApplySettings] ⏭️  Skipping main prompt (undefined, empty, or not string)');
+    console.log('[ApplySettings] ⏭️  Skipping main prompt (undefined, empty, or not string)');
   }
   
   // Apply individual prompts to pair configs (regardless of current mode)
   // These prompts populate the pair fields whether you're in batch or timeline mode
   if (settings.prompts && settings.prompts.length > 1 && context.updatePairPromptsByIndex) {
-    console.error('[ApplySettings] 📝 === APPLYING INDIVIDUAL PROMPTS TO PAIR CONFIGS ===');
-    console.error('[ApplySettings] 📝 Prompt application details:', {
+    console.log('[ApplySettings] 📝 === APPLYING INDIVIDUAL PROMPTS TO PAIR CONFIGS ===');
+    console.log('[ApplySettings] 📝 Prompt application details:', {
       promptCount: settings.prompts.length,
       hasNegativePrompts: !!(settings.negativePrompts && settings.negativePrompts.length > 0),
       currentMode: context.currentGenerationMode,
@@ -332,7 +358,7 @@ export const applyPromptSettings = async (
     
     for (let i = 0; i < settings.prompts.length; i++) {
       const rawPrompt = settings.prompts[i];
-      console.error(`[ApplySettings] 🔍 Processing pair ${i}:`, {
+      console.log(`[ApplySettings] 🔍 Processing pair ${i}:`, {
         rawValue: rawPrompt,
         typeOf: typeof rawPrompt,
         isString: typeof rawPrompt === 'string',
@@ -346,7 +372,7 @@ export const applyPromptSettings = async (
       const pairNegativePrompt = settings.negativePrompts?.[i]?.trim() || '';
       
       if (pairPrompt) {
-        console.error(`[ApplySettings] 📝 Applying prompt for pair ${i}:`, {
+        console.log(`[ApplySettings] 📝 Applying prompt for pair ${i}:`, {
           prompt: `"${pairPrompt.substring(0, 40)}..."`,
           promptLength: pairPrompt.length,
           hasNegativePrompt: !!pairNegativePrompt
@@ -355,18 +381,18 @@ export const applyPromptSettings = async (
         try {
           await context.updatePairPromptsByIndex(i, pairPrompt, pairNegativePrompt);
           successes.push(i);
-          console.error(`[ApplySettings] ✅ Successfully saved prompt for pair ${i}`);
+          console.log(`[ApplySettings] ✅ Successfully saved prompt for pair ${i}`);
         } catch (e) {
           const error = `Failed to apply prompt for pair ${i}: ${e}`;
           console.error(`[ApplySettings] ❌ ${error}`, e);
           errors.push(error);
         }
       } else {
-        console.error(`[ApplySettings] ⏭️ Skipping pair ${i} - empty prompt`);
+        console.log(`[ApplySettings] ⏭️ Skipping pair ${i} - empty prompt`);
       }
     }
     
-    console.error('[ApplySettings] 📊 PAIR PROMPTS APPLICATION SUMMARY:', {
+    console.log('[ApplySettings] 📊 PAIR PROMPTS APPLICATION SUMMARY:', {
       totalPrompts: settings.prompts.length,
       successCount: successes.length,
       errorCount: errors.length,
@@ -379,7 +405,7 @@ export const applyPromptSettings = async (
       return { success: false, settingName: 'prompts', error: errors.join('; ') };
     }
   } else {
-    console.error('[ApplySettings] ⏭️ SKIPPING INDIVIDUAL PROMPTS:', {
+    console.log('[ApplySettings] ⏭️ SKIPPING INDIVIDUAL PROMPTS:', {
       hasPrompts: !!settings.prompts,
       promptsLength: settings.prompts?.length,
       hasCallback: !!context.updatePairPromptsByIndex,
@@ -679,13 +705,13 @@ export const applyStructureVideo = async (
   const paramsHasField = 'structure_video_path' in taskData.params;
   const hasStructureVideoInTask = orchestratorHasField || paramsHasField;
   
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorHasField:', orchestratorHasField);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsHasField:', paramsHasField);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorValue:', taskData.orchestrator.structure_video_path);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsValue:', taskData.params.structure_video_path);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - extractedValue:', settings.structureVideoPath);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - hasStructureVideoInTask:', hasStructureVideoInTask);
-  console.error('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - willApply:', !!settings.structureVideoPath);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorHasField:', orchestratorHasField);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsHasField:', paramsHasField);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - orchestratorValue:', taskData.orchestrator.structure_video_path);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - paramsValue:', taskData.params.structure_video_path);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - extractedValue:', settings.structureVideoPath);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - hasStructureVideoInTask:', hasStructureVideoInTask);
+  console.log('[ApplySettings] 🔍 STRUCTURE VIDEO FIELD CHECK - willApply:', !!settings.structureVideoPath);
   
   if (!hasStructureVideoInTask) {
     console.log('[ApplySettings] ⏭️  Skipping structure video (field not present in task)');
@@ -693,14 +719,14 @@ export const applyStructureVideo = async (
   }
   
   if (settings.structureVideoPath) {
-    console.error('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
-    console.error('[ApplySettings] 🎥 Structure video path:', settings.structureVideoPath);
-    console.error('[ApplySettings] 🎥 Structure video pathFilename:', settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1));
-    console.error('[ApplySettings] 🎥 Structure video treatment:', settings.structureVideoTreatment);
-    console.error('[ApplySettings] 🎥 Structure video motionStrength:', settings.structureVideoMotionStrength);
-    console.error('[ApplySettings] 🎥 Structure video type:', settings.structureVideoType);
-    console.error('[ApplySettings] 🎥 Structure video hasHandler:', !!context.handleStructureVideoChange);
-    console.error('[ApplySettings] 🎥 Structure video handlerType:', typeof context.handleStructureVideoChange);
+    console.log('[ApplySettings] 🎥 === APPLYING STRUCTURE VIDEO ===');
+    console.log('[ApplySettings] 🎥 Structure video path:', settings.structureVideoPath);
+    console.log('[ApplySettings] 🎥 Structure video pathFilename:', settings.structureVideoPath.substring(settings.structureVideoPath.lastIndexOf('/') + 1));
+    console.log('[ApplySettings] 🎥 Structure video treatment:', settings.structureVideoTreatment);
+    console.log('[ApplySettings] 🎥 Structure video motionStrength:', settings.structureVideoMotionStrength);
+    console.log('[ApplySettings] 🎥 Structure video type:', settings.structureVideoType);
+    console.log('[ApplySettings] 🎥 Structure video hasHandler:', !!context.handleStructureVideoChange);
+    console.log('[ApplySettings] 🎥 Structure video handlerType:', typeof context.handleStructureVideoChange);
     
     if (!context.handleStructureVideoChange) {
       console.error('[ApplySettings] ❌ handleStructureVideoChange is not defined in context!');
@@ -712,23 +738,23 @@ export const applyStructureVideo = async (
     }
     
     try {
-      console.error('[ApplySettings] 🎥 Extracting metadata from video URL...');
+      console.log('[ApplySettings] 🎥 Extracting metadata from video URL...');
       let metadata = null;
       try {
         metadata = await extractVideoMetadataFromUrl(settings.structureVideoPath);
-        console.error('[ApplySettings] ✅ Metadata duration:', metadata.duration_seconds);
-        console.error('[ApplySettings] ✅ Metadata frameRate:', metadata.frame_rate);
-        console.error('[ApplySettings] ✅ Metadata totalFrames:', metadata.total_frames);
-        console.error('[ApplySettings] ✅ Metadata dimensions:', `${metadata.width}x${metadata.height}`);
+        console.log('[ApplySettings] ✅ Metadata duration:', metadata.duration_seconds);
+        console.log('[ApplySettings] ✅ Metadata frameRate:', metadata.frame_rate);
+        console.log('[ApplySettings] ✅ Metadata totalFrames:', metadata.total_frames);
+        console.log('[ApplySettings] ✅ Metadata dimensions:', `${metadata.width}x${metadata.height}`);
       } catch (metadataError) {
         console.error('[ApplySettings] ⚠️  Failed to extract metadata, proceeding without it:', metadataError);
       }
       
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - videoPath:', settings.structureVideoPath);
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - hasMetadata:', !!metadata);
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - treatment:', settings.structureVideoTreatment || 'adjust');
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - motionStrength:', settings.structureVideoMotionStrength ?? 1.0);
-      console.error('[ApplySettings] 🎥 Calling handleStructureVideoChange - structureType:', settings.structureVideoType || 'flow');
+      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange - videoPath:', settings.structureVideoPath);
+      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange - hasMetadata:', !!metadata);
+      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange - treatment:', settings.structureVideoTreatment || 'adjust');
+      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange - motionStrength:', settings.structureVideoMotionStrength ?? 1.0);
+      console.log('[ApplySettings] 🎥 Calling handleStructureVideoChange - structureType:', settings.structureVideoType || 'flow');
       
       context.handleStructureVideoChange(
         settings.structureVideoPath,
@@ -738,8 +764,8 @@ export const applyStructureVideo = async (
         settings.structureVideoType || 'flow'
       );
       
-      console.error('[ApplySettings] ✅ Structure video change handler completed successfully');
-      console.error('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
+      console.log('[ApplySettings] ✅ Structure video change handler completed successfully');
+      console.log('[ApplySettings] 🎥 === STRUCTURE VIDEO APPLICATION COMPLETE ===');
       return { success: true, settingName: 'structureVideo' };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

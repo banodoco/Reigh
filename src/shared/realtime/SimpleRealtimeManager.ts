@@ -201,7 +201,7 @@ export class SimpleRealtimeManager {
             
             // Check authentication state for debugging
             supabase.auth.getUser().then(({ data: { user }, error }) => {
-              console.error('[SimpleRealtime] 🔍 Auth check after channel error:', {
+              console.log('[SimpleRealtime] 🔍 Auth check after channel error:', {
                 hasUser: !!user,
                 userId: user?.id,
                 authError: error?.message,
