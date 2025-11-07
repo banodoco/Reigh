@@ -311,19 +311,23 @@ export async function fetchGenerations(
         const chunk = generationIds.slice(start, end);
         
         console.error(`[ShotFilterPagination] 📦 Fetching timestamps chunk ${i + 1}/${chunks} (${chunk.length} IDs)`);
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Building query...`);
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step A - About to build query`);
         
         // Fetch ONLY id and created_at (very lightweight)
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step B - Calling supabase.from`);
         let chunkQuery = supabase
           .from('generations')
           .select('id, created_at')
           .eq('user_id', userId)
           .in('id', chunk);
         
-        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Executing query...`);
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step C - Query built`);
         const chunkStartTime = Date.now();
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step D - About to await query`);
         
         const { data: chunkData, error: chunkError } = await chunkQuery;
+        
+        console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Step E - Query returned`);
         
         const chunkDuration = Date.now() - chunkStartTime;
         console.error(`[ShotFilterPagination] Timestamp chunk ${i + 1}: Completed in ${chunkDuration}ms`);
