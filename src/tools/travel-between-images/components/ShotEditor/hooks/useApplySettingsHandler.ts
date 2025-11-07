@@ -252,28 +252,45 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         })
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
-      // Step 5: Apply settings (except images which were already handled)
+      // Step 5: Apply settings (using actual exported functions)
       console.log('[ApplySettings] Step 5: Applying settings...');
-      await ApplySettingsService.applyMainSettings(settings, applyContext, results);
-      console.log('[ApplySettings] - Main settings done');
-      await ApplySettingsService.applyOtherSettings(settings, applyContext, results);
-      console.log('[ApplySettings] - Other settings done');
-      await ApplySettingsService.applySteerableMotionSettings(settings, applyContext, results);
-      console.log('[ApplySettings] - Steerable motion done');
-      await ApplySettingsService.applyStructureVideo(settings, applyContext, results);
-      console.log('[ApplySettings] - Structure video done');
-      await ApplySettingsService.applyPhaseAndPresetSettings(settings, applyContext, results);
-      console.log('[ApplySettings] - Phase/preset done');
       
-      // Apply pair prompts
-      const pairPromptResults = await ApplySettingsService.applyPairPromptsFromFrames(
+      results.push(await ApplySettingsService.applyModelSettings(settings, applyContext));
+      console.log('[ApplySettings] - Model settings done');
+      
+      results.push(await ApplySettingsService.applyPromptSettings(settings, applyContext));
+      console.log('[ApplySettings] - Prompt settings done');
+      
+      results.push(await ApplySettingsService.applyGenerationSettings(settings, applyContext));
+      console.log('[ApplySettings] - Generation settings done');
+      
+      results.push(await ApplySettingsService.applyModeSettings(settings, applyContext));
+      console.log('[ApplySettings] - Mode settings done');
+      
+      results.push(await ApplySettingsService.applyAdvancedModeSettings(settings, applyContext));
+      console.log('[ApplySettings] - Advanced mode settings done');
+      
+      results.push(await ApplySettingsService.applyTextPromptAddons(settings, applyContext));
+      console.log('[ApplySettings] - Text prompt addons done');
+      
+      results.push(await ApplySettingsService.applyMotionSettings(settings, applyContext));
+      console.log('[ApplySettings] - Motion settings done');
+      
+      results.push(await ApplySettingsService.applyLoRAs(settings, applyContext));
+      console.log('[ApplySettings] - LoRAs done');
+      
+      results.push(await ApplySettingsService.applyStructureVideo(settings, applyContext, taskData));
+      console.log('[ApplySettings] - Structure video done');
+      
+      // Apply pair prompts using frame positions
+      results.push(await ApplySettingsService.applyFramePositionsToExistingImages(
         settings,
-        { ...applyContext, preparedPairPromptTargets },
-        results,
+        preparedPairPromptTargets,
         ctx.selectedShot?.id || '',
-        ctx.projectId
-      );
-      results.push(pairPromptResults);
+        ctx.projectId,
+        ctx.updatePairPromptsByIndex
+      ));
+      console.log('[ApplySettings] - Pair prompts done');
       
       // Step 6: Log summary
       const successCount = results.filter(r => r.success).length;
