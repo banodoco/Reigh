@@ -619,55 +619,55 @@ export const useInpainting = ({
     // All required refs must be ready
     if (!displayCanvasRef.current || !maskCanvasRef.current || !imageContainerRef.current) return;
     
-    const container = imageContainerRef.current;
-    const img = container.querySelector('img');
-    
-    if (!img) return;
-    
-    const rect = img.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    
-    const canvas = displayCanvasRef.current;
-    const maskCanvas = maskCanvasRef.current;
-    
-    const newWidth = Math.round(rect.width);
-    const newHeight = Math.round(rect.height);
-    
-    // Skip if canvas is already the right size (prevents constant reinits during layout settling)
-    if (canvas.width === newWidth && canvas.height === newHeight) {
-      lastInitializedMediaRef.current = media.id;
-      return;
-    }
-    
-    // If canvas size is changing and we have existing strokes, scale them
-    const prevSize = prevCanvasSizeRef.current;
-    if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
-      // Scale both inpaint and annotation strokes
-      if (inpaintStrokes.length > 0) {
-        const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
-        setInpaintStrokes(scaledInpaintStrokes);
-      }
+      const container = imageContainerRef.current;
+      const img = container.querySelector('img');
       
-      if (annotationStrokes.length > 0) {
-        const scaledAnnotationStrokes = scaleStrokes(annotationStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
-        setAnnotationStrokes(scaledAnnotationStrokes);
-      }
-    }
-    
-    // Update canvas dimensions
-    canvas.width = newWidth;
-    canvas.height = newHeight;
-    canvas.style.left = `${rect.left - containerRect.left}px`;
-    canvas.style.top = `${rect.top - containerRect.top}px`;
-    canvas.style.width = `${newWidth}px`;
-    canvas.style.height = `${newHeight}px`;
-    
-    maskCanvas.width = newWidth;
-    maskCanvas.height = newHeight;
-    
-    // Store new size for future comparisons
-    prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
-    
+    if (!img) return;
+      
+        const rect = img.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        const canvas = displayCanvasRef.current;
+        const maskCanvas = maskCanvasRef.current;
+        
+        const newWidth = Math.round(rect.width);
+        const newHeight = Math.round(rect.height);
+        
+        // Skip if canvas is already the right size (prevents constant reinits during layout settling)
+        if (canvas.width === newWidth && canvas.height === newHeight) {
+      lastInitializedMediaRef.current = media.id;
+          return;
+        }
+        
+        // If canvas size is changing and we have existing strokes, scale them
+        const prevSize = prevCanvasSizeRef.current;
+        if (prevSize && (prevSize.width !== newWidth || prevSize.height !== newHeight)) {
+          // Scale both inpaint and annotation strokes
+          if (inpaintStrokes.length > 0) {
+            const scaledInpaintStrokes = scaleStrokes(inpaintStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+            setInpaintStrokes(scaledInpaintStrokes);
+          }
+          
+          if (annotationStrokes.length > 0) {
+            const scaledAnnotationStrokes = scaleStrokes(annotationStrokes, prevSize.width, prevSize.height, newWidth, newHeight);
+            setAnnotationStrokes(scaledAnnotationStrokes);
+          }
+        }
+        
+        // Update canvas dimensions
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        canvas.style.left = `${rect.left - containerRect.left}px`;
+        canvas.style.top = `${rect.top - containerRect.top}px`;
+        canvas.style.width = `${newWidth}px`;
+        canvas.style.height = `${newHeight}px`;
+        
+        maskCanvas.width = newWidth;
+        maskCanvas.height = newHeight;
+        
+        // Store new size for future comparisons
+        prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
+        
     // Mark this media as initialized
     lastInitializedMediaRef.current = media.id;
   }, [isInpaintMode, media.id]); // Only re-run when mode or media changes
