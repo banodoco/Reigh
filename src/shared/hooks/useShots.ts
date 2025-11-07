@@ -129,28 +129,14 @@ export const useDuplicateShot = () => {
         throw new Error('Project ID is required to duplicate a shot.');
       }
 
-      // Get the shot to duplicate (only fetch positioned shot_generations)
+      // Get the shot to duplicate (basic info only)
       const { data: originalShot, error: fetchError } = await supabase
         .from('shots')
-        .select('*, name, position, project_id')
+        .select('id, name, position, project_id')
         .eq('id', shotId)
         .single();
       
       if (fetchError || !originalShot) throw new Error('Shot not found');
-      
-      // Fetch ONLY positioned, non-video shot_generations separately for efficiency
-      const { data: positionedShotGens, error: sgError } = await supabase
-        .from('shot_generations')
-        .select(`
-          generation_id,
-          timeline_frame,
-          generation:generations(type, location)
-        `)
-        .eq('shot_id', shotId)
-        .not('timeline_frame', 'is', null) // Only positioned items
-        .order('timeline_frame', { ascending: true });
-      
-      if (sgError) throw sgError;
       
       // Create new shot at position right after the original
       const { shot: newShot } = await createShot.mutateAsync({
@@ -160,39 +146,24 @@ export const useDuplicateShot = () => {
         position: ((originalShot as any).position || 0) + 1
       }) as { shot: Shot };
       
-      // Batch insert all positioned non-video shot_generations
-      if (positionedShotGens && positionedShotGens.length > 0) {
-        // Filter out videos
-        const nonVideoShotGens = positionedShotGens.filter(sg => {
-          const gen = sg.generation as any;
-          return gen && !(
-            gen.type === 'video_travel_output' ||
-            (gen.location && gen.location.endsWith('.mp4'))
-          );
+      // Use server-side function to copy shot_generations (no client data transfer!)
+      console.log(`[DuplicateShot] 🚀 Calling server-side duplication function...`);
+      const { data: stats, error: duplicateError } = await supabase
+        .rpc('duplicate_shot_generations', {
+          p_source_shot_id: shotId,
+          p_target_shot_id: newShot.id
         });
-        
-        if (nonVideoShotGens.length > 0) {
-          console.log(`[DuplicateShot] Batch inserting ${nonVideoShotGens.length} shot_generations...`);
-          
-          // Single batch insert instead of loop
-          const shotGenerationsToInsert = nonVideoShotGens.map(sg => ({
-            shot_id: newShot.id,
-            generation_id: sg.generation_id,
-            timeline_frame: sg.timeline_frame
-          }));
-          
-          const { error: batchInsertError } = await supabase
-            .from('shot_generations')
-            .insert(shotGenerationsToInsert);
-          
-          if (batchInsertError) {
-            console.error('[DuplicateShot] Batch insert failed:', batchInsertError);
-            throw batchInsertError;
-          }
-          
-          console.log(`[DuplicateShot] ✅ Successfully duplicated ${nonVideoShotGens.length} shot_generations`);
-        }
+      
+      if (duplicateError) {
+        console.error('[DuplicateShot] Server-side duplication failed:', duplicateError);
+        throw duplicateError;
       }
+      
+      console.log(`[DuplicateShot] ✅ Duplication complete:`, {
+        inserted: stats?.[0]?.inserted_count || 0,
+        skipped_videos: stats?.[0]?.skipped_videos || 0,
+        skipped_unpositioned: stats?.[0]?.skipped_unpositioned || 0
+      });
       
       // Return the new shot with its images
       const { data: completeShot } = await supabase
