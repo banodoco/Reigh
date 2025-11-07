@@ -125,13 +125,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   autoCreateIndividualPrompts,
   hasNoImages = false
 }) => {
-  // TOP-LEVEL PAIR PROMPTS DEBUG
-  console.error('[PAIR_PROMPTS_DATA] pairPromptsExists:', !!pairPrompts);
-  console.error('[PAIR_PROMPTS_DATA] pairPromptsKeys:', pairPrompts ? Object.keys(pairPrompts) : 'NONE');
-  console.error('[PAIR_PROMPTS_DATA] pairPromptsCount:', pairPrompts ? Object.keys(pairPrompts).length : 0);
-  console.error('[PAIR_PROMPTS_DATA] firstPrompt:', pairPrompts?.[0]);
-  console.error('[PAIR_PROMPTS_DATA] allPrompts:', pairPrompts);
-  
   // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(50);
   const maxGap = Math.max(1, 81 - contextFrames);

@@ -32,6 +32,7 @@ import { ShotEditorProps, GenerationsPaneSettings, DEFAULT_STEERABLE_MOTION_SETT
 import { useShotEditorState } from './state/useShotEditorState';
 import { useGenerationActions } from './hooks/useGenerationActions';
 import { useLoraSync } from './hooks/useLoraSync';
+import { useApplySettingsHandler } from './hooks/useApplySettingsHandler';
 import { Header } from './ui/Header';
 import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
@@ -1289,6 +1290,57 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const addImageToShotMutation = useAddImageToShot();
   const removeImageFromShotMutation = useRemoveImageFromShot();
 
+  // Import the stable callback hook at the top if not already done
+  // This will be added to imports
+  
+  // Use stable callback hook to prevent VideoItem re-renders
+  const applySettingsFromTask = useApplySettingsHandler({
+    projectId,
+    selectedShotId: selectedShot?.id || '',
+    simpleFilteredImages,
+    selectedShot,
+    availableLoras,
+    onBatchVideoPromptChange,
+    onSteerableMotionSettingsChange,
+    onBatchVideoFramesChange,
+    onBatchVideoContextChange,
+    onBatchVideoStepsChange,
+    onDimensionSourceChange,
+    onCustomWidthChange,
+    onCustomHeightChange,
+    onGenerationModeChange,
+    onAdvancedModeChange,
+    onMotionModeChange,
+    onPhaseConfigChange,
+    onPhasePresetSelect,
+    onPhasePresetRemove,
+    onTurboModeChange,
+    onEnhancePromptChange,
+    onAmountOfMotionChange,
+    onTextBeforePromptsChange,
+    onTextAfterPromptsChange,
+    handleStructureVideoChange,
+    generationMode,
+    advancedMode,
+    motionMode,
+    turboMode,
+    enhancePrompt,
+    amountOfMotion,
+    textBeforePrompts,
+    textAfterPrompts,
+    batchVideoSteps,
+    batchVideoFrames,
+    batchVideoContext,
+    steerableMotionSettings,
+    loraManager,
+    addImageToShotMutation,
+    removeImageFromShotMutation,
+    updatePairPromptsByIndex,
+    loadPositions,
+  });
+
+  // OLD IMPLEMENTATION - Replaced with stable hook above
+  /*
   const applySettingsFromTask = useCallback(async (taskId: string, replaceImages: boolean, inputImages: string[]) => {
     console.log('[ApplySettings] 🎬 === APPLY SETTINGS FROM TASK START ===', {
       taskId: taskId.substring(0, 8),
@@ -1673,6 +1725,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     updatePairPromptsByIndex,
     loadPositions,
   ]);
+  */
 
 
   // Early return check after all hooks are called (Rules of Hooks)
