@@ -118,13 +118,17 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       // Step 1: Fetch task from database
       const taskData = await ApplySettingsService.fetchTask(taskId);
       if (!taskData) {
+        console.error('[ApplySettings] ❌ Task not found or fetch failed');
         return;
       }
+      console.log('[ApplySettings] ✅ Task data fetched successfully');
       
       // Step 2: Extract all settings
       const settings = ApplySettingsService.extractSettings(taskData);
+      console.log('[ApplySettings] ✅ Settings extracted:', Object.keys(settings));
       
       // Step 3: Build apply context with all callbacks and current state
+      console.log('[ApplySettings] Building apply context...');
       const applyContext: ApplySettingsService.ApplyContext = {
         // Current state
         currentGenerationMode: ctx.generationMode,
@@ -165,10 +169,13 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         motionMode: ctx.motionMode,
       };
       
+      console.log('[ApplySettings] ✅ Apply context built');
+      
       // Step 4: Apply all settings in sequence
       const results: ApplySettingsService.ApplyResult[] = [];
       
       // Replace images first if requested
+      console.log('[ApplySettings] Step 4a: Replace images check...');
       results.push(await ApplySettingsService.replaceImagesIfRequested(
         settings,
         replaceImages,
@@ -235,11 +242,17 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
       // Step 5: Apply settings (except images which were already handled)
+      console.log('[ApplySettings] Step 5: Applying settings...');
       await ApplySettingsService.applyMainSettings(settings, applyContext, results);
+      console.log('[ApplySettings] - Main settings done');
       await ApplySettingsService.applyOtherSettings(settings, applyContext, results);
+      console.log('[ApplySettings] - Other settings done');
       await ApplySettingsService.applySteerableMotionSettings(settings, applyContext, results);
+      console.log('[ApplySettings] - Steerable motion done');
       await ApplySettingsService.applyStructureVideo(settings, applyContext, results);
+      console.log('[ApplySettings] - Structure video done');
       await ApplySettingsService.applyPhaseAndPresetSettings(settings, applyContext, results);
+      console.log('[ApplySettings] - Phase/preset done');
       
       // Apply pair prompts
       const pairPromptResults = await ApplySettingsService.applyPairPromptsFromFrames(
