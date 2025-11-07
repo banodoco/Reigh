@@ -92,6 +92,16 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
     const ctx = contextRef.current;
     
     console.log('[ApplySettings] 🎬 Starting apply settings from task');
+    console.log('[ApplySettings] Context check:', {
+      hasCtx: !!ctx,
+      hasProjectId: !!ctx.projectId,
+      hasSelectedShot: !!ctx.selectedShot,
+      selectedShotId: ctx.selectedShot?.id?.substring(0, 8),
+      hasCallbacks: !!ctx.onBatchVideoPromptChange,
+      taskId: taskId.substring(0, 8),
+      replaceImages,
+      inputImagesCount: inputImages.length
+    });
     
     let pairPromptSnapshot: Array<{
       id: string;
@@ -253,6 +263,11 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       
     } catch (e) {
       console.error('[ApplySettings] Failed to apply settings:', e);
+      console.error('[ApplySettings] Error details:', {
+        error: e,
+        message: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined
+      });
     }
   }, [queryClient]); // ✅ Only depends on queryClient (stable)
 }
