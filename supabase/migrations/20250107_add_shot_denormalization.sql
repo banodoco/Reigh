@@ -248,12 +248,14 @@ Should return 0 rows if everything is working correctly.';
 -- ============================================================================
 -- MIGRATION COMPLETE
 -- ============================================================================
-RAISE NOTICE '✅ Migration complete! Shot denormalization is now active.';
-RAISE NOTICE '   - Added shot_id and timeline_frame columns to generations';
-RAISE NOTICE '   - Created indexes for fast shot filtering';  
-RAISE NOTICE '   - Created robust sync trigger on shot_generations';
-RAISE NOTICE '   - Backfilled existing data';
-RAISE NOTICE '';
-RAISE NOTICE '📊 To verify sync, run: SELECT * FROM verify_shot_sync();';
-RAISE NOTICE '   (Should return 0 rows if everything is in sync)';
+-- Migration completed successfully!
+-- 
+-- What was done:
+--   - Added shot_id and timeline_frame columns to generations
+--   - Created indexes for fast shot filtering
+--   - Created robust sync trigger on shot_generations
+--   - Backfilled existing data
+--
+-- To verify sync, run: SELECT * FROM verify_shot_sync();
+-- (Should return 0 rows if everything is in sync)
 
