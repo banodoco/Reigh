@@ -14,7 +14,7 @@ import { CharacterAnimateSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { createCharacterAnimateTask } from '@/shared/lib/tasks/characterAnimate';
 import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
-import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { cn } from '@/shared/lib/utils';

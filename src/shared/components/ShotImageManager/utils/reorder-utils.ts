@@ -11,8 +11,8 @@ export const calculateMultiDragOrder = (
   activeId: string,
   overId: string
 ): GenerationRow[] => {
-  const selectedItems = currentImages.filter((img) => selectedIds.includes(img.shotImageEntryId));
-  const remainingItems = currentImages.filter((img) => !selectedIds.includes(img.shotImageEntryId));
+  const selectedItems = currentImages.filter((img) => selectedIds.includes(img.shotImageEntryId ?? img.id));
+  const remainingItems = currentImages.filter((img) => !selectedIds.includes(img.shotImageEntryId ?? img.id));
 
   // If dropping onto a selected item, we need to determine the correct insertion point
   let targetIndex: number;
@@ -21,7 +21,7 @@ export const calculateMultiDragOrder = (
   if (selectedIds.includes(overId)) {
     // Dropping onto a selected item - use the position relative to non-selected items
     const selectedItemIndices = selectedItems.map(item => 
-      currentImages.findIndex(img => img.shotImageEntryId === item.shotImageEntryId)
+      currentImages.findIndex(img => (img.shotImageEntryId ?? img.id) === (item.shotImageEntryId ?? item.id))
     ).sort((a, b) => a - b);
     
     const overIndexInSelected = selectedItemIndices.indexOf(overIndex);
@@ -33,12 +33,14 @@ export const calculateMultiDragOrder = (
       // Dropping on other selected item - insert after the previous non-selected item
       const prevSelectedIndex = selectedItemIndices[overIndexInSelected - 1];
       const itemsBetween = currentImages.slice(prevSelectedIndex + 1, overIndex);
-      const nonSelectedBetween = itemsBetween.filter(item => !selectedIds.includes(item.shotImageEntryId));
+      const nonSelectedBetween = itemsBetween.filter(item => !selectedIds.includes(item.shotImageEntryId ?? item.id));
       targetIndex = prevSelectedIndex + nonSelectedBetween.length + 1;
     }
     
     const overInRemainingIndex = remainingItems.findIndex((_, idx) => {
-      const remainingItemIndex = currentImages.findIndex(img => img.shotImageEntryId === remainingItems[idx].shotImageEntryId);
+      const remainingItemIndex = currentImages.findIndex(img => 
+        (img.shotImageEntryId ?? img.id) === (remainingItems[idx].shotImageEntryId ?? remainingItems[idx].id)
+      );
       return remainingItemIndex >= targetIndex;
     });
     
@@ -54,7 +56,7 @@ export const calculateMultiDragOrder = (
     }
   } else {
     // Dropping onto a non-selected item - use original logic
-    const overInRemainingIndex = remainingItems.findIndex((img) => img.shotImageEntryId === overId);
+    const overInRemainingIndex = remainingItems.findIndex((img) => (img.shotImageEntryId ?? img.id) === overId);
 
     if (activeIndex > overIndex) {
       // Dragging up
@@ -85,12 +87,12 @@ export const calculateMobileMoveOrder = (
   targetIndex: number
 ): GenerationRow[] => {
   // Get selected items and remaining items
-  const selectedItems = currentImages.filter(img => mobileSelectedIds.includes(img.shotImageEntryId));
-  const remainingItems = currentImages.filter(img => !mobileSelectedIds.includes(img.shotImageEntryId));
+  const selectedItems = currentImages.filter(img => mobileSelectedIds.includes(img.shotImageEntryId ?? img.id));
+  const remainingItems = currentImages.filter(img => !mobileSelectedIds.includes(img.shotImageEntryId ?? img.id));
   
   // Calculate adjusted target index based on selected items before target
   const selectedIndicesBefore = mobileSelectedIds
-    .map(id => currentImages.findIndex(img => img.shotImageEntryId === id))
+    .map(id => currentImages.findIndex(img => (img.shotImageEntryId ?? img.id) === id))
     .filter(idx => idx < targetIndex).length;
   const adjustedTargetIndex = Math.max(0, targetIndex - selectedIndicesBefore);
   

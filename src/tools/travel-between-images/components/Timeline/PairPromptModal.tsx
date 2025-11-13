@@ -67,6 +67,20 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
   // Update state when modal opens with new data
   React.useEffect(() => {
     if (isOpen && pairData) {
+      console.log('[PairPromptFlow] 🎭 MODAL OPENED:', {
+        pairIndex: pairData.index,
+        startFrame: pairData.startFrame,
+        endFrame: pairData.endFrame,
+        startImageId: pairData.startImage?.id?.substring(0, 8),
+        endImageId: pairData.endImage?.id?.substring(0, 8),
+        receivedPairPrompt: pairPrompt?.substring(0, 50) || '(none)',
+        receivedPairNegativePrompt: pairNegativePrompt?.substring(0, 50) || '(none)',
+        hasCustomPrompt: !!pairPrompt?.trim(),
+        hasCustomNegativePrompt: !!pairNegativePrompt?.trim(),
+        defaultPrompt: defaultPrompt?.substring(0, 30) || '(none)',
+        defaultNegativePrompt: defaultNegativePrompt?.substring(0, 30) || '(none)',
+      });
+      
       // Only set form values if there are actual custom prompts
       // Leave empty if using defaults to show faded placeholders
       setPrompt(pairPrompt?.trim() ? pairPrompt : '');
@@ -77,10 +91,22 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
         promptTextareaRef.current?.focus();
       }, 100);
     }
-  }, [isOpen, pairData, pairPrompt, pairNegativePrompt]);
+  }, [isOpen, pairData, pairPrompt, pairNegativePrompt, defaultPrompt, defaultNegativePrompt]);
 
   const handleSave = () => {
     if (pairData) {
+      console.log('[PairPromptFlow] 💾 USER CLICKED SAVE:', {
+        pairIndex: pairData.index,
+        startImageId: pairData.startImage?.id?.substring(0, 8),
+        endImageId: pairData.endImage?.id?.substring(0, 8),
+        startFrame: pairData.startFrame,
+        endFrame: pairData.endFrame,
+        promptLength: prompt.trim().length,
+        negativePromptLength: negativePrompt.trim().length,
+        hasPrompt: !!prompt.trim(),
+        hasNegativePrompt: !!negativePrompt.trim(),
+      });
+      
       // Pass empty strings if fields are empty (will use defaults)
       // Pass actual values if user entered custom prompts
       onSave(pairData.index, prompt.trim(), negativePrompt.trim());
@@ -91,6 +117,12 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
   const handleReset = () => {
     // Reset to defaults by clearing form fields and saving empty strings
     if (pairData) {
+      console.log('[PairPromptFlow] 🔄 USER CLICKED RESET:', {
+        pairIndex: pairData.index,
+        startImageId: pairData.startImage?.id?.substring(0, 8),
+        clearingPrompts: true,
+      });
+      
       setPrompt('');
       setNegativePrompt('');
       onSave(pairData.index, '', ''); // Save empty strings (will use defaults)
@@ -100,6 +132,12 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
 
   const handleNavigatePrevious = () => {
     if (pairData && onNavigatePrevious) {
+      console.log('[PairPromptFlow] ⬅️ USER NAVIGATING TO PREVIOUS PAIR:', {
+        currentPairIndex: pairData.index,
+        savingBeforeNav: true,
+        promptLength: prompt.trim().length,
+      });
+      
       // Save current changes before navigating
       onSave(pairData.index, prompt.trim(), negativePrompt.trim());
       onNavigatePrevious();
@@ -108,6 +146,12 @@ const PairPromptModal: React.FC<PairPromptModalProps> = ({
 
   const handleNavigateNext = () => {
     if (pairData && onNavigateNext) {
+      console.log('[PairPromptFlow] ➡️ USER NAVIGATING TO NEXT PAIR:', {
+        currentPairIndex: pairData.index,
+        savingBeforeNav: true,
+        promptLength: prompt.trim().length,
+      });
+      
       // Save current changes before navigating
       onSave(pairData.index, prompt.trim(), negativePrompt.trim());
       onNavigateNext();

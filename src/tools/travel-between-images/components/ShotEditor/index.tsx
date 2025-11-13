@@ -317,10 +317,38 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
-  const orderedShotImages = React.useMemo(() => 
-    fullShotImages.length > 0 ? fullShotImages : contextImages,
-    [fullShotImages, contextImages]
-  );
+  const orderedShotImages = React.useMemo(() => {
+    const result = fullShotImages.length > 0 ? fullShotImages : contextImages;
+    
+    // Check for duplicates by ID
+    const idCounts = new Map<string, number>();
+    result.forEach(img => {
+      const count = idCounts.get(img.id) || 0;
+      idCounts.set(img.id, count + 1);
+    });
+    const duplicates = Array.from(idCounts.entries()).filter(([id, count]) => count > 1);
+    
+    console.log('[UnifiedDataFlow] ShotEditor data preparation:', {
+      selectedShotId: selectedShotId?.substring(0, 8),
+      fullShotImagesCount: fullShotImages.length,
+      contextImagesCount: contextImages.length,
+      resultCount: result.length,
+      usingTwoPhase: fullShotImages.length > 0,
+      willPassToChildren: true,
+      hasDuplicateIds: duplicates.length > 0,
+      duplicateIds: duplicates.length > 0 ? duplicates.map(([id, count]) => ({ id: id.substring(0, 8), count })) : [],
+    });
+    
+    console.log('[DataTrace] 📤 ShotEditor → passing to children:', {
+      shotId: selectedShotId?.substring(0, 8),
+      total: result.length,
+      positioned: result.filter(r => r.timeline_frame != null && r.timeline_frame >= 0).length,
+      unpositioned: result.filter(r => r.timeline_frame == null).length,
+      duplicates: duplicates.length,
+    });
+    
+    return result;
+  }, [fullShotImages, contextImages, selectedShotId]);
 
   
   // [VideoLoadSpeedIssue] Track image data loading progress
@@ -523,30 +551,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Use the new modular state management
   const { state, actions } = useShotEditorState();
 
-  // Timeline warmup: Use optimistic local state for initial render to prevent order jumping
-  const timelineReadyImages = React.useMemo(() => {
-    if (state.localOrderedShotImages.length > 0) {
-      const optimizedImages = state.localOrderedShotImages
-        .filter(img => img.timeline_frame !== undefined && img.timeline_frame !== null);
-      if (optimizedImages.length === state.localOrderedShotImages.length) {
-        console.log('[TimelineWarmup] Using cached localOrderedShotImages for initial render', {
-          shotId: selectedShotId,
-          count: optimizedImages.length
-        });
-        return optimizedImages;
-      }
-      const fallback = orderedShotImages.map(serverImg => {
-        const localMatch = state.localOrderedShotImages.find(img => img.id === serverImg.id);
-        return localMatch ? { ...localMatch, timeline_frame: serverImg.timeline_frame } : serverImg;
-      });
-      console.log('[TimelineWarmup] Merging local and server images for initial render', {
-        shotId: selectedShotId,
-        count: fallback.length
-      });
-      return fallback;
-    }
-    return orderedShotImages;
-  }, [state.localOrderedShotImages, orderedShotImages, selectedShotId]);
+  // REMOVED: localOrderedShotImages layer - no longer needed with fast two-phase loading
+  // Two-phase loading (~300ms) is fast enough that we don't need local caching
+  // ShotImageManager's optimisticOrder handles drag operations
+  const timelineReadyImages = orderedShotImages;
 
   // Sticky header visibility similar to ImageGenerationToolPage
   const headerContainerRef = useRef<HTMLDivElement>(null);
@@ -840,15 +848,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     skipNextSyncRef,
   });
 
-  // Keep local optimistic list in sync with server-provided images
-  // unless we're explicitly skipping due to an optimistic mutation
-  useEffect(() => {
-    if (skipNextSyncRef.current) {
-      skipNextSyncRef.current = false;
-      return;
-    }
-    actions.setLocalOrderedShotImages(orderedShotImages);
-  }, [orderedShotImages, actions]);
+  // REMOVED: Local optimistic list sync - no longer needed with two-phase loading
 
   // Function to update GenerationsPane settings for current shot
   const updateGenerationsPaneSettings = (settings: Partial<GenerationsPaneSettings>) => {
@@ -1133,11 +1133,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [handleNameSave, handleNameCancel]);
 
-  // Use state from the hook for optimistic updates on image list
-  const localOrderedShotImages = state.localOrderedShotImages;
+  // REMOVED: localOrderedShotImages - redundant with two-phase loading + ShotImageManager's optimisticOrder
   
   // [VideoLoadSpeedIssue] OPTIMIZED: Only log significant data flow changes
-  const dataFlowKey = `${selectedShotId}-${orderedShotImages.length}-${localOrderedShotImages.length}`;
+  const dataFlowKey = `${selectedShotId}-${orderedShotImages.length}`;
   const lastDataFlowKeyRef = React.useRef('');
   const lastProcessingKeyRef = React.useRef('');
   const lastFilteringKeyRef = React.useRef('');
@@ -1147,12 +1146,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       console.log('[VideoLoadSpeedIssue] ShotEditor data flow change:', {
         selectedShotId,
         orderedShotImagesCount: orderedShotImages.length,
-        localOrderedShotImagesCount: localOrderedShotImages.length,
         timestamp: Date.now()
       });
       lastDataFlowKeyRef.current = dataFlowKey;
     }
-  }, [dataFlowKey, selectedShotId, orderedShotImages.length, localOrderedShotImages.length]);
+  }, [dataFlowKey, selectedShotId, orderedShotImages.length]);
   
   // Remove debug logs for production
 
@@ -1356,6 +1354,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       currentShotId: selectedShot?.id?.substring(0, 8)
     });
     
+    // ⚠️ SAFETY CHECK: Ensure Phase 2 data is loaded before mutations
+    // Phase 2 provides shotImageEntryId needed for mutations
+    const hasMissingIds = simpleFilteredImages.some(img => !img.shotImageEntryId);
+    if (hasMissingIds && replaceImages) {
+      console.warn('[ApplySettings] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Waiting for metadata...');
+      toast.error('Loading shot data... please try again in a moment.');
+      return;
+    }
+    
     let pairPromptSnapshot: Array<{
       id: string;
       timeline_frame: number | null;
@@ -1452,6 +1459,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // Invalidate (not remove) cache to mark data as stale
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShot.id] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShot.id] });
+        // IMPORTANT: Also invalidate two-phase cache keys
+        queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', selectedShot.id] });
+        queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', selectedShot.id] });
         // Small delay to ensure DB writes complete
         await new Promise(resolve => setTimeout(resolve, 50));
         await loadPositions({ silent: true });
@@ -1676,6 +1686,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Invalidate cache and wait for DB writes to complete
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShot.id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShot.id] });
+      // IMPORTANT: Also invalidate two-phase cache keys
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', selectedShot.id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', selectedShot.id] });
       await new Promise(resolve => setTimeout(resolve, 200));
       await loadPositions({ silent: true });
       console.error('[ApplySettings] ✅ Final reload complete - pair prompts should now be visible');
@@ -2470,6 +2483,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             shotName={selectedShot.name}
             batchVideoFrames={batchVideoFrames}
             batchVideoContext={batchVideoContext}
+            preloadedImages={orderedShotImages}
             onImageReorder={handleReorderImagesInShot}
             onImageSaved={async (imageId: string, newImageUrl: string, createNew?: boolean) => {
               console.log('[ImageFlipDebug] [ShotEditor] onImageSaved called', {
@@ -2507,6 +2521,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 // Invalidate queries to refresh the UI
                 await queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShotId] });
                 await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShotId] });
+                await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShotId] });
+                // IMPORTANT: Also invalidate two-phase cache keys
+                await queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', selectedShotId] });
+                await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', selectedShotId] });
                 
                 console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {
                   timestamp: Date.now()

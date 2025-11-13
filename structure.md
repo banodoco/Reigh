@@ -219,6 +219,10 @@ tool-name/
 For the complete catalog, see [`shared_hooks_contexts.md`](docs/structure_detail/shared_hooks_contexts.md).
 
 #### 🖼️ Image Gallery Features
+- **Unified Component**: Single `ImageGallery` component (previously split between standard and optimized variants)
+  - Location: `src/shared/components/ImageGallery/index.tsx`
+  - Consolidated filtering, state management, and display logic
+  - Used across all tools: Image Generation, Edit Travel, Character Animate, Join Clips, Video Travel
 - **Project-Aware Dimensions**: Gallery items automatically use project aspect ratio (16:9, 4:3, 9:16, etc.) instead of square layout for consistent visual presentation
 - **Dual Add-to-Shot Options**: Images can be added to shots in two ways:
   - **With position** (main button): Adds image at the final position in the shot timeline
@@ -282,8 +286,12 @@ Shot generation data flows from the database through React Query hooks to UI com
 
 **`useAllShotGenerations(shotId, options?)`** (`src/shared/hooks/useShotGenerations.ts`)
 - **Primary data source** for shot images
+- **Two-phase loading architecture** for optimal performance:
+  - **Phase 1 (Fast)**: Queries `generations` table with `shot_data` JSONB filter (no joins) - provides instant display
+  - **Phase 2 (Lazy)**: Queries `shot_generations` table for metadata and mutation IDs - enables edit operations
+  - Images display immediately from Phase 1; Phase 2 loads in background
 - Loads ALL shot_generations (positioned + unpositioned) with full metadata
-- Returns `GenerationRow[]`
+- Returns `GenerationRow[]` with progressive enhancement (Phase 1 data → Phase 1+2 merged)
 - Use cases: galleries, lightboxes, shot image management
 - Options:
   - `disableRefetch: boolean` - Prevents refetching during drag/persist operations
@@ -296,6 +304,15 @@ Shot generation data flows from the database through React Query hooks to UI com
 - Automatically filters out:
   - Unpositioned images (`timeline_frame == null`)
   - Images without metadata (`metadata == null`)
+
+**`useTimelinePositionUtils(options)`** (`src/shared/hooks/useTimelinePositionUtils.ts`)
+- **Utility hook for timeline position management** without full `useEnhancedShotPositions` overhead
+- Designed for components that already have generation data and only need position utilities
+- Provides: `shotGenerations`, `updateTimelineFrame`, `batchExchangePositions`, `initializeTimelineFrames`, `loadPositions`, `pairPrompts`, `isLoading`
+- Use cases: Timeline components with pre-loaded data (from two-phase loading), avoiding duplicate data fetching
+- Options:
+  - `shotId: string | null` - Shot ID to manage positions for
+  - `generations: GenerationRow[]` - Pre-loaded generation data to use (avoids duplicate queries)
 
 ### Type Guards
 
@@ -314,17 +331,27 @@ Shot generation data flows from the database through React Query hooks to UI com
 ### Data Flow Diagram
 
 ```
-Database (shot_generations table)
-  ↓
-useAllShotGenerations (loads all with metadata)
+Database
+  ├─→ Phase 1: generations table (shot_data JSONB filter)
+  │   ↓
+  │   Fast query (no joins) → Instant image display
+  │
+  └─→ Phase 2: shot_generations table (metadata join)
+      ↓
+      Lazy query → Mutation IDs + Metadata
+      
+useAllShotGenerations (two-phase loading + merge)
   ↓
   ├─→ Galleries / Lightboxes (GenerationRow[])
   ├─→ Shot Image Manager (GenerationRow[])
+  ├─→ ImageGallery (unified component)
   └─→ useTimelineShotGenerations (filters + types)
        ↓
        Timeline Components (TimelineGenerationRow[])
          ↓
-         Pair Prompts Display
+         useTimelinePositionUtils (position management)
+           ↓
+           Pair Prompts Display
 ```
 
 ### Best Practices
@@ -364,8 +391,10 @@ await supabase
   })
   .eq('id', shotGenerationId);
 
-// Invalidate cache to trigger refetch
+// Invalidate cache to trigger refetch (both phases)
 queryClient.invalidateQueries(['unified-generations', 'shot', shotId]);
+queryClient.invalidateQueries(['shot-generations-fast', shotId]);
+queryClient.invalidateQueries(['shot-generations-meta', shotId]);
 ```
 
 ---
@@ -406,6 +435,30 @@ See [README.md](README.md) for:
 ---
 
 ## 🔄 Recent Updates
+
+### Two-Phase Data Loading & ImageGallery Unification (November 2025)
+
+**Added**: Major performance optimization with two-phase loading architecture for shot generation data.
+
+**Changes Made:**
+- **Two-Phase Loading Architecture**: Refactored `useAllShotGenerations` hook to load data in two phases:
+  - **Phase 1 (Fast)**: Queries `generations` table with `shot_data` JSONB filter (no joins) for instant image display
+  - **Phase 2 (Lazy)**: Background queries `shot_generations` table for metadata and mutation IDs
+  - Images display immediately from Phase 1 while Phase 2 enhances them with edit capabilities
+  - Query keys: `['shot-generations-fast', shotId]` and `['shot-generations-meta', shotId]`
+- **ImageGallery Unification**: Consolidated gallery components into single unified implementation
+  - Removed: `ImageGalleryOptimized.tsx`, `useImageGalleryFilters.ts`, `useImageGalleryState.ts`
+  - Added: `types.ts` for shared ImageGallery types
+  - All tools now use single `ImageGallery` component with consistent behavior
+- **New Position Management Hook**: Added `useTimelinePositionUtils` for timeline position management without duplicate data fetching
+  - Designed for components with pre-loaded generation data
+  - Avoids redundant queries when data already available from two-phase loading
+- **Query Optimization**: `useListShots` now uses `shot_data` JSONB filter instead of joins for preview images
+- **Cache Invalidation**: All shot mutation hooks now invalidate both phase query keys for consistency
+- **Edge Function Enhancement**: `complete_task` now allows orchestrator tasks to reference child task thumbnails
+- **Debug Logging**: Added `[TwoPhaseLoad]` and `[UnifiedDataFlow]` log tags for performance monitoring
+
+**Performance Impact**: Shot image loading is now perceivably instant (Phase 1) with background metadata enhancement, eliminating the previous multi-second load delays for large shots.
 
 ### iPad Timeline Interaction & Tablet Mode Support (October 21, 2025)
 

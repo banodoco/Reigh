@@ -177,8 +177,7 @@ export interface ShotEditorState {
   duplicateSuccessImageId: string | null;
   pendingFramePositions: Map<string, number>;
   
-  // Optimistic updates
-  localOrderedShotImages: GenerationRow[];
+  // REMOVED: localOrderedShotImages - redundant with two-phase loading + ShotImageManager's optimisticOrder
   
   // UI state
   creatingTaskId: string | null;

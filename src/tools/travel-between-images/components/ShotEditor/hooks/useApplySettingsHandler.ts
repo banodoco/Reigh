@@ -94,6 +94,16 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
     // Get latest values from ref (no stale closures!)
     const ctx = contextRef.current;
     
+    // ⚠️ SAFETY CHECK: Ensure Phase 2 data is loaded before mutations
+    // Phase 2 provides shotImageEntryId needed for mutations
+    const hasMissingIds = ctx.simpleFilteredImages.some(img => !img.shotImageEntryId);
+    if (hasMissingIds && replaceImages) {
+      console.warn('[ApplySettings] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Waiting for metadata...');
+      const { toast } = await import('sonner');
+      toast.error('Loading shot data... please try again in a moment.');
+      return;
+    }
+    
     console.log('[ApplySettings] Context check:', {
       hasCtx: !!ctx,
       hasProjectId: !!ctx.projectId,

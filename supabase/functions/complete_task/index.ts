@@ -186,10 +186,34 @@ serve(async (req)=>{
           }
           const thumbTaskId = thumbParts[2];
           if (thumbTaskId !== task_id) {
-            // Note: For now, require thumbnail to match orchestrator task ID
-            // Could be extended to allow child task thumbnails if needed
-            console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
-            return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
+            // Allow orchestrator tasks to reference child task thumbnails
+            // Need to fetch task type to check if it's an orchestrator
+            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+            const supabaseUrl = Deno.env.get("SUPABASE_URL");
+            if (!serviceKey || !supabaseUrl) {
+              console.error("Missing required environment variables");
+              return new Response("Server configuration error", { status: 500 });
+            }
+            const tempClient = createClient(supabaseUrl, serviceKey);
+            
+            const { data: taskForThumb, error: taskFetchError } = await tempClient
+              .from('tasks')
+              .select('task_type')
+              .eq('id', task_id)
+              .single();
+            
+            if (taskFetchError) {
+              console.error(`[COMPLETE-TASK-DEBUG] Error fetching task for thumbnail validation: ${taskFetchError.message}`);
+              return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
+            }
+            
+            const isOrchestrator = taskForThumb?.task_type?.includes('orchestrator');
+            if (isOrchestrator) {
+              console.log(`[COMPLETE-TASK-DEBUG] ✅ Orchestrator task ${task_id} referencing thumbnail from task ${thumbTaskId} - allowing`);
+            } else {
+              console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
+              return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
+            }
           }
         }
       } else {
@@ -887,6 +911,10 @@ serve(async (req)=>{
             console.log(`[Orchestrator] Creating generation for orchestrator output: ${publicUrl} (type: ${contentType})`);
             
             try {
+              // Extract shot information
+              const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
+              console.log(`[Orchestrator] Extracted shot_id: ${shotId}, add_in_position: ${addInPosition}`);
+              
               const newGenerationId = crypto.randomUUID();
               const generationRecord = {
                 id: newGenerationId,
@@ -906,6 +934,20 @@ serve(async (req)=>{
               
               const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
               console.log(`[Orchestrator] Created generation ${newGeneration.id} for orchestrator task ${taskIdString}`);
+              
+              // Link to shot if applicable
+              if (shotId) {
+                await linkGenerationToShot(supabaseAdmin, shotId, newGeneration.id, addInPosition);
+                console.log(`[Orchestrator] Linked generation ${newGeneration.id} to shot ${shotId} (add_in_position: ${addInPosition})`);
+              }
+              
+              // Mark task as having created a generation
+              await supabaseAdmin
+                .from('tasks')
+                .update({ generation_created: true })
+                .eq('id', taskIdString);
+              
+              console.log(`[Orchestrator] Marked task ${taskIdString} as generation_created=true`);
             } catch (genError) {
               console.error(`[Orchestrator] Error creating generation for orchestrator task ${taskIdString}:`, genError);
               // Don't fail the task - the output is still in output_location

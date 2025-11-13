@@ -12,6 +12,13 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
   const [reconciliationId, setReconciliationId] = useState(0);
   const reconciliationTimeoutRef = useRef<NodeJS.Timeout>();
   
+  console.log('[DataTrace] 🎭 ShotImageManager OptimisticOrder state:', {
+    propsImagesCount: images.length,
+    optimisticOrderCount: optimisticOrder.length,
+    isOptimisticUpdate,
+    displayingWhich: isOptimisticUpdate ? 'optimistic' : 'props',
+  });
+  
   // Enhanced reconciliation with debouncing, tracking IDs, and timeout-based recovery
   useEffect(() => {
     console.log('[DragDebug:ShotImageManager] Parent images prop changed', {
@@ -41,8 +48,8 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
         }
         
         // Check if parent props now match our optimistic order
-        const currentOrder = optimisticOrder.map(img => img.shotImageEntryId).join(',');
-        const parentOrder = images.map(img => img.shotImageEntryId).join(',');
+        const currentOrder = optimisticOrder.map(img => img.shotImageEntryId ?? img.id).join(',');
+        const parentOrder = images.map(img => img.shotImageEntryId ?? img.id).join(',');
         
         if (currentOrder === parentOrder) {
           console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');

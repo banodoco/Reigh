@@ -47,7 +47,14 @@ export const useEnhancedShotImageReorder = (
 
   // Handle drag and drop reordering in batch mode - Timeline-frame-based swapping
   const handleReorder = useCallback(async (orderedShotImageEntryIds: string[]) => {
+    console.log('[DataTrace] 🔄 handleReorder CALLED:', {
+      shotId: shotId?.substring(0, 8),
+      idsCount: orderedShotImageEntryIds.length,
+      ids: orderedShotImageEntryIds.map(id => id?.substring(0, 8)),
+    });
+    
     if (!shotId || orderedShotImageEntryIds.length === 0) {
+      console.warn('[DataTrace] handleReorder aborted - no shotId or empty array');
       return;
     }
 
@@ -67,6 +74,81 @@ export const useEnhancedShotImageReorder = (
       // Get current images and their timeline_frame values
       const currentImages = getImagesForMode('batch');
       const currentOrder = currentImages.map(img => img.shotImageEntryId || img.id);
+      
+      console.log('[DataTrace] 🔍 Analyzing reorder:', {
+        currentOrder: currentOrder.map(id => id?.substring(0, 8)),
+        desiredOrder: orderedShotImageEntryIds.map(id => id?.substring(0, 8)),
+      });
+      
+      // Detect item move (single or multi) for midpoint logic
+      const detectItemMove = (() => {
+        if (orderedShotImageEntryIds.length !== currentOrder.length) return false;
+        
+        // Find all items that changed position
+        const movedItemIds: string[] = [];
+        const movedIndices: Array<{ oldIndex: number; newIndex: number }> = [];
+        
+        for (let i = 0; i < orderedShotImageEntryIds.length; i++) {
+          if (orderedShotImageEntryIds[i] !== currentOrder[i]) {
+            const oldIndex = currentOrder.indexOf(orderedShotImageEntryIds[i]);
+            if (oldIndex !== -1) {
+              movedItemIds.push(orderedShotImageEntryIds[i]);
+              movedIndices.push({ oldIndex, newIndex: i });
+            }
+          }
+        }
+        
+        if (movedItemIds.length === 0) return false;
+        
+        // Check if moved items form a contiguous block in the new order
+        const newIndices = movedIndices.map(m => m.newIndex).sort((a, b) => a - b);
+        const isContiguous = newIndices.every((idx, i) => 
+          i === 0 || idx === newIndices[i - 1] + 1
+        );
+        
+        if (!isContiguous) return false; // Not a simple block move
+        
+        return {
+          movedItemIds,
+          newStartIndex: Math.min(...newIndices),
+          oldStartIndex: Math.min(...movedIndices.map(m => m.oldIndex)),
+        };
+      })();
+      
+      console.log('[DataTrace] 🔍 Item move detection:', {
+        hasMove: !!detectItemMove,
+        moveInfo: detectItemMove ? {
+          numItems: detectItemMove.movedItemIds.length,
+          ids: detectItemMove.movedItemIds.map(id => id.substring(0, 8)),
+          from: detectItemMove.oldStartIndex,
+          to: detectItemMove.newStartIndex,
+        } : null,
+      });
+      
+      // NEW: Use midpoint logic for contiguous block moves (single or multi)
+      if (detectItemMove && parentHook?.['moveItemsToMidpoint']) {
+        console.log('[DataTrace] ✅ Using MIDPOINT DISTRIBUTION logic for block move');
+        
+        // Build the new order array for neighbor calculation
+        const newOrderItems = orderedShotImageEntryIds.map(id => {
+          const img = currentImages.find(i => (i.shotImageEntryId || i.id) === id);
+          return {
+            id,
+            timeline_frame: img?.timeline_frame ?? null
+          };
+        });
+        
+        await (parentHook as any).moveItemsToMidpoint(
+          detectItemMove.movedItemIds,
+          detectItemMove.newStartIndex,
+          newOrderItems
+        );
+        
+        console.log('[DataTrace] ✅ Midpoint distribution complete');
+        return;
+      }
+      
+      console.log('[DataTrace] ⚠️ Using SWAP logic (no contiguous block or no midpoint function)');
       
       // Safety check: If orderedIds has more items than currentImages, data is out of sync
       // This can happen when an image was just added but positions haven't reloaded yet
@@ -274,7 +356,7 @@ export const useEnhancedShotImageReorder = (
       toast.error('Failed to reorder items');
       throw error;
     }
-  }, [shotId, getImagesForMode, exchangePositions]);
+  }, [shotId, getImagesForMode, shotGenerations, exchangePositionsNoReload, loadPositions]);
 
   // Handle item deletion
   const handleDelete = useCallback(async (shotImageEntryId: string) => {

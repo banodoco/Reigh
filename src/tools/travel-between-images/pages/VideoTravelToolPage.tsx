@@ -32,7 +32,7 @@ import { useShotSettings } from '../hooks/useShotSettings';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useGenerations } from '@/shared/hooks/useGenerations';
-import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';

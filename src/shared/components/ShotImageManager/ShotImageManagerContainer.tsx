@@ -23,6 +23,11 @@ import { ShotImageManagerMobileWrapper } from './ShotImageManagerMobileWrapper.t
 export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props) => {
   const isMobile = useIsMobile();
   
+  console.log('[DataTrace] 🎯 ShotImageManager received props.images:', {
+    count: props.images?.length || 0,
+    imageIds: props.images?.map(img => ((img as any).shotImageEntryId ?? (img as any).id)?.substring(0, 8)) || [],
+  });
+  
   // ============================================================================
   // HOOK INITIALIZATION (MUST BE BEFORE ANY EARLY RETURNS)
   // ============================================================================
@@ -113,6 +118,14 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
   // ============================================================================
   
   console.log(`[DEBUG] Checking images condition - images.length=${props.images?.length} selectedIds.length=${selection.selectedIds.length}`);
+  
+  console.log('[DataTrace] 🎨 ShotImageManager about to render:', {
+    propsImages: props.images?.length || 0,
+    optimisticOrder: optimistic.optimisticOrder.length,
+    lightboxCurrentImages: lightbox.currentImages.length,
+    isOptimisticUpdate: optimistic.isOptimisticUpdate,
+    displayingWhich: optimistic.isOptimisticUpdate ? 'optimistic' : 'props',
+  });
   
   if (!props.images || props.images.length === 0) {
     console.log(`[DEBUG] EARLY RETURN - No images`);

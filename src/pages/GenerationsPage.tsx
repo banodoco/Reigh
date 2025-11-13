@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useGenerationsPageLogic } from '@/shared/hooks/useGenerationsPageLogic';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useProject } from '@/shared/contexts/ProjectContext';

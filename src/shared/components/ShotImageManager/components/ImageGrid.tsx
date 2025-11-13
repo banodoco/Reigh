@@ -60,6 +60,11 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
 }) => {
+  console.log('[DataTrace] 🖼️  ImageGrid rendering:', {
+    imagesCount: images.length,
+    imageIds: images.map(img => ((img as any).shotImageEntryId ?? (img as any).id)?.substring(0, 8)),
+  });
+  
   console.log('[PairIndicatorDebug] ImageGrid render:', {
     imagesCount: images.length,
     hasOnPairClick: !!onPairClick,
@@ -87,6 +92,12 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         const frameNumber = index * batchVideoFrames;
         const isLastImage = index === images.length - 1;
         
+        console.log('[DataTrace] 🎨 Rendering image item:', {
+          index,
+          imageKey: imageKey?.substring(0, 8),
+          imageId: image.id?.substring(0, 8),
+        });
+        
         // Get pair data for the indicator after this image
         const pairPrompt = pairPrompts?.[index];
         const enhancedPrompt = enhancedPrompts?.[index];
@@ -94,7 +105,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         const endImage = images[index + 1];
         
         return (
-          <div key={image.shotImageEntryId} data-sortable-item className="relative">
+          <div key={imageKey} data-sortable-item className="relative">
             <SortableImageItem
               image={image}
               isSelected={desktopSelected}
@@ -102,7 +113,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
               onClick={isMobile ? undefined : (e) => {
                 onItemClick(imageKey, e);
               }}
-              onDelete={() => onDelete(image.shotImageEntryId)}
+              onDelete={() => onDelete(image.shotImageEntryId ?? image.id)}
               onDuplicate={onDuplicate}
               timeline_frame={frameNumber}
               onDoubleClick={isMobile ? () => {} : () => onItemDoubleClick(index)}

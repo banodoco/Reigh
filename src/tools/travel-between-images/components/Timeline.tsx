@@ -62,6 +62,7 @@ import { usePositionManagement } from "./Timeline/hooks/usePositionManagement";
 import { useCoordinateSystem } from "./Timeline/hooks/useCoordinateSystem";
 import { useLightbox } from "./Timeline/hooks/useLightbox";
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
+import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
 import { timelineDebugger } from "./Timeline/utils/timeline-debug";
 import { calculateMaxGap, validateGaps } from "./Timeline/utils/timeline-utils";
 import { useExternalGenerations } from "@/shared/components/ShotImageManager/hooks/useExternalGenerations";
@@ -90,7 +91,8 @@ export interface TimelineProps {
   // Shared data props to prevent hook re-instantiation
   shotGenerations?: import("@/shared/hooks/useEnhancedShotPositions").ShotGeneration[];
   updateTimelineFrame?: (generationId: string, frame: number) => Promise<void>;
-  images?: GenerationRow[];
+  images?: GenerationRow[]; // Filtered images for display
+  allGenerations?: GenerationRow[]; // ALL generations for lookups (unfiltered)
   // Callback to reload parent data after timeline changes
   onTimelineChange?: () => Promise<void>;
   // Shared hook data to prevent creating duplicate hook instances
@@ -177,6 +179,7 @@ const Timeline: React.FC<TimelineProps> = ({
   shotGenerations: propShotGenerations,
   updateTimelineFrame: propUpdateTimelineFrame,
   images: propImages,
+  allGenerations: propAllGenerations,
   onTimelineChange,
   hookData: propHookData,
   onPairClick,
@@ -226,11 +229,44 @@ const Timeline: React.FC<TimelineProps> = ({
   // Remove excessive render tracking - not needed in production
   
   // Use shared hook data if provided, otherwise create new instance (for backward compatibility)
-  const hookData = propHookData || useEnhancedShotPositions(shotId, isDragInProgress);
+  // NEW: When propAllGenerations is provided, use utility hook for position management with ALL data
+  const legacyHookData = useEnhancedShotPositions(!propAllGenerations ? shotId : null, isDragInProgress);
+  const utilsHookData = useTimelinePositionUtils({
+    shotId: propAllGenerations ? shotId : null,
+    generations: propAllGenerations || [] // Use ALL generations for lookups, not filtered images
+  });
+  
+  // Choose data source: prefer propHookData, then utility hook if allGenerations provided, else legacy hook
+  const hookData = propHookData || (propAllGenerations ? {
+    shotGenerations: utilsHookData.shotGenerations,
+    updateTimelineFrame: utilsHookData.updateTimelineFrame,
+    batchExchangePositions: utilsHookData.batchExchangePositions,
+    initializeTimelineFrames: utilsHookData.initializeTimelineFrames,
+    loadPositions: utilsHookData.loadPositions,
+    pairPrompts: utilsHookData.pairPrompts,
+    isLoading: utilsHookData.isLoading,
+  } as any : legacyHookData);
+  
   const shotGenerations = propShotGenerations || hookData.shotGenerations;
   const updateTimelineFrame = propUpdateTimelineFrame || hookData.updateTimelineFrame;
   const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
+  
+  // Log data source for debugging
+  console.log('[UnifiedDataFlow] Timeline data source:', {
+    shotId: shotId.substring(0, 8),
+    hasPropHookData: !!propHookData,
+    hasPropImages: !!propImages,
+    dataSource: propHookData ? 'shared hookData' : propImages ? 'utility hook (two-phase)' : 'legacy hook',
+    imageCount: shotGenerations.length,
+  });
+  
+  console.log('[DataTrace] 📥 Timeline received data:', {
+    shotId: shotId.substring(0, 8),
+    shotGenerationsCount: shotGenerations.length,
+    propImagesCount: propImages?.length || 0,
+    usingPropImages: !!propImages,
+  });
   
   // Get pair prompts from database instead of props (now reactive)
   const databasePairPrompts = hookData.pairPrompts;
@@ -275,6 +311,13 @@ const Timeline: React.FC<TimelineProps> = ({
       })) : 'using propImages'
     });
 
+    console.log('[DataTrace] 🎨 Timeline final images for display:', {
+      shotId: shotId.substring(0, 8),
+      total: result.length,
+      source: propImages ? 'propImages' : 'shotGenerations',
+      positioned: result.filter(img => img.timeline_frame != null && img.timeline_frame >= 0).length,
+    });
+    
     return result;
   }, [shotGenerations, propImages, shotId]);
 

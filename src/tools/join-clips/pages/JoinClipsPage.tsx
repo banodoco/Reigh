@@ -15,7 +15,7 @@ import { JoinClipsSettings } from '../settings';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { useGenerations, type GenerationsPaginatedResponse } from '@/shared/hooks/useGenerations';
-import { ImageGalleryOptimized as ImageGallery } from '@/shared/components/ImageGallery';
+import { ImageGallery } from '@/shared/components/ImageGallery';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';

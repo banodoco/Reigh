@@ -78,6 +78,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   
   // Track if we just clicked a button to prevent drag from starting
   const buttonClickedRef = useRef(false);
+  
+  // Use imageKey for Phase 1 compatibility (shotImageEntryId may be null)
+  const imageKey = image.shotImageEntryId ?? image.id;
 
   // ===== MOBILE TAP HANDLING =====
   // Use generalized double-tap hook for iPad/mobile interaction
@@ -85,7 +88,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   const { handleTouchStart, handleTouchEnd } = useDoubleTapWithSelection({
     onSingleTap: () => {
       console.log('[DoubleTapFlow] 🎬 SINGLE TAP CALLBACK - TimelineItem:', {
-        itemId: image.shotImageEntryId.substring(0, 8),
+        itemId: imageKey?.substring(0, 8),
         hasTapToMove: !!onTapToMove,
         hasMobileTap: !!onMobileTap,
         readOnly
@@ -105,7 +108,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     },
     onDoubleTap: () => {
       console.log('[DoubleTapFlow] 🎬 DOUBLE TAP CALLBACK - TimelineItem:', {
-        itemId: image.shotImageEntryId.substring(0, 8),
+        itemId: imageKey?.substring(0, 8),
         hasMobileTap: !!onMobileTap,
         readOnly
       });
@@ -118,7 +121,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         console.log('[DoubleTapFlow] ⚠️ No onMobileTap handler for double-tap!');
       }
     },
-    itemId: image.shotImageEntryId,
+    itemId: imageKey,
     disabled: readOnly,
   });
 
@@ -209,7 +212,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
   // [Position0Debug] Only log position 0 items to reduce noise
   if (framePosition === 0) {
-    console.log(`[Position0Debug] 📍 POSITION 0 Item ${image.shotImageEntryId.substring(0, 8)} position calculation:`, {
+    console.log(`[Position0Debug] 📍 POSITION 0 Item ${imageKey?.substring(0, 8)} position calculation:`, {
       framePosition,
       fullMinFrames,
       fullRange,
@@ -238,7 +241,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
   return (
     <div
-      data-item-id={image.shotImageEntryId}
+      data-item-id={imageKey}
       style={{
         position: 'absolute',
         left: `${leftPercent}%`,
@@ -257,7 +260,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       onMouseDown={(e) => {
         // [NonDraggableDebug] Log that we reached the TimelineItem onMouseDown handler
         console.log('[NonDraggableDebug] 📍 TimelineItem onMouseDown FIRED:', {
-          itemId: image.shotImageEntryId.substring(0, 8),
+          itemId: imageKey?.substring(0, 8),
           framePosition,
           eventType: e.type,
           buttons: e.buttons,
@@ -270,7 +273,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         const isClickingButton = target.closest('button') || target.closest('[data-click-blocker]');
         
         console.log('[TimelineItem] 🖱️ MOUSEDOWN on timeline item:', {
-          imageId: image.shotImageEntryId.substring(0, 8),
+          imageId: imageKey?.substring(0, 8),
           framePosition,
           isHovered,
           isDragging,
@@ -282,7 +285,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         // Check both the DOM and the recent click flag
         if (isClickingButton || buttonClickedRef.current) {
           console.log('[TimelineItem] 🛑 BLOCKED by button/blocker:', {
-            itemId: image.shotImageEntryId.substring(0, 8),
+            itemId: imageKey?.substring(0, 8),
             reason: isClickingButton ? 'DOM check' : 'Recent click flag'
           });
           e.preventDefault();
@@ -291,10 +294,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         }
         
         console.log('[TimelineItem] ✅ CALLING onMouseDown handler:', {
-          itemId: image.shotImageEntryId.substring(0, 8),
+          itemId: imageKey?.substring(0, 8),
           hasHandler: typeof onMouseDown === 'function'
         });
-        onMouseDown(e, image.shotImageEntryId);
+        onMouseDown(e, imageKey);
       }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -459,12 +462,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     buttonClickedRef.current = false;
                   }, 100);
                 }}
-                disabled={duplicatingImageId === image.shotImageEntryId}
+                disabled={duplicatingImageId === imageKey}
                 title="Duplicate image"
               >
-                {duplicatingImageId === image.shotImageEntryId ? (
+                {duplicatingImageId === imageKey ? (
                   <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-                ) : duplicateSuccessImageId === image.shotImageEntryId ? (
+                ) : duplicateSuccessImageId === imageKey ? (
                   <Check className="h-3 w-3" />
                 ) : (
                   <Copy className="h-3 w-3" />

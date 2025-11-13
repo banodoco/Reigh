@@ -358,22 +358,16 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       }
       
       // Get images per shot based on maxImagesPerShot parameter
+      // NEW: Use shot_data JSONB filter (fast, no joins) for preview images
       const shotPromises = shots.map(async (shot) => {
+        const startTime = Date.now();
+        
+        // Query from generations table with shot_data filter (no join needed for previews)
         let query = supabase
-          .from('shot_generations')
-          .select(`
-            id,
-            timeline_frame,
-            generation:generations!inner(
-              id,
-              location,
-              type,
-              created_at
-            )
-          `)
-          .eq('shot_id', shot.id)
-          .not('generation.type', 'eq', 'video')
-          .order('timeline_frame', { ascending: true })
+          .from('generations')
+          .select('id, location, thumbnail_url, type, created_at, starred, shot_data')
+          .not(`shot_data->${shot.id}`, 'is', null) // GIN index filter
+          .not('type', 'ilike', '%video%') // Exclude videos
           .order('created_at', { ascending: false });
         
         // Only apply limit if specified (allows unlimited when needed)
@@ -381,42 +375,51 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
           query = query.limit(maxImagesPerShot);
         }
         
-        const { data: shotGenerations, error: sgError } = await query;
+        const { data: gens, error: genError } = await query;
         
-        if (sgError) {
-          console.error('[ShotImageDebug] Error loading shot generations:', sgError, { shotId: shot.id });
-          throw sgError;
+        if (genError) {
+          console.error('[ShotImageDebug] Error loading generations:', genError, { shotId: shot.id });
+          throw genError;
         }
         
-        console.log('[ShotImageDebug] Loaded shot generations:', {
+        const duration = Date.now() - startTime;
+        console.log('[ShotImageDebug] [UnifiedDataFlow] Loaded generations (no join):', {
           shotId: shot.id.substring(0, 8),
           shotName: shot.name,
-          generationsCount: shotGenerations?.length || 0,
-          sampleGenerations: shotGenerations?.slice(0, 3).map(sg => ({
-            id: sg.generation?.id?.substring(0, 8),
-            type: sg.generation?.type,
-            timeline_frame: sg.timeline_frame,
-            hasLocation: !!sg.generation?.location,
-            location: sg.generation?.location?.substring(0, 60) + '...'
+          generationsCount: gens?.length || 0,
+          duration: `${duration}ms`,
+          queryType: 'shot_data JSONB filter',
+          sampleGenerations: gens?.slice(0, 3).map(gen => ({
+            id: gen.id?.substring(0, 8),
+            type: gen.type,
+            timeline_frame: gen.shot_data?.[shot.id],
+            hasLocation: !!gen.location,
           }))
         });
         
-        const transformedImages = (shotGenerations || [])
-          .filter(sg => sg.generation) // Filter out any null generations
-          .map(sg => ({
-            ...sg.generation,
-            shotImageEntryId: sg.id,
-            imageUrl: (sg.generation as any).location,
-            thumbUrl: (sg.generation as any).location,
-            timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
-          }));
+        // Transform and sort by timeline_frame from shot_data
+        const transformedImages = (gens || [])
+          .map(gen => ({
+            ...gen,
+            shotImageEntryId: null, // Preview images don't need mutation IDs
+            imageUrl: gen.location,
+            thumbUrl: gen.thumbnail_url || gen.location,
+            timeline_frame: gen.shot_data?.[shot.id] ?? null,
+          }))
+          .sort((a, b) => {
+            // Sort by timeline_frame (nulls last)
+            if (a.timeline_frame == null && b.timeline_frame == null) return 0;
+            if (a.timeline_frame == null) return 1;
+            if (b.timeline_frame == null) return -1;
+            return a.timeline_frame - b.timeline_frame;
+          });
         
-        console.log('[ShotImageDebug] Transformed images for shot:', {
+        console.log('[ShotImageDebug] [UnifiedDataFlow] Transformed preview images:', {
           shotId: shot.id.substring(0, 8),
           shotName: shot.name,
           transformedImagesCount: transformedImages.length,
+          duration: `${Date.now() - startTime}ms total`,
           sampleTransformed: transformedImages.slice(0, 2).map(img => ({
-            shotImageEntryId: img.shotImageEntryId,
             hasImageUrl: !!img.imageUrl,
             hasThumbUrl: !!img.thumbUrl,
             timeline_frame: img.timeline_frame,
@@ -805,6 +808,8 @@ export const useAddImageToShot = () => {
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
         }, 100); // 100ms delay for React batch updates, query disabled separately
       }
     },
@@ -896,6 +901,8 @@ export const useAddImageToShotWithoutPosition = () => {
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add without position operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
         }, 100);
       }
     },
@@ -1043,6 +1050,8 @@ export const usePositionExistingGenerationInShot = () => {
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after position existing operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
         }, 100);
       }
     },
@@ -1434,6 +1443,10 @@ export const useDuplicateImageInShot = () => {
       console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after duplicate operation (100ms delay)');
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        // IMPORTANT: Also invalidate two-phase cache keys
+        queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
+        queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
+        console.log('[DataTrace] 🔄 Invalidated all caches after duplicate');
       }, 100);
     }
   });
@@ -1508,6 +1521,8 @@ export const useRemoveImageFromShot = () => {
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after remove operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', variables.shot_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', variables.shot_id] });
         }, 100);
       }
     },
@@ -1653,6 +1668,8 @@ export const useUpdateShotImageOrder = () => {
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
         }, 100);
       }
     },
@@ -1726,6 +1743,8 @@ export const useCreateShotWithImage = () => {
         console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create shot with image operation (100ms delay)');
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shotId] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', data.shotId] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
         }, 100);
       }
     },

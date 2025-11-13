@@ -344,6 +344,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // Invalidate cache to refresh UI
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      // IMPORTANT: Also invalidate two-phase cache keys
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
     } catch (err) {
       console.error('[clearEnhancedPromptsForGenerations] Error:', err);
       // Don't throw - position changes should still succeed even if prompt clearing fails
@@ -1045,6 +1048,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // This prevents stale data from being loaded when other operations trigger cache invalidation
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      // IMPORTANT: Also invalidate two-phase cache keys
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
       
       console.log('[PairPrompts] ✅ Cache invalidated, all components will see the updated pair prompt');
     } catch (err) {
@@ -1295,6 +1301,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       // Invalidate cache to refresh UI
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      // IMPORTANT: Also invalidate two-phase cache keys
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
     } catch (err) {
       console.error('[clearAllEnhancedPrompts] Error:', err);
       throw err;

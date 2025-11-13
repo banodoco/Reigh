@@ -123,7 +123,7 @@ export function usePositionManagement({
   // Calculate frame positions from database
   const imagesByShotGenId = useMemo(() => {
     return new Map(
-      images.map(img => [img.shotImageEntryId, img])
+      images.map(img => [img.shotImageEntryId ?? img.id, img])
     );
   }, [images]);
 
@@ -177,21 +177,22 @@ export function usePositionManagement({
           timeline_frame: sg.timeline_frame,
           matchingImage: matchingImage ? {
             id: matchingImage.id?.substring(0, 8),
-            shotImageEntryId: matchingImage.shotImageEntryId?.substring(0, 8)
+            shotImageEntryId: (matchingImage.shotImageEntryId ?? matchingImage.id)?.substring(0, 8)
           } : null,
           allImageIds: images.map(img => ({
             id: img.id?.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8)
+            shotImageEntryId: (img.shotImageEntryId ?? img.id)?.substring(0, 8)
           }))
         });
       }
       
       if (matchingImage) {
         if (sg.timeline_frame !== null && sg.timeline_frame !== undefined) {
+          const imageKey = matchingImage.shotImageEntryId ?? matchingImage.id;
           // [Position0Debug] Check if we're about to overwrite a position 0 item
-          const existingPosition = positions.get(matchingImage.shotImageEntryId);
+          const existingPosition = positions.get(imageKey);
           if (existingPosition === 0 && sg.timeline_frame !== 0) {
-            console.log(`[Position0Debug] 🚨 OVERWRITING POSITION 0! Item ${matchingImage.shotImageEntryId.substring(0, 8)} had position 0, now setting to ${sg.timeline_frame}`, {
+            console.log(`[Position0Debug] 🚨 OVERWRITING POSITION 0! Item ${imageKey?.substring(0, 8)} had position 0, now setting to ${sg.timeline_frame}`, {
               shotGenerationId: sg.id.substring(0, 8),
               generationId: sg.generation_id?.substring(0, 8),
               oldPosition: existingPosition,
@@ -199,12 +200,12 @@ export function usePositionManagement({
             });
           }
           
-          positions.set(matchingImage.shotImageEntryId, sg.timeline_frame);
+          positions.set(imageKey, sg.timeline_frame);
           
           // [Position0Debug] Log position 0 items being added to positions map
           if (sg.timeline_frame === 0) {
             console.log(`[Position0Debug] ✅ Position 0 item added to positions map:`, {
-              shotImageEntryId: matchingImage.shotImageEntryId.substring(0, 8),
+              shotImageEntryId: imageKey?.substring(0, 8),
               timeline_frame: sg.timeline_frame,
               positionsMapSize: positions.size
             });
@@ -213,10 +214,11 @@ export function usePositionManagement({
           // Initialize with max existing frame + 50 if no timeline_frame
           const maxFrame = Math.max(0, ...Array.from(positions.values()));
           
+          const imageKey = matchingImage.shotImageEntryId ?? matchingImage.id;
           // [Position0Debug] Check if we're about to overwrite a position 0 item with fallback
-          const existingPosition = positions.get(matchingImage.shotImageEntryId);
+          const existingPosition = positions.get(imageKey);
           if (existingPosition === 0) {
-            console.log(`[Position0Debug] 🚨 OVERWRITING POSITION 0 WITH FALLBACK! Item ${matchingImage.shotImageEntryId.substring(0, 8)} had position 0, now setting to ${maxFrame + 50}`, {
+            console.log(`[Position0Debug] 🚨 OVERWRITING POSITION 0 WITH FALLBACK! Item ${imageKey?.substring(0, 8)} had position 0, now setting to ${maxFrame + 50}`, {
               shotGenerationId: sg.id.substring(0, 8),
               generationId: sg.generation_id?.substring(0, 8),
               oldPosition: existingPosition,
@@ -224,7 +226,7 @@ export function usePositionManagement({
             });
           }
           
-          positions.set(matchingImage.shotImageEntryId, maxFrame + 50);
+          positions.set(imageKey, maxFrame + 50);
         }
       } else if (sg.timeline_frame === 0) {
         console.log(`[Position0Debug] ❌ No matching image found for position 0 shotGeneration:`, {
@@ -268,11 +270,11 @@ export function usePositionManagement({
     console.log(`[Position0Debug] 🏁 Final framePositions map before return:`, {
       totalItems: positions.size,
       position0Items: position0InFinalMap.map(([id, pos]) => ({
-        shotImageEntryId: id.substring(0, 8),
+        shotImageEntryId: id?.substring(0, 8),
         position: pos
       })),
       allPositions: Array.from(positions.entries()).map(([id, pos]) => ({
-        shotImageEntryId: id.substring(0, 8),
+        shotImageEntryId: id?.substring(0, 8),
         position: pos
       })).sort((a, b) => a.position - b.position)
     });
@@ -505,16 +507,18 @@ export function usePositionManagement({
     try {
       // Update each changed position
       for (const change of positionChanges) {
-        const matchingImage = images.find(img =>
-          img.shotImageEntryId.endsWith(change.id) || img.shotImageEntryId.substring(0, 8) === change.id
-        );
+        const matchingImage = images.find(img => {
+          const imageKey = img.shotImageEntryId ?? img.id;
+          return imageKey?.endsWith(change.id) || imageKey?.substring(0, 8) === change.id;
+        });
 
         if (matchingImage && updateTimelineFrame) {
+          const imageKey = matchingImage.shotImageEntryId ?? matchingImage.id;
           // Find the shot_generation.id that corresponds to this change
           const shotGeneration = shotGenerations.find(sg => 
             sg.generation_id === matchingImage.id || 
-            matchingImage.shotImageEntryId === sg.id ||
-            matchingImage.shotImageEntryId?.endsWith(change.id) ||
+            imageKey === sg.id ||
+            imageKey?.endsWith(change.id) ||
             sg.id.substring(0, 8) === change.id
           );
           

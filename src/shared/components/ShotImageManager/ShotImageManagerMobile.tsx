@@ -205,6 +205,15 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         return;
       }
 
+      // Safety check: Ensure all images have shotImageEntryId (Phase 2 complete)
+      const hasMissingIds = currentImages.some(img => !(img as any).shotImageEntryId);
+      if (hasMissingIds) {
+        console.warn('[MobileReorder] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Cannot reorder yet.');
+        const { toast } = await import('sonner');
+        toast.error('Loading image data... please wait a moment and try again.');
+        return;
+      }
+
       // Sort by current index to maintain relative order
       selectedItems.sort((a, b) => a.currentIndex - b.currentIndex);
 
@@ -221,9 +230,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         newOrder.splice(targetIndex + i, 0, item.image!);
       });
 
-      // Create ordered IDs array for the unified system
-      const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
-
+      // Create ordered IDs array for the unified system (safe now - checked above)
+      const orderedIds = newOrder.map(img => (img as any).shotImageEntryId);
 
       // 1. Apply optimistic update immediately for instant visual feedback
       setReconciliationId(prev => prev + 1);
@@ -242,7 +250,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       console.error('[MobileReorder] ❌ Mobile reorder failed:', error);
       // Don't clear selection on error so user can retry
     }
-  }, [mobileSelectedIds, images, onImageReorder]);
+  }, [mobileSelectedIds, currentImages, onImageReorder, onSelectionChange]);
 
   // Individual delete handler
   const handleIndividualDelete = useCallback((shotImageEntryId: string) => {
@@ -251,11 +259,31 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
   // Batch delete handler
   const performBatchDelete = useCallback(async (idsToDelete: string[]) => {
+    // Filter out IDs that don't correspond to actual shotImageEntryIds
+    // This handles Phase 1 loading where shotImageEntryId might be null
+    const validIds = idsToDelete.filter(id => {
+      const img = currentImages.find(i => ((i as any).shotImageEntryId ?? (i as any).id) === id);
+      return img && (img as any).shotImageEntryId;
+    });
+    
+    if (validIds.length < idsToDelete.length) {
+      console.warn('[MobileBatchDelete] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Skipping those.');
+      const { toast } = await import('sonner');
+      toast.warning(`Could only delete ${validIds.length} of ${idsToDelete.length} images. Some are still loading.`);
+    }
+    
+    if (validIds.length === 0) {
+      const { toast } = await import('sonner');
+      toast.error('Unable to delete images. Please wait a moment and try again.');
+      setConfirmOpen(false);
+      return;
+    }
+    
     if (onBatchImageDelete) {
-      await onBatchImageDelete(idsToDelete);
+      await onBatchImageDelete(validIds);
     } else {
       // Fallback to individual deletes
-      for (const id of idsToDelete) {
+      for (const id of validIds) {
         await onImageDelete(id);
       }
     }
@@ -265,7 +293,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     onSelectionChange?.(false);
     setConfirmOpen(false);
     setPendingDeleteIds([]);
-  }, [onImageDelete, onBatchImageDelete, onSelectionChange]);
+  }, [currentImages, onImageDelete, onBatchImageDelete, onSelectionChange]);
 
   // Check if item would actually move
   const wouldActuallyMove = useCallback((insertIndex: number) => {
@@ -388,7 +416,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   isSelected={isSelected}
                   index={index}
                   onMobileTap={() => handleMobileTap(imageKey as string, index)}
-                  onDelete={() => handleIndividualDelete((image as any).shotImageEntryId)}
+                  onDelete={(image as any).shotImageEntryId ? () => handleIndividualDelete((image as any).shotImageEntryId) : undefined}
                   onDuplicate={onImageDuplicate}
                   onOpenLightbox={onOpenLightbox ? () => onOpenLightbox(index) : undefined}
                   onInpaintClick={onInpaintClick ? () => onInpaintClick(index) : undefined}

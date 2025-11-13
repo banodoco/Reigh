@@ -104,7 +104,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
         onDragEnd={dragAndDrop.handleDragEnd}
       >
         <SortableContext
-          items={lightbox.currentImages.map((img: any) => img.shotImageEntryId)}
+          items={lightbox.currentImages.map((img: any) => img.shotImageEntryId ?? img.id)}
           strategy={rectSortingStrategy}
         >
           <ImageGrid
@@ -240,7 +240,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               onPrevious={lightbox.handlePrevious}
               onDelete={!props.readOnly ? (mediaId: string) => {
                 const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
-                props.onImageDelete(currentImage.shotImageEntryId);
+                const shotImageEntryId = currentImage.shotImageEntryId || currentImage.id;
+                props.onImageDelete(shotImageEntryId);
               } : undefined}
               onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
                 await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}

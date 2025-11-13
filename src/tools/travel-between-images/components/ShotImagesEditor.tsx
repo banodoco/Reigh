@@ -8,6 +8,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useEnhancedShotImageReorder } from "@/shared/hooks/useEnhancedShotImageReorder";
+import { useTimelinePositionUtils } from "@/shared/hooks/useTimelinePositionUtils";
 import PairPromptModal from "./Timeline/PairPromptModal";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -217,8 +218,55 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
-  // When preloadedImages is provided, bypass database queries
-  const hookData = useEnhancedShotPositions(preloadedImages ? null : selectedShotId);
+  // When preloadedImages is provided, use new utility hook; otherwise use legacy hook
+  const legacyHookData = useEnhancedShotPositions(preloadedImages ? null : selectedShotId);
+  
+  // NEW: Use utility hook when preloaded images are provided
+  const utilsData = useTimelinePositionUtils({
+    shotId: preloadedImages ? selectedShotId : null,
+    generations: preloadedImages || []
+  });
+  
+  // Choose data source based on whether we have preloaded images
+  const hookData: typeof legacyHookData = preloadedImages ? {
+    // Use utility hook data when preloaded
+    shotGenerations: utilsData.shotGenerations,
+    pairPrompts: utilsData.pairPrompts,
+    isLoading: utilsData.isLoading,
+    error: utilsData.error ? utilsData.error.message : '',
+    updateTimelineFrame: utilsData.updateTimelineFrame,
+    batchExchangePositions: utilsData.batchExchangePositions,
+    loadPositions: utilsData.loadPositions,
+    updatePairPrompts: utilsData.updatePairPrompts,
+    clearEnhancedPrompt: utilsData.clearEnhancedPrompt,
+    initializeTimelineFrames: utilsData.initializeTimelineFrames,
+    // Provide filtering function for mode-specific views
+    getImagesForMode: (mode: 'batch' | 'timeline') => {
+      // BOTH modes show only positioned images (timeline_frame != null)
+      const positioned = preloadedImages.filter(img => 
+        img.timeline_frame != null && img.timeline_frame !== -1
+      );
+      console.log('[TimelinePositionUtils] getImagesForMode:', {
+        mode,
+        total: preloadedImages.length,
+        positioned: positioned.length,
+        filtered: preloadedImages.length - positioned.length,
+      });
+      return positioned;
+    },
+    exchangePositions: async () => {},
+    exchangePositionsNoReload: async () => {},
+    deleteItem: async () => {},
+    updatePairPromptsByIndex: async () => {},
+    clearAllEnhancedPrompts: async () => {},
+    isPersistingPositions: false,
+    setIsPersistingPositions: () => {},
+    getPositionsForMode: () => new Map(),
+    addItem: async () => {},
+    applyTimelineFrames: async () => {},
+    getPairPrompts: () => utilsData.pairPrompts,
+  } as any : legacyHookData;
+  
   const {
     getImagesForMode,
     isLoading: positionsLoading,
@@ -239,19 +287,48 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Use preloaded images if provided, otherwise use database images
   const shotGenerations = preloadedImages || dbShotGenerations;
   
+  // Log data source for debugging
+  console.log('[UnifiedDataFlow] ShotImagesEditor data source:', {
+    selectedShotId: selectedShotId.substring(0, 8),
+    usingPreloadedImages: !!preloadedImages,
+    dataSource: preloadedImages ? 'two-phase (from ShotEditor)' : 'legacy (useEnhancedShotPositions)',
+    imageCount: shotGenerations.length,
+    withMetadata: shotGenerations.filter((img: any) => img.metadata).length,
+    withShotGenId: shotGenerations.filter((img: any) => img.shotImageEntryId || img.id).length,
+    positioned: shotGenerations.filter((img: any) => img.timeline_frame != null && img.timeline_frame !== -1).length,
+    unpositioned: shotGenerations.filter((img: any) => img.timeline_frame == null || img.timeline_frame === -1).length,
+    hookDataShotGensCount: hookData.shotGenerations.length,
+  });
+  
   // Enhanced reorder management for batch mode - pass parent hook to avoid duplication
-  // Skip this hook when in read-only mode with preloaded images
+  // When using preloaded images, still need shotId for mutations!
   const { handleReorder, handleDelete } = useEnhancedShotImageReorder(
-    preloadedImages ? null : selectedShotId, 
+    selectedShotId, // Always pass shotId - needed for mutations 
     preloadedImages ? {
-      shotGenerations: preloadedImages,
-      getImagesForMode: (mode: 'batch' | 'timeline') => preloadedImages,
-      exchangePositions: async (genIdA: string, genIdB: string) => {},
-      exchangePositionsNoReload: async (shotGenIdA: string, shotGenIdB: string) => {},
-      batchExchangePositions: async (exchanges: any[]) => {}, // Type mismatch in codebase, use any for read-only mode
-      deleteItem: async (genId: string) => {},
-      loadPositions: async () => {},
-      isLoading: false
+      shotGenerations: utilsData.shotGenerations,
+      getImagesForMode: hookData.getImagesForMode, // Use the filtering function we created
+      exchangePositions: async (genIdA: string, genIdB: string) => {
+        // Single exchange - just use batchExchangePositions with one item
+        await utilsData.batchExchangePositions([
+          { id: genIdA, newFrame: 0 }, // Placeholder, will be calculated
+          { id: genIdB, newFrame: 0 }
+        ]);
+      },
+      exchangePositionsNoReload: async (shotGenIdA: string, shotGenIdB: string) => {
+        console.log('[ShotImagesEditor] exchangePositionsNoReload - swapping pair:', {
+          shotGenIdA: shotGenIdA.substring(0, 8),
+          shotGenIdB: shotGenIdB.substring(0, 8),
+        });
+        // Call utility's batchExchangePositions with pair swap format
+        await utilsData.batchExchangePositions([{ shotGenerationIdA: shotGenIdA, shotGenerationIdB: shotGenIdB }] as any);
+      },
+      batchExchangePositions: utilsData.batchExchangePositions, // REAL function!
+      deleteItem: async (genId: string) => {
+        console.warn('[ShotImagesEditor] deleteItem called via utility hook');
+      },
+      loadPositions: utilsData.loadPositions, // REAL function!
+      moveItemsToMidpoint: utilsData.moveItemsToMidpoint, // NEW: Midpoint-based reordering (single or multi)
+      isLoading: utilsData.isLoading
     } as any : {
       shotGenerations,
       getImagesForMode,
@@ -266,11 +343,27 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // Memoize images and shotGenerations to prevent infinite re-renders in Timeline
   const images = React.useMemo(() => {
-    if (preloadedImages) {
-      return preloadedImages;
-    }
-    return getImagesForMode(generationMode);
-  }, [preloadedImages, getImagesForMode, generationMode]);
+    // ALWAYS use getImagesForMode to apply correct filtering for the mode
+    const result = getImagesForMode(generationMode);
+    
+    console.log('[UnifiedDataFlow] ShotImagesEditor images memoization:', {
+      selectedShotId: selectedShotId.substring(0, 8),
+      generationMode,
+      usingPreloaded: !!preloadedImages,
+      totalImages: result.length,
+      positioned: result.filter((img: any) => img.timeline_frame != null && img.timeline_frame !== -1).length,
+      unpositioned: result.filter((img: any) => img.timeline_frame == null || img.timeline_frame === -1).length,
+    });
+    
+    console.log('[DataTrace] 📤 ShotImagesEditor → passing to Timeline/Manager:', {
+      shotId: selectedShotId.substring(0, 8),
+      mode: generationMode,
+      total: result.length,
+      willBeDisplayed: result.length,
+    });
+    
+    return result;
+  }, [getImagesForMode, generationMode, selectedShotId]);
 
   // Memoize shotGenerations to prevent reference changes
   const memoizedShotGenerations = React.useMemo(() => {
@@ -556,15 +649,18 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 projectAspectRatio={projectAspectRatio}
                 readOnly={readOnly}
                 // Pass shared data to prevent reloading
-                shotGenerations={memoizedShotGenerations}
+                // Pass ALL generations for lookups, but filtered images for display
+                shotGenerations={preloadedImages ? undefined : memoizedShotGenerations}
                 updateTimelineFrame={updateTimelineFrame}
+                allGenerations={preloadedImages}
                 images={images}
                 onTimelineChange={async () => {
                   console.log('[ShotImagesEditor] 🔄 TIMELINE CHANGE - Reloading parent data');
                   await loadPositions({ silent: true });
                 }}
                 // Pass shared hook data to prevent creating duplicate instances
-                hookData={hookData}
+                // BUT: Only pass if not using preloaded images (to avoid filtering conflict)
+                hookData={preloadedImages ? undefined : hookData}
                 onPairClick={(pairIndex, pairData) => {
                   setPairPromptModalData({
                     isOpen: true,
@@ -974,27 +1070,38 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         })()}
         onSave={async (pairIndex, prompt, negativePrompt) => {
           try {
+            console.log('[PairPromptFlow] 📥 ONSAVE CALLBACK RECEIVED:', {
+              pairIndex,
+              promptLength: prompt?.length || 0,
+              negativePromptLength: negativePrompt?.length || 0,
+              hasPrompt: !!prompt,
+              hasNegativePrompt: !!negativePrompt,
+            });
+            
             // CRITICAL FIX: Use the actual shot_generation.id from the timeline
             // instead of recalculating it from index (which can be wrong with duplicates)
             const shotGenerationId = pairPromptModalData.pairData?.startImage?.id;
             
             if (!shotGenerationId) {
-              console.error('[PairPrompts] ❌ No shot_generation.id found in pairData:', pairPromptModalData.pairData);
+              console.error('[PairPromptFlow] ❌ No shot_generation.id found in pairData:', pairPromptModalData.pairData);
               return;
             }
             
-            console.log(`[PairPrompts] 💾 Saving prompts for Pair ${pairIndex + 1} to shot_generation:`, {
+            console.log(`[PairPromptFlow] 🎯 CALLING updatePairPrompts for Pair ${pairIndex + 1}:`, {
               shotGenerationId: shotGenerationId.substring(0, 8),
-              fullId: shotGenerationId,
-              prompt,
-              negativePrompt
+              fullShotGenerationId: shotGenerationId,
+              prompt: prompt?.substring(0, 50) + (prompt?.length > 50 ? '...' : ''),
+              negativePrompt: negativePrompt?.substring(0, 50) + (negativePrompt?.length > 50 ? '...' : ''),
+              startFrame: pairPromptModalData.pairData?.startFrame,
+              endFrame: pairPromptModalData.pairData?.endFrame,
             });
             
             await updatePairPrompts(shotGenerationId, prompt, negativePrompt);
-            console.log(`[PairPrompts] ✅ Saved prompts for Pair ${pairIndex + 1}`);
+            
+            console.log(`[PairPromptFlow] ✅ updatePairPrompts COMPLETED for Pair ${pairIndex + 1}`);
             // Timeline now uses shared hook data, so changes are reactive
           } catch (error) {
-            console.error(`[PairPrompts] ❌ Failed to save prompts for Pair ${pairIndex + 1}:`, error);
+            console.error(`[PairPromptFlow] ❌ FAILED to save prompts for Pair ${pairIndex + 1}:`, error);
           }
         }}
       />

@@ -137,10 +137,21 @@ export const useUnpositionedGenerationsCount = (
 };
 
 /**
- * Hook for loading ALL shot generations (non-paginated)
+ * Hook for loading ALL shot generations (non-paginated) with TWO-PHASE LOADING
  * 
- * This is the primary data source for shot images throughout the app.
- * It loads positioned and unpositioned images with full metadata including pair prompts.
+ * **PERFORMANCE OPTIMIZATION:**
+ * This hook uses a two-phase progressive loading strategy for maximum speed:
+ * 
+ * **Phase 1 (FAST):** Query generations table with shot_data JSONB filter
+ * - No joins = instant results
+ * - Uses GIN index on shot_data for fast filtering
+ * - Returns images immediately for rendering
+ * - Missing: shot_generations.id (needed for mutations), metadata (pair prompts)
+ * 
+ * **Phase 2 (LAZY):** Query shot_generations table in background
+ * - Fetches mutation IDs and metadata
+ * - Merges into Phase 1 data when ready
+ * - Enables mutations and pair prompt editing
  * 
  * **Data Loaded:**
  * - All shot_generations for the shot (positioned + unpositioned)
@@ -152,14 +163,10 @@ export const useUnpositionedGenerationsCount = (
  * - Timeline display (filter to positioned images)
  * - Shot image management
  * 
- * **For Timeline-Specific Use:**
- * Consider using `useTimelineShotGenerations` instead, which filters to only
- * positioned images with metadata and provides stronger type guarantees.
- * 
  * @param shotId - The shot ID to load generations for
  * @param options - Query options
  * @param options.disableRefetch - Prevents refetching during drag/persist operations
- * @returns Query result with GenerationRow[] data
+ * @returns Query result with GenerationRow[] data (progressively enhanced)
  * 
  * @example
  * ```typescript
@@ -191,7 +198,7 @@ export const useAllShotGenerations = (
   const lastLogRef = React.useRef(0);
   const now = Date.now();
   if (now - lastLogRef.current > 500) { // Reduced to every 500ms to catch rapid calls
-    console.log('[VideoLoadSpeedIssue] useAllShotGenerations hook called:', { 
+    console.log('[TwoPhaseLoad] useAllShotGenerations hook called:', { 
       shotId: stableShotId, 
       enabled: isEnabled,
       disableRefetch: options?.disableRefetch,
@@ -199,152 +206,316 @@ export const useAllShotGenerations = (
     });
     lastLogRef.current = now;
   }
-  
-  // Throttle logging to avoid infinite loop spam
-  const lastLogRef2 = React.useRef(0);
-  if (now - lastLogRef2.current > 1000) { // Log max once per second
-    console.log('[ADDTOSHOT] useAllShotGenerations called (throttled)', { 
-      shotId: stableShotId, 
-      disableRefetch: options?.disableRefetch,
-      timestamp: now 
-    });
-    lastLogRef2.current = now;
-  }
 
-  return useQuery({
-    queryKey: ['unified-generations', 'shot', stableShotId],
+  // ============================================================================
+  // PHASE 1: FAST - Query from generations table (no joins)
+  // ============================================================================
+  const phase1Query = useQuery({
+    queryKey: ['shot-generations-fast', stableShotId],
     enabled: isEnabled,
-    // Prevent automatic refetches during sensitive operations (drag, persist, etc.)
-    // This is in addition to `enabled` flag - provides belt-and-suspenders protection
     refetchOnMount: !options?.disableRefetch,
     refetchOnWindowFocus: !options?.disableRefetch,
     refetchOnReconnect: !options?.disableRefetch,
     queryFn: async ({ signal }) => {
-      // Don't throw immediately on abort - let the fetch fail naturally
-      // This prevents the "signal is aborted without reason" error from being thrown manually
-      console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn executing', { shotId, timestamp: Date.now() });
-      let allGenerations: any[] = [];
-      let offset = 0;
-      const INITIAL_LOAD = 200; // Fast initial load for first 200 items
-      const BATCH_SIZE = 500; // Smaller batches for better responsiveness
-
-      // PERFORMANCE BOOST: Load initial batch with only essential fields for instant rendering
-      const { data: initialData, error: initialError } = await supabase
-        .from('shot_generations')
-        .select(`
-          id,
-          timeline_frame,
-          metadata,
-          generation:generations(
-            id,
-            location,
-            type,
-            created_at,
-            starred
-          )
-        `)
-        .eq('shot_id', shotId!)
-        .order('timeline_frame', { ascending: true })
-        .range(0, INITIAL_LOAD - 1)
-        .abortSignal(signal);
-
-      if (initialError) {
-        // Better error handling for 400 errors
-        if (initialError.code === 'PGRST116' || initialError.message?.includes('Invalid')) {
-          console.warn('[useAllShotGenerations] Invalid shot ID or query parameters:', { shotId, error: initialError });
-          return [];
-        }
-        // Let abort errors fail naturally so retry logic can handle them
-        throw initialError;
-      }
-
-      // Don't manually check for abort - let the natural error flow handle it
-
-      if (initialData) {
-        allGenerations = initialData;
-        offset = initialData.length;
-      }
-
-      // [StarPersist] Log raw data structure from Supabase
-      if (initialData && initialData.length > 0) {
-        console.log('[StarPersist] 🔍 RAW Supabase data (before transformation):', {
-          shotId,
-          firstRawItem: initialData[0],
-          firstRawItemKeys: Object.keys(initialData[0]),
-          generationData: initialData[0].generation,
-          generationKeys: initialData[0].generation ? Object.keys(initialData[0].generation) : 'no generation',
-          hasStarredInGeneration: initialData[0].generation ? 'starred' in initialData[0].generation : false,
-          starredValue: initialData[0].generation?.starred
-        });
-      }
-
-      // PERFORMANCE OPTIMIZATION: For large shots, only load first 200 items initially
-      // This provides instant loading for shots with 100+ images
-      // Background loading removed to prevent 8+ second delays
-      console.log('[PERF] Large shot optimization - using initial batch only for faster rendering:', {
-        shotId,
-        initialDataLength: initialData?.length || 0,
-        skippingBackgroundLoad: true
+      const startTime = Date.now();
+      console.log('[TwoPhaseLoad] Phase 1 START - Fast query from generations table', { 
+        shotId: stableShotId, 
+        timestamp: startTime 
       });
 
-      // Transform to match GenerationRow interface
-      const result = allGenerations
-        .filter(sg => sg.generation)
-        .map(sg => ({
-          ...sg.generation,
-          shotImageEntryId: sg.id,
-          shot_generation_id: sg.id,
-          position: Math.floor((sg.timeline_frame ?? 0) / 50),
-          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
-          metadata: sg.metadata, // Include metadata for pair prompts
-          imageUrl: sg.generation?.location,
-          thumbUrl: sg.generation?.location,
-        }));
+      let data, error;
+      try {
+        const response = await supabase
+          .from('generations')
+          .select(`
+            id,
+            location,
+            thumbnail_url,
+            type,
+            created_at,
+            starred,
+            upscaled_url,
+            name,
+            based_on,
+            params,
+            shot_data
+          `)
+          .not(`shot_data->${stableShotId}`, 'is', null) // GIN index filter
+          .order('created_at', { ascending: false })
+          .abortSignal(signal);
+        
+        data = response.data;
+        error = response.error;
+        
+        console.log('[TwoPhaseLoad] Phase 1 query response:', {
+          shotId: stableShotId,
+          hasData: !!data,
+          dataCount: data?.length || 0,
+          hasError: !!error,
+          errorCode: error?.code,
+          errorMessage: error?.message,
+          errorDetails: error?.details,
+          errorHint: error?.hint,
+        });
+      } catch (err) {
+        console.error('[TwoPhaseLoad] Phase 1 EXCEPTION:', {
+          shotId: stableShotId,
+          error: err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          errorStack: err instanceof Error ? err.stack : undefined,
+        });
+        throw err;
+      }
 
-      console.log('[VideoLoadSpeedIssue][ADDTOSHOT] useAllShotGenerations queryFn completed', { 
-        shotId, 
+      if (error) {
+        console.error('[TwoPhaseLoad] Phase 1 ERROR:', {
+          shotId: stableShotId,
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        });
+        
+        if (error.code === 'PGRST116' || error.message?.includes('Invalid')) {
+          console.warn('[TwoPhaseLoad] Phase 1 - Invalid shot ID:', { shotId: stableShotId, error });
+          return [];
+        }
+        throw error;
+      }
+
+      // Transform data - extract timeline_frame from shot_data JSONB
+      const result = (data || []).map(gen => {
+        const timelineFrame = gen.shot_data?.[stableShotId!];
+        return {
+          ...gen,
+          timeline_frame: timelineFrame,
+          position: timelineFrame != null ? Math.floor(timelineFrame / 50) : null,
+          imageUrl: gen.location,
+          thumbUrl: gen.thumbnail_url || gen.location,
+          // These will be populated in Phase 2
+          shotImageEntryId: null, 
+          shot_generation_id: null,
+          metadata: null,
+        };
+      });
+
+      // Sort by timeline_frame (nulls last)
+      result.sort((a, b) => {
+        if (a.timeline_frame == null && b.timeline_frame == null) return 0;
+        if (a.timeline_frame == null) return 1;
+        if (b.timeline_frame == null) return -1;
+        return a.timeline_frame - b.timeline_frame;
+      });
+
+      const duration = Date.now() - startTime;
+      console.log('[TwoPhaseLoad] Phase 1 COMPLETE - Fast query finished', { 
+        shotId: stableShotId, 
         resultCount: result.length,
-        videoCount: result.filter(r => r.type === 'video').length,
+        duration: `${duration}ms`,
         timestamp: Date.now() 
       });
       
-      // [StarPersist] Log first item to verify starred field is present
-      if (result.length > 0) {
-        console.log('[StarPersist] 📊 Sample shot generation data structure:', {
-          shotId,
-          firstItem: {
-            id: result[0].id,
-            shotImageEntryId: result[0].shotImageEntryId,
-            shot_generation_id: result[0].shot_generation_id,
-            starred: result[0].starred,
-            hasStarredField: 'starred' in result[0],
-            starredType: typeof result[0].starred,
-            allKeys: Object.keys(result[0])
-          }
-        });
-      }
+      console.log('[DataTrace] 📦 DB → Phase 1 complete:', {
+        shotId: stableShotId?.substring(0, 8),
+        total: result.length,
+        positioned: result.filter(r => r.timeline_frame != null && r.timeline_frame >= 0).length,
+        unpositioned: result.filter(r => r.timeline_frame == null).length,
+      });
 
       return result;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     retry: (failureCount, error) => {
-      // Don't retry cancelled requests or 400 errors
       if (error?.message?.includes('Request was cancelled') || 
           (error as any)?.code === 'PGRST116' || 
           error?.message?.includes('Invalid')) {
         return false;
       }
-      // Retry up to 2 times for other errors
       return failureCount < 2;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 3000),
-    meta: {
-      onInvalidate: () => {
-        console.log('[VideoLoadSpeedIssue] useAllShotGenerations query invalidated for shotId:', shotId);
-      }
-    }
   });
+
+  // ============================================================================
+  // PHASE 2: LAZY - Query from shot_generations table (metadata & IDs)
+  // ============================================================================
+  const generationIds = React.useMemo(() => 
+    phase1Query.data?.map(gen => gen.id) || [], 
+    [phase1Query.data]
+  );
+
+  const phase2Query = useQuery({
+    queryKey: ['shot-generations-meta', stableShotId, generationIds.length],
+    enabled: isEnabled && generationIds.length > 0,
+    refetchOnMount: !options?.disableRefetch,
+    refetchOnWindowFocus: !options?.disableRefetch,
+    refetchOnReconnect: !options?.disableRefetch,
+    queryFn: async ({ signal }) => {
+      const startTime = Date.now();
+      console.log('[TwoPhaseLoad] Phase 2 START - Lazy query for metadata', { 
+        shotId: stableShotId,
+        generationCount: generationIds.length,
+        timestamp: startTime 
+      });
+
+      let data, error;
+      try {
+        const response = await supabase
+          .from('shot_generations')
+          .select('id, generation_id, timeline_frame, metadata')
+          .eq('shot_id', stableShotId!)
+          .in('generation_id', generationIds)
+          .abortSignal(signal);
+        
+        data = response.data;
+        error = response.error;
+        
+        console.log('[TwoPhaseLoad] Phase 2 query response:', {
+          shotId: stableShotId,
+          hasData: !!data,
+          dataCount: data?.length || 0,
+          hasError: !!error,
+          errorCode: error?.code,
+          errorMessage: error?.message,
+        });
+      } catch (err) {
+        console.error('[TwoPhaseLoad] Phase 2 EXCEPTION (non-fatal):', {
+          shotId: stableShotId,
+          error: err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
+        return []; // Return empty array, don't throw - Phase 1 data is still usable
+      }
+
+      if (error) {
+        console.warn('[TwoPhaseLoad] Phase 2 error (non-fatal):', {
+          shotId: stableShotId,
+          error,
+          code: error.code,
+          message: error.message,
+        });
+        return []; // Return empty array, don't throw - Phase 1 data is still usable
+      }
+
+      const duration = Date.now() - startTime;
+      console.log('[TwoPhaseLoad] Phase 2 COMPLETE - Metadata loaded', { 
+        shotId: stableShotId,
+        metadataCount: data?.length || 0,
+        duration: `${duration}ms`,
+        timestamp: Date.now() 
+      });
+
+      return data || [];
+    },
+    staleTime: Infinity, // Don't refetch, it's supplementary data
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    retry: false, // Don't retry Phase 2 - not critical
+  });
+
+  // ============================================================================
+  // MERGE: Combine Phase 1 and Phase 2 data
+  // ============================================================================
+  const mergedData = React.useMemo(() => {
+    if (!phase1Query.data) return undefined;
+    
+    // If Phase 2 hasn't loaded yet, return Phase 1 data
+    // (user can see images immediately, mutations will work once Phase 2 loads)
+    if (!phase2Query.data || phase2Query.data.length === 0) {
+      console.log('[TwoPhaseLoad] Using Phase 1 data only (Phase 2 pending)', {
+        shotId: stableShotId,
+        imageCount: phase1Query.data.length,
+        phase2Status: phase2Query.status
+      });
+      return phase1Query.data;
+    }
+
+    // Create lookup map for Phase 2 data
+    const metadataMap = new Map(
+      phase2Query.data.map(sg => [sg.generation_id, sg])
+    );
+
+    // Merge Phase 2 data into Phase 1 data
+    const merged = phase1Query.data.map(gen => {
+      const shotGen = metadataMap.get(gen.id);
+      if (shotGen) {
+        return {
+          ...gen,
+          shotImageEntryId: shotGen.id,
+          shot_generation_id: shotGen.id,
+          metadata: shotGen.metadata,
+          // Use Phase 2 timeline_frame if available (more authoritative)
+          timeline_frame: shotGen.timeline_frame ?? gen.timeline_frame,
+        };
+      }
+      return gen;
+    });
+
+    console.log('[TwoPhaseLoad] Merged Phase 1 + Phase 2 data', {
+      shotId: stableShotId,
+      totalImages: merged.length,
+      withMetadata: merged.filter(g => g.metadata).length,
+      withShotGenId: merged.filter(g => g.shotImageEntryId).length,
+    });
+    
+    console.log('[DataTrace] 📦 DB → Phase 2 merged:', {
+      shotId: stableShotId?.substring(0, 8),
+      total: merged.length,
+      withMutationIds: merged.filter(g => g.shotImageEntryId).length,
+      withMetadata: merged.filter(g => g.metadata).length,
+    });
+
+    return merged;
+  }, [phase1Query.data, phase2Query.data, stableShotId]);
+
+  // ============================================================================
+  // Return merged query result with phase status
+  // ============================================================================
+  const result = {
+    ...phase1Query,
+    data: mergedData,
+    // Consider both phases for loading state (but prioritize Phase 1 for perceived speed)
+    isLoading: phase1Query.isLoading,
+    isFetching: phase1Query.isFetching || phase2Query.isFetching,
+  } as UseQueryResult<GenerationRow[]>;
+
+  // Add custom property to indicate if mutations are safe
+  // Components can check this before enabling mutation buttons
+  (result as any).isPhase2Complete = !!(
+    phase2Query.data && 
+    phase2Query.data.length > 0 && 
+    !phase2Query.isLoading && 
+    !phase2Query.isFetching
+  );
+
+  // Add custom property to check if any images are missing mutation IDs
+  (result as any).hasMissingMutationIds = !!(
+    mergedData && 
+    mergedData.some(img => !img.shotImageEntryId)
+  );
+
+  console.log('[TwoPhaseLoad] Query result status:', {
+    shotId: stableShotId,
+    phase1Status: phase1Query.status,
+    phase1FetchStatus: phase1Query.fetchStatus,
+    phase1Complete: !!phase1Query.data,
+    phase1Loading: phase1Query.isLoading,
+    phase1Fetching: phase1Query.isFetching,
+    phase1Error: phase1Query.error,
+    phase2Status: phase2Query.status,
+    phase2FetchStatus: phase2Query.fetchStatus,
+    phase2Complete: (result as any).isPhase2Complete,
+    phase2Loading: phase2Query.isLoading,
+    phase2Fetching: phase2Query.isFetching,
+    phase2Enabled: phase2Query.isEnabled,
+    generationIdsCount: generationIds.length,
+    hasMissingMutationIds: (result as any).hasMissingMutationIds,
+    totalImages: mergedData?.length || 0,
+    imagesWithIds: mergedData?.filter(img => img.shotImageEntryId).length || 0,
+  });
+
+  return result;
 };
 
 /**

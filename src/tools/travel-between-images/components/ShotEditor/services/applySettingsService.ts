@@ -951,15 +951,21 @@ export const replaceImagesIfRequested = async (
   });
   
   try {
-    // Remove existing non-video images
+    // Remove existing non-video images (only those with shotImageEntryId)
     const imagesToDelete = simpleFilteredImages.filter(img => !!img.shotImageEntryId);
     console.log('[ApplySettings] 🗑️  Removing existing images:', {
-      count: imagesToDelete.length
+      count: imagesToDelete.length,
+      totalImages: simpleFilteredImages.length,
+      skippedWithoutId: simpleFilteredImages.length - imagesToDelete.length
     });
+    
+    if (imagesToDelete.length < simpleFilteredImages.length) {
+      console.warn('[ApplySettings] ⚠️  Some images missing shotImageEntryId, cannot delete them. May need to wait for Phase 2 loading.');
+    }
     
     const deletions = imagesToDelete.map(img => removeImageFromShotMutation.mutateAsync({
       shot_id: selectedShot.id,
-      shotImageEntryId: img.shotImageEntryId!,
+      shotImageEntryId: img.shotImageEntryId!, // Safe now - filtered above
       project_id: projectId,
     }));
     

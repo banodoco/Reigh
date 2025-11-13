@@ -38,7 +38,7 @@ interface UseGenerationActionsProps {
     setDuplicatingImageId: (value: string | null) => void;
     setDuplicateSuccessImageId: (value: string | null) => void;
     setPendingFramePositions: (value: Map<string, number>) => void;
-    setLocalOrderedShotImages: (value: GenerationRow[]) => void;
+    // REMOVED: setLocalOrderedShotImages - no longer needed with two-phase loading
   };
   selectedShot: Shot;
   projectId: string;
@@ -124,7 +124,7 @@ export const useGenerationActions = ({
       optimisticImages.push(optimisticImage);
     }
 
-    actions.setLocalOrderedShotImages([...state.localOrderedShotImages, ...optimisticImages]);
+    // REMOVED: Optimistic local state update - two-phase loading handles updates fast enough
 
     const uploadPromises = files.map(async (file, i) => {
       const optimisticImage = optimisticImages[i];
@@ -242,40 +242,11 @@ export const useGenerationActions = ({
 
     const results = await Promise.all(uploadPromises);
 
-    // Build the final images array after processing results
-    let updatedImages = [...state.localOrderedShotImages];
-    results.forEach(result => {
-      if (result.success) {
-        const idx = updatedImages.findIndex(img => img.shotImageEntryId === result.optimisticId);
-        if (idx !== -1) {
-          updatedImages[idx] = result.finalImage!;
-        }
-      } else {
-        updatedImages = updatedImages.filter(img => img.shotImageEntryId !== result.optimisticId);
-      }
-    });
-
-    // Apply the single state update
-    actions.setLocalOrderedShotImages(updatedImages);
-
-    const successfulUploads = results.filter(r => r.success).length;
-    if (successfulUploads > 0) {      
-      // Update parent cache directly to avoid refetch-based reordering
-      if (projectId) {
-        queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
-          return oldShots.map(shot => {
-            if (shot.id !== selectedShot.id) return shot;
-            return { ...shot, images: updatedImages };
-          });
-        });
-      }
-    }
+    // REMOVED: Local state updates - two-phase loading will refetch automatically
     
     actions.setFileInputKey(Date.now());
-    skipNextSyncRef.current = true; // Skip the next prop sync to prevent flicker
     actions.setUploadingImage(false);
   }, [
-    state.localOrderedShotImages,
     actions,
     projectId,
     selectedShot?.id,
@@ -295,8 +266,7 @@ export const useGenerationActions = ({
     actions.setDeletingVideoId(generationId);
     
     try {
-      // Optimistically remove the video from local state
-      actions.setLocalOrderedShotImages(state.localOrderedShotImages.filter(img => img.id !== generationId));
+      // REMOVED: Optimistic local state - two-phase loading handles updates
       
       // Delete the generation (this will show success/error toasts automatically)
       await deleteGenerationMutation.mutateAsync(generationId);
@@ -304,12 +274,11 @@ export const useGenerationActions = ({
       // Refresh the shot data
       onShotImagesUpdate(); 
     } catch (error) {
-      // Rollback the optimistic update on error
-      actions.setLocalOrderedShotImages(orderedShotImages);
+      // Error handled by mutation
     } finally {
       actions.setDeletingVideoId(null);
     }
-  }, [selectedShot?.id, projectId, actions, deleteGenerationMutation, onShotImagesUpdate, orderedShotImages]);
+  }, [selectedShot?.id, projectId, actions, deleteGenerationMutation, onShotImagesUpdate]);
 
   const handleDeleteImageFromShot = useCallback(async (shotImageEntryId: string) => {
     if (!selectedShot || !projectId) {
@@ -317,47 +286,30 @@ export const useGenerationActions = ({
       return;
     }
 
-    console.log('[OPTIMISTIC_DELETE] Parent handling optimistic removal from timeline', {
+    console.log('[DELETE] Removing image from timeline', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
-      currentCount: state.localOrderedShotImages.length
     });
 
-    // Optimistically remove the image from the local state
-    // NOTE: This removes timeline_frame (not deleting the record), so generation is preserved
-    const optimisticImages = state.localOrderedShotImages.filter(img => img.shotImageEntryId !== shotImageEntryId);
-    actions.setLocalOrderedShotImages(optimisticImages);
-    skipNextSyncRef.current = true; // Skip next prop sync to prevent flicker
+    // REMOVED: Optimistic local state - two-phase loading handles updates
     
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
       shotImageEntryId: shotImageEntryId, // Use the unique entry ID
       project_id: projectId,
-    }, {
-      onError: () => {
-        // Rollback on error
-        console.log('[OPTIMISTIC_DELETE] Rolling back optimistic removal');
-        actions.setLocalOrderedShotImages(orderedShotImages);
-        skipNextSyncRef.current = false;
-      }
     });
-  }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages, state.localOrderedShotImages, skipNextSyncRef]);
+  }, [selectedShot?.id, projectId, removeImageFromShotMutation]);
 
   const handleBatchDeleteImages = useCallback(async (shotImageEntryIds: string[]) => {
     if (!selectedShot || !projectId || shotImageEntryIds.length === 0) {
       return;
     }
 
-    console.log('[OPTIMISTIC_DELETE] Parent handling batch optimistic removal from timeline', {
+    console.log('[BATCH_DELETE] Removing multiple images from timeline', {
       idsToRemove: shotImageEntryIds.map(id => id.substring(0, 8)),
       totalCount: shotImageEntryIds.length,
-      currentCount: state.localOrderedShotImages.length
     });
 
-    // Optimistically remove all images from the local state
-    // NOTE: This removes timeline_frame (not deleting the records), so generations are preserved
-    const optimisticImages = state.localOrderedShotImages.filter(img => !shotImageEntryIds.includes(img.shotImageEntryId));
-    actions.setLocalOrderedShotImages(optimisticImages);
-    skipNextSyncRef.current = true; // Skip next prop sync to prevent flicker
+    // REMOVED: Optimistic local state - two-phase loading handles updates
     
     // Execute all timeline removals
     const removePromises = shotImageEntryIds.map(id => 
@@ -370,15 +322,11 @@ export const useGenerationActions = ({
 
     try {
       await Promise.all(removePromises);
-      console.log('[OPTIMISTIC_DELETE] Batch removal completed successfully');
+      console.log('[BATCH_DELETE] Batch removal completed successfully');
     } catch (error) {
-      // Rollback on error
-      console.log('[OPTIMISTIC_DELETE] Rolling back batch optimistic removal');
-      actions.setLocalOrderedShotImages(orderedShotImages);
-      skipNextSyncRef.current = false;
       toast.error('Failed to remove some images from timeline');
     }
-  }, [selectedShot?.id, projectId, actions, removeImageFromShotMutation, orderedShotImages, state.localOrderedShotImages, skipNextSyncRef]);
+  }, [selectedShot?.id, projectId, removeImageFromShotMutation]);
 
   const handleDuplicateImage = useCallback(async (shotImageEntryId: string, timeline_frame: number) => {
     console.log('[DUPLICATE_DEBUG] 🚀 DUPLICATE BUTTON CLICKED:', {
@@ -393,20 +341,20 @@ export const useGenerationActions = ({
       return;
     }
 
-    const originalImage = state.localOrderedShotImages.find(img => img.shotImageEntryId === shotImageEntryId);
+    const originalImage = orderedShotImages.find(img => (img.shotImageEntryId ?? img.id) === shotImageEntryId);
     if (!originalImage) {
       toast.error("Original image not found for duplication.");
       return;
     }
     const generationId = originalImage.id;
     
-    console.log('[DUPLICATE_DEBUG] 📍 FOUND ORIGINAL IMAGE IN LOCAL STATE:', {
+    console.log('[DUPLICATE_DEBUG] 📍 FOUND ORIGINAL IMAGE:', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
       generationId: generationId.substring(0, 8),
       timeline_frame_from_button: timeline_frame,
       timeline_frame_from_image: (originalImage as any).timeline_frame,
       imageUrl: originalImage.imageUrl?.substring(0, 50) + '...',
-      totalImagesInShot: state.localOrderedShotImages.length
+      totalImagesInShot: orderedShotImages.length
     });
 
     // Start loading state targeting the specific shotImageEntryId
@@ -422,20 +370,7 @@ export const useGenerationActions = ({
       // Place duplicate right after the original for mobile batch view
     };
 
-    console.log('[OPTIMISTIC_DUPLICATE] Adding optimistic duplicate for mobile', {
-      originalId: shotImageEntryId.substring(0, 8),
-      tempDuplicateId: tempDuplicateId.substring(0, 8),
-      currentImagesCount: state.localOrderedShotImages.length
-    });
-
-    // Find position of original image and insert duplicate after it
-    const originalIndex = state.localOrderedShotImages.findIndex(img => img.shotImageEntryId === shotImageEntryId);
-    const optimisticImages = [...state.localOrderedShotImages];
-    if (originalIndex !== -1) {
-      optimisticImages.splice(originalIndex + 1, 0, optimisticDuplicate);
-      actions.setLocalOrderedShotImages(optimisticImages);
-      skipNextSyncRef.current = true; // Skip the next prop sync to prevent flicker
-    }
+    // REMOVED: Optimistic duplicate insertion - two-phase loading is fast enough
 
     // Position is now computed from timeline_frame, so we don't need to calculate it
     // The useDuplicateImageInShot hook will calculate the timeline_frame midpoint
@@ -453,16 +388,7 @@ export const useGenerationActions = ({
       onSuccess: (result) => {
         console.log('[DUPLICATE] Duplicate mutation successful', result);
         
-        // Replace optimistic duplicate with real data
-        const updatedImages = state.localOrderedShotImages.map(img => 
-          img.shotImageEntryId === tempDuplicateId ? {
-            ...img,
-            shotImageEntryId: result.id,
-            id: result.generation_id,
-            isOptimistic: false
-          } : img
-        );
-        actions.setLocalOrderedShotImages(updatedImages);
+        // REMOVED: Local state update - two-phase cache will refetch
         
         // Show success state
         actions.setDuplicateSuccessImageId(shotImageEntryId);
@@ -473,16 +399,14 @@ export const useGenerationActions = ({
         console.error('[DUPLICATE] Duplicate mutation failed:', error);
         toast.error(`Failed to duplicate image: ${error.message}`);
         
-        // Remove optimistic duplicate on error
-        const revertedImages = state.localOrderedShotImages.filter(img => img.shotImageEntryId !== tempDuplicateId);
-        actions.setLocalOrderedShotImages(revertedImages);
+        // REMOVED: Rollback logic - no optimistic state to revert
       },
       onSettled: () => {
         // Clear loading state
         actions.setDuplicatingImageId(null);
       }
     });
-  }, [state.localOrderedShotImages, selectedShot?.id, projectId, actions, duplicateImageInShotMutation, skipNextSyncRef]);
+  }, [orderedShotImages, selectedShot?.id, projectId, actions, duplicateImageInShotMutation, skipNextSyncRef]);
 
   /**
    * Handle dropping external image files onto the timeline

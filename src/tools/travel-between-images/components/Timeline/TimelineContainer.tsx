@@ -925,19 +925,20 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
           {/* Timeline items */}
           {images.map((image, idx) => {
-            const framePosition = currentPositions.get(image.shotImageEntryId) ?? idx * 50;
-            const isDragging = dragState.isDragging && dragState.activeId === image.shotImageEntryId;
+            const imageKey = image.shotImageEntryId ?? image.id;
+            const framePosition = currentPositions.get(imageKey) ?? idx * 50;
+            const isDragging = dragState.isDragging && dragState.activeId === imageKey;
 
             // [Position0Debug] Track position lookup failures for item 50bbb119
-            if (image.shotImageEntryId.startsWith('50bbb119')) {
+            if (imageKey?.startsWith('50bbb119')) {
               console.log(`[Position0Debug] 🔍 Position lookup for item 50bbb119:`, {
-                shotImageEntryId: image.shotImageEntryId,
+                shotImageEntryId: imageKey,
                 framePosition,
-                fromCurrentPositions: currentPositions.has(image.shotImageEntryId),
-                currentPositionsValue: currentPositions.get(image.shotImageEntryId),
-                fallbackCalculation: !currentPositions.has(image.shotImageEntryId) ? `${idx} * 50 = ${idx * 50}` : null,
+                fromCurrentPositions: currentPositions.has(imageKey),
+                currentPositionsValue: currentPositions.get(imageKey),
+                fallbackCalculation: !currentPositions.has(imageKey) ? `${idx} * 50 = ${idx * 50}` : null,
                 currentPositionsSize: currentPositions.size,
-                allCurrentPositionsKeys: Array.from(currentPositions.keys()).map(k => k.substring(0, 8))
+                allCurrentPositionsKeys: Array.from(currentPositions.keys()).map(k => k?.substring(0, 8))
               });
             }
 
@@ -945,27 +946,27 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             if (framePosition === 0) {
               console.log(`[Position0Debug] 🎬 POSITION 0 ITEM RENDERING:`, {
                 idx,
-                imageId: image.shotImageEntryId.substring(0, 8),
+                imageId: imageKey?.substring(0, 8),
                 framePosition,
                 coordinateSystem: { fullMin, fullMax, fullRange },
-                fromCurrentPositions: currentPositions.has(image.shotImageEntryId),
-                currentPositionsValue: currentPositions.get(image.shotImageEntryId)
+                fromCurrentPositions: currentPositions.has(imageKey),
+                currentPositionsValue: currentPositions.get(imageKey)
               });
             }
 
             return (
               <TimelineItem
-                key={image.shotImageEntryId}
+                key={imageKey}
                 image={image}
                 framePosition={framePosition}
                 isDragging={isDragging}
-                isSwapTarget={swapTargetId === image.shotImageEntryId}
+                isSwapTarget={swapTargetId === imageKey}
                 dragOffset={isDragging ? dragOffset : null}
-                onMouseDown={readOnly ? undefined : (e) => handleMouseDown(e, image.shotImageEntryId, containerRef)}
+                onMouseDown={readOnly ? undefined : (e) => handleMouseDown(e, imageKey, containerRef)}
                 onDoubleClick={isMobile && !isTablet ? undefined : () => handleDesktopDoubleClick(idx)}
                 onMobileTap={isMobile ? () => {
                   console.log('[DoubleTapFlow] 📲 TimelineContainer handleMobileTap called:', {
-                    itemId: image.shotImageEntryId.substring(0, 8),
+                    itemId: imageKey?.substring(0, 8),
                     index: idx,
                     isMobile,
                     isTablet
@@ -979,7 +980,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 currentDragFrame={isDragging ? currentDragFrame : null}
                 dragDistances={isDragging ? dragDistances : null}
                 maxAllowedGap={maxAllowedGap}
-                originalFramePos={framePositions.get(image.shotImageEntryId) ?? 0}
+                originalFramePos={framePositions.get(imageKey) ?? 0}
                 onDelete={onImageDelete}
                 onDuplicate={onImageDuplicate}
                 onInpaintClick={handleInpaintClick ? () => handleInpaintClick(idx) : undefined}
@@ -987,8 +988,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 duplicateSuccessImageId={duplicateSuccessImageId}
                 projectAspectRatio={projectAspectRatio}
                 readOnly={readOnly}
-                isSelectedForMove={tapToMove.isItemSelected(image.shotImageEntryId)}
-                onTapToMove={enableTapToMove ? () => tapToMove.handleItemTap(image.shotImageEntryId) : undefined}
+                isSelectedForMove={tapToMove.isItemSelected(imageKey)}
+                onTapToMove={enableTapToMove ? () => tapToMove.handleItemTap(imageKey) : undefined}
               />
             );
           })}

@@ -11,7 +11,7 @@ const createInitialState = (): ShotEditorState => ({
   duplicatingImageId: null,
   duplicateSuccessImageId: null,
   pendingFramePositions: new Map(),
-  localOrderedShotImages: [],
+  // REMOVED: localOrderedShotImages
   creatingTaskId: null,
   isSettingsModalOpen: false,
   isModeReady: false,
@@ -51,12 +51,7 @@ const shotEditorReducer = (state: ShotEditorState, action: ShotEditorAction): Sh
         return state;
       }
       return { ...state, pendingFramePositions: action.payload };
-    case 'SET_LOCAL_ORDERED_SHOT_IMAGES':
-      // Prevent unnecessary re-renders by checking reference equality
-      if (action.payload === state.localOrderedShotImages) {
-        return state;
-      }
-      return { ...state, localOrderedShotImages: action.payload };
+    // REMOVED: SET_LOCAL_ORDERED_SHOT_IMAGES - no longer needed
     case 'SET_CREATING_TASK_ID':
       if (action.payload === state.creatingTaskId) return state;
       return { ...state, creatingTaskId: action.payload };
@@ -126,9 +121,7 @@ export const useShotEditorState = () => {
       dispatch({ type: 'SET_PENDING_FRAME_POSITIONS', payload: value });
     }, []),
 
-    setLocalOrderedShotImages: useCallback((value: GenerationRow[]) => {
-      dispatch({ type: 'SET_LOCAL_ORDERED_SHOT_IMAGES', payload: value });
-    }, []),
+    // REMOVED: setLocalOrderedShotImages - no longer needed
 
     setCreatingTaskId: useCallback((value: string | null) => {
       dispatch({ type: 'SET_CREATING_TASK_ID', payload: value });
@@ -180,7 +173,7 @@ export const useShotEditorState = () => {
     actions.setDuplicatingImageId,
     actions.setDuplicateSuccessImageId,
     actions.setPendingFramePositions,
-    actions.setLocalOrderedShotImages,
+    // REMOVED: actions.setLocalOrderedShotImages
     actions.setCreatingTaskId,
     actions.setSettingsModalOpen,
     actions.setModeReady,

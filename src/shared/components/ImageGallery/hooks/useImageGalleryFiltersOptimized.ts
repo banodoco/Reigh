@@ -241,6 +241,12 @@ export const useImageGalleryFiltersOptimized = ({
       hasUpdates = true;
     }
     
+    if (filtersState.searchTerm !== initialSearchTerm) {
+      externalUpdates.searchTerm = initialSearchTerm;
+      externalUpdates.isSearchOpen = !!initialSearchTerm; // Auto-open search if there's a term
+      hasUpdates = true;
+    }
+    
     if (hasUpdates) {
       dispatch({ type: 'SYNC_EXTERNAL_FILTERS', payload: externalUpdates });
     }
@@ -250,11 +256,13 @@ export const useImageGalleryFiltersOptimized = ({
     initialMediaTypeFilter,
     initialStarredFilter,
     initialToolTypeFilter,
+    initialSearchTerm,
     filtersState.shotFilter,
     filtersState.excludePositioned,
     filtersState.mediaTypeFilter,
     filtersState.showStarredOnly,
-    filtersState.toolTypeFilterEnabled
+    filtersState.toolTypeFilterEnabled,
+    filtersState.searchTerm
   ]);
 
   // Memoized action creators to prevent unnecessary re-renders
