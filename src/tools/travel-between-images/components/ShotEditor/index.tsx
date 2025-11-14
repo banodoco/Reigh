@@ -3075,7 +3075,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 </div>
 
                 {/* Full-width divider and generate button - Original position with ref */}
-                <div ref={ctaContainerRef} className="mt-6 pt-6 border-t">
+                <div 
+                  ref={ctaContainerRef} 
+                  className={`mt-6 pt-6 border-t ${isCtaFloating ? 'opacity-0 pointer-events-none' : ''}`}
+                >
                   <div className="flex flex-col items-center">
                     {/* Variant Name Input */}
                     <div className="w-full max-w-md mb-4">
@@ -3222,7 +3225,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       />
       
       {/* Floating CTA - appears when original position is not visible */}
-      {showCtaElement && (() => {
+      {showCtaElement && isCtaFloating && (() => {
         // Use stable bounds (captured when floating becomes visible) to prevent jumps during fast scrolling
         // Fall back to current ctaBounds if stable bounds aren't available
         const boundsToUse = stableCtaBoundsRef.current.width > 0 ? stableCtaBoundsRef.current : ctaBounds;
@@ -3230,20 +3233,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         return (
           <div 
-            className={`fixed z-[80] flex justify-center pointer-events-none ${
-              isInitialMountRef.current 
-                ? '' // No animation on initial mount
-                : isCtaFloating 
-                  ? 'animate-in slide-in-from-bottom-4 fade-in' 
-                  : 'animate-out slide-out-to-bottom-4 fade-out'
-            }`}
+            className="fixed z-[80] flex justify-center animate-in fade-in duration-300"
             style={{
               bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
               left: hasCtaBounds ? `${boundsToUse.left}px` : (isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px'),
               width: hasCtaBounds ? `${boundsToUse.width}px` : undefined,
               right: hasCtaBounds ? undefined : (isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px'),
-              transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
-              willChange: 'left, width, right, opacity',
+              transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out',
+              willChange: 'left, width, right',
               transform: 'translateZ(0)'
             }}
           >
