@@ -182,16 +182,182 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot,
 }) => {
-  // [ShotNavPerf] Log when component renders with images
-  const renderStartTime = performance.now();
+  // [RenderProfile] DETAILED PROFILING: Track what props are changing to cause re-renders
   const renderCount = React.useRef(0);
   renderCount.current += 1;
-  console.log('[ShotNavPerf] 📸 ShotImagesEditor RENDER START #' + renderCount.current, {
-    selectedShotId: selectedShotId?.substring(0, 8),
-    preloadedImagesCount: preloadedImages?.length || 0,
-    isModeReady,
-    generationMode,
-    timestamp: Date.now()
+  
+  // Track all props that could cause re-renders
+  const prevPropsRef = React.useRef<{
+    selectedShotId?: string;
+    preloadedImagesLength: number;
+    isModeReady: boolean;
+    generationMode: string;
+    readOnly: boolean;
+    batchVideoFrames?: number;
+    batchVideoContext?: number;
+    pendingPositionsSize: number;
+    columns: number;
+    unpositionedGenerationsCount: number;
+    fileInputKey: number;
+    isUploadingImage: boolean;
+    uploadProgress: number;
+    duplicatingImageId?: string | null;
+    duplicateSuccessImageId?: string | null;
+    defaultPrompt: string;
+    defaultNegativePrompt: string;
+    structureVideoPath?: string | null;
+    structureVideoTreatment: string;
+    structureVideoMotionStrength: number;
+    structureVideoType: string;
+    autoCreateIndividualPrompts: boolean;
+    allShotsLength: number;
+  }>({
+    selectedShotId: undefined,
+    preloadedImagesLength: 0,
+    isModeReady: false,
+    generationMode: '',
+    readOnly: false,
+    pendingPositionsSize: 0,
+    columns: 2,
+    unpositionedGenerationsCount: 0,
+    fileInputKey: 0,
+    isUploadingImage: false,
+    uploadProgress: 0,
+    duplicatingImageId: null,
+    duplicateSuccessImageId: null,
+    defaultPrompt: '',
+    defaultNegativePrompt: '',
+    structureVideoPath: null,
+    structureVideoTreatment: 'adjust',
+    structureVideoMotionStrength: 1.0,
+    structureVideoType: 'flow',
+    autoCreateIndividualPrompts: false,
+    allShotsLength: 0,
+  });
+  
+  React.useEffect(() => {
+    const currentProps = {
+      selectedShotId,
+      preloadedImagesLength: preloadedImages?.length || 0,
+      isModeReady,
+      generationMode,
+      readOnly,
+      batchVideoFrames,
+      batchVideoContext,
+      pendingPositionsSize: pendingPositions.size,
+      columns,
+      unpositionedGenerationsCount,
+      fileInputKey,
+      isUploadingImage,
+      uploadProgress,
+      duplicatingImageId,
+      duplicateSuccessImageId,
+      defaultPrompt,
+      defaultNegativePrompt,
+      structureVideoPath: propStructureVideoPath,
+      structureVideoTreatment: propStructureVideoTreatment,
+      structureVideoMotionStrength: propStructureVideoMotionStrength,
+      structureVideoType: propStructureVideoType,
+      autoCreateIndividualPrompts,
+      allShotsLength: allShots?.length || 0,
+    };
+    
+    const prev = prevPropsRef.current;
+    const changedProps: string[] = [];
+    
+    (Object.keys(currentProps) as Array<keyof typeof currentProps>).forEach(key => {
+      if (prev[key] !== currentProps[key]) {
+        changedProps.push(`${key}: ${JSON.stringify(prev[key])} → ${JSON.stringify(currentProps[key])}`);
+      }
+    });
+    
+    if (changedProps.length > 0) {
+      console.log(`[RenderProfile] 📸 ShotImagesEditor RENDER #${renderCount.current} - Props changed:`, {
+        changedProps,
+        timestamp: Date.now()
+      });
+    } else if (renderCount.current > 1) {
+      // Re-render with NO prop changes - this is the problem!
+      console.warn(`[RenderProfile] ⚠️ ShotImagesEditor RENDER #${renderCount.current} - NO PROPS CHANGED (parent re-render)`, {
+        timestamp: Date.now()
+      });
+    }
+    
+    prevPropsRef.current = currentProps;
+  });
+  
+  // [RenderProfile] Track callback prop changes (these are often unstable)
+  const prevCallbacksRef = React.useRef<{
+    onGenerationModeChange?: any;
+    onImageReorder?: any;
+    onImageSaved?: any;
+    onContextFramesChange?: any;
+    onFramePositionsChange?: any;
+    onImageDrop?: any;
+    onGenerationDrop?: any;
+    onBatchFileDrop?: any;
+    onBatchGenerationDrop?: any;
+    onPendingPositionApplied?: any;
+    onImageDelete?: any;
+    onBatchImageDelete?: any;
+    onImageDuplicate?: any;
+    onOpenUnpositionedPane?: any;
+    onImageUpload?: any;
+    onDefaultPromptChange?: any;
+    onDefaultNegativePromptChange?: any;
+    propOnStructureVideoChange?: any;
+    onSelectionChange?: any;
+    onShotChange?: any;
+    onAddToShot?: any;
+    onAddToShotWithoutPosition?: any;
+    onCreateShot?: any;
+  }>({});
+  
+  React.useEffect(() => {
+    const callbacks = {
+      onGenerationModeChange,
+      onImageReorder,
+      onImageSaved,
+      onContextFramesChange,
+      onFramePositionsChange,
+      onImageDrop,
+      onGenerationDrop,
+      onBatchFileDrop,
+      onBatchGenerationDrop,
+      onPendingPositionApplied,
+      onImageDelete,
+      onBatchImageDelete,
+      onImageDuplicate,
+      onOpenUnpositionedPane,
+      onImageUpload,
+      onDefaultPromptChange,
+      onDefaultNegativePromptChange,
+      propOnStructureVideoChange,
+      onSelectionChange,
+      onShotChange,
+      onAddToShot,
+      onAddToShotWithoutPosition,
+      onCreateShot,
+    };
+    
+    const prev = prevCallbacksRef.current;
+    const changedCallbacks: string[] = [];
+    
+    (Object.keys(callbacks) as Array<keyof typeof callbacks>).forEach(key => {
+      if (prev[key] !== callbacks[key]) {
+        changedCallbacks.push(key);
+      }
+    });
+    
+    if (changedCallbacks.length > 0) {
+      console.warn(`[RenderProfile] 🔄 ShotImagesEditor RENDER #${renderCount.current} - Callback props changed (UNSTABLE):`, {
+        changedCallbacks,
+        hint: 'Parent should wrap these in useCallback',
+        timestamp: Date.now()
+      });
+    }
+    
+    prevCallbacksRef.current = callbacks;
   });
   
   // Force mobile to use batch mode regardless of desktop setting
@@ -557,15 +723,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     }
   }, [onAddToShotWithoutPosition, selectedShotId]);
 
-  // [ShotNavPerf] Log render completion
-  const renderEndTime = performance.now();
-  const renderDuration = renderEndTime - renderStartTime;
-  console.log('[ShotNavPerf] ✅ ShotImagesEditor RENDER COMPLETE', {
-    selectedShotId: selectedShotId?.substring(0, 8),
-    renderDuration: `${renderDuration.toFixed(2)}ms`,
-    imagesCount: images.length,
-    timestamp: Date.now()
-  });
+  // [ShotNavPerf] Removed redundant render completion log - use STATE CHANGED log instead
 
   return (
     <Card className="w-full">
@@ -1180,4 +1338,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   );
 };
 
-export default ShotImagesEditor;
+// [PERFORMANCE] Wrap in React.memo to prevent re-renders when props haven't meaningfully changed
+// This is critical because parent (ShotEditor) re-renders frequently due to settings queries
+export default React.memo(ShotImagesEditor);

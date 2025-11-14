@@ -177,7 +177,32 @@ export function useProjectGenerationModesCache(projectId: string | null) {
     });
   }, [projectId, getAllShotModes]);
   
-  // Invalidate cache when mode changes
+  // Optimistically update a single shot's mode in cache
+  const updateShotMode = useCallback((shotId: string | null, mode: 'batch' | 'timeline') => {
+    if (!projectId || !shotId) return;
+    
+    console.log('[ProjectGenerationModesCache] 🎯 Optimistically updating shot mode:', {
+      shotId: shotId.substring(0, 8),
+      newMode: mode,
+      timestamp: Date.now()
+    });
+    
+    // Update in-memory cache immediately
+    const currentModes = cacheRef.current.getProjectModes(projectId);
+    if (currentModes) {
+      currentModes.set(shotId, mode);
+      cacheRef.current.setProjectModes(projectId, currentModes);
+    }
+    
+    // Also update React Query cache if it exists
+    if (projectModes) {
+      const updatedModes = new Map(projectModes);
+      updatedModes.set(shotId, mode);
+      // Note: We don't force a refetch here - let it happen naturally via polling
+    }
+  }, [projectId, projectModes]);
+  
+  // Invalidate cache when mode changes (for manual refresh if needed)
   const invalidateOnModeChange = useCallback(() => {
     if (projectId) {
       cacheRef.current.deleteProject(projectId);
@@ -189,6 +214,7 @@ export function useProjectGenerationModesCache(projectId: string | null) {
   return {
     getShotGenerationMode,
     getAllShotModes,
+    updateShotMode,
     isLoading,
     error,
     refetch,

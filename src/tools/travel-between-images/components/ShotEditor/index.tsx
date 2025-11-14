@@ -2482,6 +2482,110 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
   
+  // [PERFORMANCE] Stable callbacks for ShotImagesEditor to prevent re-renders
+  const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string, createNew?: boolean) => {
+    console.log('[ImageFlipDebug] [ShotEditor] onImageSaved called', {
+      imageId,
+      newImageUrl,
+      createNew,
+      timestamp: Date.now()
+    });
+    
+    try {
+      if (createNew) {
+        // TODO: Create new generation if needed
+        console.log('[ImageFlipDebug] [ShotEditor] Create new not implemented yet');
+        return;
+      }
+      
+      console.log('[ImageFlipDebug] [ShotEditor] Updating generation location and thumbnail', {
+        imageId,
+        newImageUrl,
+        timestamp: Date.now()
+      });
+      
+      // Update both location and thumbnail_url in the database
+      await updateGenerationLocationMutation.mutateAsync({
+        id: imageId,
+        location: newImageUrl,
+        thumbUrl: newImageUrl, // Also update thumbnail
+        projectId: projectId
+      });
+      
+      console.log('[ImageFlipDebug] [ShotEditor] Generation location updated successfully', {
+        timestamp: Date.now()
+      });
+      
+      // Invalidate queries to refresh the UI
+      await queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShotId] });
+      await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShotId] });
+      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShotId] });
+      // IMPORTANT: Also invalidate two-phase cache keys
+      await queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', selectedShotId] });
+      await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', selectedShotId] });
+      
+      console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {
+        timestamp: Date.now()
+      });
+      
+      // Call parent callback to update other related data
+      onShotImagesUpdate();
+      
+      console.log('[ImageFlipDebug] [ShotEditor] onImageSaved completed successfully', {
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('[ImageFlipDebug] [ShotEditor] Error in onImageSaved:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        imageId,
+        newImageUrl,
+        timestamp: Date.now()
+      });
+      toast.error('Failed to save flipped image.');
+    }
+  }, [updateGenerationLocationMutation, projectId, selectedShotId, queryClient, onShotImagesUpdate]);
+
+  const handleSelectionChange = useCallback((hasSelection: boolean) => {
+    // Track selection state - floating CTA will auto-hide/show based on this
+    setHasActiveSelection(hasSelection);
+  }, []);
+
+  const handleDefaultNegativePromptChange = useCallback((value: string) => {
+    onSteerableMotionSettingsChange({ negative_prompt: value });
+  }, [onSteerableMotionSettingsChange]);
+
+  const handleShotChange = useCallback((shotId: string) => {
+    console.log('[ShotEditor] Shot change requested to:', shotId);
+    // Shot change will be handled by parent navigation
+  }, []);
+
+  const handleAddToShot = useCallback(async (shotId: string, generationId: string, position: number) => {
+    console.log('[ShotEditor] Adding generation to shot with position', { shotId, generationId, position });
+    await addToShotMutation({ 
+      shot_id: shotId, 
+      generation_id: generationId, 
+      timelineFrame: position, 
+      project_id: projectId 
+    });
+  }, [addToShotMutation, projectId]);
+
+  const handleAddToShotWithoutPosition = useCallback(async (shotId: string, generationId: string) => {
+    console.log('[ShotEditor] Adding generation to shot without position', { shotId, generationId });
+    await addToShotWithoutPositionMutation({ 
+      shot_id: shotId, 
+      generation_id: generationId, 
+      project_id: projectId 
+    });
+  }, [addToShotWithoutPositionMutation, projectId]);
+
+  const handleCreateShot = useCallback(async (name: string) => {
+    console.log('[ShotEditor] Creating new shot', { name });
+    const result = await createShotMutation({ name, projectId });
+    return result.shot.id;
+  }, [createShotMutation, projectId]);
+  
   // Intersection observer for sticky header (using existing ctaContainerRef from line 531)
   useEffect(() => {
     const ctaContainer = ctaContainerRef.current;
@@ -2582,69 +2686,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             batchVideoContext={batchVideoContext}
             preloadedImages={orderedShotImages}
             onImageReorder={handleReorderImagesInShot}
-            onImageSaved={async (imageId: string, newImageUrl: string, createNew?: boolean) => {
-              console.log('[ImageFlipDebug] [ShotEditor] onImageSaved called', {
-                imageId,
-                newImageUrl,
-                createNew,
-                timestamp: Date.now()
-              });
-              
-              try {
-                if (createNew) {
-                  // TODO: Create new generation if needed
-                  console.log('[ImageFlipDebug] [ShotEditor] Create new not implemented yet');
-                  return;
-                }
-                
-                console.log('[ImageFlipDebug] [ShotEditor] Updating generation location and thumbnail', {
-                  imageId,
-                  newImageUrl,
-                  timestamp: Date.now()
-                });
-                
-                // Update both location and thumbnail_url in the database
-                await updateGenerationLocationMutation.mutateAsync({
-                  id: imageId,
-                  location: newImageUrl,
-                  thumbUrl: newImageUrl, // Also update thumbnail
-                  projectId: projectId
-                });
-                
-                console.log('[ImageFlipDebug] [ShotEditor] Generation location updated successfully', {
-                  timestamp: Date.now()
-                });
-                
-                // Invalidate queries to refresh the UI
-                await queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShotId] });
-                await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShotId] });
-                await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShotId] });
-                // IMPORTANT: Also invalidate two-phase cache keys
-                await queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', selectedShotId] });
-                await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', selectedShotId] });
-                
-                console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {
-                  timestamp: Date.now()
-                });
-                
-                // Call parent callback to update other related data
-                onShotImagesUpdate();
-                
-                console.log('[ImageFlipDebug] [ShotEditor] onImageSaved completed successfully', {
-                  timestamp: Date.now()
-                });
-              } catch (error) {
-                console.error('[ImageFlipDebug] [ShotEditor] Error in onImageSaved:', {
-                  error,
-                  errorMessage: error instanceof Error ? error.message : String(error),
-                  errorStack: error instanceof Error ? error.stack : undefined,
-                  imageId,
-                  newImageUrl,
-                  timestamp: Date.now()
-                });
-                toast.error('Failed to save flipped image.');
-              }
-            }}
+            onImageSaved={handleImageSaved}
             onContextFramesChange={onBatchVideoContextChange}
             onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}
@@ -2674,14 +2716,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={effectiveAspectRatio}
-            onSelectionChange={(hasSelection) => {
-              // Track selection state - floating CTA will auto-hide/show based on this
-              setHasActiveSelection(hasSelection);
-            }}
+            onSelectionChange={handleSelectionChange}
             defaultPrompt={batchVideoPrompt}
             onDefaultPromptChange={onBatchVideoPromptChange}
             defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
-            onDefaultNegativePromptChange={(value) => onSteerableMotionSettingsChange({ negative_prompt: value })}
+            onDefaultNegativePromptChange={handleDefaultNegativePromptChange}
             // Structure video props
             structureVideoPath={structureVideoPath}
             structureVideoMetadata={structureVideoMetadata}
@@ -2692,32 +2731,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             autoCreateIndividualPrompts={autoCreateIndividualPrompts}
             // Shot management for external generation viewing
             allShots={shots}
-            onShotChange={(shotId) => {
-              console.log('[ShotEditor] Shot change requested to:', shotId);
-              // Shot change will be handled by parent navigation
-            }}
-            onAddToShot={async (shotId, generationId, position) => {
-              console.log('[ShotEditor] Adding generation to shot with position', { shotId, generationId, position });
-              await addToShotMutation({ 
-                shot_id: shotId, 
-                generation_id: generationId, 
-                timelineFrame: position, 
-                project_id: projectId 
-              });
-            }}
-            onAddToShotWithoutPosition={async (shotId, generationId) => {
-              console.log('[ShotEditor] Adding generation to shot without position', { shotId, generationId });
-              await addToShotWithoutPositionMutation({ 
-                shot_id: shotId, 
-                generation_id: generationId, 
-                project_id: projectId 
-              });
-            }}
-            onCreateShot={async (name) => {
-              console.log('[ShotEditor] Creating new shot', { name });
-              const result = await createShotMutation({ name, projectId });
-              return result.shot.id;
-            }}
+            onShotChange={handleShotChange}
+            onAddToShot={handleAddToShot}
+            onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
+            onCreateShot={handleCreateShot}
           />
         </div>
 

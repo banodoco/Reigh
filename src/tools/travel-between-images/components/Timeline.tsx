@@ -212,21 +212,23 @@ const Timeline: React.FC<TimelineProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot
 }) => {
-  // [ShotNavPerf] Track Timeline component renders and image count
+  // [ShotNavPerf] Track Timeline component renders and image count - ONLY ON CHANGE
   const timelineRenderCount = React.useRef(0);
   timelineRenderCount.current += 1;
-  const prevImagesLengthRef = React.useRef(0);
-  const imagesChanged = propImages?.length !== prevImagesLengthRef.current;
+  const prevTimelineStateRef = React.useRef<string>('');
+  const timelineStateKey = `${shotId}-${propImages?.length || 0}-${propShotGenerations?.length || 0}`;
   
-  console.log('[ShotNavPerf] 🎞️ Timeline RENDER #' + timelineRenderCount.current, {
-    shotId: shotId?.substring(0, 8),
-    propImagesCount: propImages?.length || 0,
-    propShotGenerationsCount: propShotGenerations?.length || 0,
-    imagesChanged,
-    timestamp: Date.now()
-  });
-  
-  prevImagesLengthRef.current = propImages?.length || 0;
+  React.useEffect(() => {
+    if (prevTimelineStateRef.current !== timelineStateKey) {
+      console.log('[ShotNavPerf] 🎞️ Timeline STATE CHANGED (render #' + timelineRenderCount.current + ')', {
+        shotId: shotId?.substring(0, 8),
+        propImagesCount: propImages?.length || 0,
+        propShotGenerationsCount: propShotGenerations?.length || 0,
+        timestamp: Date.now()
+      });
+      prevTimelineStateRef.current = timelineStateKey;
+    }
+  }, [timelineStateKey, shotId, propImages?.length, propShotGenerations?.length]);
   
   // Navigation
   const navigate = useNavigate();

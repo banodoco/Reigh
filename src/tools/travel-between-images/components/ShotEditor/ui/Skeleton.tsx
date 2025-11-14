@@ -2,6 +2,7 @@ import React from 'react';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { CardHeader, CardTitle, CardContent } from '@/shared/components/ui/card';
 import { GenerationRow } from '@/types/shots';
+import { Image } from 'lucide-react';
 
 interface ImageManagerSkeletonProps {
   isMobile: boolean;
@@ -60,13 +61,6 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
     return isMobile ? 'grid-cols-2' : 'grid-cols-6';
   }, [columns, isMobile]);
   
-  // If we have shot data, show exact count; otherwise fall back to default
-  const fallbackCols = React.useMemo(() => {
-    if (columns) return columns;
-    return isMobile ? 2 : 6;
-  }, [columns, isMobile]);
-  const skeletonCount = actualImageCount > 0 ? actualImageCount : fallbackCols;
-  
   // Calculate exact aspect ratio for skeleton items based on project dimensions
   const aspectRatioStyle = React.useMemo(() => {
     if (!projectAspectRatio) return { aspectRatio: '1' }; // Default square
@@ -85,9 +79,9 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
       {/* Only render content skeleton since header is now always rendered in ShotImagesEditor */}
       <div className="p-1">
           {actualImageCount > 0 ? (
-            /* Real shot composition skeleton */
+            /* Real shot composition skeleton - show actual image count */
             <div className={`grid gap-3 ${gridCols}`}>
-              {Array.from({ length: skeletonCount }).map((_, i) => (
+              {Array.from({ length: actualImageCount }).map((_, i) => (
                 <div key={i} style={aspectRatioStyle}>
                   <div className="w-full h-full relative">
                     {/* Realistic image skeleton with subtle loading animation */}
@@ -102,13 +96,18 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
               ))}
             </div>
           ) : (
-            /* Fallback generic skeleton when no shot data available */
-            <div className={`grid gap-3 ${gridCols}`}>
-              {Array.from({ length: skeletonCount }).map((_, i) => (
-                <div key={i} style={aspectRatioStyle}>
-                  <Skeleton className="w-full h-full rounded-lg" />
+            /* Empty state skeleton - matches the uploader UI when no images */
+            <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <Image className="h-8 w-8 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Add images to start building your animation
+                </p>
+                <div className="flex gap-2 w-full">
+                  <Skeleton className="flex-1 h-9" />
+                  <Skeleton className="flex-1 h-9" />
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>

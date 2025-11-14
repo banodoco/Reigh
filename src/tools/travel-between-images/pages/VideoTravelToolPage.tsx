@@ -172,7 +172,7 @@ const VideoTravelToolPage: React.FC = () => {
   const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
   
   // Preload all shot generation modes for the project
-  const { getShotGenerationMode, invalidateOnModeChange, isLoading: isLoadingProjectModes, error: projectModesError } = useProjectGenerationModesCache(selectedProjectId);
+  const { getShotGenerationMode, updateShotMode, isLoading: isLoadingProjectModes, error: projectModesError } = useProjectGenerationModesCache(selectedProjectId);
   
   // Debug project video counts cache - reduced logging
   const hasLoggedCacheState = useRef(false);
@@ -482,10 +482,14 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotSettings, selectedShot?.id]);
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
+    // Optimistically update the cache for THIS shot immediately
+    if (selectedShot?.id) {
+      updateShotMode(selectedShot.id, mode);
+    }
+    
+    // Update the actual settings (will save to DB asynchronously)
     shotSettings.updateField('generationMode', mode);
-    // Invalidate the cache so other shots will see the updated mode immediately
-    invalidateOnModeChange();
-  }, [shotSettings, invalidateOnModeChange]);
+  }, [shotSettings, selectedShot?.id, updateShotMode]);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
