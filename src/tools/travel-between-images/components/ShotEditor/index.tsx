@@ -2977,81 +2977,79 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const gap = isMobile ? -16 : 8; // Negative gap on mobile to push up, small gap on desktop
         const topPosition = globalHeaderHeight + gap;
         
-        // Calculate horizontal constraints based on locked panes
-        const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
-        const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
-        
+        // Measure the original header container to get its exact position and width
         const hasHeaderBounds = headerBounds.width > 0;
-        const stickyStyle: React.CSSProperties = hasHeaderBounds
-          ? {
-              left: `${headerBounds.left}px`,
-              width: `${headerBounds.width}px`
-            }
-          : {
-              left: `${leftOffset}px`,
-              right: `${rightOffset}px`
-            };
-
+        
+        // Use the exact same structure as the original header
+        // Position the sticky wrapper to match the original header container's position
         return (
           <div
             className={`fixed z-50 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
-              ...stickyStyle,
+              left: hasHeaderBounds ? `${headerBounds.left}px` : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
+              width: hasHeaderBounds ? `${headerBounds.width}px` : undefined,
+              right: hasHeaderBounds ? undefined : `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
               willChange: 'transform, opacity',
               transform: 'translateZ(0)'
             }}
           >
-            {/* Match the original header's three-column justify-between layout */}
-            <div className="flex justify-between items-center px-2">
-              {/* Left spacer - fixed width to match back button container */}
-              <div className="w-[140px]" />
-              
-              {/* Center section - matches original header structure */}
-              <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-2' : 'py-2 px-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
-                {/* Subtle grain overlay to match GlobalHeader vibe */}
-                <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onPreviousShot) onPreviousShot();
-                  }}
-                  disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                  className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
-                  title="Previous shot"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+            {/* EXACT same structure as original Header component's desktop layout */}
+            <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
+              <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
+                {/* Left - Back button container (invisible but maintains layout) */}
+                <div className="w-[140px]" />
                 
-                <span
-                  className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-primary truncate px-2 ${isMobile ? 'max-w-[100px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''} pointer-events-auto`}
-                  onClick={handleStickyNameClick}
-                  title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
-                >
-                  {selectedShot?.name || 'Untitled Shot'}
-                </span>
+                {/* Center - Shot name with navigation (styled floating element) */}
+                <div className="flex items-center justify-center">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onPreviousShot) onPreviousShot();
+                      }}
+                      disabled={!hasPrevious || state.isTransitioningFromNameEdit}
+                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
+                      title="Previous shot"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <span
+                      className={`text-xl font-semibold text-primary truncate px-4 w-[200px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''} pointer-events-auto relative overflow-hidden bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border`}
+                      onClick={handleStickyNameClick}
+                      title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
+                      style={{
+                        // Add subtle grain overlay effect
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                      }}
+                    >
+                      {selectedShot?.name || 'Untitled Shot'}
+                    </span>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onNextShot) onNextShot();
+                      }}
+                      disabled={!hasNext || state.isTransitioningFromNameEdit}
+                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
+                      title="Next shot"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
                 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onNextShot) onNextShot();
-                  }}
-                  disabled={!hasNext || state.isTransitioningFromNameEdit}
-                  className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
-                  title="Next shot"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                {/* Right - Aspect ratio selector container (invisible but maintains layout) */}
+                <div className="w-[140px]" />
               </div>
-              
-              {/* Right spacer - fixed width to match aspect ratio selector container */}
-              <div className="w-[140px]" />
             </div>
           </div>
         );
