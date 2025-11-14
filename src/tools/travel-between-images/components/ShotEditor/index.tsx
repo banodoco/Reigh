@@ -3236,7 +3236,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             }}
           >
             {/* EXACT same structure as original CTA */}
-            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-4 pointer-events-auto">
+            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md pointer-events-auto">
               <div className="flex flex-col items-center">
                 {/* Variant Name Input */}
                 <div className="w-full max-w-md mb-4">
