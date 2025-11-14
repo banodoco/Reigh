@@ -115,6 +115,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   getShotVideoCount,
   invalidateVideoCountsCache,
 }) => {
+  // [ShotNavPerf] TEST LOG - Component is rendering
+  console.log('[ShotNavPerf] 🚀 ShotEditor RENDERING START', {
+    selectedShotId: selectedShotId?.substring(0, 8),
+    timestamp: Date.now()
+  });
+  
   // Call all hooks first (Rules of Hooks)
   const { selectedProjectId, projects } = useProject();
   const queryClient = useQueryClient();
@@ -290,15 +296,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // [VideoLoadSpeedIssue] AGGRESSIVE OPTIMIZATION: Use memoized values to prevent re-render loops
   const hasContextData = React.useMemo(() => contextImages.length > 0, [contextImages.length]);
-  // CRITICAL FIX: Always load detailed data in ShotEditor to ensure consistency with VideoTravelToolPage
-  // This prevents video pair config mismatches when context data is limited (e.g., 5 images vs 10 total)
+  
+  // [ShotNavPerf] PERFORMANCE FIX: Always fetch full data in background, but don't block UI
+  // We'll use context images immediately while the query runs asynchronously
   const shouldLoadDetailedData = React.useMemo(() => 
-    !!selectedShotId, // Always load full data in editor mode
+    !!selectedShotId, // Always load full data in editor mode for pair prompts, mutations, etc.
     [selectedShotId]
   );
   
-  // [VideoLoadSpeedIssue] CRITICAL: Completely disable hook when context data exists
-  // Use a stable null value to prevent React Query from re-executing
+  // Always enable query to get full data (needed for mutations and pair prompts)
   const queryKey = shouldLoadDetailedData ? selectedShotId : null;
   
   console.log('[VideoLoadSpeedIssue] ShotEditor optimization decision:', {
@@ -316,9 +322,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   console.log('[ShotNavPerf] 🎬 ShotEditor calling useAllShotGenerations', {
     queryKey: queryKey?.substring(0, 8) || 'null',
     selectedShotId: selectedShotId?.substring(0, 8),
+    hasContextImages: contextImages.length > 0,
     timestamp: Date.now()
   });
-  const fullImagesQueryResult = useAllShotGenerations(queryKey);
+  
+  // [ShotNavPerf] CRITICAL FIX: Pass disableRefetch during initial load to prevent query storm
+  // The query will still run once, but won't refetch on every render
+  const fullImagesQueryResult = useAllShotGenerations(queryKey, {
+    disableRefetch: false // Let it fetch normally, we'll use context images as placeholder
+  });
+  
   const fullShotImages = fullImagesQueryResult.data || [];
   const isLoadingFullImages = fullImagesQueryResult.isLoading;
   console.log('[ShotNavPerf] ✅ ShotEditor useAllShotGenerations result:', {
@@ -335,20 +348,41 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
   const orderedShotImages = React.useMemo(() => {
-    // [ShotNavPerf] When query is fetching and has no data yet, use context images as fallback
-    // This prevents blank screen during arrow navigation
+    // [ShotNavPerf] PERFORMANCE FIX: Prioritize showing content immediately
+    // Use context images when query is fetching to prevent blank screen during navigation
     const hasValidFullImages = fullShotImages.length > 0;
+    const hasValidContextImages = contextImages.length > 0;
     const isQueryFetchingNewData = fullImagesQueryResult.isFetching && !fullImagesQueryResult.data;
     
-    console.log('[ShotNavPerf] 🔄 Deciding data source:', {
+    // Priority: fullImages > contextImages (while fetching) > empty
+    // This ensures instant display when navigating via arrows
+    let result: typeof contextImages;
+    let dataSource: string;
+    
+    if (hasValidFullImages) {
+      result = fullShotImages;
+      dataSource = 'fullImages (query complete)';
+    } else if (hasValidContextImages && (isQueryFetchingNewData || fullImagesQueryResult.isLoading)) {
+      result = contextImages;
+      dataSource = 'contextImages (query pending)';
+    } else if (hasValidContextImages) {
+      result = contextImages;
+      dataSource = 'contextImages (no query)';
+    } else {
+      result = fullShotImages; // Fallback to query result even if empty
+      dataSource = 'fullImages (no context available)';
+    }
+    
+    console.log('[ShotNavPerf] 🔄 Data source decision:', {
       hasValidFullImages,
+      hasValidContextImages,
       isQueryFetchingNewData,
+      isQueryLoading: fullImagesQueryResult.isLoading,
       contextImagesCount: contextImages.length,
       fullImagesCount: fullShotImages.length,
-      willUse: hasValidFullImages ? 'fullImages' : (isQueryFetchingNewData ? 'contextImages (fetching)' : 'contextImages')
+      resultCount: result.length,
+      dataSource
     });
-    
-    const result = hasValidFullImages ? fullShotImages : contextImages;
     
     // Check for duplicates by ID
     const idCounts = new Map<string, number>();
@@ -378,7 +412,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     });
     
     return result;
-  }, [fullShotImages, contextImages, selectedShotId]);
+  }, [
+    fullShotImages, // Need full array for the actual data
+    contextImages,  // Need full array for the actual data
+    fullImagesQueryResult.isFetching,
+    fullImagesQueryResult.isLoading,
+    fullImagesQueryResult.data,
+    selectedShotId
+  ]);
 
   
   // [VideoLoadSpeedIssue] Track image data loading progress

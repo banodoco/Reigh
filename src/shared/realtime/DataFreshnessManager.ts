@@ -76,18 +76,20 @@ export class DataFreshnessManager {
     const now = Date.now();
     const timeSinceStatusChange = now - this.state.lastStatusChange;
 
-    // 🎯 NEW: If realtime is connected and stable, DISABLE polling completely
+    // 🎯 If realtime is connected, trust it after it's been stable
     if (this.state.realtimeStatus === 'connected') {
-      // If realtime just connected, give it time to prove it's stable
+      // If realtime just connected (< 30 seconds), give it time to prove it's stable
       if (timeSinceStatusChange < 30000) {
         console.log('[DataFreshness:Polling] ⏱️ Realtime recently connected, using backup polling', {
           queryKey: queryKey[0],
-          timeSinceConnect: timeSinceStatusChange
+          timeSinceConnect: Math.round(timeSinceStatusChange / 1000) + 's'
         });
         return 30000; // 30 seconds - wait for realtime to prove it's stable
       }
 
-      // If we have recent events, realtime is working - DISABLE polling
+      // ✅ FIXED: If realtime has been stable for >30 seconds, trust it
+      // "No events" just means "nothing changed" - not "realtime is broken"
+      
       if (lastEvent) {
         const eventAge = now - lastEvent;
         
@@ -107,13 +109,26 @@ export class DataFreshnessManager {
         }
       }
 
-      // Realtime connected but no recent events - use moderate polling
-      console.log('[DataFreshness:Polling] ⚠️ Realtime connected but no recent events, moderate polling', {
-        queryKey: queryKey[0],
-        hasEvents: !!lastEvent,
-        timeSinceConnect: Math.round(timeSinceStatusChange / 1000) + 's'
-      });
-      return 15000; // 15 seconds - something might be wrong
+      // ✅ KEY FIX: Realtime stable for >30s but no events
+      // This is NORMAL when idle - don't assume it's broken
+      // Use very light polling as safety net only
+      if (timeSinceStatusChange > 5 * 60 * 1000) {
+        // Realtime been stable for >5 minutes - fully trust it
+        console.log('[DataFreshness:Polling] 🟢 Realtime stable, DISABLING polling (idle is normal)', {
+          queryKey: queryKey[0],
+          hasEvents: !!lastEvent,
+          stableDuration: Math.round(timeSinceStatusChange / 1000) + 's'
+        });
+        return false; // ✨ DISABLE POLLING - realtime is stable, idle is OK
+      } else {
+        // Realtime stable for 30s-5min - use safety net polling
+        console.log('[DataFreshness:Polling] 🟡 Realtime stable, light safety polling', {
+          queryKey: queryKey[0],
+          hasEvents: !!lastEvent,
+          stableDuration: Math.round(timeSinceStatusChange / 1000) + 's'
+        });
+        return 60000; // 60 seconds - safety net while realtime proves long-term stability
+      }
     }
 
     // If realtime is disconnected or errored, use aggressive polling
