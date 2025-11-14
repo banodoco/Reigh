@@ -698,6 +698,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const centerSectionRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
   const savedOnApproachRef = useRef(false);
+  const [headerBounds, setHeaderBounds] = useState({ left: 0, width: 0 });
+  const updateHeaderBounds = useCallback(() => {
+    const containerEl = headerContainerRef.current;
+    if (!containerEl) return;
+
+    const rect = containerEl.getBoundingClientRect();
+    setHeaderBounds({ left: rect.left, width: rect.width });
+  }, []);
   
   // Floating CTA state and refs
   const ctaContainerRef = useRef<HTMLDivElement>(null);
@@ -780,6 +788,27 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
   }, [isMobile, isSticky, state.isEditingName, state.editingName, onUpdateShotName, selectedShot?.name, actions]);
 
+
+  useEffect(() => {
+    const containerEl = headerContainerRef.current;
+    if (!containerEl) return;
+    updateHeaderBounds();
+
+    const ro = new ResizeObserver(() => updateHeaderBounds());
+    ro.observe(containerEl);
+
+    const handleResize = () => updateHeaderBounds();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [updateHeaderBounds]);
+
+  useEffect(() => {
+    updateHeaderBounds();
+  }, [updateHeaderBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
 
   // Reset the pre-trigger guard whenever user enters edit mode
   useEffect(() => {
@@ -2952,18 +2981,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         
-        // Match the main content container padding from Layout.tsx
-        // Content-responsive: px-6 (lg >= 1024px), px-4 (sm >= 640px), px-2 (base)
-        const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
-        const contentPadding = windowWidth >= 1024 ? 24 : windowWidth >= 640 ? 16 : 8;
-        
+        const hasHeaderBounds = headerBounds.width > 0;
+        const stickyStyle: React.CSSProperties = hasHeaderBounds
+          ? {
+              left: `${headerBounds.left}px`,
+              width: `${headerBounds.width}px`
+            }
+          : {
+              left: `${leftOffset}px`,
+              right: `${rightOffset}px`
+            };
+
         return (
           <div
             className={`fixed z-50 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
-              left: `${leftOffset + contentPadding}px`,
-              right: `${rightOffset + contentPadding}px`,
+              ...stickyStyle,
               willChange: 'transform, opacity',
               transform: 'translateZ(0)'
             }}
