@@ -1230,23 +1230,30 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       {/* Action buttons and UI elements */}
       {image.id && ( // Ensure image has ID for actions
       <>
-          {/* Add to Shot UI - Top Left */}
+          {/* Shot Name Badge for Videos - Top Left (always show for videos with shot_id) */}
+          {isVideoContent && image.shot_id && simplifiedShotOptions.length > 0 && (
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              <button 
+                  className="px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+                  onClick={() => {
+                      const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
+                      if (targetShot) {
+                          navigateToShot(targetShot as any, { scrollToTop: true });
+                      }
+                  }}
+              >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                  {simplifiedShotOptions.find(s => s.id === image.shot_id)?.name || 'Unknown Shot'}
+              </button>
+          </div>
+          )}
+          
+          {/* Add to Shot UI - Top Left (for non-video content) */}
           {simplifiedShotOptions.length > 0 && onAddToLastShot && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-              {isVideoContent && image.shot_id ? (
-                  /* Show clickable shot name for videos */
-                  <button 
-                      className="px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs transition-colors"
-                      onClick={() => {
-                          const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
-                          if (targetShot) {
-                              navigateToShot(targetShot as any, { scrollToTop: true });
-                          }
-                      }}
-                  >
-                      {simplifiedShotOptions.find(s => s.id === image.shot_id)?.name || 'Unknown Shot'}
-                  </button>
-              ) : (
+              {!isVideoContent && (
               <ShotSelector
                   value={selectedShotIdLocal}
                   onValueChange={(value) => {
