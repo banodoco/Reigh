@@ -138,8 +138,8 @@ const HeaderComponent: React.FC<HeaderProps> = ({
     <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
       {/* Desktop layout */}
       <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
-        {/* Back button on the left */}
-        <div className="flex-1 flex justify-start">
+        {/* Back button on the left - fixed width to match right side */}
+        <div className="flex justify-start" style={{ width: '180px' }}>
           <Button 
             variant="outline" 
             size="sm" 
@@ -153,7 +153,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
         </div>
         
         {/* Desktop shot name with navigation buttons - centered */}
-        <div ref={centerSectionRef} className="flex items-center justify-center">
+        <div ref={centerSectionRef} className="flex items-center justify-center flex-1">
           {isEditingName ? (
             // Hide navigation buttons when editing - only show name editing controls
             <div className="flex items-center space-x-2">
@@ -215,8 +215,8 @@ const HeaderComponent: React.FC<HeaderProps> = ({
           )}
         </div>
         
-        {/* Aspect Ratio Selector on the right */}
-        <div className="flex-1 flex justify-end">
+        {/* Aspect Ratio Selector on the right - fixed width to match left side */}
+        <div className="flex justify-end" style={{ width: '180px' }}>
           <AspectRatioSelector
             value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
             onValueChange={handleAspectRatioChange}
