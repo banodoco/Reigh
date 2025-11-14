@@ -317,6 +317,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     editMode,
     annotationMode,
     selectedShapeId,
+    showTextModeHint,
     setIsInpaintMode,
     setIsEraseMode,
     setInpaintPrompt,
@@ -1062,6 +1063,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isFlippedHorizontally={isFlippedHorizontally}
                     isSaving={isSaving}
                     isInpaintMode={isInpaintMode}
+                    editMode={editMode}
                     imageContainerRef={imageContainerRef}
                     canvasRef={canvasRef}
                     displayCanvasRef={displayCanvasRef}
@@ -1251,6 +1253,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
+                      showTextModeHint={showTextModeHint}
                       inpaintPrompt={inpaintPrompt}
                       setInpaintPrompt={setInpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
@@ -1402,6 +1405,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isFlippedHorizontally={isFlippedHorizontally}
                       isSaving={isSaving}
                       isInpaintMode={isInpaintMode}
+                      editMode={editMode}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
                       displayCanvasRef={displayCanvasRef}
@@ -1560,6 +1564,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       editMode={editMode}
                       setEditMode={setEditMode}
                       setIsInpaintMode={setIsInpaintMode}
+                      showTextModeHint={showTextModeHint}
                       inpaintPrompt={inpaintPrompt}
                       setInpaintPrompt={setInpaintPrompt}
                       inpaintNumGenerations={inpaintNumGenerations}
@@ -1711,6 +1716,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isFlippedHorizontally={isFlippedHorizontally}
                     isSaving={isSaving}
                     isInpaintMode={isInpaintMode}
+                    editMode={editMode}
                     imageContainerRef={imageContainerRef}
                     canvasRef={canvasRef}
                     displayCanvasRef={displayCanvasRef}

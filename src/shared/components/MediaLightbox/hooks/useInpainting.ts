@@ -115,6 +115,15 @@ export const useInpainting = ({
   // Ref to latest redrawStrokes to avoid stale closures
   const redrawStrokesRef = useRef<((strokes: BrushStroke[]) => void) | null>(null);
   
+  // [MobileHeatDebug] Throttle canvas redraws during drag operations
+  const lastRedrawTimeRef = useRef<number>(0);
+  const pendingRedrawRef = useRef<NodeJS.Timeout | null>(null);
+  const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  // Track when user tries to draw in text mode (for tooltip hint)
+  const [showTextModeHint, setShowTextModeHint] = useState(false);
+  const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Track last used edit mode globally (for inheritance when visiting new media)
   const lastUsedEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>('text');
   
@@ -858,12 +867,34 @@ export const useInpainting = ({
   // drawArrow helper function removed (not needed for rectangles)
 
   // Redraw all strokes on canvas
-  const redrawStrokes = useCallback((strokes: BrushStroke[]) => {
+  const redrawStrokes = useCallback((strokes: BrushStroke[], immediate = false) => {
+    // [MobileHeatDebug] Throttle redraws to max 30fps (33ms) on mobile, 60fps (16ms) on desktop
+    // Skip throttling if immediate is true (for finishing strokes)
+    if (!immediate) {
+      const now = Date.now();
+      const throttleMs = isMobileDevice ? 33 : 16; // 30fps mobile, 60fps desktop
+      const timeSinceLastRedraw = now - lastRedrawTimeRef.current;
+      
+      if (timeSinceLastRedraw < throttleMs) {
+        // Too soon - schedule a deferred redraw
+        if (pendingRedrawRef.current) {
+          clearTimeout(pendingRedrawRef.current);
+        }
+        pendingRedrawRef.current = setTimeout(() => {
+          redrawStrokes(strokes, true); // Execute immediately when timer fires
+        }, throttleMs - timeSinceLastRedraw);
+        return;
+      }
+      
+      lastRedrawTimeRef.current = now;
+    }
+    
     console.error('[InpaintDraw] 🖌️ redrawStrokes called', {
       strokeCount: strokes.length,
       selectedId: selectedShapeId,
       canvasExists: !!displayCanvasRef.current,
       maskExists: !!maskCanvasRef.current,
+      immediate,
       timestamp: Date.now()
     });
     console.log('[InpaintDraw] 🖌️ redrawStrokes called', {
@@ -871,6 +902,7 @@ export const useInpainting = ({
       selectedId: selectedShapeId,
       canvasExists: !!displayCanvasRef.current,
       maskExists: !!maskCanvasRef.current,
+      immediate,
       timestamp: Date.now()
     });
     
@@ -1050,6 +1082,20 @@ export const useInpainting = ({
   useEffect(() => {
     redrawStrokesRef.current = redrawStrokes;
   }, [redrawStrokes]);
+  
+  // [MobileHeatDebug] Cleanup pending redraw timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingRedrawRef.current) {
+        clearTimeout(pendingRedrawRef.current);
+        pendingRedrawRef.current = null;
+      }
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current);
+        hintTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Rectangles don't need control points (arrow control point logic removed)
 
@@ -1108,6 +1154,27 @@ export const useInpainting = ({
     
     if (!isInpaintMode) {
       console.log('[MobilePaintDebug] ❌ Not in inpaint mode, returning');
+      return;
+    }
+    
+    // Prevent drawing in text edit mode - canvas should be non-interactive
+    if (editMode === 'text') {
+      console.log('[MobilePaintDebug] ❌ In text edit mode, canvas drawing disabled');
+      
+      // Show tooltip hint to switch modes
+      setShowTextModeHint(true);
+      
+      // Clear any existing timeout
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current);
+      }
+      
+      // Auto-hide tooltip after 2 seconds
+      hintTimeoutRef.current = setTimeout(() => {
+        setShowTextModeHint(false);
+        hintTimeoutRef.current = null;
+      }, 2000);
+      
       return;
     }
     
@@ -1250,6 +1317,9 @@ export const useInpainting = ({
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isInpaintMode) return;
+    
+    // Prevent drawing in text edit mode (but allow shape dragging for existing shapes)
+    if (editMode === 'text' && !isDraggingShape) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -1429,6 +1499,11 @@ export const useInpainting = ({
       setDraggingCornerIndex(null); // Reset free-form corner dragging
       selectedShapeRef.current = null;
       
+      // [MobileHeatDebug] Do a final immediate redraw when drag ends to ensure clean state
+      if (brushStrokes.length > 0) {
+        redrawStrokes(brushStrokes, true); // immediate=true for final render
+      }
+      
       // Release pointer capture
       if (e && e.target) {
         try {
@@ -1448,6 +1523,9 @@ export const useInpainting = ({
     }
     
     if (!isInpaintMode || !isDrawing) return;
+    
+    // Prevent drawing in text edit mode
+    if (editMode === 'text') return;
     
     console.log('[MobilePaintDebug] 🛑 Finishing stroke');
     
@@ -2013,6 +2091,7 @@ export const useInpainting = ({
     editMode,
     annotationMode,
     selectedShapeId,
+    showTextModeHint,
     setIsInpaintMode,
     setInpaintPrompt,
     setInpaintNumGenerations,

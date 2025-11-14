@@ -71,10 +71,15 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
   const {
     queryKey,
     minInterval = 5 * 60 * 1000, // 5 minutes default
-    maxInterval = 5000, // 5 seconds default
+    // [MobileHeatDebug] Increased from 5s to 15s to reduce mobile CPU usage
+    // Desktop can handle aggressive polling, but mobile overheats with 5s intervals
+    maxInterval = 15000, // 15 seconds default (was 5s)
     freshnessThreshold = 30000, // 30 seconds default
     debug = false
   } = config;
+  
+  // [MobileHeatDebug] Detect mobile devices and increase polling intervals
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   // Force re-render when freshness manager state changes
   const [, forceUpdate] = useReducer(x => x + 1, 0);
@@ -99,25 +104,38 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
   // Apply our min/max constraints
   let finalInterval: number | false;
   let pollingReason: string;
+  
+  // [MobileHeatDebug] On mobile, multiply all intervals by 2x to reduce CPU usage
+  const mobileMultiplier = isMobile ? 2 : 1;
+  const effectiveMaxInterval = maxInterval * mobileMultiplier;
+  const effectiveMinInterval = minInterval === false ? false : minInterval * mobileMultiplier;
 
   if (pollingInterval === false) {
     // 🎯 NEW: Respect when freshness manager disables polling completely
-    if (minInterval === false) {
+    if (effectiveMinInterval === false) {
       finalInterval = false;
       pollingReason = 'Polling DISABLED - realtime is healthy and working';
     } else {
-      finalInterval = minInterval;
-      pollingReason = 'Freshness manager disabled polling, using minInterval fallback';
+      finalInterval = effectiveMinInterval;
+      pollingReason = isMobile 
+        ? 'Freshness manager disabled polling, using minInterval fallback (2x for mobile)'
+        : 'Freshness manager disabled polling, using minInterval fallback';
     }
-  } else if (minInterval !== false && pollingInterval > minInterval && isDataFresh) {
-    finalInterval = minInterval;
-    pollingReason = 'Data is fresh, using minInterval';
-  } else if (pollingInterval < maxInterval) {
-    finalInterval = maxInterval;
-    pollingReason = 'Clamping to maxInterval for aggressive polling';
+  } else if (effectiveMinInterval !== false && pollingInterval > effectiveMinInterval && isDataFresh) {
+    finalInterval = effectiveMinInterval;
+    pollingReason = isMobile 
+      ? 'Data is fresh, using minInterval (2x for mobile)'
+      : 'Data is fresh, using minInterval';
+  } else if (pollingInterval < effectiveMaxInterval) {
+    finalInterval = effectiveMaxInterval;
+    pollingReason = isMobile
+      ? 'Clamping to maxInterval for aggressive polling (2x for mobile - 30s)'
+      : 'Clamping to maxInterval for aggressive polling';
   } else {
-    finalInterval = pollingInterval;
-    pollingReason = 'Using freshness manager interval';
+    finalInterval = pollingInterval * mobileMultiplier;
+    pollingReason = isMobile
+      ? 'Using freshness manager interval (2x for mobile)'
+      : 'Using freshness manager interval';
   }
 
   // Calculate stale time based on freshness
@@ -148,7 +166,18 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
       realtimeStatus: result.realtimeStatus,
       pollingReason,
       lastEventAge: queryAge?.ageMs,
-      freshnessManagerInterval: pollingInterval
+      freshnessManagerInterval: pollingInterval,
+      // [MobileHeatDebug] Show mobile-specific info
+      isMobile,
+      mobileMultiplier
+    });
+  }
+  
+  // [MobileHeatDebug] Log aggressive polling on mobile for debugging
+  if (isMobile && finalInterval !== false && finalInterval < 60000) {
+    console.log(`[MobileHeatDebug] ⚠️ Active polling on mobile: ${finalInterval}ms for ${queryKey.join(':')}`, {
+      pollingReason,
+      realtimeStatus: result.realtimeStatus
     });
   }
 

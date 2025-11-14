@@ -24,14 +24,33 @@ import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
-import { extractVideoPosterFrame } from '@/shared/utils/videoPosterExtractor';
+import { extractVideoPosterFrame, extractVideoFinalFrame } from '@/shared/utils/videoPosterExtractor';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // Types for clip management
 interface VideoClip {
   id: string;
   url: string;
   posterUrl?: string;
+  finalFrameUrl?: string;
   file?: File;
   loaded: boolean;
   playing: boolean;
@@ -56,6 +75,234 @@ const UploadingVideoState: React.FC = () => (
     <p className="text-sm font-medium text-foreground">Uploading video...</p>
   </div>
 );
+
+// Sortable clip wrapper component
+interface SortableClipProps {
+  clip: VideoClip;
+  index: number;
+  clips: VideoClip[];
+  uploadingClipId: string | null;
+  draggingOverClipId: string | null;
+  isScrolling: boolean;
+  settingsLoaded: boolean;
+  videoRefs: React.MutableRefObject<{ [clipId: string]: HTMLVideoElement | null }>;
+  fileInputRefs: React.MutableRefObject<{ [clipId: string]: HTMLInputElement | null }>;
+  transitionPrompts: TransitionPrompt[];
+  useIndividualPrompts: boolean;
+  onRemoveClip: (clipId: string) => void;
+  onVideoUpload: (e: React.ChangeEvent<HTMLInputElement>, clipId: string) => void;
+  onDragOver: (e: React.DragEvent, clipId: string) => void;
+  onDragEnter: (e: React.DragEvent, clipId: string) => void;
+  onDragLeave: (e: React.DragEvent, clipId: string) => void;
+  onDrop: (e: React.DragEvent, clipId: string) => void;
+  onPromptChange: (clipId: string, prompt: string) => void;
+  setClips: React.Dispatch<React.SetStateAction<VideoClip[]>>;
+}
+
+const SortableClip: React.FC<SortableClipProps> = ({
+  clip,
+  index,
+  clips,
+  uploadingClipId,
+  draggingOverClipId,
+  isScrolling,
+  settingsLoaded,
+  videoRefs,
+  fileInputRefs,
+  transitionPrompts,
+  useIndividualPrompts,
+  onRemoveClip,
+  onVideoUpload,
+  onDragOver,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
+  onPromptChange,
+  setClips,
+}) => {
+  // Check if this is the last clip and it's empty
+  const isLastClip = index === clips.length - 1;
+  const isEmptyClip = !clip.url;
+  const isAddAnotherClip = isLastClip && isEmptyClip;
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: clip.id,
+    disabled: isAddAnotherClip, // Disable dragging for the "Add another clip" slot
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="space-y-3">
+      {/* Clip Card */}
+      <div className="relative border rounded-lg p-3 space-y-3 bg-card">
+        {/* Header with number/title, drag handle, and remove button */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {!isAddAnotherClip && (
+              <div 
+                {...attributes}
+                {...listeners}
+                className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-muted rounded transition-colors"
+              >
+                <GripVertical className="h-4 w-4 text-muted-foreground" />
+              </div>
+            )}
+            <div className="text-sm font-medium text-muted-foreground">
+              {isAddAnotherClip ? 'Add another clip' : `Clip #${index + 1}`}
+            </div>
+          </div>
+          {clips.length > 2 && !isAddAnotherClip && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemoveClip(clip.id)}
+              className="h-6 w-6 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+
+        {/* Video Container */}
+        <div className="space-y-2">
+          <div 
+            className={cn(
+              "aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative",
+              draggingOverClipId === clip.id 
+                ? 'border-primary bg-primary/10' 
+                : 'border-border hover:border-primary/50',
+              !clip.url && uploadingClipId !== clip.id ? 'cursor-pointer' : ''
+            )}
+            onDragOver={(e) => onDragOver(e, clip.id)}
+            onDragEnter={(e) => onDragEnter(e, clip.id)}
+            onDragLeave={(e) => onDragLeave(e, clip.id)}
+            onDrop={(e) => onDrop(e, clip.id)}
+            onClick={() => !clip.url && uploadingClipId !== clip.id && fileInputRefs.current[clip.id]?.click()}
+          >
+            {uploadingClipId === clip.id ? (
+              <UploadingVideoState />
+            ) : clip.url ? (
+              <>
+                {!clip.loaded && <VideoContainerSkeleton />}
+                {!clip.playing && clip.posterUrl ? (
+                  <>
+                    <img
+                      src={clip.posterUrl}
+                      alt="Video poster"
+                      className={cn(
+                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
+                        clip.loaded ? 'opacity-100' : 'opacity-0'
+                      )}
+                      onLoad={() => {
+                        setClips(prev => prev.map(c => 
+                          c.id === clip.id ? { ...c, loaded: true } : c
+                        ));
+                      }}
+                    />
+                    <div 
+                      className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
+                      onClick={() => {
+                        setClips(prev => prev.map(c => 
+                          c.id === clip.id ? { ...c, playing: true } : c
+                        ));
+                      }}
+                    >
+                      <div className="bg-black/50 rounded-full p-3 hover:bg-black/70 transition-colors">
+                        <Play className="h-8 w-8 text-white" fill="white" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <video
+                    ref={el => { videoRefs.current[clip.id] = el; }}
+                    src={clip.url}
+                    controls
+                    autoPlay={clip.playing}
+                    preload="metadata"
+                    playsInline
+                    muted
+                    className={cn(
+                      'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
+                      clip.loaded ? 'opacity-100' : 'opacity-0'
+                    )}
+                    onLoadedData={() => {
+                      setClips(prev => prev.map(c => 
+                        c.id === clip.id ? { ...c, loaded: true } : c
+                      ));
+                    }}
+                  />
+                )}
+                {/* Final frame thumbnail in bottom right corner */}
+                {clip.finalFrameUrl && (
+                  <div className="absolute bottom-2 right-2 w-16 h-10 rounded border-2 border-white shadow-lg overflow-hidden z-10">
+                    <img
+                      src={clip.finalFrameUrl}
+                      alt="Final frame"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                {draggingOverClipId === clip.id && !isScrolling && (
+                  <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                    <p className="text-sm font-medium text-foreground">Drop to replace</p>
+                  </div>
+                )}
+              </>
+            ) : !settingsLoaded ? (
+              <VideoContainerSkeleton />
+            ) : (
+              <div className="text-center p-4 pointer-events-none">
+                <Film className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-xs text-muted-foreground mb-1">
+                  {draggingOverClipId === clip.id ? 'Drop video here' : 'Click or drop to upload'}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {draggingOverClipId === clip.id ? '' : 'MP4, WebM, MOV'}
+                </p>
+              </div>
+            )}
+          </div>
+          <input
+            ref={el => { fileInputRefs.current[clip.id] = el; }}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => onVideoUpload(e, clip.id)}
+          />
+        </div>
+
+        {/* Transition Prompt (if not last clip and individual prompts enabled) */}
+        {index < clips.length - 1 && useIndividualPrompts && (
+          <div className="space-y-2 pt-2 border-t">
+            <Label htmlFor={`prompt-${clips[index + 1].id}`} className="text-xs text-muted-foreground">
+              Transition to Clip #{index + 2}
+            </Label>
+            <Textarea
+              id={`prompt-${clips[index + 1].id}`}
+              value={transitionPrompts.find(p => p.id === clips[index + 1].id)?.prompt || ''}
+              onChange={(e) => onPromptChange(clips[index + 1].id, e.target.value)}
+              placeholder="Additional details for this transition (optional)"
+              rows={2}
+              className="resize-none text-sm"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const JoinClipsPage: React.FC = () => {
   const { toast } = useToast();
@@ -189,6 +436,7 @@ const JoinClipsPage: React.FC = () => {
               id: crypto.randomUUID(),
               url: clip.url,
               posterUrl: clip.posterUrl,
+              finalFrameUrl: clip.finalFrameUrl,
               loaded: false,
               playing: false
             });
@@ -211,6 +459,7 @@ const JoinClipsPage: React.FC = () => {
             id: crypto.randomUUID(),
             url: joinSettings.settings.startingVideoUrl,
             posterUrl: joinSettings.settings.startingVideoPosterUrl,
+            finalFrameUrl: joinSettings.settings.startingVideoFinalFrameUrl,
             loaded: false,
             playing: false
           });
@@ -221,6 +470,7 @@ const JoinClipsPage: React.FC = () => {
             id: crypto.randomUUID(),
             url: joinSettings.settings.endingVideoUrl,
             posterUrl: joinSettings.settings.endingVideoPosterUrl,
+            finalFrameUrl: joinSettings.settings.endingVideoFinalFrameUrl,
             loaded: false,
             playing: false
           });
@@ -266,7 +516,8 @@ const JoinClipsPage: React.FC = () => {
       .filter(clip => clip.url)
       .map(clip => ({
         url: clip.url,
-        posterUrl: clip.posterUrl
+        posterUrl: clip.posterUrl,
+        finalFrameUrl: clip.finalFrameUrl
       }));
     
     // Convert transitionPrompts to indexed format for persistence
@@ -294,10 +545,24 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [clips, transitionPrompts, settingsLoaded, joinSettings]);
   
-  // Auto-add empty slot when all slots are filled
+  // Auto-add empty slot when all slots are filled, and remove extra trailing empty slots
   useEffect(() => {
-    // Only auto-add if we have clips and ALL of them have videos
-    if (clips.length > 0 && clips.every(clip => clip.url)) {
+    if (clips.length === 0) return;
+    
+    // Find trailing empty slots (consecutive empty slots at the end)
+    let lastNonEmptyIndex = -1;
+    for (let i = clips.length - 1; i >= 0; i--) {
+      if (clips[i].url) {
+        lastNonEmptyIndex = i;
+        break;
+      }
+    }
+    
+    // Count trailing empty slots
+    const trailingEmptyCount = clips.length - lastNonEmptyIndex - 1;
+    
+    // If all slots are filled (no trailing empty), add one
+    if (clips.every(clip => clip.url)) {
       console.log('[JoinClips] All slots filled, adding new empty slot');
       const newClipId = crypto.randomUUID();
       setClips(prev => [...prev, {
@@ -306,6 +571,25 @@ const JoinClipsPage: React.FC = () => {
         loaded: false,
         playing: false
       }]);
+      return; // Prevent running the cleanup logic in the same effect run
+    }
+    
+    // If we have more than one trailing empty slot, remove extras (keeping only one)
+    if (trailingEmptyCount > 1) {
+      console.log('[JoinClips] Multiple trailing empty slots detected, keeping only one');
+      const targetLength = lastNonEmptyIndex + 2; // Keep all non-empty + 1 empty
+      
+      // Only update if we actually need to remove clips
+      if (clips.length !== targetLength) {
+        const newClips = clips.slice(0, targetLength);
+        setClips(newClips);
+        
+        // Clean up transition prompts for removed clips
+        const removedClipIds = clips.slice(targetLength).map(c => c.id);
+        if (removedClipIds.length > 0) {
+          setTransitionPrompts(prev => prev.filter(p => !removedClipIds.includes(p.id)));
+        }
+      }
     }
   }, [clips]);
   
@@ -339,7 +623,7 @@ const JoinClipsPage: React.FC = () => {
   const uploadVideoFile = async (
     file: File, 
     clipId: string
-  ): Promise<{ videoUrl: string; posterUrl: string } | null> => {
+  ): Promise<{ videoUrl: string; posterUrl: string; finalFrameUrl: string } | null> => {
     if (!file.type.startsWith('video/')) {
       toast({
         title: 'Invalid file type',
@@ -351,32 +635,40 @@ const JoinClipsPage: React.FC = () => {
     
     setUploadingClipId(clipId);
     try {
-      const posterBlob = await extractVideoPosterFrame(file);
+      // Extract both first and final frames
+      const [posterBlob, finalFrameBlob] = await Promise.all([
+        extractVideoPosterFrame(file),
+        extractVideoFinalFrame(file)
+      ]);
       
       const fileExt = file.name.split('.').pop() || 'mp4';
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
       const fileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}.${fileExt}`;
       const posterFileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}-poster.jpg`;
+      const finalFrameFileName = `join-clips/${selectedProjectId}/${timestamp}-${clipId}-${randomId}-final.jpg`;
       
-      const { data: videoData, error: videoError } = await supabase.storage
-        .from('image_uploads')
-        .upload(fileName, file, {
+      // Upload video and both frames in parallel
+      const [videoUpload, posterUpload, finalFrameUpload] = await Promise.all([
+        supabase.storage.from('image_uploads').upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
-        });
-      
-      if (videoError) throw videoError;
-      
-      const { data: posterData, error: posterError } = await supabase.storage
-        .from('image_uploads')
-        .upload(posterFileName, posterBlob, {
+        }),
+        supabase.storage.from('image_uploads').upload(posterFileName, posterBlob, {
           cacheControl: '3600',
           upsert: false,
           contentType: 'image/jpeg'
-        });
+        }),
+        supabase.storage.from('image_uploads').upload(finalFrameFileName, finalFrameBlob, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: 'image/jpeg'
+        })
+      ]);
       
-      if (posterError) throw posterError;
+      if (videoUpload.error) throw videoUpload.error;
+      if (posterUpload.error) throw posterUpload.error;
+      if (finalFrameUpload.error) throw finalFrameUpload.error;
       
       const { data: { publicUrl: videoUrl } } = supabase.storage
         .from('image_uploads')
@@ -385,13 +677,17 @@ const JoinClipsPage: React.FC = () => {
       const { data: { publicUrl: posterUrl } } = supabase.storage
         .from('image_uploads')
         .getPublicUrl(posterFileName);
+        
+      const { data: { publicUrl: finalFrameUrl } } = supabase.storage
+        .from('image_uploads')
+        .getPublicUrl(finalFrameFileName);
       
       toast({
         title: 'Video uploaded',
         description: 'Your video has been saved',
       });
       
-      return { videoUrl, posterUrl };
+      return { videoUrl, posterUrl, finalFrameUrl };
     } catch (error) {
       console.error('Error uploading video:', error);
       toast({
@@ -433,7 +729,7 @@ const JoinClipsPage: React.FC = () => {
     
     setClips(prev => prev.map(clip => 
       clip.id === clipId
-        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, file, loaded: false, playing: false }
+        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, finalFrameUrl: result.finalFrameUrl, file, loaded: false, playing: false }
         : clip
     ));
   };
@@ -487,7 +783,7 @@ const JoinClipsPage: React.FC = () => {
     
     setClips(prev => prev.map(clip => 
       clip.id === clipId
-        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, file, loaded: false, playing: false }
+        ? { ...clip, url: result.videoUrl, posterUrl: result.posterUrl, finalFrameUrl: result.finalFrameUrl, file, loaded: false, playing: false }
         : clip
     ));
   };
@@ -610,6 +906,77 @@ const JoinClipsPage: React.FC = () => {
     generateJoinClipsMutation.mutate();
   };
   
+  // Set up drag and drop sensors
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150, // 150ms delay before drag starts on touch
+        tolerance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  
+  // Handle drag end to reorder clips
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) {
+      return;
+    }
+    
+    setClips((prevClips) => {
+      const oldIndex = prevClips.findIndex((clip) => clip.id === active.id);
+      const newIndex = prevClips.findIndex((clip) => clip.id === over.id);
+      
+      if (oldIndex === -1 || newIndex === -1) {
+        return prevClips;
+      }
+      
+      const reorderedClips = arrayMove(prevClips, oldIndex, newIndex);
+      
+      console.log('[JoinClips] Clips reordered:', {
+        from: oldIndex,
+        to: newIndex,
+        newOrder: reorderedClips.map((c, i) => `${i + 1}: ${c.url ? 'video' : 'empty'}`)
+      });
+      
+      return reorderedClips;
+    });
+    
+    // Update transition prompts to match new order if needed
+    setTransitionPrompts((prevPrompts) => {
+      const newClipsOrder = arrayMove(
+        clips,
+        clips.findIndex((clip) => clip.id === active.id),
+        clips.findIndex((clip) => clip.id === over.id)
+      );
+      
+      // Remap prompts to maintain correct associations after reorder
+      return prevPrompts.map(prompt => {
+        const oldClipIndex = clips.findIndex(c => c.id === prompt.id);
+        if (oldClipIndex !== -1 && oldClipIndex > 0) {
+          // Find where this clip moved to in the new order
+          const newClipIndex = newClipsOrder.findIndex(c => c.id === clips[oldClipIndex].id);
+          if (newClipIndex > 0) {
+            return {
+              ...prompt,
+              id: newClipsOrder[newClipIndex].id
+            };
+          }
+        }
+        return prompt;
+      });
+    });
+  };
+  
   if (!selectedProjectId) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -624,19 +991,6 @@ const JoinClipsPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-light tracking-tight text-foreground">Join Clips</h1>
-          {joinSettings.status === 'loading' ? (
-            <Skeleton className="h-9 w-24" />
-          ) : (
-            <Button
-              onClick={handleAddClip}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Clip
-            </Button>
-          )}
         </div>
         
         {/* Clips Grid */}
@@ -650,7 +1004,6 @@ const JoinClipsPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Skeleton className="h-5 w-16" />
                     </div>
-                    <Skeleton className="h-6 w-6" />
                   </div>
                   
                   {/* Video container skeleton */}
@@ -668,161 +1021,43 @@ const JoinClipsPage: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clips.map((clip, index) => (
-            <div key={clip.id} className="space-y-3">
-              {/* Clip Card */}
-              <div className="relative border rounded-lg p-3 space-y-3 bg-card">
-                {/* Header with number and remove button */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-medium text-muted-foreground">Clip #{index + 1}</div>
-                      </div>
-                  {clips.length > 2 && (
-                  <Button
-                      variant="ghost"
-                    size="icon"
-                      onClick={() => handleRemoveClip(clip.id)}
-                      className="h-6 w-6 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                  </Button>
-                  )}
-          </div>
-
-                {/* Video Container */}
-            <div className="space-y-2">
-                    <div 
-                      className={cn(
-                        "aspect-video bg-muted rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors relative",
-                        draggingOverClipId === clip.id 
-                  ? 'border-primary bg-primary/10' 
-                          : 'border-border hover:border-primary/50',
-                        !clip.url && uploadingClipId !== clip.id ? 'cursor-pointer' : ''
-                      )}
-                      onDragOver={(e) => handleDragOver(e, clip.id)}
-                      onDragEnter={(e) => handleDragEnter(e, clip.id)}
-                      onDragLeave={(e) => handleDragLeave(e, clip.id)}
-                      onDrop={(e) => handleDrop(e, clip.id)}
-                      onClick={() => !clip.url && uploadingClipId !== clip.id && fileInputRefs.current[clip.id]?.click()}
-                    >
-                      {uploadingClipId === clip.id ? (
-                <UploadingVideoState />
-                      ) : clip.url ? (
-                <>
-                          {!clip.loaded && <VideoContainerSkeleton />}
-                          {!clip.playing && clip.posterUrl ? (
-                    <>
-                      <img
-                                src={clip.posterUrl}
-                        alt="Video poster"
-                        className={cn(
-                          'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                                  clip.loaded ? 'opacity-100' : 'opacity-0'
-                                )}
-                                onLoad={() => {
-                                  setClips(prev => prev.map(c => 
-                                    c.id === clip.id ? { ...c, loaded: true } : c
-                                  ));
-                                }}
-                              />
-                      <div 
-                        className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/30 transition-colors z-[5]"
-                                onClick={() => {
-                                  setClips(prev => prev.map(c => 
-                                    c.id === clip.id ? { ...c, playing: true } : c
-                                  ));
-                                }}
-                              >
-                                <div className="bg-black/50 rounded-full p-3 hover:bg-black/70 transition-colors">
-                                  <Play className="h-8 w-8 text-white" fill="white" />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <video
-                              ref={el => { videoRefs.current[clip.id] = el; }}
-                              src={clip.url}
-                      controls
-                              autoPlay={clip.playing}
-                      preload="metadata"
-                      playsInline
-                      muted
-                      className={cn(
-                        'absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-0',
-                                clip.loaded ? 'opacity-100' : 'opacity-0'
-                      )}
-                      onLoadedData={() => {
-                                setClips(prev => prev.map(c => 
-                                  c.id === clip.id ? { ...c, loaded: true } : c
-                                ));
-                      }}
-                    />
-                  )}
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                            className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                              setClips(prev => prev.map(c => 
-                                c.id === clip.id ? { ...c, url: '', posterUrl: undefined, loaded: false, playing: false } : c
-                              ));
-                            }}
-                            disabled={uploadingClipId === clip.id}
-                          >
-                            <X className="h-3 w-3" />
-                  </Button>
-                          {draggingOverClipId === clip.id && !isScrolling && (
-                    <div className="absolute inset-0 bg-primary/20 backdrop-blur-sm flex items-center justify-center pointer-events-none">
-                              <p className="text-sm font-medium text-foreground">Drop to replace</p>
-                    </div>
-                  )}
-                </>
-              ) : !settingsLoaded ? (
-                <VideoContainerSkeleton />
-              ) : (
-                        <div className="text-center p-4 pointer-events-none">
-                          <Film className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {draggingOverClipId === clip.id ? 'Drop video here' : 'Click or drop to upload'}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {draggingOverClipId === clip.id ? '' : 'MP4, WebM, MOV'}
-                  </p>
-                </div>
-              )}
-            </div>
-            <input
-                      ref={el => { fileInputRefs.current[clip.id] = el; }}
-              type="file"
-              accept="video/*"
-              className="hidden"
-                      onChange={(e) => handleVideoUpload(e, clip.id)}
-            />
-          </div>
-        </div>
-
-                {/* Transition Prompt (if not last clip and individual prompts enabled) */}
-                {index < clips.length - 1 && useIndividualPrompts && (
-                  <div className="space-y-2 pt-2 border-t">
-                    <Label htmlFor={`prompt-${clips[index + 1].id}`} className="text-xs text-muted-foreground">
-                      Transition to Clip #{index + 2}
-                </Label>
-                    <Textarea
-                      id={`prompt-${clips[index + 1].id}`}
-                      value={transitionPrompts.find(p => p.id === clips[index + 1].id)?.prompt || ''}
-                      onChange={(e) => handlePromptChange(clips[index + 1].id, e.target.value)}
-                      placeholder="Additional details for this transition (optional)"
-                      rows={2}
-                      className="resize-none text-sm"
-                    />
-                  </div>
-                )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={clips.map(c => c.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {clips.map((clip, index) => (
+                  <SortableClip
+                    key={clip.id}
+                    clip={clip}
+                    index={index}
+                    clips={clips}
+                    uploadingClipId={uploadingClipId}
+                    draggingOverClipId={draggingOverClipId}
+                    isScrolling={isScrolling}
+                    settingsLoaded={settingsLoaded}
+                    videoRefs={videoRefs}
+                    fileInputRefs={fileInputRefs}
+                    transitionPrompts={transitionPrompts}
+                    useIndividualPrompts={useIndividualPrompts}
+                    onRemoveClip={handleRemoveClip}
+                    onVideoUpload={handleVideoUpload}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onPromptChange={handlePromptChange}
+                    setClips={setClips}
+                  />
+                ))}
               </div>
-            ))
-          }
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
 
         {/* Global Settings */}

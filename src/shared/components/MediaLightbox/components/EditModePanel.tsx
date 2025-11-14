@@ -7,6 +7,7 @@ import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
 import { GenerationRow } from '@/types/shots';
 import type { LoraMode } from '../hooks';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 
 export interface EditModePanelProps {
   // Source generation
@@ -21,6 +22,7 @@ export interface EditModePanelProps {
   editMode: 'text' | 'inpaint' | 'annotate';
   setEditMode: (mode: 'text' | 'inpaint' | 'annotate') => void;
   setIsInpaintMode: (value: boolean) => void;
+  showTextModeHint?: boolean; // Show tooltip hint when trying to draw in text mode
   
   // Prompt state
   inpaintPrompt: string;
@@ -80,6 +82,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   editMode,
   setEditMode,
   setIsInpaintMode,
+  showTextModeHint = false,
   inpaintPrompt,
   setInpaintPrompt,
   inpaintNumGenerations,
@@ -228,7 +231,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
                 editMode === 'inpaint'
                   ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                highlightDrawModes && editMode !== 'inpaint' && "animate-pulse-hint"
               )}
             >
               <Paintbrush className={toggleIconSize} />
@@ -243,7 +247,8 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'annotate'
                   ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                highlightDrawModes && editMode !== 'annotate' && "animate-pulse-hint"
               )}
             >
               <Pencil className={toggleIconSize} />

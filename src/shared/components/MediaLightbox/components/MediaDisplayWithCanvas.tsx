@@ -11,6 +11,7 @@ interface MediaDisplayWithCanvasProps {
   isFlippedHorizontally: boolean;
   isSaving: boolean;
   isInpaintMode: boolean;
+  editMode?: 'text' | 'inpaint' | 'annotate';
   
   // Refs
   imageContainerRef: React.RefObject<HTMLDivElement>;
@@ -43,6 +44,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   isFlippedHorizontally,
   isSaving,
   isInpaintMode,
+  editMode = 'text',
   imageContainerRef,
   canvasRef,
   displayCanvasRef,
@@ -161,9 +163,9 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               {/* Display Canvas - User draws here */}
               <canvas
                 ref={displayCanvasRef}
-                className="absolute top-0 left-0 pointer-events-auto cursor-crosshair"
+                className={`absolute top-0 left-0 ${editMode === 'text' ? 'pointer-events-none' : 'pointer-events-auto cursor-crosshair'}`}
                 style={{
-                  touchAction: 'none',
+                  touchAction: editMode === 'text' ? 'auto' : 'none',
                   zIndex: 50,
                   userSelect: 'none',
                   WebkitUserSelect: 'none'

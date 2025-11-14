@@ -20,6 +20,8 @@ import { GenerationTaskProvider } from '@/shared/contexts/GenerationTaskContext'
 // [MobileStallFix] Import debug utilities for console debugging
 import '@/shared/lib/mobileProjectDebug';
 import { getNetworkStatusManager } from '@/shared/lib/NetworkStatusManager';
+// [MobileHeatDebug] Import performance monitor for mobile heating issues
+import { perfMonitor } from '@/shared/utils/mobilePerformanceMonitor';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -241,6 +243,14 @@ function App() {
       getNetworkStatusManager(); 
     } catch (error) {
       console.warn('[App] Failed to initialize NetworkStatusManager:', error);
+    }
+    
+    // [MobileHeatDebug] Auto-start performance monitoring on mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      console.log('[MobileHeatDebug] 📱 Mobile device detected - performance monitor available');
+      console.log('[MobileHeatDebug] Run __perfMonitor.start() in console to begin monitoring');
+      console.log('[MobileHeatDebug] Run __perfMonitor.stop() to stop monitoring');
     }
   }, []);
 

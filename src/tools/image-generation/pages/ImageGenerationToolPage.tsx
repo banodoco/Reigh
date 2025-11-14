@@ -1255,7 +1255,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                     <div className="flex items-center gap-2 transition-all duration-700 ease-in-out">
                       <Settings2 className={`h-4 w-4 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`} />
                       <span className={`font-light flex items-center gap-1 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`}>
-                        Image Generation
+                        Make images
                         <Sparkles className={`h-3 w-3 transition-all duration-700 ease-in-out ${!isFormExpanded ? 'text-white' : ''}`} />
                       </span>
                     </div>
@@ -1323,7 +1323,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                   <div className="flex items-center gap-2 transition-all duration-700 ease-in-out">
                     <Settings2 className="h-4 w-4 text-white transition-all duration-700 ease-in-out" />
                     <span className="font-light flex items-center gap-1 text-white transition-all duration-700 ease-in-out">
-                      {isMobile ? 'Image Generation' : 'Image Generation'}
+                      {isMobile ? 'Make images' : 'Make images'}
                       <Sparkles className="h-3 w-3 text-white transition-all duration-700 ease-in-out" />
                     </span>
                   </div>
