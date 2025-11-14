@@ -224,7 +224,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // NEW: Use utility hook when preloaded images are provided
   const utilsData = useTimelinePositionUtils({
     shotId: preloadedImages ? selectedShotId : null,
-    generations: preloadedImages || []
+    generations: preloadedImages || [],
+    projectId: projectId, // Pass projectId to invalidate ShotsPane cache
   });
   
   // Choose data source based on whether we have preloaded images
@@ -932,31 +933,39 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         readOnly={readOnly}
         pairPrompt={(() => {
           // CRITICAL: Read prompt from the exact shot_generation being displayed
-          // instead of using index-based lookup (which can fail with duplicates)
+          // Look up by shotImageEntryId (which is the shot_generation.id)
           if (!pairPromptModalData.pairData?.startImage?.id) {
             return "";
           }
-          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
+          const shotGen = shotGenerations.find(sg => sg.shotImageEntryId === pairPromptModalData.pairData.startImage.id);
           const prompt = shotGen?.metadata?.pair_prompt || "";
           
           // Only log when modal is actually open
           if (pairPromptModalData.isOpen) {
-            console.error('[PairPrompt-READ] 📖 Reading pair prompt for modal:', {
-              pairIndex: pairPromptModalData.pairData.index,
-              shotGenId: pairPromptModalData.pairData.startImage.id.substring(0, 8),
-              found: !!shotGen,
-              hasMetadata: !!shotGen?.metadata,
-              hasPairPrompt: !!shotGen?.metadata?.pair_prompt,
-              prompt: prompt ? `"${prompt.substring(0, 40)}..."` : '(empty)',
-              promptLength: prompt?.length || 0
-            });
+            console.log('[PairPromptFlow] 📖 Looking for ID:', pairPromptModalData.pairData.startImage.id.substring(0, 8));
+            console.log('[PairPromptFlow] 📖 Total shotGenerations:', shotGenerations.length);
+            console.log('[PairPromptFlow] 📖 Found in array?', !!shotGen);
+            console.log('[PairPromptFlow] 📖 Source:', preloadedImages ? 'preloadedImages' : 'dbShotGenerations');
+            console.log('[PairPromptFlow] 📖 Received prompt:', prompt || '(empty)');
+            
+            // Show ALL available IDs
+            const allIds = shotGenerations.map((sg, i) => ({
+              index: i,
+              id: sg.id?.substring(0, 8),
+              shotImageEntryId: sg.shotImageEntryId?.substring(0, 8),
+              shot_generation_id: sg.shot_generation_id?.substring(0, 8),
+              hasMetadata: !!sg.metadata,
+              hasPairPrompt: !!sg.metadata?.pair_prompt,
+            }));
+            console.log('[PairPromptFlow] 📖 ALL IDs in shotGenerations:', allIds);
           }
           return prompt;
         })()}
         pairNegativePrompt={(() => {
           // CRITICAL: Read negative prompt from the exact shot_generation being displayed
+          // Look up by shotImageEntryId (which is the shot_generation.id)
           if (!pairPromptModalData.pairData?.startImage?.id) return "";
-          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
+          const shotGen = shotGenerations.find(sg => sg.shotImageEntryId === pairPromptModalData.pairData.startImage.id);
           return shotGen?.metadata?.pair_negative_prompt || "";
         })()}
         defaultPrompt={defaultPrompt}
@@ -969,7 +978,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           // Calculate previous pair data
           return () => {
             const sortedImages = [...shotGenerations]
-              .filter(sg => sg.generation && sg.timeline_frame != null)
+              .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
               .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
             
             if (sortedImages.length < 2) return;
@@ -980,9 +989,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             const startImage = sortedImages[prevIndex];
             const endImage = sortedImages[prevIndex + 1];
             
-            // Access location from generation object (matches transformForTimeline)
-            const startLocation = (startImage.generation as any)?.location;
-            const endLocation = (endImage.generation as any)?.location;
+            // Access location from flattened GenerationRow structure
+            const startLocation = startImage.imageUrl || startImage.location;
+            const endLocation = endImage.imageUrl || endImage.location;
             
             setPairPromptModalData({
               isOpen: true,
@@ -992,14 +1001,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 startFrame: startImage.timeline_frame!,
                 endFrame: endImage.timeline_frame!,
                 startImage: {
-                  id: startImage.id,
+                  id: startImage.shotImageEntryId || startImage.id, // Use shot_generation.id
                   url: startLocation,
                   thumbUrl: startLocation,
                   timeline_frame: startImage.timeline_frame!,
                   position: prevIndex + 1,
                 },
                 endImage: {
-                  id: endImage.id,
+                  id: endImage.shotImageEntryId || endImage.id, // Use shot_generation.id
                   url: endLocation,
                   thumbUrl: endLocation,
                   timeline_frame: endImage.timeline_frame!,
@@ -1015,7 +1024,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
           
           // Calculate if there's a next pair
           const sortedImages = [...shotGenerations]
-            .filter(sg => sg.generation && sg.timeline_frame != null)
+            .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
             .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
           
           if (currentIndex >= sortedImages.length - 2) return undefined;
@@ -1028,9 +1037,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             const startImage = sortedImages[nextIndex];
             const endImage = sortedImages[nextIndex + 1];
             
-            // Access location from generation object (matches transformForTimeline)
-            const startLocation = (startImage.generation as any)?.location;
-            const endLocation = (endImage.generation as any)?.location;
+            // Access location from flattened GenerationRow structure
+            const startLocation = startImage.imageUrl || startImage.location;
+            const endLocation = endImage.imageUrl || endImage.location;
             
             setPairPromptModalData({
               isOpen: true,
@@ -1040,14 +1049,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 startFrame: startImage.timeline_frame!,
                 endFrame: endImage.timeline_frame!,
                 startImage: {
-                  id: startImage.id,
+                  id: startImage.shotImageEntryId || startImage.id, // Use shot_generation.id
                   url: startLocation,
                   thumbUrl: startLocation,
                   timeline_frame: startImage.timeline_frame!,
                   position: nextIndex + 1,
                 },
                 endImage: {
-                  id: endImage.id,
+                  id: endImage.shotImageEntryId || endImage.id, // Use shot_generation.id
                   url: endLocation,
                   thumbUrl: endLocation,
                   timeline_frame: endImage.timeline_frame!,
@@ -1064,8 +1073,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         hasNext={(() => {
           if (!pairPromptModalData.pairData) return false;
           const sortedImages = [...shotGenerations]
-            .filter(sg => sg.generation && sg.timeline_frame != null)
+            .filter(sg => sg.timeline_frame != null && sg.timeline_frame >= 0)
             .sort((a, b) => a.timeline_frame! - b.timeline_frame!);
+          
+          console.log('[PairPromptFlow] 📊 hasNext calculation:', {
+            currentPairIndex: pairPromptModalData.pairData.index,
+            totalSortedImages: sortedImages.length,
+            totalPairs: sortedImages.length - 1,
+            hasNext: pairPromptModalData.pairData.index < sortedImages.length - 2,
+          });
+          
           return pairPromptModalData.pairData.index < sortedImages.length - 2;
         })()}
         onSave={async (pairIndex, prompt, negativePrompt) => {

@@ -20,9 +20,10 @@ export type { ShotGeneration, PositionMetadata };
 interface UseTimelinePositionUtilsOptions {
   shotId: string | null;
   generations: GenerationRow[];
+  projectId?: string | null; // Optional: used to invalidate ShotsPane cache
 }
 
-export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePositionUtilsOptions) {
+export function useTimelinePositionUtils({ shotId, generations, projectId }: UseTimelinePositionUtilsOptions) {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -38,7 +39,7 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
   // NOTE: Include both positioned and unpositioned items
   // For unpositioned items, use a sentinel value (-1) instead of null to match type
   const shotGenerations: ShotGeneration[] = generations.map(gen => ({
-    id: gen.shotImageEntryId || gen.shot_generation_id || '',
+    id: gen.shotImageEntryId || (gen as any).shot_generation_id || '',
     shot_id: shotId || '',
     generation_id: gen.id,
     timeline_frame: gen.timeline_frame ?? -1, // Use -1 as sentinel for unpositioned
@@ -47,7 +48,7 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
       id: gen.id,
       location: gen.imageUrl || gen.location || undefined,
       type: gen.type || undefined,
-      created_at: gen.created_at || gen.createdAt || new Date().toISOString(),
+      created_at: gen.createdAt || new Date().toISOString(),
       upscaled_url: gen.upscaled_url || undefined,
       starred: gen.starred ?? undefined,
     }
@@ -95,6 +96,11 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
       await queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
       await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
       await queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      
+      // CRITICAL: Also invalidate shots list so ShotsPane preview updates immediately
+      if (projectId) {
+        await queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      }
 
       setIsLoading(false);
     } catch (err) {
@@ -527,9 +533,10 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
 
   /**
    * Update pair prompt for a specific pair
+   * @param shotGenerationId - The shot_generation.id (NOT generation_id)
    */
   const updatePairPrompts = useCallback(async (
-    generationId: string,
+    shotGenerationId: string,
     prompt: string,
     negativePrompt: string
   ) => {
@@ -538,7 +545,7 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
     }
 
     console.log('[PairPromptFlow] 🔧 useTimelinePositionUtils.updatePairPrompts START:', {
-      generationId: generationId.substring(0, 8),
+      shotGenerationId: shotGenerationId.substring(0, 8),
       shotId: shotId.substring(0, 8),
       promptLength: prompt?.length || 0,
       negativePromptLength: negativePrompt?.length || 0,
@@ -546,13 +553,15 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
       hasNegativePrompt: !!negativePrompt,
     });
 
-    const shotGen = shotGenerations.find(sg => sg.generation_id === generationId);
+    // Look up by shot_generation.id (which is sg.id in our data structure)
+    const shotGen = shotGenerations.find(sg => sg.id === shotGenerationId);
     if (!shotGen?.id) {
       console.error('[PairPromptFlow] ❌ Shot generation not found:', {
-        lookingFor: generationId.substring(0, 8),
-        availableGenIds: shotGenerations.map(sg => sg.generation_id?.substring(0, 8)),
+        lookingForShotGenId: shotGenerationId.substring(0, 8),
+        availableShotGenIds: shotGenerations.map(sg => sg.id?.substring(0, 8)),
+        availableGenerationIds: shotGenerations.map(sg => sg.generation_id?.substring(0, 8)),
       });
-      throw new Error(`Shot generation not found for generation ${generationId}`);
+      throw new Error(`Shot generation not found for shot_generation.id ${shotGenerationId}`);
     }
 
     console.log('[PairPromptFlow] 📝 Found shot_generation, preparing metadata update:', {
@@ -597,19 +606,29 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
 
   /**
    * Clear enhanced prompt for a generation
+   * @param shotGenerationId - The shot_generation.id (NOT generation_id)
    */
-  const clearEnhancedPrompt = useCallback(async (generationId: string) => {
+  const clearEnhancedPrompt = useCallback(async (shotGenerationId: string) => {
     if (!shotId) {
       throw new Error('No shotId provided');
     }
 
-    const shotGen = shotGenerations.find(sg => sg.generation_id === generationId);
+    console.log('[PairPromptFlow] 🧹 Clearing enhanced prompt for shot_generation:', shotGenerationId.substring(0, 8));
+
+    // Look up by shot_generation.id
+    const shotGen = shotGenerations.find(sg => sg.id === shotGenerationId);
     if (!shotGen?.id) {
-      throw new Error(`Shot generation not found for generation ${generationId}`);
+      console.error('[PairPromptFlow] ❌ Shot generation not found for clear:', {
+        lookingForShotGenId: shotGenerationId.substring(0, 8),
+        availableShotGenIds: shotGenerations.map(sg => sg.id?.substring(0, 8)),
+      });
+      throw new Error(`Shot generation not found for shot_generation.id ${shotGenerationId}`);
     }
 
     const existingMetadata = shotGen.metadata || {};
     const { enhanced_prompt, ...restMetadata } = existingMetadata;
+
+    console.log('[PairPromptFlow] 💾 Clearing enhanced_prompt from metadata...');
 
     const { error } = await supabase
       .from('shot_generations')
@@ -617,10 +636,13 @@ export function useTimelinePositionUtils({ shotId, generations }: UseTimelinePos
       .eq('id', shotGen.id);
 
     if (error) {
+      console.error('[PairPromptFlow] ❌ Failed to clear enhanced prompt:', error);
       throw error;
     }
 
+    console.log('[PairPromptFlow] ✅ Enhanced prompt cleared, invalidating caches...');
     await loadPositions({ silent: true, reason: 'clear_enhanced_prompt' });
+    console.log('[PairPromptFlow] ✅ Cache invalidation complete');
   }, [shotId, shotGenerations, loadPositions]);
 
   return {

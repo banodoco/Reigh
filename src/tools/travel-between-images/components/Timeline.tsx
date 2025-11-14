@@ -233,7 +233,8 @@ const Timeline: React.FC<TimelineProps> = ({
   const legacyHookData = useEnhancedShotPositions(!propAllGenerations ? shotId : null, isDragInProgress);
   const utilsHookData = useTimelinePositionUtils({
     shotId: propAllGenerations ? shotId : null,
-    generations: propAllGenerations || [] // Use ALL generations for lookups, not filtered images
+    generations: propAllGenerations || [], // Use ALL generations for lookups, not filtered images
+    projectId: projectId, // Pass projectId to invalidate ShotsPane cache
   });
   
   // Choose data source: prefer propHookData, then utility hook if allGenerations provided, else legacy hook
