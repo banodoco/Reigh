@@ -699,12 +699,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const [isSticky, setIsSticky] = useState(false);
   const savedOnApproachRef = useRef(false);
   const [headerBounds, setHeaderBounds] = useState({ left: 0, width: 0 });
+  const stableBoundsRef = useRef({ left: 0, width: 0 }); // Stable bounds when sticky becomes visible
+  
   const updateHeaderBounds = useCallback(() => {
     const containerEl = headerContainerRef.current;
     if (!containerEl) return;
 
     const rect = containerEl.getBoundingClientRect();
-    setHeaderBounds({ left: rect.left, width: rect.width });
+    const newBounds = { left: rect.left, width: rect.width };
+    setHeaderBounds(newBounds);
+    // Also update stable ref for use when sticky is visible
+    stableBoundsRef.current = newBounds;
   }, []);
   
   // Floating CTA state and refs
@@ -789,26 +794,75 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [isMobile, isSticky, state.isEditingName, state.editingName, onUpdateShotName, selectedShot?.name, actions]);
 
 
+  // Update header bounds during scroll and resize for smooth positioning
+  // Only update when sticky header is NOT visible to prevent jumps during fast scrolling
   useEffect(() => {
     const containerEl = headerContainerRef.current;
     if (!containerEl) return;
+    
+    let rafId: number | null = null;
+    let lastUpdateTime = 0;
+    const THROTTLE_MS = 16; // ~60fps
+    
+    const updateBounds = () => {
+      const now = performance.now();
+      // Only update if enough time has passed (throttle) or if sticky is not visible
+      if (now - lastUpdateTime >= THROTTLE_MS || !isSticky) {
+        updateHeaderBounds();
+        lastUpdateTime = now;
+      }
+      rafId = null;
+    };
+    
+    const scheduleUpdate = () => {
+      // When sticky header is visible, throttle updates more aggressively
+      if (isSticky) {
+        // Only update on resize when sticky, not on scroll
+        return;
+      }
+      
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateBounds);
+      }
+    };
+    
+    // Initial update
     updateHeaderBounds();
 
-    const ro = new ResizeObserver(() => updateHeaderBounds());
+    const ro = new ResizeObserver(() => {
+      // Always update on resize
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateBounds);
+      }
+    });
     ro.observe(containerEl);
 
-    const handleResize = () => updateHeaderBounds();
+    const handleResize = () => {
+      // Always update on resize
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateBounds);
+      }
+    };
+    
     window.addEventListener('resize', handleResize);
 
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', handleResize);
+      if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [updateHeaderBounds]);
+  }, [updateHeaderBounds, isSticky]);
 
   useEffect(() => {
     updateHeaderBounds();
   }, [updateHeaderBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
+
+  // Capture stable bounds when sticky header becomes visible to prevent jumps
+  useEffect(() => {
+    if (isSticky && headerBounds.width > 0) {
+      stableBoundsRef.current = headerBounds;
+    }
+  }, [isSticky, headerBounds]);
 
   // Reset the pre-trigger guard whenever user enters edit mode
   useEffect(() => {
@@ -2977,20 +3031,23 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const gap = isMobile ? -16 : 8; // Negative gap on mobile to push up, small gap on desktop
         const topPosition = globalHeaderHeight + gap;
         
-        // Measure the original header container to get its exact position and width
-        const hasHeaderBounds = headerBounds.width > 0;
+        // Use stable bounds (captured when sticky becomes visible) to prevent jumps during fast scrolling
+        // Fall back to current headerBounds if stable bounds aren't available
+        const boundsToUse = stableBoundsRef.current.width > 0 ? stableBoundsRef.current : headerBounds;
+        const hasHeaderBounds = boundsToUse.width > 0;
         
         // Use the exact same structure as the original header
         // Position the sticky wrapper to match the original header container's position
         return (
           <div
-            className={`fixed z-50 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
+            className={`fixed z-50 animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
-              left: hasHeaderBounds ? `${headerBounds.left}px` : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
-              width: hasHeaderBounds ? `${headerBounds.width}px` : undefined,
+              left: hasHeaderBounds ? `${boundsToUse.left}px` : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
+              width: hasHeaderBounds ? `${boundsToUse.width}px` : undefined,
               right: hasHeaderBounds ? undefined : `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
-              willChange: 'transform, opacity',
+              transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
+              willChange: 'left, width, right, opacity',
               transform: 'translateZ(0)'
             }}
           >
