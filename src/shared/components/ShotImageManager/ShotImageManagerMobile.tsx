@@ -249,9 +249,16 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       // Safety check: Ensure all images have shotImageEntryId (Phase 2 complete)
       const hasMissingIds = currentImages.some(img => !(img as any).shotImageEntryId);
       if (hasMissingIds) {
-        console.warn('[MobileReorder] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Cannot reorder yet.');
+        const missingCount = currentImages.filter(img => !(img as any).shotImageEntryId).length;
+        console.warn('[MobileReorder] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Cannot reorder yet.', {
+          totalImages: currentImages.length,
+          missingIds: missingCount
+        });
         const { toast } = await import('sonner');
-        toast.error('Loading image data... please wait a moment and try again.');
+        const message = currentImages.length > 500 
+          ? `Loading metadata for ${currentImages.length} images... this may take a moment.`
+          : 'Loading image metadata... please wait a moment and try again.';
+        toast.error(message);
         return;
       }
 
@@ -310,12 +317,15 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     if (validIds.length < idsToDelete.length) {
       console.warn('[MobileBatchDelete] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Skipping those.');
       const { toast } = await import('sonner');
-      toast.warning(`Could only delete ${validIds.length} of ${idsToDelete.length} images. Some are still loading.`);
+      toast.warning(`Could only delete ${validIds.length} of ${idsToDelete.length} images. Some are still loading metadata.`);
     }
     
     if (validIds.length === 0) {
       const { toast } = await import('sonner');
-      toast.error('Unable to delete images. Please wait a moment and try again.');
+      const message = currentImages.length > 500 
+        ? `Loading metadata for ${currentImages.length} images... please wait.`
+        : 'Unable to delete images. Metadata still loading, please wait a moment and try again.';
+      toast.error(message);
       setConfirmOpen(false);
       return;
     }

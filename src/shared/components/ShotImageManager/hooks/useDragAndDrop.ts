@@ -123,6 +123,26 @@ export function useDragAndDrop({
       return;
     }
     
+    // Safety check: Ensure all images have shotImageEntryId (Phase 2 complete)
+    const hasMissingIds = images.some(img => !img.shotImageEntryId);
+    if (hasMissingIds) {
+      const missingCount = images.filter(img => !img.shotImageEntryId).length;
+      console.warn('[DesktopReorder] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Cannot reorder yet.', {
+        totalImages: images.length,
+        missingIds: missingCount
+      });
+      import('sonner').then(({ toast }) => {
+        const message = images.length > 500 
+          ? `Loading metadata for ${images.length} images... this may take a moment.`
+          : 'Loading image metadata... please wait a moment and try again.';
+        toast.error(message);
+      });
+      // Clear selection
+      setSelectedIds([]);
+      setLastSelectedIndex(null);
+      return;
+    }
+    
     const activeIsSelected = selectedIds.includes(active.id as string);
     
     if (!activeIsSelected || selectedIds.length <= 1) {

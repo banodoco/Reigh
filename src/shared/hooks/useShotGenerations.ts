@@ -143,15 +143,18 @@ export const useUnpositionedGenerationsCount = (
  * This hook uses a two-phase progressive loading strategy for maximum speed:
  * 
  * **Phase 1 (FAST):** Query generations table with shot_data JSONB filter
- * - No joins = instant results
+ * - No joins = instant results (~50-200ms even for large datasets)
  * - Uses GIN index on shot_data for fast filtering
  * - Returns images immediately for rendering
  * - Missing: shot_generations.id (needed for mutations), metadata (pair prompts)
  * 
- * **Phase 2 (LAZY):** Query shot_generations table in background
- * - Fetches mutation IDs and metadata
- * - Merges into Phase 1 data when ready
- * - Enables mutations and pair prompt editing
+ * **Phase 2 (REQUIRED):** Query shot_generations table for mutation data
+ * - Fetches shotImageEntryId (required for reorder/delete/duplicate)
+ * - Fetches metadata (pair prompts, enhanced prompts)
+ * - Merges into Phase 1 data when complete
+ * - For large datasets (2000+ items), uses batched queries to avoid PostgreSQL limits
+ * - Retries on failure (exponential backoff)
+ * - Mutations are blocked until Phase 2 completes
  * 
  * **Data Loaded:**
  * - All shot_generations for the shot (positioned + unpositioned)
@@ -354,14 +357,66 @@ export const useAllShotGenerations = (
     refetchOnReconnect: !options?.disableRefetch,
     queryFn: async ({ signal }) => {
       const startTime = Date.now();
-      console.log('[TwoPhaseLoad] Phase 2 START - Lazy query for metadata', { 
+      const BATCH_SIZE = 500; // PostgreSQL .in() works well with ~500 items max
+      
+      console.log('[TwoPhaseLoad] Phase 2 START - Loading metadata (required for mutations)', { 
         shotId: stableShotId,
         generationCount: generationIds.length,
+        needsBatching: generationIds.length > BATCH_SIZE,
         timestamp: startTime 
       });
 
-      let data, error;
-      try {
+      let allData: any[] = [];
+      
+      // If we have a large dataset, batch the queries
+      if (generationIds.length > BATCH_SIZE) {
+        console.log('[TwoPhaseLoad] Phase 2 - Large dataset detected, using batched queries', {
+          totalItems: generationIds.length,
+          batchSize: BATCH_SIZE,
+          batchCount: Math.ceil(generationIds.length / BATCH_SIZE)
+        });
+        
+        // Split IDs into batches
+        const batches: string[][] = [];
+        for (let i = 0; i < generationIds.length; i += BATCH_SIZE) {
+          batches.push(generationIds.slice(i, i + BATCH_SIZE));
+        }
+        
+        // Execute batches in parallel (max 4 concurrent to avoid overwhelming DB)
+        const MAX_CONCURRENT = 4;
+        for (let i = 0; i < batches.length; i += MAX_CONCURRENT) {
+          const batchGroup = batches.slice(i, i + MAX_CONCURRENT);
+          const batchPromises = batchGroup.map(async (batchIds, batchIndex) => {
+            const actualBatchIndex = i + batchIndex;
+            console.log(`[TwoPhaseLoad] Phase 2 - Fetching batch ${actualBatchIndex + 1}/${batches.length}`, {
+              batchSize: batchIds.length
+            });
+            
+            const response = await supabase
+              .from('shot_generations')
+              .select('id, generation_id, timeline_frame, metadata')
+              .eq('shot_id', stableShotId!)
+              .in('generation_id', batchIds)
+              .abortSignal(signal);
+            
+            if (response.error) {
+              console.error(`[TwoPhaseLoad] Phase 2 - Batch ${actualBatchIndex + 1} error:`, response.error);
+              throw response.error;
+            }
+            
+            return response.data || [];
+          });
+          
+          const batchResults = await Promise.all(batchPromises);
+          allData.push(...batchResults.flat());
+        }
+        
+        console.log('[TwoPhaseLoad] Phase 2 - All batches complete', {
+          totalBatches: batches.length,
+          totalResults: allData.length
+        });
+      } else {
+        // Small dataset, use single query
         const response = await supabase
           .from('shot_generations')
           .select('id, generation_id, timeline_frame, metadata')
@@ -369,49 +424,35 @@ export const useAllShotGenerations = (
           .in('generation_id', generationIds)
           .abortSignal(signal);
         
-        data = response.data;
-        error = response.error;
+        if (response.error) {
+          throw response.error;
+        }
         
-        console.log('[TwoPhaseLoad] Phase 2 query response:', {
-          shotId: stableShotId,
-          hasData: !!data,
-          dataCount: data?.length || 0,
-          hasError: !!error,
-          errorCode: error?.code,
-          errorMessage: error?.message,
-        });
-      } catch (err) {
-        console.error('[TwoPhaseLoad] Phase 2 EXCEPTION (non-fatal):', {
-          shotId: stableShotId,
-          error: err,
-          errorMessage: err instanceof Error ? err.message : String(err),
-        });
-        return []; // Return empty array, don't throw - Phase 1 data is still usable
+        allData = response.data || [];
       }
-
-      if (error) {
-        console.warn('[TwoPhaseLoad] Phase 2 error (non-fatal):', {
-          shotId: stableShotId,
-          error,
-          code: error.code,
-          message: error.message,
-        });
-        return []; // Return empty array, don't throw - Phase 1 data is still usable
-      }
+      
+      console.log('[TwoPhaseLoad] Phase 2 query response:', {
+        shotId: stableShotId,
+        hasData: !!allData,
+        dataCount: allData.length,
+        requestedCount: generationIds.length,
+        missingCount: generationIds.length - allData.length,
+      });
 
       const duration = Date.now() - startTime;
       console.log('[TwoPhaseLoad] Phase 2 COMPLETE - Metadata loaded', { 
         shotId: stableShotId,
-        metadataCount: data?.length || 0,
+        metadataCount: allData.length,
         duration: `${duration}ms`,
         timestamp: Date.now() 
       });
 
-      return data || [];
+      return allData;
     },
     staleTime: Infinity, // Don't refetch, it's supplementary data
     gcTime: 5 * 60 * 1000, // 5 minutes
-    retry: false, // Don't retry Phase 2 - not critical
+    retry: 3, // Retry Phase 2 - it's required for mutations to work
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff: 1s, 2s, 4s
   });
 
   // ============================================================================
@@ -486,7 +527,8 @@ export const useAllShotGenerations = (
     phase2Query.data && 
     phase2Query.data.length > 0 && 
     !phase2Query.isLoading && 
-    !phase2Query.isFetching
+    !phase2Query.isFetching &&
+    !phase2Query.error
   );
 
   // Add custom property to check if any images are missing mutation IDs
@@ -494,6 +536,10 @@ export const useAllShotGenerations = (
     mergedData && 
     mergedData.some(img => !img.shotImageEntryId)
   );
+  
+  // Expose Phase 2 loading and error states for UI feedback
+  (result as any).isPhase2Loading = phase2Query.isLoading || phase2Query.isFetching;
+  (result as any).phase2Error = phase2Query.error;
 
   console.log('[TwoPhaseLoad] Query result status:', {
     shotId: stableShotId,
