@@ -140,7 +140,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
           </span>
         </div>
         <CardContent className="pt-12 px-4 pb-4">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
             {/* Left Column */}
             <div className="space-y-3">
               {/* Number of Phases */}
@@ -406,8 +406,8 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                   const inputId = `lora-${phaseIdx}-${loraIdx}`;
                   const isFocused = focusedLoraInput === inputId;
                   return (
-                    <div key={loraIdx} className="flex gap-2 mb-1.5">
-                      <div className="relative flex-1">
+                    <div key={loraIdx} className="flex items-center gap-2 mb-1.5">
+                      <div className="relative flex-1 min-w-0">
                         <Input
                           placeholder="LoRA URL"
                           value={isFocused ? lora.url : getDisplayNameFromUrl(lora.url, availableLoras)}
@@ -462,7 +462,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                           });
                         }}
                         onBlur={() => onBlurSave?.()}
-                        className="w-24"
+                        className="w-16 sm:w-20 flex-shrink-0 text-center"
                       />
                     </div>
                   );
