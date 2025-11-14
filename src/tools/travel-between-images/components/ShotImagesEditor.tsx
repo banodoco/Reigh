@@ -16,6 +16,8 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 import { BatchGuidanceVideo } from './BatchGuidanceVideo';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
+import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Video } from 'lucide-react';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -180,6 +182,18 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot,
 }) => {
+  // [ShotNavPerf] Log when component renders with images
+  const renderStartTime = performance.now();
+  const renderCount = React.useRef(0);
+  renderCount.current += 1;
+  console.log('[ShotNavPerf] 📸 ShotImagesEditor RENDER START #' + renderCount.current, {
+    selectedShotId: selectedShotId?.substring(0, 8),
+    preloadedImagesCount: preloadedImages?.length || 0,
+    isModeReady,
+    generationMode,
+    timestamp: Date.now()
+  });
+  
   // Force mobile to use batch mode regardless of desktop setting
   const effectiveGenerationMode = isMobile ? 'batch' : generationMode;
   
@@ -543,6 +557,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     }
   }, [onAddToShotWithoutPosition, selectedShotId]);
 
+  // [ShotNavPerf] Log render completion
+  const renderEndTime = performance.now();
+  const renderDuration = renderEndTime - renderStartTime;
+  console.log('[ShotNavPerf] ✅ ShotImagesEditor RENDER COMPLETE', {
+    selectedShotId: selectedShotId?.substring(0, 8),
+    renderDuration: `${renderDuration.toFixed(2)}ms`,
+    imagesCount: images.length,
+    timestamp: Date.now()
+  });
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -623,14 +647,44 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       <CardContent>
         {!isModeReady || (positionsLoading && !memoizedShotGenerations.length) ? (
           <div className="p-1">
-            {skeleton}
+            {/* Show section headers even in skeleton mode for batch mode */}
+            {effectiveGenerationMode === "batch" && (
+              <>
+                <div className="mb-4">
+                  <SectionHeader title="Input Images" theme="blue" />
+                </div>
+                {skeleton}
+                
+                {/* Show Guidance Video header and skeleton if enabled */}
+                {selectedShotId && projectId && propOnStructureVideoChange && (
+                  <>
+                    <div className="mb-4 mt-6">
+                      <SectionHeader title="Guidance Video" theme="green" />
+                    </div>
+                    {/* Guidance Video Upload Skeleton */}
+                    <div className="mb-4">
+                      <div className="w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border rounded-lg bg-muted/20">
+                        <div className="flex flex-col items-center gap-3 text-center">
+                          <Video className="h-8 w-8 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground">
+                            Add a motion guidance video to control the animation
+                          </p>
+                          <Skeleton className="w-full h-9" />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+            {effectiveGenerationMode === "timeline" && skeleton}
           </div>
         ) : (
           <div className="p-1">
             {effectiveGenerationMode === "timeline" ? (
               <>
               <Timeline
-                key={`timeline-${selectedShotId}-${images.length}`}
+                key={`timeline-${selectedShotId}`}
                 shotId={selectedShotId}
                 projectId={projectId}
                 frameSpacing={batchVideoFrames}

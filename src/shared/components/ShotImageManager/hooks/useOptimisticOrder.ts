@@ -79,6 +79,14 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
     }
   }, [images, isOptimisticUpdate, reconciliationId, optimisticOrder]);
   
+  // If not in an optimistic update, optimisticOrder should always reflect the parent's images prop.
+  // When an optimistic update is finished, this effect will re-sync with the parent.
+  useEffect(() => {
+    if (!isOptimisticUpdate) {
+      setOptimisticOrder(images);
+    }
+  }, [images, isOptimisticUpdate]);
+  
   // Cleanup reconciliation timeout on unmount
   useEffect(() => {
     return () => {

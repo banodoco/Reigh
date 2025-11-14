@@ -551,6 +551,7 @@ All polling intervals across the codebase have been standardized to use the `use
 - `usePaginatedTasks` - Now uses standardized polling with activity detection for Processing filters
 - `useTaskStatusCounts` - Migrated from static 5s interval to network-aware polling  
 - `useProjectVideoCountsCache` - Migrated from static 60s interval to network-aware polling
+- `useProjectGenerationModesCache` - Project-wide shot generation mode cache (batch/timeline) with smart polling
 - `useGenerations`, `useUnifiedGenerations` - Already using standardized system
 
 **🎯 Key Benefits:**

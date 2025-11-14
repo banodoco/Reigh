@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -396,9 +396,31 @@ export function useToolSettings<T>(
   }, []);
 
   // Fetch merged settings using Supabase with mobile optimizations
-  const { data: settings, isLoading, error } = useQuery({
+  const { data: settings, isLoading, error, fetchStatus, dataUpdatedAt } = useQuery({
     queryKey: ['toolSettings', toolId, projectId, shotId],
-    queryFn: ({ signal }) => fetchToolSettingsSupabase(toolId, { projectId, shotId }, signal),
+    queryFn: ({ signal }) => {
+      console.log('[ShotNavPerf] 🔍 useToolSettings queryFn START', {
+        toolId,
+        shotId: shotId?.substring(0, 8) || 'none',
+        timestamp: Date.now()
+      });
+      const result = fetchToolSettingsSupabase(toolId, { projectId, shotId }, signal);
+      result.then(() => {
+        console.log('[ShotNavPerf] ✅ useToolSettings queryFn COMPLETE', {
+          toolId,
+          shotId: shotId?.substring(0, 8) || 'none',
+          timestamp: Date.now()
+        });
+      }).catch(err => {
+        console.log('[ShotNavPerf] ❌ useToolSettings queryFn FAILED', {
+          toolId,
+          shotId: shotId?.substring(0, 8) || 'none',
+          error: err.message,
+          timestamp: Date.now()
+        });
+      });
+      return result;
+    },
     enabled: !!toolId && fetchEnabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
@@ -427,6 +449,23 @@ export function useToolSettings<T>(
   if (error && !error?.message?.includes('Request was cancelled')) {
     console.error('[useToolSettings] Query error:', error);
   }
+  
+  // [ShotNavPerf] Log query status ONLY when it changes (not every render)
+  const prevStatusRef = React.useRef<string>('');
+  React.useEffect(() => {
+    const statusKey = `${toolId}-${shotId}-${isLoading}-${fetchStatus}`;
+    if (prevStatusRef.current !== statusKey) {
+      console.log('[ShotNavPerf] 📊 useToolSettings status CHANGED:', {
+        toolId,
+        shotId: shotId?.substring(0, 8) || 'none',
+        isLoading,
+        fetchStatus,
+        hasData: !!settings,
+        timestamp: Date.now()
+      });
+      prevStatusRef.current = statusKey;
+    }
+  }, [toolId, shotId, isLoading, fetchStatus, settings]);
 
   // Update settings mutation
   const updateMutation = useMutation({

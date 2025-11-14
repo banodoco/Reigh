@@ -73,6 +73,16 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   isSelectedForMove = false,
   onTapToMove,
 }) => {
+  // [ShotNavPerf] Log when TimelineItem mounts/updates
+  React.useEffect(() => {
+    console.log('[ShotNavPerf] 🖼️ TimelineItem MOUNTED/UPDATED', {
+      imageId: image.id?.substring(0, 8),
+      framePosition,
+      hasImageUrl: !!image.imageUrl,
+      timestamp: Date.now()
+    });
+  }, [image.id, framePosition, image.imageUrl]);
+  
   // Track hover state
   const [isHovered, setIsHovered] = useState(false);
   

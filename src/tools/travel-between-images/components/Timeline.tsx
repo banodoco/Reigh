@@ -212,6 +212,21 @@ const Timeline: React.FC<TimelineProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot
 }) => {
+  // [ShotNavPerf] Track Timeline component renders and image count
+  const timelineRenderCount = React.useRef(0);
+  timelineRenderCount.current += 1;
+  const prevImagesLengthRef = React.useRef(0);
+  const imagesChanged = propImages?.length !== prevImagesLengthRef.current;
+  
+  console.log('[ShotNavPerf] 🎞️ Timeline RENDER #' + timelineRenderCount.current, {
+    shotId: shotId?.substring(0, 8),
+    propImagesCount: propImages?.length || 0,
+    propShotGenerationsCount: propShotGenerations?.length || 0,
+    imagesChanged,
+    timestamp: Date.now()
+  });
+  
+  prevImagesLengthRef.current = propImages?.length || 0;
   
   // Navigation
   const navigate = useNavigate();

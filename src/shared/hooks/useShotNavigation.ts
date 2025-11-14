@@ -37,13 +37,19 @@ export const useShotNavigation = (): ShotNavigationResult => {
     closeMobilePanes: true,
     replace: false,
     scrollBehavior: 'smooth',
-    scrollDelay: 100,
+    scrollDelay: 200, // Increased to 200ms to ensure DOM has updated
   };
 
   const performScroll = (options: Required<ShotNavigationOptions>) => {
     if (options.scrollToTop) {
       const scrollFn = () => {
-        window.scrollTo({ top: 0, behavior: options.scrollBehavior });
+        // Use requestAnimationFrame to ensure DOM has painted
+        requestAnimationFrame(() => {
+          // Always scroll the window - containerRef is just a wrapper div, not a scroll container
+          console.log('[ShotNavPerf] 📜 Scrolling window to top');
+          window.scrollTo({ top: 0, behavior: options.scrollBehavior });
+          console.log('[ShotNavPerf] 📜 Scroll to top executed');
+        });
       };
       
       if (options.scrollDelay > 0) {

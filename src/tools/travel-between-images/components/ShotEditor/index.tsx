@@ -116,6 +116,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   invalidateVideoCountsCache,
 }) => {
   // [ShotNavPerf] TEST LOG - Component is rendering
+  const renderStartTime = performance.now();
   console.log('[ShotNavPerf] 🚀 ShotEditor RENDERING START', {
     selectedShotId: selectedShotId?.substring(0, 8),
     timestamp: Date.now()
@@ -2497,6 +2498,15 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // [ShotNavPerf] Log render completion time
+  const renderEndTime = performance.now();
+  const renderDuration = renderEndTime - renderStartTime;
+  console.log('[ShotNavPerf] ⏱️ ShotEditor RENDER COMPLETE', {
+    selectedShotId: selectedShotId?.substring(0, 8),
+    renderDuration: `${renderDuration.toFixed(2)}ms`,
+    timestamp: Date.now()
+  });
+
   return (
     <div className="flex flex-col space-y-4 pb-4">
       {/* Header */}
@@ -2864,7 +2874,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (onPreviousShotNoScroll) onPreviousShotNoScroll();
+                  if (onPreviousShot) onPreviousShot();
                 }}
                 disabled={!hasPrevious || state.isTransitioningFromNameEdit}
                 className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
@@ -2887,7 +2897,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (onNextShotNoScroll) onNextShotNoScroll();
+                  if (onNextShot) onNextShot();
                 }}
                 disabled={!hasNext || state.isTransitioningFromNameEdit}
                 className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"

@@ -28,6 +28,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import ShotEditor from '../components/ShotEditor';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
+import { useProjectGenerationModesCache } from '@/shared/hooks/useProjectGenerationModesCache';
 import { useShotSettings } from '../hooks/useShotSettings';
 
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
@@ -164,8 +165,14 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [selectedShot, viaShotClick]);
   
+  // Mobile detection for mode handling
+  const isMobile = useIsMobile();
+  
   // Preload all shot video counts for the project
   const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
+  
+  // Preload all shot generation modes for the project
+  const { getShotGenerationMode, invalidateOnModeChange, isLoading: isLoadingProjectModes, error: projectModesError } = useProjectGenerationModesCache(selectedProjectId);
   
   // Debug project video counts cache - reduced logging
   const hasLoggedCacheState = useRef(false);
@@ -476,21 +483,23 @@ const VideoTravelToolPage: React.FC = () => {
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     shotSettings.updateField('generationMode', mode);
-  }, [shotSettings]);
+    // Invalidate the cache so other shots will see the updated mode immediately
+    invalidateOnModeChange();
+  }, [shotSettings, invalidateOnModeChange]);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
   // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   // const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>([]);
   
+  // Add ref for main container
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+  
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
 
   // Content-responsive breakpoints for dynamic layout
   const { isSm, isLg } = useContentResponsive();
-
-  // Add ref for main container to enable scroll-to-top functionality
-  const mainContainerRef = useRef<HTMLDivElement>(null);
 
   // Extract and validate hash shot id once for reuse
   const hashShotId = useMemo(() => {
@@ -606,12 +615,26 @@ const VideoTravelToolPage: React.FC = () => {
   }, [shotsLoadingRaw, initializingFromHash]);
 
   // ✅ NEW: All settings now derived from hook - no more individual useState calls!
-  const isMobile = useIsMobile();
-  
   // Detect tablets/iPads - treat them like desktop for timeline mode
   // iPads have screen width >= 768px, so they should get timeline mode option
   const isTabletOrLarger = typeof window !== 'undefined' && window.innerWidth >= 768;
   const shouldDefaultToBatch = isMobile && !isTabletOrLarger;
+  
+  // Get cached generation mode for instant loading (before settings fully load)
+  const cachedGenerationMode = getShotGenerationMode?.(selectedShot?.id || null, shouldDefaultToBatch);
+  
+  // Debug: Log cached generation mode usage
+  React.useEffect(() => {
+    if (selectedShot?.id && cachedGenerationMode) {
+      console.log('[GenerationModeCache] 🎯 Using cached generation mode:', {
+        shotId: selectedShot.id.substring(0, 8),
+        cachedMode: cachedGenerationMode,
+        shouldDefaultToBatch,
+        isMobile,
+        timestamp: Date.now()
+      });
+    }
+  }, [selectedShot?.id, cachedGenerationMode, shouldDefaultToBatch, isMobile]);
   
   const {
     videoControlMode = 'batch',
@@ -629,7 +652,7 @@ const VideoTravelToolPage: React.FC = () => {
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
-    generationMode = (shouldDefaultToBatch ? 'batch' : 'timeline'),
+    generationMode = cachedGenerationMode || (shouldDefaultToBatch ? 'batch' : 'timeline'),
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
     textBeforePrompts = '',
     textAfterPrompts = '',
@@ -1264,7 +1287,7 @@ const VideoTravelToolPage: React.FC = () => {
       currentShotName: selectedShot?.name
     });
     if (shots && selectedShot) {
-      navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
+      navigateToPreviousShot(shots, selectedShot, { scrollToTop: true });
     }
   }, [shots, selectedShot, navigateToPreviousShot]);
 
@@ -1275,7 +1298,7 @@ const VideoTravelToolPage: React.FC = () => {
       currentShotName: selectedShot?.name
     });
     if (shots && selectedShot) {
-      navigateToNextShot(shots, selectedShot, { scrollToTop: false });
+      navigateToNextShot(shots, selectedShot, { scrollToTop: true });
     }
   }, [shots, selectedShot, navigateToNextShot]);
 
@@ -1645,7 +1668,7 @@ const VideoTravelToolPage: React.FC = () => {
                   shotName: shotToEdit.name,
                   timestamp: Date.now()
                 })}
-                <ShotEditor
+              <ShotEditor
                 selectedShotId={shotToEdit.id}
                 projectId={selectedProjectId}
               videoControlMode={videoControlMode}

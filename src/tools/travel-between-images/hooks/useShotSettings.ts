@@ -177,9 +177,22 @@ export const useShotSettings = (
     }
     
     if (isLoading) {
+      console.log('[ShotNavPerf] ⏳ useShotSettings WAITING for useToolSettings', {
+        shotId: shotId.substring(0, 8),
+        isLoading,
+        hasDbSettings: !!dbSettings,
+        timestamp: Date.now()
+      });
       setStatus('loading');
       return;
     }
+    
+    console.log('[ShotNavPerf] ✅ useShotSettings useToolSettings LOADED', {
+      shotId: shotId.substring(0, 8),
+      isLoading,
+      hasDbSettings: !!dbSettings,
+      timestamp: Date.now()
+    });
     
     // FIX: Don't overwrite user's changes while they're actively editing or have pending saves
     // NOTE: With optimistic cache updates, this protection is now less critical since saves
