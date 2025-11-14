@@ -148,6 +148,22 @@ const VideoTravelToolPage: React.FC = () => {
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null);
   const { currentShotId, setCurrentShotId } = useCurrentShot();
   
+  // [ShotNavPerf] Track when selectedShot changes
+  const prevSelectedShotRef = useRef<Shot | null>(null);
+  useEffect(() => {
+    if (prevSelectedShotRef.current?.id !== selectedShot?.id) {
+      console.log('[ShotNavPerf] 🔄 selectedShot CHANGED', {
+        timestamp: Date.now(),
+        from: prevSelectedShotRef.current?.name || 'none',
+        fromId: prevSelectedShotRef.current?.id?.substring(0, 8) || 'none',
+        to: selectedShot?.name || 'none',
+        toId: selectedShot?.id?.substring(0, 8) || 'none',
+        source: viaShotClick ? 'ShotListDisplay' : 'Navigation'
+      });
+      prevSelectedShotRef.current = selectedShot;
+    }
+  }, [selectedShot, viaShotClick]);
+  
   // Preload all shot video counts for the project
   const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
   
@@ -169,6 +185,8 @@ const VideoTravelToolPage: React.FC = () => {
   // Task queue notifier is now handled inside ShotEditor component
   
   // Use parallelized data fetching for better performance
+  console.log('[ShotNavPerf] 📡 Calling useVideoTravelData with shotId:', selectedShot?.id?.substring(0, 8) || 'none');
+  const videoTravelDataStart = Date.now();
   const {
     shots,
     shotsLoading: shotsLoadingRaw,
@@ -184,9 +202,16 @@ const VideoTravelToolPage: React.FC = () => {
     projectUISettings,
     shotLoraSettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
+  console.log('[ShotNavPerf] ✅ useVideoTravelData returned in', Date.now() - videoTravelDataStart, 'ms');
   
   // NEW: Modern settings management using dedicated hook
+  console.log('[ShotNavPerf] 📡 Calling useShotSettings with shotId:', selectedShot?.id?.substring(0, 8) || 'none');
+  const shotSettingsStart = Date.now();
   const shotSettings = useShotSettings(selectedShot?.id, selectedProjectId);
+  console.log('[ShotNavPerf] ✅ useShotSettings returned in', Date.now() - shotSettingsStart, 'ms', {
+    status: shotSettings.status,
+    hasSettings: !!shotSettings.settings
+  });
   
   // Ref to always access latest shotSettings without triggering effects
   const shotSettingsRef = useRef(shotSettings);
@@ -845,17 +870,26 @@ const VideoTravelToolPage: React.FC = () => {
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
     // Also check if we have a valid shot from hash
     const hashShotExists = hashShotId && shots?.find(s => s.id === hashShotId);
-    return !!(shotExists || hashShotExists);
+    const result = !!(shotExists || hashShotExists);
+    console.log('[ShotNavPerf] 🎯 shouldShowShotEditor computed:', {
+      result,
+      shotExists: !!shotExists,
+      hashShotExists: !!hashShotExists,
+      selectedShotId: selectedShot?.id?.substring(0, 8) || 'none'
+    });
+    return result;
   }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
   
   const shotToEdit = useMemo(() => {
     if (hashShotId && shots) {
       const hashShot = shots.find(s => s.id === hashShotId);
       if (hashShot) {
+        console.log('[ShotNavPerf] 📝 shotToEdit: Using hash shot', hashShot.name);
         return hashShot;
       }
     }
     const fallbackShot = selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
+    console.log('[ShotNavPerf] 📝 shotToEdit: Using fallback shot', fallbackShot?.name || 'none');
     return fallbackShot;
   }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
   
@@ -1091,14 +1125,34 @@ const VideoTravelToolPage: React.FC = () => {
   // CRITICAL FIX: Use same logic as ShotEditor to prevent data inconsistency
   // Always load full data when in ShotEditor mode to ensure pair configs match generation logic
   const needsFullImageData = shouldShowShotEditor;
+  console.log('[ShotNavPerf] 📸 Calling useAllShotGenerations', {
+    needsFullImageData,
+    shotId: selectedShot?.id?.substring(0, 8) || 'none',
+    willFetch: needsFullImageData && !!selectedShot?.id
+  });
+  const fullImagesStart = Date.now();
   // Always call the hook to prevent hook order issues - the hook internally handles enabling/disabling
-  const { data: fullShotImages = [] } = useAllShotGenerations(
+  const fullImagesQuery = useAllShotGenerations(
     needsFullImageData ? (selectedShot?.id || null) : null,
     {
       // Disable refetch during shot operations to prevent race conditions with timeline
       disableRefetch: isShotOperationInProgress
     }
   );
+  const fullShotImages = fullImagesQuery.data || [];
+  console.log('[ShotNavPerf] ✅ useAllShotGenerations returned in', Date.now() - fullImagesStart, 'ms', {
+    imagesCount: fullShotImages.length,
+    isShotOperationInProgress,
+    queryState: {
+      isLoading: fullImagesQuery.isLoading,
+      isFetching: fullImagesQuery.isFetching,
+      isError: fullImagesQuery.isError,
+      error: fullImagesQuery.error?.message,
+      dataStatus: fullImagesQuery.dataUpdatedAt ? 'has-data' : 'no-data',
+      dataUpdatedAt: fullImagesQuery.dataUpdatedAt,
+      fetchStatus: fullImagesQuery.fetchStatus
+    }
+  });
   
   // Use full images if available AND needed, otherwise fall back to context images
   // This ensures consistency with ShotEditor's image selection logic
@@ -1164,6 +1218,11 @@ const VideoTravelToolPage: React.FC = () => {
   }, [currentShotId, shots, viaShotClick, navigate, location.pathname, selectedShot, setCurrentShotId]);
 
   const handleShotSelect = (shot: Shot) => {
+    console.log('[ShotNavPerf] === SHOT CLICKED FROM LIST ===', {
+      timestamp: Date.now(),
+      shotId: shot.id.substring(0, 8),
+      shotName: shot.name
+    });
     // Reset videos view when selecting a shot
     setShowVideosView(false);
     navigateToShot(shot);
@@ -1190,12 +1249,22 @@ const VideoTravelToolPage: React.FC = () => {
 
   // Navigation handlers
   const handlePreviousShot = useCallback(() => {
+    console.log('[ShotNavPerf] === PREVIOUS SHOT CLICKED ===', {
+      timestamp: Date.now(),
+      currentShotId: selectedShot?.id?.substring(0, 8),
+      currentShotName: selectedShot?.name
+    });
     if (shots && selectedShot) {
       navigateToPreviousShot(shots, selectedShot, { scrollToTop: false });
     }
   }, [shots, selectedShot, navigateToPreviousShot]);
 
   const handleNextShot = useCallback(() => {
+    console.log('[ShotNavPerf] === NEXT SHOT CLICKED ===', {
+      timestamp: Date.now(),
+      currentShotId: selectedShot?.id?.substring(0, 8),
+      currentShotName: selectedShot?.name
+    });
     if (shots && selectedShot) {
       navigateToNextShot(shots, selectedShot, { scrollToTop: false });
     }
@@ -1233,6 +1302,11 @@ const VideoTravelToolPage: React.FC = () => {
   // Ensure selectedShot is set when shotToEdit is available
   useEffect(() => {
     if (shotToEdit && (!selectedShot || selectedShot.id !== shotToEdit.id)) {
+      console.log('[ShotNavPerf] ⚙️ Syncing selectedShot with shotToEdit', {
+        shotToEditId: shotToEdit.id.substring(0, 8),
+        shotToEditName: shotToEdit.name,
+        previousSelectedId: selectedShot?.id?.substring(0, 8) || 'none'
+      });
       setSelectedShot(shotToEdit);
     }
   }, [shotToEdit, selectedShot]);
@@ -1556,7 +1630,13 @@ const VideoTravelToolPage: React.FC = () => {
           <PageFadeIn className="pt-3 sm:pt-5">
             {/* Only render ShotEditor if we have a valid shot to edit */}
             {shotToEdit ? (
-              <ShotEditor
+              <>
+                {console.log('[ShotNavPerf] 🎨 RENDERING ShotEditor for shot:', {
+                  shotId: shotToEdit.id.substring(0, 8),
+                  shotName: shotToEdit.name,
+                  timestamp: Date.now()
+                })}
+                <ShotEditor
                 selectedShotId={shotToEdit.id}
                 projectId={selectedProjectId}
               videoControlMode={videoControlMode}
@@ -1622,6 +1702,7 @@ const VideoTravelToolPage: React.FC = () => {
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               // afterEachPromptText props removed - not in ShotEditorProps interface
             />
+              </>
             ) : (
               // Show error message when shot is not found
               <div className="flex items-center justify-center h-64">

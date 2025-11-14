@@ -751,7 +751,7 @@ export default function HomePage() {
                       <img 
                         src="/banodoco-gold.png" 
                         alt="Banodoco" 
-                        className="w-9 h-9 object-contain opacity-100 brightness-[0.75] hover:brightness-100 transition-all duration-700 ease-in-out hover:scale-110 hover:saturate-150 hover:hue-rotate-[-15deg]" 
+                        className="w-8 h-8 object-contain opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 transition-all duration-700 ease-in-out hover:scale-110 hover:saturate-150 hover:hue-rotate-[-15deg]" 
                       />
                     </a>
                   </div>
