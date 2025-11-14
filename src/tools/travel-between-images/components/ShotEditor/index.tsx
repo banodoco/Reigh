@@ -730,6 +730,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Floating CTA state and refs
   const ctaContainerRef = useRef<HTMLDivElement>(null);
   const videoGalleryRef = useRef<HTMLDivElement>(null);
+  const generateVideosCardRef = useRef<HTMLDivElement>(null); // Ref for the Generate Videos card
   const [isCtaFloating, setIsCtaFloating] = useState(false);
   const [hasActiveSelection, setHasActiveSelection] = useState(false);
   const [showCtaElement, setShowCtaElement] = useState(true); // Start as true to show on initial load
@@ -806,7 +807,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (rafId) cancelAnimationFrame(rafId as unknown as number);
       ro.disconnect();
     };
-  }, [isMobile, isSticky, state.isEditingName, state.editingName, onUpdateShotName, selectedShot?.name, actions]);
+  }, [isMobile, state.isEditingName]);
 
 
   // Update header bounds during scroll and resize for smooth positioning
@@ -996,7 +997,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   useEffect(() => {
     // Check refs are ready and notify
     const checkRefs = () => {
-      if (videoGalleryRef.current && ctaContainerRef.current && refsReady === 0) {
+      if (generateVideosCardRef.current && ctaContainerRef.current && refsReady === 0) {
         console.log('[ShotEditor] Refs are now ready, triggering observer setup');
         setRefsReady(1);
       }
@@ -1011,41 +1012,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return () => clearTimeout(timer);
   }, []); // Run once on mount
 
-  // Floating CTA: Track when user scrolls past video gallery and before reaching original CTA
+  // Floating CTA: Track when user scrolls past Generate Videos card and before reaching original CTA
   useEffect(() => {
-    const galleryEl = videoGalleryRef.current;
+    const settingsCardEl = generateVideosCardRef.current;
     const ctaEl = ctaContainerRef.current;
-    if (!galleryEl || !ctaEl) {
-      console.log('[ShotEditor] Refs not ready yet, waiting...', { galleryEl: !!galleryEl, ctaEl: !!ctaEl });
+    if (!settingsCardEl || !ctaEl) {
+      console.log('[ShotEditor] Refs not ready yet, waiting...', { settingsCardEl: !!settingsCardEl, ctaEl: !!ctaEl });
       return;
     }
     
     console.log('[ShotEditor] Setting up IntersectionObservers for floating CTA');
     
-    let hasScrolledPastGallery = false;
+    let hasScrolledPastSettings = false;
     let isOriginalCtaVisible = false;
     
     const updateFloatingState = () => {
-      // Show floating CTA only when: scrolled past gallery AND original CTA is not visible AND no active selection
-      const shouldFloat = hasScrolledPastGallery && !isOriginalCtaVisible && !hasActiveSelection;
+      // Show floating CTA only when: scrolled past settings card AND original CTA is not visible AND no active selection
+      const shouldFloat = hasScrolledPastSettings && !isOriginalCtaVisible && !hasActiveSelection;
       setIsCtaFloating(shouldFloat);
     };
     
-    // Mobile needs smaller margins due to smaller viewport
-    const galleryMargin = isMobile ? '-100px 0px 0px 0px' : '-300px 0px 0px 0px';
+    // Trigger when the settings card starts to leave the viewport
+    // Smaller margin means it triggers closer to when the element leaves the viewport
+    const settingsMargin = isMobile ? '-50px 0px 0px 0px' : '-100px 0px 0px 0px';
     const ctaMargin = isMobile ? '0px 0px -100px 0px' : '0px 0px -150px 0px';
     
-    // Track video gallery - show floating CTA when it's scrolled out of view (top is above viewport)
-    const galleryObserver = new IntersectionObserver(
+    // Track Generate Videos card - show floating CTA when it's scrolled out of view (top is above viewport)
+    const settingsObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          hasScrolledPastGallery = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+          hasScrolledPastSettings = !entry.isIntersecting && entry.boundingClientRect.top < 0;
           updateFloatingState();
         });
       },
       {
         threshold: 0,
-        rootMargin: galleryMargin,
+        rootMargin: settingsMargin,
       }
     );
     
@@ -1063,15 +1065,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       }
     );
     
-    galleryObserver.observe(galleryEl);
+    settingsObserver.observe(settingsCardEl);
     ctaObserver.observe(ctaEl);
     
     // Immediately check initial state since IntersectionObserver callbacks don't fire synchronously
-    const galleryRect = galleryEl.getBoundingClientRect();
+    const settingsRect = settingsCardEl.getBoundingClientRect();
     const ctaRect = ctaEl.getBoundingClientRect();
     
-    // Check if gallery is above viewport (scrolled past)
-    hasScrolledPastGallery = galleryRect.top < -200; // Match the rootMargin threshold
+    // Check if settings card is above viewport (scrolled past)
+    const marginPx = isMobile ? -50 : -100;
+    hasScrolledPastSettings = settingsRect.top < marginPx;
     
     // Check if original CTA is visible in viewport
     const ctaTop = ctaRect.top;
@@ -1083,14 +1086,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     updateFloatingState();
     
     console.log('[ShotEditor] Initial floating state:', { 
-      hasScrolledPastGallery, 
+      hasScrolledPastSettings, 
       isOriginalCtaVisible, 
       hasActiveSelection,
-      shouldFloat: hasScrolledPastGallery && !isOriginalCtaVisible && !hasActiveSelection
+      shouldFloat: hasScrolledPastSettings && !isOriginalCtaVisible && !hasActiveSelection
     });
     
     return () => {
-      galleryObserver.disconnect();
+      settingsObserver.disconnect();
       ctaObserver.disconnect();
     };
   }, [isMobile, hasActiveSelection, refsReady]);
@@ -2976,7 +2979,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
         {/* Generation Settings */}
         <div className="w-full">
-          <Card>
+          <Card ref={generateVideosCardRef}>
             <CardHeader>
                 <CardTitle className="text-base sm:text-lg font-light">Generate Videos</CardTitle>
             </CardHeader>
