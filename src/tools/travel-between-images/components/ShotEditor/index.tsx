@@ -3079,7 +3079,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                   ref={ctaContainerRef} 
                   className="mt-6 pt-6 border-t"
                 >
-                  <div className="flex flex-col items-center">
+                  <div className={`flex flex-col items-center ${isCtaFloating ? 'opacity-0 pointer-events-none' : ''}`}>
                     {/* Variant Name Input */}
                     <div className="w-full max-w-md mb-4">
                       <input
@@ -3226,26 +3226,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       
       {/* Floating CTA - appears when original position is not visible */}
       {showCtaElement && isCtaFloating && (() => {
-        // Use stable bounds (captured when floating becomes visible) to prevent jumps during fast scrolling
-        // Fall back to current ctaBounds if stable bounds aren't available
-        const boundsToUse = stableCtaBoundsRef.current.width > 0 ? stableCtaBoundsRef.current : ctaBounds;
-        const hasCtaBounds = boundsToUse.width > 0;
-        
         return (
           <div 
-            className="fixed z-[80] animate-in fade-in duration-300 pointer-events-none"
+            className="fixed z-[80] animate-in fade-in duration-300 flex justify-center pointer-events-none"
             style={{
               bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
-              left: hasCtaBounds ? `${boundsToUse.left}px` : (isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px'),
-              width: hasCtaBounds ? `${boundsToUse.width}px` : undefined,
-              right: hasCtaBounds ? undefined : (isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px'),
-              transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out',
-              willChange: 'left, width, right',
-              transform: 'translateZ(0)'
+              left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0',
+              right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0',
             }}
           >
             {/* EXACT same structure as original CTA */}
-            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-4 pointer-events-auto">
+            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-4 w-full max-w-md pointer-events-auto">
               <div className="flex flex-col items-center">
                 {/* Variant Name Input */}
                 <div className="w-full max-w-md mb-4">
