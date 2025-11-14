@@ -695,23 +695,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Sticky header visibility similar to ImageGenerationToolPage
   const headerContainerRef = useRef<HTMLDivElement>(null);
+  const centerSectionRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
   const savedOnApproachRef = useRef(false);
-  const [stickyBounds, setStickyBounds] = useState<{ width: number; left: number }>({
-    width: 0,
-    left: 0
-  });
-
-  const updateStickyBounds = useCallback(() => {
-    const containerEl = headerContainerRef.current;
-    if (!containerEl) return;
-
-    const rect = containerEl.getBoundingClientRect();
-    setStickyBounds({
-      width: rect.width,
-      left: rect.left
-    });
-  }, []);
   
   // Floating CTA state and refs
   const ctaContainerRef = useRef<HTMLDivElement>(null);
@@ -794,28 +780,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
   }, [isMobile, isSticky, state.isEditingName, state.editingName, onUpdateShotName, selectedShot?.name, actions]);
 
-  // Track sticky header width/position for perfect alignment with original header
-  useEffect(() => {
-    const containerEl = headerContainerRef.current;
-    if (!containerEl) return;
-
-    updateStickyBounds();
-
-    const ro = new ResizeObserver(() => updateStickyBounds());
-    ro.observe(containerEl);
-
-    const handleResize = () => updateStickyBounds();
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [updateStickyBounds]);
-
-  useEffect(() => {
-    updateStickyBounds();
-  }, [updateStickyBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
 
   // Reset the pre-trigger guard whenever user enters edit mode
   useEffect(() => {
@@ -2752,6 +2716,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onEditingNameChange={actions.setEditingNameValue}
         projectAspectRatio={effectiveAspectRatio}
         projectId={projectId}
+        centerSectionRef={centerSectionRef}
       />
       </div>
 
@@ -2986,68 +2951,68 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // Calculate horizontal constraints based on locked panes
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
-        const hasStickyMeasurements = stickyBounds.width > 0;
-        const stickyPositionStyle = hasStickyMeasurements
-          ? {
-              left: `${stickyBounds.left}px`,
-              width: `${stickyBounds.width}px`
-            }
-          : {
-              left: `${leftOffset + 16}px`,
-              right: `${rightOffset + 16}px`
-            };
         
         return (
           <div
-            className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
+            className={`fixed z-50 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
+              left: `${leftOffset}px`,
+              right: `${rightOffset}px`,
               willChange: 'transform, opacity',
-              transform: 'translateZ(0)',
-              ...stickyPositionStyle
+              transform: 'translateZ(0)'
             }}
           >
-            {/* Center-aligned compact design with slightly transparent background */}
-            <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-2' : 'py-2 px-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
-              {/* Subtle grain overlay to match GlobalHeader vibe */}
-              <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (onPreviousShot) onPreviousShot();
-                }}
-                disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
-                title="Previous shot"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
+            {/* Match the original header's three-column justify-between layout */}
+            <div className="flex justify-between items-center px-2">
+              {/* Left spacer - invisible but maintains layout */}
+              <div className="flex-1" />
               
-              <span
-                className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-primary truncate px-2 ${isMobile ? 'max-w-[100px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''} pointer-events-auto`}
-                onClick={handleStickyNameClick}
-                title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
-              >
-                {selectedShot?.name || 'Untitled Shot'}
-              </span>
+              {/* Center section - matches original header structure */}
+              <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-2' : 'py-2 px-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
+                {/* Subtle grain overlay to match GlobalHeader vibe */}
+                <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onPreviousShot) onPreviousShot();
+                  }}
+                  disabled={!hasPrevious || state.isTransitioningFromNameEdit}
+                  className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
+                  title="Previous shot"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <span
+                  className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-primary truncate px-2 ${isMobile ? 'max-w-[100px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''} pointer-events-auto`}
+                  onClick={handleStickyNameClick}
+                  title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
+                >
+                  {selectedShot?.name || 'Untitled Shot'}
+                </span>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onNextShot) onNextShot();
+                  }}
+                  disabled={!hasNext || state.isTransitioningFromNameEdit}
+                  className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
+                  title="Next shot"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (onNextShot) onNextShot();
-                }}
-                disabled={!hasNext || state.isTransitioningFromNameEdit}
-                className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
-                title="Next shot"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              {/* Right spacer - invisible but maintains layout */}
+              <div className="flex-1" />
             </div>
           </div>
         );

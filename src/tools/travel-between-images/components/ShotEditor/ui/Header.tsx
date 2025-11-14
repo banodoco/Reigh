@@ -26,6 +26,7 @@ interface HeaderProps {
   onEditingNameChange: (value: string) => void;
   projectAspectRatio?: string;
   projectId?: string;
+  centerSectionRef?: React.RefObject<HTMLDivElement>;
 }
 
 // Internal component - not memoized to allow hooks
@@ -47,6 +48,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   onEditingNameChange,
   projectAspectRatio,
   projectId,
+  centerSectionRef,
 }) => {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
@@ -151,7 +153,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
         </div>
         
         {/* Desktop shot name with navigation buttons - centered */}
-        <div className="flex items-center justify-center">
+        <div ref={centerSectionRef} className="flex items-center justify-center">
           {isEditingName ? (
             // Hide navigation buttons when editing - only show name editing controls
             <div className="flex items-center space-x-2">
