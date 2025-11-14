@@ -2953,8 +2953,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         
         // Match the main content container padding from Layout.tsx
-        // Content-responsive: px-6 (lg), px-4 (sm), px-2 (base)
-        const contentPadding = isLg ? 24 : isSm ? 16 : 8; // Convert px-6/4/2 to pixels
+        // Content-responsive: px-6 (lg >= 1024px), px-4 (sm >= 640px), px-2 (base)
+        const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
+        const contentPadding = windowWidth >= 1024 ? 24 : windowWidth >= 640 ? 16 : 8;
         
         return (
           <div
