@@ -480,7 +480,10 @@ export const useShotSettings = (
     };
   }, []);
   
-  return {
+  // 🎯 FIX: Memoize the return object to prevent callback instability in parent components
+  // Without this, every render creates a new object, causing all callbacks that depend on
+  // this hook (e.g. in VideoTravelToolPage) to be recreated, triggering cascade rerenders
+  return useMemo(() => ({
     settings,
     status,
     isDirty,
@@ -493,6 +496,19 @@ export const useShotSettings = (
     save,
     saveImmediate,
     revert,
-  };
+  }), [
+    settings,
+    status,
+    isDirty,
+    error,
+    updateField,
+    updateFields,
+    applyShotSettings,
+    applyProjectDefaults,
+    resetToDefaults,
+    save,
+    saveImmediate,
+    revert,
+  ]);
 };
 

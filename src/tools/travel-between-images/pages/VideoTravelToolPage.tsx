@@ -133,6 +133,42 @@ const VideoTravelToolPage: React.FC = () => {
     console.log(`${VIDEO_DEBUG_TAG} === RENDER START #${videoRenderCount.current} === ${Date.now() - videoMountTime.current}ms since mount`);
   }
   
+  // [PROFILING] Track what's causing VideoTravelToolPage rerenders
+  const prevStateRef = useRef<any>(null);
+  useEffect(() => {
+    if (prevStateRef.current && (videoRenderCount.current <= 10 || videoRenderCount.current % 10 === 0)) {
+      const changes: string[] = [];
+      
+      // Track key state changes
+      if (prevStateRef.current.locationKey !== location.key) changes.push(`location.key(${location.key})`);
+      if (prevStateRef.current.locationHash !== location.hash) changes.push(`location.hash(${location.hash?.substring(0, 12)})`);
+      if (prevStateRef.current.selectedProjectId !== selectedProjectId) changes.push('selectedProjectId');
+      if (prevStateRef.current.currentShotId !== currentShotId) changes.push('currentShotId');
+      if (prevStateRef.current.selectedShotId !== selectedShot?.id) changes.push('selectedShot.id');
+      
+      if (changes.length > 0) {
+        console.warn(`[VideoTravelToolPage:Profiling] 🔄 Render #${videoRenderCount.current} caused by:`, {
+          changes,
+          timeSinceMount: Date.now() - videoMountTime.current,
+          timestamp: Date.now()
+        });
+      } else {
+        console.warn(`[VideoTravelToolPage:Profiling] ⚠️ Render #${videoRenderCount.current} with NO STATE CHANGES (context/parent rerender)`, {
+          timeSinceMount: Date.now() - videoMountTime.current,
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    prevStateRef.current = {
+      locationKey: location.key,
+      locationHash: location.hash,
+      selectedProjectId,
+      currentShotId,
+      selectedShotId: selectedShot?.id
+    };
+  });
+  
   const navigate = useNavigate();
   const location = useLocation();
   const viaShotClick = location.state?.fromShotClick === true;
@@ -218,6 +254,22 @@ const VideoTravelToolPage: React.FC = () => {
   console.log('[ShotNavPerf] ✅ useShotSettings returned in', Date.now() - shotSettingsStart, 'ms', {
     status: shotSettings.status,
     hasSettings: !!shotSettings.settings
+  });
+  
+  // [PROFILING] Track shotSettings object stability to verify Fix #1
+  const prevShotSettingsRef = useRef<any>(null);
+  useEffect(() => {
+    if (prevShotSettingsRef.current && prevShotSettingsRef.current !== shotSettings) {
+      console.warn('[VideoTravelToolPage:Profiling] 🔄 shotSettings object changed (should be stable after Fix #1)', {
+        updateFieldChanged: prevShotSettingsRef.current.updateField !== shotSettings.updateField,
+        updateFieldsChanged: prevShotSettingsRef.current.updateFields !== shotSettings.updateFields,
+        saveChanged: prevShotSettingsRef.current.save !== shotSettings.save,
+        settingsDataChanged: prevShotSettingsRef.current.settings !== shotSettings.settings,
+        statusChanged: prevShotSettingsRef.current.status !== shotSettings.status,
+        timestamp: Date.now()
+      });
+    }
+    prevShotSettingsRef.current = shotSettings;
   });
   
   // Ref to always access latest shotSettings without triggering effects

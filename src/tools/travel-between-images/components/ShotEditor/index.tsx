@@ -117,9 +117,74 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 }) => {
   // [ShotNavPerf] TEST LOG - Component is rendering
   const renderStartTime = performance.now();
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  
   console.log('[ShotNavPerf] 🚀 ShotEditor RENDERING START', {
     selectedShotId: selectedShotId?.substring(0, 8),
+    renderNumber: renderCount.current,
     timestamp: Date.now()
+  });
+  
+  // [PROFILING] Track which props changed to cause this render
+  const prevPropsRef = useRef<any>(null);
+  useEffect(() => {
+    if (prevPropsRef.current) {
+      const changedProps: string[] = [];
+      const changedCallbacks: string[] = [];
+      
+      // Check primitive props
+      if (prevPropsRef.current.selectedShotId !== selectedShotId) changedProps.push('selectedShotId');
+      if (prevPropsRef.current.projectId !== projectId) changedProps.push('projectId');
+      if (prevPropsRef.current.generationMode !== generationMode) changedProps.push('generationMode');
+      if (prevPropsRef.current.batchVideoFrames !== batchVideoFrames) changedProps.push('batchVideoFrames');
+      if (prevPropsRef.current.batchVideoContext !== batchVideoContext) changedProps.push('batchVideoContext');
+      if (prevPropsRef.current.enhancePrompt !== enhancePrompt) changedProps.push('enhancePrompt');
+      if (prevPropsRef.current.turboMode !== turboMode) changedProps.push('turboMode');
+      if (prevPropsRef.current.advancedMode !== advancedMode) changedProps.push('advancedMode');
+      if (prevPropsRef.current.settingsLoading !== settingsLoading) changedProps.push('settingsLoading');
+      
+      // Check callback props (these are the likely culprits)
+      if (prevPropsRef.current.onShotImagesUpdate !== onShotImagesUpdate) changedCallbacks.push('onShotImagesUpdate');
+      if (prevPropsRef.current.onBack !== onBack) changedCallbacks.push('onBack');
+      if (prevPropsRef.current.onGenerationModeChange !== onGenerationModeChange) changedCallbacks.push('onGenerationModeChange');
+      if (prevPropsRef.current.onBatchVideoFramesChange !== onBatchVideoFramesChange) changedCallbacks.push('onBatchVideoFramesChange');
+      if (prevPropsRef.current.onBatchVideoContextChange !== onBatchVideoContextChange) changedCallbacks.push('onBatchVideoContextChange');
+      if (prevPropsRef.current.onEnhancePromptChange !== onEnhancePromptChange) changedCallbacks.push('onEnhancePromptChange');
+      if (prevPropsRef.current.onTurboModeChange !== onTurboModeChange) changedCallbacks.push('onTurboModeChange');
+      if (prevPropsRef.current.onAdvancedModeChange !== onAdvancedModeChange) changedCallbacks.push('onAdvancedModeChange');
+      if (prevPropsRef.current.onGenerateAllSegments !== onGenerateAllSegments) changedCallbacks.push('onGenerateAllSegments');
+      if (prevPropsRef.current.onPreviousShot !== onPreviousShot) changedCallbacks.push('onPreviousShot');
+      if (prevPropsRef.current.onNextShot !== onNextShot) changedCallbacks.push('onNextShot');
+      if (prevPropsRef.current.onUpdateShotName !== onUpdateShotName) changedCallbacks.push('onUpdateShotName');
+      if (prevPropsRef.current.getShotVideoCount !== getShotVideoCount) changedCallbacks.push('getShotVideoCount');
+      if (prevPropsRef.current.invalidateVideoCountsCache !== invalidateVideoCountsCache) changedCallbacks.push('invalidateVideoCountsCache');
+      
+      if (changedProps.length > 0 || changedCallbacks.length > 0) {
+        console.warn('[ShotEditor:Profiling] 🔄 Props changed causing ShotEditor rerender:', {
+          renderNumber: renderCount.current,
+          changedProps,
+          changedCallbacks,
+          callbackCount: changedCallbacks.length,
+          timestamp: Date.now()
+        });
+      } else {
+        console.warn('[ShotEditor:Profiling] ⚠️ ShotEditor rerendered with NO PROP CHANGES (parent rerender):', {
+          renderNumber: renderCount.current,
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    // Save current props for next comparison
+    prevPropsRef.current = {
+      selectedShotId, projectId, generationMode, batchVideoFrames, batchVideoContext,
+      enhancePrompt, turboMode, advancedMode, settingsLoading,
+      onShotImagesUpdate, onBack, onGenerationModeChange, onBatchVideoFramesChange,
+      onBatchVideoContextChange, onEnhancePromptChange, onTurboModeChange,
+      onAdvancedModeChange, onGenerateAllSegments, onPreviousShot, onNextShot,
+      onUpdateShotName, getShotVideoCount, invalidateVideoCountsCache
+    };
   });
   
   // Call all hooks first (Rules of Hooks)
@@ -2891,14 +2956,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               top: `${topPosition}px`,
               left: `${leftOffset}px`,
               right: `${rightOffset}px`,
-              paddingLeft: '16px',
-              paddingRight: '16px',
               willChange: 'transform, opacity',
               transform: 'translateZ(0)'
             }}
           >
             {/* Center-aligned compact design with slightly transparent background */}
-            <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-3' : 'p-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
+            <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-2' : 'py-2 px-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
               {/* Subtle grain overlay to match GlobalHeader vibe */}
               <div className="pointer-events-none absolute inset-0 bg-film-grain opacity-10 animate-film-grain"></div>
               <Button
@@ -2917,7 +2980,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               </Button>
               
               <span
-                className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-primary truncate px-2 ${isMobile ? 'w-[135px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''} pointer-events-auto`}
+                className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-primary truncate px-2 ${isMobile ? 'max-w-[100px]' : 'w-[200px]'} text-center ${onUpdateShotName ? 'cursor-pointer hover:underline transition-all duration-200' : ''} pointer-events-auto`}
                 onClick={handleStickyNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >

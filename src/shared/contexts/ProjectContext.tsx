@@ -707,11 +707,27 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [updateUserPreferences]);
 
   // [MobileStallFix] Enhanced project loading with fallback recovery
+  // [PROFILING] Track fetch invocations to detect triple-fetch issue
+  const fetchInvocationCountRef = useRef(0);
+  const lastFetchReasonRef = useRef<string>('');
+  
   useEffect(() => {
     console.log(`[ProjectContext:MobileDebug] Project loading check - userId: ${!!userId}, isLoadingPreferences: ${isLoadingPreferences}`);
     
     // FAST RESUME: Start loading projects as soon as we have userId (don't wait for preferences)
     if (userId) {
+      fetchInvocationCountRef.current += 1;
+      const reason = `userId=${!!userId}, isLoadingPreferences=${isLoadingPreferences}`;
+      
+      console.log(`[ProjectContext:Profiling] 📊 fetchProjects invocation #${fetchInvocationCountRef.current}`, {
+        reason,
+        previousReason: lastFetchReasonRef.current,
+        timeSinceMount: Date.now(),
+        stack: new Error().stack?.split('\n').slice(2, 5).join('\n')
+      });
+      
+      lastFetchReasonRef.current = reason;
+      
       console.log(`[ProjectContext:MobileDebug] Starting project fetch immediately (removed 100ms delay)`);
       // REMOVED: 100ms delay that was causing slow tab resume
       fetchProjects();
