@@ -425,7 +425,7 @@ const VideoTravelToolPage: React.FC = () => {
         selectedPhasePresetId: null  // Clear preset when going to basic mode
       });
     }
-  }, [shotSettings, selectedShot?.id]);
+  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
     // Prevent enabling advanced mode when turbo mode is on
@@ -458,7 +458,7 @@ const VideoTravelToolPage: React.FC = () => {
     } else {
       shotSettings.updateField('advancedMode', advanced);
     }
-  }, [shotSettings, selectedShot?.id]);
+  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
   const handleRegenerateAnchorsChange = useCallback((regenerate: boolean) => {
     shotSettings.updateField('regenerateAnchors', regenerate);
@@ -488,7 +488,7 @@ const VideoTravelToolPage: React.FC = () => {
     });
     
     shotSettings.updateField('phaseConfig', adjustedConfig);
-  }, [shotSettings, selectedShot?.id]);
+  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
   const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => {
     console.log('[PhasePreset] User selected preset:', {
@@ -521,7 +521,7 @@ const VideoTravelToolPage: React.FC = () => {
     
     // Save all fields
     shotSettings.updateFields(fieldsToUpdate);
-  }, [shotSettings, selectedShot?.id]);
+  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
   const handlePhasePresetRemove = useCallback(() => {
     console.log('[PhasePreset] User removed preset:', {
@@ -531,7 +531,7 @@ const VideoTravelToolPage: React.FC = () => {
     
     // Clear preset ID but keep the current config
     shotSettings.updateField('selectedPhasePresetId', null);
-  }, [shotSettings, selectedShot?.id]);
+  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     // Optimistically update the cache for THIS shot immediately

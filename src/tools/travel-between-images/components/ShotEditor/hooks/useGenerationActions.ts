@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useMemo } from 'react';
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { GenerationRow, Shot } from "@/types/shots";
@@ -908,7 +908,10 @@ export const useGenerationActions = ({
     }
   }, [selectedShot?.id, selectedShot?.name, projectId, addImageToShotMutation, onShotImagesUpdate]);
 
-  return {
+  // 🎯 FIX #3: Memoize the return object to prevent callback instability in parent components
+  // Without this, every render creates a new object, causing ShotImagesEditor to rerender
+  // even when the individual callbacks haven't changed
+  return useMemo(() => ({
     handleImageUploadToShot,
     handleDeleteVideoOutput,
     handleDeleteImageFromShot,
@@ -923,5 +926,19 @@ export const useGenerationActions = ({
     enqueueTasks,
     // Expose mutation for direct use (e.g., for image flipping)
     updateGenerationLocationMutation,
-  };
+  }), [
+    handleImageUploadToShot,
+    handleDeleteVideoOutput,
+    handleDeleteImageFromShot,
+    handleBatchDeleteImages,
+    handleDuplicateImage,
+    handleTimelineImageDrop,
+    handleTimelineGenerationDrop,
+    handleBatchImageDrop,
+    handleBatchGenerationDrop,
+    isEnqueuing,
+    justQueued,
+    enqueueTasks,
+    updateGenerationLocationMutation,
+  ]);
 }; 

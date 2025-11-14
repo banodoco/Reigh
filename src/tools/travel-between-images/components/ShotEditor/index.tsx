@@ -697,6 +697,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const headerContainerRef = useRef<HTMLDivElement>(null);
   const [isSticky, setIsSticky] = useState(false);
   const savedOnApproachRef = useRef(false);
+  const [stickyBounds, setStickyBounds] = useState<{ width: number; left: number }>({
+    width: 0,
+    left: 0
+  });
+
+  const updateStickyBounds = useCallback(() => {
+    const containerEl = headerContainerRef.current;
+    if (!containerEl) return;
+
+    const rect = containerEl.getBoundingClientRect();
+    setStickyBounds({
+      width: rect.width,
+      left: rect.left
+    });
+  }, []);
   
   // Floating CTA state and refs
   const ctaContainerRef = useRef<HTMLDivElement>(null);
@@ -778,6 +793,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       ro.disconnect();
     };
   }, [isMobile, isSticky, state.isEditingName, state.editingName, onUpdateShotName, selectedShot?.name, actions]);
+
+  // Track sticky header width/position for perfect alignment with original header
+  useEffect(() => {
+    const containerEl = headerContainerRef.current;
+    if (!containerEl) return;
+
+    updateStickyBounds();
+
+    const ro = new ResizeObserver(() => updateStickyBounds());
+    ro.observe(containerEl);
+
+    const handleResize = () => updateStickyBounds();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [updateStickyBounds]);
+
+  useEffect(() => {
+    updateStickyBounds();
+  }, [updateStickyBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
 
   // Reset the pre-trigger guard whenever user enters edit mode
   useEffect(() => {
@@ -2948,16 +2986,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // Calculate horizontal constraints based on locked panes
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
+        const hasStickyMeasurements = stickyBounds.width > 0;
+        const stickyPositionStyle = hasStickyMeasurements
+          ? {
+              left: `${stickyBounds.left}px`,
+              width: `${stickyBounds.width}px`
+            }
+          : {
+              left: `${leftOffset + 16}px`,
+              right: `${rightOffset + 16}px`
+            };
         
         return (
           <div
             className={`fixed z-50 flex justify-center transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
-              left: `${leftOffset}px`,
-              right: `${rightOffset}px`,
               willChange: 'transform, opacity',
-              transform: 'translateZ(0)'
+              transform: 'translateZ(0)',
+              ...stickyPositionStyle
             }}
           >
             {/* Center-aligned compact design with slightly transparent background */}
