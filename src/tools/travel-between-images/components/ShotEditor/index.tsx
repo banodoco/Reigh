@@ -711,6 +711,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // Also update stable ref for use when sticky is visible
     stableBoundsRef.current = newBounds;
   }, []);
+
+  // CTA bounds for smooth floating positioning
+  const [ctaBounds, setCtaBounds] = useState({ left: 0, width: 0 });
+  const stableCtaBoundsRef = useRef({ left: 0, width: 0 }); // Stable bounds when floating becomes visible
+  
+  const updateCtaBounds = useCallback(() => {
+    const containerEl = ctaContainerRef.current;
+    if (!containerEl) return;
+
+    const rect = containerEl.getBoundingClientRect();
+    const newBounds = { left: rect.left, width: rect.width };
+    setCtaBounds(newBounds);
+    // Also update stable ref for use when floating is visible
+    stableCtaBoundsRef.current = newBounds;
+  }, []);
   
   // Floating CTA state and refs
   const ctaContainerRef = useRef<HTMLDivElement>(null);
@@ -863,6 +878,76 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       stableBoundsRef.current = headerBounds;
     }
   }, [isSticky, headerBounds]);
+
+  // Update CTA bounds during resize for smooth positioning
+  // Only update when floating CTA is NOT visible to prevent jumps during fast scrolling
+  useEffect(() => {
+    const containerEl = ctaContainerRef.current;
+    if (!containerEl) return;
+    
+    let rafId: number | null = null;
+    let lastUpdateTime = 0;
+    const THROTTLE_MS = 16; // ~60fps
+    
+    const updateBounds = () => {
+      const now = performance.now();
+      // Only update if enough time has passed (throttle) or if floating is not visible
+      if (now - lastUpdateTime >= THROTTLE_MS || !isCtaFloating) {
+        updateCtaBounds();
+        lastUpdateTime = now;
+      }
+      rafId = null;
+    };
+    
+    const scheduleUpdate = () => {
+      // When floating CTA is visible, throttle updates more aggressively
+      if (isCtaFloating) {
+        // Only update on resize when floating, not on scroll
+        return;
+      }
+      
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateBounds);
+      }
+    };
+    
+    // Initial update
+    updateCtaBounds();
+
+    const ro = new ResizeObserver(() => {
+      // Always update on resize
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateBounds);
+      }
+    });
+    ro.observe(containerEl);
+
+    const handleResize = () => {
+      // Always update on resize
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateBounds);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [updateCtaBounds, isCtaFloating]);
+
+  useEffect(() => {
+    updateCtaBounds();
+  }, [updateCtaBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
+
+  // Capture stable bounds when floating CTA becomes visible to prevent jumps
+  useEffect(() => {
+    if (isCtaFloating && ctaBounds.width > 0) {
+      stableCtaBoundsRef.current = ctaBounds;
+    }
+  }, [isCtaFloating, ctaBounds]);
 
   // Reset the pre-trigger guard whenever user enters edit mode
   useEffect(() => {
@@ -3137,21 +3222,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       />
       
       {/* Floating CTA - appears when original position is not visible */}
-      {showCtaElement && (
-        <div 
-          className={`fixed z-[80] flex justify-center duration-300 pointer-events-none ${
-            isInitialMountRef.current 
-              ? '' // No animation on initial mount
-              : isCtaFloating 
-                ? 'animate-in slide-in-from-bottom-4 fade-in' 
-                : 'animate-out slide-out-to-bottom-4 fade-out'
-          }`}
-          style={{
-            bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
-            left: isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px',
-            right: isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px',
-          }}
-        >
+      {showCtaElement && (() => {
+        // Use stable bounds (captured when floating becomes visible) to prevent jumps during fast scrolling
+        // Fall back to current ctaBounds if stable bounds aren't available
+        const boundsToUse = stableCtaBoundsRef.current.width > 0 ? stableCtaBoundsRef.current : ctaBounds;
+        const hasCtaBounds = boundsToUse.width > 0;
+        
+        return (
+          <div 
+            className={`fixed z-[80] flex justify-center pointer-events-none ${
+              isInitialMountRef.current 
+                ? '' // No animation on initial mount
+                : isCtaFloating 
+                  ? 'animate-in slide-in-from-bottom-4 fade-in' 
+                  : 'animate-out slide-out-to-bottom-4 fade-out'
+            }`}
+            style={{
+              bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
+              left: hasCtaBounds ? `${boundsToUse.left}px` : (isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px'),
+              width: hasCtaBounds ? `${boundsToUse.width}px` : undefined,
+              right: hasCtaBounds ? undefined : (isTasksPaneLocked ? `${tasksPaneWidth + 16}px` : '16px'),
+              transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
+              willChange: 'left, width, right, opacity',
+              transform: 'translateZ(0)'
+            }}
+          >
           <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-lg pointer-events-auto">
             <div className="flex flex-col items-center gap-2">
               {/* Variant Name Input */}
@@ -3182,7 +3277,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Back to Top Button */}
       {showBackToTop && (
