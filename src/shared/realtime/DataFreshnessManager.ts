@@ -30,12 +30,28 @@ export class DataFreshnessManager {
    */
   onRealtimeStatusChange(status: RealtimeStatus, reason?: string) {
     const previousStatus = this.state.realtimeStatus;
+    const previousChangeAt = this.state.lastStatusChange;
+    const now = Date.now();
+    
+    // 🎯 KEY FIX: Ignore duplicate status changes to keep lastStatusChange stable
+    // This allows the "recently connected" grace period in getPollingInterval to actually expire
+    if (previousStatus === status) {
+      console.log(`[DataFreshness] ⏸️  Duplicate status ignored: ${status}${reason ? ` (${reason})` : ''}`, {
+        status,
+        stableFor: Math.round((now - previousChangeAt) / 1000) + 's',
+        reason: 'Prevents resetting lastStatusChange on redundant calls',
+        timestamp: now
+      });
+      return; // Don't update state or notify subscribers for duplicates
+    }
+    
+    // Actual status transition - update state
     this.state.realtimeStatus = status;
-    this.state.lastStatusChange = Date.now();
+    this.state.lastStatusChange = now;
 
     console.log(`[DataFreshness] 🔄 Status change: ${previousStatus} → ${status}${reason ? ` (${reason})` : ''}`, {
-      timestamp: this.state.lastStatusChange,
-      timeSinceLastChange: this.state.lastStatusChange - this.state.lastStatusChange
+      timestamp: now,
+      timeSinceLastChange: Math.round((now - previousChangeAt) / 1000) + 's'
     });
 
     // Notify all subscribers that polling intervals may have changed

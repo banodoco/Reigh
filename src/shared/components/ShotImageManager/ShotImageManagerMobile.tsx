@@ -16,6 +16,8 @@ import { MobileImageItem } from './MobileImageItem';
 import { BaseShotImageManagerProps } from './types';
 import { PairPromptIndicator } from './components/PairPromptIndicator';
 
+const DOUBLE_TAP_WINDOW_MS = 275;
+
 export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   images,
   onImageDelete,
@@ -66,7 +68,12 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Double-tap detection for mobile taps
   const lastTapTimeRef = useRef<number>(0);
   const lastTappedIdRef = useRef<string | null>(null);
-  const singleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSingleTapRef = useRef<{
+    imageId: string;
+    previousSelection: string[];
+    previousLastSelectedIndex: number | null;
+  } | null>(null);
+  const pendingSingleTapClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const mobileGridColsClass = {
     2: 'grid-cols-2',
@@ -153,58 +160,73 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   }, [images, isOptimisticUpdate, optimisticOrder]);
 
   // Mobile tap handler for selection (disabled in readOnly)
+  const clearPendingSingleTap = useCallback(() => {
+    if (pendingSingleTapClearTimeoutRef.current) {
+      clearTimeout(pendingSingleTapClearTimeoutRef.current);
+      pendingSingleTapClearTimeoutRef.current = null;
+    }
+    pendingSingleTapRef.current = null;
+  }, []);
+
   const handleMobileTap = useCallback((imageId: string, index: number) => {
     if (readOnly) return; // Don't allow selection in readOnly mode
-
-    // Clear any pending single-tap action (if a double-tap occurs)
-    if (singleTapTimeoutRef.current) {
-      clearTimeout(singleTapTimeoutRef.current);
-      singleTapTimeoutRef.current = null;
-    }
 
     const now = Date.now();
     const timeDiff = now - lastTapTimeRef.current;
     const isSameImage = lastTappedIdRef.current === imageId;
+    const isDoubleTap =
+      timeDiff > 10 && timeDiff < DOUBLE_TAP_WINDOW_MS && isSameImage;
 
-    // Double-tap: open lightbox immediately and do NOT toggle selection
-    if (timeDiff > 10 && timeDiff < 300 && isSameImage) {
+    if (isDoubleTap) {
+      const pendingState = pendingSingleTapRef.current;
+      if (pendingState?.imageId === imageId) {
+        setMobileSelectedIds(pendingState.previousSelection);
+        setLastSelectedIndex(pendingState.previousLastSelectedIndex);
+      }
+      clearPendingSingleTap();
       if (onOpenLightbox) {
         onOpenLightbox(index);
       }
-      // Reset refs to avoid triple taps chaining
       lastTapTimeRef.current = 0;
       lastTappedIdRef.current = null;
       return;
     }
 
-    // Otherwise, schedule single-tap selection toggle after a short delay
+    const wasSelected = mobileSelectedIds.includes(imageId);
+    const previousSelectionSnapshot = [...mobileSelectedIds];
+    const previousLastSelectedIndexSnapshot = lastSelectedIndex;
+
+    clearPendingSingleTap();
+
+    pendingSingleTapRef.current = {
+      imageId,
+      previousSelection: previousSelectionSnapshot,
+      previousLastSelectedIndex: previousLastSelectedIndexSnapshot,
+    };
+
+    pendingSingleTapClearTimeoutRef.current = setTimeout(() => {
+      pendingSingleTapRef.current = null;
+      pendingSingleTapClearTimeoutRef.current = null;
+    }, DOUBLE_TAP_WINDOW_MS);
+
+    if (wasSelected) {
+      setMobileSelectedIds(prev => prev.filter(id => id !== imageId));
+      setLastSelectedIndex(null);
+    } else {
+      setMobileSelectedIds(prev => [...prev, imageId]);
+      setLastSelectedIndex(index);
+    }
+
     lastTapTimeRef.current = now;
     lastTappedIdRef.current = imageId;
-
-    singleTapTimeoutRef.current = setTimeout(() => {
-      const isCurrentlySelected = mobileSelectedIds.includes(imageId);
-      if (isCurrentlySelected) {
-        // Deselect
-        setMobileSelectedIds(prev => prev.filter(id => id !== imageId));
-        setLastSelectedIndex(null);
-      } else {
-        // Select
-        setMobileSelectedIds(prev => [...prev, imageId]);
-        setLastSelectedIndex(index);
-      }
-      singleTapTimeoutRef.current = null;
-    }, 250);
-  }, [mobileSelectedIds, readOnly, onOpenLightbox]);
+  }, [mobileSelectedIds, readOnly, onOpenLightbox, clearPendingSingleTap, lastSelectedIndex]);
 
   // Cleanup any pending single-tap timeout on unmount
   React.useEffect(() => {
     return () => {
-      if (singleTapTimeoutRef.current) {
-        clearTimeout(singleTapTimeoutRef.current);
-        singleTapTimeoutRef.current = null;
-      }
+      clearPendingSingleTap();
     };
-  }, []);
+  }, [clearPendingSingleTap]);
 
   // Mobile reordering function
   const handleMobileMoveHere = useCallback(async (targetIndex: number) => {
