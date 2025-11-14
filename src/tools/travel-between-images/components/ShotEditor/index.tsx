@@ -3233,7 +3233,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         return (
           <div 
-            className="fixed z-[80] flex justify-center animate-in fade-in duration-300"
+            className="fixed z-[80] animate-in fade-in duration-300 pointer-events-none"
             style={{
               bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
               left: hasCtaBounds ? `${boundsToUse.left}px` : (isShotsPaneLocked ? `${shotsPaneWidth + 16}px` : '16px'),
@@ -3244,36 +3244,37 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               transform: 'translateZ(0)'
             }}
           >
-          <div className="bg-background/80 backdrop-blur-md border rounded-lg shadow-2xl px-6 py-3 w-full max-w-lg pointer-events-auto">
-            <div className="flex flex-col items-center gap-2">
-              {/* Variant Name Input */}
-              <div className="w-full">
-                <input
-                  id="variant-name-floating"
-                  type="text"
-                  value={variantName}
-                  onChange={(e) => setVariantName(e.target.value)}
-                  placeholder="Variant name"
-                  className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                />
+            {/* EXACT same structure as original CTA */}
+            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-4 pointer-events-auto">
+              <div className="flex flex-col items-center">
+                {/* Variant Name Input */}
+                <div className="w-full max-w-md mb-4">
+                  <input
+                    id="variant-name-floating"
+                    type="text"
+                    value={variantName}
+                    onChange={(e) => setVariantName(e.target.value)}
+                    placeholder="Variant name"
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                  />
+                </div>
+                
+                <Button 
+                  size="lg" 
+                  className="w-full max-w-md" 
+                  variant={steerableMotionJustQueued ? "success" : "default"}
+                  onClick={handleGenerateBatch}
+                  disabled={isGenerationDisabled}
+                >
+                  {steerableMotionJustQueued
+                    ? "Added to queue!"
+                    : isSteerableMotionEnqueuing 
+                      ? 'Creating Tasks...' 
+                      : 'Generate Video'}
+                </Button>
               </div>
-              
-              <Button 
-                size="lg" 
-                className="w-full" 
-                variant={steerableMotionJustQueued ? "success" : "default"}
-                onClick={handleGenerateBatch}
-                disabled={isGenerationDisabled}
-              >
-                {steerableMotionJustQueued
-                  ? "Added to queue!"
-                  : isSteerableMotionEnqueuing 
-                    ? 'Creating Tasks...' 
-                    : 'Generate Video'}
-              </Button>
             </div>
           </div>
-        </div>
         );
       })()}
 
