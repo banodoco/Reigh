@@ -85,6 +85,25 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Use optimistic order if available, otherwise use props images
   const currentImages = isOptimisticUpdate && optimisticOrder.length > 0 ? optimisticOrder : images;
 
+  // Reset optimistic state when images array changes significantly (e.g., shot navigation)
+  // This prevents flickering when the component receives a completely new dataset
+  const prevImagesLengthRef = React.useRef(images.length);
+  React.useEffect(() => {
+    // If the images array length changes dramatically (not just +/- 1 from reorder/delete/add),
+    // it's likely a new shot or major data refresh - clear optimistic state
+    const lengthDiff = Math.abs(images.length - prevImagesLengthRef.current);
+    if (lengthDiff > 1 && isOptimisticUpdate) {
+      console.log('[MobileOptimistic] Clearing optimistic state due to major data change', {
+        prevLength: prevImagesLengthRef.current,
+        newLength: images.length,
+        diff: lengthDiff
+      });
+      setIsOptimisticUpdate(false);
+      setOptimisticOrder([]);
+    }
+    prevImagesLengthRef.current = images.length;
+  }, [images.length, isOptimisticUpdate]);
+
   // Show selection bar with a delay after items are selected
   React.useEffect(() => {
     if (mobileSelectedIds.length > 0) {

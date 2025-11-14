@@ -1057,6 +1057,15 @@ const VideoTravelToolPage: React.FC = () => {
   // Get full image data when editing a shot to avoid thumbnail limitation
   const contextImages = selectedShot?.images || [];
   
+  console.log('[ShotNavPerf] 📦 Context images available:', {
+    selectedShotId: selectedShot?.id?.substring(0, 8) || 'none',
+    selectedShotName: selectedShot?.name || 'none',
+    contextImagesCount: contextImages.length,
+    hasSelectedShot: !!selectedShot,
+    shotHasImagesProperty: selectedShot ? 'images' in selectedShot : false,
+    timestamp: Date.now()
+  });
+  
   // STAGE 2: Track when shot operations are in progress to prevent query race conditions
   // This flag is set when mutations complete and cleared after a safe period
   // Prevents timeline position resets and "signal is aborted" errors

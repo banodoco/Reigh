@@ -313,12 +313,42 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // CRITICAL: Only call useAllShotGenerations when we genuinely need detailed data
   // Using disabled query when context data is available
-  const { data: fullShotImages = [], isLoading: isLoadingFullImages } = useAllShotGenerations(queryKey);
+  console.log('[ShotNavPerf] 🎬 ShotEditor calling useAllShotGenerations', {
+    queryKey: queryKey?.substring(0, 8) || 'null',
+    selectedShotId: selectedShotId?.substring(0, 8),
+    timestamp: Date.now()
+  });
+  const fullImagesQueryResult = useAllShotGenerations(queryKey);
+  const fullShotImages = fullImagesQueryResult.data || [];
+  const isLoadingFullImages = fullImagesQueryResult.isLoading;
+  console.log('[ShotNavPerf] ✅ ShotEditor useAllShotGenerations result:', {
+    imagesCount: fullShotImages.length,
+    isLoading: fullImagesQueryResult.isLoading,
+    isFetching: fullImagesQueryResult.isFetching,
+    isError: fullImagesQueryResult.isError,
+    error: fullImagesQueryResult.error?.message,
+    dataUpdatedAt: fullImagesQueryResult.dataUpdatedAt,
+    fetchStatus: fullImagesQueryResult.fetchStatus,
+    timestamp: Date.now()
+  });
   
   // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
   const orderedShotImages = React.useMemo(() => {
-    const result = fullShotImages.length > 0 ? fullShotImages : contextImages;
+    // [ShotNavPerf] When query is fetching and has no data yet, use context images as fallback
+    // This prevents blank screen during arrow navigation
+    const hasValidFullImages = fullShotImages.length > 0;
+    const isQueryFetchingNewData = fullImagesQueryResult.isFetching && !fullImagesQueryResult.data;
+    
+    console.log('[ShotNavPerf] 🔄 Deciding data source:', {
+      hasValidFullImages,
+      isQueryFetchingNewData,
+      contextImagesCount: contextImages.length,
+      fullImagesCount: fullShotImages.length,
+      willUse: hasValidFullImages ? 'fullImages' : (isQueryFetchingNewData ? 'contextImages (fetching)' : 'contextImages')
+    });
+    
+    const result = hasValidFullImages ? fullShotImages : contextImages;
     
     // Check for duplicates by ID
     const idCounts = new Map<string, number>();
