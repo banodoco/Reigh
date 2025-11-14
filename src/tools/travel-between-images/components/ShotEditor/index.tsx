@@ -2952,13 +2952,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         const leftOffset = isShotsPaneLocked ? shotsPaneWidth : 0;
         const rightOffset = isTasksPaneLocked ? tasksPaneWidth : 0;
         
+        // Match the main content container padding from Layout.tsx
+        // Content-responsive: px-6 (lg), px-4 (sm), px-2 (base)
+        const contentPadding = isLg ? 24 : isSm ? 16 : 8; // Convert px-6/4/2 to pixels
+        
         return (
           <div
             className={`fixed z-50 transition-all duration-300 ease-out animate-in fade-in slide-in-from-top-2 pointer-events-none`}
             style={{
               top: `${topPosition}px`,
-              left: `${leftOffset}px`,
-              right: `${rightOffset}px`,
+              left: `${leftOffset + contentPadding}px`,
+              right: `${rightOffset + contentPadding}px`,
               willChange: 'transform, opacity',
               transform: 'translateZ(0)'
             }}
