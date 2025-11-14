@@ -2725,8 +2725,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   return (
     <div className="flex flex-col space-y-4 pb-4">
-      {/* Header */}
-      <div ref={headerContainerRef}>
+      {/* Header - hide when sticky header is visible */}
+      <div ref={headerContainerRef} className={isSticky && !state.isEditingName ? 'opacity-0 pointer-events-none' : ''}>
       <Header
         selectedShot={selectedShot}
         isEditingName={state.isEditingName}
@@ -3012,7 +3012,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         if (onPreviousShot) onPreviousShot();
                       }}
                       disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
+                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-md shadow-lg rounded-md border border-border"
                       title="Previous shot"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -3039,7 +3039,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         if (onNextShot) onNextShot();
                       }}
                       disabled={!hasNext || state.isTransitioningFromNameEdit}
-                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity"
+                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-md shadow-lg rounded-md border border-border"
                       title="Next shot"
                     >
                       <ChevronRight className="h-4 w-4" />
