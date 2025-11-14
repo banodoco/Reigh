@@ -206,7 +206,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         <h2 className={`${headerSize} font-light`}>Edit Image</h2>
         
         {/* Three-way toggle: Text | Inpaint | Annotate - Segmented control style */}
-        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30">
+        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30 relative">
             <button
               onClick={() => {
                 setIsInpaintMode(true);
@@ -222,22 +222,32 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               <Type className={toggleIconSize} />
               Text
             </button>
-            <button
-              onClick={() => {
-                setIsInpaintMode(true);
-                setEditMode('inpaint');
-              }}
-              className={cn(
-                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
-                editMode === 'inpaint'
-                  ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                highlightDrawModes && editMode !== 'inpaint' && "animate-pulse-hint"
-              )}
-            >
-              <Paintbrush className={toggleIconSize} />
-              Inpaint
-            </button>
+            
+            <TooltipProvider>
+              <Tooltip open={showTextModeHint && editMode === 'text'}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      setIsInpaintMode(true);
+                      setEditMode('inpaint');
+                    }}
+                    className={cn(
+                      `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
+                      editMode === 'inpaint'
+                        ? "bg-background text-foreground font-medium shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <Paintbrush className={toggleIconSize} />
+                    Inpaint
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="bg-primary text-primary-foreground">
+                  <p className="text-sm font-medium">Switch to Inpaint mode to draw</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
             <button
               onClick={() => {
                 setIsInpaintMode(true);
@@ -247,8 +257,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all`,
                 editMode === 'annotate'
                   ? "bg-background text-foreground font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                highlightDrawModes && editMode !== 'annotate' && "animate-pulse-hint"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
               <Pencil className={toggleIconSize} />

@@ -1510,18 +1510,6 @@
   }
 }
 
-/* Gentle hint animation for draw mode buttons */
-@keyframes pulseHint {
-  0%, 100% {
-    background-color: hsl(var(--muted) / 0.5);
-    transform: scale(1);
-  }
-  50% {
-    background-color: hsl(var(--primary) / 0.15);
-    transform: scale(1.02);
-  }
-}
-
 /* Animation for drag drop shrink fade */
 @keyframes scaleFade {
   0% { transform: scale(1); opacity: 1; }
@@ -1622,10 +1610,6 @@
 
 .animate-subtle-wiggle {
   animation: subtleWiggle 0.5s ease-in-out;
-}
-
-.animate-pulse-hint {
-  animation: pulseHint 1s ease-in-out 3;
 }
 
 /* Custom animations for homepage side panes */
