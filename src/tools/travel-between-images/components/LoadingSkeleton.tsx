@@ -18,10 +18,10 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
       <PageFadeIn className="pt-3 sm:pt-5">
         <div className="flex flex-col space-y-4 pb-4">
           <div className="flex-shrink-0 space-y-1 sm:space-y-3 pb-2">
-            {/* Desktop skeleton - 3-column layout matching actual Header */}
-            <div className="hidden sm:flex items-center px-2">
-              {/* Left: Back button */}
-              <div className="flex-1 flex justify-start">
+            {/* Desktop skeleton - 3-column layout matching actual Header with fixed widths */}
+            <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
+              {/* Left: Back button container - fixed width matching Header */}
+              <div className="w-[140px]">
                 <Skeleton className="h-9 w-20 rounded-md" />
               </div>
               
@@ -35,12 +35,9 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
                 <Skeleton className="h-9 w-9 rounded-md" />
               </div>
               
-              {/* Right: Aspect Ratio Selector with visualizer */}
-              <div className="flex-1 flex justify-end">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-10 w-32 rounded-md" />
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                </div>
+              {/* Right: Aspect Ratio Selector container - fixed width matching Header, no visualizer */}
+              <div className="w-[140px] flex justify-end">
+                <Skeleton className="h-10 w-32 rounded-md" />
               </div>
             </div>
             
