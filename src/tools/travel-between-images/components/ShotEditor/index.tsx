@@ -3077,7 +3077,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 {/* Full-width divider and generate button - Original position with ref */}
                 <div 
                   ref={ctaContainerRef} 
-                  className={`mt-6 pt-6 border-t ${isCtaFloating ? 'opacity-0 pointer-events-none' : ''}`}
+                  className="mt-6 pt-6 border-t"
                 >
                   <div className="flex flex-col items-center">
                     {/* Variant Name Input */}
