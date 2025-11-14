@@ -2978,8 +2978,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         </div>
 
         {/* Generation Settings */}
-        <div className="w-full">
-          <Card ref={generateVideosCardRef}>
+        <div className="w-full" ref={generateVideosCardRef}>
+          <Card>
             <CardHeader>
                 <CardTitle className="text-base sm:text-lg font-light">Generate Videos</CardTitle>
             </CardHeader>
