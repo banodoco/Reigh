@@ -2963,10 +2963,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               transform: 'translateZ(0)'
             }}
           >
-            {/* Match the original header's three-column layout with fixed side widths */}
+            {/* Match the original header's three-column justify-between layout */}
             <div className="flex justify-between items-center px-2">
-              {/* Left spacer - fixed width to match Back button container */}
-              <div style={{ width: '180px' }} />
+              {/* Left spacer - fixed width to match back button container */}
+              <div className="w-[140px]" />
               
               {/* Center section - matches original header structure */}
               <div className={`relative overflow-hidden flex items-center justify-center space-x-2 ${isMobile ? 'p-2' : 'py-2 px-3'} bg-background/80 backdrop-blur-md shadow-xl transition-all duration-500 ease-out rounded-lg border border-border`}>
@@ -3011,8 +3011,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 </Button>
               </div>
               
-              {/* Right spacer - fixed width to match Aspect Ratio container */}
-              <div style={{ width: '180px' }} />
+              {/* Right spacer - fixed width to match aspect ratio selector container */}
+              <div className="w-[140px]" />
             </div>
           </div>
         );
