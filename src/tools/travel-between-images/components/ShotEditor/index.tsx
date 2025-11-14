@@ -984,12 +984,28 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return () => clearTimeout(fallbackTimer);
   }, [settingsLoading, isShotUISettingsLoading, isShotLoraSettingsLoading, actions, isMobile, selectedShot?.id]);
 
-  // Reset mode readiness when shot changes
+  // CRITICAL FIX: Reset mode readiness when shot changes ONLY if we don't have context images yet
+  // If we have context images, stay ready and let settings refetch in the background
+  // This prevents the unmount/remount cascade that was canceling image loads
   useEffect(() => {
     if (selectedShot?.id) {
-      actions.setModeReady(false);
+      const hasContextImages = contextImages.length > 0;
+      if (hasContextImages) {
+        // We have images - stay ready, let settings update in background
+        console.log('[ShotNavPerf] 🚀 Shot changed but keeping ready state - we have context images', {
+          shotId: selectedShot.id.substring(0, 8),
+          contextImagesCount: contextImages.length
+        });
+        actions.setModeReady(true);
+      } else {
+        // No images yet - reset to loading state
+        console.log('[ShotNavPerf] ⏳ Shot changed - resetting to loading state', {
+          shotId: selectedShot.id.substring(0, 8)
+        });
+        actions.setModeReady(false);
+      }
     }
-  }, [selectedShot?.id, actions]);
+  }, [selectedShot?.id, contextImages.length, actions]);
 
     // Handle generation mode setup and readiness - AGGRESSIVE OPTIMIZATION for faster ready state
   const readinessState = React.useMemo(() => ({
