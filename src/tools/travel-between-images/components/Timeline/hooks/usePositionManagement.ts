@@ -100,10 +100,12 @@ export function usePositionManagement({
           shotId: shotId.substring(0, 8),
           type,
           lockedItemsCount: currentPositions.size,
-          lockedItems: Array.from(currentPositions.entries()).map(([id, pos]) => ({
-            id: id.substring(0, 8),
-            position: pos
-          })),
+          lockedItems: Array.from(currentPositions.entries())
+            .sort((a, b) => a[1] - b[1]) // Sort by position for clarity
+            .map(([id, pos]) => ({
+              id: id.substring(0, 8),
+              position: pos
+            })),
           timestamp: Date.now()
         });
         
@@ -193,31 +195,64 @@ export function usePositionManagement({
     if (positionLockRef.current.isLocked) {
       const timeSinceLock = Date.now() - positionLockRef.current.lockTimestamp;
       if (timeSinceLock < 3000) { // 3 second maximum lock duration (covers refetch period)
-        // CRITICAL FIX: Filter locked positions to only include items that currently exist
-        // This prevents "ghost" positions from deleted items causing coordinate system issues
-        const currentImageKeys = new Set(
-          images.map(img => img.shotImageEntryId ?? img.id)
-        );
+        // IMPROVED FIX: Match by POSITION ORDER instead of ID
+        // During refetch, IDs may change temporarily, so we match current images to locked positions by index
+        // This keeps positions stable even when IDs are inconsistent during data transitions
         
-        const filteredLockedPositions = new Map<string, number>();
-        for (const [id, pos] of positionLockRef.current.lockedPositions.entries()) {
-          if (currentImageKeys.has(id)) {
-            filteredLockedPositions.set(id, pos);
-          }
-        }
+        const lockedPositionsList = Array.from(positionLockRef.current.lockedPositions.entries())
+          .sort((a, b) => a[1] - b[1]); // Sort by position value
         
-        console.log(`[TimelineVisibility] 🔒 LOCKED - Using filtered locked positions (${timeSinceLock}ms since lock)`, {
-          originalLockedCount: positionLockRef.current.lockedPositions.size,
-          filteredCount: filteredLockedPositions.size,
-          currentImagesCount: images.length,
-          removed: positionLockRef.current.lockedPositions.size - filteredLockedPositions.size,
-          lockedItems: Array.from(filteredLockedPositions.entries()).map(([id, pos]) => ({
-            id: id.substring(0, 8),
-            position: pos
-          })).slice(0, 10)
+        const rebuiltPositions = new Map<string, number>();
+        
+        // Detect if this is a duplicate (more items) or delete (fewer items)
+        const isDuplicateOperation = images.length > positionLockRef.current.lockedPositions.size;
+        const isDeleteOperation = images.length < positionLockRef.current.lockedPositions.size;
+        
+        console.log(`[TimelineVisibility] 🔒 LOCK ACTIVE - Operation type detected (${timeSinceLock}ms since lock)`, {
+          lockedCount: positionLockRef.current.lockedPositions.size,
+          currentCount: images.length,
+          isDuplicate: isDuplicateOperation,
+          isDelete: isDeleteOperation,
+          isNeutral: !isDuplicateOperation && !isDeleteOperation,
+          lockedPositions: lockedPositionsList.map(([id, pos]) => ({
+            id: id?.substring(0, 8),
+            pos
+          })),
+          currentImages: images.map((img, idx) => ({
+            idx,
+            id: (img.shotImageEntryId ?? img.id)?.substring(0, 8),
+            timeline_frame: img.timeline_frame
+          }))
         });
         
-        return filteredLockedPositions;
+        // Match current images (by index) to locked positions (by index)
+        images.forEach((img, idx) => {
+          const imageKey = img.shotImageEntryId ?? img.id;
+          if (idx < lockedPositionsList.length) {
+            // Use the locked position at this index
+            const [_, position] = lockedPositionsList[idx];
+            rebuiltPositions.set(imageKey, position);
+          } else {
+            // NEW ITEM (duplicate case) - no locked position for this index
+            console.log(`[TimelineVisibility] ⚠️ NEW ITEM at index ${idx} has no locked position`, {
+              imageKey: imageKey?.substring(0, 8),
+              timeline_frame: img.timeline_frame
+            });
+          }
+        });
+        
+        console.log(`[TimelineVisibility] 🔒 LOCKED - Position-order matching complete (${timeSinceLock}ms since lock)`, {
+          originalLockedCount: positionLockRef.current.lockedPositions.size,
+          rebuiltCount: rebuiltPositions.size,
+          currentImagesCount: images.length,
+          strategy: 'position-order-matching',
+          rebuiltItems: Array.from(rebuiltPositions.entries()).map(([id, pos]) => ({
+            id: id?.substring(0, 8),
+            position: pos
+          }))
+        });
+        
+        return rebuiltPositions;
       } else {
         // Auto-unlock after timeout
         console.log(`[TimelineVisibility] 🔓 AUTO-UNLOCK after ${timeSinceLock}ms`);
@@ -234,31 +269,32 @@ export function usePositionManagement({
         const isDataChanging = shotGenerations.length !== prevDeps.shotGenerations.length || 
                                 images.length !== prevDeps.images.length;
         if (isDataChanging) {
-          // Filter locked positions to match current images
-          const currentImageKeys = new Set(
-            images.map(img => img.shotImageEntryId ?? img.id)
-          );
+          // Use position-order matching (same as main lock logic)
+          const lockedPositionsList = Array.from(positionLockRef.current.lockedPositions.entries())
+            .sort((a, b) => a[1] - b[1]); // Sort by position value
           
-          const filteredLockedPositions = new Map<string, number>();
-          for (const [id, pos] of positionLockRef.current.lockedPositions.entries()) {
-            if (currentImageKeys.has(id)) {
-              filteredLockedPositions.set(id, pos);
+          const rebuiltPositions = new Map<string, number>();
+          images.forEach((img, idx) => {
+            const imageKey = img.shotImageEntryId ?? img.id;
+            if (idx < lockedPositionsList.length) {
+              const [_, position] = lockedPositionsList[idx];
+              rebuiltPositions.set(imageKey, position);
             }
-          }
+          });
           
-          console.log(`[TimelineVisibility] 🛡️ REFETCH PROTECTION - Data changing, using filtered locked positions`, {
+          console.log(`[TimelineVisibility] 🛡️ REFETCH PROTECTION - Data changing, using position-order matching`, {
             shotId: shotId.substring(0, 8),
             prevShotGenerations: prevDeps.shotGenerations.length,
             newShotGenerations: shotGenerations.length,
             prevImages: prevDeps.images.length,
             newImages: images.length,
             originalLockedCount: positionLockRef.current.lockedPositions.size,
-            filteredCount: filteredLockedPositions.size,
+            rebuiltCount: rebuiltPositions.size,
             timeSinceLock,
             change: shotGenerations.length > prevDeps.shotGenerations.length ? 'ADDED' : 
                     shotGenerations.length < prevDeps.shotGenerations.length ? 'REMOVED' : 'CHANGED'
           });
-          return filteredLockedPositions;
+          return rebuiltPositions;
         }
       }
     }
