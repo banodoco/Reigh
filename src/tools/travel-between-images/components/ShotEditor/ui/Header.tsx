@@ -230,7 +230,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
       <div className="sm:hidden">
         {isEditingName ? (
           // Editing mode - centered editing controls
-          <div className="flex items-center justify-center space-x-2 px-3">
+          <div className="flex items-center justify-center space-x-2">
             <Button 
               size="sm" 
               variant="ghost" 
@@ -256,17 +256,17 @@ const HeaderComponent: React.FC<HeaderProps> = ({
           </div>
         ) : (
           // Normal mode - back button, name with chevrons, and aspect ratio all on one row
-          <div className="flex items-center justify-between px-3">
+          <div className="flex items-center justify-between">
             {/* Back button on the left - fixed width container */}
-            <div className="w-[40px]">
+            <div className="w-[75px]">
               <Button 
                 variant="outline" 
                 size="sm" 
                 onClick={onBack}
-                className="flex items-center justify-center border-2 w-full px-0"
+                className="flex items-center justify-center border-2 w-full px-0 text-[10px]"
                 title="Back to shots"
               >
-                <ArrowLeft className="h-3 w-3" />
+                <ArrowLeft className="h-2.5 w-2.5" />
               </Button>
             </div>
             
@@ -304,12 +304,12 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             </div>
             
             {/* Aspect Ratio Selector on the right - fixed width container */}
-            <div className="w-[40px]">
+            <div className="w-[75px]">
               <AspectRatioSelector
                 value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
                 onValueChange={handleAspectRatioChange}
                 showVisualizer={false}
-                className="w-full text-xs"
+                className="w-full text-[10px]"
               />
             </div>
           </div>

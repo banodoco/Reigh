@@ -42,9 +42,9 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             </div>
             
             {/* Mobile skeleton - all in one row matching actual mobile Header */}
-            <div className="sm:hidden flex items-center justify-between px-3">
+            <div className="sm:hidden flex items-center justify-between">
               {/* Back button - fixed width container matching Header */}
-              <div className="w-[80px]">
+              <div className="w-[75px]">
                 <Skeleton className="h-9 w-full rounded-md" />
               </div>
               
@@ -56,7 +56,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
               </div>
               
               {/* Aspect Ratio Selector - fixed width container matching Header */}
-              <div className="w-[80px]">
+              <div className="w-[75px]">
                 <Skeleton className="h-9 w-full rounded-md" />
               </div>
             </div>
