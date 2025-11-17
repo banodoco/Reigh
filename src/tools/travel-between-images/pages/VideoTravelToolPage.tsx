@@ -776,7 +776,6 @@ const VideoTravelToolPage: React.FC = () => {
     return loading;
   }, [shotsLoadingRaw, initializingFromHash]);
 
-  // ✅ NEW: All settings now derived from hook - no more individual useState calls!
   // Detect tablets/iPads - treat them like desktop for timeline mode
   // iPads have screen width >= 768px, so they should get timeline mode option
   const { isTabletOrLarger } = useDeviceDetection();
