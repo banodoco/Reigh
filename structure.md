@@ -43,7 +43,6 @@
 | **Edge Functions** | [edge_functions.md](docs/structure_detail/edge_functions.md) | Complete serverless function reference and API details |
 | **Adding Tools** | [adding_new_tool.md](docs/structure_detail/adding_new_tool.md) | Step-by-step guide for new tool modules |
 | **Design Standards** | [design_motion_guidelines.md](docs/structure_detail/design_motion_guidelines.md) | UI/UX patterns, motion, accessibility, mobile touch interactions |
-| **Double-Tap Pattern** | [double-tap-selection-pattern.md](docs/double-tap-selection-pattern.md) | Mobile/tablet double-tap detection pattern with instant selection feedback |
 | **Shared Code** | [shared_hooks_contexts.md](docs/structure_detail/shared_hooks_contexts.md) | Reusable hooks, contexts, components catalog (includes useCurrentProject) |
 | **Realtime Architecture** | [realtime_system.md](docs/structure_detail/realtime_system.md) | Implemented unified realtime system and usage guide |
 | **Component Modularity** | [component_modularization.md](docs/structure_detail/component_modularization.md) | Reusable UI component patterns and shared details |
