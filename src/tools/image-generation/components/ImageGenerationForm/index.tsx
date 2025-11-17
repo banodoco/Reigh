@@ -366,7 +366,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } else if (referenceMode === currentReferenceMode) {
       console.log('[RefSettings] ✅ Mode already in sync:', referenceMode);
     }
-  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength, currentReferenceMode, styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, inThisSceneStrength, referenceMode, selectedReferenceId, selectedReference?.name]);
+  // IMPORTANT: Only depend on DATABASE values, not local state
+  // Including local state creates a sync loop where local changes trigger DB sync which triggers local sync...
+  // Only trigger on selectedReferenceId changes, not selectedReference object changes (causes excessive re-syncs)
+  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength, currentReferenceMode, selectedReferenceId]);
 
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
