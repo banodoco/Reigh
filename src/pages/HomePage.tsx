@@ -14,10 +14,10 @@ import { FadeInSection } from '@/shared/components/transitions/FadeInSection';
 import { PaintParticles } from '@/shared/components/PaintParticles';
 import { PaletteIcon } from '@/shared/components/PaletteIcon';
 import { WesAndersonBackground } from '@/shared/components/WesAndersonBackground';
-import { ReighLoading } from '@/shared/components/ReighLoading';
 import { ProfitSplitBar } from '@/shared/components/ProfitSplitBar';
 import { useScrollFade } from '@/shared/hooks/useScrollFade';
 import { SocialIcons } from '@/shared/components/SocialIcons';
+import { useDebounce } from '@/shared/hooks/use-debounce';
 
 
 
@@ -482,12 +482,10 @@ export default function HomePage() {
   // Remove aggressive mobile scroll prevention - let content flow naturally
   // The side panes handle their own overflow, and the main content should be scrollable
 
-  // Only render content when assets are loaded
-  if (!assetsLoaded) {
-    return <ReighLoading />;
-  }
+  // Start content fade-in while bar is moving (after 200ms delay)
+  const barTransitionCompleted = useDebounce(assetsLoaded, 200);
 
-    return (
+  return (
     <PageFadeIn className="wes-texture relative">
       <WesAndersonBackground />
       
@@ -553,31 +551,29 @@ export default function HomePage() {
 
 
             {/* Icon above title */}
-            <FadeInSection delayMs={25}>
+            <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out' }}>
               <PaletteIcon className="mb-6 mt-0" />
-            </FadeInSection>
+            </div>
             
             {/* Main title */}
-            <FadeInSection delayMs={50}>
+            <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.1s' }}>
               <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary mb-8 text-shadow-vintage">
                 Reigh
               </h1>
-            </FadeInSection>
+            </div>
             
-            {/* Decorative divider - loading bar that fills from left to right */}
-            <div className="relative w-32 h-1.5 mx-auto mb-8">
+            {/* Decorative divider - THIS IS THE PERSISTENT ELEMENT */}
+            <div 
+              className={`w-32 h-1.5 mx-auto mb-8 transition-all duration-[1600ms] ease-in-out ${!assetsLoaded ? 'is-loading' : 'is-loaded'}`}
+            >
               {/* Background track */}
               <div className="absolute inset-0 bg-muted/20 rounded-full"></div>
               {/* Loading/loaded bar */}
-              <div className={`absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full shadow-inner-vintage transition-all duration-1000 ease-out ${
-                !assetsLoaded 
-                  ? 'w-0 animate-pulse' 
-                  : 'w-full animate-pulse-glow'
-              }`}></div>
+              <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full shadow-inner-vintage w-full animate-pulse-glow"></div>
             </div>
             
             {/* Subtitle */}
-            <FadeInSection delayMs={200}>
+            <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.2s' }}>
               <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
                 An{' '}
                 <TooltipProvider>
@@ -656,13 +652,13 @@ export default function HomePage() {
                     <ChevronRight className="hover-arrow w-6 h-6 text-primary transition-transform transition-colors duration-700 ease-in-out group-hover:text-primary group-hover:animate-sway-x" strokeWidth={1.5} />
                   </div>
                 </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            </Tooltip>
+          </TooltipProvider>
               </p>
-            </FadeInSection>
+            </div>
             
             {/* Sign-in button below hero */}
-            <FadeInSection delayMs={250}>
+            <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.3s' }}>
               {!session ? (
                 <div
                   className="group"
@@ -732,32 +728,34 @@ export default function HomePage() {
                   </button>
                 </div>
               )}
-            </FadeInSection>
+            </div>
 
             {/* Social Icons */}
-            <FadeInSection delayMs={350}>
+            <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.4s' }}>
               <div className="mt-8">
                 <SocialIcons />
-                
-                {/* Banodoco Logo */}
-                <div className="flex justify-center">
-                  <div className="mt-2">
-                    <a
-                      href="http://banodoco.ai/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block transition-all duration-700 ease-in-out"
-                    >
-                      <img 
-                        src="/banodoco-gold.png" 
-                        alt="Banodoco" 
-                        className="w-[34px] h-[34px] object-contain opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 transition-all duration-700 ease-in-out hover:saturate-150 hover:hue-rotate-[-15deg]" 
-                      />
-                    </a>
-                  </div>
+              </div>
+            </div>
+
+            {/* Banodoco Logo */}
+            <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.5s' }}>
+              <div className="flex justify-center">
+                <div className="mt-2">
+                  <a
+                    href="http://banodoco.ai/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block transition-all duration-700 ease-in-out"
+                  >
+                    <img 
+                      src="/banodoco-gold.png" 
+                      alt="Banodoco" 
+                      className="w-[34px] h-[34px] object-contain opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 transition-all duration-700 ease-in-out hover:saturate-150 hover:hue-rotate-[-15deg]" 
+                    />
+                  </a>
                 </div>
               </div>
-            </FadeInSection>
+            </div>
 
           </div>
         </div>

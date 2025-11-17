@@ -1423,6 +1423,46 @@
   }
 }
 
+@keyframes fill-bar {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(25vh);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideToFinal {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInStable {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Clean, subtle color cycling with smooth loop back to start */
 @keyframes reighColorCycle {
   0% { filter: hue-rotate(0deg) saturate(1.0) brightness(1.0); }      /* Original clean */
@@ -2468,5 +2508,26 @@
   fill: transparent;
   stroke: currentColor;
   transition: fill 800ms ease, stroke 800ms ease;
+}
+
+/* New styles for the persistent loading bar transition */
+.is-loading {
+  /* Move down to roughly screen center */
+  transform: translateY(20vh);
+  opacity: 1;
+}
+
+.is-loaded {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@keyframes fadeInStable {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
