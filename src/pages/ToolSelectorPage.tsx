@@ -182,7 +182,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
       {/* Horizontal layout for Process tools */}
       {!isSquare ? (
-        <div className="flex items-center h-full p-1 sm:p-2 lg:p-3 relative">
+        <div className="flex items-center h-full px-2 py-1 sm:px-3 sm:py-1.5 lg:px-4 lg:py-2 relative">
           {/* Large subtle number in background - responsive visibility */}
           {index !== undefined && isLg && (
             <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 -translate-y-5">
@@ -211,11 +211,11 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className={`${isSm ? 'px-2 py-1' : 'px-1 py-0.5'} ${isLg ? 'px-3 py-1' : ''} h-full flex flex-col justify-center`}>
+        <div className={`${isSm ? 'px-2 py-1' : 'px-1 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-col justify-center`}>
           {/* Tool Header without icon */}
-          <div className={`wes-symmetry ${isSm ? 'mb-1' : 'mb-0.5'} relative`}>
+          <div className={`wes-symmetry ${isSm ? 'mb-0.5' : 'mb-0'} relative`}>
             <div className="px-2">
-              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-2 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-nowrap`}>
+              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-nowrap`}>
                 {item.id === 'character-animate' && !isSm ? 'Characters' : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
@@ -223,7 +223,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           </div>
 
           {/* Description - always show on mobile with adjusted styling */}
-          <div className={`${isSm ? 'mt-1' : 'mt-0.5'} px-2`}>
+          <div className={`${isSm ? 'mt-0.5' : 'mt-0'} px-2`}>
             <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
               {item.description}
             </p>
@@ -232,9 +232,11 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       )}
 
       {/* Decorative Elements */}
-      <div className={`absolute ${isSm ? 'top-4 right-4' : 'top-3 right-3'} opacity-20`}>
-        <Sparkles className={`${isSm ? 'w-5 h-5' : 'w-4 h-4'} text-primary animate-sway`} />
-      </div>
+      {!isSquare && (
+        <div className={`absolute ${isSm ? 'top-4 right-4' : 'top-3 right-3'} opacity-20`}>
+          <Sparkles className={`${isSm ? 'w-5 h-5' : 'w-4 h-4'} text-primary animate-sway`} />
+        </div>
+      )}
 
       {/* Hover shimmer effect removed to prevent inset-0 overlay issues */}
     </div>
@@ -349,8 +351,8 @@ const ToolSelectorPage: React.FC = () => {
 
   // Dynamic spacing based on content area - fixed padding to prevent right shift
   const containerPadding = isSm ? 'px-4' : 'px-2';
-  const containerSpacing = isLg ? 'pt-2 pb-4' : isSm ? 'pt-3 pb-2' : 'pt-1 pb-[0.333rem]';
-  const sectionGap = 'gap-0';
+  const containerSpacing = isLg ? 'pt-5 pb-2' : isSm ? 'pt-6 pb-1' : 'pt-3 pb-[0.333rem]';
+  const sectionGap = isLg ? 'gap-4' : isSm ? 'gap-3' : 'gap-2';
   const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-5';
   const topMargin = isLg ? 'mt-0' : isSm ? 'mt-0' : 'mt-0';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
@@ -370,7 +372,7 @@ const ToolSelectorPage: React.FC = () => {
           <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
             {/* Process Column */}
             <div className="w-full c-lg:w-1/2">
-              <div className={`flex flex-col ${itemGap} ${topMargin} px-4 py-4`}>
+              <div className={`flex flex-col ${itemGap} ${topMargin} px-2 py-2`}>
                 {processTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
                   
@@ -389,7 +391,7 @@ const ToolSelectorPage: React.FC = () => {
 
             {/* Assistant Tools Column */}
             <div className="w-full c-lg:w-1/2">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-4 py-4`}>
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-2 py-2`}>
                 {assistantTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
                   

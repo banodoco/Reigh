@@ -164,6 +164,37 @@ export interface ShotEditorProps {
   
   // Function to invalidate video counts cache when videos are added/deleted
   invalidateVideoCountsCache?: () => void;
+  
+  // Callback refs for parent-level floating UI elements (notify parent when attached)
+  headerContainerRef?: (node: HTMLDivElement | null) => void;
+  timelineSectionRef?: (node: HTMLDivElement | null) => void;
+  ctaContainerRef?: (node: HTMLDivElement | null) => void;
+  onSelectionChange?: (hasSelection: boolean) => void;
+  
+  // Mutable ref to expose shot-specific generation data to parent
+  getGenerationDataRef?: React.MutableRefObject<(() => {
+    structureVideo: {
+      path: string | null;
+      type: 'canny' | 'depth' | null;
+      treatment: 'image' | 'video';
+      motionStrength: number;
+    };
+    aspectRatio: string | null;
+    loras: Array<{ id: string; path: string; strength: number; name: string }>;
+    clearEnhancedPrompts: () => Promise<void>;
+  }) | null>;
+  
+  // Mutable ref to expose generate video function to parent
+  generateVideoRef?: React.MutableRefObject<((variantName: string) => Promise<void>) | null>;
+  
+  // Mutable ref to expose name click handler to parent (for floating header)
+  nameClickRef?: React.MutableRefObject<(() => void) | null>;
+  
+  // CTA state from parent (for rendering CTA in both positions)
+  variantName?: string;
+  onVariantNameChange?: (name: string) => void;
+  isGeneratingVideo?: boolean;
+  videoJustQueued?: boolean;
 }
 
 // Internal state interface for the shot editor

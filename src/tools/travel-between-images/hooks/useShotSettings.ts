@@ -96,7 +96,7 @@ export const useShotSettings = (
     const previousShotId = currentShotIdRef.current;
     
     // Flush pending saves when shot changes
-    if (previousShotId && previousShotId !== shotId) {
+      if (previousShotId && previousShotId !== shotId) {
       console.log('[useShotSettings] 🔄 Shot changed, flushing pending saves:', {
         from: previousShotId.substring(0, 8),
         to: shotId.substring(0, 8),
@@ -159,6 +159,16 @@ export const useShotSettings = (
         }
         
         pendingSettingsRef.current = null;
+      }
+      
+      // 🔧 FIX: Clear editing flags when shot changes to allow new shot's settings to load
+      // This prevents "settings bleeding" where the old shot's settings persist in state
+      console.log('[useShotSettings] 🧹 Clearing editing flags for shot change');
+      isUserEditingRef.current = false;
+      pendingSettingsRef.current = null;
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
       }
       
       currentShotIdRef.current = shotId;

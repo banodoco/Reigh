@@ -49,6 +49,7 @@ import { CommonGenerationSettings } from './CommonGenerationSettings';
 import { TimelineGenerationSettings } from './TimelineGenerationSettings';
 import { BatchGenerationSettings } from './BatchGenerationSettings';
 import * as ApplySettingsService from './services/applySettingsService';
+import { GenerateVideoCTA } from '../GenerateVideoCTA';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -61,6 +62,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onShotImagesUpdate,
   onBack,
   onVideoControlModeChange,
+  // Refs from parent for floating UI
+  headerContainerRef: parentHeaderRef,
+  timelineSectionRef: parentTimelineRef,
+  ctaContainerRef: parentCtaRef,
+  onSelectionChange: parentOnSelectionChange,
+  getGenerationDataRef: parentGetGenerationDataRef,
+  generateVideoRef: parentGenerateVideoRef,
+  nameClickRef: parentNameClickRef,
+  // CTA state from parent
+  variantName: parentVariantName,
+  onVariantNameChange: parentOnVariantNameChange,
+  isGeneratingVideo: parentIsGeneratingVideo,
+  videoJustQueued: parentVideoJustQueued,
   onPairConfigChange,
   onBatchVideoPromptChange,
   onBatchVideoFramesChange,
@@ -694,463 +708,29 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const timelineReadyImages = orderedShotImages;
 
   // Sticky header visibility similar to ImageGenerationToolPage
-  const headerContainerRef = useRef<HTMLDivElement>(null);
+  // ============================================================================
+  // REFS FOR PARENT-CONTROLLED FLOATING UI
+  // ============================================================================
+  // Parent provides callback refs for floating UI elements
+  // These refs notify the parent when DOM elements are attached
+  // (No local fallback needed - floating UI is parent's responsibility)
+  
+  // Other local refs
   const centerSectionRef = useRef<HTMLDivElement>(null);
-  const [isSticky, setIsSticky] = useState(false);
-  const savedOnApproachRef = useRef(false);
-  const [headerBounds, setHeaderBounds] = useState({ left: 0, width: 0 });
-  const stableBoundsRef = useRef({ left: 0, width: 0 }); // Stable bounds when sticky becomes visible
-  
-  const updateHeaderBounds = useCallback(() => {
-    const containerEl = headerContainerRef.current;
-    if (!containerEl) return;
-
-    const rect = containerEl.getBoundingClientRect();
-    const newBounds = { left: rect.left, width: rect.width };
-    setHeaderBounds(newBounds);
-    // Also update stable ref for use when sticky is visible
-    stableBoundsRef.current = newBounds;
-  }, []);
-
-  // CTA bounds for smooth floating positioning
-  const [ctaBounds, setCtaBounds] = useState({ left: 0, width: 0 });
-  const stableCtaBoundsRef = useRef({ left: 0, width: 0 }); // Stable bounds when floating becomes visible
-  
-  const updateCtaBounds = useCallback(() => {
-    const containerEl = ctaContainerRef.current;
-    if (!containerEl) return;
-
-    const rect = containerEl.getBoundingClientRect();
-    const newBounds = { left: rect.left, width: rect.width };
-    setCtaBounds(newBounds);
-    // Also update stable ref for use when floating is visible
-    stableCtaBoundsRef.current = newBounds;
-  }, []);
-  
-  // ============================================================================
-  // FLOATING ELEMENTS STATE & REFS
-  // ============================================================================
-  
-  // Floating Generate Video Button
-  const ctaContainerRef = useRef<HTMLDivElement>(null);
-  const timelineSectionRef = useRef<HTMLDivElement>(null);
-  const [isCtaFloating, setIsCtaFloating] = useState(false);
-  const [showCtaElement, setShowCtaElement] = useState(true);
-  const hasScrolledRef = useRef(false);
-  const ctaHideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialMountRef = useRef(true);
-  const [refsReady, setRefsReady] = useState(0);
-  
-  // Selection state (affects floating button visibility)
-  const [hasActiveSelection, setHasActiveSelection] = useState(false);
-  
-  // Legacy refs (to be cleaned up)
   const videoGalleryRef = useRef<HTMLDivElement>(null);
   const generateVideosCardRef = useRef<HTMLDivElement>(null);
-
-  // ============================================================================
-  // STICKY SHOT SELECTOR - Scroll Detection (RAF-based)
-  // ============================================================================
-  // Shows shot name + nav arrows at top when original header scrolls out of view
-  useEffect(() => {
-    const containerEl = headerContainerRef.current;
-    if (!containerEl) return;
-
-    const stickyThresholdY = { current: 0 } as { current: number };
-    const isStickyRef = { current: isSticky } as { current: boolean };
-    let rafId = 0 as number | 0;
-
-    const computeThreshold = () => {
-      const rect = containerEl.getBoundingClientRect();
-      const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
-      const containerDocTop = rect.top + docTop;
-      
-      const globalHeaderHeight = isMobile ? 60 : 96;
-      const buffer = isMobile ? 5 : 10;
-      
-      // Trigger when shot name would be hidden by global header
-      stickyThresholdY.current = containerDocTop - globalHeaderHeight - buffer;
-    };
-
-    const checkSticky = () => {
-      rafId = 0 as number | 0;
-      const currentScroll = (window.pageYOffset || document.documentElement.scrollTop || 0);
-      const preTriggerOffset = isMobile ? 16 : 24; // Save/close just before sticky shows
-      const shouldBeSticky = currentScroll > stickyThresholdY.current;
-
-      // Do not auto-save/close while actively editing; user controls save/cancel
-      if (!state.isEditingName && !savedOnApproachRef.current && currentScroll > (stickyThresholdY.current - preTriggerOffset)) {
-        // no-op: previously auto-saved here; now disabled during edit to prevent blur
-      }
-
-      if (shouldBeSticky !== isStickyRef.current) {
-        isStickyRef.current = shouldBeSticky;
-        setIsSticky(shouldBeSticky);
-        // Do not force-close when sticky toggles while editing
-      }
-    };
-
-    const onScroll = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(checkSticky) as unknown as number;
-    };
-
-    const onResize = () => {
-      computeThreshold();
-      if (rafId) cancelAnimationFrame(rafId as unknown as number);
-      rafId = requestAnimationFrame(checkSticky) as unknown as number;
-    };
-
-    computeThreshold();
-    // Avoid immediate sticky check while editing to prevent instant blur
-    if (!state.isEditingName) {
-      checkSticky();
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onResize);
-
-    const ro = new ResizeObserver(() => onResize());
-    ro.observe(containerEl);
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onResize);
-      if (rafId) cancelAnimationFrame(rafId as unknown as number);
-      ro.disconnect();
-    };
-  }, [isMobile, state.isEditingName]);
-
-
-  // Update header bounds during scroll and resize for smooth positioning
-  // Only update when sticky header is NOT visible to prevent jumps during fast scrolling
-  useEffect(() => {
-    const containerEl = headerContainerRef.current;
-    if (!containerEl) return;
-    
-    let rafId: number | null = null;
-    let lastUpdateTime = 0;
-    const THROTTLE_MS = 16; // ~60fps
-    
-    const updateBounds = () => {
-      const now = performance.now();
-      // Only update if enough time has passed (throttle) or if sticky is not visible
-      if (now - lastUpdateTime >= THROTTLE_MS || !isSticky) {
-        updateHeaderBounds();
-        lastUpdateTime = now;
-      }
-      rafId = null;
-    };
-    
-    const scheduleUpdate = () => {
-      // When sticky header is visible, throttle updates more aggressively
-      if (isSticky) {
-        // Only update on resize when sticky, not on scroll
-        return;
-      }
-      
-      if (!rafId) {
-        rafId = requestAnimationFrame(updateBounds);
-      }
-    };
-    
-    // Initial update
-    updateHeaderBounds();
-
-    const ro = new ResizeObserver(() => {
-      // Always update on resize
-      if (!rafId) {
-        rafId = requestAnimationFrame(updateBounds);
-      }
-    });
-    ro.observe(containerEl);
-
-    const handleResize = () => {
-      // Always update on resize
-      if (!rafId) {
-        rafId = requestAnimationFrame(updateBounds);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', handleResize);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, [updateHeaderBounds, isSticky]);
-
-  useEffect(() => {
-    updateHeaderBounds();
-  }, [updateHeaderBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
-
-  // Capture stable bounds when sticky header becomes visible to prevent jumps
-  useEffect(() => {
-    if (isSticky && headerBounds.width > 0) {
-      stableBoundsRef.current = headerBounds;
-    }
-  }, [isSticky, headerBounds]);
-
-  // Update CTA bounds during resize for smooth positioning
-  // Only update when floating CTA is NOT visible to prevent jumps during fast scrolling
-  useEffect(() => {
-    const containerEl = ctaContainerRef.current;
-    if (!containerEl) return;
-    
-    let rafId: number | null = null;
-    let lastUpdateTime = 0;
-    const THROTTLE_MS = 16; // ~60fps
-    
-    const updateBounds = () => {
-      const now = performance.now();
-      // Only update if enough time has passed (throttle) or if floating is not visible
-      if (now - lastUpdateTime >= THROTTLE_MS || !isCtaFloating) {
-        updateCtaBounds();
-        lastUpdateTime = now;
-      }
-      rafId = null;
-    };
-    
-    const scheduleUpdate = () => {
-      // When floating CTA is visible, throttle updates more aggressively
-      if (isCtaFloating) {
-        // Only update on resize when floating, not on scroll
-        return;
-      }
-      
-      if (!rafId) {
-        rafId = requestAnimationFrame(updateBounds);
-      }
-    };
-    
-    // Initial update
-    updateCtaBounds();
-
-    const ro = new ResizeObserver(() => {
-      // Always update on resize
-      if (!rafId) {
-        rafId = requestAnimationFrame(updateBounds);
-      }
-    });
-    ro.observe(containerEl);
-
-    const handleResize = () => {
-      // Always update on resize
-      if (!rafId) {
-        rafId = requestAnimationFrame(updateBounds);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', handleResize);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, [updateCtaBounds, isCtaFloating]);
-
-  useEffect(() => {
-    updateCtaBounds();
-  }, [updateCtaBounds, isShotsPaneLocked, shotsPaneWidth, isTasksPaneLocked, tasksPaneWidth, isMobile]);
-
-  // Capture stable bounds when floating CTA becomes visible to prevent jumps
-  useEffect(() => {
-    if (isCtaFloating && ctaBounds.width > 0) {
-      stableCtaBoundsRef.current = ctaBounds;
-    }
-  }, [isCtaFloating, ctaBounds]);
-
-  // Reset the pre-trigger guard whenever user enters edit mode
-  useEffect(() => {
-    if (state.isEditingName) {
-      savedOnApproachRef.current = false;
-    }
-  }, [state.isEditingName]);
   
-  // Manage CTA element visibility with animation delay
-  useEffect(() => {
-    // After first render, mark that initial mount is complete
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-    }
-    
-    if (isCtaFloating) {
-      // Clear any pending hide timer
-      if (ctaHideTimerRef.current) {
-        clearTimeout(ctaHideTimerRef.current);
-        ctaHideTimerRef.current = null;
-      }
-      // Show immediately when it should float
-      setShowCtaElement(true);
-    } else if (showCtaElement && !isInitialMountRef.current) {
-      // When it should hide, wait for animation to complete before removing from DOM
-      // Skip this on initial mount to avoid unwanted animation
-      // Clear any existing timer first
-      if (ctaHideTimerRef.current) {
-        clearTimeout(ctaHideTimerRef.current);
-      }
-      ctaHideTimerRef.current = setTimeout(() => {
-        setShowCtaElement(false);
-        ctaHideTimerRef.current = null;
-      }, 300); // Match animation duration
-    }
-    
-    return () => {
-      if (ctaHideTimerRef.current) {
-        clearTimeout(ctaHideTimerRef.current);
-      }
-    };
-  }, [isCtaFloating, showCtaElement]);
+  // Selection state (forwarded to parent for floating button control)
+  const handleSelectionChange = useCallback((hasSelection: boolean) => {
+    parentOnSelectionChange?.(hasSelection);
+  }, [parentOnSelectionChange]);
 
-  // Check when refs become available and trigger scroll detection setup
-  useEffect(() => {
-    // Check refs are ready and notify
-    const checkRefs = () => {
-      if (timelineSectionRef.current && ctaContainerRef.current && refsReady === 0) {
-        console.log('[FloatingCTA] Refs are now ready, triggering detection setup');
-        setRefsReady(1);
-      }
-    };
-    
-    // Check immediately
-    checkRefs();
-    
-    // Also check after a short delay in case of async rendering
-    const timer = setTimeout(checkRefs, 100);
-    
-    return () => clearTimeout(timer);
-  }, []); // Run once on mount
-
-  // ============================================================================
-  // FLOATING GENERATE VIDEO BUTTON - Scroll Detection
-  // ============================================================================
-  // Shows a floating "Generate Video" button while user is working in the timeline
-  // Hides when: at top of page, original button visible, or items selected
-  useEffect(() => {
-    const timelineEl = timelineSectionRef.current;
-    const ctaEl = ctaContainerRef.current;
-    if (!timelineEl || !ctaEl) {
-      console.log('[FloatingCTA] 🔍 Refs not ready yet, waiting...', { timelineEl: !!timelineEl, ctaEl: !!ctaEl });
-      return;
-    }
-    
-    console.log('[FloatingCTA] ✅ Setting up scroll-based floating CTA detection');
-    
-    // Configuration
-    const TRIGGER_BUFFER = isMobile ? 200 : 100; // Delay before showing (px)
-    const TOP_THRESHOLD = 50; // Hide when near top (px)
-    const PERSIST_BUFFER = 100; // Hide when original CTA this far into viewport (px)
-    
-    const checkFloatingState = () => {
-      const timelineRect = timelineEl.getBoundingClientRect();
-      const ctaRect = ctaEl.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-      
-      // Visibility conditions
-      const userHasScrolled = hasScrolledRef.current;
-      const notAtTop = scrollY > TOP_THRESHOLD;
-      const timelineHasBeenViewed = timelineRect.top < (viewportHeight - TRIGGER_BUFFER);
-      const ctaNotVisible = ctaRect.top > (viewportHeight - PERSIST_BUFFER);
-      const noActiveSelection = !hasActiveSelection;
-      
-      const shouldFloat = userHasScrolled && notAtTop && timelineHasBeenViewed && ctaNotVisible && noActiveSelection;
-      
-      console.log('[FloatingCTA] 📊 Check:', {
-        shouldFloat,
-        conditions: {
-          userHasScrolled,
-          notAtTop,
-          timelineHasBeenViewed,
-          ctaNotVisible,
-          noActiveSelection
-        },
-        metrics: {
-          scrollY: scrollY.toFixed(0),
-          timelineTop: timelineRect.top.toFixed(0),
-          ctaTop: ctaRect.top.toFixed(0)
-        }
-      });
-      
-      if (shouldFloat !== isCtaFloating) {
-        console.log('[FloatingCTA] 🔄 Changing floating state from', isCtaFloating, 'to', shouldFloat);
-        setIsCtaFloating(shouldFloat);
-      }
-    };
-    
-    // Check on scroll (throttled)
-    let scrollTimeout: NodeJS.Timeout | null = null;
-    const handleScroll = () => {
-      // Mark that user has scrolled
-      if (!hasScrolledRef.current) {
-        hasScrolledRef.current = true;
-        console.log('[FloatingCTA] ✅ User has scrolled, enabling floating CTA detection');
-      }
-      
-      if (scrollTimeout) return;
-      scrollTimeout = setTimeout(() => {
-        checkFloatingState();
-        scrollTimeout = null;
-      }, 100);
-    };
-    
-    // Check on resize
-    const handleResize = () => {
-      checkFloatingState();
-    };
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
-      if (scrollTimeout) clearTimeout(scrollTimeout);
-      // Reset scroll tracking when component unmounts or effect re-runs
-      hasScrolledRef.current = false;
-    };
-  }, [isMobile, refsReady, hasActiveSelection, isCtaFloating]);
-
-  const handleStickyNameClick = useCallback(() => {
-    const containerEl = headerContainerRef.current;
-    if (!containerEl) {
-      actions.setEditingName(true);
-      return;
-    }
-    try {
-      const rect = containerEl.getBoundingClientRect();
-      const headerHeight = isMobile ? 60 : 96; // Match the global header heights
-      const bufferSpace = 30;
-      const targetScrollTop = (window.scrollY || window.pageYOffset || 0) + rect.top - headerHeight - bufferSpace;
-      window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
-
-      let scrollTimeout: number;
-      let lastScrollTop = window.scrollY;
-      let scrollStableCount = 0;
-      const checkScrollComplete = () => {
-        const currentScrollTop = window.scrollY;
-        const targetReached = Math.abs(currentScrollTop - Math.max(0, targetScrollTop)) < 5;
-        if (targetReached || currentScrollTop === lastScrollTop) {
-          scrollStableCount++;
-          if (scrollStableCount >= 3 || targetReached) {
-            actions.setEditingName(true);
-            if (scrollTimeout) window.clearTimeout(scrollTimeout);
-            return;
-          }
-        } else {
-          scrollStableCount = 0;
-        }
-        lastScrollTop = currentScrollTop;
-        scrollTimeout = window.setTimeout(checkScrollComplete, 50);
-      };
-      window.setTimeout(checkScrollComplete, 100);
-      window.setTimeout(() => actions.setEditingName(true), 1500);
-    } catch {
-      actions.setEditingName(true);
-    }
-  }, [actions, isMobile]);
+  // STICKY HEADER & FLOATING CTA LOGIC MOVED TO PARENT (VideoTravelToolPage)
+  // Parent manages:
+  // - Scroll detection via useStickyHeader and useFloatingCTA hooks
+  // - Rendering of floating elements
+  // - Element visibility and positioning
+  // - Click handlers for floating UI that scroll and trigger actions
 
   // Use the LoRA sync hook
   const { loraManager, isShotLoraSettingsLoading, hasInitializedShot: loraInitialized } = useLoraSync({
@@ -1160,6 +740,41 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     batchVideoPrompt,
     onBatchVideoPromptChange,
   });
+
+  // Expose shot-specific generation data to parent via mutable ref
+  // This is called by parent (VideoTravelToolPage) when generating video
+  useEffect(() => {
+    if (parentGetGenerationDataRef) {
+      // Store the callback that returns current generation data
+      parentGetGenerationDataRef.current = () => {
+        return {
+          structureVideo: {
+            path: structureVideoPath,
+            type: structureVideoType === 'flow' ? null : structureVideoType,
+            treatment: structureVideoTreatment === 'adjust' ? 'image' : structureVideoTreatment === 'clip' ? 'video' : 'image',
+            motionStrength: structureVideoMotionStrength
+          },
+          aspectRatio: effectiveAspectRatio,
+          loras: loraManager.selectedLoras.map(lora => ({
+            id: lora.id,
+            path: lora.path,
+            strength: parseFloat(lora.strength?.toString() ?? '0') || 0.0,
+            name: lora.name
+          })),
+          clearEnhancedPrompts: clearAllEnhancedPrompts
+        };
+      };
+    }
+  }, [
+    parentGetGenerationDataRef,
+    structureVideoPath,
+    structureVideoType,
+    structureVideoTreatment,
+    structureVideoMotionStrength,
+    effectiveAspectRatio,
+    loraManager.selectedLoras,
+    clearAllEnhancedPrompts
+  ]);
 
   // Use generation actions hook
   const generationActions = useGenerationActions({
@@ -2131,15 +1746,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Local state for steerable motion task creation
   const [isSteerableMotionEnqueuing, setIsSteerableMotionEnqueuing] = useState(false);
   const [steerableMotionJustQueued, setSteerableMotionJustQueued] = useState(false);
-  const [variantName, setVariantName] = useState('');
 
-  // Note: Pair prompts are now managed through the database via ShotImagesEditor
-  // The generation logic will need to be updated to fetch pair prompts from the database
+  // Note: variantName is now managed by parent (VideoTravelToolPage)
+  // and passed as parameter to handleGenerateBatch
 
   const isGenerationDisabled = isSteerableMotionEnqueuing;
 
-  // Handle video generation
-  const handleGenerateBatch = useCallback(async () => {
+  // Handle video generation - accepts variantName as parameter from parent
+  const handleGenerateBatch = useCallback(async (variantNameParam: string) => {
     if (!projectId) {
       toast.error('No project selected. Please select a project first.');
       return;
@@ -2570,7 +2184,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Include selected phase preset ID for UI state restoration
       selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
       // Add generation name if provided
-      generation_name: variantName.trim() || undefined,
+      generation_name: variantNameParam.trim() || undefined,
       // Text before/after prompts
       ...(textBeforePrompts ? { text_before_prompts: textBeforePrompts } : {}),
       ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
@@ -2662,8 +2276,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       // Use the new client-side travel between images task creation instead of calling the edge function
       await createTravelBetweenImagesTask(requestBody as TravelBetweenImagesTaskParams);
       
-      // Clear variant name field after successful submission
-      setVariantName('');
+      // Note: variant name clearing is handled by parent now
       
       // Show success feedback and update state
       setSteerableMotionJustQueued(true);
@@ -2698,7 +2311,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     advancedMode,
     phaseConfig,
     selectedPhasePresetId,
-    variantName,
+    // variantName removed - now passed as parameter from parent
     // selectedMode removed - now hardcoded to use specific model
     loraManager.selectedLoras,
     queryClient,
@@ -2709,6 +2322,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     structureVideoTreatment,
     structureVideoMotionStrength
   ]);
+
+  // Expose generateVideo function and state to parent via mutable ref
+  useEffect(() => {
+    if (parentGenerateVideoRef) {
+      parentGenerateVideoRef.current = handleGenerateBatch;
+    }
+  }, [parentGenerateVideoRef, handleGenerateBatch]);
+  
+  // Expose name click handler to parent for floating header
+  useEffect(() => {
+    if (parentNameClickRef) {
+      parentNameClickRef.current = handleNameClick;
+    }
+  }, [parentNameClickRef, handleNameClick]);
 
   // Opens the Generations pane focused on un-positioned images for the current shot
   const openUnpositionedGenerationsPane = useCallback(() => {
@@ -2800,10 +2427,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
   }, [updateGenerationLocationMutation, projectId, selectedShotId, queryClient, onShotImagesUpdate]);
 
-  const handleSelectionChange = useCallback((hasSelection: boolean) => {
-    // Track selection state - floating CTA will auto-hide/show based on this
-    setHasActiveSelection(hasSelection);
-  }, []);
+  const handleSelectionChangeLocal = useCallback((hasSelection: boolean) => {
+    // Track selection state - forward to parent for floating CTA control
+    parentOnSelectionChange?.(hasSelection);
+  }, [parentOnSelectionChange]);
 
   const handleDefaultNegativePromptChange = useCallback((value: string) => {
     onSteerableMotionSettingsChange({ negative_prompt: value });
@@ -2839,8 +2466,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return result.shot.id;
   }, [createShotMutation, projectId]);
   
-  // Sticky header is already handled by the scroll-based detection above (lines 741-810)
-  // which correctly watches headerContainerRef. No additional observer needed.
+  // Sticky header is handled by parent's useStickyHeader hook via callback ref.
 
   // Back to top button logic
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -2861,7 +2487,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   return (
     <div className="flex flex-col space-y-4 pb-4">
       {/* Header - hide when sticky header is visible */}
-      <div ref={headerContainerRef} className={isSticky && !state.isEditingName ? 'opacity-0 pointer-events-none' : ''}>
+      <div ref={parentHeaderRef}>
       <Header
         selectedShot={selectedShot}
         isEditingName={state.isEditingName}
@@ -2904,7 +2530,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       <div className="flex flex-col gap-4">
         
         {/* Image Manager / Timeline */}
-        <div ref={timelineSectionRef} className="flex flex-col w-full gap-4">
+        <div ref={parentTimelineRef} className="flex flex-col w-full gap-4">
             <ShotImagesEditor
             isModeReady={state.isModeReady}
             settingsError={state.settingsError}
@@ -2948,7 +2574,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             duplicatingImageId={state.duplicatingImageId}
             duplicateSuccessImageId={state.duplicateSuccessImageId}
             projectAspectRatio={effectiveAspectRatio}
-            onSelectionChange={handleSelectionChange}
+            onSelectionChange={handleSelectionChangeLocal}
             defaultPrompt={batchVideoPrompt}
             onDefaultPromptChange={onBatchVideoPromptChange}
             defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
@@ -3072,121 +2698,25 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
                 {/* Full-width divider and generate button - Original position with ref */}
                 <div 
-                  ref={ctaContainerRef} 
+                  ref={parentCtaRef} 
                   className="mt-6 pt-6 border-t"
                 >
-                  <div className={`flex flex-col items-center ${isCtaFloating ? 'opacity-0 pointer-events-none' : ''}`}>
-                    {/* Variant Name Input */}
-                    <div className="w-full max-w-md mb-4">
-                      <input
-                        id="variant-name"
-                        type="text"
-                        value={variantName}
-                        onChange={(e) => setVariantName(e.target.value)}
-                        placeholder="Variant name"
-                        className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                      />
-                    </div>
-                    
-                    <Button 
-                      size="lg" 
-                      className="w-full max-w-md" 
-                      variant={steerableMotionJustQueued ? "success" : "default"}
-                      onClick={handleGenerateBatch}
-                      disabled={isGenerationDisabled}
-                    >
-                      {steerableMotionJustQueued
-                        ? "Added to queue!"
-                        : isSteerableMotionEnqueuing 
-                          ? 'Creating Tasks...' 
-                          : 'Generate Video'}
-                    </Button>
-                  </div>
+                  <GenerateVideoCTA
+                    variantName={parentVariantName || ''}
+                    onVariantNameChange={parentOnVariantNameChange || (() => {})}
+                    onGenerate={() => handleGenerateBatch(parentVariantName || '')}
+                    isGenerating={parentIsGeneratingVideo || isSteerableMotionEnqueuing}
+                    justQueued={parentVideoJustQueued || steerableMotionJustQueued}
+                    disabled={isGenerationDisabled}
+                    inputId="variant-name"
+                  />
                 </div>
             </CardContent>
           </Card>
         </div>
       </div>
       
-      {/* Sticky shot header - appears when original header is out of view */}
-      {(!state.isEditingName) && isSticky && (() => {
-        // Position right below the global header with minimal gap
-        const globalHeaderHeight = isMobile ? 60 : 96; // Match actual global header heights
-        const gap = isMobile ? -16 : 8; // Negative gap on mobile to push up, small gap on desktop
-        const topPosition = globalHeaderHeight + gap;
-        
-        // Use stable bounds (captured when sticky becomes visible) to prevent jumps during fast scrolling
-        // Fall back to current headerBounds if stable bounds aren't available
-        const boundsToUse = stableBoundsRef.current.width > 0 ? stableBoundsRef.current : headerBounds;
-        const hasHeaderBounds = boundsToUse.width > 0;
-        
-        // Use the exact same structure as the original header
-        // Position the sticky wrapper to match the original header container's position
-        return (
-          <div
-            className={`fixed z-50 animate-in fade-in slide-in-from-top-2`}
-            style={{
-              top: `${topPosition}px`,
-              left: hasHeaderBounds ? `${boundsToUse.left}px` : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
-              width: hasHeaderBounds ? `${boundsToUse.width}px` : undefined,
-              right: hasHeaderBounds ? undefined : `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
-              transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
-              willChange: 'left, width, right, opacity',
-              transform: 'translateZ(0)',
-              pointerEvents: 'none' // Disable pointer events on wrapper via style
-            }}
-          >
-            {/* Sticky header - visible on all screen sizes */}
-            <div className="flex-shrink-0 pb-2 sm:pb-1">
-              <div className="flex justify-center items-center px-2">
-                {/* Center - Shot name with navigation (styled floating element) - Single cohesive element */}
-                <div className="flex items-center justify-center">
-                  {/* FIX: Wrap all interactive elements in a single container with pointer-events-auto to prevent gaps */}
-                  <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onPreviousShot) onPreviousShot();
-                      }}
-                      disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                      className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
-                      title="Previous shot"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    
-                    <span
-                      className={`text-base sm:text-xl font-semibold text-primary truncate px-2 sm:px-4 w-[140px] sm:w-[200px] text-center border-2 border-transparent rounded-md py-1 sm:py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''} relative overflow-hidden`}
-                      onClick={handleStickyNameClick}
-                      title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
-                    >
-                      {selectedShot?.name || 'Untitled Shot'}
-                    </span>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onNextShot) onNextShot();
-                      }}
-                      disabled={!hasNext || state.isTransitioningFromNameEdit}
-                      className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
-                      title="Next shot"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* STICKY HEADER NOW RENDERED BY PARENT (VideoTravelToolPage) */}
 
       <LoraSelectorModal
         isOpen={loraManager.isLoraModalOpen}
@@ -3212,51 +2742,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         onOpenChange={actions.setSettingsModalOpen}
       />
       
-      {/* Floating CTA - appears when original position is not visible */}
-      {showCtaElement && isCtaFloating && (() => {
-        return (
-          <div 
-            className="fixed z-[80] animate-in fade-in duration-300 flex justify-center"
-            style={{
-              bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
-              left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0',
-              right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0',
-              pointerEvents: 'none' // Disable pointer events on wrapper via style
-            }}
-          >
-            {/* EXACT same structure as original CTA */}
-            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
-              <div className="flex flex-col items-center">
-                {/* Variant Name Input */}
-                <div className="w-full max-w-md mb-4">
-                  <input
-                    id="variant-name-floating"
-                    type="text"
-                    value={variantName}
-                    onChange={(e) => setVariantName(e.target.value)}
-                    placeholder="Variant name"
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                  />
-                </div>
-                
-                <Button 
-                  size="lg" 
-                  className="w-full max-w-md" 
-                  variant={steerableMotionJustQueued ? "success" : "default"}
-                  onClick={handleGenerateBatch}
-                  disabled={isGenerationDisabled}
-                >
-                  {steerableMotionJustQueued
-                    ? "Added to queue!"
-                    : isSteerableMotionEnqueuing 
-                      ? 'Creating Tasks...' 
-                      : 'Generate Video'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* FLOATING CTA NOW RENDERED BY PARENT (VideoTravelToolPage) */}
 
       {/* Back to Top Button */}
       {showBackToTop && (

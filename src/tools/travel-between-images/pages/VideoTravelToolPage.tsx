@@ -6,11 +6,13 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentShot } from '@/shared/contexts/CurrentShotContext';
+import { usePanes } from '@/shared/contexts/PanesContext';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
@@ -38,6 +40,9 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useVideoTravelHeader } from '../hooks/useVideoTravelHeader';
+import { useFloatingCTA } from '../hooks/useFloatingCTA';
+import { useStickyHeader } from '../hooks/useStickyHeader';
+import { GenerateVideoCTA } from '../components/GenerateVideoCTA';
 
 // Custom hook to parallelize data fetching for better performance
 const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
@@ -551,6 +556,89 @@ const VideoTravelToolPage: React.FC = () => {
   // Add ref for main container
   const mainContainerRef = useRef<HTMLDivElement>(null);
   
+  // ============================================================================
+  // FLOATING UI - Refs and State
+  // ============================================================================
+  // Stable refs for floating elements (maintained for hook access)
+  const headerContainerRef = useRef<HTMLDivElement>(null);
+  const timelineSectionRef = useRef<HTMLDivElement>(null);
+  const ctaContainerRef = useRef<HTMLDivElement>(null);
+  
+  // State to track when refs are attached to DOM elements
+  const [headerReady, setHeaderReady] = useState(false);
+  const [timelineReady, setTimelineReady] = useState(false);
+  const [ctaReady, setCtaReady] = useState(false);
+  
+  // Callback refs that update both the ref object AND state when elements attach
+  const headerCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    headerContainerRef.current = node;
+    setHeaderReady(!!node);
+  }, []);
+  
+  const timelineCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    timelineSectionRef.current = node;
+    setTimelineReady(!!node);
+  }, []);
+  
+  const ctaCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    ctaContainerRef.current = node;
+    setCtaReady(!!node);
+  }, []);
+  
+  // Selection state for floating CTA visibility control
+  const [hasActiveSelection, setHasActiveSelection] = useState(false);
+  
+  // Callback to receive selection changes from ShotEditor
+  const handleSelectionChange = useCallback((hasSelection: boolean) => {
+    setHasActiveSelection(hasSelection);
+  }, []);
+  
+  // ============================================================================
+  // GENERATE VIDEO CTA STATE (Page-level management)
+  // ============================================================================
+  const [variantName, setVariantName] = useState('');
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [videoJustQueued, setVideoJustQueued] = useState(false);
+  
+  // Refs to get shot-specific data and generate function from ShotEditor
+  const getGenerationDataRef = useRef<(() => any) | null>(null);
+  const generateVideoRef = useRef<((variantName: string) => Promise<void>) | null>(null);
+  const nameClickRef = useRef<(() => void) | null>(null);
+  
+  // Handle generate video - calls ShotEditor's function with current variant name
+  const handleGenerateVideo = useCallback(async () => {
+    if (generateVideoRef.current) {
+      setIsGeneratingVideo(true);
+      setVideoJustQueued(false);
+      try {
+        await generateVideoRef.current(variantName);
+        setVariantName(''); // Clear after success
+        setVideoJustQueued(true);
+        setTimeout(() => setVideoJustQueued(false), 2000);
+      } catch (error) {
+        console.error('Failed to generate video:', error);
+      } finally {
+        setIsGeneratingVideo(false);
+      }
+    }
+  }, [variantName]);
+  
+  // Handle floating header name click - scroll to top and trigger edit mode
+  const handleFloatingHeaderNameClick = useCallback(() => {
+    // Scroll to the original header
+    if (headerContainerRef.current) {
+      headerContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    // Trigger edit mode after a short delay to let scroll finish
+    setTimeout(() => {
+      if (nameClickRef.current) {
+        nameClickRef.current();
+      }
+    }, 300);
+  }, []);
+  
+  
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
 
@@ -971,6 +1059,34 @@ const VideoTravelToolPage: React.FC = () => {
     console.log('[ShotNavPerf] 📝 shotToEdit: Using fallback shot', fallbackShot?.name || 'none');
     return fallbackShot;
   }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
+
+  // Get pane widths for positioning floating elements
+  const { 
+    isShotsPaneLocked, 
+    shotsPaneWidth, 
+    isTasksPaneLocked, 
+    tasksPaneWidth 
+  } = usePanes();
+
+  // Use sticky/floating hooks only when editor is visible
+  const floatingCTA = useFloatingCTA({
+    timelineRef: timelineSectionRef,
+    ctaRef: ctaContainerRef,
+    hasActiveSelection,
+    isMobile,
+    enabled: shouldShowShotEditor && timelineReady && ctaReady
+  });
+  
+  const stickyHeader = useStickyHeader({
+    headerRef: headerContainerRef,
+    isMobile,
+    enabled: shouldShowShotEditor && headerReady
+  });
+
+  // Reset selection tracking whenever the active shot changes
+  useEffect(() => {
+    setHasActiveSelection(false);
+  }, [shotToEdit?.id]);
   
   // Initialize video gallery thumbnail preloader (after dependencies are defined)
   const preloaderState = useVideoGalleryPreloader({
@@ -1740,6 +1856,19 @@ const VideoTravelToolPage: React.FC = () => {
               onTextBeforePromptsChange={handleTextBeforePromptsChange}
               textAfterPrompts={textAfterPrompts}
               onTextAfterPromptsChange={handleTextAfterPromptsChange}
+              // Callback refs for floating UI (trigger state updates when attached)
+              headerContainerRef={headerCallbackRef}
+              timelineSectionRef={timelineCallbackRef}
+              ctaContainerRef={ctaCallbackRef}
+              onSelectionChange={handleSelectionChange}
+              getGenerationDataRef={getGenerationDataRef}
+              generateVideoRef={generateVideoRef}
+              nameClickRef={nameClickRef}
+              // CTA state
+              variantName={variantName}
+              onVariantNameChange={setVariantName}
+              isGeneratingVideo={isGeneratingVideo}
+              videoJustQueued={videoJustQueued}
               onBatchVideoFramesChange={handleBatchVideoFramesChange}
               onBatchVideoContextChange={handleBatchVideoContextChange}
               batchVideoSteps={batchVideoSteps}
@@ -1816,6 +1945,104 @@ const VideoTravelToolPage: React.FC = () => {
         initialAspectRatio={null}
         projectId={selectedProjectId}
       />
+      
+      {/* ============================================================================ */}
+      {/* FLOATING UI ELEMENTS (Page-level concerns) */}
+      {/* ============================================================================ */}
+      
+      {/* Sticky Shot Selector - appears when original header is out of view */}
+      {shouldShowShotEditor && stickyHeader.isSticky && shotToEdit && (
+        <div
+          className="fixed z-50 animate-in fade-in slide-in-from-top-2"
+          style={{
+            top: `${(isMobile ? 60 : 96) + (isMobile ? -16 : 8)}px`,
+            left: stickyHeader.stableBounds.width > 0 
+              ? `${stickyHeader.stableBounds.left}px` 
+              : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
+            width: stickyHeader.stableBounds.width > 0 
+              ? `${stickyHeader.stableBounds.width}px` 
+              : undefined,
+            right: stickyHeader.stableBounds.width > 0 
+              ? undefined 
+              : `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
+            transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
+            willChange: 'left, width, right, opacity',
+            transform: 'translateZ(0)',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="flex-shrink-0 pb-2 sm:pb-1">
+            <div className="flex justify-center items-center px-2">
+              <div className="flex items-center justify-center">
+                <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePreviousShotNoScroll();
+                    }}
+                    disabled={!hasPrevious}
+                    className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
+                    title="Previous shot"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <span
+                    className="text-base sm:text-xl font-semibold text-primary truncate px-2 sm:px-4 w-[140px] sm:w-[200px] text-center border-2 border-transparent rounded-md py-1 sm:py-2 cursor-pointer hover:underline"
+                    title="Click to edit shot name"
+                    onClick={handleFloatingHeaderNameClick}
+                  >
+                    {shotToEdit.name || 'Untitled Shot'}
+                  </span>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNextShotNoScroll();
+                    }}
+                    disabled={!hasNext}
+                    className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
+                    title="Next shot"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Floating Generate Video Button - appears when scrolling in timeline */}
+      {shouldShowShotEditor && floatingCTA.showElement && floatingCTA.isFloating && shotToEdit && (
+        <div 
+          className="fixed z-[80] animate-in fade-in duration-300 flex justify-center"
+          style={{
+            bottom: isMobile ? '55px' : '60px',
+            left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0',
+            right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0',
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
+            <GenerateVideoCTA
+              variantName={variantName}
+              onVariantNameChange={setVariantName}
+              onGenerate={handleGenerateVideo}
+              isGenerating={isGeneratingVideo}
+              justQueued={videoJustQueued}
+              disabled={isGeneratingVideo}
+              inputId="variant-name-floating"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
