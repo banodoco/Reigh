@@ -6,6 +6,7 @@ import { GeneratedImageWithMetadata } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 
 export interface ImageGalleryLightboxProps {
   // Lightbox state
@@ -138,18 +139,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
   }, [activeLightboxMedia?.metadata?.__autoEnterEditMode, autoEnterEditMode, activeLightboxMedia?.id]);
   
   // Detect tablet/iPad size (768px+) for side-by-side task details layout
-  const [isTabletOrLarger, setIsTabletOrLarger] = React.useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
-  );
-  
-  React.useEffect(() => {
-    const handleResize = () => {
-      setIsTabletOrLarger(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const { isTabletOrLarger } = useDeviceDetection();
   
   // [ShotNavDebug] confirm plumbing into Lightbox
   React.useEffect(() => {

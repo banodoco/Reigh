@@ -46,6 +46,7 @@ import { GenerationRow } from "@/types/shots";
 import { toast } from "sonner";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useDeviceDetection } from "@/shared/hooks/useDeviceDetection";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
@@ -488,18 +489,7 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [lightboxSelectedShotId, onAddToShotWithoutPosition]);
 
   // Detect tablet/iPad size (768px+) for side-by-side task details layout
-  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
-  );
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsTabletOrLarger(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const { isTabletOrLarger } = useDeviceDetection();
 
   // Fetch task ID mapping from unified cache
   const { data: taskMapping } = useTaskFromUnifiedCache(

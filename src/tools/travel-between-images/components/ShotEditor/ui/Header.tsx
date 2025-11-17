@@ -139,7 +139,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
       {/* Desktop layout */}
       <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
         {/* Back button on the left - fixed width container */}
-        <div className="w-[140px]">
+        <div className="w-[100px]">
           <Button 
             variant="outline" 
             size="sm" 
@@ -216,7 +216,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
         </div>
         
         {/* Aspect Ratio Selector on the right - fixed width container, no visualizer */}
-        <div className="w-[140px]">
+        <div className="w-[100px]">
           <AspectRatioSelector
             value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
             onValueChange={handleAspectRatioChange}
@@ -246,7 +246,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               onChange={(e) => onEditingNameChange(e.target.value)}
               onKeyDown={onNameKeyDown}
               onBlur={onNameSave}
-              className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 flex-1 max-w-[135px] text-center"
+              className="!text-xl font-semibold text-primary h-auto py-0.5 px-2 flex-1 text-center"
               autoFocus
               maxLength={30}
             />
@@ -257,16 +257,18 @@ const HeaderComponent: React.FC<HeaderProps> = ({
         ) : (
           // Normal mode - back button, name with chevrons, and aspect ratio all on one row
           <div className="flex items-center justify-between px-3">
-            {/* Back button on the left */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onBack}
-              className="flex items-center border-2 flex-shrink-0 px-2"
-              title="Back to shots"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            {/* Back button on the left - fixed width container */}
+            <div className="w-[80px]">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onBack}
+                className="flex items-center justify-center border-2 w-full px-0"
+                title="Back to shots"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
             
             {/* Shot name with navigation buttons - tighter spacing */}
             <div className="flex items-center space-x-1">
@@ -282,7 +284,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-base font-semibold text-primary truncate text-center px-1 max-w-[100px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-base font-semibold text-primary truncate text-center px-1 w-[100px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >
@@ -301,12 +303,13 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               </Button>
             </div>
             
-            {/* Aspect Ratio Selector on the right */}
-            <div className="flex-shrink-0">
+            {/* Aspect Ratio Selector on the right - fixed width container */}
+            <div className="w-[80px]">
               <AspectRatioSelector
                 value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
                 onValueChange={handleAspectRatioChange}
                 showVisualizer={false}
+                className="w-full"
               />
             </div>
           </div>

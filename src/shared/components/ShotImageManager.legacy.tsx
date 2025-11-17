@@ -26,6 +26,7 @@ import { MultiImagePreview, SingleImagePreview } from './ImageDragPreview';
 import BatchDropZone from './BatchDropZone';
 
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { useAddImageToShot, useAddImageToShotWithoutPosition } from '@/shared/hooks/useShots';
@@ -218,18 +219,7 @@ const ShotImageManagerComponent: React.FC<ShotImageManagerProps> = ({
   const isMobile = useIsMobile();
 
   // Detect tablet/iPad size (768px+) for side-by-side task details layout
-  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() => 
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
-  );
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsTabletOrLarger(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const { isTabletOrLarger } = useDeviceDetection();
   
   // Debug lightbox state changes (must be after isMobile is declared)
   React.useEffect(() => {

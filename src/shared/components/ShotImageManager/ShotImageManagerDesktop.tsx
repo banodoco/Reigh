@@ -17,6 +17,7 @@ import { MultiImagePreview, SingleImagePreview } from '../ImageDragPreview';
 import BatchDropZone from '../BatchDropZone';
 import MediaLightbox from '../MediaLightbox';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useState, useEffect } from 'react';
 import { useTaskDetails } from './hooks/useTaskDetails';
 
@@ -75,18 +76,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   const isMobile = useIsMobile();
   
   // Detect tablet/iPad size for task details
-  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
-  );
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsTabletOrLarger(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const { isTabletOrLarger } = useDeviceDetection();
   
   return (
     <BatchDropZone

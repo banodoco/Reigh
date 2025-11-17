@@ -6,7 +6,7 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUp } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -26,7 +26,6 @@ import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
 
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
-// import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import ShotEditor from '../components/ShotEditor';
 import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import { useProjectVideoCountsCache } from '@/shared/hooks/useProjectVideoCountsCache';
@@ -37,6 +36,7 @@ import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloade
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { ImageGallery } from '@/shared/components/ImageGallery';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useVideoTravelHeader } from '../hooks/useVideoTravelHeader';
@@ -318,7 +318,6 @@ const VideoTravelToolPage: React.FC = () => {
   // Memoized callbacks to prevent infinite re-renders
   const noOpCallback = useCallback(() => {}, []);
   
-  // ✅ NEW: All handlers now use shotSettings.updateField - much simpler!
   const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
     shotSettings.updateField('videoControlMode', mode);
   }, [shotSettings]);
@@ -341,7 +340,6 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('textAfterPrompts', text);
   }, [shotSettings]);
   
-  // ✅ NEW: Immediate save handler using hook - much simpler!
   const handleBlurSave = useCallback(() => {
     console.log('[PhaseConfigTrack] 🔵 Blur save triggered - saving immediately');
     shotSettings.saveImmediate();
@@ -638,6 +636,26 @@ const VideoTravelToolPage: React.FC = () => {
     }, 300);
   }, []);
   
+  // ============================================================================
+  // BACK TO TOP BUTTON (Page-level navigation)
+  // ============================================================================
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+  
+  // Show back-to-top button when user scrolls down
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollThreshold = 400; // Show button after scrolling 400px
+      setShowBackToTop(window.scrollY > scrollThreshold);
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
   
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
@@ -761,7 +779,7 @@ const VideoTravelToolPage: React.FC = () => {
   // ✅ NEW: All settings now derived from hook - no more individual useState calls!
   // Detect tablets/iPads - treat them like desktop for timeline mode
   // iPads have screen width >= 768px, so they should get timeline mode option
-  const isTabletOrLarger = typeof window !== 'undefined' && window.innerWidth >= 768;
+  const { isTabletOrLarger } = useDeviceDetection();
   const shouldDefaultToBatch = isMobile && !isTabletOrLarger;
   
   // Get cached generation mode for instant loading (before settings fully load)
@@ -1955,7 +1973,7 @@ const VideoTravelToolPage: React.FC = () => {
         <div
           className="fixed z-50 animate-in fade-in slide-in-from-top-2"
           style={{
-            top: `${(isMobile ? 60 : 96) + (isMobile ? -16 : 8)}px`,
+            top: `${(isMobile ? 60 : 96) + (isMobile ? 8 : 8)}px`,
             left: stickyHeader.stableBounds.width > 0 
               ? `${stickyHeader.stableBounds.left}px` 
               : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
@@ -2042,6 +2060,19 @@ const VideoTravelToolPage: React.FC = () => {
             />
           </div>
         </div>
+      )}
+      
+      {/* Back to Top Button - appears when scrolled down */}
+      {showBackToTop && (
+        <Button
+          variant="theme-soft"
+          size="icon"
+          className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg"
+          onClick={scrollToTop}
+          title="Back to top"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </Button>
       )}
     </div>
   );

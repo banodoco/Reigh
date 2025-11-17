@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { calculateMaxGap, getPairInfo, getTimelineDimensions, pixelToFrame } from './utils/timeline-utils';
 import { timelineDebugger } from './utils/timeline-debug';
 import { framesToSeconds } from './utils/time-utils';
@@ -155,30 +156,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const isMobile = useIsMobile();
   
   // Detect tablets - treat them differently from phones for tap-to-move
-  const isTablet = React.useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const nav: any = navigator || {};
-    const ua: string = nav.userAgent || '';
-    const platform: string = nav.platform || '';
-    const maxTouchPoints: number = nav.maxTouchPoints || 0;
-    
-    // iPad detection (including iPadOS 13+ that masquerades as Mac)
-    const isIpadUA = /iPad/i.test(ua);
-    const isIpadOsLike = platform === 'MacIntel' && maxTouchPoints > 1;
-    
-    // Android tablets
-    const isAndroidTablet = /Android(?!.*Mobile)/i.test(ua);
-    const isOtherTablet = /Tablet|Silk|Kindle|PlayBook/i.test(ua);
-    
-    // Width-based detection
-    const screenWidth = window.innerWidth;
-    const isTabletWidth = screenWidth >= 768 && screenWidth <= 1024;
-    
-    return Boolean(
-      isIpadUA || isIpadOsLike || isAndroidTablet || isOtherTablet || 
-      (isTabletWidth && maxTouchPoints > 0)
-    );
-  }, []);
+  const { isTablet } = useDeviceDetection();
   
   // Only show tap-to-move on tablets (not phones or desktop)
   const enableTapToMove = isTablet && !readOnly;

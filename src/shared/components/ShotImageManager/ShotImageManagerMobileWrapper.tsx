@@ -3,6 +3,7 @@ import { ShotImageManagerProps } from './types';
 import { ShotImageManagerMobile } from './ShotImageManagerMobile';
 import MediaLightbox from '../MediaLightbox';
 import { useTaskDetails } from './hooks/useTaskDetails';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 
 interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   selection: any;
@@ -55,18 +56,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   const { taskDetailsData } = useTaskDetails({ generationId: currentLightboxImageId });
   
   // Detect tablet/iPad size for task details
-  const [isTabletOrLarger, setIsTabletOrLarger] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 768 : false
-  );
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsTabletOrLarger(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const { isTabletOrLarger } = useDeviceDetection();
   
   return (
     <>

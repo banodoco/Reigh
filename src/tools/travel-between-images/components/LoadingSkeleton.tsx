@@ -21,7 +21,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             {/* Desktop skeleton - 3-column layout matching actual Header with fixed widths */}
             <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
               {/* Left: Back button container - fixed width matching Header */}
-              <div className="w-[140px]">
+              <div className="w-[100px]">
                 <Skeleton className="h-9 w-20 rounded-md" />
               </div>
               
@@ -36,15 +36,17 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
               </div>
               
               {/* Right: Aspect Ratio Selector container - fixed width matching Header, no visualizer */}
-              <div className="w-[140px] flex justify-end">
+              <div className="w-[100px] flex justify-end">
                 <Skeleton className="h-10 w-32 rounded-md" />
               </div>
             </div>
             
             {/* Mobile skeleton - all in one row matching actual mobile Header */}
             <div className="sm:hidden flex items-center justify-between px-3">
-              {/* Back button (icon only) */}
-              <Skeleton className="h-9 w-9 rounded-md flex-shrink-0" />
+              {/* Back button - fixed width container matching Header */}
+              <div className="w-[80px]">
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
               
               {/* Shot name with navigation buttons */}
               <div className="flex items-center space-x-1 flex-shrink-0">
@@ -53,8 +55,10 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
                 <Skeleton className="h-9 w-9 rounded-md" />
               </div>
               
-              {/* Aspect Ratio Selector (without visualizer) - narrower to balance layout */}
-              <Skeleton className="h-9 w-16 rounded-md flex-shrink-0" />
+              {/* Aspect Ratio Selector - fixed width container matching Header */}
+              <div className="w-[80px]">
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
             </div>
           </div>
           <Skeleton className="h-64 w-full" />
