@@ -727,17 +727,31 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     stableCtaBoundsRef.current = newBounds;
   }, []);
   
-  // Floating CTA state and refs
+  // ============================================================================
+  // FLOATING ELEMENTS STATE & REFS
+  // ============================================================================
+  
+  // Floating Generate Video Button
   const ctaContainerRef = useRef<HTMLDivElement>(null);
-  const videoGalleryRef = useRef<HTMLDivElement>(null);
-  const generateVideosCardRef = useRef<HTMLDivElement>(null); // Ref for the Generate Videos card
+  const timelineSectionRef = useRef<HTMLDivElement>(null);
   const [isCtaFloating, setIsCtaFloating] = useState(false);
-  const [hasActiveSelection, setHasActiveSelection] = useState(false);
-  const [showCtaElement, setShowCtaElement] = useState(true); // Start as true to show on initial load
+  const [showCtaElement, setShowCtaElement] = useState(true);
+  const hasScrolledRef = useRef(false);
   const ctaHideTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitialMountRef = useRef(true); // Track if this is the first render
-  const [refsReady, setRefsReady] = useState(0); // Increment to trigger effect re-run when refs are ready
+  const isInitialMountRef = useRef(true);
+  const [refsReady, setRefsReady] = useState(0);
+  
+  // Selection state (affects floating button visibility)
+  const [hasActiveSelection, setHasActiveSelection] = useState(false);
+  
+  // Legacy refs (to be cleaned up)
+  const videoGalleryRef = useRef<HTMLDivElement>(null);
+  const generateVideosCardRef = useRef<HTMLDivElement>(null);
 
+  // ============================================================================
+  // STICKY SHOT SELECTOR - Scroll Detection (RAF-based)
+  // ============================================================================
+  // Shows shot name + nav arrows at top when original header scrolls out of view
   useEffect(() => {
     const containerEl = headerContainerRef.current;
     if (!containerEl) return;
@@ -751,12 +765,10 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       const docTop = window.pageYOffset || document.documentElement.scrollTop || 0;
       const containerDocTop = rect.top + docTop;
       
-      // More aggressive threshold - trigger as soon as the shot name starts to go out of view
-      // Use the actual header height from the global header plus minimal buffer
-      const globalHeaderHeight = isMobile ? 60 : 96; // Actual global header heights
-      const buffer = isMobile ? 5 : 10; // Small buffer to ensure smooth transition
+      const globalHeaderHeight = isMobile ? 60 : 96;
+      const buffer = isMobile ? 5 : 10;
       
-      // Trigger when the shot name would be at the global header position
+      // Trigger when shot name would be hidden by global header
       stickyThresholdY.current = containerDocTop - globalHeaderHeight - buffer;
     };
 
@@ -992,13 +1004,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     };
   }, [isCtaFloating, showCtaElement]);
 
-  // Check when refs become available and trigger IntersectionObserver setup
-  // useLayoutEffect runs synchronously after DOM mutations, ensuring refs are populated
+  // Check when refs become available and trigger scroll detection setup
   useEffect(() => {
     // Check refs are ready and notify
     const checkRefs = () => {
-      if (generateVideosCardRef.current && ctaContainerRef.current && refsReady === 0) {
-        console.log('[ShotEditor] Refs are now ready, triggering observer setup');
+      if (timelineSectionRef.current && ctaContainerRef.current && refsReady === 0) {
+        console.log('[FloatingCTA] Refs are now ready, triggering detection setup');
         setRefsReady(1);
       }
     };
@@ -1012,91 +1023,95 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return () => clearTimeout(timer);
   }, []); // Run once on mount
 
-  // Floating CTA: Track when user scrolls past Generate Videos card and before reaching original CTA
+  // ============================================================================
+  // FLOATING GENERATE VIDEO BUTTON - Scroll Detection
+  // ============================================================================
+  // Shows a floating "Generate Video" button while user is working in the timeline
+  // Hides when: at top of page, original button visible, or items selected
   useEffect(() => {
-    const settingsCardEl = generateVideosCardRef.current;
+    const timelineEl = timelineSectionRef.current;
     const ctaEl = ctaContainerRef.current;
-    if (!settingsCardEl || !ctaEl) {
-      console.log('[ShotEditor] Refs not ready yet, waiting...', { settingsCardEl: !!settingsCardEl, ctaEl: !!ctaEl });
+    if (!timelineEl || !ctaEl) {
+      console.log('[FloatingCTA] 🔍 Refs not ready yet, waiting...', { timelineEl: !!timelineEl, ctaEl: !!ctaEl });
       return;
     }
     
-    console.log('[ShotEditor] Setting up IntersectionObservers for floating CTA');
+    console.log('[FloatingCTA] ✅ Setting up scroll-based floating CTA detection');
     
-    let hasScrolledPastSettings = false;
-    let isOriginalCtaVisible = false;
+    // Configuration
+    const TRIGGER_BUFFER = isMobile ? 200 : 100; // Delay before showing (px)
+    const TOP_THRESHOLD = 50; // Hide when near top (px)
+    const PERSIST_BUFFER = 100; // Hide when original CTA this far into viewport (px)
     
-    const updateFloatingState = () => {
-      // Show floating CTA only when: scrolled past settings card AND original CTA is not visible AND no active selection
-      const shouldFloat = hasScrolledPastSettings && !isOriginalCtaVisible && !hasActiveSelection;
-      setIsCtaFloating(shouldFloat);
+    const checkFloatingState = () => {
+      const timelineRect = timelineEl.getBoundingClientRect();
+      const ctaRect = ctaEl.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+      
+      // Visibility conditions
+      const userHasScrolled = hasScrolledRef.current;
+      const notAtTop = scrollY > TOP_THRESHOLD;
+      const timelineHasBeenViewed = timelineRect.top < (viewportHeight - TRIGGER_BUFFER);
+      const ctaNotVisible = ctaRect.top > (viewportHeight - PERSIST_BUFFER);
+      const noActiveSelection = !hasActiveSelection;
+      
+      const shouldFloat = userHasScrolled && notAtTop && timelineHasBeenViewed && ctaNotVisible && noActiveSelection;
+      
+      console.log('[FloatingCTA] 📊 Check:', {
+        shouldFloat,
+        conditions: {
+          userHasScrolled,
+          notAtTop,
+          timelineHasBeenViewed,
+          ctaNotVisible,
+          noActiveSelection
+        },
+        metrics: {
+          scrollY: scrollY.toFixed(0),
+          timelineTop: timelineRect.top.toFixed(0),
+          ctaTop: ctaRect.top.toFixed(0)
+        }
+      });
+      
+      if (shouldFloat !== isCtaFloating) {
+        console.log('[FloatingCTA] 🔄 Changing floating state from', isCtaFloating, 'to', shouldFloat);
+        setIsCtaFloating(shouldFloat);
+      }
     };
     
-    // Trigger when the settings card starts to leave the viewport
-    // Smaller margin means it triggers closer to when the element leaves the viewport
-    const settingsMargin = isMobile ? '-50px 0px 0px 0px' : '-100px 0px 0px 0px';
-    const ctaMargin = isMobile ? '0px 0px -100px 0px' : '0px 0px -150px 0px';
-    
-    // Track Generate Videos card - show floating CTA when it's scrolled out of view (top is above viewport)
-    const settingsObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          hasScrolledPastSettings = !entry.isIntersecting && entry.boundingClientRect.top < 0;
-          updateFloatingState();
-        });
-      },
-      {
-        threshold: 0,
-        rootMargin: settingsMargin,
+    // Check on scroll (throttled)
+    let scrollTimeout: NodeJS.Timeout | null = null;
+    const handleScroll = () => {
+      // Mark that user has scrolled
+      if (!hasScrolledRef.current) {
+        hasScrolledRef.current = true;
+        console.log('[FloatingCTA] ✅ User has scrolled, enabling floating CTA detection');
       }
-    );
+      
+      if (scrollTimeout) return;
+      scrollTimeout = setTimeout(() => {
+        checkFloatingState();
+        scrollTimeout = null;
+      }, 100);
+    };
     
-    // Track original CTA position - hide floating CTA when reaching the bottom
-    const ctaObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          isOriginalCtaVisible = entry.isIntersecting;
-          updateFloatingState();
-        });
-      },
-      {
-        threshold: 0,
-        rootMargin: ctaMargin,
-      }
-    );
+    // Check on resize
+    const handleResize = () => {
+      checkFloatingState();
+    };
     
-    settingsObserver.observe(settingsCardEl);
-    ctaObserver.observe(ctaEl);
-    
-    // Immediately check initial state since IntersectionObserver callbacks don't fire synchronously
-    const settingsRect = settingsCardEl.getBoundingClientRect();
-    const ctaRect = ctaEl.getBoundingClientRect();
-    
-    // Check if settings card is above viewport (scrolled past)
-    const marginPx = isMobile ? -50 : -100;
-    hasScrolledPastSettings = settingsRect.top < marginPx;
-    
-    // Check if original CTA is visible in viewport
-    const ctaTop = ctaRect.top;
-    const ctaBottom = ctaRect.bottom;
-    const viewportHeight = window.innerHeight;
-    isOriginalCtaVisible = ctaTop < viewportHeight && ctaBottom > 0;
-    
-    // Update state immediately with initial values
-    updateFloatingState();
-    
-    console.log('[ShotEditor] Initial floating state:', { 
-      hasScrolledPastSettings, 
-      isOriginalCtaVisible, 
-      hasActiveSelection,
-      shouldFloat: hasScrolledPastSettings && !isOriginalCtaVisible && !hasActiveSelection
-    });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
     
     return () => {
-      settingsObserver.disconnect();
-      ctaObserver.disconnect();
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      // Reset scroll tracking when component unmounts or effect re-runs
+      hasScrolledRef.current = false;
     };
-  }, [isMobile, hasActiveSelection, refsReady]);
+  }, [isMobile, refsReady, hasActiveSelection, isCtaFloating]);
 
   const handleStickyNameClick = useCallback(() => {
     const containerEl = headerContainerRef.current;
@@ -2824,30 +2839,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return result.shot.id;
   }, [createShotMutation, projectId]);
   
-  // Intersection observer for sticky header (using existing ctaContainerRef from line 531)
-  useEffect(() => {
-    const ctaContainer = ctaContainerRef.current;
-    if (!ctaContainer) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsSticky(!entry.isIntersecting);
-      },
-      {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0,
-      }
-    );
-
-    observer.observe(ctaContainer);
-
-    return () => {
-      if (ctaContainer) {
-        observer.unobserve(ctaContainer);
-      }
-    };
-  }, []);
+  // Sticky header is already handled by the scroll-based detection above (lines 741-810)
+  // which correctly watches headerContainerRef. No additional observer needed.
 
   // Back to top button logic
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -2911,7 +2904,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       <div className="flex flex-col gap-4">
         
         {/* Image Manager / Timeline */}
-        <div className="flex flex-col w-full gap-4">
+        <div ref={timelineSectionRef} className="flex flex-col w-full gap-4">
             <ShotImagesEditor
             isModeReady={state.isModeReady}
             settingsError={state.settingsError}
@@ -3131,7 +3124,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // Position the sticky wrapper to match the original header container's position
         return (
           <div
-            className={`fixed z-50 animate-in fade-in slide-in-from-top-2 pointer-events-none`}
+            className={`fixed z-50 animate-in fade-in slide-in-from-top-2`}
             style={{
               top: `${topPosition}px`,
               left: hasHeaderBounds ? `${boundsToUse.left}px` : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
@@ -3139,18 +3132,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
               right: hasHeaderBounds ? undefined : `${isTasksPaneLocked ? tasksPaneWidth : 0}px`,
               transition: 'left 0.2s ease-out, width 0.2s ease-out, right 0.2s ease-out, opacity 0.3s ease-out',
               willChange: 'left, width, right, opacity',
-              transform: 'translateZ(0)'
+              transform: 'translateZ(0)',
+              pointerEvents: 'none' // Disable pointer events on wrapper via style
             }}
           >
-            {/* EXACT same structure as original Header component's desktop layout */}
-            <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
-              <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
-                {/* Left - Back button container (invisible but maintains layout) */}
-                <div className="w-[140px]" />
-                
-                {/* Center - Shot name with navigation (styled floating element) */}
+            {/* Sticky header - visible on all screen sizes */}
+            <div className="flex-shrink-0 pb-2 sm:pb-1">
+              <div className="flex justify-center items-center px-2">
+                {/* Center - Shot name with navigation (styled floating element) - Single cohesive element */}
                 <div className="flex items-center justify-center">
-                  <div className="flex items-center space-x-2">
+                  {/* FIX: Wrap all interactive elements in a single container with pointer-events-auto to prevent gaps */}
+                  <div className="flex items-center space-x-1 sm:space-x-2 bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border p-1" style={{ pointerEvents: 'auto' }}>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -3160,20 +3152,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         if (onPreviousShot) onPreviousShot();
                       }}
                       disabled={!hasPrevious || state.isTransitioningFromNameEdit}
-                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-md shadow-lg rounded-md border border-border"
+                      className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
                       title="Previous shot"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     
                     <span
-                      className={`text-xl font-semibold text-primary truncate px-4 w-[200px] text-center border-2 border-transparent rounded-md py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''} pointer-events-auto relative overflow-hidden bg-background/80 backdrop-blur-md shadow-xl rounded-lg border border-border`}
+                      className={`text-base sm:text-xl font-semibold text-primary truncate px-2 sm:px-4 w-[140px] sm:w-[200px] text-center border-2 border-transparent rounded-md py-1 sm:py-2 ${onUpdateShotName ? 'cursor-pointer hover:underline hover:border-border hover:bg-accent/50 transition-all duration-200' : ''} relative overflow-hidden`}
                       onClick={handleStickyNameClick}
                       title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
-                      style={{
-                        // Add subtle grain overlay effect
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                      }}
                     >
                       {selectedShot?.name || 'Untitled Shot'}
                     </span>
@@ -3187,16 +3175,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         if (onNextShot) onNextShot();
                       }}
                       disabled={!hasNext || state.isTransitioningFromNameEdit}
-                      className="flex-shrink-0 pointer-events-auto opacity-60 hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-md shadow-lg rounded-md border border-border"
+                      className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9 p-0"
                       title="Next shot"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                
-                {/* Right - Aspect ratio selector container (invisible but maintains layout) */}
-                <div className="w-[140px]" />
               </div>
             </div>
           </div>
@@ -3231,15 +3216,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       {showCtaElement && isCtaFloating && (() => {
         return (
           <div 
-            className="fixed z-[80] animate-in fade-in duration-300 flex justify-center pointer-events-none"
+            className="fixed z-[80] animate-in fade-in duration-300 flex justify-center"
             style={{
               bottom: isMobile ? '55px' : '60px', // Positioned nicely above bottom
               left: isShotsPaneLocked ? `${shotsPaneWidth}px` : '0',
               right: isTasksPaneLocked ? `${tasksPaneWidth}px` : '0',
+              pointerEvents: 'none' // Disable pointer events on wrapper via style
             }}
           >
             {/* EXACT same structure as original CTA */}
-            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md pointer-events-auto">
+            <div className="bg-background/80 backdrop-blur-md rounded-lg shadow-2xl py-4 px-6 w-full max-w-md" style={{ pointerEvents: 'auto' }}>
               <div className="flex flex-col items-center">
                 {/* Variant Name Input */}
                 <div className="w-full max-w-md mb-4">

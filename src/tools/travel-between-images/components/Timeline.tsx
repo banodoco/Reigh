@@ -879,7 +879,10 @@ const Timeline: React.FC<TimelineProps> = ({
                         <Button
                           variant="default"
                           size="default"
-                          onClick={() => navigate('/tools/image-generation')}
+                          onClick={() => {
+                            // Open image generation in a new tab to preserve context in travel tool
+                            window.open('/tools/image-generation', '_blank', 'noopener,noreferrer');
+                          }}
                           className="flex-1"
                         >
                           Start generating

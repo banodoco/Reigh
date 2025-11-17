@@ -56,6 +56,8 @@ export const useImageGalleryPagination = ({
   
   // Safety timeout ref for clearing stuck loading states
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track last applied server data signature so we can clear loading when new data arrives
+  const lastServerDataSignatureRef = useRef<string>('');
 
   // CRITICAL: Track loadingButton state changes to debug disabled buttons
   useEffect(() => {
@@ -99,6 +101,44 @@ export const useImageGalleryPagination = ({
       setPage(Math.max(0, totalPages - 1));
     }
   }, [totalPages, page]);
+
+  // Detect when new server data has been applied (includes mobile where prefetch is disabled)
+  useEffect(() => {
+    if (!isServerPagination || !serverPage) return;
+
+    const firstId = filteredImages[0]?.id ?? 'none';
+    const lastId = filteredImages[filteredImages.length - 1]?.id ?? 'none';
+    const signature = `${serverPage}-${filteredImages.length}-${firstId}-${lastId}`;
+
+    if (signature === lastServerDataSignatureRef.current) {
+      return;
+    }
+    lastServerDataSignatureRef.current = signature;
+
+    console.log(`[PAGELOADINGDEBUG] Server page data applied – clearing loading states`, {
+      serverPage,
+      filteredCount: filteredImages.length,
+      signature,
+    });
+
+    if (loadingButton !== null) {
+      console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton after data sync`, {
+        serverPage,
+        signature,
+        timestamp: Date.now(),
+      });
+      setLoadingButton(null);
+    }
+
+    if (isGalleryLoading) {
+      setIsGalleryLoading(false);
+    }
+
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  }, [filteredImages, isServerPagination, serverPage, loadingButton, isGalleryLoading]);
   
   // Handle pagination with loading state
   const handlePageChange = useCallback((newPage: number, direction: 'prev' | 'next', fromBottom = false) => {

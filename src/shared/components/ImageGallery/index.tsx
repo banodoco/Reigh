@@ -291,7 +291,9 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
 
   // Calculate effective page for progressive loading
-  const effectivePage = paginationHook.isServerPagination ? 0 : paginationHook.page;
+  const effectivePage = paginationHook.isServerPagination
+    ? Math.max(0, (serverPage ?? 1) - 1)
+    : paginationHook.page;
 
   // Memoized navigation handler to prevent re-creation
   const handleNavigateToShot = useCallback((shot: Shot) => {

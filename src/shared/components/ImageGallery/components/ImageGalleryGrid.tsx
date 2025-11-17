@@ -105,9 +105,6 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   ...itemProps
 }) => {
   
-  // Guard to avoid redundant button clears and unnecessary renders
-  const lastClearedButtonRef = React.useRef<'prev' | 'next' | null | 'cleared'>(null);
-  
   // Track previous paginated images length to detect when new images arrive
   const prevPaginatedLengthRef = React.useRef(paginatedImages.length);
   
@@ -246,14 +243,11 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
               // Only clear button loading for server pagination - client pagination handles this separately
               if (isServerPagination) {
                 console.log(`🔘 [PAGELOADINGDEBUG] [GALLERY] Server pagination - also clearing button loading`);
-                if (lastClearedButtonRef.current !== 'cleared') {
-                  console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
-                    reason: 'Server pagination images ready',
-                    timestamp: Date.now()
-                  });
-                  setLoadingButton(null);
-                  lastClearedButtonRef.current = 'cleared';
-                }
+                console.warn(`[ReconnectionIssue][UI_LOADING_STATE] Clearing loadingButton - buttons will be re-enabled`, {
+                  reason: 'Server pagination images ready',
+                  timestamp: Date.now()
+                });
+                setLoadingButton(null);
               }
               
               // Clear the gallery safety timeout since loading completed successfully
