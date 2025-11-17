@@ -24,6 +24,7 @@ import { uploadImageToStorage } from "@/shared/lib/imageUploader";
 import { generateClientThumbnail } from "@/shared/lib/clientThumbnailGenerator";
 import { nanoid } from 'nanoid';
 import { supabase } from "@/integrations/supabase/client";
+import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
 
 // Import extracted components
 import { PromptsSection } from "./components/PromptsSection";
@@ -41,6 +42,7 @@ import {
   ProjectImageSettings,
   ReferenceImage,
   ReferenceMode,
+  PromptMode,
 } from "./types";
 
 // Lazy load modals to improve initial bundle size and performance
@@ -130,10 +132,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   });
   // Store prompts by shot ID (including 'none' for no shot)
   const [promptsByShot, setPromptsByShot] = useState<Record<string, PromptEntry[]>>({});
-  const promptIdCounter = useRef(1);
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
   const [openPromptModalWithAIExpanded, setOpenPromptModalWithAIExpanded] = useState(false);
-  const [imagesPerPrompt, setImagesPerPrompt] = useState(1);
+  const [imagesPerPrompt, setImagesPerPrompt] = useState(8); // Default to 8 for automated mode
   const [steps, setSteps] = useState(12); // Default to 12 steps for local generation
   const defaultsApplied = useRef(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -566,12 +567,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [beforeEachPromptText, setBeforeEachPromptText] = useState("");
   const [afterEachPromptText, setAfterEachPromptText] = useState("");
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
+  
+  // Prompt mode: automated vs managed (default to automated)
+  const [promptMode, setPromptMode] = useState<PromptMode>('automated');
+  const [masterPromptText, setMasterPromptText] = useState("");
+  const [isGeneratingAutomatedPrompts, setIsGeneratingAutomatedPrompts] = useState(false);
 
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
   const createShotMutation = useCreateShot();
   const queryClient = useQueryClient();
   const { navigateToShot } = useShotNavigation();
+  
+  // Define generatePromptId before using it in hooks
+  const promptIdCounter = useRef(1);
+  const generatePromptId = useCallback(() => `prompt-${promptIdCounter.current++}`, []);
+  
+  // AI interaction service for automated prompt generation
+  const {
+    generatePrompts: aiGeneratePrompts,
+    isGenerating: isAIGenerating,
+  } = useAIInteractionService({
+    apiKey: openaiApiKey,
+    generatePromptId,
+  });
 
   // Debug project context
   useEffect(() => {
@@ -636,6 +655,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       beforeEachPromptText: [beforeEachPromptText, setBeforeEachPromptText],
       afterEachPromptText: [afterEachPromptText, setAfterEachPromptText],
       associatedShotId: [associatedShotId, setAssociatedShotId],
+      promptMode: [promptMode, setPromptMode],
+      masterPromptText: [masterPromptText, setMasterPromptText],
     }
     // Remove enabled: !!selectedProjectId - let persistence work even without project to preserve state
   );
@@ -787,8 +808,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [ready, effectiveShotId]); // Remove promptsByShot from dependencies to avoid infinite loops
 
   const hasApiKey = true; // Always true for wan-local
-
-  const generatePromptId = () => `prompt-${promptIdCounter.current++}`;
 
   // Memoize actionable prompts count to prevent recalculation on every render
   const actionablePromptsCount = useMemo(() => 
@@ -1513,9 +1532,110 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     onGenerate
   ]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();    
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Handle automated mode: generate prompts first, then images
+    if (promptMode === 'automated') {
+      if (!masterPromptText.trim()) {
+        toast.error("Please enter a master prompt.");
+        return;
+      }
+      
+      if (!styleReferenceImageGeneration) {
+        toast.error("Please upload a style reference image for Qwen.Image model.");
+        return;
+      }
+      
+      try {
+        setIsGeneratingAutomatedPrompts(true);
+        
+        console.log('[ImageGenerationForm] Automated mode: Generating prompts from master prompt:', masterPromptText);
+        
+        // Generate prompts using AI
+        const rawResults = await aiGeneratePrompts({
+          overallPromptText: masterPromptText,
+          numberToGenerate: imagesPerPrompt, // Slider value = number of prompts
+          includeExistingContext: false,
+          addSummaryForNewPrompts: true,
+          replaceCurrentPrompts: true,
+          temperature: 0.8,
+          existingPromptsForContext: [],
+        });
+        
+        console.log('[ImageGenerationForm] Automated mode: Generated', rawResults.length, 'prompts');
+        
+        // Convert to PromptEntry format
+        const newPrompts: PromptEntry[] = rawResults.map(item => ({
+          id: item.id,
+          fullPrompt: item.text,
+          shortPrompt: item.shortText || item.text.substring(0, 30) + (item.text.length > 30 ? "..." : ""),
+        }));
+        
+        // Save generated prompts to state
+        setPrompts(newPrompts);
+        
+        // Now generate images with these prompts (1 image per prompt)
+        const lorasForApi: any[] = [];
+        
+        // Append styleBoostTerms to afterEachPromptText if present
+        const effectiveAfterEachPromptText = currentStyleBoostTerms.trim() 
+          ? `${afterEachPromptText}${afterEachPromptText.trim() ? ', ' : ''}${currentStyleBoostTerms.trim()}`
+          : afterEachPromptText;
+        
+        const batchTaskParams: BatchImageGenerationTaskParams = {
+          project_id: selectedProjectId!,
+          prompts: newPrompts.map(p => {
+            const combinedFull = `${beforeEachPromptText ? `${beforeEachPromptText.trim()}, ` : ''}${p.fullPrompt.trim()}${effectiveAfterEachPromptText ? `, ${effectiveAfterEachPromptText.trim()}` : ''}`.trim();
+            return {
+              id: p.id,
+              fullPrompt: combinedFull,
+              shortPrompt: p.shortPrompt || (combinedFull.substring(0, 30) + (combinedFull.length > 30 ? "..." : ""))
+            };
+          }), 
+          imagesPerPrompt: 1, // Always 1 image per prompt in automated mode
+          loras: lorasForApi,
+          shot_id: associatedShotId || undefined,
+          model_name: 'qwen-image',
+          steps: isLocalGenerationEnabled ? steps : undefined,
+          style_reference_image: styleReferenceImageGeneration,
+          style_reference_strength: currentStyleStrength,
+          subject_reference_image: styleReferenceImageGeneration,
+          subject_strength: currentSubjectStrength,
+          subject_description: effectiveSubjectDescription,
+          in_this_scene: currentInThisScene,
+          in_this_scene_strength: currentInThisSceneStrength
+        };
+        
+        const legacyGenerationData = {
+          prompts: batchTaskParams.prompts,
+          imagesPerPrompt: 1,
+          loras: lorasForApi,
+          fullSelectedLoras: loraManager.selectedLoras,
+          generationMode: selectedModel,
+          associatedShotId,
+          styleReferenceImage: styleReferenceImageGeneration,
+          styleReferenceStrength: currentStyleStrength,
+          subjectStrength: currentSubjectStrength,
+          subjectDescription: effectiveSubjectDescription,
+          selectedModel,
+          batchTaskParams
+        };
+        
+        console.log('[ImageGenerationForm] Automated mode: Queuing', newPrompts.length, 'images (1 per prompt)');
+        onGenerate(legacyGenerationData);
+        
+        return;
+      } catch (error) {
+        console.error('[ImageGenerationForm] Automated mode: Error generating prompts:', error);
+        toast.error("Failed to generate prompts. Please try again.");
+        return;
+      } finally {
+        setIsGeneratingAutomatedPrompts(false);
+      }
+    }
+    
+    // Managed mode: use existing prompts
     const activePrompts = prompts.filter(p => p.fullPrompt.trim() !== "");
     if (activePrompts.length === 0) {
         console.warn("[ImageGenerationForm] handleSubmit: No active prompts. Generation aborted.");
@@ -1770,7 +1890,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               prompts={prompts}
               ready={ready}
               lastKnownPromptCount={lastKnownPromptCount}
-              isGenerating={isGenerating}
+              isGenerating={isGenerating || isGeneratingAutomatedPrompts}
               hasApiKey={hasApiKey}
               actionablePromptsCount={actionablePromptsCount}
               activePromptId={directFormActivePromptId}
@@ -1793,6 +1913,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
                 setAfterEachPromptText('');
               }}
               onDeleteAllPrompts={handleDeleteAllPrompts}
+              promptMode={promptMode}
+              onPromptModeChange={(mode) => {
+                markAsInteracted();
+                setPromptMode(mode);
+              }}
+              masterPromptText={masterPromptText}
+              onMasterPromptTextChange={handleTextChange(setMasterPromptText)}
+              onClearMasterPromptText={() => {
+                markAsInteracted();
+                setMasterPromptText('');
+              }}
             />
 
             <ShotSelector
@@ -1846,12 +1977,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           imagesPerPrompt={imagesPerPrompt}
           onChangeImagesPerPrompt={handleSliderChange(setImagesPerPrompt)}
           actionablePromptsCount={actionablePromptsCount}
-          isGenerating={isGenerating}
+          isGenerating={isGenerating || isGeneratingAutomatedPrompts}
           hasApiKey={hasApiKey}
           justQueued={justQueued}
           steps={steps}
           onChangeSteps={setSteps}
           showStepsDropdown={isLocalGenerationEnabled}
+          promptMode={promptMode}
         />
       </form>
 

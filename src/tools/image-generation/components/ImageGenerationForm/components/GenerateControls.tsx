@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select";
+import { PromptMode } from "../types";
 
 interface GenerateControlsProps {
   imagesPerPrompt: number;
@@ -14,6 +15,8 @@ interface GenerateControlsProps {
   steps?: number;
   onChangeSteps?: (value: number) => void;
   showStepsDropdown?: boolean;
+  // Prompt mode for slider label
+  promptMode: PromptMode;
 }
 
 export const GenerateControls: React.FC<GenerateControlsProps> = ({
@@ -26,6 +29,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
   steps = 12,
   onChangeSteps,
   showStepsDropdown = false,
+  promptMode,
 }) => {
   return (
     <div className="mt-8 p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg">
@@ -36,7 +40,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
             <div className="flex gap-6">
               <div className="flex-1">
                 <SliderWithValue
-                  label={actionablePromptsCount <= 1 ? "Images" : "Images per Prompt"}
+                  label={promptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
                   value={imagesPerPrompt}
                   onChange={onChangeImagesPerPrompt}
                   min={1}
@@ -72,7 +76,7 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
           ) : (
             // Show only images slider
             <SliderWithValue
-              label={actionablePromptsCount <= 1 ? "Images" : "Images per Prompt"}
+              label={promptMode === 'automated' ? "Number of prompts" : "Images per prompt"}
               value={imagesPerPrompt}
               onChange={onChangeImagesPerPrompt}
               min={1}
@@ -89,13 +93,15 @@ export const GenerateControls: React.FC<GenerateControlsProps> = ({
           type="submit"
           className="w-full md:w-1/2 transition-none disabled:opacity-100 disabled:saturate-100 disabled:brightness-100"
           variant={justQueued ? "success" : "default"}
-          disabled={isGenerating || !hasApiKey || actionablePromptsCount === 0}
+          disabled={isGenerating || !hasApiKey || (promptMode === 'managed' && actionablePromptsCount === 0)}
         >
           {justQueued
             ? "Added to queue!"
             : isGenerating
               ? "Creating tasks..."
-              : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
+              : promptMode === 'automated'
+                ? `Generate ${imagesPerPrompt} ${imagesPerPrompt === 1 ? 'Image' : 'Images'}`
+                : `Generate ${imagesPerPrompt * actionablePromptsCount} ${imagesPerPrompt * actionablePromptsCount === 1 ? 'Image' : 'Images'}`}
         </Button>
       </div>
     </div>

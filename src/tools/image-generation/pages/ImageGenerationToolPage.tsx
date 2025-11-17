@@ -24,7 +24,6 @@ import { useListPublicResources } from '@/shared/hooks/useResources';
 // Removed useListTasks import - was causing performance issues with 1000+ tasks
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useSearchParams } from 'react-router-dom';
-import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 import { timeEnd } from '@/shared/lib/logger';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { fetchGenerations } from "@/shared/hooks/useGenerations";
@@ -37,7 +36,6 @@ import { ChevronDown, ChevronLeft, ChevronRight, Sparkles, Settings2 } from 'luc
 import { usePersistentToolState } from '@/shared/hooks/usePersistentToolState';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useStableObject } from '@/shared/hooks/useStableObject';
-import { useToolPageHeader } from '@/shared/contexts/ToolPageHeaderContext';
 
 // Remove unnecessary environment detection - tool should work in all environments
 
@@ -122,7 +120,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     shotsPaneWidth,
     tasksPaneWidth
   } = usePanes();
-  const { setHeader, clearHeader } = useToolPageHeader();
   
   // Early prefetch of public LoRAs to reduce loading time
   const publicLorasResult = useListPublicResources('lora');
@@ -1072,17 +1069,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     timeEnd('NavPerf', 'PageLoad:/tools/image-generation');
   }, []);
 
-  useEffect(() => {
-    setHeader(
-      <div className="mb-2 sm:mb-4 mt-4 sm:mt-6">
-        <h1 className="text-3xl font-light tracking-tight text-foreground sm:text-4xl">
-          Image Generation
-        </h1>
-      </div>
-    );
-    return () => clearHeader();
-  }, [setHeader, clearHeader]);
-
   // Ref to track ongoing server-side prefetch operations
   const prefetchOperationsRef = useRef<{
     images: HTMLImageElement[];
@@ -1197,6 +1183,11 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   return (
     <PageFadeIn>
+      <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-light tracking-tight text-foreground">Image Generation</h1>
+        </div>
 
         {/* <Button variant="ghost" onClick={() => setShowSettingsModal(true)}>
           <Settings className="h-5 w-5" />
@@ -1408,6 +1399,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         isOpen={showSettingsModal}
         onOpenChange={setShowSettingsModal}
       />
+      </div>
     </PageFadeIn>
   );
 }, () => true); // Always return true since component has no props

@@ -284,7 +284,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
               </Button>
               
               <span 
-                className={`text-base font-semibold text-primary truncate text-center px-1 w-[100px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
+                className={`text-base font-semibold text-primary truncate text-center px-1 w-[70px] ${onUpdateShotName ? 'cursor-pointer hover:underline' : ''}`}
                 onClick={onNameClick}
                 title={onUpdateShotName ? "Click to edit shot name" : selectedShot?.name || 'Untitled Shot'}
               >

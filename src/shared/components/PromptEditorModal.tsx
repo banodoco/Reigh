@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/shared/components/ui/dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -71,7 +71,10 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     return () => console.log('[PromptEditResetTrace] Modal UNMOUNT');
   }, []);
   
-  const [internalPrompts, setInternalPrompts] = useState<PromptEntry[]>([]);
+  // Initialize with initialPrompts immediately to prevent content snap on open
+  const [internalPrompts, setInternalPrompts] = useState<PromptEntry[]>(() => 
+    initialPrompts.map(p => ({ ...p }))
+  );
   const internalPromptsRef = useRef<PromptEntry[]>([]);
   useEffect(() => { internalPromptsRef.current = internalPrompts; }, [internalPrompts]);
   
@@ -267,17 +270,20 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
     }
   );
 
-  // Effect to initialize modal state (prompts) on open – persistence handled by hook
-  useEffect(() => {
+  // Effect to initialize modal state on open
+  // Note: Using useLayoutEffect to sync prompts BEFORE browser paint to prevent visual snap
+  // Prompts are also initialized via useState lazy initializer for first render
+  useLayoutEffect(() => {
     console.log(`[PromptEditorModal:INIT_EFFECT] Effect running. isOpen: ${isOpen}, initialPrompts.length: ${initialPrompts.length}, selectedProjectId: ${selectedProjectId}`);
     if (isOpen) {
-      console.log(`[PromptEditorModal:INIT_EFFECT] Initializing modal state. Setting prompts from initialPrompts.`);
+      console.log(`[PromptEditorModal:INIT_EFFECT] Initializing modal state.`);
       setShowScrollToTop(false);
       if (scrollRef.current) {
         scrollRef.current.scrollTop = 0;
       }      
       setPromptToEdit(null);
       clearEditInstructions('modal-open'); // Reset edit instructions text
+      // Sync prompts from prop (handles case where modal was previously opened and closed)
       setInternalPrompts(initialPrompts.map(p => ({ ...p })));
       setActivePromptIdForFullView(null);
       setIsAIPromptSectionExpanded(openWithAIExpanded); // Use prop to control AI section initial state

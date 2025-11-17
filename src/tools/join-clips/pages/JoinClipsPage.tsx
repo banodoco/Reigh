@@ -26,6 +26,7 @@ import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import { extractVideoPosterFrame, extractVideoFinalFrame } from '@/shared/utils/videoPosterExtractor';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
+import { generateUUID } from '@/shared/lib/taskCreation';
 import {
   DndContext,
   closestCenter,
@@ -433,7 +434,7 @@ const JoinClipsPage: React.FC = () => {
         joinSettings.settings.clips.forEach((clip) => {
           if (clip.url) {
             initialClips.push({
-              id: crypto.randomUUID(),
+              id: generateUUID(),
               url: clip.url,
               posterUrl: clip.posterUrl,
               finalFrameUrl: clip.finalFrameUrl,
@@ -564,7 +565,7 @@ const JoinClipsPage: React.FC = () => {
     // If all slots are filled (no trailing empty), add one
     if (clips.every(clip => clip.url)) {
       console.log('[JoinClips] All slots filled, adding new empty slot');
-      const newClipId = crypto.randomUUID();
+      const newClipId = generateUUID();
       setClips(prev => [...prev, {
         id: newClipId,
         url: '',

@@ -21,7 +21,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
-import { ToolPageHeader } from '@/shared/components/ToolPageHeader';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
 import { timeEnd } from '@/shared/lib/logger';
 
@@ -39,7 +38,6 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import { useVideoTravelHeader } from '../hooks/useVideoTravelHeader';
 import { useFloatingCTA } from '../hooks/useFloatingCTA';
 import { useStickyHeader } from '../hooks/useStickyHeader';
 import { GenerateVideoCTA } from '../components/GenerateVideoCTA';
@@ -1202,22 +1200,8 @@ const VideoTravelToolPage: React.FC = () => {
     setShowProjectError(false);
   }, [selectedProjectId]);
 
-  // Set up the page header with dynamic content based on state
-  useVideoTravelHeader({
-    shouldShowShotEditor,
-    hashShotId,
-    showVideosView,
-    isLoading,
-    shots,
-    shotSearchQuery,
-    onSearchQueryChange: setShotSearchQuery,
-    clearSearch,
-    shotSortMode,
-    onSortModeChange: setShotSortMode,
-    onCreateNewShot: handleCreateNewShot,
-    onToggleVideosView: handleToggleVideosView,
-    searchInputRef,
-  });
+  // Header is now inline in the page content instead of using external hook
+  // useVideoTravelHeader({ ... });
 
   // Auto-disable turbo mode when cloud generation is disabled
   useEffect(() => {
@@ -1761,10 +1745,19 @@ const VideoTravelToolPage: React.FC = () => {
     <div ref={mainContainerRef} className="w-full">
       {!shouldShowShotEditor ? (
         <>
+          {/* Shot List Header - Constrained */}
+          <div className="px-4 max-w-7xl mx-auto pt-6 pb-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
+            </div>
+          </div>
+          
+          {/* Content Area - Videos: Constrained */}
           {showVideosView ? (
-            // Show SkeletonGallery when loading videos or when no data yet
-            // IMPROVED: Track view transition to prevent empty state flash
-            (() => {
+            <div className="px-4 max-w-7xl mx-auto">
+            {(() => {
+              // Show SkeletonGallery when loading videos or when no data yet
+              // IMPROVED: Track view transition to prevent empty state flash
               const vd: any = videosData as any;
               const hasValidData = vd?.items && vd.items.length > 0;
               const isLoadingOrFetching = videosLoading || videosFetching;
@@ -1800,7 +1793,7 @@ const VideoTravelToolPage: React.FC = () => {
               });
               
               return shouldShowSkeleton ? (
-                <div className="px-4 pb-2">
+                <div className="pb-2">
                   <SkeletonGallery
                     count={skeletonCount}
                     columns={{ base: 1, sm: 2, md: 2, lg: 3, xl: 3, '2xl': 3 }}
@@ -1809,7 +1802,7 @@ const VideoTravelToolPage: React.FC = () => {
                   />
                 </div>
               ) : (
-                <div className="px-4 pb-2">
+                <div className="pb-2">
                   <ImageGallery
                     images={(videosData as any)?.items || []}
                     allShots={shots || []}
@@ -1827,10 +1820,11 @@ const VideoTravelToolPage: React.FC = () => {
                   />
                 </div>
               );
-            })()
+            })()}
+            </div>
           ) : (
             hasNoSearchResults ? (
-              <div className="px-4 py-10 text-center text-muted-foreground">
+              <div className="px-4 max-w-7xl mx-auto py-10 text-center text-muted-foreground">
                 <p className="mb-4">No shots or parameters match your search.</p>
                 <Button variant="outline" size="sm" onClick={clearSearch}>Clear search</Button>
               </div>
@@ -1847,8 +1841,9 @@ const VideoTravelToolPage: React.FC = () => {
         </>
       ) : (
         // Show a loading state while settings or component are being fetched
+        <div className="px-4 max-w-7xl mx-auto pt-5">
         <Suspense fallback={<LoadingSkeleton type="editor" />}>
-          <PageFadeIn className="pt-3 sm:pt-5">
+          <PageFadeIn>
             {/* Only render ShotEditor if we have a valid shot to edit */}
             {shotToEdit ? (
               <>
@@ -1950,6 +1945,7 @@ const VideoTravelToolPage: React.FC = () => {
             )}
           </PageFadeIn>
         </Suspense>
+        </div>
       )}
 
       <CreateShotModal 

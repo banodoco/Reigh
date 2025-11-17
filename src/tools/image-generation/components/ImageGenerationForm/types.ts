@@ -1,5 +1,7 @@
 export type GenerationMode = 'wan-local' | 'qwen-image';
 
+export type PromptMode = 'managed' | 'automated';
+
 export interface MetadataLora {
   id: string;
   name: string;
@@ -44,6 +46,9 @@ export interface PersistedFormSettings {
   afterEachPromptText?: string;
   selectedLorasByMode?: Record<GenerationMode, ActiveLora[]>;
   associatedShotId?: string | null;
+  // Prompt mode and automated mode settings
+  promptMode?: PromptMode;
+  masterPromptText?: string;
 }
 
 // Reference mode type

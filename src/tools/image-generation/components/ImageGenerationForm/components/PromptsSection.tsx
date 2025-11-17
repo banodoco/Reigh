@@ -2,16 +2,18 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { PlusCircle, Edit3, Sparkles, Trash2 } from "lucide-react";
+import { PlusCircle, Edit3, Sparkles, Trash2, Wand2, Info } from "lucide-react";
 import { 
   Tooltip, 
   TooltipContent, 
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
-import { PromptEntry } from "../types";
+import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
+import { PromptEntry, PromptMode } from "../types";
 import { PromptInputRow } from "./PromptInputRow";
 import { SectionHeader } from "./SectionHeader";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 interface PromptsSectionProps {
   prompts: PromptEntry[];
@@ -34,6 +36,12 @@ interface PromptsSectionProps {
   onClearBeforeEachPromptText?: () => void;
   onClearAfterEachPromptText?: () => void;
   onDeleteAllPrompts?: () => void;
+  // Prompt mode props
+  promptMode: PromptMode;
+  onPromptModeChange: (mode: PromptMode) => void;
+  masterPromptText: string;
+  onMasterPromptTextChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onClearMasterPromptText?: () => void;
 }
 
 export const PromptsSection: React.FC<PromptsSectionProps> = ({
@@ -57,122 +65,151 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
   onClearBeforeEachPromptText,
   onClearAfterEachPromptText,
   onDeleteAllPrompts,
+  promptMode,
+  onPromptModeChange,
+  masterPromptText,
+  onMasterPromptTextChange,
+  onClearMasterPromptText,
 }) => {
+  const isMobile = useIsMobile();
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-2">
+      {/* Header section - stacks on mobile */}
+      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row justify-between items-center'} mb-2`}>
         <div className="flex items-center gap-2">
           <SectionHeader title="Prompts" theme="orange" />
         </div>
         <div className="flex items-center space-x-2">
-          {/* Magic Prompt button - always visible */}
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onOpenMagicPrompt}
-                  disabled={!hasApiKey || isGenerating || !ready}
-                  aria-label="Magic Prompt"
-                  className="px-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Magic Prompt (AI Tools)
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-
-          {/* Manage Prompts button */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onOpenPromptModal}
-            disabled={!hasApiKey || isGenerating || !ready}
-            aria-label="Manage Prompts"
-          >
-            <Edit3 className="h-4 w-4 mr-0 sm:mr-2" />
-            <span className="hidden sm:inline">Manage Prompts</span>
-          </Button>
+          {/* Automated vs Managed Toggle */}
+          <Tabs value={promptMode} onValueChange={(value) => onPromptModeChange(value as PromptMode)}>
+            <TabsList className="h-9">
+              <TabsTrigger value="automated" className="text-xs">
+                Automated
+              </TabsTrigger>
+              <TabsTrigger value="managed" className="text-xs">
+                Managed
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
-      <div className={(!ready ? lastKnownPromptCount <= 1 : prompts.length <= 1) ? "" : "space-y-3"}>
-        {!ready ? (
-          // Simple skeleton loading state - one prompt field
-          <div>
-            <div className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
-              <div className="min-h-[60px] bg-muted rounded animate-pulse"></div>
+      {/* Prompt display area - differs by mode */}
+      {promptMode === 'automated' ? (
+        // Automated mode: Master prompt field
+        <div className="mt-2">
+          <div className="relative">
+            <Label htmlFor="masterPromptText" className="text-sm font-light block mb-1.5">
+              Master Prompt
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                    <Info className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    AI will generate multiple prompt variations based on this description
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <Textarea
+            id="masterPromptText"
+            value={masterPromptText}
+            onChange={onMasterPromptTextChange}
+            placeholder="Describe what you want to generate..."
+            disabled={!hasApiKey || isGenerating || !ready}
+            className="min-h-[100px] resize-none"
+            rows={4}
+            clearable
+            onClear={onClearMasterPromptText}
+          />
+        </div>
+      ) : (
+        // Managed mode: Always show summary box
+        <div className="space-y-3">
+          {!ready ? (
+            // Simple skeleton loading state
+            <div>
+              <div className="p-3 rounded-md shadow-sm bg-slate-50/30 dark:bg-slate-800/30">
+                <div className="min-h-[60px] bg-muted rounded animate-pulse"></div>
+              </div>
             </div>
-          </div>
-        ) : prompts.length <= 1 ? (
-          // Single prompt case (normal spacing)
-          <div className="mt-2">
-            {prompts.map((promptEntry, index) => (
-              <PromptInputRow
-                key={promptEntry.id}
-                promptEntry={promptEntry}
-                onUpdate={onUpdatePrompt}
-                onRemove={onRemovePrompt}
-                canRemove={prompts.length > 1}
-                isGenerating={isGenerating}
-                hasApiKey={hasApiKey}
-                index={index}
-                totalPrompts={prompts.length}
-                onEditWithAI={() => { /* Placeholder for direct form AI edit */ }}
-                aiEditButtonIcon={null} 
-                onSetActiveForFullView={onSetActive}
-                isActiveForFullView={activePromptId === promptEntry.id}
-                forceExpanded={prompts.length <= 1}
-              />
-            ))}
-          </div>
-        ) : (
-          // Multiple prompts case (normal spacing)
-          <div className="mt-2 group relative p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" onClick={onOpenPromptModal}>
-            {actionablePromptsCount === prompts.length ? (
-              <p className="text-sm text-muted-foreground">
-                <span className="font-light text-primary">{prompts.length} prompts</span> currently active.
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {prompts.length} prompts, <span className="font-light text-primary">{actionablePromptsCount} currently active</span>
-              </p>
-            )}
-            {/* Delete All button - visible on hover in top right corner */}
-            {onDeleteAllPrompts && (
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteAllPrompts();
-                      }}
-                      disabled={isGenerating || !ready}
-                      aria-label="Delete all prompts"
-                      className="absolute top-1 right-1 h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Delete all and reset to one empty prompt
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        )}
-      </div>
+          ) : (
+            <div 
+              className="mt-2 group relative p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" 
+              onClick={isMobile ? onOpenPromptModal : onOpenPromptModal}
+            >
+              {actionablePromptsCount === prompts.length ? (
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-light text-primary">{prompts.length} {prompts.length === 1 ? 'prompt' : 'prompts'}</span> currently active.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {prompts.length} {prompts.length === 1 ? 'prompt' : 'prompts'}, <span className="font-light text-primary">{actionablePromptsCount} currently active</span>
+                </p>
+              )}
+              {/* Action buttons container - right side */}
+              <div className={`absolute top-1 right-1 flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                {/* Magic wand button */}
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenMagicPrompt();
+                        }}
+                        disabled={isGenerating || !ready || !hasApiKey}
+                        aria-label="AI Prompt Tools"
+                        className="h-6 w-6 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-100 dark:text-purple-400 dark:hover:text-purple-300 dark:hover:bg-purple-900/20"
+                      >
+                        <Wand2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      AI Prompt Tools
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                {/* Delete All button */}
+                {onDeleteAllPrompts && (
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteAllPrompts();
+                          }}
+                          disabled={isGenerating || !ready}
+                          aria-label="Delete all prompts"
+                          className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Delete all and reset to one empty prompt
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Before / After prompt modifiers */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

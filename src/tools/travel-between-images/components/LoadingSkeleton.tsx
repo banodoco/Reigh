@@ -51,7 +51,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
               {/* Shot name with navigation buttons */}
               <div className="flex items-center space-x-1 flex-shrink-0">
                 <Skeleton className="h-9 w-9 rounded-md" />
-                <Skeleton className="h-9 w-[100px] rounded-md" />
+                <Skeleton className="h-9 w-[70px] rounded-md" />
                 <Skeleton className="h-9 w-9 rounded-md" />
               </div>
               
