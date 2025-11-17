@@ -19,7 +19,7 @@ import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, useCr
 
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { useListPublicResources, useListResources } from '@/shared/hooks/useResources';
 
 // Removed useListTasks import - was causing performance issues with 1000+ tasks
 import { PageFadeIn } from '@/shared/components/transitions';
@@ -124,11 +124,29 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Early prefetch of public LoRAs to reduce loading time
   const publicLorasResult = useListPublicResources('lora');
   
+  // Early prefetch of style references to reduce loading time in browser modal
+  const publicStyleRefsResult = useListPublicResources('style-reference');
+  const myStyleRefsResult = useListResources('style-reference');
+  
   console.log(`${DEBUG_TAG} Render #${renderCount.current} - useListPublicResources states:`, {
-    isLoading: publicLorasResult.isLoading,
-    hasData: !!publicLorasResult.data,
-    dataLength: Array.isArray(publicLorasResult.data) ? publicLorasResult.data.length : undefined,
-    error: !!publicLorasResult.error
+    loras: {
+      isLoading: publicLorasResult.isLoading,
+      hasData: !!publicLorasResult.data,
+      dataLength: Array.isArray(publicLorasResult.data) ? publicLorasResult.data.length : undefined,
+      error: !!publicLorasResult.error
+    },
+    publicStyleRefs: {
+      isLoading: publicStyleRefsResult.isLoading,
+      hasData: !!publicStyleRefsResult.data,
+      dataLength: Array.isArray(publicStyleRefsResult.data) ? publicStyleRefsResult.data.length : undefined,
+      error: !!publicStyleRefsResult.error
+    },
+    myStyleRefs: {
+      isLoading: myStyleRefsResult.isLoading,
+      hasData: !!myStyleRefsResult.data,
+      dataLength: Array.isArray(myStyleRefsResult.data) ? myStyleRefsResult.data.length : undefined,
+      error: !!myStyleRefsResult.error
+    }
   });
   
   // Use the new task queue notifier hook
@@ -152,7 +170,28 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
   
+  // Need queryClient early for cache inspection
+  const queryClient = useQueryClient();
+  
   console.log(`${DEBUG_TAG} Render #${renderCount.current} - selectedProjectId:`, selectedProjectId);
+  
+  // [RefLoadingDebug] Check cache state for project-image-settings at page level
+  const projectImageSettingsCacheKey = ['toolSettings', 'project-image-settings', selectedProjectId, undefined];
+  const cachedProjectImageSettings = queryClient.getQueryData(projectImageSettingsCacheKey);
+  const projectImageSettingsQueryState = queryClient.getQueryState(projectImageSettingsCacheKey);
+  
+  console.log('[RefLoadingDebug] 📦 PAGE LEVEL - project-image-settings cache state:', {
+    selectedProjectId,
+    hasCachedData: !!cachedProjectImageSettings,
+    referenceCount: (cachedProjectImageSettings as any)?.references?.length ?? 0,
+    queryState: {
+      status: projectImageSettingsQueryState?.status,
+      fetchStatus: projectImageSettingsQueryState?.fetchStatus,
+      dataUpdatedAt: projectImageSettingsQueryState?.dataUpdatedAt,
+      isStale: projectImageSettingsQueryState ? Date.now() - (projectImageSettingsQueryState.dataUpdatedAt || 0) > 5 * 60 * 1000 : 'no-state'
+    },
+    timestamp: Date.now()
+  });
   
   // Use stable object for task queue notifier options
   const taskQueueOptions = useStableObject(() => ({
@@ -319,8 +358,6 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   const deleteGenerationMutation = useDeleteGeneration();
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
   const createGenerationMutation = useCreateGeneration();
-
-  const queryClient = useQueryClient();
   
   // [Strategic Debug] Check React Query cache state for this exact query
   const generationsQueryKey = ['unified-generations', 'project', effectiveProjectId, currentPage, itemsPerPage, generationsFilters];

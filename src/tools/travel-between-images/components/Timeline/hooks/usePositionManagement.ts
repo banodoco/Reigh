@@ -66,12 +66,69 @@ export function usePositionManagement({
     lockTimestamp: 0
   });
 
+  // Store current framePositions in a ref so event listener can access latest value
+  const framePositionsRef = useRef<Map<string, number>>(new Map());
+
   // Simple setStablePositions wrapper
   const setStablePositions = useCallback((newPositions: Map<string, number>, reason?: string) => {
     if (reason === 'position-update' || reason === 'drag-optimistic-update') {
       _setStablePositions(newPositions);
     }
   }, [shotId]);
+
+  // Listen for delete/duplicate mutation start events to lock positions during refetch
+  // Use a stable listener with no dependencies on changing data
+  useEffect(() => {
+    const handleMutationStart = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { shotId: mutationShotId, type } = customEvent.detail || {};
+      
+      console.log(`[TimelineVisibility] 🎯 MUTATION EVENT RECEIVED:`, {
+        mutationShotId: mutationShotId?.substring(0, 8),
+        currentShotId: shotId.substring(0, 8),
+        type,
+        matches: mutationShotId === shotId,
+        timestamp: Date.now()
+      });
+      
+      // Only lock if this mutation is for our shot
+      if (mutationShotId === shotId && (type === 'delete' || type === 'duplicate')) {
+        // Use the CURRENT framePositions from ref (most up-to-date)
+        const currentPositions = new Map(framePositionsRef.current);
+        
+        console.log(`[TimelineVisibility] 🔒 MUTATION LOCK START - ${type.toUpperCase()}`, {
+          shotId: shotId.substring(0, 8),
+          type,
+          lockedItemsCount: currentPositions.size,
+          lockedItems: Array.from(currentPositions.entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })),
+          timestamp: Date.now()
+        });
+        
+        // Lock positions to prevent glitches during refetch
+        positionLockRef.current = {
+          isLocked: true,
+          lockedPositions: currentPositions,
+          lockTimestamp: Date.now()
+        };
+        
+        // Auto-unlock after 2 seconds as a safety measure
+        setTimeout(() => {
+          if (positionLockRef.current.isLocked) {
+            console.log(`[TimelineVisibility] ⏰ AUTO-UNLOCK after 2s safety timeout`, {
+              shotId: shotId.substring(0, 8)
+            });
+            positionLockRef.current.isLocked = false;
+          }
+        }, 2000);
+      }
+    };
+    
+    window.addEventListener('shot-mutation-start', handleMutationStart);
+    return () => window.removeEventListener('shot-mutation-start', handleMutationStart);
+  }, [shotId]); // Only depend on shotId, not changing data
 
   // Detect unexpected position changes (but ignore legitimate drag/persist operations)
   useEffect(() => {
@@ -135,13 +192,74 @@ export function usePositionManagement({
     // 🔒 POSITION LOCK: If positions are locked, return the locked positions instead of fresh data
     if (positionLockRef.current.isLocked) {
       const timeSinceLock = Date.now() - positionLockRef.current.lockTimestamp;
-      if (timeSinceLock < 5000) { // 5 second maximum lock duration
-        console.log(`[TIMELINE_TRACK] [POSITION_LOCK] 🔒 Using locked positions instead of fresh data (${timeSinceLock}ms since lock)`);
-        return positionLockRef.current.lockedPositions;
+      if (timeSinceLock < 3000) { // 3 second maximum lock duration (covers refetch period)
+        // CRITICAL FIX: Filter locked positions to only include items that currently exist
+        // This prevents "ghost" positions from deleted items causing coordinate system issues
+        const currentImageKeys = new Set(
+          images.map(img => img.shotImageEntryId ?? img.id)
+        );
+        
+        const filteredLockedPositions = new Map<string, number>();
+        for (const [id, pos] of positionLockRef.current.lockedPositions.entries()) {
+          if (currentImageKeys.has(id)) {
+            filteredLockedPositions.set(id, pos);
+          }
+        }
+        
+        console.log(`[TimelineVisibility] 🔒 LOCKED - Using filtered locked positions (${timeSinceLock}ms since lock)`, {
+          originalLockedCount: positionLockRef.current.lockedPositions.size,
+          filteredCount: filteredLockedPositions.size,
+          currentImagesCount: images.length,
+          removed: positionLockRef.current.lockedPositions.size - filteredLockedPositions.size,
+          lockedItems: Array.from(filteredLockedPositions.entries()).map(([id, pos]) => ({
+            id: id.substring(0, 8),
+            position: pos
+          })).slice(0, 10)
+        });
+        
+        return filteredLockedPositions;
       } else {
         // Auto-unlock after timeout
-        console.log(`[TIMELINE_TRACK] [POSITION_UNLOCK] 🔓 Auto-unlocking positions after ${timeSinceLock}ms timeout`);
+        console.log(`[TimelineVisibility] 🔓 AUTO-UNLOCK after ${timeSinceLock}ms`);
         positionLockRef.current.isLocked = false;
+      }
+    }
+    
+    // 🛡️ REFETCH PROTECTION: If we detect data is inconsistent during refetch, use previous positions
+    // This prevents glitches when delete/duplicate operations trigger cache invalidation
+    if (prevDeps && positionLockRef.current.lockedPositions.size > 0) {
+      const timeSinceLock = Date.now() - positionLockRef.current.lockTimestamp;
+      // If recent lock (within 500ms) and data is changing, maintain previous positions
+      if (timeSinceLock < 500) {
+        const isDataChanging = shotGenerations.length !== prevDeps.shotGenerations.length || 
+                                images.length !== prevDeps.images.length;
+        if (isDataChanging) {
+          // Filter locked positions to match current images
+          const currentImageKeys = new Set(
+            images.map(img => img.shotImageEntryId ?? img.id)
+          );
+          
+          const filteredLockedPositions = new Map<string, number>();
+          for (const [id, pos] of positionLockRef.current.lockedPositions.entries()) {
+            if (currentImageKeys.has(id)) {
+              filteredLockedPositions.set(id, pos);
+            }
+          }
+          
+          console.log(`[TimelineVisibility] 🛡️ REFETCH PROTECTION - Data changing, using filtered locked positions`, {
+            shotId: shotId.substring(0, 8),
+            prevShotGenerations: prevDeps.shotGenerations.length,
+            newShotGenerations: shotGenerations.length,
+            prevImages: prevDeps.images.length,
+            newImages: images.length,
+            originalLockedCount: positionLockRef.current.lockedPositions.size,
+            filteredCount: filteredLockedPositions.size,
+            timeSinceLock,
+            change: shotGenerations.length > prevDeps.shotGenerations.length ? 'ADDED' : 
+                    shotGenerations.length < prevDeps.shotGenerations.length ? 'REMOVED' : 'CHANGED'
+          });
+          return filteredLockedPositions;
+        }
       }
     }
     
@@ -165,6 +283,15 @@ export function usePositionManagement({
     prevDepsRef.current = currentDeps;
     
     const positions = new Map<string, number>();
+    
+    console.log(`[TimelineVisibility] 📊 CALCULATING framePositions:`, {
+      shotId: shotId.substring(0, 8),
+      shotGenerationsCount: shotGenerations.length,
+      imagesCount: images.length,
+      recalcCount: framePositionsRenderCount.current,
+      isLocked: positionLockRef.current.isLocked,
+      timestamp: Date.now()
+    });
     
     shotGenerations.forEach(sg => {
       const matchingImage = imagesByShotGenId.get(sg.id);
@@ -279,6 +406,20 @@ export function usePositionManagement({
       })).sort((a, b) => a.position - b.position)
     });
     
+    console.log(`[TimelineVisibility] ✅ framePositions CALCULATED:`, {
+      shotId: shotId.substring(0, 8),
+      positionsCount: positions.size,
+      positions: Array.from(positions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        position: pos
+      })).slice(0, 10), // First 10 items
+      totalPositions: positions.size,
+      timestamp: Date.now()
+    });
+    
+    // Store in ref so event listener can access latest positions
+    framePositionsRef.current = positions;
+    
     return positions;
   }, [shotGenerations, images, frameSpacing, shotId, isLoading]);
 
@@ -309,7 +450,19 @@ export function usePositionManagement({
     }
 
     // 🎯 MOVEMENT TRACKING: Log display position source changes
-    console.log(`[TIMELINE_TRACK] [DISPLAY_SOURCE] 🖥️ Using ${source} positions (${selectedPositions.size} items)`);
+    console.log(`[TimelineVisibility] 🎨 displayPositions UPDATE:`, {
+      shotId: shotId.substring(0, 8),
+      source,
+      positionsCount: selectedPositions.size,
+      isDragInProgress,
+      isPersistingPositions,
+      isLoading,
+      positions: Array.from(selectedPositions.entries()).map(([id, pos]) => ({
+        id: id.substring(0, 8),
+        position: pos
+      })).slice(0, 10), // First 10 items
+      timestamp: Date.now()
+    });
 
     // [Position0Debug] Only log if there are position 0 items or if we're missing expected position 0 items
     const position0Items = Array.from(selectedPositions.entries()).filter(([id, pos]) => pos === 0);

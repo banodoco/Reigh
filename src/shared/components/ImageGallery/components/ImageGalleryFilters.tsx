@@ -1,14 +1,8 @@
 import React from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Star, Download, Loader2 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
+import { Checkbox } from "@/shared/components/ui/checkbox";
 import { ShotFilter } from "@/shared/components/ShotFilter";
 import { ToolTypeFilter } from "./ToolTypeFilter";
 
@@ -33,8 +27,10 @@ export interface ImageGalleryFiltersProps {
   
   // Media type filter props
   hideTopFilters?: boolean;
-  mediaTypeFilter: 'all' | 'image' | 'video';
-  onMediaTypeFilterChange?: (mediaType: 'all' | 'image' | 'video') => void;
+  showStarredOnly: boolean;
+  onStarredFilterChange?: (starredOnly: boolean) => void;
+  onDownloadStarred?: () => void;
+  isDownloadingStarred?: boolean;
   
   // Tool type filter props
   toolTypeFilterEnabled?: boolean;
@@ -61,17 +57,19 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
   clearSearch,
   handleSearchChange,
   hideTopFilters = false,
-  mediaTypeFilter,
-  onMediaTypeFilterChange,
+  showStarredOnly,
+  onStarredFilterChange,
+  onDownloadStarred,
+  isDownloadingStarred,
   toolTypeFilterEnabled = true,
   onToolTypeFilterChange,
   currentToolTypeName,
   isMobile = false,
 }) => {
   return (
-    <div className="flex justify-between items-center flex-wrap gap-y-2">
+    <div className="flex justify-between items-center w-full gap-3">
       {/* Left side filters */}
-      <div className="flex items-center gap-3 flex-1">
+      <div className="flex items-center gap-3">
         {/* Shot Filter */}
         {showShotFilter && (
           <ShotFilter
@@ -83,7 +81,7 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
             size="sm"
             whiteText={whiteText}
             checkboxId="exclude-positioned-image-gallery"
-            triggerWidth="w-[140px]"
+            triggerWidth="w-[120px] sm:w-[140px]"
             triggerClassName={`h-8 text-xs ${whiteText ? 'bg-zinc-800 border-zinc-600 text-white' : ''}`}
           />
         )}
@@ -141,21 +139,37 @@ export const ImageGalleryFilters: React.FC<ImageGalleryFiltersProps> = ({
       
       {/* Right side filters */}
       <div className="flex items-center gap-3">
-        {/* Media Type Filter */}
+        {/* Starred Filter */}
         {!hideTopFilters && (
-          <div className="flex items-center">
-            <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
-              onMediaTypeFilterChange?.(value);
-            }}>
-              <SelectTrigger id="media-type-filter" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">All</SelectItem>
-                <SelectItem value="image" className="text-xs">Images</SelectItem>
-                <SelectItem value="video" className="text-xs">Videos</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center space-x-3">
+              <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`p-1 h-8 w-8 ${whiteText ? 'text-zinc-400 hover:text-white hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => onStarredFilterChange?.(!showStarredOnly)}
+                  aria-label={showStarredOnly ? "Hide starred items" : "Show only starred items"}
+              >
+                  <Star
+                      className="h-5 w-5"
+                      fill={showStarredOnly ? 'currentColor' : 'none'}
+                  />
+              </Button>
+              {/* {onDownloadStarred && showStarredOnly && (
+                  <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onDownloadStarred}
+                      disabled={isDownloadingStarred}
+                      className={`text-xs h-6 px-2 ${whiteText ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                      {isDownloadingStarred ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                          <Download className="h-3 w-3 mr-1" />
+                      )}
+                      <span>Download all starred</span>
+                  </Button>
+              )} */}
           </div>
         )}
       </div>

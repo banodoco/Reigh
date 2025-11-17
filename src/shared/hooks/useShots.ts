@@ -1467,23 +1467,72 @@ export const useRemoveImageFromShot = () => {
   
   return useMutation({
     mutationFn: async ({ shot_id, shotImageEntryId, project_id }: { shot_id: string; shotImageEntryId: string; project_id?: string | null }) => {
+      console.log('[DELETE:useRemoveImageFromShot] 🗑️ STEP 3: Mutation starting', {
+        shot_id: shot_id?.substring(0, 8),
+        shotImageEntryId: shotImageEntryId?.substring(0, 8),
+        project_id: project_id?.substring(0, 8),
+        timestamp: Date.now()
+      });
+
       // Instead of deleting, just remove the timeline_frame to unlink from timeline
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('shot_generations')
         .update({ timeline_frame: null })
         .eq('id', shotImageEntryId)
-        .eq('shot_id', shot_id);
+        .eq('shot_id', shot_id)
+        .select();
       
-      if (error) throw error;
+      console.log('[DELETE:useRemoveImageFromShot] 📊 Database response:', {
+        success: !error,
+        error: error?.message,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
+        updatedRows: data?.length || 0,
+        data: data,
+        timestamp: Date.now()
+      });
+
+      if (error) {
+        console.error('[DELETE:useRemoveImageFromShot] ❌ Database error:', error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        console.error('[DELETE:useRemoveImageFromShot] ⚠️ No rows were updated!', {
+          shot_id: shot_id?.substring(0, 8),
+          shotImageEntryId: shotImageEntryId?.substring(0, 8),
+          hint: 'Record might not exist or IDs are incorrect'
+        });
+      } else {
+        console.log('[DELETE:useRemoveImageFromShot] ✅ Successfully removed from timeline', {
+          updatedRows: data.length,
+          timestamp: Date.now()
+        });
+      }
       
       return { shot_id, shotImageEntryId };
     },
     onMutate: async ({ shot_id, shotImageEntryId, project_id }) => {
+      console.log('[DELETE:useRemoveImageFromShot] 🔄 STEP 4: onMutate starting optimistic update', {
+        shot_id: shot_id?.substring(0, 8),
+        shotImageEntryId: shotImageEntryId?.substring(0, 8),
+        project_id: project_id?.substring(0, 8),
+        timestamp: Date.now()
+      });
+
       // Use project_id from arguments if provided
-      if (!project_id) return { previousShots: undefined, project_id: undefined };
+      if (!project_id) {
+        console.log('[DELETE:useRemoveImageFromShot] ⚠️ No project_id, skipping optimistic update');
+        return { previousShots: undefined, project_id: undefined };
+      }
 
       await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
       const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+
+      console.log('[DELETE:useRemoveImageFromShot] 📝 Applying optimistic update', {
+        previousShotsCount: previousShots?.length || 0,
+        timestamp: Date.now()
+      });
 
       queryClient.setQueryData<Shot[]>(['shots', project_id], (oldShots = []) =>
         oldShots.map(shot => {
@@ -1500,17 +1549,43 @@ export const useRemoveImageFromShot = () => {
       return { previousShots, project_id };
     },
     onError: (err, args, context) => {
-      console.error('Optimistic update failed for removeImageFromShot:', err);
+      console.error('[DELETE:useRemoveImageFromShot] ❌ STEP 5: onError - Mutation failed!', {
+        error: err,
+        errorMessage: err.message,
+        args: {
+          shot_id: args.shot_id?.substring(0, 8),
+          shotImageEntryId: args.shotImageEntryId?.substring(0, 8),
+          project_id: args.project_id?.substring(0, 8)
+        },
+        hasContext: !!context,
+        timestamp: Date.now()
+      });
       if (context?.previousShots && context.project_id) {
+        console.log('[DELETE:useRemoveImageFromShot] 🔙 Reverting optimistic update');
         queryClient.setQueryData<Shot[]>(['shots', context.project_id], context.previousShots);
       }
       toast.error(`Failed to remove image: ${err.message}`);
     },
     onSettled: (data, error, variables) => {
+      console.log('[DELETE:useRemoveImageFromShot] 🏁 STEP 6: onSettled - Finalizing', {
+        success: !error,
+        error: error?.message,
+        shot_id: variables.shot_id?.substring(0, 8),
+        shotImageEntryId: variables.shotImageEntryId?.substring(0, 8),
+        project_id: variables.project_id?.substring(0, 8),
+        timestamp: Date.now()
+      });
+
       // Use project_id from variables
       const project_id = variables.project_id;
       
       if (project_id) {
+        console.log('[DELETE:useRemoveImageFromShot] 🔄 Invalidating queries immediately', {
+          project_id: project_id.substring(0, 8),
+          shot_id: variables.shot_id.substring(0, 8),
+          timestamp: Date.now()
+        });
+
         queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
         // Also invalidate unified generations cache so GenerationsPane updates immediately
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
@@ -1518,12 +1593,21 @@ export const useRemoveImageFromShot = () => {
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
 
         // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after remove operation (100ms delay)');
+        console.log('[DELETE:useRemoveImageFromShot] ⏱️ Scheduling shot-specific query invalidation (100ms delay)');
         setTimeout(() => {
+          console.log('[DELETE:useRemoveImageFromShot] 🔄 Delayed invalidation executing', {
+            shot_id: variables.shot_id.substring(0, 8),
+            timestamp: Date.now()
+          });
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
           queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', variables.shot_id] });
           queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', variables.shot_id] });
+          console.log('[DELETE:useRemoveImageFromShot] ✅ DELETION COMPLETE!', {
+            timestamp: Date.now()
+          });
         }, 100);
+      } else {
+        console.warn('[DELETE:useRemoveImageFromShot] ⚠️ No project_id, skipping query invalidation');
       }
     },
   });

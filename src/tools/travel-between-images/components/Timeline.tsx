@@ -271,6 +271,20 @@ const Timeline: React.FC<TimelineProps> = ({
   const batchExchangePositions = hookData.batchExchangePositions; // Always use hook for exchanges
   const initializeTimelineFrames = hookData.initializeTimelineFrames;
   
+  // [TimelineVisibility] Track when Timeline receives data updates from parent
+  React.useEffect(() => {
+    console.log('[TimelineVisibility] 📥 Timeline DATA RECEIVED from parent:', {
+      shotId: shotId.substring(0, 8),
+      propShotGenerationsCount: propShotGenerations?.length ?? 0,
+      propImagesCount: propImages?.length ?? 0,
+      shotGenerationsCount: shotGenerations.length,
+      hasPropHookData: !!propHookData,
+      hasPropImages: !!propImages,
+      dataSource: propHookData ? 'shared hookData' : propImages ? 'utility hook (two-phase)' : 'legacy hook',
+      timestamp: Date.now()
+    });
+  }, [shotId, propShotGenerations, propImages, shotGenerations, propHookData]);
+  
   // Log data source for debugging
   console.log('[UnifiedDataFlow] Timeline data source:', {
     shotId: shotId.substring(0, 8),
@@ -305,6 +319,20 @@ const Timeline: React.FC<TimelineProps> = ({
         .map(sg => transformForTimeline(sg as any as RawShotGeneration))
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     }
+
+    // [TimelineVisibility] Log images array changes
+    console.log(`[TimelineVisibility] 📸 IMAGES ARRAY COMPUTED:`, {
+      shotId: shotId.substring(0, 8),
+      source: propImages ? 'propImages' : 'shotGenerations',
+      totalImages: result.length,
+      shotGenerationsCount: shotGenerations.length,
+      images: result.map(img => ({
+        id: (img.shotImageEntryId ?? img.id)?.substring(0, 8),
+        timeline_frame: img.timeline_frame,
+        hasImageUrl: !!img.imageUrl
+      })),
+      timestamp: Date.now()
+    });
 
     // [Position0Debug] Log timeline data transformation for debugging
     const position0Images = result.filter(img => img.timeline_frame === 0);

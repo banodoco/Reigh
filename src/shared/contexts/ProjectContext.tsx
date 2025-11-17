@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Project } from '@/types/project'; // Added import
 import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Type for updating projects
 interface ProjectUpdate {
@@ -141,6 +142,48 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   // Prefetch all tool settings for the currently selected project so that
   // tool pages hydrate instantly without an extra round-trip.
   usePrefetchToolSettings(selectedProjectId);
+  
+  // [RefLoadingDebug] Monitor project-image-settings cache state globally
+  const queryClient = useQueryClient();
+  React.useEffect(() => {
+    if (!selectedProjectId) return;
+    
+    const projectImageSettingsCacheKey = ['toolSettings', 'project-image-settings', selectedProjectId, undefined];
+    
+    const logCacheState = () => {
+      const cachedData = queryClient.getQueryData(projectImageSettingsCacheKey);
+      const queryState = queryClient.getQueryState(projectImageSettingsCacheKey);
+      
+      console.log('[RefLoadingDebug] 🌍 GLOBAL (ProjectProvider) - project-image-settings cache state:', {
+        selectedProjectId,
+        currentPage: window.location.pathname,
+        hasCachedData: !!cachedData,
+        referenceCount: (cachedData as any)?.references?.length ?? 0,
+        queryState: {
+          status: queryState?.status,
+          fetchStatus: queryState?.fetchStatus,
+          dataUpdatedAt: queryState?.dataUpdatedAt,
+          age: queryState?.dataUpdatedAt ? `${Date.now() - queryState.dataUpdatedAt}ms` : 'no-data'
+        },
+        timestamp: Date.now()
+      });
+    };
+    
+    // Log immediately
+    logCacheState();
+    
+    // Also log when the query data changes (prefetch completes)
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query?.queryKey?.[0] === 'toolSettings' && 
+          event?.query?.queryKey?.[1] === 'project-image-settings' &&
+          event?.query?.queryKey?.[2] === selectedProjectId) {
+        console.log('[RefLoadingDebug] 🔔 Cache updated for project-image-settings');
+        logCacheState();
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [selectedProjectId, queryClient]);
 
   // [MobileStallFix] Cleanup all timeouts on unmount
   useEffect(() => {

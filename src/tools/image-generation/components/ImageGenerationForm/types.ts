@@ -54,22 +54,45 @@ export interface PersistedFormSettings {
 // Reference mode type
 export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene' | 'custom';
 
-// Individual reference image with its own settings
+// Reference pointer stored in tool settings (lightweight)
+// Actual data is stored in resources table
 export interface ReferenceImage {
-  id: string; // Unique identifier (use nanoid())
-  name: string; // User-editable display name
-  styleReferenceImage: string | null; // Processed URL for generation
-  styleReferenceImageOriginal: string | null; // Original URL for display
-  thumbnailUrl?: string | null; // Small thumbnail URL for grid display (300px max)
-  styleReferenceStrength: number; // 0.1 - 2.0
-  subjectStrength: number; // 0.0 - 2.0
-  subjectDescription: string; // Text description
-  inThisScene: boolean; // Boolean flag
-  inThisSceneStrength: number; // Strength for "in this scene" LoRA (0.0 - 2.0)
-  referenceMode?: ReferenceMode; // How to use this reference
-  styleBoostTerms?: string; // Style-boost terms to append to prompts
-  createdAt: string; // ISO timestamp
-  updatedAt: string; // ISO timestamp
+  id: string; // Unique identifier for UI state (use nanoid())
+  resourceId: string; // ID in resources table where actual data is stored
+  
+  // Legacy fields for migration - will be removed after bulk migration
+  name?: string;
+  styleReferenceImage?: string | null;
+  styleReferenceImageOriginal?: string | null;
+  thumbnailUrl?: string | null;
+  styleReferenceStrength?: number;
+  subjectStrength?: number;
+  subjectDescription?: string;
+  inThisScene?: boolean;
+  inThisSceneStrength?: number;
+  referenceMode?: ReferenceMode;
+  styleBoostTerms?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Hydrated reference with full data from resources table
+export interface HydratedReferenceImage {
+  id: string; // UI identifier
+  resourceId: string; // Resource table ID
+  name: string;
+  styleReferenceImage: string;
+  styleReferenceImageOriginal: string;
+  thumbnailUrl: string | null;
+  styleReferenceStrength: number;
+  subjectStrength: number;
+  subjectDescription: string;
+  inThisScene: boolean;
+  inThisSceneStrength: number;
+  referenceMode: ReferenceMode;
+  styleBoostTerms: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Project-level settings for model and style reference

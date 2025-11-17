@@ -281,16 +281,34 @@ export const useGenerationActions = ({
   }, [selectedShot?.id, projectId, actions, deleteGenerationMutation, onShotImagesUpdate]);
 
   const handleDeleteImageFromShot = useCallback(async (shotImageEntryId: string) => {
+    console.log('[DELETE:useGenerationActions] 🗑️ STEP 2: handleDeleteImageFromShot called', {
+      shotImageEntryId: shotImageEntryId?.substring(0, 8),
+      shotId: selectedShot?.id?.substring(0, 8),
+      projectId: projectId?.substring(0, 8),
+      hasSelectedShot: !!selectedShot,
+      hasProjectId: !!projectId,
+      timestamp: Date.now()
+    });
+
     if (!selectedShot || !projectId) {
+      console.error('[DELETE:useGenerationActions] ❌ Missing shot or project', {
+        hasSelectedShot: !!selectedShot,
+        hasProjectId: !!projectId
+      });
       toast.error("Cannot remove image: No shot or project selected.");
       return;
     }
 
-    console.log('[DELETE] Removing image from timeline', {
+    console.log('[DELETE:useGenerationActions] ✅ Calling removeImageFromShotMutation with:', {
+      shot_id: selectedShot.id.substring(0, 8),
       shotImageEntryId: shotImageEntryId.substring(0, 8),
+      project_id: projectId.substring(0, 8),
     });
 
-    // REMOVED: Optimistic local state - two-phase loading handles updates
+    // Emit event to lock timeline positions during mutation + refetch
+    window.dispatchEvent(new CustomEvent('shot-mutation-start', {
+      detail: { shotId: selectedShot.id, type: 'delete' }
+    }));
     
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
@@ -356,6 +374,11 @@ export const useGenerationActions = ({
       imageUrl: originalImage.imageUrl?.substring(0, 50) + '...',
       totalImagesInShot: orderedShotImages.length
     });
+
+    // Emit event to lock timeline positions during mutation + refetch
+    window.dispatchEvent(new CustomEvent('shot-mutation-start', {
+      detail: { shotId: selectedShot.id, type: 'duplicate' }
+    }));
 
     // Start loading state targeting the specific shotImageEntryId
     actions.setDuplicatingImageId(shotImageEntryId);

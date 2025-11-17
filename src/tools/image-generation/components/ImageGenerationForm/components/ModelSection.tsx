@@ -9,7 +9,8 @@ import FileInput from "@/shared/components/FileInput";
 import { SectionHeader } from "./SectionHeader";
 import { DatasetBrowserModal } from "@/shared/components/DatasetBrowserModal";
 import { cn } from "@/shared/lib/utils";
-import { ReferenceImage, ReferenceMode } from "../types";
+import { HydratedReferenceImage, ReferenceMode } from "../types";
+import { Resource } from "@/shared/hooks/useResources";
 
 interface ModelSectionProps {
   isGenerating: boolean;
@@ -29,17 +30,18 @@ interface ModelSectionProps {
   onSubjectDescriptionBlur?: () => void;
   onInThisSceneChange: (value: boolean) => void;
   onInThisSceneStrengthChange: (value: number) => void;
-  // New multiple references props
-  references?: ReferenceImage[];
+  // New multiple references props (uses hydrated references with full data)
+  references?: HydratedReferenceImage[];
   selectedReferenceId?: string | null;
   onSelectReference?: (id: string) => void;
   onDeleteReference?: (id: string) => void;
   onUpdateReferenceName?: (id: string, name: string) => void;
+  onResourceSelect?: (resource: Resource) => void;
 }
 
 // ReferenceSelector Component - shows thumbnail gallery of references
 interface ReferenceSelectorProps {
-  references: ReferenceImage[];
+  references: HydratedReferenceImage[];
   selectedReferenceId: string | null;
   onSelectReference: (id: string) => void;
   onAddReference: (files: File[]) => void;
@@ -47,6 +49,9 @@ interface ReferenceSelectorProps {
   isGenerating: boolean;
   isUploadingStyleReference: boolean;
   onOpenDatasetBrowser: () => void;
+  // Loading state - show placeholders when we have pointers but no hydrated data yet
+  isLoadingReferenceData?: boolean;
+  referenceCount?: number; // Number of references from cache (for skeleton)
 }
 
 const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
@@ -58,6 +63,8 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   isGenerating,
   isUploadingStyleReference,
   onOpenDatasetBrowser,
+  isLoadingReferenceData = false,
+  referenceCount = 0,
 }) => {
   const [isDraggingOverAdd, setIsDraggingOverAdd] = React.useState(false);
   // Track loading state for each reference image
@@ -83,143 +90,197 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
     });
   }, [references]);
   
+  // Debug logging for ReferenceSelector rendering decision
+  React.useEffect(() => {
+    console.log('[RefLoadingDebug] 🎨 ReferenceSelector render state:', {
+      isLoadingReferenceData,
+      referenceCount,
+      actualReferencesLength: references.length,
+      willShowSkeletons: isLoadingReferenceData && referenceCount > 0,
+      willShowActualRefs: !(isLoadingReferenceData && referenceCount > 0),
+      timestamp: Date.now()
+    });
+  }, [isLoadingReferenceData, referenceCount, references.length]);
+  
+  // Aggressively preload thumbnail images as soon as we have them
+  React.useEffect(() => {
+    if (!isLoadingReferenceData && references.length > 0) {
+      console.log('[RefLoadingDebug] 📥 Preloading', references.length, 'thumbnail images with high priority');
+      
+      references.forEach(ref => {
+        const thumbnailUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
+        if (thumbnailUrl) {
+          const img = new Image();
+          img.fetchPriority = 'high'; // Request high priority from browser
+          img.loading = 'eager'; // Load immediately, don't wait for viewport
+          img.src = thumbnailUrl;
+          // Don't need to track these - just trigger the download
+        }
+      });
+    }
+  }, [isLoadingReferenceData, references]);
+  
   return (
     <div className="space-y-3">
       {/* Thumbnail gallery */}
       <div className="grid grid-cols-4 gap-2">
-        {references.map(ref => {
-          const isSelected = selectedReferenceId === ref.id;
-          // Use thumbnail for grid display, fallback to original or processed
-          const imageUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
-          const isLoaded = loadedImages.has(ref.id);
-          
-          return (
+        {/* Show skeleton placeholders while loading reference data */}
+        {isLoadingReferenceData && referenceCount > 0 ? (
+          // Render skeleton cards based on cached reference count
+          (() => {
+            console.log('[RefLoadingDebug] 💀 Rendering skeleton placeholders:', referenceCount);
+            return Array.from({ length: referenceCount }).map((_, idx) => (
             <div
-              key={ref.id}
-              className={cn(
-                "relative cursor-pointer rounded-lg border-2 overflow-hidden group",
-                "aspect-square transition-all hover:scale-105",
-                isSelected 
-                  ? "border-purple-500 ring-2 ring-purple-500 shadow-lg" 
-                  : "border-gray-300 hover:border-purple-300"
-              )}
-              onClick={() => !isGenerating && onSelectReference(ref.id)}
-              onTouchEnd={(e) => {
-                // Handle touch to ensure single-tap selection works
-                if (!isGenerating) {
-                  // Don't select if tapping the delete button
-                  const target = e.target as HTMLElement;
-                  if (!target.closest('button')) {
-                    onSelectReference(ref.id);
-                  }
-                }
-                setTouchedRef(null);
-              }}
-              onTouchStart={() => setTouchedRef(ref.id)}
-              onTouchCancel={() => setTouchedRef(null)}
-              title={ref.name}
+              key={`skeleton-${idx}`}
+              className="relative rounded-lg border-2 border-gray-300 overflow-hidden aspect-square"
             >
-              {imageUrl ? (
-                <>
-                  {/* Visible image - only shown when loaded */}
-                  {isLoaded && (
-                    <img
-                      src={imageUrl}
-                      alt={ref.name}
-                      className="w-full h-full object-cover"
-                      draggable={false}
-                    />
-                  )}
-                  
-                  {/* Hidden image for loading */}
-                  {!isLoaded && (
-                    <img
-                      src={imageUrl}
-                      alt={ref.name}
-                      style={{ display: 'none' }}
-                      onLoad={() => handleImageLoad(ref.id)}
-                      draggable={false}
-                    />
-                  )}
-                  
-                  {/* Loading skeleton */}
-                  {!isLoaded && (
-                    <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
-                      <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                  <Images className="h-6 w-6 text-gray-400" />
-                </div>
-              )}
-              
-              {/* Delete button - show on hover or when touched on mobile */}
-              {!isGenerating && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onDeleteReference(ref.id);
-                  }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onDeleteReference(ref.id);
-                  }}
-                  className={cn(
-                    "absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 transition-opacity hover:bg-red-600 z-10",
-                    touchedRef === ref.id || isSelected
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  )}
-                  title="Delete reference"
-                >
-                  <X className="h-3 w-3" />
+              <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
+                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
+              </div>
+            </div>
+            ));
+          })()
+        ) : (
+          // Render actual reference thumbnails once data is loaded
+          (() => {
+            console.log('[RefLoadingDebug] 🖼️ Rendering actual reference thumbnails:', references.length);
+            return references.map(ref => {
+            const isSelected = selectedReferenceId === ref.id;
+            // Use thumbnail for grid display, fallback to original or processed
+            const imageUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
+            const isLoaded = loadedImages.has(ref.id);
+            
+            return (
+              <div
+                key={ref.id}
+                className={cn(
+                  "relative cursor-pointer rounded-lg border-2 overflow-hidden group",
+                  "aspect-square transition-all hover:scale-105",
+                  isSelected 
+                    ? "border-purple-500 ring-2 ring-purple-500 shadow-lg" 
+                    : "border-gray-300 hover:border-purple-300"
+                )}
+                onClick={() => !isGenerating && onSelectReference(ref.id)}
+                onTouchEnd={(e) => {
+                  // Handle touch to ensure single-tap selection works
+                  if (!isGenerating) {
+                    // Don't select if tapping the delete button
+                    const target = e.target as HTMLElement;
+                    if (!target.closest('button')) {
+                      onSelectReference(ref.id);
+                    }
+                  }
+                  setTouchedRef(null);
+                }}
+                onTouchStart={() => setTouchedRef(ref.id)}
+                onTouchCancel={() => setTouchedRef(null)}
+                title={ref.name.split('\n')[0]}
+              >
+                {imageUrl ? (
+                  <>
+                    {/* Visible image - only shown when loaded */}
+                    {isLoaded && (
+                      <img
+                        src={imageUrl}
+                        alt={ref.name}
+                        className="w-full h-full object-cover"
+                        draggable={false}
+                      />
+                    )}
+                    
+                    {/* Hidden image for loading */}
+                    {!isLoaded && (
+                      <img
+                        src={imageUrl}
+                        alt={ref.name}
+                        style={{ display: 'none' }}
+                        onLoad={() => handleImageLoad(ref.id)}
+                        draggable={false}
+                      />
+                    )}
+                    
+                    {/* Loading skeleton */}
+                    {!isLoaded && (
+                      <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
+                        <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                    <Images className="h-6 w-6 text-gray-400" />
+                  </div>
+                )}
+                
+                {/* Delete button - show on hover or when touched on mobile */}
+                {!isGenerating && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onDeleteReference(ref.id);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onDeleteReference(ref.id);
+                    }}
+                    className={cn(
+                      "absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 transition-opacity hover:bg-red-600 z-10",
+                      touchedRef === ref.id || isSelected
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                    )}
+                    title="Delete reference"
+                  >
+                    <X className="h-3 w-3" />
                 </button>
               )}
             </div>
           );
-        })}
+        });
+          })()
+        )}
         
-        {/* Add reference button with search button in top right */}
+        {/* Add reference button with search button */}
         <div className="relative aspect-square">
-          <label 
+          <label
             className={cn(
-              "w-full h-full flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200",
+              'w-full h-full flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded-lg transition-all duration-200',
               isGenerating || isUploadingStyleReference
-                ? "border-gray-200 cursor-not-allowed opacity-50"
+                ? 'border-gray-200 cursor-not-allowed opacity-50'
                 : isDraggingOverAdd
-                  ? "border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg"
-                  : "border-gray-300 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950"
+                ? 'border-purple-500 bg-purple-500/20 dark:bg-purple-500/30 scale-105 shadow-lg cursor-pointer'
+                : 'border-gray-300 cursor-pointer'
             )}
-            title="Add new reference"
-            onDragEnter={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            title="Click to upload or drag & drop"
+            onDragEnter={e => {
+              e.preventDefault()
+              e.stopPropagation()
               if (!isGenerating && !isUploadingStyleReference) {
-                setIsDraggingOverAdd(true);
+                setIsDraggingOverAdd(true)
               }
             }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onDragOver={e => {
+              e.preventDefault()
+              e.stopPropagation()
             }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDraggingOverAdd(false);
+            onDragLeave={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsDraggingOverAdd(false)
             }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDraggingOverAdd(false);
+            onDrop={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsDraggingOverAdd(false)
               if (!isGenerating && !isUploadingStyleReference) {
-                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                const files = Array.from(e.dataTransfer.files).filter(f =>
+                  f.type.startsWith('image/')
+                )
                 if (files.length > 0) {
-                  onAddReference(files);
+                  onAddReference(files)
                 }
               }
             }}
@@ -227,42 +288,53 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
             {isDraggingOverAdd ? (
               <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400 animate-bounce" />
             ) : (
-              <Plus className="h-6 w-6 text-gray-400" />
+              <div className="relative w-full h-full">
+                {/* Diagonal divider line */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-[141%] h-px bg-gray-300 dark:bg-gray-600 rotate-45 transform origin-center" />
+                </div>
+
+                {/* Plus icon - top right - pointer-events-none so clicks pass through to label */}
+                <div className="absolute top-2 right-2 pointer-events-none">
+                  <Plus className="h-5 w-5 text-gray-400" />
+                </div>
+              </div>
             )}
             <input
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length > 0) onAddReference(files);
-                e.target.value = ''; // Reset input
+              onChange={e => {
+                const files = Array.from(e.target.files || [])
+                if (files.length > 0) onAddReference(files)
+                e.target.value = '' // Reset input
               }}
               disabled={isGenerating || isUploadingStyleReference}
             />
           </label>
-          
-          {/* Search reference button - positioned in top right corner */}
-          <button
-            type="button"
-            className={cn(
-              "absolute top-1.5 right-1.5 p-1 rounded-full shadow-sm transition-all duration-200",
-              isGenerating || isUploadingStyleReference
-                ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-40"
-                : "bg-white dark:bg-gray-900 hover:bg-purple-50 dark:hover:bg-purple-950 hover:shadow-md hover:scale-105 active:scale-95"
-            )}
-            title="Search reference images"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!isGenerating && !isUploadingStyleReference) {
-                onOpenDatasetBrowser();
-              }
-            }}
-            disabled={isGenerating || isUploadingStyleReference}
-          >
-            <Search className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-          </button>
+
+          {/* Search icon - bottom left */}
+          {!isDraggingOverAdd && (
+            <button
+              type="button"
+              className={cn(
+                'absolute bottom-[0.625rem] left-[0.625rem] p-0.5 rounded',
+                (isGenerating || isUploadingStyleReference) &&
+                  'cursor-not-allowed opacity-40'
+              )}
+              title="Search reference images"
+              onClick={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (!isGenerating && !isUploadingStyleReference) {
+                  onOpenDatasetBrowser()
+                }
+              }}
+              disabled={isGenerating || isUploadingStyleReference}
+            >
+              <Search className="h-4 w-4 text-gray-400" />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -291,12 +363,16 @@ const StyleReferenceSection: React.FC<{
   onReferenceModeChange?: (mode: ReferenceMode) => void;
   styleBoostTerms?: string;
   onStyleBoostTermsChange?: (value: string) => void;
-  // New multiple references props
-  references?: ReferenceImage[];
+  // New multiple references props (uses hydrated references with full data)
+  references?: HydratedReferenceImage[];
   selectedReferenceId?: string | null;
   onSelectReference?: (id: string) => void;
   onDeleteReference?: (id: string) => void;
   onUpdateReferenceName?: (id: string, name: string) => void;
+  onResourceSelect?: (resource: Resource) => void;
+  // Loading state props
+  isLoadingReferenceData?: boolean;
+  referenceCount?: number;
 }> = ({
   styleReferenceImage,
   styleReferenceStrength,
@@ -324,14 +400,14 @@ const StyleReferenceSection: React.FC<{
   onSelectReference,
   onDeleteReference,
   onUpdateReferenceName,
+  onResourceSelect,
+  isLoadingReferenceData = false,
+  referenceCount = 0,
 }) => {
   const [imageLoaded, setImageLoaded] = React.useState(false);
   const [imageError, setImageError] = React.useState(false);
   const [isDraggingOver, setIsDraggingOver] = React.useState(false);
   const [showDatasetBrowser, setShowDatasetBrowser] = React.useState(false);
-
-
-
 
   // Reset loading states when image changes
   React.useEffect(() => {
@@ -357,8 +433,8 @@ const StyleReferenceSection: React.FC<{
       <SectionHeader title="Reference" theme="purple" />
     </div>
 
-    {/* New Multiple References UI - Two column layout when reference exists */}
-    {showMultiReference && references.length > 0 && styleReferenceImage && (
+    {/* New Multiple References UI - Two column layout when reference exists OR loading */}
+    {showMultiReference && (referenceCount > 0 || references.length > 0) && (
       <div className="space-y-4">
         {/* First Row: Thumbnails and Preview */}
         <div className="flex gap-4 flex-col md:flex-row">
@@ -373,18 +449,33 @@ const StyleReferenceSection: React.FC<{
               isGenerating={isGenerating}
               isUploadingStyleReference={isUploadingStyleReference}
               onOpenDatasetBrowser={() => setShowDatasetBrowser(true)}
+              isLoadingReferenceData={isLoadingReferenceData}
+              referenceCount={referenceCount}
             />
           </div>
           
           {/* Right side - Large preview (hidden on small screens) */}
           <div className="flex-1 hidden md:block">
             <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden aspect-square">
-              <img
-                src={styleReferenceImage}
-                alt="Selected reference"
-                className="w-full h-full object-contain"
-                style={{ objectFit: 'contain' }}
-              />
+              {isLoadingReferenceData ? (
+                // Show skeleton while loading
+                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center animate-pulse">
+                  <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-gray-400"></div>
+                </div>
+              ) : styleReferenceImage ? (
+                // Show actual image once loaded
+                <img
+                  src={styleReferenceImage}
+                  alt="Selected reference"
+                  className="w-full h-full object-contain"
+                  style={{ objectFit: 'contain' }}
+                />
+              ) : (
+                // Fallback if no image but references exist
+                <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <Images className="h-8 w-8 text-gray-400" />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -601,15 +692,19 @@ const StyleReferenceSection: React.FC<{
         <div className="border-2 border-solid border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 relative">
           <div className="flex items-start flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
             <div className="relative flex-shrink-0 w-full md:w-48">
-              {styleReferenceImage ? (
-                showSkeleton ? (
-                  /* Skeleton loading state */
+              {styleReferenceImage || isUploadingStyleReference ? (
+                showSkeleton || isUploadingStyleReference ? (
+                  /* Skeleton loading state - show during upload or initial load */
                   <div className="w-full aspect-square rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 dark:from-gray-700 dark:via-gray-800 dark:to-gray-700 animate-pulse relative overflow-hidden">
                     {/* Shimmer effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-gray-600/20 to-transparent animate-shimmer transform -skew-x-12"></div>
-                    {/* <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
-                      <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
-                    </div> */}
+                    {isUploadingStyleReference && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-3 py-2 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Uploading...</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -624,9 +719,6 @@ const StyleReferenceSection: React.FC<{
                         setImageLoaded(true);
                       }}
                     />
-                    {/* <div className="absolute top-2 left-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded px-2 py-1 border border-gray-200 dark:border-gray-600 z-10">
-                      <p className="text-xs font-light text-gray-600 dark:text-gray-400">Style</p>
-                    </div> */}
                     <div className="absolute top-2 right-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full p-0.5 border border-gray-200 dark:border-gray-600 z-10">
                       <Button
                         type="button"
@@ -702,7 +794,7 @@ const StyleReferenceSection: React.FC<{
                 </div>
               )}
               
-              {/* Browse Dataset Images Button - Always visible */}
+              {/* Browse Style References Button - Always visible */}
               <div className="mt-3">
                 <Button
                   type="button"
@@ -712,8 +804,8 @@ const StyleReferenceSection: React.FC<{
                   disabled={isGenerating || isUploadingStyleReference}
                   className="w-full"
                 >
-                  <Images className="h-4 w-4 mr-2" />
-                  Browse images
+                  <Search className="h-4 w-4 mr-2" />
+                  Browse references
                 </Button>
               </div>
             </div>
@@ -728,7 +820,7 @@ const StyleReferenceSection: React.FC<{
     <DatasetBrowserModal
       isOpen={showDatasetBrowser}
       onOpenChange={setShowDatasetBrowser}
-      onImageSelect={onStyleUpload}
+      onResourceSelect={onResourceSelect}
     />
   </div>
   );
@@ -739,6 +831,8 @@ export const ModelSection: React.FC<ModelSectionProps & {
   onReferenceModeChange?: (mode: ReferenceMode) => void;
   styleBoostTerms?: string;
   onStyleBoostTermsChange?: (value: string) => void;
+  isLoadingReferenceData?: boolean;
+  referenceCount?: number;
 }> = ({
   isGenerating,
   styleReferenceImage,
@@ -766,6 +860,9 @@ export const ModelSection: React.FC<ModelSectionProps & {
   onSelectReference,
   onDeleteReference,
   onUpdateReferenceName,
+  onResourceSelect,
+  isLoadingReferenceData,
+  referenceCount,
 }) => {
   return (
     <div className="flex-1">
@@ -797,6 +894,9 @@ export const ModelSection: React.FC<ModelSectionProps & {
         onSelectReference={onSelectReference}
         onDeleteReference={onDeleteReference}
         onUpdateReferenceName={onUpdateReferenceName}
+        onResourceSelect={onResourceSelect}
+        isLoadingReferenceData={isLoadingReferenceData}
+        referenceCount={referenceCount}
       />
     </div>
   );

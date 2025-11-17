@@ -12,7 +12,7 @@ import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { useToolSettings } from "@/shared/hooks/useToolSettings";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
-import { useListPublicResources } from '@/shared/hooks/useResources';
+import { useListPublicResources, useCreateResource, useUpdateResource, useDeleteResource, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
 import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
 import CreateShotModal from "@/shared/components/CreateShotModal";
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,6 +25,7 @@ import { generateClientThumbnail } from "@/shared/lib/clientThumbnailGenerator";
 import { nanoid } from 'nanoid';
 import { supabase } from "@/integrations/supabase/client";
 import { useAIInteractionService } from '@/shared/hooks/useAIInteractionService';
+import { useHydratedReferences } from '../../hooks/useHydratedReferences';
 
 // Import extracted components
 import { PromptsSection } from "./components/PromptsSection";
@@ -41,6 +42,7 @@ import {
   PersistedFormSettings,
   ProjectImageSettings,
   ReferenceImage,
+  HydratedReferenceImage,
   ReferenceMode,
   PromptMode,
 } from "./types";
@@ -157,6 +159,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const [associatedShotId, setAssociatedShotId] = useState<string | null>(null);
   
   const { selectedProjectId } = useProject();
+  const queryClient = useQueryClient();
   
   // Access user's generation settings to detect local generation
   const {
@@ -170,7 +173,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const {
     settings: projectImageSettings,
     update: updateProjectImageSettings,
-    isUpdating: isSavingProjectSettings
+    isUpdating: isSavingProjectSettings,
+    isLoading: isLoadingProjectSettings
   } = useToolSettings<ProjectImageSettings>('project-image-settings', {
     projectId: selectedProjectId,
     enabled: !!selectedProjectId
@@ -185,11 +189,59 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Get the effective shot ID for storage (use 'none' for null)
   const effectiveShotId = associatedShotId || 'none';
   
-  // Get references array and selected reference for current shot
-  const references = projectImageSettings?.references ?? [];
+  // Get reference pointers array and selected reference for current shot
+  const cachedProjectSettings = selectedProjectId
+    ? queryClient.getQueryData<ProjectImageSettings>(['toolSettings', 'project-image-settings', selectedProjectId, undefined])
+    : undefined;
+  const referenceCountFromCache = cachedProjectSettings?.references?.length ?? 0;
+  
+  // Track the highest reference count we've seen - once we know we have N references, never drop below that
+  const lastKnownReferenceCount = useRef<number>(0);
+  const currentCount = projectImageSettings?.references?.length ?? referenceCountFromCache;
+  if (currentCount > lastKnownReferenceCount.current) {
+    lastKnownReferenceCount.current = currentCount;
+  }
+  const referenceCount = Math.max(currentCount, lastKnownReferenceCount.current);
+  
+  const referencePointers = projectImageSettings?.references ?? cachedProjectSettings?.references ?? [];
   const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? {};
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
-  const selectedReference = references.find(ref => ref.id === selectedReferenceId) || null;
+  
+  // Hydrate references with data from resources table
+  const { hydratedReferences, isLoading: isLoadingReferences, hasLegacyReferences } = useHydratedReferences(referencePointers);
+  const selectedReference = hydratedReferences.find(ref => ref.id === selectedReferenceId) || null;
+  // Show loading state until we have all references hydrated (or at least 90% to account for missing resources)
+  const isReferenceDataLoading = isLoadingProjectSettings || isLoadingReferences || (referenceCount > 0 && hydratedReferences.length < Math.floor(referenceCount * 0.9));
+  
+  // Debug logging for reference loading state
+  useEffect(() => {
+    const threshold = Math.floor(referenceCount * 0.9);
+    console.log('[RefLoadingDebug] 📊 Reference loading state:', {
+      isLoadingProjectSettings,
+      referenceCount,
+      hydratedReferencesLength: hydratedReferences.length,
+      referencePointersLength: referencePointers.length,
+      isLoadingReferences,
+      threshold,
+      needsMoreRefs: hydratedReferences.length < threshold,
+      isReferenceDataLoading,
+      calculationBreakdown: {
+        condition1_loadingSettings: isLoadingProjectSettings,
+        condition2_loadingReferences: isLoadingReferences,
+        condition3_notEnoughHydrated: referenceCount > 0 && hydratedReferences.length < threshold,
+        finalResult: isLoadingProjectSettings || isLoadingReferences || (referenceCount > 0 && hydratedReferences.length < threshold)
+      },
+      cachedReferenceCount: referenceCountFromCache,
+      hasCachedSettings: !!cachedProjectSettings,
+      hasProjectSettings: !!projectImageSettings,
+      timestamp: Date.now()
+    });
+  }, [isLoadingProjectSettings, referenceCount, hydratedReferences.length, referencePointers.length, isReferenceDataLoading, isLoadingReferences, referenceCountFromCache, cachedProjectSettings, projectImageSettings]);
+  
+  // Resource mutation hooks
+  const createStyleReference = useCreateResource();
+  const updateStyleReference = useUpdateResource();
+  const deleteStyleReference = useDeleteResource();
   
   // Clear pending mode update when switching references AND force sync
   const prevSelectedReferenceId = useRef(selectedReferenceId);
@@ -205,14 +257,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       // Look up the reference directly to ensure we have the latest data
       // Also check the optimistic cache in case there's a pending write
       if (selectedReferenceId) {
-        const newSelectedRef = references.find(ref => ref.id === selectedReferenceId);
+        const newSelectedRef = hydratedReferences.find(ref => ref.id === selectedReferenceId);
         if (newSelectedRef) {
           const newMode = newSelectedRef.referenceMode ?? 'custom';
           console.log('[RefSettings] 🎯 Force syncing mode for new reference:', {
             refId: selectedReferenceId,
             refName: newSelectedRef.name,
             newMode,
-            allModes: references.map(r => ({ id: r.id, mode: r.referenceMode }))
+            allModes: hydratedReferences.map(r => ({ id: r.id, mode: r.referenceMode }))
           });
           
           // Force sync all settings for this reference
@@ -223,30 +275,30 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           setInThisScene(newSelectedRef.inThisScene);
           setStyleBoostTerms(newSelectedRef.styleBoostTerms || '');
         } else {
-          console.warn('[RefSettings] ⚠️ Could not find reference with ID:', selectedReferenceId, 'in references:', references.map(r => r.id));
+          console.warn('[RefSettings] ⚠️ Could not find reference with ID:', selectedReferenceId, 'in references:', hydratedReferences.map(r => r.id));
         }
       }
       
       prevSelectedReferenceId.current = selectedReferenceId;
     }
-  }, [selectedReferenceId, references]);
+  }, [selectedReferenceId, hydratedReferences]);
   
   // Debug logging for reference state
   useEffect(() => {
     console.log('[RefSettings] 📊 Current state:', {
       effectiveShotId,
-      referencesCount: references.length,
+      referencesCount: hydratedReferences.length,
       selectedReferenceId,
       hasSelectedReference: !!selectedReference,
       selectedReferenceName: selectedReference?.name,
       selectedReferenceStrength: selectedReference?.styleReferenceStrength,
       selectedSubjectStrength: selectedReference?.subjectStrength,
       selectedReferenceMode: selectedReference?.referenceMode,
-      allReferenceIds: references.map(r => r.id),
-      allReferenceModes: references.map(r => ({ id: r.id, name: r.name, mode: r.referenceMode })),
+      allReferenceIds: hydratedReferences.map(r => r.id),
+      allReferenceModes: hydratedReferences.map(r => ({ id: r.id, name: r.name, mode: r.referenceMode })),
       allShotSelections: selectedReferenceIdByShot
     });
-  }, [effectiveShotId, references, selectedReferenceId, selectedReference, selectedReferenceIdByShot]);
+  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot]);
   
   // For backward compatibility with single reference (used in display)
   const rawStyleReferenceImage = selectedReference?.styleReferenceImage || projectImageSettings?.styleReferenceImage || null;
@@ -289,14 +341,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
 
   // Auto-select first reference if we have references but no valid selected reference for this shot
   useEffect(() => {
-    if (references.length > 0 && projectImageSettings) {
+    if (hydratedReferences.length > 0 && projectImageSettings) {
       // Case 1: No selectedReferenceId for this shot
       if (!selectedReferenceId) {
         console.log('[RefSettings] 🔄 Auto-selecting first reference for shot', effectiveShotId, '(no ID set)');
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
-            [effectiveShotId]: references[0].id
+            [effectiveShotId]: hydratedReferences[0].id
           }
         });
       }
@@ -306,12 +358,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         updateProjectImageSettings('project', {
           selectedReferenceIdByShot: {
             ...selectedReferenceIdByShot,
-            [effectiveShotId]: references[0].id
+            [effectiveShotId]: hydratedReferences[0].id
           }
         });
       }
     }
-  }, [effectiveShotId, references, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
+  }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
 
   // Sync local state with selected reference settings (only when values actually change)
   useEffect(() => {
@@ -460,6 +512,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         
         const legacyReference: ReferenceImage = {
           id: nanoid(),
+          resourceId: '', // Will be set by bulk migration
           name: "Reference 1",
           styleReferenceImage: projectImageSettings.styleReferenceImage || null,
           styleReferenceImageOriginal: projectImageSettings.styleReferenceImageOriginal || null,
@@ -515,46 +568,171 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   }, [effectiveShotId, projectImageSettings, selectedProjectId, updateProjectImageSettings]);
   
   // Migrate references missing inThisSceneStrength field and old scene modes
+  // Track per-project state to ensure migration runs only once
+  const sceneMigrationStateRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
-    const migrateSceneSettings = async () => {
-      if (!projectImageSettings || !references.length) return;
+    const runSceneMigration = async () => {
+      if (!projectImageSettings || !referencePointers.length || !selectedProjectId) return;
+      if (sceneMigrationStateRef.current[selectedProjectId]) return; // Already migrated for this project
       
-      // Check if any references need migration
-      const needsMigration = references.some(ref => 
+      // Check if any references still need migration
+      const needsMigration = referencePointers.some(ref => 
         ref.inThisSceneStrength === undefined || 
         (ref.referenceMode as string) === 'scene-imprecise' || 
         (ref.referenceMode as string) === 'scene-precise'
       );
       
-      if (needsMigration) {
-        console.log('[RefSettings] 🔧 Migrating references for scene mode updates');
-        const updatedReferences = references.map(ref => {
-          const updates: Partial<ReferenceImage> = { ...ref };
-          
-          // Migrate old scene modes to new unified 'scene' mode
-          if ((ref.referenceMode as string) === 'scene-imprecise' || (ref.referenceMode as string) === 'scene-precise') {
-            updates.referenceMode = 'scene';
-            // Keep existing inThisSceneStrength if present, otherwise set to 1.0
-            updates.inThisSceneStrength = ref.inThisSceneStrength ?? 1.0;
-          } else if (ref.inThisSceneStrength === undefined) {
-            // Add missing inThisSceneStrength field
-            updates.inThisSceneStrength = ref.inThisScene ? 1.0 : 0;
-          }
-          
-          return updates as ReferenceImage;
-        });
+      if (!needsMigration) {
+        sceneMigrationStateRef.current[selectedProjectId] = true;
+        return;
+      }
+      
+      console.log('[RefSettings] 🔧 Migrating references for scene mode updates');
+      sceneMigrationStateRef.current[selectedProjectId] = true; // Prevent parallel runs
+      
+      const updatedReferences = referencePointers.map(ref => {
+        const updates: Partial<ReferenceImage> = { ...ref };
         
-        try {
-          await updateProjectImageSettings('project', { references: updatedReferences });
-          console.log('[RefSettings] ✅ Successfully migrated scene settings');
-        } catch (error) {
-          console.error('[RefSettings] ❌ Failed to migrate scene settings:', error);
+        // Migrate old scene modes to new unified 'scene' mode
+        if ((ref.referenceMode as string) === 'scene-imprecise' || (ref.referenceMode as string) === 'scene-precise') {
+          updates.referenceMode = 'scene';
+          // Keep existing inThisSceneStrength if present, otherwise set to 1.0
+          updates.inThisSceneStrength = ref.inThisSceneStrength ?? 1.0;
+        } else if (ref.inThisSceneStrength === undefined) {
+          // Add missing inThisSceneStrength field
+          updates.inThisSceneStrength = ref.inThisScene ? 1.0 : 0;
         }
+        
+        return updates as ReferenceImage;
+      });
+      
+      try {
+        // Only update references array to avoid clobbering selectedReferenceIdByShot
+        await updateProjectImageSettings('project', { references: updatedReferences });
+        console.log('[RefSettings] ✅ Successfully migrated scene settings');
+      } catch (error) {
+        console.error('[RefSettings] ❌ Failed to migrate scene settings:', error);
+        sceneMigrationStateRef.current[selectedProjectId] = false; // Allow retry if it failed
       }
     };
     
-    migrateSceneSettings();
-  }, [references, projectImageSettings, updateProjectImageSettings]);
+    runSceneMigration();
+  }, [projectImageSettings, referencePointers, selectedProjectId, updateProjectImageSettings]);
+  
+  // BULK MIGRATION: Convert legacy inline references to resource-based references
+  // Use sessionStorage to persist migration state across component remounts
+  const migrationCompleteRef = useRef(
+    (() => {
+      try {
+        return typeof window !== 'undefined' && window.sessionStorage.getItem('referenceMigrationComplete') === 'true';
+      } catch {
+        return false;
+      }
+    })()
+  );
+  
+  useEffect(() => {
+    const migrateToResources = async () => {
+      // Only run once per session and only if we have legacy references
+      if (migrationCompleteRef.current || !hasLegacyReferences || !selectedProjectId) {
+        return;
+      }
+      
+      console.log('[RefMigration] 🔄 Starting bulk migration of', referencePointers.length, 'legacy references to resources table');
+      migrationCompleteRef.current = true; // Mark as started to prevent duplicate runs
+      
+      // Persist to sessionStorage to prevent re-runs across component remounts
+      try {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem('referenceMigrationComplete', 'true');
+        }
+      } catch {}
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('[RefMigration] ❌ Not authenticated');
+          return;
+        }
+        
+        const migratedPointers: ReferenceImage[] = [];
+        
+        for (const pointer of referencePointers) {
+          // Skip if already migrated (has resourceId)
+          if (pointer.resourceId) {
+            migratedPointers.push(pointer);
+            continue;
+          }
+          
+          // Skip if no data to migrate
+          if (!pointer.styleReferenceImage) {
+            console.warn('[RefMigration] ⚠️ Skipping pointer with no image data:', pointer.id);
+            migratedPointers.push(pointer);
+            continue;
+          }
+          
+          console.log('[RefMigration] 📦 Migrating reference:', pointer.id, pointer.name);
+          
+          // Create resource with legacy data
+          const now = new Date().toISOString();
+          const metadata: StyleReferenceMetadata = {
+            name: pointer.name || 'Reference',
+            styleReferenceImage: pointer.styleReferenceImage,
+            styleReferenceImageOriginal: pointer.styleReferenceImageOriginal || pointer.styleReferenceImage,
+            thumbnailUrl: pointer.thumbnailUrl || null,
+            styleReferenceStrength: pointer.styleReferenceStrength ?? 1.1,
+            subjectStrength: pointer.subjectStrength ?? 0.0,
+            subjectDescription: pointer.subjectDescription || '',
+            inThisScene: pointer.inThisScene ?? false,
+            inThisSceneStrength: pointer.inThisSceneStrength ?? 1.0,
+            referenceMode: pointer.referenceMode || 'style',
+            styleBoostTerms: pointer.styleBoostTerms || '',
+            is_public: false,
+            created_by: {
+              is_you: true,
+              username: user.email || 'user',
+            },
+            createdAt: pointer.createdAt || now,
+            updatedAt: pointer.updatedAt || now,
+          };
+          
+          const resource = await createStyleReference.mutateAsync({
+            type: 'style-reference',
+            metadata,
+          });
+          
+          console.log('[RefMigration] ✅ Created resource:', resource.id);
+          
+          // Create new pointer with only resourceId
+          migratedPointers.push({
+            id: pointer.id, // Keep same ID for selection tracking
+            resourceId: resource.id,
+          });
+        }
+        
+        // Update project settings with migrated pointers
+        await updateProjectImageSettings('project', {
+          references: migratedPointers
+        });
+        
+        console.log('[RefMigration] 🎉 Successfully migrated all references to resources table');
+      } catch (error) {
+        console.error('[RefMigration] ❌ Migration failed:', error);
+        toast.error('Failed to migrate references');
+        migrationCompleteRef.current = false; // Allow retry
+        try {
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.removeItem('referenceMigrationComplete');
+          }
+        } catch {}
+      }
+    };
+    
+    // Only check for legacy references once
+    if (!migrationCompleteRef.current && hasLegacyReferences) {
+      migrateToResources();
+    }
+  }, [selectedProjectId]); // Minimal dependencies - only re-run if project changes
   
   // Mark that we've visited this page in the session
   React.useEffect(() => {
@@ -579,7 +757,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Removed unused currentShotId that was causing unnecessary re-renders
   const { data: shots } = useListShots(selectedProjectId);
   const createShotMutation = useCreateShot();
-  const queryClient = useQueryClient();
   const { navigateToShot } = useShotNavigation();
   
   // Define generatePromptId before using it in hooks
@@ -1006,10 +1183,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const processedUploadedUrl = await uploadImageToStorage(processedFile);
       console.log('[StyleRefDebug] Upload completed, URL:', processedUploadedUrl);
       
-      // Create a new reference
-      const newReference: ReferenceImage = {
-        id: nanoid(),
-        name: `Reference ${(references.length + 1)}`,
+      // Get user for metadata
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      // Create resource metadata
+      const now = new Date().toISOString();
+      const metadata: StyleReferenceMetadata = {
+        name: `Reference ${(hydratedReferences.length + 1)}`,
         styleReferenceImage: processedUploadedUrl,
         styleReferenceImageOriginal: originalUploadedUrl,
         thumbnailUrl: thumbnailUrl,
@@ -1019,21 +1200,50 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         inThisScene: false,
         inThisSceneStrength: 1.0,
         referenceMode: 'style',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        styleBoostTerms: '',
+        is_public: false, // Always private for user uploads
+        created_by: {
+          is_you: true,
+          username: user.email || 'user',
+        },
+        createdAt: now,
+        updatedAt: now,
       };
       
-      console.log('[RefSettings] ➕ Creating new reference:', newReference);
+      console.log('[RefSettings] ➕ Creating new reference resource:', metadata.name);
       
-      // Optimistic UI update
+      // Create resource in resources table
+      const resource = await createStyleReference.mutateAsync({
+        type: 'style-reference',
+        metadata,
+      });
+      
+      console.log('[RefSettings] ✅ Created resource:', resource.id);
+      
+      // Create lightweight pointer
+      const newPointer: ReferenceImage = {
+        id: nanoid(),
+        resourceId: resource.id,
+      };
+      
+      console.log('[RefSettings] ➕ Creating reference pointer:', newPointer);
+      
+      // Optimistic UI updates for both resources and settings
       try {
+        // Update resources cache optimistically so hydration works immediately
+        queryClient.setQueryData(['resources', 'style-reference'], (prev: any) => {
+          const prevResources = prev || [];
+          return [...prevResources, resource];
+        });
+        
+        // Update settings cache to select the new reference
         queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
           const next = { 
             ...(prev || {}), 
-            references: [...references, newReference],
+            references: [...referencePointers, newPointer],
             selectedReferenceIdByShot: {
               ...selectedReferenceIdByShot,
-              [effectiveShotId]: newReference.id
+              [effectiveShotId]: newPointer.id
             }
           };
           console.log('[RefSettings] ⚡ Applied optimistic cache update for new reference', { next });
@@ -1043,27 +1253,101 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         console.warn('[RefSettings] Failed to set optimistic cache data', e);
       }
       
-      // Add the new reference and select it for the current shot
+      // Add the new pointer and select it for the current shot
       await updateProjectImageSettings('project', {
-        references: [...references, newReference],
+        references: [...referencePointers, newPointer],
         selectedReferenceIdByShot: {
           ...selectedReferenceIdByShot,
-          [effectiveShotId]: newReference.id
+          [effectiveShotId]: newPointer.id
         }
       });
+      
+      // Don't invalidate immediately - let optimistic updates do their job
+      // The debounced updateProjectImageSettings will eventually persist to DB
+      // and the mutation's onSuccess will handle query invalidation
       
       markAsInteracted();
       // Optimistically reflect the original uploaded image for display
       setStyleReferenceOverride(originalUploadedUrl);
       
-      console.log('[RefSettings] ✅ Style reference upload completed successfully!');
+      console.log('[RefSettings] ✅ Style reference upload completed successfully!', {
+        newPointerId: newPointer.id,
+        selectedForShot: effectiveShotId,
+        allSelections: {
+          ...selectedReferenceIdByShot,
+          [effectiveShotId]: newPointer.id
+        }
+      });
     } catch (error) {
       console.error('Error uploading style reference:', error);
       toast.error('Failed to upload reference image');
     } finally {
       setIsUploadingStyleReference(false);
     }
-  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, references, queryClient]);
+  }, [effectiveShotId, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, selectedProjectId, hydratedReferences, queryClient, createStyleReference, referencePointers]);
+
+  // Handle selecting an existing resource from the browser (no upload needed)
+  const handleResourceSelect = useCallback(async (resource: Resource) => {
+    try {
+      // Create lightweight pointer to existing resource
+      const newPointer: ReferenceImage = {
+        id: nanoid(),
+        resourceId: resource.id,
+      };
+      
+      console.log('[RefBrowser] 🔗 Linking existing resource:', {
+        resourceId: resource.id,
+        resourceType: resource.type,
+        pointerId: newPointer.id,
+        willBeSelectedForShot: effectiveShotId,
+        selectedProjectId
+      });
+      
+      // Optimistic UI update - use functional update to get current state
+      try {
+        queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+          const currentReferences = prev?.references || [];
+          const currentSelections = prev?.selectedReferenceIdByShot || {};
+          
+          const updatedReferences = [...currentReferences, newPointer];
+          const updatedSelections = {
+            ...currentSelections,
+            [effectiveShotId]: newPointer.id
+          };
+          
+          console.log('[RefBrowser] ⚡ Applied optimistic cache update for resource link', { 
+            prevReferencesLength: currentReferences.length,
+            nextReferencesLength: updatedReferences.length,
+            previouslySelectedForShot: currentSelections[effectiveShotId],
+            nowSelectedForShot: newPointer.id
+          });
+          
+          return { 
+            ...(prev || {}), 
+            references: updatedReferences,
+            selectedReferenceIdByShot: updatedSelections
+          };
+        });
+      } catch (e) {
+        console.error('[RefBrowser] ❌ Failed to set optimistic cache data:', e);
+      }
+      
+      // Get current values for persistence using functional pattern
+      const currentData = queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined]) as any;
+      
+      console.log('[RefBrowser] 💾 Persisting to database...');
+      await updateProjectImageSettings('project', {
+        references: currentData?.references || [],
+        selectedReferenceIdByShot: currentData?.selectedReferenceIdByShot || {}
+      });
+      
+      console.log('[RefBrowser] ✅ Successfully linked existing resource and persisted to DB');
+      markAsInteracted();
+    } catch (error) {
+      console.error('[RefBrowser] ❌ Failed to link resource:', error);
+      toast.error('Failed to add reference');
+    }
+  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted]);
 
   // Handle selecting a reference for the current shot
   const handleSelectReference = useCallback(async (referenceId: string) => {
@@ -1098,14 +1382,36 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Handle deleting a reference
   const handleDeleteReference = useCallback(async (referenceId: string) => {
     console.log('[RefSettings] 🗑️ Deleting reference:', referenceId);
-    const filteredReferences = references.filter(ref => ref.id !== referenceId);
+    
+    // Find the hydrated reference to get the resourceId
+    const hydratedRef = hydratedReferences.find(r => r.id === referenceId);
+    if (!hydratedRef) {
+      console.error('[RefSettings] ❌ Could not find reference:', referenceId);
+      return;
+    }
+    
+    // Delete the resource from resources table
+    try {
+      await deleteStyleReference.mutateAsync({
+        id: hydratedRef.resourceId,
+        type: 'style-reference',
+      });
+      console.log('[RefSettings] ✅ Resource deleted successfully');
+    } catch (error) {
+      console.error('[RefSettings] ❌ Failed to delete resource:', error);
+      toast.error('Failed to delete reference');
+      return;
+    }
+    
+    // Remove pointer from settings
+    const filteredPointers = referencePointers.filter(ref => ref.id !== referenceId);
     
     // Update all shot selections that had this reference selected
     const updatedSelections = { ...selectedReferenceIdByShot };
     Object.keys(updatedSelections).forEach(shotId => {
       if (updatedSelections[shotId] === referenceId) {
         // Select first remaining reference or null
-        updatedSelections[shotId] = filteredReferences[0]?.id ?? null;
+        updatedSelections[shotId] = filteredPointers[0]?.id ?? null;
       }
     });
     
@@ -1114,7 +1420,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
         const next = { 
           ...(prev || {}), 
-          references: filteredReferences,
+          references: filteredPointers,
           selectedReferenceIdByShot: updatedSelections
         };
         console.log('[RefSettings] ⚡ Applied optimistic cache update for reference deletion', { next });
@@ -1126,85 +1432,75 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     // Persist to database (debounced)
     await updateProjectImageSettings('project', {
-      references: filteredReferences,
+      references: filteredPointers,
       selectedReferenceIdByShot: updatedSelections
     });
     
     markAsInteracted();
-  }, [references, selectedReferenceIdByShot, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
+  }, [hydratedReferences, referencePointers, selectedReferenceIdByShot, deleteStyleReference, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
+  
+  // Handle updating a reference's settings
+  const handleUpdateReference = useCallback(async (referenceId: string, updates: Partial<HydratedReferenceImage>) => {
+    console.log('[RefSettings] 💾 Updating reference settings:', { referenceId, updates });
+    
+    // Find the hydrated reference to get the resourceId
+    const hydratedRef = hydratedReferences.find(r => r.id === referenceId);
+    if (!hydratedRef) {
+      console.error('[RefSettings] ❌ Could not find reference:', referenceId);
+      return;
+    }
+    
+    // Update the resource in resources table
+    const currentMetadata = {
+      name: hydratedRef.name,
+      styleReferenceImage: hydratedRef.styleReferenceImage,
+      styleReferenceImageOriginal: hydratedRef.styleReferenceImageOriginal,
+      thumbnailUrl: hydratedRef.thumbnailUrl,
+      styleReferenceStrength: hydratedRef.styleReferenceStrength,
+      subjectStrength: hydratedRef.subjectStrength,
+      subjectDescription: hydratedRef.subjectDescription,
+      inThisScene: hydratedRef.inThisScene,
+      inThisSceneStrength: hydratedRef.inThisSceneStrength,
+      referenceMode: hydratedRef.referenceMode,
+      styleBoostTerms: hydratedRef.styleBoostTerms,
+      is_public: false,
+      created_by: {
+        is_you: true,
+        username: 'user', // Will be preserved from existing metadata
+      },
+      createdAt: hydratedRef.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    const updatedMetadata: StyleReferenceMetadata = {
+      ...currentMetadata,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    console.log('[RefSettings] 📤 Updating resource:', hydratedRef.resourceId, updatedMetadata);
+    
+    try {
+      await updateStyleReference.mutateAsync({
+        id: hydratedRef.resourceId,
+        type: 'style-reference',
+        metadata: updatedMetadata,
+      });
+      console.log('[RefSettings] ✅ Resource updated successfully');
+    } catch (error) {
+      console.error('[RefSettings] ❌ Failed to update resource:', error);
+      toast.error('Failed to update reference');
+    }
+    
+    markAsInteracted();
+  }, [hydratedReferences, updateStyleReference, markAsInteracted]);
   
   // Handle updating a reference's name
   const handleUpdateReferenceName = useCallback(async (referenceId: string, name: string) => {
     console.log('[RefSettings] ✏️ Updating reference name:', referenceId, name);
-    const updatedReferences = references.map(ref =>
-      ref.id === referenceId
-        ? { ...ref, name, updatedAt: new Date().toISOString() }
-        : ref
-    );
-    
-    // Optimistic UI update
-    try {
-      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-        const next = { 
-          ...(prev || {}), 
-          references: updatedReferences
-        };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference name', { next });
-        return next;
-      });
-    } catch (e) {
-      console.warn('[RefSettings] Failed to set optimistic cache data', e);
-    }
-    
-    // Persist to database (debounced)
-    await updateProjectImageSettings('project', {
-      references: updatedReferences
-    });
-    markAsInteracted();
-  }, [references, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
-  
-  // Handle updating a reference's settings
-  const handleUpdateReference = useCallback(async (referenceId: string, updates: Partial<ReferenceImage>) => {
-    console.log('[RefSettings] 💾 Updating reference settings:', { referenceId, updates });
-    const updatedReferences = references.map(ref =>
-      ref.id === referenceId
-        ? { ...ref, ...updates, updatedAt: new Date().toISOString() }
-        : ref
-    );
-    
-    // Log what we're about to save
-    const updatedRef = updatedReferences.find(r => r.id === referenceId);
-    console.log('[RefSettings] 📤 Will save reference to DB:', {
-      id: updatedRef?.id,
-      name: updatedRef?.name,
-      referenceMode: updatedRef?.referenceMode,
-      styleStrength: updatedRef?.styleReferenceStrength,
-      subjectStrength: updatedRef?.subjectStrength
-    });
-    
-    // Optimistic UI update
-    try {
-      queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-        const next = { 
-          ...(prev || {}), 
-          references: updatedReferences
-        };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference settings', { 
-          updatedRefInCache: updatedReferences.find(r => r.id === referenceId)
-        });
-        return next;
-      });
-    } catch (e) {
-      console.warn('[RefSettings] Failed to set optimistic cache data', e);
-    }
-    
-    console.log('[RefSettings] ⏳ Saving to database (debounced 300ms)...');
-    await updateProjectImageSettings('project', {
-      references: updatedReferences
-    });
-    console.log('[RefSettings] ✅ Update call completed (actual DB write may still be pending due to debounce)');
-    markAsInteracted();
-  }, [references, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
+    // Use the generic update handler which updates the resource
+    await handleUpdateReference(referenceId, { name });
+  }, [handleUpdateReference]);
   
   // Handle removing style reference image (legacy - now removes selected reference)
   const handleRemoveStyleReference = useCallback(async () => {
@@ -1564,7 +1860,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           addSummaryForNewPrompts: true,
           replaceCurrentPrompts: true,
           temperature: 0.8,
-          existingPromptsForContext: [],
+          rulesToRememberText: '',
         });
         
         console.log('[ImageGenerationForm] Automated mode: Generated', rawResults.length, 'prompts');
@@ -1971,11 +2267,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
             styleBoostTerms={styleBoostTerms}
             onStyleBoostTermsChange={handleStyleBoostTermsChange}
             // New multiple references props
-            references={references}
+            references={hydratedReferences}
             selectedReferenceId={selectedReferenceId}
             onSelectReference={handleSelectReference}
             onDeleteReference={handleDeleteReference}
             onUpdateReferenceName={handleUpdateReferenceName}
+            onResourceSelect={handleResourceSelect}
+            // Loading state - show placeholders while hydrating
+            isLoadingReferenceData={isReferenceDataLoading}
+            referenceCount={referenceCount}
           />
         </div>
 

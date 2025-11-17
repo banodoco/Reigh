@@ -243,7 +243,7 @@ export const useAllShotGenerations = (
             params,
             shot_data
           `)
-          .not(`shot_data->${stableShotId}`, 'is', null) // GIN index filter
+          .not(`shot_data->${stableShotId}`, 'is', null) // GIN index filter on shot_data JSONB
           .order('created_at', { ascending: false })
           .abortSignal(signal);
         

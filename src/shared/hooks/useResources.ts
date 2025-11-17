@@ -25,8 +25,29 @@ export interface PhaseConfigMetadata {
     presetPromptPrefix?: string; // Text to prepend to prompts when this preset is selected
 }
 
-export type ResourceType = 'lora' | 'phase-config';
-export type ResourceMetadata = LoraModel | PhaseConfigMetadata;
+export interface StyleReferenceMetadata {
+    name: string;
+    styleReferenceImage: string;
+    styleReferenceImageOriginal: string;
+    thumbnailUrl: string | null;
+    styleReferenceStrength: number;
+    subjectStrength: number;
+    subjectDescription: string;
+    inThisScene: boolean;
+    inThisSceneStrength: number;
+    referenceMode: 'style' | 'subject' | 'style-character' | 'scene' | 'custom';
+    styleBoostTerms: string;
+    created_by: {
+        is_you: boolean;
+        username?: string;
+    };
+    is_public: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type ResourceType = 'lora' | 'phase-config' | 'style-reference';
+export type ResourceMetadata = LoraModel | PhaseConfigMetadata | StyleReferenceMetadata;
 
 export interface Resource {
     id: string;

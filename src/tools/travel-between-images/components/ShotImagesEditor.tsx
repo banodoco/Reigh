@@ -504,8 +504,18 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         await utilsData.batchExchangePositions([{ shotGenerationIdA: shotGenIdA, shotGenerationIdB: shotGenIdB }] as any);
       },
       batchExchangePositions: utilsData.batchExchangePositions, // REAL function!
-      deleteItem: async (genId: string) => {
-        console.warn('[ShotImagesEditor] deleteItem called via utility hook');
+      deleteItem: async (shotGenerationId: string) => {
+        console.log('[DELETE:ShotImagesEditor] 🔄 deleteItem stub forwarding to onImageDelete', {
+          shotGenerationId: shotGenerationId.substring(0, 8),
+          hasOnImageDelete: !!onImageDelete,
+          timestamp: Date.now()
+        });
+        // Forward to the actual delete handler passed from parent
+        if (onImageDelete) {
+          onImageDelete(shotGenerationId);
+        } else {
+          console.error('[DELETE:ShotImagesEditor] ❌ No onImageDelete handler provided!');
+        }
       },
       loadPositions: utilsData.loadPositions, // REAL function!
       moveItemsToMidpoint: utilsData.moveItemsToMidpoint, // NEW: Midpoint-based reordering (single or multi)

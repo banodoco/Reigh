@@ -1,4 +1,11 @@
 import React from "react";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
 import { Star, Download, Loader2 } from "lucide-react";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
@@ -132,41 +139,19 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
           compact={true}
           isBottom={false}
           rightContent={!hideTopFilters ? (
-            <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="starred-filter-gallery"
-                        checked={showStarredOnly}
-                        onCheckedChange={(checked) => {
-                            const newStarredOnly = Boolean(checked);
-                            onStarredFilterChange?.(newStarredOnly);
-                        }}
-                        className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
-                    />
-                    <Label 
-                        htmlFor="starred-filter-gallery" 
-                        className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
-                    >
-                        <Star className="h-3 w-3" />
-                        <span>Starred</span>
-                    </Label>
-                </div>
-                {onDownloadStarred && showStarredOnly && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onDownloadStarred}
-                        disabled={isDownloadingStarred}
-                        className={`text-xs h-6 px-2 ${whiteText ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        {isDownloadingStarred ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                            <Download className="h-3 w-3 mr-1" />
-                        )}
-                        <span>Download all starred</span>
-                    </Button>
-                )}
+            <div className="flex items-center">
+              <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
+                onMediaTypeFilterChange?.(value);
+              }}>
+                <SelectTrigger id="media-type-filter" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All</SelectItem>
+                  <SelectItem value="image" className="text-xs">Images</SelectItem>
+                  <SelectItem value="video" className="text-xs">Videos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           ) : undefined}
         />
@@ -179,43 +164,21 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
             Showing {rangeStart}-{rangeEnd} of {totalFilteredItems}
           </span>
         
-          {/* Starred Filter on the right */}
+          {/* Media Type Filter on the right */}
           {!hideTopFilters && (
-            <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="starred-filter-gallery-single"
-                        checked={showStarredOnly}
-                        onCheckedChange={(checked) => {
-                            const newStarredOnly = Boolean(checked);
-                            onStarredFilterChange?.(newStarredOnly);
-                        }}
-                        className={whiteText ? "border-zinc-600 data-[state=checked]:bg-zinc-600" : ""}
-                    />
-                    <Label 
-                        htmlFor="starred-filter-gallery-single" 
-                        className={`text-xs cursor-pointer flex items-center space-x-1 ${whiteText ? 'text-zinc-400' : 'text-muted-foreground'}`}
-                    >
-                        <Star className="h-3 w-3" />
-                        <span>Starred</span>
-                    </Label>
-                </div>
-                {onDownloadStarred && showStarredOnly && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onDownloadStarred}
-                        disabled={isDownloadingStarred}
-                        className={`text-xs h-6 px-2 ${whiteText ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        {isDownloadingStarred ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                            <Download className="h-3 w-3 mr-1" />
-                        )}
-                        <span>Download all starred</span>
-                    </Button>
-                )}
+            <div className="flex items-center">
+              <Select value={mediaTypeFilter} onValueChange={(value: 'all' | 'image' | 'video') => {
+                onMediaTypeFilterChange?.(value);
+              }}>
+                <SelectTrigger id="media-type-filter-single" className={`h-8 text-xs w-[80px] ${whiteText ? 'bg-zinc-800 border-zinc-700 text-white' : ''}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All</SelectItem>
+                  <SelectItem value="image" className="text-xs">Images</SelectItem>
+                  <SelectItem value="video" className="text-xs">Videos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
@@ -238,8 +201,10 @@ export const ImageGalleryHeader: React.FC<ImageGalleryHeaderProps> = ({
         clearSearch={clearSearch}
         handleSearchChange={handleSearchChange}
         hideTopFilters={hideTopFilters}
-        mediaTypeFilter={mediaTypeFilter}
-        onMediaTypeFilterChange={onMediaTypeFilterChange}
+        showStarredOnly={showStarredOnly}
+        onStarredFilterChange={onStarredFilterChange}
+        onDownloadStarred={onDownloadStarred}
+        isDownloadingStarred={isDownloadingStarred}
         toolTypeFilterEnabled={toolTypeFilterEnabled}
         onToolTypeFilterChange={onToolTypeFilterChange}
         currentToolTypeName={currentToolTypeName}

@@ -902,6 +902,33 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           })}
 
           {/* Timeline items */}
+          {(() => {
+            // [TimelineVisibility] Log what items are about to be rendered
+            console.log(`[TimelineVisibility] 🎬 RENDERING ${images.length} timeline items:`, {
+              shotId: shotId.substring(0, 8),
+              imagesCount: images.length,
+              currentPositionsSize: currentPositions.size,
+              items: images.map((img, idx) => {
+                const imgKey = img.shotImageEntryId ?? img.id;
+                const pos = currentPositions.get(imgKey);
+                return {
+                  idx,
+                  id: imgKey?.substring(0, 8),
+                  hasPosition: pos !== undefined,
+                  position: pos ?? `fallback:${idx * 50}`,
+                  imageUrl: !!img.imageUrl
+                };
+              }),
+              missingPositions: images.filter(img => {
+                const imgKey = img.shotImageEntryId ?? img.id;
+                return !currentPositions.has(imgKey);
+              }).map(img => ({
+                id: (img.shotImageEntryId ?? img.id)?.substring(0, 8)
+              })),
+              timestamp: Date.now()
+            });
+            return null;
+          })()}
           {images.map((image, idx) => {
             const imageKey = image.shotImageEntryId ?? image.id;
             const framePosition = currentPositions.get(imageKey) ?? idx * 50;

@@ -230,8 +230,29 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               onPrevious={lightbox.handlePrevious}
               onDelete={!props.readOnly ? (mediaId: string) => {
                 const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
-                const shotImageEntryId = currentImage.shotImageEntryId || currentImage.id;
-                props.onImageDelete(shotImageEntryId);
+                console.log('[DELETE:ShotImageManager] 🗑️ STEP 1: Delete clicked in lightbox', {
+                  lightboxIndex: lightbox.lightboxIndex,
+                  mediaIdFromCallback: mediaId?.substring(0, 8),
+                  currentImage: {
+                    id: currentImage.id?.substring(0, 8),
+                    shotImageEntryId: currentImage.shotImageEntryId?.substring(0, 8),
+                    generation_id: (currentImage as any).generation_id?.substring(0, 8),
+                    type: currentImage.type,
+                    hasImageUrl: !!currentImage.imageUrl,
+                    timeline_frame: (currentImage as any).timeline_frame
+                  },
+                  willCallWith: currentImage.shotImageEntryId?.substring(0, 8),
+                  timestamp: Date.now()
+                });
+                // Use shotImageEntryId for deletion to target the specific shot_generations entry
+                if (!currentImage.shotImageEntryId) {
+                  console.error('[DELETE:ShotImageManager] ❌ Missing shotImageEntryId!', {
+                    currentImage,
+                    allKeys: Object.keys(currentImage)
+                  });
+                  return;
+                }
+                props.onImageDelete(currentImage.shotImageEntryId);
               } : undefined}
               onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
                 await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}

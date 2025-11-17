@@ -82,6 +82,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
           {/* Automated vs Managed Toggle */}
           <div className="inline-flex items-center bg-muted rounded-full p-1">
             <button
+              type="button"
               onClick={() => onPromptModeChange('automated')}
               className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
                 promptMode === 'automated'
@@ -92,6 +93,7 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
               Automated
             </button>
             <button
+              type="button"
               onClick={() => onPromptModeChange('managed')}
               className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
                 promptMode === 'managed'
