@@ -2,14 +2,13 @@ import React from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { PlusCircle, Edit3, Sparkles, Trash2, Wand2, Info } from "lucide-react";
+import { PlusCircle, Edit3, Sparkles, Trash2, Wand2, Info, Layers } from "lucide-react";
 import { 
   Tooltip, 
   TooltipContent, 
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs";
 import { PromptEntry, PromptMode } from "../types";
 import { PromptInputRow } from "./PromptInputRow";
 import { SectionHeader } from "./SectionHeader";
@@ -81,16 +80,28 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
         </div>
         <div className="flex items-center space-x-2">
           {/* Automated vs Managed Toggle */}
-          <Tabs value={promptMode} onValueChange={(value) => onPromptModeChange(value as PromptMode)}>
-            <TabsList className="h-9">
-              <TabsTrigger value="automated" className="text-xs">
-                Automated
-              </TabsTrigger>
-              <TabsTrigger value="managed" className="text-xs">
-                Managed
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="inline-flex items-center bg-muted rounded-full p-1">
+            <button
+              onClick={() => onPromptModeChange('automated')}
+              className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                promptMode === 'automated'
+                  ? 'bg-background shadow-sm'
+                  : 'hover:bg-background/50'
+              }`}
+            >
+              Automated
+            </button>
+            <button
+              onClick={() => onPromptModeChange('managed')}
+              className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                promptMode === 'managed'
+                  ? 'bg-background shadow-sm'
+                  : 'hover:bg-background/50'
+              }`}
+            >
+              Managed
+            </button>
+          </div>
         </div>
       </div>
 

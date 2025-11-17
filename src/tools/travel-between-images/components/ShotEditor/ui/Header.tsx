@@ -258,7 +258,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
           // Normal mode - back button, name with chevrons, and aspect ratio all on one row
           <div className="flex items-center justify-between px-3">
             {/* Back button on the left - fixed width container */}
-            <div className="w-[80px]">
+            <div className="w-[40px]">
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -266,7 +266,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
                 className="flex items-center justify-center border-2 w-full px-0"
                 title="Back to shots"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-3 w-3" />
               </Button>
             </div>
             
@@ -304,12 +304,12 @@ const HeaderComponent: React.FC<HeaderProps> = ({
             </div>
             
             {/* Aspect Ratio Selector on the right - fixed width container */}
-            <div className="w-[80px]">
+            <div className="w-[40px]">
               <AspectRatioSelector
                 value={selectedShot?.aspect_ratio || projectAspectRatio || '16:9'}
                 onValueChange={handleAspectRatioChange}
                 showVisualizer={false}
-                className="w-full"
+                className="w-full text-xs"
               />
             </div>
           </div>

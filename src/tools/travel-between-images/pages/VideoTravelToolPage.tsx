@@ -1841,7 +1841,7 @@ const VideoTravelToolPage: React.FC = () => {
         </>
       ) : (
         // Show a loading state while settings or component are being fetched
-        <div className="px-4 max-w-7xl mx-auto pt-5">
+        <div className="px-4 max-w-7xl mx-auto pt-4">
         <Suspense fallback={<LoadingSkeleton type="editor" />}>
           <PageFadeIn>
             {/* Only render ShotEditor if we have a valid shot to edit */}

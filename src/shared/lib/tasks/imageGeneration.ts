@@ -8,6 +8,76 @@ import {
 } from '../taskCreation';
 
 /**
+ * Filter reference settings based on the selected reference mode.
+ * This ensures only relevant settings are passed to the backend based on what mode is active.
+ */
+function filterReferenceSettingsByMode(
+  referenceMode: 'style' | 'subject' | 'style-character' | 'scene' | 'custom' | undefined,
+  settings: {
+    style_reference_strength?: number;
+    subject_strength?: number;
+    subject_description?: string;
+    in_this_scene?: boolean;
+    in_this_scene_strength?: number;
+  }
+): Partial<typeof settings> {
+  // If no mode specified or custom mode, pass all settings as-is
+  if (!referenceMode || referenceMode === 'custom') {
+    return settings;
+  }
+
+  const filtered: Partial<typeof settings> = {};
+  
+  console.log(`[ReferenceFilter] Filtering settings for mode: ${referenceMode}`, { input: settings });
+
+  switch (referenceMode) {
+    case 'style':
+      // Style mode: only pass style strength, exclude subject and scene
+      if (settings.style_reference_strength !== undefined) {
+        filtered.style_reference_strength = settings.style_reference_strength;
+      }
+      break;
+
+    case 'subject':
+      // Subject mode: only pass subject strength and description, exclude style and scene
+      if (settings.subject_strength !== undefined) {
+        filtered.subject_strength = settings.subject_strength;
+      }
+      if (settings.subject_description !== undefined && settings.subject_description.trim()) {
+        filtered.subject_description = settings.subject_description;
+      }
+      break;
+
+    case 'style-character':
+      // Style + Subject mode: pass both style and subject, exclude scene
+      if (settings.style_reference_strength !== undefined) {
+        filtered.style_reference_strength = settings.style_reference_strength;
+      }
+      if (settings.subject_strength !== undefined) {
+        filtered.subject_strength = settings.subject_strength;
+      }
+      if (settings.subject_description !== undefined && settings.subject_description.trim()) {
+        filtered.subject_description = settings.subject_description;
+      }
+      break;
+
+    case 'scene':
+      // Scene mode: only pass scene settings, exclude style and subject
+      if (settings.in_this_scene !== undefined) {
+        filtered.in_this_scene = settings.in_this_scene;
+      }
+      if (settings.in_this_scene_strength !== undefined) {
+        filtered.in_this_scene_strength = settings.in_this_scene_strength;
+      }
+      break;
+  }
+  
+  console.log(`[ReferenceFilter] Filtered result for mode ${referenceMode}:`, { output: filtered });
+
+  return filtered;
+}
+
+/**
  * Parameters for creating an image generation task
  * Maps to the parameters expected by the single-image-generate edge function
  */
@@ -28,6 +98,7 @@ export interface ImageGenerationTaskParams {
   in_this_scene?: boolean; // Whether the subject is "in this scene"
   in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
   steps?: number; // Number of inference steps
+  reference_mode?: 'style' | 'subject' | 'style-character' | 'scene' | 'custom'; // Reference mode to filter settings
 }
 
 /**
@@ -53,6 +124,7 @@ export interface BatchImageGenerationTaskParams {
   in_this_scene?: boolean; // Whether the subject is "in this scene"
   in_this_scene_strength?: number; // Strength for "in this scene" LoRA (0.0-2.0)
   steps?: number; // Number of inference steps
+  reference_mode?: 'style' | 'subject' | 'style-character' | 'scene' | 'custom'; // Reference mode to filter settings
 }
 
 /**
@@ -216,19 +288,26 @@ export async function createImageGenerationTask(params: ImageGenerationTaskParam
         
         return Object.keys(lorasMap).length > 0 ? { additional_loras: lorasMap } : {};
       })(),
-      // Include style reference for Qwen.Image
-      ...(isQwenModel && params.style_reference_image && {
-        style_reference_image: params.style_reference_image,
-        style_reference_strength: params.style_reference_strength ?? 1.0,
-        subject_reference_image: params.subject_reference_image || params.style_reference_image, // Fallback to style image
-        subject_strength: params.subject_strength ?? 0.0,
-        subject_description: params.subject_description,
-        in_this_scene: params.in_this_scene
-      }),
-      // Include scene reference strength for Qwen.Image when available
-      ...(isQwenModel && params.in_this_scene_strength !== undefined && {
-        scene_reference_strength: params.in_this_scene_strength
-      }),
+      // Include style reference for Qwen.Image - filtered by reference mode to only include relevant settings
+      ...(isQwenModel && params.style_reference_image && (() => {
+        const filteredSettings = filterReferenceSettingsByMode(params.reference_mode, {
+          style_reference_strength: params.style_reference_strength ?? 1.0,
+          subject_strength: params.subject_strength ?? 0.0,
+          subject_description: params.subject_description,
+          in_this_scene: params.in_this_scene,
+          in_this_scene_strength: params.in_this_scene_strength
+        });
+        
+        return {
+          style_reference_image: params.style_reference_image,
+          subject_reference_image: params.subject_reference_image || params.style_reference_image, // Fallback to style image
+          ...filteredSettings,
+          // Add scene_reference_strength if in_this_scene_strength was included in filtered settings
+          ...(filteredSettings.in_this_scene_strength !== undefined && {
+            scene_reference_strength: filteredSettings.in_this_scene_strength
+          })
+        };
+      })()),
       // Include shot association
       ...(params.shot_id ? { shot_id: params.shot_id } : {}),
       // Make new image generations unpositioned by default
@@ -291,16 +370,23 @@ export async function createBatchImageGenerationTasks(params: BatchImageGenerati
           shot_id: params.shot_id,
           model_name: params.model_name,
           steps: params.steps, // Pass through the steps parameter
-          // Include style reference for Qwen.Image model
-          ...(params.style_reference_image && {
-            style_reference_image: params.style_reference_image,
-            style_reference_strength: params.style_reference_strength,
-            subject_reference_image: params.subject_reference_image || params.style_reference_image, // Fallback to style image
-            subject_strength: params.subject_strength,
-            subject_description: params.subject_description,
-            in_this_scene: params.in_this_scene,
-            in_this_scene_strength: params.in_this_scene_strength
-          })
+          reference_mode: params.reference_mode, // Pass reference mode for filtering
+          // Include style reference for Qwen.Image model - filtered by reference mode
+          ...(params.style_reference_image && (() => {
+            const filteredSettings = filterReferenceSettingsByMode(params.reference_mode, {
+              style_reference_strength: params.style_reference_strength,
+              subject_strength: params.subject_strength,
+              subject_description: params.subject_description,
+              in_this_scene: params.in_this_scene,
+              in_this_scene_strength: params.in_this_scene_strength
+            });
+            
+            return {
+              style_reference_image: params.style_reference_image,
+              subject_reference_image: params.subject_reference_image || params.style_reference_image,
+              ...filteredSettings
+            };
+          })())
         } as ImageGenerationTaskParams;
       });
     });

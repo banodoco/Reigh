@@ -1490,7 +1490,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subject_strength: currentSubjectStrength,
         subject_description: effectiveSubjectDescription,
         in_this_scene: currentInThisScene,
-        in_this_scene_strength: currentInThisSceneStrength
+        in_this_scene_strength: currentInThisSceneStrength,
+        reference_mode: referenceMode // Pass reference mode to filter settings properly
       }),
     };
 
@@ -1604,7 +1605,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           subject_strength: currentSubjectStrength,
           subject_description: effectiveSubjectDescription,
           in_this_scene: currentInThisScene,
-          in_this_scene_strength: currentInThisSceneStrength
+          in_this_scene_strength: currentInThisSceneStrength,
+          reference_mode: referenceMode // Pass reference mode to filter settings properly
         };
         
         const legacyGenerationData = {
@@ -1693,7 +1695,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subject_strength: currentSubjectStrength,
         subject_description: effectiveSubjectDescription,
         in_this_scene: currentInThisScene,
-        in_this_scene_strength: currentInThisSceneStrength
+        in_this_scene_strength: currentInThisSceneStrength,
+        reference_mode: referenceMode // Pass reference mode to filter settings properly
       }),
       // resolution will be resolved by the helper
     };
