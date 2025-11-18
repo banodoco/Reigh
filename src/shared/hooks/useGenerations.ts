@@ -119,7 +119,8 @@ export async function fetchGenerations(
       tasks,
       based_on,
       upscaled_url,
-      shot_data
+      shot_data,
+      name
     `)
     .eq('project_id', projectId);
 
@@ -182,17 +183,19 @@ export async function fetchGenerations(
   }
 
   // [UpscaleDebug] ALWAYS log to confirm function is running
-  console.log('[UpscaleDebug] ===== fetchGenerations called =====', {
-    projectId,
-    totalItems: data?.length || 0,
-    itemsWithUpscaledUrl: data?.filter((item: any) => item.upscaled_url).length || 0,
-    allItemIds: data?.slice(0, 3).map((item: any) => ({
-      id: item.id?.substring(0, 8),
-      hasUpscaledUrl: !!item.upscaled_url,
-      upscaledUrl: item.upscaled_url ? item.upscaled_url.substring(0, 60) + '...' : 'NONE',
-      location: item.location ? item.location.substring(0, 60) + '...' : 'NONE'
-    }))
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[UpscaleDebug] ===== fetchGenerations called =====', {
+      projectId,
+      totalItems: data?.length || 0,
+      itemsWithUpscaledUrl: data?.filter((item: any) => item.upscaled_url).length || 0,
+      allItemIds: data?.slice(0, 3).map((item: any) => ({
+        id: item.id?.substring(0, 8),
+        hasUpscaledUrl: !!item.upscaled_url,
+        upscaledUrl: item.upscaled_url ? item.upscaled_url.substring(0, 60) + '...' : 'NONE',
+        location: item.location ? item.location.substring(0, 60) + '...' : 'NONE'
+      }))
+    });
+  }
 
   // Calculate hasMore and process results based on count strategy
   let finalData = data || [];
@@ -212,7 +215,7 @@ export async function fetchGenerations(
   // Use shared transformer instead of inline transformation logic
   const items = finalData?.map((item: any) => {
     // [UpscaleDebug] Preserve existing debug logging
-    if (item.upscaled_url) {
+    if (item.upscaled_url && process.env.NODE_ENV === 'development') {
       console.log('[UpscaleDebug] Processing item with upscaled_url:', {
         id: item.id?.substring(0, 8),
         upscaled_url: item.upscaled_url?.substring(0, 60)
@@ -323,7 +326,7 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
   if (!data || data.length === 0) {
     console.error('[StarPersist] ⚠️ Database UPDATE returned no rows - possible RLS block', { 
       id, 
-      starred,
+      starred, 
       hint: 'Check Row Level Security policies on generations table' 
     });
     throw new Error(`Failed to update generation: No rows updated (possible RLS policy issue)`);
@@ -333,6 +336,36 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
     id, 
     starred, 
     updatedData: data[0],
+    timestamp: Date.now() 
+  });
+}
+
+/**
+ * Update generation name using direct Supabase call
+ */
+async function updateGenerationName(id: string, name: string): Promise<void> {
+  console.log('[GenerationUpdate] 🚀 Starting generation name UPDATE', { 
+    id, 
+    name, 
+    timestamp: Date.now() 
+  });
+
+  // Update the 'name' column directly
+  const { data, error } = await supabase
+    .from('generations')
+    .update({ name })
+    .eq('id', id)
+    .select('id, name');
+
+  if (error) {
+    console.error('[GenerationUpdate] ❌ Database UPDATE failed', { id, name, error: error.message });
+    throw new Error(`Failed to update generation name: ${error.message}`);
+  }
+
+  console.log('[GenerationUpdate] ✅ Database UPDATE successful', { 
+    id, 
+    name, 
+    updatedData: data?.[0],
     timestamp: Date.now() 
   });
 }
@@ -446,8 +479,50 @@ export function useUpdateGenerationLocation() {
   });
 }
 
+export function useUpdateGenerationName() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => {
+      return updateGenerationName(id, name);
+    },
+    onMutate: async ({ id, name }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['unified-generations'] });
+
+      // Snapshot previous values
+      const previousGenerationsQueries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
+
+      // Optimistically update
+      queryClient.setQueriesData({ queryKey: ['unified-generations'] }, (old: any) => {
+        if (!old?.items) return old;
+        return {
+          ...old,
+          items: old.items.map((item: any) => 
+            item.id === id ? { ...item, name } : item
+          )
+        };
+      });
+
+      return { previousGenerationsQueries };
+    },
+    onError: (error: Error, variables, context) => {
+      // Rollback on error
+      if (context?.previousGenerationsQueries) {
+        context.previousGenerationsQueries.forEach(([key, data]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+      console.error('Error updating generation name:', error);
+      toast.error(error.message || 'Failed to update generation name');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+    }
+  });
+}
+
 // NOTE: useGetTaskIdForGeneration moved to generationTaskBridge.ts for centralization
-// Import from: import { useGetTaskIdForGeneration } from '@/shared/lib/generationTaskBridge';
 
 export function useCreateGeneration() {
     const queryClient = useQueryClient();
@@ -533,15 +608,17 @@ export async function fetchDerivedGenerations(
     const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
     
     // Debug based_on field
-    console.log('[BasedOnDebug] 🔍 useGenerations mapping item:');
-    console.log('  itemId:', item.id?.substring(0, 8));
-    console.log('  hasBasedOnField:', !!item.based_on);
-    console.log('  basedOnValue:', item.based_on);
-    console.log('  hasBasedOnInParams:', !!(item.params?.based_on));
-    console.log('  basedOnInParams:', item.params?.based_on);
-    console.log('  allItemKeys:', Object.keys(item));
-    console.log('  paramsKeys:', item.params ? Object.keys(item.params) : 'no params');
-    console.log('  timestamp:', Date.now());
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[BasedOnDebug] 🔍 useGenerations mapping item:');
+      console.log('  itemId:', item.id?.substring(0, 8));
+      console.log('  hasBasedOnField:', !!item.based_on);
+      console.log('  basedOnValue:', item.based_on);
+      console.log('  hasBasedOnInParams:', !!(item.params?.based_on));
+      console.log('  basedOnInParams:', item.params?.based_on);
+      console.log('  allItemKeys:', Object.keys(item));
+      console.log('  paramsKeys:', item.params ? Object.keys(item.params) : 'no params');
+      console.log('  timestamp:', Date.now());
+    }
     
     const baseItem: GeneratedImageWithMetadata = {
       id: item.id,
@@ -563,10 +640,12 @@ export async function fetchDerivedGenerations(
       based_on: item.based_on || item.params?.based_on || null, // Include based_on from database or params
     };
     
-    console.log('[BasedOnDebug] ✅ Created baseItem:');
-    console.log('  baseItemId:', baseItem.id?.substring(0, 8));
-    console.log('  baseItem.based_on:', baseItem.based_on);
-    console.log('  baseItemKeys:', Object.keys(baseItem));
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[BasedOnDebug] ✅ Created baseItem:');
+      console.log('  baseItemId:', baseItem.id?.substring(0, 8));
+      console.log('  baseItem.based_on:', baseItem.based_on);
+      console.log('  baseItemKeys:', Object.keys(baseItem));
+    }
     
     // Include shot association data
     const shotGenerations = item.shot_generations || [];
@@ -590,7 +669,7 @@ export async function fetchDerivedGenerations(
         shot_id: sg.shot_id,
         timeline_frame: sg.timeline_frame,
         position: normalizePosition(sg.timeline_frame),
-      }));
+        }));
       
       const primaryShot = shotGenerations[0];
       return {

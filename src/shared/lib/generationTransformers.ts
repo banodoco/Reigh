@@ -162,6 +162,7 @@ export function transformGeneration(
     upscaled_url: item.upscaled_url, // Top level for MediaLightbox
     position: null, // Will be set if shot context provided
     timeline_frame: null, // Will be set if shot context provided
+    name: item.name || item.params?.name || undefined,
   };
 
   // [UpscaleDebug] Preserve existing debug logging

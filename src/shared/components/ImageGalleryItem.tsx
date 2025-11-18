@@ -33,6 +33,7 @@ import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
 import { useTaskType } from "@/shared/hooks/useTaskType";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
+import { deriveInputImages } from "./ImageGallery/utils";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -133,6 +134,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const taskId: string | null = taskIdFromMetadata || taskIdFromCache;
   
   const { data: taskData } = useGetTask(taskId);
+  
+  // Derive input images for guidance tooltip
+  const inputImages = useMemo(() => deriveInputImages(taskData), [taskData]);
   
   // Only use the actual task type name (like 'wan_2_2_t2i'), not tool_type (like 'image-generation')
   // tool_type and task type name are different concepts - tool_type is a broader category
@@ -1364,7 +1368,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                             {isVideoTask && taskData ? (
                               <SharedTaskDetails
                                 task={taskData}
-                                inputImages={[]}
+                                inputImages={inputImages}
                                 variant="panel"
                                 isMobile={true}
                               />
@@ -1402,7 +1406,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                           {isVideoTask && taskData ? (
                             <SharedTaskDetails
                               task={taskData}
-                              inputImages={[]}
+                              inputImages={inputImages}
                               variant="hover"
                               isMobile={false}
                             />
