@@ -79,6 +79,7 @@ interface ImageGalleryItemProps {
   currentViewingShotId?: string; // ID of the shot currently being viewed (hides navigation buttons)
   // Project dimensions
   projectAspectRatio?: string;
+  showShare?: boolean;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -122,6 +123,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   onCreateShot,
   currentViewingShotId,
   projectAspectRatio,
+  showShare = true,
 }) => {
   // Local pending state to scope star button disabled to this item only
   const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
@@ -1426,7 +1428,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
 
               {/* Share Button - Below Info */}
-              {taskId && (
+              {showShare && taskId && (
                 <TooltipProvider>
                   <Tooltip delayDuration={300}>
                     <TooltipTrigger asChild>

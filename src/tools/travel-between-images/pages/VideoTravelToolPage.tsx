@@ -1887,6 +1887,7 @@ const VideoTravelToolPage: React.FC = () => {
                     onStarredFilterChange={setVideoStarredOnly}
                     columnsPerRow={3}
                     itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
+                    showShare={false}
                   />
                 </div>
               );
@@ -1900,13 +1901,13 @@ const VideoTravelToolPage: React.FC = () => {
               </div>
             ) : (
               <div className="max-w-7xl mx-auto">
-                <ShotListDisplay
-                  onSelectShot={handleShotSelect}
-                  onCreateNewShot={handleCreateNewShot}
-                  shots={filteredShots}
-                  sortMode={shotSortMode}
-                  highlightedShotId={highlightedShotId}
-                />
+              <ShotListDisplay
+                onSelectShot={handleShotSelect}
+                onCreateNewShot={handleCreateNewShot}
+                shots={filteredShots}
+                sortMode={shotSortMode}
+                highlightedShotId={highlightedShotId}
+              />
               </div>
             )
           )}

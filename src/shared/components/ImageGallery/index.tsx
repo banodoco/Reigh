@@ -701,6 +701,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           toggleStarMutation={toggleStarMutation}
           onCreateShot={onCreateShot}
           currentViewingShotId={currentViewingShotId}
+          showShare={showShare}
         />
         
         {/* Bottom Pagination Controls */}

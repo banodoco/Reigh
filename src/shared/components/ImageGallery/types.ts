@@ -100,5 +100,6 @@ export interface ImageGalleryProps {
   enableAdjacentPagePreloading?: boolean;
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
   onBackfillRequest?: (deletedCount: number, currentPage: number, itemsPerPage: number) => Promise<GeneratedImageWithMetadata[]>;
+  showShare?: boolean;
 }
 
