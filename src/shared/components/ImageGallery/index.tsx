@@ -106,7 +106,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     enableAdjacentPagePreloading = true,
     onCreateShot,
     lastShotNameForTooltip,
-    onBackfillRequest
+    onBackfillRequest,
+    showShare = true
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
