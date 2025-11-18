@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil, Share2, Copy, Loader2, CornerDownLeft } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil, Share2, Copy, Loader2, CornerDownLeft, Film } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import GalleryVideoScrubber from './ImageGallery/components/GalleryVideoScrubber';
 import { 
@@ -956,29 +956,33 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       <>
           {/* Shot Name Badge / Variant Name for Videos - Top Left */}
           {isVideoContent && ((image as any).name || (image.shot_id && simplifiedShotOptions.length > 0)) && (
-          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-              {/* Variant Name */}
+          <div className="absolute top-2 left-2 flex flex-col items-start gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              {/* Variant Name - Subtle Metadata Label */}
               {(image as any).name && (
-                <div className="bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md mb-1">
+                <div className="bg-black/40 backdrop-blur-[2px] border border-white/10 text-white/90 text-[10px] sm:text-xs px-2 py-0.5 rounded-full shadow-sm">
                   {(image as any).name}
                 </div>
               )}
               
-              {/* Shot Navigation Button */}
+              {/* Shot Navigation Button - Distinct Actionable Design */}
               {image.shot_id && simplifiedShotOptions.length > 0 && (
                 <button 
-                    className="px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
-                    onClick={() => {
+                    className="group/shot-btn px-2.5 py-1 rounded-full bg-blue-600/80 hover:bg-blue-600 text-white text-xs font-medium transition-all flex items-center gap-1.5 shadow-md border border-blue-400/20 backdrop-blur-sm"
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent opening lightbox
                         const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
                         if (targetShot) {
                             navigateToShot(targetShot as any, { scrollToTop: true });
                         }
                     }}
                 >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    <Film className="w-3 h-3 text-blue-100" />
+                    <span className="truncate max-w-[80px]">
+                      {simplifiedShotOptions.find(s => s.id === image.shot_id)?.name || 'Unknown Shot'}
+                    </span>
+                    <svg className="w-3 h-3 text-blue-200 opacity-70 group-hover/shot-btn:opacity-100 group-hover/shot-btn:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                     </svg>
-                    {simplifiedShotOptions.find(s => s.id === image.shot_id)?.name || 'Unknown Shot'}
                 </button>
               )}
           </div>
