@@ -256,7 +256,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   }
 
   // Derived values
-  const isVideo = media.type === 'video' || media.type === 'video_travel_output' || media.location?.endsWith('.mp4');
+  // FIX: Check media.url for .mp4 extension since that's the actual field name
+  const isVideo = media.type === 'video' || media.type === 'video_travel_output' || (media as any).url?.endsWith('.mp4') || media.location?.endsWith('.mp4');
   
   // ========================================
   // ALL HOOKS - Business logic extracted
