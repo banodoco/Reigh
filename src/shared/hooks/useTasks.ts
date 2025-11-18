@@ -267,17 +267,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   
   // [TasksPaneCountMismatch] Debug unexpected limit values
   if (limit < 10) {
-    console.warn('[TasksPaneCountMismatch]', {
-      context: 'usePaginatedTasks:UNEXPECTED_SMALL_LIMIT',
-      receivedParams: params,
-      limit,
-      offset,
-      page,
-      status,
-      projectId,
-      WARNING: 'Limit too small for processing view - check for cache collision',
-      timestamp: Date.now()
-    });
+    // Limit too small for processing view - check for cache collision
   }
   
   const effectiveProjectId = projectId ?? (typeof window !== 'undefined' ? (window as any).__PROJECT_CONTEXT__?.selectedProjectId : null);
@@ -285,45 +275,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
     // CRITICAL: Use page-based cache keys like gallery
     queryKey: [TASKS_QUERY_KEY, 'paginated', effectiveProjectId, page, limit, status],
     queryFn: async (queryContext) => {
-      const startTime = Date.now();
-      const queryId = `query-${startTime}-${Math.random().toString(36).slice(2, 8)}`;
-      
-      console.log(`[TaskQueryDiag:${queryId}] 🚀 QUERY START:`, {
-        projectId: effectiveProjectId,
-        page,
-        limit,
-        status,
-        queryKey: queryContext.queryKey,
-        signal: !!queryContext.signal,
-        aborted: queryContext.signal?.aborted,
-        timestamp: startTime
-      });
-      // [TasksPaneCountMismatch] Log function entry params to catch limit corruption
-      console.log('[TasksPaneCountMismatch]', {
-        context: 'usePaginatedTasks:queryFn-entry',
-        projectId,
-        page,
-        limit,
-        offset,
-        status,
-        WARNING: limit < 10 ? 'CORRUPTED_LIMIT_DETECTED' : null,
-        cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':'),
-        timestamp: Date.now()
-      });
-      
-      console.log('[TaskPollingDebug] Starting paginated tasks query - GALLERY PATTERN:', {
-        projectId,
-        page,
-        limit,
-        offset,
-        status,
-        visibilityState: document.visibilityState,
-        isHidden: document.hidden,
-        userAgent: navigator.userAgent,
-        timestamp: Date.now(),
-        queryContextMessage: 'EXECUTING DATABASE QUERY',
-        cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':')
-      });
       
       if (!effectiveProjectId) {
         return { tasks: [], total: 0, hasMore: false, totalPages: 0 }; 
@@ -384,17 +335,7 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         }
         
         if (effectiveBaseLimit !== limit) {
-          console.warn('[TasksPaneCountMismatch]', {
-            context: 'usePaginatedTasks:limit-override-for-processing',
-            projectId,
-            page,
-            receivedLimit: limit,
-            effectiveBaseLimit,
-            fetchLimit,
-            strategy: page === 1 ? 'first-page-expanded' : 'standard-pagination',
-            reason: 'Processing view progressive loading',
-            timestamp: Date.now()
-          });
+          // Limit override for processing view
         }
         dataQuery = dataQuery.limit(fetchLimit);
       } else {
@@ -403,13 +344,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       }
 
       // Execute queries (skip count for fast polling scenarios)
-      console.log('[TaskPollingDebug] Executing queries...', {
-        projectId,
-        page,
-        skipCount: shouldSkipCount,
-        timestamp: Date.now()
-      });
-      
       const [countResult, { data, error: dataError }] = await Promise.all([
         shouldSkipCount ? Promise.resolve({ count: null, error: null }) : countQuery,
         dataQuery
@@ -417,63 +351,18 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
       
       const { count, error: countError } = countResult;
       
-      console.log('[TaskPollingDebug] Query results received:', {
-        projectId,
-        page,
-        count,
-        dataLength: data?.length,
-        countError: countError?.message,
-        dataError: dataError?.message,
-        timestamp: Date.now()
-      });
-      
       if (countError) {
-        console.error('[TaskPollingDebug] Count query failed:', {
-          projectId,
-          page,
-          error: countError,
-          timestamp: Date.now()
-        });
+        console.error('[TaskPollingDebug] Count query failed:', countError);
         throw countError;
       }
       if (dataError) {
-        console.error('[TaskPollingDebug] Data query failed:', {
-          projectId,
-          page,
-          error: dataError,
-          timestamp: Date.now()
-        });
+        console.error('[TaskPollingDebug] Data query failed:', dataError);
         throw dataError;
       }
       
       // Apply client-side filtering and sorting
       const allTasks = (data || []).map(mapDbTaskToTask);
       const visibleTasks = filterVisibleTasks(allTasks);
-      // [TasksPaneCountMismatch] Visibility breakdown to detect mismatches between counts and list
-      try {
-        const hiddenTasks = allTasks.filter(t => !isTaskVisible(t.taskType));
-        const processingVisible = visibleTasks.filter(t => t.status === TASK_STATUS.QUEUED || t.status === TASK_STATUS.IN_PROGRESS);
-        const processingVisibleOrchestrators = processingVisible.filter(t => t.taskType.includes('orchestrator'));
-        const processingVisibleNonOrchestrators = processingVisible.filter(t => !t.taskType.includes('orchestrator'));
-        console.log('[TasksPaneCountMismatch]', {
-          context: 'usePaginatedTasks:visibility-breakdown',
-          projectId,
-          page,
-          limit,
-          offset,
-          filterStatus: status,
-          rawFetchedCount: allTasks.length,
-          visibleCount: visibleTasks.length,
-          hiddenCount: hiddenTasks.length,
-          hiddenTaskTypesSample: hiddenTasks.slice(0, 5).map(t => ({ id: t.id, taskType: t.taskType, status: t.status })),
-          processingVisibleCount: processingVisible.length,
-          processingVisibleOrchestratorsCount: processingVisibleOrchestrators.length,
-          processingVisibleNonOrchestratorsCount: processingVisibleNonOrchestrators.length,
-          timestamp: Date.now()
-        });
-      } catch (e) {
-        console.warn('[TasksPaneCountMismatch]', { context: 'usePaginatedTasks:visibility-breakdown:log-error', message: (e as Error)?.message });
-      }
       
       let paginatedTasks: typeof allTasks;
       
@@ -502,38 +391,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         paginatedTasks = visibleTasks;
       }
       
-      // CRITICAL DEBUGGING: Track pagination math issues
-      console.log('[TasksPaginationDebug] Pagination logic breakdown:', {
-        projectId,
-        page,
-        limit,
-        offset,
-        needsCustomSorting,
-        paginationStrategy: needsCustomSorting ? 'CLIENT_SIDE_SORT_AND_PAGINATE' : 'DATABASE_PAGINATED',
-        rawFetched: allTasks.length,
-        filteredTasks: visibleTasks.length,
-        actualPaginatedCount: paginatedTasks.length,
-        totalFromDB: count,
-        calculatedTotalPages: Math.ceil((count || 0) / limit),
-        fetchLimit: needsCustomSorting ? Math.min(limit * PAGINATION_CONFIG.PROCESSING_FETCH_MULTIPLIER, PAGINATION_CONFIG.PROCESSING_MAX_FETCH) : limit,
-        FIXED_PAGINATION: !needsCustomSorting || (needsCustomSorting && offset < visibleTasks.length),
-        timestamp: Date.now()
-      });
-      
-      // Debug log to verify sorting is working (throttled to prevent spam)
-      if (paginatedTasks.length > 0 && Math.random() < 0.1) { // Only log 10% of the time
-        const statusCounts = paginatedTasks.reduce((acc, task) => {
-          acc[task.status] = (acc[task.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        console.log('[PollingBreakageIssue] Task sorting applied - status distribution:', {
-          statusCounts,
-          firstTaskStatus: paginatedTasks[0]?.status,
-          totalTasks: paginatedTasks.length,
-          timestamp: Date.now()
-        });
-      }
-      
       // Use approximation when count is skipped during fast polling
       // For Processing tasks, use a more reasonable approximation based on current page
       const total = count !== null ? count : Math.max(paginatedTasks.length, offset + paginatedTasks.length);
@@ -546,42 +403,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
         hasMore,
         totalPages,
       };
-
-      // [TasksPaneCountMismatch] Final payload summary for potential mismatch detection
-      try {
-        console.log('[TasksPaneCountMismatch]', {
-          context: 'usePaginatedTasks:result-summary',
-          projectId,
-          page,
-          total,
-          totalPages,
-          tasksReturned: result.tasks.length,
-          processingReturned: result.tasks.filter(t => t.status === TASK_STATUS.QUEUED || t.status === TASK_STATUS.IN_PROGRESS).length,
-          processingReturnedTypesSample: result.tasks
-            .filter(t => t.status === TASK_STATUS.QUEUED || t.status === TASK_STATUS.IN_PROGRESS)
-            .slice(0, 5)
-            .map(t => ({ id: t.id, taskType: t.taskType })),
-          timestamp: Date.now()
-        });
-      } catch {}
-
-      console.log('[TaskPollingDebug] Query completed successfully:', {
-        projectId,
-        page,
-        limit,
-        offset,
-        total,
-        totalPages,
-        hasMore,
-        tasksReturned: paginatedTasks.length,
-        filteredFrom: visibleTasks.length,
-        rawFetched: allTasks.length,
-        statusBreakdown: paginatedTasks.reduce((acc, task) => {
-          acc[task.status] = (acc[task.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
-        timestamp: Date.now()
-      });
 
       return result;
     },
@@ -598,28 +419,16 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   });
   
   // [TasksPaneCountMismatch] CRITICAL DEBUG: Log the actual query state to catch cache/stale issues
+  // Reduced to simplified debug object without logging
   const queryDebugInfo = {
-    context: 'usePaginatedTasks:query-state-debug',
     projectId,
     page,
     limit,
     status,
-    queryEnabled: !!projectId,
-    queryStatus: query.status,
-    queryFetchStatus: query.fetchStatus,
-    isLoading: query.isLoading,
-    isFetching: query.isFetching,
-    isStale: query.isStale,
-    isError: query.isError,
     hasData: !!query.data,
     dataTasksCount: query.data?.tasks ? query.data.tasks.length : 0,
     dataAge: query.dataUpdatedAt ? Math.round((Date.now() - query.dataUpdatedAt) / 1000) + 's' : 'never',
-    errorMessage: query.error?.message,
-    cacheKey: [TASKS_QUERY_KEY, 'paginated', projectId, page, limit, status].join(':'),
-    timestamp: Date.now()
   };
-  
-  console.log('[TasksPaneCountMismatch]', queryDebugInfo);
   
   // NUCLEAR OPTION: Force refetch if query has data but no tasks for Processing view
   // SAFETY: Only trigger if data is genuinely stale (older than 30 seconds) to prevent infinite loops
@@ -640,17 +449,6 @@ export const usePaginatedTasks = (params: PaginatedTasksParams) => {
   const meetsStaleThreshold = dataAge > hiddenStaleThresholdMs;
 
   if (isProcessingFilter && hasStaleEmptyData && query.status === 'success' && meetsStaleThreshold && timeSinceLastRefetch > minBackoffMs) {
-    console.warn('[TasksPaneCountMismatch] NUCLEAR REFETCH: Processing query has empty data but is marked success!', {
-      queryDebugInfo,
-      forcingRefetch: true,
-      reason: 'Processing filter with empty data should refetch',
-      dataAge: Math.round(dataAge / 1000) + 's',
-      timeSinceLastRefetch: Math.round(timeSinceLastRefetch / 1000) + 's',
-      isHidden,
-      thresholds: { minBackoffMs, hiddenStaleThresholdMs },
-      timestamp: Date.now()
-    });
-    
     lastRefetchRef.current = Date.now();
     // Force immediate refetch
     query.refetch();

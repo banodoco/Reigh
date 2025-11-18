@@ -58,7 +58,7 @@ const assistantTools = [
   {
     id: 'join-clips',
     name: 'Join Clips',
-    description: 'Seamlessly connect video clips with AI.',
+    description: 'Seamlessly connect video clips.',
     tool: toolsUIManifest.find(t => t.id === 'join-clips'),
     icon: Link2,
     gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',

@@ -83,14 +83,19 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
 
   // Force re-render when freshness manager state changes
   const [, forceUpdate] = useReducer(x => x + 1, 0);
+  const lastIntervalRef = useRef<number | false | null>(null);
 
   useEffect(() => {
     // Subscribe to freshness manager updates
     const unsubscribe = dataFreshnessManager.subscribe(() => {
-      if (debug) {
-        console.log(`[SmartPolling] 🔄 Freshness update for query:`, queryKey);
+      // 🎯 OPTIMIZATION: Only re-render if the calculated polling interval actually changes
+      const currentInterval = dataFreshnessManager.getPollingInterval(queryKey);
+      if (lastIntervalRef.current !== currentInterval) {
+        if (debug) {
+          console.log(`[SmartPolling] 🔄 Polling interval changed for ${JSON.stringify(queryKey)}: ${lastIntervalRef.current} -> ${currentInterval}`);
+        }
+        forceUpdate();
       }
-      forceUpdate();
     });
 
     return unsubscribe;
@@ -98,6 +103,7 @@ export function useSmartPolling(config: SmartPollingConfig): SmartPollingResult 
 
   // Get current state from freshness manager
   const pollingInterval = dataFreshnessManager.getPollingInterval(queryKey);
+  lastIntervalRef.current = pollingInterval;
   const isDataFresh = dataFreshnessManager.isDataFresh(queryKey, freshnessThreshold);
   const diagnostics = debug ? dataFreshnessManager.getDiagnostics() : null;
 

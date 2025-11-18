@@ -398,8 +398,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
               >
                 <div className="relative flex items-center space-x-2">
                   <div className="relative">
-                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-xl border-2 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300 animate-reigh-color-cycle">
-                      <Palette className="h-5 w-5 text-white group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg" />
+                    <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue rounded-xl border-2 border-wes-vintage-gold/40 shadow-wes-vintage group-hover:shadow-wes-hover transition-all duration-300 animate-reigh-color-cycle">
+                      <Palette className="h-6 w-6 text-white group-hover:rotate-12 transition-transform duration-300 drop-shadow-lg" />
                     </div>
                     <div className="absolute -top-1 -right-1 pointer-events-none">
                       <Crown className="w-2.5 h-2.5 text-wes-vintage-gold animate-bounce-gentle opacity-60" />
@@ -463,7 +463,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ contentOffsetRight =
                 variant="ghost"
                 size="icon"
                 onClick={onOpenSettings}
-                className="h-11 w-11 no-sweep wes-button-spin-pulse bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
+                className="h-10 w-10 no-sweep wes-button-spin-pulse bg-gradient-to-br from-wes-dusty-blue to-wes-lavender border-2 border-wes-vintage-gold/40 hover:from-wes-dusty-blue-dark hover:to-wes-lavender-dark shadow-wes-vintage hover:shadow-wes-hover group relative overflow-hidden"
               >
                 <div className="absolute inset-0 bg-film-grain opacity-20 animate-film-grain pointer-events-none"></div>
                 <Settings className="h-4 w-4 text-white relative z-10 transition-transform duration-500 group-hover:[transform:rotate(360deg)] delay-100" />

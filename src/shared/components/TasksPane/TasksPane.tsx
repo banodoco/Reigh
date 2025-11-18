@@ -242,20 +242,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   }, [lightboxData?.task]);
   
   // Realtime connection status
-  const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError, lastTaskUpdate, lastNewTask } = useSimpleRealtime();
-  
-  // [TasksPaneRealtimeDebug] Track realtime connection and task loading conditions
-  console.log('[TasksPaneRealtimeDebug]', {
-    context: 'connection-and-loading-state',
-    selectedProjectId,
-    shouldLoadTasks,
-    selectedFilter,
-    currentPage,
-    realtimeConnected,
-    realtimeConnecting,
-    realtimeError: realtimeError?.message || null,
-    timestamp: Date.now()
-  });
+  const { isConnected: realtimeConnected, isConnecting: realtimeConnecting, error: realtimeError } = useSimpleRealtime();
   
   // Get paginated tasks
   const { data: paginatedData, isLoading: isPaginatedLoading, error: paginatedError, refetch: refetchPaginatedTasks } = usePaginatedTasks({
@@ -268,206 +255,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // NOTE: Task invalidation is now handled by the centralized TaskInvalidationSubscriber
   // which provides better read-after-write consistency with exponential backoff retry
   
-  // [TasksPaneRealtimeDebug] Track React Query state and detect polling fallback
-  const queryState = queryClient.getQueryState(['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE]);
-  const queryData = queryClient.getQueryData(['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE]);
-  
-  console.log('[TasksPaneRealtimeDebug]', {
-    context: 'react-query-state-analysis',
-    queryKey: ['tasks', 'paginated', selectedProjectId, STATUS_GROUPS[selectedFilter], ITEMS_PER_PAGE, (currentPage - 1) * ITEMS_PER_PAGE],
-    queryState: {
-      status: queryState?.status,
-      fetchStatus: queryState?.fetchStatus,
-      isStale: queryState?.isStale,
-      dataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
-      dataUpdatedAtAge: queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt : null,
-      errorUpdatedAt: queryState?.errorUpdatedAt ? new Date(queryState.errorUpdatedAt).toISOString() : null,
-      isInvalidated: queryState?.isInvalidated,
-    },
-    hasQueryData: !!queryData,
-    realtimeStatus: {
-      connected: realtimeConnected,
-      connecting: realtimeConnecting,
-      error: realtimeError?.message || null
-    },
-    possiblePollingFallback: !realtimeConnected && queryState?.fetchStatus === 'fetching',
-    timestamp: Date.now()
-  });
-
-  // [TasksPaneRealtimeDebug] Track paginated tasks hook results
-  console.log('[TasksPaneRealtimeDebug]', {
-    context: 'paginated-hook-params-and-results',
-    hookParams: {
-      projectId: shouldLoadTasks ? selectedProjectId : null,
-      status: STATUS_GROUPS[selectedFilter],
-      limit: ITEMS_PER_PAGE,
-      offset: (currentPage - 1) * ITEMS_PER_PAGE,
-      ITEMS_PER_PAGE_CONSTANT: ITEMS_PER_PAGE,
-      currentPage,
-      selectedFilter,
-    },
-    hookResults: {
-      isLoading: isPaginatedLoading,
-      hasData: !!paginatedData,
-      tasksCount: paginatedData?.tasks?.length || 0,
-      total: paginatedData?.total || 0,
-      totalPages: paginatedData?.totalPages || 0,
-      hasMore: paginatedData?.hasMore,
-      error: paginatedError,
-    },
-    timestamp: Date.now()
-  });
-  
-  // Store previous pagination data to avoid flickering during loading
-  const [displayPaginatedData, setDisplayPaginatedData] = useState<typeof paginatedData>(paginatedData);
-  
-  // [TasksPaneRealtimeDebug] Track data freshness and invalidation events
-  useEffect(() => {
-    const handleTaskUpdate = (event: CustomEvent) => {
-      console.log('[TasksPaneRealtimeDebug]', {
-        context: 'realtime-task-update-event-received',
-        eventType: 'realtime:task-update',
-        eventDetail: event.detail,
-        currentFilter: selectedFilter,
-        currentPage,
-        realtimeConnected,
-        timestamp: Date.now()
-      });
-    };
-
-    const handleTaskNew = (event: CustomEvent) => {
-      console.log('[TasksPaneRealtimeDebug]', {
-        context: 'realtime-task-new-event-received',
-        eventType: 'realtime:task-new',
-        eventDetail: event.detail,
-        currentFilter: selectedFilter,
-        currentPage,
-        realtimeConnected,
-        timestamp: Date.now()
-      });
-    };
-
-    // Listen for realtime events
-    window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
-    window.addEventListener('realtime:task-new', handleTaskNew as EventListener);
-
-    return () => {
-      window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);
-      window.removeEventListener('realtime:task-new', handleTaskNew as EventListener);
-    };
-  }, [selectedFilter, currentPage, realtimeConnected]);
-  
-  // Update display data more aggressively - update when tasks are added OR removed
-  useEffect(() => {
-    const shouldUpdate = (!isPaginatedLoading && paginatedData) || 
-                        (!displayPaginatedData && paginatedData) ||
-                        // IMMEDIATE UPDATE: If we have new data with different task count, update immediately
-                        (paginatedData && displayPaginatedData && 
-                         (paginatedData as any).tasks.length !== (displayPaginatedData as any).tasks.length);
-    
-    if (shouldUpdate) {
-      console.log('[TasksPaneRealtimeDebug]', {
-        context: 'data-update-triggered',
-        reason: !displayPaginatedData ? 'initial' : 'task_count_changed',
-        previousTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
-        newTasksCount: (paginatedData as any)?.tasks?.length || 0,
-        countChange: ((paginatedData as any)?.tasks?.length || 0) - ((displayPaginatedData as any)?.tasks?.length || 0),
-        isLoading: isPaginatedLoading,
-        selectedFilter,
-        currentPage,
-        realtimeConnected,
-        dataFreshness: {
-          queryDataUpdatedAt: queryState?.dataUpdatedAt ? new Date(queryState.dataUpdatedAt).toISOString() : null,
-          ageInMs: queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt : null,
-          isStale: queryState?.isStale,
-          wasRecentlyInvalidated: queryState?.isInvalidated
-        },
-        timestamp: Date.now()
-      });
-      
-      setDisplayPaginatedData(paginatedData);
-      
-      // [TasksPaneCountMismatch] Track pagination data in TasksPane
-      console.log('[TasksPaneCountMismatch]', {
-        context: 'TasksPane:new-paginated-data',
-        selectedFilter,
-        currentPage,
-        isLoading: isPaginatedLoading,
-      tasksReceived: (paginatedData as any)?.tasks?.length || 0,
-      totalFromHook: (paginatedData as any)?.total || 0,
-      totalPagesFromHook: (paginatedData as any)?.totalPages || 0,
-      hasMoreFromHook: (paginatedData as any)?.hasMore,
-        calculatedOffset: (currentPage - 1) * ITEMS_PER_PAGE,
-        expectedItemsPerPage: ITEMS_PER_PAGE,
-        ISSUE_DETECTED: (paginatedData as any)?.tasks?.length === 0 && currentPage > 2 && ((paginatedData as any)?.total || 0) > 0,
-        timestamp: Date.now()
-      });
-
-      // [TasksPaneCountMismatch] Mismatch detector between counts and visible items on page
-      try {
-        const tasks = (paginatedData as any)?.tasks || [];
-        const visibleTasks = filterVisibleTasks(tasks);
-        const hiddenTasks = tasks.filter(t => !isTaskVisible((t as any).taskType));
-        const processingOnPage = visibleTasks.filter(t => (t as any).status === 'Queued' || (t as any).status === 'In Progress');
-        console.log('[TasksPaneCountMismatch]', {
-          context: 'TasksPane:page-visibility-breakdown',
-          selectedFilter,
-          currentPage,
-          pageTasksCount: tasks.length,
-          visibleOnPage: visibleTasks.length,
-          hiddenOnPage: hiddenTasks.length,
-          hiddenTypesSample: hiddenTasks.slice(0, 5).map(t => ({ id: (t as any).id, taskType: (t as any).taskType, status: (t as any).status })),
-          processingOnPage: processingOnPage.length,
-          processingSample: processingOnPage.slice(0, 5).map(t => ({ id: (t as any).id, taskType: (t as any).taskType })),
-          timestamp: Date.now()
-        });
-      } catch (e) {
-        console.warn('[TasksPaneCountMismatch]', { context: 'TasksPane:page-visibility-breakdown:log-error', message: (e as Error)?.message });
-      }
-    } else {
-      console.log('[PollingBreakageIssue] [TasksPane] Skipping display update', {
-        context: 'TasksPane:skip-display-update',
-        isLoading: isPaginatedLoading,
-        hasPaginatedData: !!paginatedData,
-        hasDisplayData: !!displayPaginatedData,
-        selectedFilter,
-        currentPage,
-        reason: isPaginatedLoading ? 'still_loading' : 'no_new_data',
-        paginatedDataTasksCount: paginatedData?.tasks?.length || 0,
-        displayDataTasksCount: displayPaginatedData?.tasks?.length || 0,
-        timestamp: Date.now()
-      });
-    }
-  }, [paginatedData, isPaginatedLoading, displayPaginatedData, selectedFilter, currentPage]);
-  
   // Get status counts for indicators
   const { data: statusCounts, isLoading: isStatusCountsLoading, error: statusCountsError } = useTaskStatusCounts(shouldLoadTasks ? selectedProjectId : null);
-  
-  // [TasksPaneRealtimeDebug] Track status counts hook results and freshness
-  const statusCountsQueryState = queryClient.getQueryState(['task-status-counts', selectedProjectId]);
-  
-  console.log('[TasksPaneRealtimeDebug]', {
-    context: 'status-counts-hook-results-and-freshness',
-    hookParams: {
-      projectId: shouldLoadTasks ? selectedProjectId : null,
-    },
-    hookResults: {
-      isLoading: isStatusCountsLoading,
-      hasData: !!statusCounts,
-      statusCounts,
-      error: statusCountsError,
-    },
-    queryFreshness: {
-      status: statusCountsQueryState?.status,
-      fetchStatus: statusCountsQueryState?.fetchStatus,
-      dataUpdatedAt: statusCountsQueryState?.dataUpdatedAt ? new Date(statusCountsQueryState.dataUpdatedAt).toISOString() : null,
-      ageInMs: statusCountsQueryState?.dataUpdatedAt ? Date.now() - statusCountsQueryState.dataUpdatedAt : null,
-      isStale: statusCountsQueryState?.isStale,
-      isInvalidated: statusCountsQueryState?.isInvalidated
-    },
-    realtimeConnected,
-    timestamp: Date.now()
-  });
   
   // Store previous status counts to avoid flickering during loading
   const [displayStatusCounts, setDisplayStatusCounts] = useState<typeof statusCounts>(statusCounts);
@@ -485,128 +274,15 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   // For Processing filter: shows total processing tasks across all pages
   // For other filters: shows the processing tasks count from status counts (for the badge)
   const cancellableTaskCount = selectedFilter === 'Processing' 
-    ? ((displayPaginatedData as any)?.total || 0)
+    ? ((paginatedData as any)?.total || 0)
     : (displayStatusCounts?.processing || 0);
   
   // Track count vs task list mismatch
-  const currentTasksCount = (displayPaginatedData as any)?.tasks?.length || 0;
+  const currentTasksCount = (paginatedData as any)?.tasks?.length || 0;
   const isProcessingFilter = selectedFilter === 'Processing';
   
   // Badge now uses status counts total, pagination uses database total - both should match
   const hasMismatch = false;
-  
-  // [TasksPaneRealtimeDebug] Comprehensive realtime behavior summary
-  const paginatedQueryAge = queryState?.dataUpdatedAt ? Date.now() - queryState.dataUpdatedAt : null;
-  const statusCountsQueryAge = statusCountsQueryState?.dataUpdatedAt ? Date.now() - statusCountsQueryState.dataUpdatedAt : null;
-  
-  console.log('[TasksPaneRealtimeDebug]', {
-    context: 'comprehensive-realtime-behavior-summary',
-    realtimeStatus: {
-      connected: realtimeConnected,
-      connecting: realtimeConnecting,
-      error: realtimeError?.message || null
-    },
-    dataFreshness: {
-      paginatedQuery: {
-        ageInMs: paginatedQueryAge,
-        ageInSeconds: paginatedQueryAge ? Math.round(paginatedQueryAge / 1000) : null,
-        isStale: queryState?.isStale,
-        status: queryState?.status,
-        fetchStatus: queryState?.fetchStatus
-      },
-      statusCountsQuery: {
-        ageInMs: statusCountsQueryAge,
-        ageInSeconds: statusCountsQueryAge ? Math.round(statusCountsQueryAge / 1000) : null,
-        isStale: statusCountsQueryState?.isStale,
-        status: statusCountsQueryState?.status,
-        fetchStatus: statusCountsQueryState?.fetchStatus
-      }
-    },
-    possibleIssues: {
-      realtimeDisconnected: !realtimeConnected,
-      dataVeryStale: (paginatedQueryAge && paginatedQueryAge > 30000) || (statusCountsQueryAge && statusCountsQueryAge > 30000),
-      queriesStillFetching: queryState?.fetchStatus === 'fetching' || statusCountsQueryState?.fetchStatus === 'fetching',
-      likelyUsingPolling: !realtimeConnected && (queryState?.fetchStatus === 'fetching' || statusCountsQueryState?.fetchStatus === 'fetching')
-    },
-    currentState: {
-      selectedFilter,
-      currentPage,
-      tasksDisplayed: (displayPaginatedData as any)?.tasks?.length || 0,
-      badgeCount: cancellableTaskCount
-    },
-    timestamp: Date.now()
-  });
-
-  console.log('[TasksPane] Badge count calculation', {
-    selectedFilter,
-    statusCountsProcessing: displayStatusCounts?.processing || 0,
-    paginatedTotal: (displayPaginatedData as any)?.total || 0,
-    finalBadgeCount: cancellableTaskCount,
-    usingPaginatedTotal: selectedFilter === 'Processing',
-    totalTasksInView: (displayPaginatedData as any)?.tasks?.length || 0,
-    timestamp: Date.now()
-  });
-
-  // [TaskDisplayDiag] Only log when there are actual changes to avoid noise
-  const currentDisplayState = {
-    paginatedTasksCount: paginatedData?.tasks?.length || 0,
-    displayTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
-    isLoadingState: isPaginatedLoading,
-    connected: realtimeConnected
-  };
-  
-  // Only log if something meaningful changed
-  const prevStateRef = React.useRef(currentDisplayState);
-  const hasStateChanged = JSON.stringify(currentDisplayState) !== JSON.stringify(prevStateRef.current);
-  
-  if (hasStateChanged) {
-    console.log('[TaskDisplayDiag] 📊 UI STATE CHANGED:', {
-      queryStates: {
-        paginatedLoading: isPaginatedLoading,
-        paginatedError: !!paginatedError,
-        paginatedDataExists: !!paginatedData,
-        paginatedTasksCount: paginatedData?.tasks?.length || 0,
-        statusCountsLoading: isStatusCountsLoading,
-        statusCountsError: !!statusCountsError
-      },
-      displayLogic: {
-        shouldShowTasks: shouldLoadTasks,
-        hasDisplayData: !!displayPaginatedData,
-        displayTasksCount: (displayPaginatedData as any)?.tasks?.length || 0,
-        isLoadingState: isPaginatedLoading,
-        isErrorState: !!paginatedError
-      },
-      realtimeHealth: {
-        connected: realtimeConnected,
-        connecting: realtimeConnecting,
-        error: realtimeError?.message || null,
-        lastUpdate: lastTaskUpdate?.timestamp || 'never',
-        lastNewTask: lastNewTask?.timestamp || 'never'
-      },
-      timestamp: Date.now()
-    });
-    prevStateRef.current = currentDisplayState;
-  }
-  
-  // NOTE: Mismatch detection is now handled by the unified polling system
-  // which provides more robust detection and automatic resolution
-
-  // [TasksPaneCountMismatch] Compare processing count badge to visible processing tasks on current page
-  try {
-    const pageTasks = (displayPaginatedData as any)?.tasks || [];
-    const visiblePageTasks = filterVisibleTasks(pageTasks);
-    const processingOnPage = visiblePageTasks.filter(t => (t as any).status === 'Queued' || (t as any).status === 'In Progress');
-    console.log('[TasksPaneCountMismatch]', {
-      context: 'TasksPane:processing-badge-vs-page',
-      selectedFilter,
-      currentPage,
-      processingBadgeCount: cancellableTaskCount,
-      processingOnPageCount: processingOnPage.length,
-      possibleCause: 'Counts exclude orchestrators; list includes them',
-      pageProcessingTypesSample: processingOnPage.slice(0, 3).map(t => ({ id: (t as any).id, taskType: (t as any).taskType })),
-      timestamp: Date.now()
-    });
-  } catch {}
 
   const cancelAllPendingMutation = useCancelAllPendingTasks();
   const { toast } = useToast();
@@ -630,36 +306,12 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
 
   // Lightbox handlers - passed down to TaskItems
   const handleOpenImageLightbox = (task: Task, media: GenerationRow) => {
-    console.log('[TasksPane:BasedOn] 🖼️ Opening image lightbox:', {
-      taskId: task.id.substring(0, 8),
-      mediaId: media.id.substring(0, 8),
-      hasBasedOn: !!(media as any).based_on,
-      basedOn: (media as any).based_on?.substring(0, 8) || 'null',
-      hasSourceGenerationId: !!media.sourceGenerationId,
-      sourceGenerationId: media.sourceGenerationId?.substring(0, 8) || 'null',
-      hasBasedOnInMetadata: !!(media.metadata as any)?.based_on,
-      metadataBasedOn: (media.metadata as any)?.based_on?.substring(0, 8) || 'null',
-      mediaKeys: Object.keys(media).join(', '),
-    });
-    
     setLightboxData({ type: 'image', task, media });
     setActiveTaskId(task.id);
     setIsTasksPaneOpenProgrammatic(true);
   };
 
   const handleOpenVideoLightbox = (task: Task, media: GenerationRow[], videoIndex: number) => {
-    const firstMedia = media[videoIndex];
-    console.log('[TasksPane:BasedOn] 🎥 Opening video lightbox:', {
-      taskId: task.id.substring(0, 8),
-      videoIndex,
-      totalVideos: media.length,
-      firstMediaId: firstMedia?.id.substring(0, 8),
-      hasBasedOn: !!(firstMedia as any)?.based_on,
-      basedOn: (firstMedia as any)?.based_on?.substring(0, 8) || 'null',
-      hasSourceGenerationId: !!firstMedia?.sourceGenerationId,
-      sourceGenerationId: firstMedia?.sourceGenerationId?.substring(0, 8) || 'null',
-    });
-    
     setLightboxData({ type: 'video', task, media, videoIndex });
     setActiveTaskId(task.id);
     setIsTasksPaneOpenProgrammatic(true);
@@ -675,12 +327,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     generationId: string,
     derivedContext?: string[]
   ) => {
-    console.log('[TasksPane:BasedOn] 🌐 Opening external generation:', {
-      generationId: generationId.substring(0, 8),
-      hasDerivedContext: !!derivedContext,
-      timestamp: Date.now()
-    });
-
     try {
       // Fetch the generation from the database with its shot associations
       const { data, error } = await supabase
@@ -696,17 +342,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       
       if (data) {
         // The database field is 'based_on' at the top level
-        const basedOnValue = (data as any).based_on || (data.metadata as any)?.based_on || null;
-        
-        console.log('[TasksPane:BasedOn] 📦 Raw data from DB:', {
-          id: data.id.substring(0, 8),
-          hasBasedOnAtTopLevel: !!(data as any).based_on,
-          basedOnAtTopLevel: (data as any).based_on?.substring(0, 8) || 'null',
-          hasBasedOnInMetadata: !!(data.metadata as any)?.based_on,
-          metadataBasedOn: (data.metadata as any)?.based_on?.substring(0, 8) || 'null',
-          finalBasedOnValue: basedOnValue?.substring(0, 8) || 'null',
-          allKeys: Object.keys(data).join(', '),
-        });
+        const basedOnValue = (data as any).based_on || (data as any).metadata?.based_on || null;
         
         // Transform the data to match GenerationRow format
         const shotGenerations = (data as any).shot_generations || [];
@@ -715,17 +351,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         const imageUrl = (data as any).location || (data as any).upscaled_url || (data as any).thumbnail_url;
         const thumbUrl = (data as any).thumbnail_url || (data as any).location;
         
-        console.log('[TasksPane:BasedOn] 🖼️ Image URL details:', {
-          id: data.id.substring(0, 8),
-          hasLocation: !!(data as any).location,
-          hasThumbnailUrl: !!(data as any).thumbnail_url,
-          hasUpscaledUrl: !!(data as any).upscaled_url,
-          locationPreview: ((data as any).location || '').substring(0, 80),
-          thumbnailUrlPreview: ((data as any).thumbnail_url || '').substring(0, 80),
-          finalImageUrl: imageUrl?.substring(0, 80) || 'null',
-          finalThumbUrl: thumbUrl?.substring(0, 80) || 'null',
-        });
-        
         const transformedData: GenerationRow = {
           id: data.id,
           location: (data as any).location,
@@ -733,9 +358,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           thumbUrl,
           videoUrl: (data as any).video_url || null,
           createdAt: data.created_at,
-          taskId: data.task_id,
-          metadata: data.metadata,
-          starred: data.starred || false,
+          taskId: (data as any).task_id,
+          metadata: (data as any).metadata,
+          starred: (data as any).starred || false,
           // CRITICAL: Include based_on at TOP LEVEL for MediaLightbox
           based_on: basedOnValue,
           // Also include as sourceGenerationId for compatibility
@@ -748,16 +373,10 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           }, {}),
         } as any;
         
-        console.log('[TasksPane:BasedOn] ✅ Transformed data:', {
-          id: transformedData.id.substring(0, 8),
-          based_on: (transformedData as any).based_on?.substring(0, 8) || 'null',
-          hasBasedOn: !!(transformedData as any).based_on,
-        });
-        
         // Update lightbox to show this generation
         // We don't have the original task, so we'll use a minimal task object
         const minimalTask: Task = {
-          id: data.task_id || 'unknown',
+          id: (data as any).task_id || 'unknown',
           status: 'Complete',
           taskType: 'unknown',
           createdAt: data.created_at,
@@ -766,14 +385,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         } as Task;
         
         setLightboxData({
-          type: transformedData.videoUrl ? 'video' : 'image',
+          type: (transformedData as any).videoUrl ? 'video' : 'image', // Safe access via any
           task: minimalTask,
           media: transformedData,
-        });
-        
-        console.log('[TasksPane:BasedOn] 🎯 Lightbox data set with media:', {
-          mediaId: transformedData.id.substring(0, 8),
-          hasBasedOn: !!(transformedData as any).based_on,
         });
       }
     } catch (error) {
@@ -811,17 +425,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   ): Promise<boolean> => {
     const targetShotId = currentShotId || lastAffectedShotId;
     
-    console.log('[TasksPane:AddToShot] 🎯 Add to shot requested:', {
-      generationId: generationId.substring(0, 8),
-      targetShotId: targetShotId?.substring(0, 8) || 'none',
-      hasCurrentShotId: !!currentShotId,
-      hasLastAffectedShotId: !!lastAffectedShotId,
-      hasImageUrl: !!imageUrl,
-      hasThumbUrl: !!thumbUrl,
-      selectedProjectId: selectedProjectId?.substring(0, 8) || 'none',
-      timestamp: Date.now()
-    });
-    
     if (!targetShotId) {
       console.error('[TasksPane:AddToShot] ❌ No shot selected');
       sonnerToast.error('No shot selected. Please select a shot first.');
@@ -846,7 +449,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         project_id: selectedProjectId,
       });
       
-      console.log('[TasksPane:AddToShot] ✅ Successfully added to shot');
       // Toast removed per user request - button state change is sufficient feedback
       return true;
     } catch (error) {
@@ -869,17 +471,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     thumbUrl?: string
   ): Promise<boolean> => {
     const targetShotId = currentShotId || lastAffectedShotId;
-    
-    console.log('[TasksPane:AddToShot] 🎯 Add to shot without position requested:', {
-      generationId: generationId.substring(0, 8),
-      targetShotId: targetShotId?.substring(0, 8) || 'none',
-      hasCurrentShotId: !!currentShotId,
-      hasLastAffectedShotId: !!lastAffectedShotId,
-      hasImageUrl: !!imageUrl,
-      hasThumbUrl: !!thumbUrl,
-      selectedProjectId: selectedProjectId?.substring(0, 8) || 'none',
-      timestamp: Date.now()
-    });
     
     if (!targetShotId) {
       console.error('[TasksPane:AddToShot] ❌ No shot selected');
@@ -905,7 +496,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         project_id: selectedProjectId,
       });
       
-      console.log('[TasksPane:AddToShot] ✅ Successfully added to shot without position');
       // Toast removed per user request - button state change is sufficient feedback
       return true;
     } catch (error) {
@@ -1026,7 +616,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   }, [isOpen]);
 
   // Calculate pagination info - use paginated data total for perfect consistency with badge
-  const totalTasks = (displayPaginatedData as any)?.total || 0;
+  const totalTasks = (paginatedData as any)?.total || 0;
   const totalPages = Math.ceil(totalTasks / ITEMS_PER_PAGE);
 
   return (
@@ -1111,8 +701,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
                 console.log('[TasksPane] Processing button count debug', {
                   buttonCount: count,
                   source: 'paginatedData.total (actual count from query)',
-                  paginatedTotal: (displayPaginatedData as any)?.total,
-                  tasksOnCurrentPage: (displayPaginatedData as any)?.tasks?.length,
+                  paginatedTotal: (paginatedData as any)?.total,
+                  tasksOnCurrentPage: (paginatedData as any)?.tasks?.length,
                   selectedFilter,
                   currentPage,
                   timestamp: Date.now()
@@ -1209,7 +799,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             filterStatuses={STATUS_GROUPS[selectedFilter]}
             activeFilter={selectedFilter}
             statusCounts={displayStatusCounts}
-            paginatedData={displayPaginatedData as any}
+            paginatedData={paginatedData as any}
             isLoading={isPaginatedLoading}
             currentPage={currentPage}
             activeTaskId={activeTaskId}
@@ -1248,7 +838,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           : undefined;
         
         const currentIndex = lightboxData.videoIndex ?? 0;
-        const totalVideos = Array.isArray(lightboxData.media) ? lightboxData.media.length : 1;
+        const totalVideos = Array.isArray(lightboxData.media) ? (lightboxData.media as any[]).length : 1;
         
         return createPortal(
           <MediaLightbox
@@ -1271,10 +861,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             allShots={simplifiedShotOptions}
             selectedShotId={lightboxSelectedShotId || currentShotId || lastAffectedShotId || undefined}
             onShotChange={(shotId) => {
-              console.log('[TasksPane:AddToShot] 📝 Shot change requested:', {
-                newShotId: shotId.substring(0, 8),
-                timestamp: Date.now()
-              });
               setLightboxSelectedShotId(shotId);
             }}
             onAddToShot={handleAddToShot}
@@ -1285,10 +871,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             onOptimisticUnpositioned={handleOptimisticUnpositioned}
             showTickForImageId={undefined}
             onShowTick={async (imageId) => {
-              console.log('[TasksPane:AddToShot] ✓ Show tick requested:', {
-                imageId: imageId.substring(0, 8),
-                timestamp: Date.now()
-              });
+              // Optional: handle tick display logic here if needed
             }}
             onOpenExternalGeneration={handleOpenExternalGeneration}
             tasksPaneOpen={true}

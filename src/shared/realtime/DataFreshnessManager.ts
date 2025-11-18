@@ -96,10 +96,6 @@ export class DataFreshnessManager {
     if (this.state.realtimeStatus === 'connected') {
       // If realtime just connected (< 30 seconds), give it time to prove it's stable
       if (timeSinceStatusChange < 30000) {
-        console.log('[DataFreshness:Polling] ⏱️ Realtime recently connected, using backup polling', {
-          queryKey: queryKey[0],
-          timeSinceConnect: Math.round(timeSinceStatusChange / 1000) + 's'
-        });
         return 30000; // 30 seconds - wait for realtime to prove it's stable
       }
 
@@ -110,17 +106,8 @@ export class DataFreshnessManager {
         const eventAge = now - lastEvent;
         
         if (eventAge < 60000) { // Events within 1 minute
-          console.log('[DataFreshness:Polling] ✅ Realtime working well - DISABLING polling', {
-            queryKey: queryKey[0],
-            eventAge: Math.round(eventAge / 1000) + 's',
-            realtimeStatus: 'healthy'
-          });
           return false; // ✨ DISABLE POLLING - realtime is working!
         } else if (eventAge < 3 * 60 * 1000) { // Events within 3 minutes
-          console.log('[DataFreshness:Polling] 🔄 Realtime events getting old, light backup polling', {
-            queryKey: queryKey[0],
-            eventAge: Math.round(eventAge / 1000) + 's'
-          });
           return 60000; // 60 seconds - light backup polling
         }
       }

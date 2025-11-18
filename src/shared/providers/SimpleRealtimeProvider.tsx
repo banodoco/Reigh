@@ -8,16 +8,12 @@ interface SimpleRealtimeContextType {
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
-  lastTaskUpdate: any;
-  lastNewTask: any;
 }
 
 const SimpleRealtimeContext = createContext<SimpleRealtimeContextType>({
   isConnected: false,
   isConnecting: false,
-  error: null,
-  lastTaskUpdate: null,
-  lastNewTask: null
+  error: null
 });
 
 export const useSimpleRealtime = () => useContext(SimpleRealtimeContext);
@@ -37,9 +33,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
   const [state, setState] = useState<SimpleRealtimeContextType>({
     isConnected: false,
     isConnecting: false,
-    error: null,
-    lastTaskUpdate: null,
-    lastNewTask: null
+    error: null
   });
 
   // Connect to realtime when project changes
@@ -116,10 +110,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     // NEW: Handle batched task updates more efficiently
     const handleTaskUpdateBatch = (event: CustomEvent) => {
       const { payloads, count } = event.detail;
-      console.log('[SimpleRealtimeProvider:Batching] 📦 Batched task updates received:', {
-        count,
-        timestamp: Date.now()
-      });
 
       // Analyze batch to determine what needs invalidation
       const hasCompleteTask = payloads.some((p: any) => p?.new?.status === 'Complete');
@@ -130,23 +120,17 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
           .filter(Boolean)
       );
 
-      setState(prev => ({
-        ...prev,
-        lastTaskUpdate: { payload: event.detail, timestamp: Date.now() }
-      }));
-
-      console.log('[TasksPaneRealtimeDebug:Batching] 🔄 Targeted invalidation for batched updates', {
-        context: 'realtime-invalidation-task-batch',
-        batchSize: count,
-        hasCompleteTask,
-        completedShotIds: Array.from(completedShotIds).map(id => (id as string).substring(0, 8)),
-        keysToInvalidate: hasCompleteTask ? 3 : 2, // Reduced from 6+
-        timestamp: Date.now()
-      });
-
-      // ALWAYS invalidate these (reduced to 2 keys)
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      // ALWAYS invalidate list queries
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'paginated'] });
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
+
+      // 🎯 TARGETED INVALIDATION: Invalidate only specific tasks that changed
+      payloads.forEach((p: any) => {
+        const taskId = p.new?.id || p.old?.id;
+        if (taskId) {
+          queryClient.invalidateQueries({ queryKey: ['tasks', 'single', taskId] });
+        }
+      });
 
       // ONLY invalidate generation data if tasks completed
       if (hasCompleteTask) {
@@ -158,7 +142,6 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         
         // Invalidate only the specific shots that completed
         if (completedShotIds.size > 0) {
-          console.log('[TasksPaneRealtimeDebug:Batching] 🎯 Targeted invalidation for', completedShotIds.size, 'completed shots');
           completedShotIds.forEach((shotId) => {
             queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
             queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] }); // 🚀 For useEnhancedShotPositions (Timeline)
@@ -184,10 +167,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       const isComplete = payload?.new?.status === 'Complete';
       const shotId = payload?.new?.metadata?.shot_id || payload?.new?.metadata?.shotId;
       
-      setState(prev => ({
-        ...prev,
-        lastTaskUpdate: { payload: event.detail, timestamp: Date.now() }
-      }));
+      // Removed state update for lastTaskUpdate
       
       // Reduced invalidation scope
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -206,10 +186,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         timestamp: Date.now()
       });
       
-      setState(prev => ({
-        ...prev,
-        lastNewTask: { payload: event.detail, timestamp: Date.now() }
-      }));
+      // Removed state update for lastNewTask
       
       const activeQueries = queryClient.getQueryCache().getAll().length;
       
@@ -240,10 +217,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     const handleNewTask = (event: CustomEvent) => {
       console.log('[SimpleRealtimeProvider] 📨 New task received (legacy - should be batched):', event.detail);
       
-      setState(prev => ({
-        ...prev,
-        lastNewTask: { payload: event.detail, timestamp: Date.now() }
-      }));
+      // Removed state update for lastNewTask
       
       // Simplified invalidation - just tasks
           queryClient.invalidateQueries({ queryKey: ['tasks'] });
