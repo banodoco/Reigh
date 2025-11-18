@@ -36,12 +36,24 @@ export const useGenerationName = ({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Ref to track if we have a pending debounce operation (to prevent sync on blur)
   const isDebouncingRef = useRef(false);
+  // Ref to track if we have triggered a mutation but React Query state hasn't updated yet
+  const isSubmittingRef = useRef(false);
+
+  // Debug render
+  console.log('[VariantName] 🎨 Render hook:', {
+    generationName,
+    isEditingGenerationName,
+    isUpdatingGenerationName,
+    isDebouncing: isDebouncingRef.current,
+    isSubmitting: isSubmittingRef.current,
+    mediaName: media.name
+  });
 
   // Update local state when media prop changes (e.g. after refetch)
   // Only if NOT currently editing, to avoid overwriting user input
   // AND only if we don't have a pending local update (debounce or mutation)
   useEffect(() => {
-    const hasPendingUpdate = isDebouncingRef.current || isUpdatingGenerationName;
+    const hasPendingUpdate = isDebouncingRef.current || isUpdatingGenerationName || isSubmittingRef.current;
     
     console.log('[VariantName] 🔄 useEffect sync triggered:', {
       propMediaName: media.name,
@@ -50,6 +62,7 @@ export const useGenerationName = ({
       hasPendingUpdate,
       isDebouncing: isDebouncingRef.current,
       isUpdating: isUpdatingGenerationName,
+      isSubmitting: isSubmittingRef.current,
       willUpdate: !isEditingGenerationName && !hasPendingUpdate && media.name !== generationName
     });
     
@@ -79,6 +92,8 @@ export const useGenerationName = ({
     // Set new timeout for debounce (1000ms)
     timeoutRef.current = setTimeout(() => {
       console.log('[VariantName] 💾 Debounce timer fired, triggering mutation for:', newName);
+      // Mark as submitting to bridge the gap until isUpdatingGenerationName becomes true
+      isSubmittingRef.current = true;
       isDebouncingRef.current = false;
       
       updateGenerationNameMutation.mutate({ 
@@ -86,7 +101,11 @@ export const useGenerationName = ({
         name: newName 
       }, {
         onSuccess: () => console.log('[VariantName] ✅ Mutation success'),
-        onError: (err) => console.error('[VariantName] ❌ Mutation error:', err)
+        onError: (err) => console.error('[VariantName] ❌ Mutation error:', err),
+        onSettled: () => {
+          console.log('[VariantName] 🏁 Mutation settled');
+          isSubmittingRef.current = false;
+        }
       });
     }, 1000);
   };
