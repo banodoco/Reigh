@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useState, useRef, useEffect } from 'react';
 import { GenerationRow } from '@/types/shots';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useUpdateGenerationName } from '@/shared/hooks/useGenerations';
 
 export interface UseGenerationNameProps {
   media: GenerationRow;
@@ -15,7 +13,7 @@ export interface UseGenerationNameReturn {
   isUpdatingGenerationName: boolean;
   setGenerationName: (name: string) => void;
   setIsEditingGenerationName: (isEditing: boolean) => void;
-  handleGenerationNameChange: (newName: string) => Promise<void>;
+  handleGenerationNameChange: (newName: string) => void;
 }
 
 /**
@@ -26,58 +24,43 @@ export const useGenerationName = ({
   media,
   selectedProjectId,
 }: UseGenerationNameProps): UseGenerationNameReturn => {
-  const [generationName, setGenerationName] = useState<string>((media as any).name || '');
+  // Initialize with media.name, defaulting to empty string if undefined
+  const [generationName, setGenerationName] = useState<string>(media.name || '');
   const [isEditingGenerationName, setIsEditingGenerationName] = useState(false);
-  const [isUpdatingGenerationName, setIsUpdatingGenerationName] = useState(false);
   
-  const queryClient = useQueryClient();
+  // Use the mutation hook which handles optimistic updates and cache invalidation
+  const updateGenerationNameMutation = useUpdateGenerationName();
+  const isUpdatingGenerationName = updateGenerationNameMutation.isPending;
+  
+  // Ref for debounce timeout
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update local state when media prop changes (e.g. after refetch)
+  // Only if NOT currently editing, to avoid overwriting user input
+  useEffect(() => {
+    if (!isEditingGenerationName) {
+      setGenerationName(media.name || '');
+    }
+  }, [media.name, isEditingGenerationName]);
 
   // Handle updating generation name
-  const handleGenerationNameChange = async (newName: string) => {
+  const handleGenerationNameChange = (newName: string) => {
+    // Update local state immediately
     setGenerationName(newName);
     
-    // Debounce the actual save
-    if (isUpdatingGenerationName) return;
-    
-    setIsUpdatingGenerationName(true);
-    try {
-      const { error } = await supabase
-        .from('generations')
-        .update({ name: newName || null })
-        .eq('id', media.id);
-
-      if (error) {
-        console.error('[VariantName] Error updating generation name:', error);
-        toast.error('Failed to update variant name');
-        throw error;
-      }
-
-      console.log('[VariantName] Successfully updated generation name:', {
-        generationId: media.id.substring(0, 8),
-        newName: newName || '(cleared)'
-      });
-
-      // Invalidate relevant queries to update UI everywhere
-      if (selectedProjectId) {
-        // Invalidate VideoOutputsGallery queries
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', selectedProjectId] });
-        
-        // Invalidate TaskItem generation mapping queries (for image tasks)
-        queryClient.invalidateQueries({ queryKey: ['generation-for-task-legacy'] });
-        queryClient.invalidateQueries({ queryKey: ['task-generation-mapping'] });
-        
-        // Invalidate video generation queries (for video tasks in TasksPane)
-        queryClient.invalidateQueries({ queryKey: ['video-generations-for-task'] });
-        
-        // Invalidate generation queries by ID (for MediaLightbox and other components)
-        queryClient.invalidateQueries({ queryKey: ['generation', media.id] });
-      }
-      
-    } catch (error) {
-      console.error('[VariantName] Failed to update generation name:', error);
-    } finally {
-      setIsUpdatingGenerationName(false);
+    // Clear existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
+    
+    // Set new timeout for debounce (1000ms)
+    timeoutRef.current = setTimeout(() => {
+      console.log('[VariantName] Triggering save for:', newName);
+      updateGenerationNameMutation.mutate({ 
+        id: media.id, 
+        name: newName 
+      });
+    }, 1000);
   };
 
   return {
