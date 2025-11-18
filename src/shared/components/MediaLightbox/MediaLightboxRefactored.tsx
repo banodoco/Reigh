@@ -232,19 +232,26 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
 
-  // Debug logging for based_on data
-  console.log('[BasedOnDebug] 🎬 MediaLightbox received media:');
-  console.log('  mediaId:', media.id?.substring(0, 8));
-  console.log('  hasBasedOnField:', !!(media as any).based_on);
-  console.log('  basedOnValue:', (media as any).based_on);
-  console.log('  hasBasedOnInMetadata:', !!(media.metadata as any)?.based_on);
-  console.log('  basedOnInMetadata:', (media.metadata as any)?.based_on);
-  console.log('  mediaKeys:', Object.keys(media));
-  console.log('  metadataKeys:', media.metadata ? Object.keys(media.metadata) : 'no metadata');
-  console.log('  timestamp:', Date.now());
+  // Track component lifecycle and media changes - ALL TOP LEVEL
+  useEffect(() => {
+    console.log('[MediaLightbox] 🎬 ========== MOUNTED/CHANGED ==========');
+    console.log('[MediaLightbox] mediaId:', media?.id?.substring(0, 8));
+    console.log('[MediaLightbox] media.url:', (media as any)?.url);
+    console.log('[MediaLightbox] media.imageUrl:', media?.imageUrl);
+    console.log('[MediaLightbox] media.location:', media?.location);
+    console.log('[MediaLightbox] media.thumbUrl:', (media as any)?.thumbUrl);
+    console.log('[MediaLightbox] media.type:', media?.type);
+    console.log('[MediaLightbox] mediaKeys:', media ? Object.keys(media) : 'no media');
+    console.log('[MediaLightbox] ========================================');
+    
+    return () => {
+      console.log('[MediaLightbox] 💀 Component will unmount or media will change');
+    };
+  }, [media?.id, (media as any)?.url, media?.imageUrl, media?.location, media?.type]);
 
   // Safety check
   if (!media) {
+    console.error('[MediaLightbox] ❌ No media prop provided!');
     return null;
   }
 

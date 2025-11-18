@@ -59,6 +59,25 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   tasksPaneWidth = 0,
   debugContext = 'MediaDisplay'
 }) => {
+  const [imageLoadError, setImageLoadError] = React.useState(false);
+  
+  // Track component lifecycle
+  React.useEffect(() => {
+    console.log(`[${debugContext}] 🎬 Component MOUNTED`);
+    return () => {
+      console.log(`[${debugContext}] 💀 Component UNMOUNTED`);
+    };
+  }, [debugContext]);
+  
+  // Reset error state when URL changes
+  React.useEffect(() => {
+    console.log(`[${debugContext}] 🔄 ========== URL CHANGED ==========`);
+    console.log(`[${debugContext}] newUrl:`, effectiveImageUrl);
+    console.log(`[${debugContext}] hasUrl:`, !!effectiveImageUrl);
+    console.log(`[${debugContext}] ========================================`);
+    setImageLoadError(false);
+  }, [effectiveImageUrl, debugContext]);
+  
   // Variant-specific styling
   const getMediaStyle = () => {
     switch (variant) {
@@ -78,6 +97,50 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   };
 
   const mediaStyle = getMediaStyle();
+
+  // Debug logging for media URL - ALL TOP LEVEL
+  console.log(`[${debugContext}] 🎬 ========== RENDERING ==========`);
+  console.log(`[${debugContext}] effectiveImageUrl:`, effectiveImageUrl);
+  console.log(`[${debugContext}] thumbUrl:`, thumbUrl);
+  console.log(`[${debugContext}] isVideo:`, isVideo);
+  console.log(`[${debugContext}] variant:`, variant);
+  console.log(`[${debugContext}] hasUrl:`, !!effectiveImageUrl);
+  console.log(`[${debugContext}] urlLength:`, effectiveImageUrl?.length || 0);
+  console.log(`[${debugContext}] ========================================`);
+
+  // Check if URL is missing
+  if (!effectiveImageUrl) {
+    console.error(`[${debugContext}] ❌ Missing effectiveImageUrl!`);
+    return (
+      <div className={`relative flex items-center justify-center ${containerClassName}`}>
+        <div className="text-center text-white bg-red-900/80 rounded-lg p-6 backdrop-blur-sm border border-red-500/50">
+          <p className="font-medium text-lg mb-2">⚠️ Media URL Missing</p>
+          <p className="text-white/70 text-sm">The media URL is not available.</p>
+          <p className="text-white/50 text-xs mt-2">Check console for details.</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show error state if image failed to load
+  if (imageLoadError && !isVideo) {
+    console.error(`[${debugContext}] ❌ Image failed to load:`, effectiveImageUrl);
+    return (
+      <div className={`relative flex items-center justify-center ${containerClassName}`}>
+        <div className="text-center text-white bg-red-900/80 rounded-lg p-6 backdrop-blur-sm border border-red-500/50 max-w-md">
+          <p className="font-medium text-lg mb-2">⚠️ Failed to Load Image</p>
+          <p className="text-white/70 text-sm mb-3">The image could not be loaded (HTTP 400 error).</p>
+          <p className="text-white/50 text-xs break-all mb-3">{effectiveImageUrl}</p>
+          <button
+            onClick={() => setImageLoadError(false)}
+            className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -125,10 +188,22 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             }}
             onLoad={(e) => {
               const img = e.target as HTMLImageElement;
+              console.log(`[${debugContext}] ✅ Image loaded successfully:`, {
+                url: effectiveImageUrl.substring(0, 100),
+                width: img.naturalWidth,
+                height: img.naturalHeight
+              });
               onImageLoad?.({
                 width: img.naturalWidth,
                 height: img.naturalHeight
               });
+            }}
+            onError={(e) => {
+              console.error(`[${debugContext}] ❌ Image load error:`, {
+                url: effectiveImageUrl,
+                error: e
+              });
+              setImageLoadError(true);
             }}
           />
 

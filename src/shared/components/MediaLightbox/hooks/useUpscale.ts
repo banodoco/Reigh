@@ -35,7 +35,8 @@ export const useUpscale = ({
   const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing upscaled if available
   const hasUpscaledVersion = !!(media as any).upscaled_url;
   const upscaledUrl = (media as any).upscaled_url || null;
-  const originalUrl = media.imageUrl || media.location || '';
+  // FIX: The media object uses 'url', not 'imageUrl' or 'location'
+  const originalUrl = (media as any).url || media.imageUrl || media.location || '';
   
   // Track pending upscale tasks using localStorage
   const [isPendingUpscale, setIsPendingUpscale] = useState(() => {
@@ -100,7 +101,8 @@ export const useUpscale = ({
 
     setIsUpscaling(true);
     try {
-      const imageUrl = media.location || media.imageUrl;
+      // FIX: Use 'url' field which is what the media object actually has
+      const imageUrl = (media as any).url || media.location || media.imageUrl;
       if (!imageUrl) {
         throw new Error('No image URL available');
       }
@@ -143,6 +145,23 @@ export const useUpscale = ({
 
   // Compute effective image URL based on upscale state
   const effectiveImageUrl = (showingUpscaled && upscaledUrl) ? upscaledUrl : originalUrl;
+  
+  // Debug logging for URL issues - ALL TOP LEVEL
+  console.log('[MediaDisplay] 🖼️ ========== URL COMPUTATION ==========');
+  console.log('[MediaDisplay] mediaId:', media.id.substring(0, 8));
+  console.log('[MediaDisplay] effectiveImageUrl:', effectiveImageUrl);
+  console.log('[MediaDisplay] originalUrl:', originalUrl);
+  console.log('[MediaDisplay] upscaledUrl:', upscaledUrl);
+  console.log('[MediaDisplay] showingUpscaled:', showingUpscaled);
+  console.log('[MediaDisplay] hasUpscaledVersion:', hasUpscaledVersion);
+  console.log('[MediaDisplay] media.url:', (media as any).url);
+  console.log('[MediaDisplay] media.imageUrl:', media.imageUrl);
+  console.log('[MediaDisplay] media.location:', media.location);
+  console.log('[MediaDisplay] media.thumbUrl:', (media as any).thumbUrl);
+  console.log('[MediaDisplay] media.type:', media.type);
+  console.log('[MediaDisplay] isEmpty:', !effectiveImageUrl);
+  console.log('[MediaDisplay] ALL media keys:', Object.keys(media));
+  console.log('[MediaDisplay] ========================================');
   
   // Source URL for tasks (always use upscaled if available, otherwise get display URL)
   const sourceUrlForTasks = upscaledUrl ? getDisplayUrl(upscaledUrl) : getDisplayUrl(originalUrl);

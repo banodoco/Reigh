@@ -53,7 +53,8 @@ export const useReferences = ({
 
     setIsAddingToReferences(true);
     try {
-      const imageUrl = media.location || media.imageUrl;
+      // FIX: Use 'url' field which is what the media object actually has
+      const imageUrl = (media as any).url || media.location || media.imageUrl;
       if (!imageUrl) {
         throw new Error('No image URL available');
       }
