@@ -419,6 +419,31 @@ export const useImageGalleryStateOptimized = ({
   
   // Reconcile optimistic state when images update
   useEffect(() => {
+    // Sync activeLightboxMedia with updated images list to ensure fresh data (like name changes)
+    if (state.activeLightboxMedia) {
+      const updatedImage = images.find(img => img.id === state.activeLightboxMedia!.id);
+      // Only update if the object reference changed (meaning data changed or refetched)
+      // and deep equality check on key properties to avoid unnecessary render cycles
+      if (updatedImage && updatedImage !== state.activeLightboxMedia) {
+        // Check if relevant fields actually changed to prevent loop
+        const nameChanged = (updatedImage as any).name !== (state.activeLightboxMedia as any).name;
+        const starredChanged = updatedImage.starred !== state.activeLightboxMedia.starred;
+        const urlChanged = updatedImage.url !== state.activeLightboxMedia.url;
+        
+        if (nameChanged || starredChanged || urlChanged) {
+          console.log('[LightboxSync] 🔄 Updating active media from list:', {
+            id: updatedImage.id,
+            oldName: (state.activeLightboxMedia as any).name,
+            newName: (updatedImage as any).name,
+            nameChanged,
+            starredChanged,
+            urlChanged
+          });
+          actions.setActiveLightboxMedia(updatedImage);
+        }
+      }
+    }
+
     // Clear backfill skeleton immediately when new images arrive (server pagination only)
     if (isServerPagination && state.isBackfillLoading && images.length > prevImageCountRef.current) {
       console.log('[SKELETON_DEBUG] State reconciliation - clearing skeleton (new images detected):', {
@@ -434,7 +459,7 @@ export const useImageGalleryStateOptimized = ({
     
     // Clean up optimistic sets using the consolidated action
     dispatch({ type: 'RECONCILE_OPTIMISTIC_STATE', payload: currentImageIds });
-  }, [currentImageIds, images.length, isServerPagination, state.isBackfillLoading, serverPage, actions]);
+  }, [currentImageIds, images, isServerPagination, state.isBackfillLoading, serverPage, actions, state.activeLightboxMedia]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
