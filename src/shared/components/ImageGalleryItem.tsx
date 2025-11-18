@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil } from "lucide-react";
+import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil, Share2, Copy, Loader2, CornerDownLeft } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import GalleryVideoScrubber from './ImageGallery/components/GalleryVideoScrubber';
 import { 
@@ -32,6 +32,7 @@ import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoadin
 import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
 import { useTaskType } from "@/shared/hooks/useTaskType";
 import { useGetTask } from "@/shared/hooks/useTasks";
+import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -143,6 +144,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   // Fallback: if no taskTypeInfo, check metadata.tool_type for legacy support
   const isVideoTask = taskTypeInfo?.content_type === 'video' || 
     (!taskTypeInfo && (image.metadata as any)?.tool_type === 'travel-between-images');
+
+  // Share functionality
+  const { handleShare, isCreatingShare, shareCopied, shareSlug } = useShareGeneration(image.id, taskId);
+
+  // Feedback state for Apply Settings
+  const [settingsApplied, setSettingsApplied] = useState(false);
   
   // [VideoThumbnailRender] Debug if this component is rendering for videos
   React.useEffect(() => {
@@ -944,6 +951,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           {/* Shot Name Badge for Videos - Top Left (always show for videos with shot_id) */}
           {isVideoContent && image.shot_id && simplifiedShotOptions.length > 0 && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              {/* Variant Name */}
+              {(image as any).name && (
+                <div className="bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md mb-1">
+                  {(image as any).name}
+                </div>
+              )}
               <button 
                   className="px-2 py-1 rounded-md bg-black/50 hover:bg-black/70 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
                   onClick={() => {
@@ -1408,23 +1421,38 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 )
               )}
 
-          {/* Apply settings button temporarily disabled */}
-          {false && image.metadata && onApplySettings && (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Tooltip>
-                      <TooltipTrigger asChild>
-                          <Button 
-                              variant="outline"
-                              size="icon" 
-                              className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                              onClick={() => onApplySettings(image.metadata!)}
-                          >
-                              <Settings className="h-4 w-4 mr-1" /> Apply
-                          </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Apply these generation settings to the form</TooltipContent>
+              {/* Share Button - Below Info */}
+              {taskId && (
+                <TooltipProvider>
+                  <Tooltip delayDuration={300}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={handleShare}
+                        disabled={isCreatingShare}
+                        className={`h-7 w-7 p-0 rounded-full text-white transition-all opacity-0 group-hover:opacity-100 ${
+                          shareCopied 
+                            ? 'bg-green-500 hover:bg-green-600' 
+                            : 'bg-black/50 hover:bg-black/70'
+                        }`}
+                      >
+                        {isCreatingShare ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : shareCopied ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : shareSlug ? (
+                          <Copy className="h-3.5 w-3.5" />
+                        ) : (
+                          <Share2 className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p>{shareCopied ? 'Link copied!' : shareSlug ? 'Copy share link' : 'Share this generation'}</p>
+                    </TooltipContent>
                   </Tooltip>
-              </div>
+                </TooltipProvider>
               )}
           </div>
 
@@ -1447,6 +1475,24 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       ) : (
                           <Trash2 className="h-3.5 w-3.5" />
                       )}
+                  </Button>
+                  {/* Download Button - Desktop Bottom Right (next to Delete) */}
+                  <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          onDownloadImage(
+                            image.url || '',
+                            image.prompt || 'generation',
+                            image.id,
+                            image.isVideo
+                          );
+                      }}
+                      title="Download"
+                  >
+                      <Download className="h-3.5 w-3.5" />
                   </Button>
               </div>
           )}
@@ -1489,6 +1535,41 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
                   />
               </Button>
+
+              {/* Apply Settings Button - Bottom Left (next to Star) */}
+              {image.metadata && onApplySettings && (
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Button 
+                              variant="secondary"
+                              size="icon" 
+                              className={`h-7 w-7 p-0 rounded-full text-white transition-all ${
+                                settingsApplied 
+                                  ? 'bg-green-500 hover:bg-green-600' 
+                                  : 'bg-black/50 hover:bg-black/70'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onApplySettings(image.metadata!);
+                                setSettingsApplied(true);
+                                setTimeout(() => setSettingsApplied(false), 2000);
+                              }}
+                              disabled={settingsApplied}
+                          >
+                              {settingsApplied ? (
+                                <Check className="h-3.5 w-3.5" />
+                              ) : (
+                                <CornerDownLeft className="h-3.5 w-3.5" />
+                              )}
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {settingsApplied ? 'Settings applied!' : 'Apply settings'}
+                      </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               
               {/* Edit Image Button - Desktop and Mobile, images only */}
               {!image.isVideo && (
