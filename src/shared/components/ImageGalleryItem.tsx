@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
+import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { 
   Tooltip, 
   TooltipContent, 
@@ -570,103 +571,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     return !isVideoExt;
   }, [image.thumbUrl]);
 
-  // Hover-to-play support for videos that show a thumbnail first
-  const [isHovering, setIsHovering] = useState(false);
-  const hoverVideoRef = useRef<HTMLVideoElement | null>(null);
   const videoUrl = useMemo(() => (isVideoContent ? (image.url || null) : null), [isVideoContent, image.url]);
-  const [videoReady, setVideoReady] = useState(false);
-  useEffect(() => {
-    setVideoReady(false);
-    if (index < 3 && isVideoContent) {
-      console.log(`[VideoHover] Video URL changed for item ${index}:`, {
-        imageId: image.id?.substring(0, 8),
-        videoUrl: videoUrl?.substring(0, 50) + '...',
-        isVideoContent,
-        hasThumbnailImage,
-        timestamp: Date.now()
-      });
-    }
-  }, [videoUrl, index, isVideoContent, hasThumbnailImage, image.id]);
-  const visibleVideoRef = useRef<HTMLVideoElement | null>(null);
-  const safePause = useCallback((videoEl: HTMLVideoElement | null, label: string) => {
-    if (!videoEl) return;
-    try {
-      videoEl.pause();
-      videoEl.currentTime = 0;
-      if (index < 3 && isVideoContent) {
-        console.log(`[VideoHover] Paused ${label} for item ${index}`);
-      }
-    } catch (error) {
-      if (index < 3 && isVideoContent) {
-        console.warn(`[VideoHover] Failed to pause ${label} for item ${index}:`, error);
-      }
-    }
-  }, [index, isVideoContent]);
-  useEffect(() => {
-    const videoEl = visibleVideoRef.current;
-    if (!videoEl) return;
-    
-    if (index < 3 && isVideoContent) {
-      console.log(`[VideoHover] Hover state changed for item ${index}:`, {
-        imageId: image.id?.substring(0, 8),
-        isHovering,
-        videoReady,
-        hasThumbnailImage,
-        videoElExists: !!videoEl,
-        videoSrc: videoEl.src?.substring(0, 50) + '...' || 'none',
-        timestamp: Date.now()
-      });
-    }
-    
-    if (isHovering && videoReady) {
-      if (index < 3 && isVideoContent) {
-        console.log(`[VideoHover] Starting play for item ${index}:`, {
-          imageId: image.id?.substring(0, 8),
-          videoSrc: videoEl.src?.substring(0, 50) + '...',
-          timestamp: Date.now()
-        });
-      }
-      videoEl.play().catch((error) => {
-        if (index < 3 && isVideoContent) {
-          console.warn(`[VideoHover] Play failed for item ${index}:`, {
-            imageId: image.id?.substring(0, 8),
-            error: error.message,
-            timestamp: Date.now()
-          });
-        }
-      });
-    } else {
-      if (index < 3 && isVideoContent) {
-        console.log(`[VideoHover] Stopping play for item ${index}:`, {
-          imageId: image.id?.substring(0, 8),
-          reason: !isHovering ? 'not hovering' : 'not ready',
-          timestamp: Date.now()
-        });
-      }
-      safePause(videoEl, 'visible video (effect)');
-    }
-  }, [isHovering, videoReady, index, isVideoContent, image.id, safePause]);
-
-  // Pause videos on visibility change (tab change or route transitions causing hidden state)
-  useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState !== 'visible') {
-        safePause(visibleVideoRef.current, 'visible video (visibility)');
-        safePause(hoverVideoRef.current, 'hidden video (visibility)');
-        if (isHovering) setIsHovering(false);
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [safePause, isHovering]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      safePause(visibleVideoRef.current, 'visible video (unmount)');
-      safePause(hoverVideoRef.current, 'hidden video (unmount)');
-    };
-  }, [safePause]);
 
   // Placeholder check
   const isPlaceholder = !image.id && actualDisplayUrl === "/placeholder.svg";
@@ -914,40 +819,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onMouseEnter={() => { 
-          if (!isMobile && isVideoContent) {
-            if (index < 3) {
-              console.log(`[VideoHover] Mouse enter on item ${index}:`, {
-                imageId: image.id?.substring(0, 8),
-                hasThumbnailImage,
-                videoReady,
-                timestamp: Date.now()
-              });
-            }
-            setIsHovering(true);
-          }
-        }}
-        onMouseLeave={() => { 
-          if (!isMobile && isVideoContent) {
-            if (index < 3) {
-              console.log(`[VideoHover] Mouse leave on item ${index}:`, {
-                imageId: image.id?.substring(0, 8),
-                hasThumbnailImage,
-                videoReady,
-                timestamp: Date.now()
-              });
-            }
-            // Explicitly pause immediately while element is still in DOM
-            if (visibleVideoRef.current) {
-              try {
-                visibleVideoRef.current.pause();
-                visibleVideoRef.current.currentTime = 0;
-                if (index < 3) console.log(`[VideoHover] Immediate pause on mouseleave for item ${index}`);
-              } catch {}
-            }
-            setIsHovering(false);
-          }
-        }}
     >
       <div className="relative w-full">
       <div 
@@ -958,22 +829,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className="relative bg-gray-200"
       >
           {isVideoContent ? (
-              // If we have a thumbnail image, show it and swap to video on hover
-              hasThumbnailImage ? (
-                <>
-                  {/* Always keep video element mounted to avoid play() interruptions */}
-                <video
-                      ref={visibleVideoRef}
+            <HoverScrubVideo
                       src={videoUrl || actualSrc || ''}
-                    playsInline
-                    loop
-                    muted
-                      preload="auto"
                       poster={displayUrl || undefined}
-                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
-                        isHovering && videoReady ? 'opacity-100 z-10' : 'opacity-0 z-0'
-                      }`}
-                      style={{ backgroundColor: 'transparent', cursor: 'pointer' }}
+              preload={shouldLoad ? "auto" : "none"}
+              className="absolute inset-0 w-full h-full"
+              videoClassName="object-cover cursor-pointer w-full h-full"
+              muted
+              loop
+              playsInline
                     onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
                     onTouchEnd={isMobile ? (e) => {
                       console.log('[MobileDebug] Video onTouchEnd fired', {
@@ -984,164 +848,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       e.preventDefault();
                       onMobileTap(image);
                     } : undefined}
-                    onMouseEnter={() => setIsHovering(true)}
-                    onMouseLeave={() => setIsHovering(false)}
-                    draggable={false}
+              // Pass video loading handlers if HoverScrubVideo supports them, or if it spreads props to video
                     onError={handleImageError}
                     onLoadStart={() => setImageLoading(true)}
                     onLoadedData={handleImageLoad}
-                    onAbort={() => {
-                      // Reset loading state if video load was aborted
-                      setImageLoading(false);
-                    }}
-                />
-                  {/* Thumbnail image - always rendered, hidden when video is visible */}
-                  {displayUrl && (
-                    <img
-                      src={displayUrl}
-                      alt={image.prompt || `Generated image ${index + 1}`}
-                        className={`absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-200 ${
-                          isHovering && videoReady ? 'opacity-0 z-0' : 'opacity-100 z-5'
-                        }`}
-                      draggable={false}
-                      style={{ cursor: 'pointer' }}
-                      onMouseEnter={() => setIsHovering(true)}
-                      onMouseLeave={() => setIsHovering(false)}
-                    />
-                  )}
-                  {/* Keep a hidden video element mounted to preload and be ready to play */}
-                  {videoUrl && (isHovering || index < 8) && (
-                    <video
-                      ref={hoverVideoRef}
-                      src={videoUrl}
-                      style={{ display: 'none' }}
-                      muted
-                      playsInline
-                      preload="metadata"
-                      onLoadStart={() => setImageLoading(true)}
-                      onLoadedMetadata={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video loadedmetadata for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
-                            hasThumbnailImage,
-                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
-                            timestamp: Date.now()
-                          });
-                        }
-                        setVideoReady(true);
-                      }}
-                      onLoadedData={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video loadeddata for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
-                            hasThumbnailImage,
-                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
-                            timestamp: Date.now()
-                          });
-                        }
-                        setVideoReady(true);
-                        handleImageLoad();
-                      }}
-                      onCanPlay={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video canplay for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
-                            hasThumbnailImage,
-                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
-                            timestamp: Date.now()
-                          });
-                        }
-                        setVideoReady(true);
-                      }}
-                      onWaiting={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video waiting (buffering) for item ${index}`);
-                        }
-                      }}
-                      onStalled={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video stalled for item ${index}`);
-                        }
-                      }}
-                      onSuspend={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] Hidden video suspend for item ${index}`);
-                        }
-                      }}
-                      onError={handleImageError}
-                      onAbort={() => setImageLoading(false)}
-                    />
-                  )}
-                </>
-              ) : (
-                // No thumbnail available: preload with metadata and show spinner until ready, then hover to play
-                <>
-                  {videoUrl && (isHovering || index < 8) && (
-                    <video
-                      ref={hoverVideoRef}
-                      src={videoUrl}
-                      style={{ display: 'none' }}
-                      muted
-                      playsInline
-                      preload="metadata"
-                      onLoadStart={() => setImageLoading(true)}
-                      onCanPlay={() => {
-                        if (index < 3 && isVideoContent) {
-                          console.log(`[VideoHover] No-thumbnail video ready (canPlay) for item ${index}:`, {
-                            imageId: image.id?.substring(0, 8),
-                            hasThumbnailImage,
-                            videoSrc: hoverVideoRef.current?.src?.substring(0, 50) + '...' || 'none',
-                            timestamp: Date.now()
-                          });
-                        }
-                        setVideoReady(true);
-                        handleImageLoad();
-                      }}
-                      onError={handleImageError}
-                      onAbort={() => setImageLoading(false)}
-                    />
-                  )}
-                  {isHovering && videoReady ? (
-                    <video
-                        ref={visibleVideoRef}
-                        src={videoUrl || ''}
-                        playsInline
-                        loop
-                        muted
-                        preload="auto"
-                        className="absolute inset-0 w-full h-full object-cover group-hover:opacity-80 transition-opacity duration-300 bg-black"
-                        onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-                        draggable={false}
-                        style={{ cursor: 'pointer' }}
-                        onPlay={() => {
-                          if (index < 3 && isVideoContent) {
-                            console.log(`[VideoHover] Visible video playing for item ${index}`);
-                          }
-                        }}
-                        onPause={() => {
-                          if (index < 3 && isVideoContent) {
-                            console.log(`[VideoHover] Visible video paused for item ${index}`);
-                          }
-                        }}
-                        onWaiting={() => {
-                          if (index < 3 && isVideoContent) {
-                            console.log(`[VideoHover] Visible video buffering (waiting) for item ${index}`);
-                          }
-                        }}
-                        onError={handleImageError}
-                        onLoadStart={() => setImageLoading(true)}
-                        onLoadedData={handleImageLoad}
-                        onAbort={() => setImageLoading(false)}
-                    />
-                  ) : (
-                    !videoReady ? (
-                    <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
-                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
-                    </div>
-                    ) : null
-                  )}
-                </>
-              )
+            />
           ) : imageLoadError ? (
             // Fallback when image fails to load after retries
             <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100 text-gray-500">
