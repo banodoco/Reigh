@@ -173,7 +173,22 @@ export const useUpdateResource = () => {
             
             console.log('[useUpdateResource] User authenticated:', { userId: user.id });
             
-            // First, verify the resource exists and belongs to the user
+            // First, let's check if the resource exists at all (without user_id filter)
+            const { data: resourceCheck, error: resourceCheckError } = await supabase
+                .from('resources')
+                .select('id, user_id, type')
+                .eq('id', id)
+                .maybeSingle();
+            
+            console.log('[useUpdateResource] Resource check (no user filter):', { 
+                found: !!resourceCheck, 
+                resourceUserId: resourceCheck?.user_id,
+                currentUserId: user.id,
+                match: resourceCheck?.user_id === user.id,
+                error: resourceCheckError 
+            });
+            
+            // Now verify the resource exists and belongs to the user
             const { data: existingResource, error: checkError } = await supabase
                 .from('resources')
                 .select('id, user_id, type')
@@ -187,7 +202,17 @@ export const useUpdateResource = () => {
             }
             
             if (!existingResource) {
-                console.error('[useUpdateResource] Resource not found or access denied:', { id, userId: user.id });
+                console.error('[useUpdateResource] Resource not found or access denied:', { 
+                    id, 
+                    userId: user.id,
+                    resourceExists: !!resourceCheck,
+                    resourceOwner: resourceCheck?.user_id
+                });
+                
+                // Provide a more specific error message
+                if (resourceCheck && resourceCheck.user_id !== user.id) {
+                    throw new Error('This resource belongs to another user');
+                }
                 throw new Error('Resource not found or you do not have permission to update it');
             }
             
