@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 import { dataFreshnessManager } from '@/shared/realtime/DataFreshnessManager';
 
 /**
