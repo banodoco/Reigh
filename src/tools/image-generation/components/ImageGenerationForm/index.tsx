@@ -209,7 +209,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Hydrate references with data from resources table
   const { hydratedReferences, isLoading: isLoadingReferences, hasLegacyReferences } = useHydratedReferences(referencePointers);
-  const selectedReference = hydratedReferences.find(ref => ref.id === selectedReferenceId) || null;
+  
+  // Keep a stable reference to prevent flickering during refetches
+  // Only update when we have a valid new selectedReference
+  const lastValidSelectedReference = useRef<HydratedReferenceImage | null>(null);
+  const currentSelectedReference = hydratedReferences.find(ref => ref.id === selectedReferenceId) || null;
+  
+  if (currentSelectedReference) {
+    lastValidSelectedReference.current = currentSelectedReference;
+  }
+  
+  // Use the current reference if available, otherwise fall back to last valid one
+  // This prevents the UI from showing "nothing" during refetches
+  const selectedReference = currentSelectedReference || lastValidSelectedReference.current;
+  
   // Show loading state until we have all references hydrated (or at least 90% to account for missing resources)
   const isReferenceDataLoading = isLoadingProjectSettings || isLoadingReferences || (referenceCount > 0 && hydratedReferences.length < Math.floor(referenceCount * 0.9));
   
