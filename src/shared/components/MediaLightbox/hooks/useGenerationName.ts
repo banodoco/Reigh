@@ -34,31 +34,59 @@ export const useGenerationName = ({
   
   // Ref for debounce timeout
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to track if we have a pending debounce operation (to prevent sync on blur)
+  const isDebouncingRef = useRef(false);
 
   // Update local state when media prop changes (e.g. after refetch)
   // Only if NOT currently editing, to avoid overwriting user input
+  // AND only if we don't have a pending local update (debounce or mutation)
   useEffect(() => {
-    if (!isEditingGenerationName) {
-      setGenerationName(media.name || '');
+    const hasPendingUpdate = isDebouncingRef.current || isUpdatingGenerationName;
+    
+    console.log('[VariantName] 🔄 useEffect sync triggered:', {
+      propMediaName: media.name,
+      localGenerationName: generationName,
+      isEditingGenerationName,
+      hasPendingUpdate,
+      isDebouncing: isDebouncingRef.current,
+      isUpdating: isUpdatingGenerationName,
+      willUpdate: !isEditingGenerationName && !hasPendingUpdate && media.name !== generationName
+    });
+    
+    if (!isEditingGenerationName && !hasPendingUpdate) {
+      if (media.name !== generationName) {
+        console.log('[VariantName] 📥 Syncing local state from props:', media.name);
+        setGenerationName(media.name || '');
+      }
+    } else {
+      console.log('[VariantName] 🛡️ Skipping sync - user is editing or update pending');
     }
-  }, [media.name, isEditingGenerationName]);
+  }, [media.name, isEditingGenerationName, isUpdatingGenerationName]);
 
   // Handle updating generation name
   const handleGenerationNameChange = (newName: string) => {
+    console.log('[VariantName] ⌨️ handleGenerationNameChange:', newName);
     // Update local state immediately
     setGenerationName(newName);
+    isDebouncingRef.current = true;
     
     // Clear existing timeout
     if (timeoutRef.current) {
+      console.log('[VariantName] ⏱️ Clearing previous timeout');
       clearTimeout(timeoutRef.current);
     }
     
     // Set new timeout for debounce (1000ms)
     timeoutRef.current = setTimeout(() => {
-      console.log('[VariantName] Triggering save for:', newName);
+      console.log('[VariantName] 💾 Debounce timer fired, triggering mutation for:', newName);
+      isDebouncingRef.current = false;
+      
       updateGenerationNameMutation.mutate({ 
         id: media.id, 
         name: newName 
+      }, {
+        onSuccess: () => console.log('[VariantName] ✅ Mutation success'),
+        onError: (err) => console.error('[VariantName] ❌ Mutation error:', err)
       });
     }, 1000);
   };
