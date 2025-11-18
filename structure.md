@@ -234,6 +234,7 @@ For the complete catalog, see [`shared_hooks_contexts.md`](docs/structure_detail
 | Component | Purpose |
 |-----------|---------|
 | **ui/** | shadcn-ui primitives (button, dialog, etc.) |
+| **ConstellationCanvas** | Animated starfield background with gentle pulsing stars; features a warm orange-coral Claude Star in the upper-right quadrant |
 | **LightboxScrubVideo** | Video player with auto-play and mouse scrubbing for lightbox usage |
 | **MediaLightbox** | Modal lightbox for viewing media with task details and video scrubbing |
 | **ToolSettingsGate** | Loading wrapper for settings hydration |

@@ -116,7 +116,13 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       const completedShotIds = new Set(
         payloads
           .filter((p: any) => p?.new?.status === 'Complete')
-          .map((p: any) => p?.new?.metadata?.shot_id || p?.new?.metadata?.shotId)
+          .map((p: any) => {
+            const newItem = p?.new;
+            return newItem?.metadata?.shot_id || 
+                   newItem?.metadata?.shotId || 
+                   newItem?.params?.shot_id || 
+                   newItem?.params?.orchestrator_details?.shot_id;
+          })
           .filter(Boolean)
       );
 
