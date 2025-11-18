@@ -21,7 +21,7 @@ export const PaletteIcon: React.FC<PaletteIconProps> = ({ className = "" }) => {
   const [isDehovering, setIsDehovering] = useState(false);
   const [quoteState, setQuoteState] = useState<QuoteState>('closed');
   const [tooltipBelow, setTooltipBelow] = useState(false);
-  const paletteRef = useRef<HTMLElement>(null);
+  const paletteRef = useRef<SVGSVGElement>(null);
   const dehoverTimerRef = useRef<number | null>(null);
 
   // Computed state based on quote state
@@ -182,7 +182,7 @@ const QuoteModal: React.FC<QuoteModalProps> = ({
   // Memoized class compositions for quote modal
   const quoteModalClasses = useMemo(() => {
     const baseClasses = [
-      'absolute left-1/2 z-[70]',
+      'absolute left-1/2 z-[9999]',
       'w-screen max-w-2xl px-4',
       'transition-all duration-300 ease-out'
     ];

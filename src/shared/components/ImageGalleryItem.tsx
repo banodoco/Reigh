@@ -959,7 +959,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               {/* Variant Name */}
               {(image as any).name && (
-                <div className="bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md mb-1">
+                <div className="bg-black/50 text-white text-xs sm:text-sm px-2 py-0.5 rounded-md mb-1 font-medium backdrop-blur-sm">
                   {(image as any).name}
                 </div>
               )}

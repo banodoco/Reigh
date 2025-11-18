@@ -5,7 +5,6 @@ import type { Session } from '@supabase/supabase-js';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { toast } from '@/shared/components/ui/use-toast';
-import { PageFadeIn } from '@/shared/components/transitions';
 import { useReferralTracking } from '@/shared/hooks/useReferralTracking';
 import { WesAndersonBackground } from '@/shared/components/WesAndersonBackground';
 import { useDebounce } from '@/shared/hooks/use-debounce';
@@ -222,7 +221,7 @@ export default function HomePage() {
   const barTransitionCompleted = useDebounce(assetsLoaded, 200);
 
   return (
-    <PageFadeIn className="wes-texture relative">
+    <div className="wes-texture relative min-h-screen">
       <WesAndersonBackground />
 
       <HeroSection 
@@ -285,7 +284,7 @@ export default function HomePage() {
         navigate={navigate}
       />
 
-    </PageFadeIn>
+    </div>
   );
 }
 

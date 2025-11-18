@@ -46,10 +46,10 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
   };
 
   return (
-    <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[70] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
+    <div className={`fixed top-0 left-0 h-full w-5/6 max-w-[30rem] sm:w-[30rem] bg-white shadow-2xl z-[100] transform transition-transform duration-300 ease-in-out overflow-visible flex flex-col ${
       isOpen ? 'translate-x-0' : '-translate-x-full'
     }`}>
-      <div ref={setRefs} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0">
+      <div ref={setRefs} className="px-4 sm:px-8 pt-2 sm:pt-4 pb-4 sm:pb-8 flex-1 overflow-y-auto overflow-x-visible min-h-0 relative z-20">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -58,7 +58,7 @@ export const CreativePartnerPane: React.FC<CreativePartnerPaneProps> = ({
           <X className="w-5 h-5 sm:w-4 sm:h-4 text-gray-600" />
         </button>
         
-        <div className="mb-8 pr-12 sm:pr-0 space-y-3">
+        <div className="mb-8 pr-12 sm:pr-0 space-y-3 relative z-10">
           <h2 className="font-theme text-2xl sm:text-3xl font-theme-heading text-primary">Reigh is an open source tool built on top of open models</h2>
           <div className="w-16 h-1 bg-gradient-to-r from-wes-coral to-wes-pink rounded-full animate-pulse-breathe"></div>
         </div>

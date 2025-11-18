@@ -61,47 +61,29 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   assetsLoaded,
 }) => {
   const [mounted, setMounted] = useState(false);
-  const [barWidth, setBarWidth] = useState('0%');
-  const [barTransitionDuration, setBarTransitionDuration] = useState('2s');
+  const [barWidth, setBarWidth] = useState('100%');
+  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
 
   useEffect(() => {
-    // If assets are already loaded, start at 100% but still trigger the transition end logic
-    // This is for the "seamless transition" case where the previous loader finished
-    if (assetsLoaded) {
-      setBarTransitionDuration('0s'); // Instant
-      setBarWidth('100%');
-      // Short delay to allow the bar to render at 100% before triggering mount
-      setTimeout(() => {
-        setMounted(true);
-      }, 50);
-      return;
-    }
-
-    // Otherwise, start the "slow load" progress
+    // Trigger expansion shortly after mount
     const timer = setTimeout(() => {
-      setBarWidth('90%');
-    }, 50);
-
+      setMounted(true);
+      // Enable overflow after animation completes (1s duration + small buffer)
+      setTimeout(() => setIsAnimationComplete(true), 1050);
+    }, 100);
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    // When assets load later, complete the bar
-    if (assetsLoaded && barWidth !== '100%') {
-      setBarTransitionDuration('0.4s');
-      setBarWidth('100%');
-    }
-  }, [assetsLoaded, barWidth]);
-
-  // Handle completion: trigger content expansion only when bar hits 100%
-  const handleBarTransitionEnd = () => {
-    if (barWidth === '100%') {
-      setMounted(true);
-    }
-  };
+  // Helper for staggering animations based on mount state
+  const getFadeStyle = (delayIndex: number, forceWait: boolean = false) => ({
+    opacity: mounted && !forceWait ? 1 : 0,
+    transition: `opacity 0.8s ease-out ${delayIndex * 0.1}s`,
+    transform: mounted && !forceWait ? 'translateY(0)' : 'translateY(10px)',
+    transitionProperty: 'opacity, transform'
+  });
 
   return (
-    <div className="container mx-auto px-4 relative z-10 flex items-center justify-center min-h-screen py-8">
+    <div className="container mx-auto px-4 relative flex items-center justify-center min-h-screen py-8">
       <div className="text-center w-full">
         <div className="max-w-4xl mx-auto">
           
@@ -111,14 +93,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             className="grid transition-[grid-template-rows] duration-1000 ease-out"
             style={{ gridTemplateRows: mounted ? '1fr' : '0fr' }}
           >
-            <div className="overflow-hidden">
-              {/* Icon above title */}
-              <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out' }}>
+            <div className={isAnimationComplete ? "overflow-visible" : "overflow-hidden"}>
+              {/* Icon above title - wait for assets */}
+              <div style={getFadeStyle(0, !assetsLoaded)} className="relative z-50">
                 <PaletteIcon className="mb-6 mt-0" />
               </div>
               
               {/* Main title */}
-              <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.1s' }}>
+              <div style={getFadeStyle(1)}>
                 <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary mb-8 text-shadow-vintage">
                   Reigh
                 </h1>
@@ -133,15 +115,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             {/* Background track */}
             <div className="absolute inset-0 bg-muted/20 rounded-full"></div>
-            {/* Loading/loaded bar */}
+            {/* Loaded bar - always full width now */}
             <div 
               className="absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full shadow-inner-vintage ease-out"
               style={{ 
                 width: barWidth, 
-                transitionProperty: 'width', 
-                transitionDuration: barTransitionDuration 
+                transition: 'width 0s' 
               }}
-              onTransitionEnd={handleBarTransitionEnd}
             ></div>
           </div>
           
@@ -152,7 +132,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             <div className="overflow-hidden">
               {/* Subtitle */}
-              <div className="mt-8" style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.2s' }}>
+              <div className="mt-8" style={getFadeStyle(2)}>
                 <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
                   An{' '}
                   <TooltipProvider>
@@ -237,7 +217,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
               
               {/* Sign-in button below hero */}
-              <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.3s' }}>
+              <div style={getFadeStyle(3)}>
                 {!session ? (
                   <div
                     className="group"
@@ -310,14 +290,14 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
 
               {/* Social Icons */}
-              <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.4s' }}>
+              <div style={getFadeStyle(4)}>
                 <div className="mt-8">
                   <SocialIcons />
                 </div>
               </div>
 
               {/* Banodoco Logo */}
-              <div style={{ opacity: barTransitionCompleted ? undefined : 0, transition: 'opacity 0.8s ease-out 0.5s' }}>
+              <div style={getFadeStyle(3, !assetsLoaded)}>
                 <div className="flex justify-center">
                   <div className="mt-2">
                     <a
