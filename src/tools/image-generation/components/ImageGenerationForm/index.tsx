@@ -380,6 +380,21 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       pendingModeUpdate: pendingReferenceModeUpdate.current
     });
     
+    // For reference mode: check if database caught up with pending update
+    if (pendingReferenceModeUpdate.current && currentReferenceMode === pendingReferenceModeUpdate.current) {
+      // Database now matches our pending update, clear the pending flag
+      console.log('[RefSettings] ✅ Database caught up with pending mode update:', currentReferenceMode);
+      pendingReferenceModeUpdate.current = null;
+    }
+    
+    // Skip ALL syncing if there's a pending mode update to prevent flickering
+    // The mode change optimistically updates ALL related fields (mode, strengths, etc.)
+    // and we don't want the sync effect to fight with those optimistic updates
+    if (pendingReferenceModeUpdate.current) {
+      console.log('[RefSettings] ⏸️ Skipping all sync, pending mode update in progress:', pendingReferenceModeUpdate.current);
+      return;
+    }
+    
     // Only update if values are different to avoid overriding optimistic updates
     if (styleReferenceStrength !== currentStyleStrength) {
       console.log('[RefSettings] 📝 Updating local styleReferenceStrength:', currentStyleStrength);
@@ -402,20 +417,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       setInThisSceneStrength(currentInThisSceneStrength);
     }
     
-    // For reference mode: check if database caught up with pending update
-    if (pendingReferenceModeUpdate.current && currentReferenceMode === pendingReferenceModeUpdate.current) {
-      // Database now matches our pending update, clear the pending flag
-      console.log('[RefSettings] ✅ Database caught up with pending mode update:', currentReferenceMode);
-      pendingReferenceModeUpdate.current = null;
-    }
-    
-    // Only sync from database if no pending update
-    if (!pendingReferenceModeUpdate.current && referenceMode !== currentReferenceMode) {
+    // Sync mode from database if no pending update
+    if (referenceMode !== currentReferenceMode) {
       console.log('[RefSettings] 📝 Syncing mode from database:', { from: referenceMode, to: currentReferenceMode });
       setReferenceMode(currentReferenceMode);
-    } else if (pendingReferenceModeUpdate.current) {
-      console.log('[RefSettings] ⏸️ Skipping mode sync, pending update in progress:', pendingReferenceModeUpdate.current);
-    } else if (referenceMode === currentReferenceMode) {
+    } else {
       console.log('[RefSettings] ✅ Mode already in sync:', referenceMode);
     }
   // IMPORTANT: Only depend on DATABASE values, not local state
