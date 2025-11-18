@@ -1441,59 +1441,48 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   
   // Handle updating a reference's settings
   const handleUpdateReference = useCallback(async (referenceId: string, updates: Partial<HydratedReferenceImage>) => {
-    console.log('[RefSettings] 💾 Updating reference settings:', { referenceId, updates });
+    console.log('[RefSettings] 💾 Updating reference settings (project-level):', { referenceId, updates });
     
-    // Find the hydrated reference to get the resourceId
-    const hydratedRef = hydratedReferences.find(r => r.id === referenceId);
-    if (!hydratedRef) {
-      console.error('[RefSettings] ❌ Could not find reference:', referenceId);
+    // Find the current pointer
+    const currentPointer = referencePointers.find(r => r.id === referenceId);
+    if (!currentPointer) {
+      console.error('[RefSettings] ❌ Could not find reference pointer:', referenceId);
       return;
     }
     
-    // Update the resource in resources table
-    const currentMetadata = {
-      name: hydratedRef.name,
-      styleReferenceImage: hydratedRef.styleReferenceImage,
-      styleReferenceImageOriginal: hydratedRef.styleReferenceImageOriginal,
-      thumbnailUrl: hydratedRef.thumbnailUrl,
-      styleReferenceStrength: hydratedRef.styleReferenceStrength,
-      subjectStrength: hydratedRef.subjectStrength,
-      subjectDescription: hydratedRef.subjectDescription,
-      inThisScene: hydratedRef.inThisScene,
-      inThisSceneStrength: hydratedRef.inThisSceneStrength,
-      referenceMode: hydratedRef.referenceMode,
-      styleBoostTerms: hydratedRef.styleBoostTerms,
-      is_public: false,
-      created_by: {
-        is_you: true,
-        username: 'user', // Will be preserved from existing metadata
-      },
-      createdAt: hydratedRef.createdAt,
-      updatedAt: new Date().toISOString(),
+    // Update only the project-specific usage settings in the pointer
+    // These are YOUR settings for how YOU use this reference, not the resource itself
+    const updatedPointer: ReferenceImage = {
+      ...currentPointer,
+      // Only update project-specific usage fields
+      ...(updates.referenceMode !== undefined && { referenceMode: updates.referenceMode }),
+      ...(updates.styleReferenceStrength !== undefined && { styleReferenceStrength: updates.styleReferenceStrength }),
+      ...(updates.subjectStrength !== undefined && { subjectStrength: updates.subjectStrength }),
+      ...(updates.subjectDescription !== undefined && { subjectDescription: updates.subjectDescription }),
+      ...(updates.inThisScene !== undefined && { inThisScene: updates.inThisScene }),
+      ...(updates.inThisSceneStrength !== undefined && { inThisSceneStrength: updates.inThisSceneStrength }),
+      ...(updates.styleBoostTerms !== undefined && { styleBoostTerms: updates.styleBoostTerms }),
     };
     
-    const updatedMetadata: StyleReferenceMetadata = {
-      ...currentMetadata,
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
+    // Update the references array in project settings
+    const updatedReferences = referencePointers.map(ref => 
+      ref.id === referenceId ? updatedPointer : ref
+    );
     
-    console.log('[RefSettings] 📤 Updating resource:', hydratedRef.resourceId, updatedMetadata);
+    console.log('[RefSettings] 📤 Updating project settings with new pointer:', updatedPointer);
     
     try {
-      await updateStyleReference.mutateAsync({
-        id: hydratedRef.resourceId,
-        type: 'style-reference',
-        metadata: updatedMetadata,
+      await updateProjectImageSettings('project', {
+        references: updatedReferences,
       });
-      console.log('[RefSettings] ✅ Resource updated successfully');
+      console.log('[RefSettings] ✅ Project settings updated successfully');
     } catch (error) {
-      console.error('[RefSettings] ❌ Failed to update resource:', error);
-      toast.error('Failed to update reference');
+      console.error('[RefSettings] ❌ Failed to update project settings:', error);
+      toast.error('Failed to update reference settings');
     }
     
     markAsInteracted();
-  }, [hydratedReferences, updateStyleReference, markAsInteracted]);
+  }, [referencePointers, updateProjectImageSettings, markAsInteracted]);
   
   // Handle updating a reference's name
   const handleUpdateReferenceName = useCallback(async (referenceId: string, name: string) => {

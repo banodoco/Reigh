@@ -55,23 +55,25 @@ export interface PersistedFormSettings {
 export type ReferenceMode = 'style' | 'subject' | 'style-character' | 'scene' | 'custom';
 
 // Reference pointer stored in tool settings (lightweight)
-// Actual data is stored in resources table
+// Actual image data is stored in resources table, usage settings stored here
 export interface ReferenceImage {
   id: string; // Unique identifier for UI state (use nanoid())
   resourceId: string; // ID in resources table where actual data is stored
+  
+  // Project-specific usage settings (how YOU use this reference in YOUR project)
+  referenceMode?: ReferenceMode;
+  styleReferenceStrength?: number;
+  subjectStrength?: number;
+  subjectDescription?: string;
+  inThisScene?: boolean;
+  inThisSceneStrength?: number;
+  styleBoostTerms?: string;
   
   // Legacy fields for migration - will be removed after bulk migration
   name?: string;
   styleReferenceImage?: string | null;
   styleReferenceImageOriginal?: string | null;
   thumbnailUrl?: string | null;
-  styleReferenceStrength?: number;
-  subjectStrength?: number;
-  subjectDescription?: string;
-  inThisScene?: boolean;
-  inThisSceneStrength?: number;
-  referenceMode?: ReferenceMode;
-  styleBoostTerms?: string;
   createdAt?: string;
   updatedAt?: string;
 }

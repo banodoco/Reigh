@@ -96,22 +96,26 @@ export const useHydratedReferences = (
         
         const metadata = resource.metadata as StyleReferenceMetadata;
         
+        // Hydrate: Resource provides image data, pointer provides usage settings
+        // Pointer settings override resource defaults (project-specific usage)
         return {
           id: pointer.id,
           resourceId: resource.id,
+          // Immutable data from resource
           name: metadata.name,
           styleReferenceImage: metadata.styleReferenceImage,
           styleReferenceImageOriginal: metadata.styleReferenceImageOriginal,
           thumbnailUrl: metadata.thumbnailUrl || null,
-          styleReferenceStrength: metadata.styleReferenceStrength,
-          subjectStrength: metadata.subjectStrength,
-          subjectDescription: metadata.subjectDescription,
-          inThisScene: metadata.inThisScene,
-          inThisSceneStrength: metadata.inThisSceneStrength,
-          referenceMode: metadata.referenceMode,
-          styleBoostTerms: metadata.styleBoostTerms || '',
           createdAt: resource.created_at,
           updatedAt: metadata.updatedAt,
+          // Project-specific usage settings from pointer (with resource defaults as fallback)
+          referenceMode: pointer.referenceMode ?? metadata.referenceMode ?? 'style',
+          styleReferenceStrength: pointer.styleReferenceStrength ?? metadata.styleReferenceStrength ?? 1.1,
+          subjectStrength: pointer.subjectStrength ?? metadata.subjectStrength ?? 0.0,
+          subjectDescription: pointer.subjectDescription ?? metadata.subjectDescription ?? '',
+          inThisScene: pointer.inThisScene ?? metadata.inThisScene ?? false,
+          inThisSceneStrength: pointer.inThisSceneStrength ?? metadata.inThisSceneStrength ?? 1.0,
+          styleBoostTerms: pointer.styleBoostTerms ?? metadata.styleBoostTerms ?? '',
         } as HydratedReferenceImage;
       })
       .filter((ref): ref is HydratedReferenceImage => ref !== null);
