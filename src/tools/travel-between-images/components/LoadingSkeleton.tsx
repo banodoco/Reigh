@@ -68,13 +68,31 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
     );
   }
 
-  // Grid type
+  // Grid type - with header matching the actual layout
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
-      {Array.from({ length: gridItemCount }).map((_, idx) => (
-        <Skeleton key={idx} className="h-40 rounded-lg" />
-      ))}
-    </div>
+    <>
+      {/* Header matching VideoTravelToolPage shot list header */}
+      <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
+          <div className="flex items-center gap-3">
+            {/* Shots vs Videos Toggle skeleton */}
+            <Skeleton className="h-8 w-32 rounded-full" />
+            {/* New Shot button skeleton */}
+            <Skeleton className="h-8 w-24 rounded-md" />
+          </div>
+        </div>
+      </div>
+      
+      {/* Grid content with matching container */}
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-x-8 md:gap-y-8 pb-6 md:pb-8 px-4 pt-4 pb-2">
+          {Array.from({ length: gridItemCount }).map((_, idx) => (
+            <Skeleton key={idx} className="h-40 rounded-lg" />
+          ))}
+        </div>
+      </div>
+    </>
   );
 };
 

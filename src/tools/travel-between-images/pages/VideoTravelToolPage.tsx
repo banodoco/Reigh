@@ -847,6 +847,14 @@ const VideoTravelToolPage: React.FC = () => {
   // Sort mode for shots
   const [shotSortMode, setShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('ordered');
   
+  // Video gallery filter state
+  const [videoShotFilter, setVideoShotFilter] = useState<string>('all');
+  const [videoExcludePositioned, setVideoExcludePositioned] = useState<boolean>(false);
+  const [videoSearchTerm, setVideoSearchTerm] = useState<string>('');
+  const [videoMediaTypeFilter, setVideoMediaTypeFilter] = useState<'all' | 'image' | 'video'>('video');
+  const [videoToolTypeFilter, setVideoToolTypeFilter] = useState<boolean>(true);
+  const [videoStarredOnly, setVideoStarredOnly] = useState<boolean>(false);
+  
   // Track highlighted shot for duplication feedback
   const [highlightedShotId, setHighlightedShotId] = useState<string | null>(null);
   
@@ -916,10 +924,15 @@ const VideoTravelToolPage: React.FC = () => {
     if (willShowVideos) {
       setVideosViewJustEnabled(true);
       console.log('[VideoSkeletonDebug] Setting videosViewJustEnabled=true to show skeletons during transition');
-    }
-    
-    // Clear search when switching views
-    if (willShowVideos) {
+      // Reset video filters when entering videos view
+      setVideoShotFilter('all');
+      setVideoExcludePositioned(false);
+      setVideoSearchTerm('');
+      setVideoMediaTypeFilter('video');
+      setVideoToolTypeFilter(true);
+      setVideoStarredOnly(false);
+    } else {
+      // Clear shot search when switching to shots view
       setShotSearchQuery('');
     }
     e.currentTarget.blur(); // Remove focus immediately after click
@@ -993,8 +1006,12 @@ const VideoTravelToolPage: React.FC = () => {
     100, // limit
     showVideosView, // only enable when showing videos view
     {
-      toolType: 'travel-between-images',
-      mediaType: 'video'
+      toolType: videoToolTypeFilter ? 'travel-between-images' : undefined,
+      mediaType: videoMediaTypeFilter,
+      shotId: videoShotFilter !== 'all' ? videoShotFilter : undefined,
+      excludePositioned: videoExcludePositioned,
+      starredOnly: videoStarredOnly,
+      searchTerm: videoSearchTerm
     }
   );
 
@@ -1746,9 +1763,52 @@ const VideoTravelToolPage: React.FC = () => {
       {!shouldShowShotEditor ? (
         <>
           {/* Shot List Header - Constrained */}
-          <div className="px-4 max-w-7xl mx-auto pt-6 pb-6">
-            <div className="flex items-center justify-between">
+          <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
+            <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
+              <div className="flex items-center gap-3">
+                {/* Shots vs Videos Toggle */}
+                <div className="inline-flex items-center bg-muted rounded-full p-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (showVideosView) {
+                        handleToggleVideosView(e);
+                      }
+                    }}
+                    className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                      !showVideosView
+                        ? 'bg-background shadow-sm'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    Shots
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (!showVideosView) {
+                        handleToggleVideosView(e);
+                      }
+                    }}
+                    className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                      showVideosView
+                        ? 'bg-background shadow-sm'
+                        : 'hover:bg-background/50'
+                    }`}
+                  >
+                    Videos
+                  </button>
+                </div>
+                <Button
+                  onClick={handleCreateNewShot}
+                  variant="default"
+                  size="sm"
+                  className="whitespace-nowrap"
+                >
+                  New Shot
+                </Button>
+              </div>
             </div>
           </div>
           
@@ -1810,11 +1870,21 @@ const VideoTravelToolPage: React.FC = () => {
                     // These bottom buttons (Add to Shot, etc.) shouldn't show for video gallery
                     // Omitting these props completely hides the workflow controls in the lightbox
                     currentToolType="travel-between-images"
-                    initialMediaTypeFilter="video"
-                    initialToolTypeFilter={true}
-                    // Hide currentToolTypeName to remove redundant tool type filter in videos view
-                    showShotFilter={false}  // Hide shot filter in videos view to reduce header height on mobile
-                    initialShotFilter="all"
+                    currentToolTypeName="Travel Between Images"
+                    initialMediaTypeFilter={videoMediaTypeFilter}
+                    onMediaTypeFilterChange={setVideoMediaTypeFilter}
+                    initialToolTypeFilter={videoToolTypeFilter}
+                    onToolTypeFilterChange={setVideoToolTypeFilter}
+                    showShotFilter={true}
+                    initialShotFilter={videoShotFilter}
+                    onShotFilterChange={setVideoShotFilter}
+                    initialExcludePositioned={videoExcludePositioned}
+                    onExcludePositionedChange={setVideoExcludePositioned}
+                    showSearch={true}
+                    initialSearchTerm={videoSearchTerm}
+                    onSearchChange={setVideoSearchTerm}
+                    initialStarredFilter={videoStarredOnly}
+                    onStarredFilterChange={setVideoStarredOnly}
                     columnsPerRow={3}
                     itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
                   />
@@ -1829,13 +1899,15 @@ const VideoTravelToolPage: React.FC = () => {
                 <Button variant="outline" size="sm" onClick={clearSearch}>Clear search</Button>
               </div>
             ) : (
-              <ShotListDisplay
-                onSelectShot={handleShotSelect}
-                onCreateNewShot={handleCreateNewShot}
-                shots={filteredShots}
-                sortMode={shotSortMode}
-                highlightedShotId={highlightedShotId}
-              />
+              <div className="max-w-7xl mx-auto">
+                <ShotListDisplay
+                  onSelectShot={handleShotSelect}
+                  onCreateNewShot={handleCreateNewShot}
+                  shots={filteredShots}
+                  sortMode={shotSortMode}
+                  highlightedShotId={highlightedShotId}
+                />
+              </div>
             )
           )}
         </>
