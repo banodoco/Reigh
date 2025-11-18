@@ -163,25 +163,84 @@ export const useUpdateResource = () => {
     const queryClient = useQueryClient();
     return useMutation<Resource, Error, UpdateResourceArgs>({
         mutationFn: async ({ id, type, metadata }) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('Not authenticated');
+            console.log('[useUpdateResource] Starting update:', { id, type, metadataKeys: Object.keys(metadata) });
             
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.error('[useUpdateResource] User not authenticated');
+                throw new Error('Not authenticated');
+            }
+            
+            console.log('[useUpdateResource] User authenticated:', { userId: user.id });
+            
+            // First, verify the resource exists and belongs to the user
+            const { data: existingResource, error: checkError } = await supabase
+                .from('resources')
+                .select('id, user_id, type')
+                .eq('id', id)
+                .eq('user_id', user.id)
+                .maybeSingle();
+            
+            if (checkError) {
+                console.error('[useUpdateResource] Error checking resource:', checkError);
+                throw new Error(`Failed to verify resource: ${checkError.message}`);
+            }
+            
+            if (!existingResource) {
+                console.error('[useUpdateResource] Resource not found or access denied:', { id, userId: user.id });
+                throw new Error('Resource not found or you do not have permission to update it');
+            }
+            
+            console.log('[useUpdateResource] Resource verified:', existingResource);
+            
+            // Now perform the update
             const { data, error } = await supabase
                 .from('resources')
                 .update({ metadata })
                 .eq('id', id)
                 .eq('user_id', user.id)
                 .select()
-                .single();
+                .maybeSingle();
             
-            if (error) throw error;
+            if (error) {
+                console.error('[useUpdateResource] Update error:', {
+                    error,
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint
+                });
+                throw error;
+            }
+            
+            if (!data) {
+                console.error('[useUpdateResource] Update succeeded but no data returned');
+                // If update succeeded but no data returned, fetch it separately
+                const { data: fetchedData, error: fetchError } = await supabase
+                    .from('resources')
+                    .select('*')
+                    .eq('id', id)
+                    .maybeSingle();
+                
+                if (fetchError || !fetchedData) {
+                    console.error('[useUpdateResource] Failed to fetch updated resource:', fetchError);
+                    throw new Error('Update may have succeeded but failed to fetch updated resource');
+                }
+                
+                console.log('[useUpdateResource] Successfully fetched updated resource');
+                return fetchedData;
+            }
+            
+            console.log('[useUpdateResource] Update successful:', { id, type });
             return data;
         },
         onSuccess: (data) => {
+            console.log('[useUpdateResource] onSuccess - invalidating queries for type:', data.type);
             queryClient.invalidateQueries({ queryKey: ['resources', data.type] });
             queryClient.invalidateQueries({ queryKey: ['public-resources', data.type] });
         },
         onError: (error) => {
+            console.error('[useUpdateResource] onError:', error);
             toast.error(error.message);
         },
     });
