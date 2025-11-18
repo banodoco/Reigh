@@ -562,9 +562,9 @@ export default function HomePage() {
               </h1>
             </div>
             
-            {/* Decorative divider - THIS IS THE PERSISTENT ELEMENT */}
+            {/* Decorative divider - stays in place, content fades in around it */}
             <div 
-              className={`w-32 h-1.5 mx-auto mb-8 transition-all duration-[1600ms] ease-in-out ${!assetsLoaded ? 'is-loading' : 'is-loaded'}`}
+              className="w-32 h-1.5 mx-auto mb-8 relative"
             >
               {/* Background track */}
               <div className="absolute inset-0 bg-muted/20 rounded-full"></div>

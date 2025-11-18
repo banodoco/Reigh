@@ -2510,24 +2510,4 @@
   transition: fill 800ms ease, stroke 800ms ease;
 }
 
-/* New styles for the persistent loading bar transition */
-.is-loading {
-  /* Move down to roughly screen center */
-  transform: translateY(20vh);
-  opacity: 1;
-}
-
-.is-loaded {
-  transform: translateY(0);
-  opacity: 1;
-}
-
-@keyframes fadeInStable {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 

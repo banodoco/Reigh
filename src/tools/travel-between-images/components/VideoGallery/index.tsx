@@ -20,7 +20,7 @@ import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
 import { supabase } from '@/integrations/supabase/client';
 
 // Import our extracted hooks and components
-import { useGalleryPagination, useVideoHover } from './hooks';
+import { useVideoHover } from './hooks';
 import { useExternalGenerations } from '@/shared/components/ShotImageManager/hooks/useExternalGenerations';
 import { useDerivedNavigation } from '@/shared/hooks/useDerivedNavigation';
 import {
@@ -55,6 +55,12 @@ import {
  * - Thumbnail-first display with smooth transition to video
  * - Automatic state sync when videos are pre-loaded
  * 
+ * 🚀 SERVER-SIDE PAGINATION:
+ * - Efficient pagination at database level (fetches only current page)
+ * - Scales to thousands of videos without performance degradation
+ * - Server handles sorting and filtering for optimal performance
+ * - Client-side operations only on current page items (6-8 videos)
+ * 
  * 🔄 LIFECYCLE TRACKING:
  * - Comprehensive [VideoLifecycle] logging for debugging
  * - Component mount/unmount tracking (identifies re-mount issues)
@@ -67,7 +73,7 @@ import {
  * 
  * 📱 RESPONSIVE BEHAVIOR:
  * - Mobile-optimized interactions (tap vs hover)
- * - Pagination for large galleries
+ * - Efficient pagination for large galleries
  * - Loading states for all network conditions
  * 
  * 🐛 DEBUGGING:
@@ -81,6 +87,7 @@ import {
  * - Successfully resolves video loading issues with thumbnail support
  * - Ready for production with clean logging practices
  * - Refactored into modular hooks and components for maintainability
+ * - Optimized with server-side pagination for large-scale performance
  */
 
 interface VideoOutputsGalleryProps {
@@ -197,6 +204,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     
     return 6; // Fallback
   }, [projectAspectRatio]);
+  
+  // Server-side pagination state
+  const [currentPage, setCurrentPage] = useState(1);
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
   const isMobile = useIsMobile();
   // Treat iPads/tablets as mobile for lightbox layout width decisions.
@@ -273,7 +283,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Stable filters object to prevent infinite re-renders
   const filters = useMemo(() => ({
     mediaType: 'video' as const, // Only get videos for this gallery
-  }), []);
+    starredOnly: showStarredOnly, // Apply starred filter at server level
+  }), [showStarredOnly]);
 
   // Debug logging for hook inputs
   console.log('[VideoGenMissing] VideoOutputsGallery props received:', {
@@ -283,14 +294,13 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     timestamp: Date.now()
   });
 
-
-  // Use preloaded data if provided, otherwise fetch from database
+  // Use preloaded data if provided, otherwise fetch from database with SERVER-SIDE pagination
   const { data: fetchedGenerationsData, isLoading: isLoadingGenerations, isFetching: isFetchingGenerations, error: generationsError } = useUnifiedGenerations({
     projectId,
     mode: 'shot-specific',
     shotId,
-    page: 1, // We'll handle pagination internally now
-    limit: 1000, // Get all videos, paginate client-side
+    page: currentPage, // Server-side pagination
+    limit: itemsPerPage, // Only fetch current page
     filters,
     includeTaskData: false, // We'll load task data on-demand for hover/lightbox
     preloadTaskData: true, // Background preload for better UX
@@ -317,11 +327,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     });
   }, [isLoadingGenerations, isFetchingGenerations, generationsData, generationsError, projectId, shotId]);
 
-  // Get video outputs from unified data
+  // Get video outputs from unified data (already paginated from server)
   const videoOutputs = useMemo(() => {
     console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_PROCESSING:`, {
       hasGenerationsData: !!(generationsData as any)?.items,
       itemCount: (generationsData as any)?.items?.length || 0,
+      total: (generationsData as any)?.total || 0,
+      currentPage,
+      serverSidePagination: true,
       processingStarted: Date.now()
     });
 
@@ -352,7 +365,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     
     
     return transformed;
-  }, [(generationsData as any)?.items]);
+  }, [(generationsData as any)?.items, currentPage]);
 
   // Enhanced generations with automatic task data preloading via context
   const enhancedVideoOutputs = useEnhancedGenerations(videoOutputs);
@@ -360,7 +373,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Background preload task data for current page
   useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
   
-  // Batch fetch share slugs for all videos (single query instead of N queries)
+  // Batch fetch share slugs for CURRENT PAGE only (not all videos)
   const [shareSlugs, setShareSlugs] = useState<Record<string, string>>({});
   useEffect(() => {
     const fetchShareSlugs = async () => {
@@ -368,6 +381,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       
       const generationIds = videoOutputs.map(v => v.id).filter(Boolean) as string[];
       if (!generationIds.length) return;
+      
+      console.log('[VideoGallery] Fetching share slugs for current page:', {
+        page: currentPage,
+        count: generationIds.length
+      });
       
       try {
         const { data, error } = await supabase
@@ -388,32 +406,27 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     };
     
     fetchShareSlugs();
-  }, [videoOutputs, readOnly]);
+  }, [videoOutputs, readOnly, currentPage]);
   
   // Handle share creation callback to update batch cache
   const handleShareCreated = useCallback((videoId: string, shareSlug: string) => {
     setShareSlugs(prev => ({ ...prev, [videoId]: shareSlug }));
   }, []);
   
-  // Sort video outputs by creation date and apply starred filter
+  // Server already sorted and filtered data - just use it directly
+  // No need for client-side sorting since database handles it efficiently
   const sortedVideoOutputs = useMemo(() => {
-    const sorted = sortVideoOutputsByDate(videoOutputs);
-    
-    // Apply starred filter if enabled
-    const filtered = showStarredOnly 
-      ? sorted.filter(video => (video as { starred?: boolean }).starred === true)
-      : sorted;
-    
-    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_SORTED:`, {
-      originalCount: videoOutputs.length,
-      sortedCount: sorted.length,
-      filteredCount: filtered.length,
+    console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_FROM_SERVER:`, {
+      count: videoOutputs.length,
+      currentPage,
       showStarredOnly,
-      sortedIds: filtered.slice(0, 5).map(item => item.id?.substring(0, 8)),
+      serverHandlesSorting: true,
+      serverHandlesFiltering: true,
+      videoIds: videoOutputs.slice(0, 5).map(item => item.id?.substring(0, 8)),
       timestamp: Date.now()
     });
-    return filtered;
-  }, [videoOutputs, showStarredOnly]);
+    return videoOutputs; // Already sorted and filtered by server
+  }, [videoOutputs, currentPage, showStarredOnly]);
 
   // External generations hook (same as ShotImageManager and Timeline)
   const externalGens = useExternalGenerations({
@@ -432,22 +445,32 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return [...filtered, ...externalGens.externalGenerations, ...externalGens.tempDerivedGenerations];
   }, [sortedVideoOutputs, optimisticallyRemovedIds, externalGens.externalGenerations, externalGens.tempDerivedGenerations]);
 
-  // Use pagination hook
-  const paginationHook = useGalleryPagination(displaySortedVideoOutputs, itemsPerPage);
-  const { currentPage, totalPages, currentVideoOutputs, handlePageChange, resetToFirstPage } = paginationHook;
+  // Server-side pagination - data is already paginated, just calculate total pages
+  const totalPages = Math.ceil(((generationsData as any)?.total || 0) / itemsPerPage);
+  const currentVideoOutputs = displaySortedVideoOutputs; // Already paginated from server
+  
+  // Page change handler - updates server query
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+  
+  const resetToFirstPage = useCallback(() => {
+    setCurrentPage(1);
+  }, []);
   
   // DEEP DEBUG: Log pagination changes
   useEffect(() => {
-    console.log(`[VideoGalleryPreload] PAGINATION_STATE:`, {
+    console.log(`[VideoGalleryPreload] SERVER_PAGINATION_STATE:`, {
       currentPage,
       totalPages,
       itemsPerPage,
-      totalVideos: sortedVideoOutputs.length,
-      currentVideoOutputsCount: currentVideoOutputs.length,
+      totalVideos: (generationsData as any)?.total || 0,
+      currentPageItemsCount: currentVideoOutputs.length,
       currentVideoIds: currentVideoOutputs.slice(0, 3).map(item => item.id?.substring(0, 8)),
+      serverSidePagination: true,
       timestamp: Date.now()
     });
-  }, [currentPage, totalPages, currentVideoOutputs.length, sortedVideoOutputs.length]);
+  }, [currentPage, totalPages, currentVideoOutputs.length, generationsData]);
 
   // ===============================================================================
   // TASK DATA HOOKS
@@ -762,7 +785,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       resetToFirstPage();
       setLightboxIndex(null);
       setSelectedVideoForDetails(null);
-      setShowStarredOnly(false); // Reset starred filter
+      setShowStarredOnly(false); // Reset starred filter (will trigger new server query)
       handleHoverEnd();
       
       // Reset stable count for new shot
@@ -779,6 +802,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     // Update the ref for next comparison
     prevShotKeyRef.current = shotKey;
   }, [shotKey, resetToFirstPage, handleHoverEnd, clearHoverTimeout]);
+  
+  // Reset to first page when starred filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [showStarredOnly]);
 
   // Log video loading strategy for this page (throttled to avoid spam)
   const hasLoggedStrategyRef = useRef(false);

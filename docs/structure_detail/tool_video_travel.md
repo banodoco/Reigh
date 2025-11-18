@@ -151,12 +151,16 @@ src/tools/travel-between-images/
   - Settings validation
 
 ### `VideoOutputsGallery.tsx`
-**Generated video display**
-- 3-column responsive grid
-- Pagination for large collections
-- Lightbox preview on click
-- Download & delete actions
+**Generated video display with server-side pagination**
+- Modular architecture with extracted hooks and components in `VideoGallery/` subdirectory
+- **Server-side pagination**: Fetches only current page (6-8 videos) instead of all videos
+- **Performance at scale**: Efficiently handles shots with hundreds/thousands of generations
+- **Database-level operations**: Sorting and filtering handled by PostgreSQL for optimal speed
+- Responsive grid layout adapting to project aspect ratio
+- Lightbox preview with task details integration
+- Download, delete, and sharing actions
 - Real-time update integration
+- Thumbnail-first display with smooth video transitions
 
 ### `SimpleVideoPlayer.tsx`
 **Video playback controls**
