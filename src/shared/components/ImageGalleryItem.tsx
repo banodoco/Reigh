@@ -967,7 +967,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               {/* Shot Navigation Button */}
               {image.shot_id && simplifiedShotOptions.length > 0 && (
                 <button 
-                    className="px-2 py-1 rounded-md bg-white/90 hover:bg-white text-black/80 hover:text-black text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+                    className="px-2 py-1 rounded-md bg-black/40 hover:bg-black/60 text-white/90 hover:text-white text-xs font-normal transition-all backdrop-blur-sm flex items-center gap-1.5"
                     onClick={() => {
                         const targetShot = simplifiedShotOptions.find(s => s.id === image.shot_id);
                         if (targetShot) {

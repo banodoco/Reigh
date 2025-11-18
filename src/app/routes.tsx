@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, redirect } from 'react-router-dom';
 import ToolSelectorPage from '@/pages/ToolSelectorPage';
-import HomePage from '@/pages/HomePage';
+import HomePage from '@/pages/Home/HomePage';
 import ArtPage from '@/pages/ArtPage';
 import PaymentSuccessPage from '@/pages/PaymentSuccessPage';
 import PaymentCancelPage from '@/pages/PaymentCancelPage';
