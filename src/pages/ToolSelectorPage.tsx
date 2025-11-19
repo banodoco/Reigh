@@ -283,7 +283,8 @@ const ToolSelectorPage: React.FC = () => {
   
   // Get generation method preferences
   const { value: generationMethods, isLoading: isLoadingGenerationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
-  const isCloudGenerationEnabled = generationMethods.inCloud && !generationMethods.onComputer;
+  // Allow tool if cloud generation is enabled (even if local is also enabled)
+  const isCloudGenerationEnabled = generationMethods.inCloud;
 
   // Debug logging for character-animate visibility
   useEffect(() => {
@@ -310,10 +311,11 @@ const ToolSelectorPage: React.FC = () => {
         `isLoading=${isLoadingGenerationMethods}, ` +
         `onComputer=${generationMethods.onComputer}, inCloud=${generationMethods.inCloud}, ` +
         `isCloudEnabled=${isCloudGenerationEnabled}, envCheck=${toolEnvironmentCheck}, ` +
-        `shouldShow=${shouldShow}, FINAL=${isLoadingGenerationMethods ? false : shouldShow}`);
+        `shouldShow=${shouldShow}, FINAL=${isLoadingGenerationMethods ? true : shouldShow}`);
       
-      // Hide during loading to prevent showing with fallback value
-      if (isLoadingGenerationMethods) return false;
+      // Show during loading (optimistic UI) to prevent layout shift/flash
+      // Since default is inCloud: true, this matches the likely final state
+      if (isLoadingGenerationMethods) return true;
       return shouldShow;
     }
     
