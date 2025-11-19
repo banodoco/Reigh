@@ -509,7 +509,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
 
   return (
     <TooltipProvider>
-      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} pb-[62px]`}>
+      <div className={`${reducedSpacing ? 'space-y-3' : 'space-y-6'} ${(!hidePagination && !hideBottomPagination) ? 'pb-[62px]' : ''}`}>
         {/* Header section with pagination and filters */}
         <div ref={stateHook.galleryTopRef}>
           <ImageGalleryHeader
