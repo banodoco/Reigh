@@ -339,9 +339,13 @@ const ToolSelectorPage: React.FC = () => {
   // Filter visible assistant tools excluding "More Soon"
   const visibleAssistantTools = assistantTools.filter(t => t.id !== 'moon-soon' && isToolVisible(t.tool, t.id));
   
-  // Determine if "More Soon" should be shown: only if we have an odd number of visible tools
-  // This ensures we don't have a single orphan in a 2-column layout, or fill a 3-column layout
-  const shouldShowMoreSoon = visibleAssistantTools.length % 2 !== 0;
+  // Determine if "More Soon" should be shown to fill the grid
+  // Desktop (lg): 3 columns. Show if we have 2 items (mod 3 = 2) to make it 3.
+  // Mobile/Tablet: 2 columns. Show if we have 1 item (mod 2 = 1) to make it 2.
+  const count = visibleAssistantTools.length;
+  const shouldShowMoreSoon = isLg 
+    ? count % 3 === 2 // Need 1 more to fill row of 3
+    : count % 2 !== 0; // Need 1 more to fill row of 2
   
   // Construct final list of assistant tools to display
   const displayedAssistantTools = [...visibleAssistantTools];
@@ -364,9 +368,9 @@ const ToolSelectorPage: React.FC = () => {
       <div className={`w-full ${containerPadding} ${containerSpacing} relative z-10`}>
         <div className="max-w-7xl mx-auto">
           {/* Content-Responsive Layout */}
-          <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
+          <div className={`flex flex-col lg:flex-row ${sectionGap}`}>
             {/* Process Column */}
-            <div className="w-full c-lg:w-1/2">
+            <div className="w-full lg:w-1/2">
               <div className={`flex flex-col ${itemGap} ${topMargin} px-2 py-2`}>
                 {processTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
@@ -385,8 +389,8 @@ const ToolSelectorPage: React.FC = () => {
             </div>
 
             {/* Assistant Tools Column */}
-            <div className="w-full c-lg:w-1/2">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 c-lg:grid-cols-3 px-2 py-2`}>
+            <div className="w-full lg:w-1/2">
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 lg:grid-cols-3 px-2 py-2`}>
                 {displayedAssistantTools.map((tool, index) => {
                   const isVisible = true; // Already filtered
                   
