@@ -20,7 +20,7 @@ import { usePanes } from '@/shared/contexts/PanesContext';
 import ShotImagesEditor from '../ShotImagesEditor';
 import { useEnhancedShotPositions } from "@/shared/hooks/useEnhancedShotPositions";
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
-import { useAllShotGenerations, useUnpositionedGenerationsCount } from '@/shared/hooks/useShotGenerations';
+import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
@@ -977,8 +977,24 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     return filtered;
   }, [orderedShotImages, selectedShotId]);
   
-  // Count unpositioned generations for this shot (excluding videos, which are expected to have null positions)
-  const { data: unpositionedGenerationsCount = 0 } = useUnpositionedGenerationsCount(selectedShot?.id);
+  // Calculate unpositioned images count locally to match "Input Images" logic
+  // 1. Must be unpositioned (no timeline_frame)
+  // 2. Must be an image (not video)
+  const unpositionedImagesCount = useMemo(() => {
+    const sourceImages = orderedShotImages || [];
+    return sourceImages
+      .filter(img => {
+        const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
+        return !hasTimelineFrame;
+      })
+      .filter(img => {
+        const isVideo = img.type === 'video' ||
+                       img.type === 'video_travel_output' ||
+                       (img.location && img.location.endsWith('.mp4')) ||
+                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
+        return !isVideo;
+      }).length;
+  }, [orderedShotImages]);
 
   // Auto-disable turbo mode when there are more than 2 images
   useEffect(() => {
@@ -1470,7 +1486,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 projectAspectRatio={effectiveAspectRatio}
               />
             }
-            unpositionedGenerationsCount={unpositionedGenerationsCount}
+            unpositionedGenerationsCount={unpositionedImagesCount}
             onOpenUnpositionedPane={openUnpositionedGenerationsPane}
             fileInputKey={state.fileInputKey}
             onImageUpload={generationActions.handleImageUploadToShot}

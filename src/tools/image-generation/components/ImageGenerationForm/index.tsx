@@ -180,6 +180,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     enabled: !!selectedProjectId
   });
   
+  // Debug log to track when projectImageSettings changes
+  useEffect(() => {
+    console.log('[AddToRefDebug:Form] 📦 projectImageSettings updated', {
+      hasSettings: !!projectImageSettings,
+      referencesCount: projectImageSettings?.references?.length,
+      selectedReferenceIdByShot: projectImageSettings?.selectedReferenceIdByShot,
+      isLoading: isLoadingProjectSettings,
+      timestamp: Date.now()
+    });
+  }, [projectImageSettings, isLoadingProjectSettings]);
+  
   // Local optimistic override for model to avoid UI stutter while saving
   const [modelOverride, setModelOverride] = useState<GenerationMode | undefined>(undefined);
 
@@ -207,6 +218,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? {};
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
   
+  // Debug log for reference selection tracking
+  useEffect(() => {
+    console.log('[AddToRefDebug:Form] 📋 Reference selection state', {
+      effectiveShotId,
+      selectedReferenceId,
+      selectedReferenceIdByShot,
+      referencePointersCount: referencePointers.length,
+      hasProjectImageSettings: !!projectImageSettings,
+      timestamp: Date.now()
+    });
+  }, [effectiveShotId, selectedReferenceId, selectedReferenceIdByShot, referencePointers.length, projectImageSettings]);
+  
   // Hydrate references with data from resources table
   const { hydratedReferences, isLoading: isLoadingReferences, hasLegacyReferences } = useHydratedReferences(referencePointers);
   
@@ -223,8 +246,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // This prevents the UI from showing "nothing" during refetches
   const selectedReference = currentSelectedReference || lastValidSelectedReference.current;
   
-  // Show loading state until we have all references hydrated (or at least 90% to account for missing resources)
-  const isReferenceDataLoading = isLoadingProjectSettings || isLoadingReferences || (referenceCount > 0 && hydratedReferences.length < Math.floor(referenceCount * 0.9));
+  // Debug log for final selected reference
+  useEffect(() => {
+    console.log('[AddToRefDebug:Form] 🎯 Final selected reference determined', {
+      selectedReferenceId,
+      currentSelectedReference: currentSelectedReference ? { id: currentSelectedReference.id, name: currentSelectedReference.name, resourceId: currentSelectedReference.resourceId } : null,
+      selectedReference: selectedReference ? { id: selectedReference.id, name: selectedReference.name, resourceId: selectedReference.resourceId } : null,
+      hydratedReferencesCount: hydratedReferences.length,
+      hydratedReferenceIds: hydratedReferences.map(r => r.id),
+      timestamp: Date.now()
+    });
+  }, [selectedReferenceId, currentSelectedReference, selectedReference, hydratedReferences]);
+  
+  // Show loading state only if we don't have enough references hydrated yet
+  // This prevents flickering when background queries (like isLoadingReferences) run but we already have data
+  const hasEnoughReferences = referenceCount > 0 && hydratedReferences.length >= Math.floor(referenceCount * 0.9);
+  const isReferenceDataLoading = (isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences;
   
   // Debug logging for reference loading state
   useEffect(() => {
@@ -241,8 +278,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       calculationBreakdown: {
         condition1_loadingSettings: isLoadingProjectSettings,
         condition2_loadingReferences: isLoadingReferences,
-        condition3_notEnoughHydrated: referenceCount > 0 && hydratedReferences.length < threshold,
-        finalResult: isLoadingProjectSettings || isLoadingReferences || (referenceCount > 0 && hydratedReferences.length < threshold)
+        condition3_notEnoughHydrated: !hasEnoughReferences,
+        finalResult: (isLoadingProjectSettings || isLoadingReferences) && !hasEnoughReferences
       },
       cachedReferenceCount: referenceCountFromCache,
       hasCachedSettings: !!cachedProjectSettings,
@@ -256,7 +293,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const updateStyleReference = useUpdateResource();
   const deleteStyleReference = useDeleteResource();
   
-  // Clear pending mode update when switching references AND force sync
+  // Clear pending mode update when switching references
   const prevSelectedReferenceId = useRef(selectedReferenceId);
   useEffect(() => {
     const hasChanged = prevSelectedReferenceId.current !== selectedReferenceId;
@@ -264,33 +301,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     if (hasChanged) {
       console.log('[RefSettings] 🔄 Reference changed from', prevId, 'to', selectedReferenceId);
-      console.log('[RefSettings] 🔄 Clearing pending mode update and forcing mode sync');
+      console.log('[RefSettings] 🔄 Clearing pending mode update');
       pendingReferenceModeUpdate.current = null;
-      
-      // Look up the reference directly to ensure we have the latest data
-      // Also check the optimistic cache in case there's a pending write
-      if (selectedReferenceId) {
-        const newSelectedRef = hydratedReferences.find(ref => ref.id === selectedReferenceId);
-        if (newSelectedRef) {
-          const newMode = newSelectedRef.referenceMode ?? 'custom';
-          console.log('[RefSettings] 🎯 Force syncing mode for new reference:', {
-            refId: selectedReferenceId,
-            refName: newSelectedRef.name,
-            newMode,
-            allModes: hydratedReferences.map(r => ({ id: r.id, mode: r.referenceMode }))
-          });
-          
-          // Force sync all settings for this reference
-          setReferenceMode(newMode);
-          setStyleReferenceStrength(newSelectedRef.styleReferenceStrength);
-          setSubjectStrength(newSelectedRef.subjectStrength);
-          setSubjectDescription(newSelectedRef.subjectDescription);
-          setInThisScene(newSelectedRef.inThisScene);
-          setStyleBoostTerms(newSelectedRef.styleBoostTerms || '');
-        } else {
-          console.warn('[RefSettings] ⚠️ Could not find reference with ID:', selectedReferenceId, 'in references:', hydratedReferences.map(r => r.id));
-        }
-      }
       
       prevSelectedReferenceId.current = selectedReferenceId;
     }
@@ -378,69 +390,15 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [effectiveShotId, hydratedReferences, selectedReferenceId, selectedReference, selectedReferenceIdByShot, projectImageSettings, updateProjectImageSettings]);
 
-  // Sync local state with selected reference settings (only when values actually change)
+  // Check if database has caught up with pending mode update
   useEffect(() => {
-    console.log('[RefSettings] 🔄 Syncing local state from DB/selected reference:', {
-      selectedReferenceId,
-      selectedReferenceName: selectedReference?.name,
-      styleStrength: currentStyleStrength,
-      subjectStrength: currentSubjectStrength,
-      subjectDescription: currentSubjectDescription,
-      inThisScene: currentInThisScene,
-      localReferenceMode: referenceMode,
-      dbReferenceMode: currentReferenceMode,
-      modeNeedsSync: referenceMode !== currentReferenceMode,
-      pendingModeUpdate: pendingReferenceModeUpdate.current
-    });
-    
     // For reference mode: check if database caught up with pending update
     if (pendingReferenceModeUpdate.current && currentReferenceMode === pendingReferenceModeUpdate.current) {
       // Database now matches our pending update, clear the pending flag
       console.log('[RefSettings] ✅ Database caught up with pending mode update:', currentReferenceMode);
       pendingReferenceModeUpdate.current = null;
     }
-    
-    // Skip ALL syncing if there's a pending mode update to prevent flickering
-    // The mode change optimistically updates ALL related fields (mode, strengths, etc.)
-    // and we don't want the sync effect to fight with those optimistic updates
-    if (pendingReferenceModeUpdate.current) {
-      console.log('[RefSettings] ⏸️ Skipping all sync, pending mode update in progress:', pendingReferenceModeUpdate.current);
-      return;
-    }
-    
-    // Only update if values are different to avoid overriding optimistic updates
-    if (styleReferenceStrength !== currentStyleStrength) {
-      console.log('[RefSettings] 📝 Updating local styleReferenceStrength:', currentStyleStrength);
-      setStyleReferenceStrength(currentStyleStrength);
-    }
-    if (subjectStrength !== currentSubjectStrength) {
-      console.log('[RefSettings] 📝 Updating local subjectStrength:', currentSubjectStrength);
-      setSubjectStrength(currentSubjectStrength);
-    }
-    if (subjectDescription !== currentSubjectDescription) {
-      console.log('[RefSettings] 📝 Updating local subjectDescription:', currentSubjectDescription);
-      setSubjectDescription(currentSubjectDescription);
-    }
-    if (inThisScene !== currentInThisScene) {
-      console.log('[RefSettings] 📝 Updating local inThisScene:', currentInThisScene);
-      setInThisScene(currentInThisScene);
-    }
-    if (inThisSceneStrength !== currentInThisSceneStrength && currentInThisSceneStrength !== undefined) {
-      console.log('[RefSettings] 📝 Updating local inThisSceneStrength:', currentInThisSceneStrength);
-      setInThisSceneStrength(currentInThisSceneStrength);
-    }
-    
-    // Sync mode from database if no pending update
-    if (referenceMode !== currentReferenceMode) {
-      console.log('[RefSettings] 📝 Syncing mode from database:', { from: referenceMode, to: currentReferenceMode });
-      setReferenceMode(currentReferenceMode);
-    } else {
-      console.log('[RefSettings] ✅ Mode already in sync:', referenceMode);
-    }
-  // IMPORTANT: Only depend on DATABASE values, not local state
-  // Including local state creates a sync loop where local changes trigger DB sync which triggers local sync...
-  // Only trigger on selectedReferenceId changes, not selectedReference object changes (causes excessive re-syncs)
-  }, [currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength, currentReferenceMode, selectedReferenceId]);
+  }, [currentReferenceMode]);
 
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
@@ -861,44 +819,9 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   );
   
   // Sync local style strength with project settings
-  useEffect(() => {
-    if (projectImageSettings?.styleReferenceStrength !== undefined) {
-      setStyleReferenceStrength(projectImageSettings.styleReferenceStrength);
-    } else {
-      setStyleReferenceStrength(1.0); // Default value
-    }
-  }, [projectImageSettings?.styleReferenceStrength]);
-
-  // Sync local subject strength with project settings
-  useEffect(() => {
-    if (projectImageSettings?.subjectStrength !== undefined) {
-      setSubjectStrength(projectImageSettings.subjectStrength);
-    } else {
-      setSubjectStrength(0.0); // Default value
-    }
-  }, [projectImageSettings?.subjectStrength]);
-
-  // Sync local subject description with project settings (same pattern as PromptInputRow)
-  useEffect(() => {
-    // Only sync when NOT actively editing - prevents reset while typing
-    if (!isEditingSubjectDescription) {
-      const parentValue = projectImageSettings?.subjectDescription ?? '';
-      // Only sync if parent actually changed from what we last knew
-      if (parentValue !== lastSubjectDescriptionFromParent) {
-        setSubjectDescription(parentValue);
-        setLastSubjectDescriptionFromParent(parentValue);
-      }
-    }
-  }, [projectImageSettings?.subjectDescription, isEditingSubjectDescription, lastSubjectDescriptionFromParent]);
-
-  // Sync local inThisScene with project settings
-  useEffect(() => {
-    if (projectImageSettings?.inThisScene !== undefined) {
-      setInThisScene(projectImageSettings.inThisScene);
-    } else {
-      setInThisScene(false); // Default value
-    }
-  }, [projectImageSettings?.inThisScene]);
+  // Legacy sync effects removed to prevent overwriting user input
+  // The form state is now managed locally and only persisted to DB on change
+  // It is NOT synced back from DB to avoid race conditions and jumping cursors
 
   // Load shot-specific prompt count when shot changes
   React.useEffect(() => {
@@ -1308,6 +1231,39 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Handle selecting an existing resource from the browser (no upload needed)
   const handleResourceSelect = useCallback(async (resource: Resource) => {
     try {
+      // Check if we already have this resource linked
+      const existingPointer = referencePointers.find(ptr => ptr.resourceId === resource.id);
+      
+      if (existingPointer) {
+        console.log('[RefBrowser] 🔄 Resource already linked, switching to existing reference:', existingPointer.id);
+        
+        // Just select the existing reference for this shot
+        const optimisticUpdate = {
+          ...selectedReferenceIdByShot,
+          [effectiveShotId]: existingPointer.id
+        };
+        
+        // Optimistic Update
+        try {
+          queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
+            return { 
+              ...(prev || {}), 
+              selectedReferenceIdByShot: optimisticUpdate
+            };
+          });
+        } catch (e) { 
+          console.warn('[RefBrowser] Failed to set optimistic cache data for existing ref switch', e); 
+        }
+        
+        // Persist
+        await updateProjectImageSettings('project', {
+          selectedReferenceIdByShot: optimisticUpdate
+        });
+        
+        markAsInteracted();
+        return;
+      }
+
       // Create lightweight pointer to existing resource
       const newPointer: ReferenceImage = {
         id: nanoid(),
@@ -1366,7 +1322,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.error('[RefBrowser] ❌ Failed to link resource:', error);
       toast.error('Failed to add reference');
     }
-  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted]);
+  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted, referencePointers, selectedReferenceIdByShot]);
 
   // Handle selecting a reference for the current shot
   const handleSelectReference = useCallback(async (referenceId: string) => {
@@ -1629,12 +1585,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
     } else if (mode === 'subject') {
-      updates.styleReferenceStrength = 0;
-      updates.subjectStrength = 1.1;
-      updates.inThisScene = false;
-      updates.inThisSceneStrength = 0;
-    } else if (mode === 'style-character') {
-      updates.styleReferenceStrength = 0.5;
+      updates.styleReferenceStrength = 0.3;
       updates.subjectStrength = 1.0;
       updates.inThisScene = false;
       updates.inThisSceneStrength = 0;
@@ -1643,8 +1594,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       updates.subjectStrength = 0;
       updates.inThisScene = true;
       updates.inThisSceneStrength = 1.0;
+    } else if (mode === 'custom') {
+      // Ensure we have valid starting values if coming from a mode with low strength (like scene)
+      const currentTotal = styleReferenceStrength + subjectStrength;
+      if (currentTotal < 0.5) {
+        console.log('[RefSettings] ⚠️ Custom mode selected but strengths are too low. Resetting to defaults.');
+        updates.styleReferenceStrength = 0.8;
+        updates.subjectStrength = 0.8;
+        updates.inThisScene = false;
+        updates.inThisSceneStrength = 0;
+      }
     }
-    // For 'custom', don't auto-change strength values or inThisScene
     
     console.log('[RefSettings] 🎯 Batched update for mode change:', updates);
     
@@ -1666,7 +1626,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     
     // Single batched update to avoid race conditions
     await handleUpdateReference(selectedReferenceId, updates);
-  }, [selectedReferenceId, handleUpdateReference]);
+  }, [selectedReferenceId, handleUpdateReference, styleReferenceStrength, subjectStrength]);
 
   const handleAddPrompt = (source: 'form' | 'modal' = 'form') => {
     markAsInteracted();
@@ -2154,40 +2114,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   };
 
-  // This large effect syncs the entire form state from either the selected reference or project settings
-  useEffect(() => {
-    if (isEditingSubjectDescription) return;
+  // Note: Form fields are NOT automatically synced when selecting a reference
+  // This allows users to maintain their current settings when switching references
 
-    // When a reference image is selected, sync the form state to match its settings
-    if (selectedReference) {
-      console.log('[RefSettings] Syncing state from selected reference:', selectedReference.name);
-      setStyleReferenceStrength(selectedReference.styleReferenceStrength);
-      setSubjectStrength(selectedReference.subjectStrength);
-      setSubjectDescription(selectedReference.subjectDescription);
-      setInThisScene(selectedReference.inThisScene);
-      setInThisSceneStrength(selectedReference.inThisSceneStrength ?? (selectedReference.inThisScene ? 1.0 : 0));
-      setReferenceMode(selectedReference.referenceMode);
-    }
-  }, [selectedReference, projectImageSettings, isEditingSubjectDescription]);
-
-  // This effect syncs local state fields with the derived `current...` values
-  useEffect(() => {
-    if (styleReferenceStrength !== currentStyleStrength) {
-      setStyleReferenceStrength(currentStyleStrength);
-    }
-    if (subjectStrength !== currentSubjectStrength) {
-      setSubjectStrength(currentSubjectStrength);
-    }
-    if (subjectDescription !== currentSubjectDescription) {
-      setSubjectDescription(currentSubjectDescription);
-    }
-    if (inThisScene !== currentInThisScene) {
-      setInThisScene(currentInThisScene);
-    }
-    if (inThisSceneStrength !== currentInThisSceneStrength && currentInThisSceneStrength !== undefined) {
-      setInThisSceneStrength(currentInThisSceneStrength);
-    }
-  }, [styleReferenceStrength, subjectStrength, subjectDescription, inThisScene, inThisSceneStrength, currentStyleStrength, currentSubjectStrength, currentSubjectDescription, currentInThisScene, currentInThisSceneStrength]);
+  // Form fields maintain their current values independent of selected reference
+  // This allows users to keep their settings when switching references
 
   return (
     <>

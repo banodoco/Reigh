@@ -295,7 +295,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                 </div>
 
                 {/* Plus icon - top right - pointer-events-none so clicks pass through to label */}
-                <div className="absolute top-2 right-2 pointer-events-none">
+                <div className="absolute top-[15%] right-[15%] pointer-events-none">
                   <Plus className="h-5 w-5 text-gray-400" />
                 </div>
               </div>
@@ -318,7 +318,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
             <button
               type="button"
               className={cn(
-                'absolute bottom-[0.625rem] left-[0.625rem] p-0.5 rounded',
+                'absolute bottom-[15%] left-[15%] p-0.5 rounded',
                 (isGenerating || isUploadingStyleReference) &&
                   'cursor-not-allowed opacity-40'
               )}
@@ -505,10 +505,6 @@ const StyleReferenceSection: React.FC<{
                 <Label htmlFor="mode-subject" className="cursor-pointer font-normal">Subject</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="style-character" id="mode-style-character" />
-                <Label htmlFor="mode-style-character" className="cursor-pointer font-normal">Style + subject</Label>
-              </div>
-              <div className="flex items-center space-x-2">
                 <RadioGroupItem value="scene" id="mode-scene" />
                 <Label htmlFor="mode-scene" className="cursor-pointer font-normal">Scene</Label>
               </div>
@@ -533,7 +529,7 @@ const StyleReferenceSection: React.FC<{
                     max={2.0}
                     step={0.1}
                     disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                    numberInputClassName="w-10"
+                    numberInputClassName="w-16"
                   />
                 </div>
               </div>
@@ -559,7 +555,7 @@ const StyleReferenceSection: React.FC<{
                       max={2.0}
                       step={0.1}
                       disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      numberInputClassName="w-10"
+                      numberInputClassName="w-16"
                     />
                   </div>
                   <div className="flex-1">
@@ -578,7 +574,7 @@ const StyleReferenceSection: React.FC<{
                       max={2.0}
                       step={0.1}
                       disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      numberInputClassName="w-10"
+                      numberInputClassName="w-16"
                     />
                   </div>
                 </div>
@@ -592,7 +588,7 @@ const StyleReferenceSection: React.FC<{
                       max={2.0}
                       step={0.1}
                       disabled={isGenerating || isUploadingStyleReference || !styleReferenceImage}
-                      numberInputClassName="w-10"
+                      numberInputClassName="w-16"
                     />
                   </div>
                 </div>
@@ -600,7 +596,7 @@ const StyleReferenceSection: React.FC<{
             )}
             
             {/* Show subject description and/or style-boost terms based on mode */}
-            {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'style-character' || (referenceMode === 'subject')) && (
+            {styleReferenceImage && (referenceMode === 'style' || referenceMode === 'subject') && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Show subject description when subject strength > 0 (excludes scene mode and custom mode) */}
                 {subjectStrength > 0 && (
@@ -622,8 +618,8 @@ const StyleReferenceSection: React.FC<{
                   </div>
                 )}
                 
-                {/* Show style-boost terms field when in style or style+subject mode */}
-                {(referenceMode === 'style' || referenceMode === 'style-character') && (
+                {/* Show style-boost terms field when in style mode */}
+                {referenceMode === 'style' && (
                   <div className="space-y-2">
                     <Label htmlFor="style-boost-terms" className="text-sm font-medium">
                       Include any style-boost terms here
