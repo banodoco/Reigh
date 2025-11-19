@@ -269,7 +269,10 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 ToolCard.displayName = 'ToolCard';
 
 const ToolSelectorPage: React.FC = () => {
-  const currentEnv = (import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB) as AppEnvValue;
+  // Handle different environment variable formats (production, prod -> web)
+  let env = import.meta.env.VITE_APP_ENV?.toLowerCase() || AppEnv.WEB;
+  if (env === 'production' || env === 'prod') env = AppEnv.WEB;
+  const currentEnv = env as AppEnvValue;
 
   // Content-responsive breakpoints and layout values
   const { isSm, isLg } = useContentResponsive();

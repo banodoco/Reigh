@@ -4,6 +4,7 @@ export { imageGenerationSettings } from './image-generation/settings';
 export { editTravelSettings } from './edit-travel/settings';
 export { characterAnimateSettings } from './character-animate/settings';
 export { joinClipsSettings } from './join-clips/settings';
+export { editImagesSettings } from './edit-images/settings';
 export { userPreferencesSettings } from '../shared/settings/userPreferences';
 
 // Tool manifest for UI discovery and automatic registration
@@ -12,6 +13,7 @@ import { imageGenerationSettings } from './image-generation/settings';
 import { editTravelSettings } from './edit-travel/settings';
 import { characterAnimateSettings } from './character-animate/settings';
 import { joinClipsSettings } from './join-clips/settings';
+import { editImagesSettings } from './edit-images/settings';
 import { userPreferencesSettings } from '../shared/settings/userPreferences';
 import { AppEnv, LOCAL_ENVS, type AppEnvValue } from '../types/env';
 import { Paintbrush, Video, Edit, Users, Link2 } from 'lucide-react';
@@ -22,6 +24,7 @@ export const toolsManifest = [
   editTravelSettings,
   characterAnimateSettings,
   joinClipsSettings,
+  editImagesSettings,
   userPreferencesSettings,
 ] as const;
 
@@ -98,6 +101,18 @@ export const toolsUIManifest: ToolUIDefinition[] = [
     gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',
     accent: 'wes-dusty-blue',
     ornament: '◆',
+    badge: 'New',
+  },
+  {
+    id: 'edit-images', // Hardcoded to avoid import issues
+    name: 'Edit Images',
+    path: '/tools/edit-images',
+    description: 'Transform, reimagine, and enhance images using text prompts or inpainting brushes.',
+    environments: [AppEnv.LOCAL, AppEnv.WEB],
+    icon: Edit,
+    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
+    accent: 'wes-yellow',
+    ornament: '✦',
     badge: 'New',
   },
 ]; 
