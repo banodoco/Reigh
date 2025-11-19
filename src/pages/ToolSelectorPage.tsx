@@ -82,46 +82,16 @@ const assistantTools = [
     gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
     accent: 'wes-sage',
   },
-  // {
-  //   id: 'edit-videos',
-  //   name: 'Edit\nVideos',
-  //   description: 'AI-assisted cuts, transitions, and effects.',
-  //   tool: null, // Coming soon
-  //   icon: Wand2,
-  //   gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
-  //   accent: 'wes-dusty-blue',
-  //   comingSoon: true,
-  // },
-  // {
-  //   id: 'edit-images',
-  //   name: 'Edit\nImages',
-  //   description: 'Transform, reimagine, and enhance images.',
-  //   tool: null, // Marked as coming soon
-  //   icon: Edit,
-  //   gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
-  //   accent: 'wes-yellow',
-  //   comingSoon: true,
-  // },
-  // {
-  //   id: 'generate-perspectives',
-  //   name: 'Different\nPerspectives',
-  //   description: 'Create images from different perspectives.',
-  //   tool: null, // Coming soon
-  //   icon: Eye,
-  //   gradient: 'from-wes-lavender via-wes-pink to-wes-coral',
-  //   accent: 'wes-lavender',
-  //   comingSoon: true,
-  // },
-  // {
-  //   id: 'train-lora',
-  //   name: 'Train\nLoRA',
-  //   description: 'Fine-tune LoRAs for unique styles & motion.',
-  //   tool: null, // Coming soon
-  //   icon: Layers,
-  //   gradient: 'from-wes-sage via-wes-mint to-wes-dusty-blue',
-  //   accent: 'wes-sage',
-  //   comingSoon: true,
-  // },
+  {
+    id: 'moon-soon',
+    name: 'More Soon',
+    description: "We're adding more tools all the time!",
+    tool: null,
+    icon: Sparkles,
+    gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
+    accent: 'wes-dusty-blue',
+    comingSoon: true,
+  },
 ];
 
 const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any, isSquare?: boolean, index?: number, isVisible: boolean }) => {
