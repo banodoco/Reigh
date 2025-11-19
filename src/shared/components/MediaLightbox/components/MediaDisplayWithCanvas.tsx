@@ -240,7 +240,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                 ref={displayCanvasRef}
                 className={`absolute top-0 left-0 ${editMode === 'text' ? 'pointer-events-none' : 'pointer-events-auto cursor-crosshair'}`}
                 style={{
-                  touchAction: editMode === 'text' ? 'auto' : 'none',
+                  touchAction: editMode === 'text' ? 'auto' : variant === 'mobile-stacked' ? 'pan-y pinch-zoom' : 'none',
                   zIndex: 50,
                   userSelect: 'none',
                   WebkitUserSelect: 'none'

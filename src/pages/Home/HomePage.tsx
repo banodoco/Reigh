@@ -31,7 +31,6 @@ export default function HomePage() {
   
   // Assets & Animation State
   const [assetsLoaded, setAssetsLoaded] = useState(false);
-  const [isBrushActive, setIsBrushActive] = useState(false);
   
   // Tooltip State
   const [openTipOpen, setOpenTipOpen] = useState(false);
@@ -243,8 +242,6 @@ export default function HomePage() {
         handleEmergingActivate={wrappedHandleEmergingActivate}
         currentExample={currentExample}
         session={session}
-        isBrushActive={isBrushActive}
-        setIsBrushActive={setIsBrushActive}
         handleDiscordSignIn={handleDiscordSignIn}
         navigate={navigate}
         assetsLoaded={assetsLoaded}

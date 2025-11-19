@@ -9,6 +9,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { generateClientThumbnail, uploadImageWithThumbnail } from '@/shared/lib/clientThumbnailGenerator';
 
 interface CharacterEditorProps {
   shot: Shot;
@@ -93,8 +94,38 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
 
     setIsUploading(true);
     try {
-      // Upload to storage
-      const url = await uploadImageToStorage(file);
+      // Generate and upload thumbnail
+      let url = '';
+      let thumbnailUrl = '';
+      
+      try {
+        // Get current user ID for storage path
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+        const userId = session.user.id;
+
+        // Generate thumbnail client-side
+        const thumbnailResult = await generateClientThumbnail(file, 300, 0.8);
+        console.log('[CharacterAnimate] Thumbnail generated:', {
+          width: thumbnailResult.thumbnailWidth,
+          height: thumbnailResult.thumbnailHeight,
+          size: thumbnailResult.thumbnailBlob.size
+        });
+        
+        // Upload both main image and thumbnail
+        const uploadResult = await uploadImageWithThumbnail(file, thumbnailResult.thumbnailBlob, userId);
+        url = uploadResult.imageUrl;
+        thumbnailUrl = uploadResult.thumbnailUrl;
+        
+        console.log('[CharacterAnimate] Upload complete - Image:', url, 'Thumbnail:', thumbnailUrl);
+      } catch (thumbnailError) {
+        console.warn('[CharacterAnimate] Client-side thumbnail generation failed:', thumbnailError);
+        // Fallback to original upload flow without thumbnail
+        url = await uploadImageToStorage(file);
+        thumbnailUrl = url; // Use main image as fallback
+      }
 
       // Add to shot images
       const { error } = await supabase
@@ -103,6 +134,7 @@ const CharacterEditor: React.FC<CharacterEditorProps> = ({
           shot_id: shot.id,
           project_id: projectId,
           url: url,
+          thumbnail_url: thumbnailUrl,
           type: 'upload',
           metadata: {
             filename: file.name,

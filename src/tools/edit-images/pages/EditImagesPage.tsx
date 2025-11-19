@@ -14,6 +14,7 @@ import { useListShots } from '@/shared/hooks/useShots';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
+import { generateClientThumbnail, uploadImageWithThumbnail } from '@/shared/lib/clientThumbnailGenerator';
 
 export default function EditImagesPage() {
   const { selectedProjectId } = useProject();
@@ -32,13 +33,46 @@ export default function EditImagesPage() {
     setIsUploading(true);
     try {
       const file = files[0];
-      const publicUrl = await uploadImageToStorage(file, 3);
+      
+      // Generate and upload thumbnail
+      let publicUrl = '';
+      let thumbnailUrl = '';
+      
+      try {
+        // Get current user ID for storage path
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+        const userId = session.user.id;
+
+        // Generate thumbnail client-side
+        const thumbnailResult = await generateClientThumbnail(file, 300, 0.8);
+        console.log('[EditImages] Thumbnail generated:', {
+          width: thumbnailResult.thumbnailWidth,
+          height: thumbnailResult.thumbnailHeight,
+          size: thumbnailResult.thumbnailBlob.size
+        });
+        
+        // Upload both main image and thumbnail
+        const uploadResult = await uploadImageWithThumbnail(file, thumbnailResult.thumbnailBlob, userId);
+        publicUrl = uploadResult.imageUrl;
+        thumbnailUrl = uploadResult.thumbnailUrl;
+        
+        console.log('[EditImages] Upload complete - Image:', publicUrl, 'Thumbnail:', thumbnailUrl);
+      } catch (thumbnailError) {
+        console.warn('[EditImages] Client-side thumbnail generation failed:', thumbnailError);
+        // Fallback to original upload flow without thumbnail
+        publicUrl = await uploadImageToStorage(file, 3);
+        thumbnailUrl = publicUrl; // Use main image as fallback
+      }
 
       const { data: generation, error: dbError } = await supabase
         .from('generations')
         .insert({
           project_id: selectedProjectId,
           location: publicUrl,
+          thumbnail_url: thumbnailUrl,
           type: 'image',
           params: {
             prompt: 'Uploaded image',
@@ -65,8 +99,13 @@ export default function EditImagesPage() {
     }
   };
 
+  const isEditingOnMobile = selectedMedia && isMobile;
+
   return (
-    <div className="w-full h-[calc(100dvh-64px)] flex flex-col overflow-hidden">
+    <div className={cn(
+      "w-full flex flex-col",
+      isEditingOnMobile ? "min-h-[calc(100dvh-64px)]" : "h-[calc(100dvh-64px)] overflow-hidden"
+    )}>
       {!selectedMedia ? (
         <div className="w-full h-full flex flex-col md:flex-row bg-transparent">
           {/* Left Panel - Placeholder */}
@@ -109,8 +148,14 @@ export default function EditImagesPage() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 relative flex flex-col overflow-hidden">
-          <div className="flex-1 relative overflow-hidden bg-transparent">
+        <div className={cn(
+          "flex-1 relative flex flex-col",
+          !isEditingOnMobile && "overflow-hidden"
+        )}>
+          <div className={cn(
+            "flex-1 relative bg-transparent",
+            !isEditingOnMobile && "overflow-hidden"
+          )}>
              <InlineEditView 
                media={selectedMedia} 
                onClose={() => setSelectedMedia(null)}
@@ -190,7 +235,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
         </TabsList>
       </div>
 
-      <TabsContent value="gallery" className="flex-1 overflow-y-auto overscroll-contain p-0 m-0 relative pt-4 px-4 md:px-6">
+      <TabsContent value="gallery" className="flex-1 overflow-y-auto p-0 m-0 relative pt-4 px-4 md:px-6">
          <ImageGallery 
             images={generationsData?.items || []}
             isLoading={isGalleryLoading}

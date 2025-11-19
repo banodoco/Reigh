@@ -30,8 +30,6 @@ interface HeroSectionProps {
   handleEmergingActivate: () => void;
   currentExample: ExampleStyle;
   session: Session | null;
-  isBrushActive: boolean;
-  setIsBrushActive: (active: boolean) => void;
   handleDiscordSignIn: () => void;
   navigate: (path: string) => void;
   assetsLoaded: boolean;
@@ -54,8 +52,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   handleEmergingActivate,
   currentExample,
   session,
-  isBrushActive,
-  setIsBrushActive,
   handleDiscordSignIn,
   navigate,
   assetsLoaded,
@@ -219,11 +215,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               {/* Sign-in button below hero */}
               <div style={getFadeStyle(3)}>
                 {!session ? (
-                  <div
-                    className="group"
-                    onMouseEnter={() => setIsBrushActive(true)}
-                    onMouseLeave={() => setIsBrushActive(false)}
-                  >
+                  <div className="group">
                     <button
                       onClick={handleDiscordSignIn}
                       className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
@@ -238,9 +230,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         
                         {/* Paintbrush Icon - in front */}
                         <div className="w-5 h-5 relative z-10">
-                          <div 
-                            className={`paintbrush-anim w-full h-full origin-[50%_90%] ${isBrushActive ? 'is-running' : ''}`}
-                          >
+                          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
                             <img 
                               src="/brush-paintbrush-icon.webp"
                               alt="Paintbrush"
@@ -253,11 +243,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div
-                    className="group"
-                    onMouseEnter={() => setIsBrushActive(true)}
-                    onMouseLeave={() => setIsBrushActive(false)}
-                  >
+                  <div className="group">
                     <button
                       onPointerUp={() => navigate('/tools')}
                       className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
@@ -272,9 +258,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         
                         {/* Paintbrush Icon - in front */}
                         <div className="w-5 h-5 relative z-10">
-                          <div 
-                            className={`paintbrush-anim w-full h-full origin-[50%_90%] ${isBrushActive ? 'is-running' : ''}`}
-                          >
+                          <div className="paintbrush-anim w-full h-full origin-[50%_90%]">
                             <img 
                               src="/brush-paintbrush-icon.webp"
                               alt="Paintbrush"
@@ -323,4 +307,3 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     </div>
   );
 };
-

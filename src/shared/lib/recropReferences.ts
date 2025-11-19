@@ -1,6 +1,8 @@
 import { processStyleReferenceForAspectRatioString } from './styleReferenceProcessor';
 import { uploadImageToStorage } from './imageUploader';
 import { dataURLtoFile } from './utils';
+import { generateClientThumbnail, uploadImageWithThumbnail } from './clientThumbnailGenerator';
+import { supabase } from '@/integrations/supabase/client';
 
 // Import the ReferenceImage type from the image generation form
 export interface ReferenceImage {
@@ -89,7 +91,7 @@ export async function recropAllReferences(
       }
       console.log(`[RecropReferences] ✅ Image processed, new length: ${processedDataURL.length} chars`);
       
-      // Upload new processed version
+      // Upload new processed version with thumbnail
       console.log(`[RecropReferences] 📤 Converting processed image to file...`);
       const processedFile = dataURLtoFile(
         processedDataURL,
@@ -99,14 +101,42 @@ export async function recropAllReferences(
       if (!processedFile) {
         throw new Error('dataURLtoFile returned null');
       }
-      console.log(`[RecropReferences] 📤 Uploading processed file to storage...`);
-      const newProcessedUrl = await uploadImageToStorage(processedFile);
-      console.log(`[RecropReferences] ✅ Upload complete:`, newProcessedUrl);
       
-      // Update reference with new processed URL (keep original)
+      let newProcessedUrl = '';
+      let newThumbnailUrl = '';
+      
+      try {
+        // Get current user ID for storage path
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) {
+          throw new Error('User not authenticated');
+        }
+        const userId = session.user.id;
+
+        // Generate thumbnail for reprocessed image
+        console.log(`[RecropReferences] 🖼️ Generating thumbnail for processed image...`);
+        const thumbnailResult = await generateClientThumbnail(processedFile, 300, 0.8);
+        console.log(`[RecropReferences] ✅ Thumbnail generated: ${thumbnailResult.thumbnailWidth}x${thumbnailResult.thumbnailHeight}`);
+        
+        // Upload both main image and thumbnail
+        console.log(`[RecropReferences] 📤 Uploading processed file and thumbnail to storage...`);
+        const uploadResult = await uploadImageWithThumbnail(processedFile, thumbnailResult.thumbnailBlob, userId);
+        newProcessedUrl = uploadResult.imageUrl;
+        newThumbnailUrl = uploadResult.thumbnailUrl;
+        
+        console.log(`[RecropReferences] ✅ Upload complete - Image:`, newProcessedUrl, 'Thumbnail:', newThumbnailUrl);
+      } catch (thumbnailError) {
+        console.warn(`[RecropReferences] ⚠️ Thumbnail generation failed, uploading without thumbnail:`, thumbnailError);
+        // Fallback to original upload flow without thumbnail
+        newProcessedUrl = await uploadImageToStorage(processedFile);
+        newThumbnailUrl = newProcessedUrl; // Use main image as fallback
+      }
+      
+      // Update reference with new processed URL and thumbnail (keep original)
       const updatedRef = {
         ...ref,
         styleReferenceImage: newProcessedUrl,
+        thumbnailUrl: newThumbnailUrl,
         updatedAt: new Date().toISOString()
       };
       reprocessed.push(updatedRef);

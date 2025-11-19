@@ -2060,16 +2060,15 @@
   to { transform: scaleX(-1) rotate(0deg); }
 }
 
-/* Base state - paintbrush is always running the "rest" animation */
+/* Base state - paintbrush is static at the start position */
 .paintbrush-anim {
-  /* This animation does nothing but hold the transform state */
-  animation: paintbrushSubtleWiggle 2s ease-in-out infinite;
-  animation-play-state: paused;
+  transform: scaleX(-1) rotate(12deg);
 }
 
-/* Explicitly controlled running state via class, avoids group-hover race conditions */
-.paintbrush-anim.is-running {
-  animation-play-state: running;
+/* Trigger animation on group hover to sync perfectly with particles */
+/* Using ease-out to match the particle animation easing */
+.group:hover .paintbrush-anim {
+  animation: paintbrushSubtleWiggle 1.8s ease-out infinite;
 }
 
 @keyframes paintbrushWiggle {
