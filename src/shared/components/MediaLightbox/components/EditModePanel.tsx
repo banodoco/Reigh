@@ -63,6 +63,7 @@ export interface EditModePanelProps {
   
   // Variant
   variant: 'desktop' | 'mobile';
+  hideInfoEditToggle?: boolean;
 }
 
 /**
@@ -104,6 +105,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   currentMediaId,
   onClose,
   variant,
+  hideInfoEditToggle = false,
 }) => {
   const isMobile = variant === 'mobile';
   
@@ -169,6 +171,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         
         {/* Info | Edit Toggle and Close Button */}
         <div className="flex items-center gap-3">
+          {!hideInfoEditToggle && (
           <div className="flex items-center gap-1 bg-muted rounded-md p-1">
             <button
               onClick={handleExitMagicEditMode}
@@ -183,6 +186,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               Edit
             </button>
           </div>
+          )}
           
           <Button
             variant="ghost"

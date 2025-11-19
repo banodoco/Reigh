@@ -390,30 +390,32 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           {!isDragging && !readOnly && (
             <>
               {/* Click blocker for Edit Button to prevent timeline item clicks */}
-              <div
-                data-click-blocker="edit-button"
-                className="absolute bottom-0 left-0 h-12 w-12 z-[19]"
-                onMouseDown={(e) => {
-                  buttonClickedRef.current = true;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setTimeout(() => {
-                    buttonClickedRef.current = false;
-                  }, 100);
-                }}
-                onPointerDown={(e) => {
-                  buttonClickedRef.current = true;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setTimeout(() => {
-                    buttonClickedRef.current = false;
-                  }, 100);
-                }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              />
+              {onInpaintClick && (
+                <div
+                  data-click-blocker="edit-button"
+                  className="absolute bottom-0 left-0 h-8 w-8 z-[19]"
+                  onMouseDown={(e) => {
+                    buttonClickedRef.current = true;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTimeout(() => {
+                      buttonClickedRef.current = false;
+                    }, 100);
+                  }}
+                  onPointerDown={(e) => {
+                    buttonClickedRef.current = true;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTimeout(() => {
+                      buttonClickedRef.current = false;
+                    }, 100);
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                />
+              )}
               {/* Edit Button - Opens lightbox in edit mode (matches ShotEditor pattern) */}
               {onInpaintClick && (
                 <Button

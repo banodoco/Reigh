@@ -837,6 +837,50 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     setIsDragging(false);
   }, []);
 
+  // Track touch start position to detect scrolling vs tapping
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Helper to determine if interaction was a tap or a scroll/drag
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartPosRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
+    };
+  };
+
+  // Handle click/tap processing with scroll detection
+  const handleInteraction = (e: React.TouchEvent | React.MouseEvent) => {
+    // Check if there was significant movement (scrolling/dragging)
+    if (e.type === 'touchend' && touchStartPosRef.current) {
+      const touch = (e as React.TouchEvent).changedTouches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
+      const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
+      
+      // Reset touch start position
+      touchStartPosRef.current = null;
+
+      // If moved more than 10px, treat as scroll/drag and ignore click
+      if (deltaX > 10 || deltaY > 10) {
+        console.log('[MobileDebug] Scroll detected, ignoring tap');
+        return;
+      }
+    }
+
+    // Proceed with click logic
+    e.preventDefault();
+    
+    // Scroll to top when an item is clicked on mobile
+    if (isMobile) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    if (enableSingleClick && onImageClick) {
+      onImageClick(image);
+    } else {
+      onMobileTap(image);
+    }
+  };
+
   // Conditionally wrap with DraggableImage only on desktop to avoid interfering with mobile scrolling
   const imageContent = (
     <div 
@@ -846,7 +890,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onClick={enableSingleClick ? (e) => {
+        onClick={!isMobile && enableSingleClick ? (e) => {
           if (onImageClick) {
             e.stopPropagation();
             onImageClick(image);
@@ -875,15 +919,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               loop
               playsInline
               onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-              onTouchEnd={isMobile ? (e) => {
-                console.log('[MobileDebug] Video onTouchEnd fired', {
-                  imageId: image.id?.substring(0, 8),
-                  target: (e.target as HTMLElement)?.tagName,
-                  timestamp: Date.now()
-                });
-                e.preventDefault();
-                onMobileTap(image);
-              } : undefined}
+              onTouchStart={isMobile ? handleTouchStart : undefined}
+              onTouchEnd={isMobile ? handleInteraction : undefined}
               // Pass video loading handlers if GalleryVideoScrubber supports them, or if it spreads props to video
               onVideoError={handleImageError}
               onLoadStart={() => setImageLoading(true)}
@@ -925,15 +962,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     progressiveEnabled && isFullLoaded && "opacity-100"
                   )}
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-                  onTouchEnd={isMobile ? (e) => {
-                    console.log('[MobileDebug] Image onTouchEnd fired', {
-                      imageId: image.id?.substring(0, 8),
-                      target: (e.target as HTMLElement)?.tagName,
-                      timestamp: Date.now()
-                    });
-                    e.preventDefault();
-                    onMobileTap(image);
-                  } : undefined}
+                  onTouchStart={isMobile ? handleTouchStart : undefined}
+                  onTouchEnd={isMobile ? handleInteraction : undefined}
                   draggable={false}
                   style={{ cursor: 'pointer' }}
                 />

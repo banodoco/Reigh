@@ -95,7 +95,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             <div className={isAnimationComplete ? "overflow-visible" : "overflow-hidden"}>
               {/* Icon above title - wait for assets */}
-              <div style={getFadeStyle(0, !assetsLoaded)} className="relative z-50">
+              <div style={getFadeStyle(0, !assetsLoaded)} className="relative z-30">
                 <PaletteIcon className="mb-6 mt-0" />
               </div>
               

@@ -189,10 +189,10 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
   if (isMobile) {
     return (
       <TooltipProvider delayDuration={500}>
-         <div className="w-full h-full flex flex-col bg-transparent">
+         <div className="w-full h-full flex flex-col bg-transparent overflow-y-auto overflow-x-hidden">
              <div 
-               className="flex items-center justify-center relative bg-zinc-900/50 w-full"
-               style={{ height: '40%' }}
+               className="flex items-center justify-center relative bg-zinc-900/50 w-full shrink-0"
+               style={{ height: '45dvh' }}
              >
                <MediaDisplayWithCanvas
                  effectiveImageUrl={effectiveImageUrl}
@@ -292,9 +292,9 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
 
              <div 
                className={cn(
-                 "bg-background border-t border-border overflow-y-auto relative z-[60] w-full rounded-t-xl"
+                 "bg-background border-t border-border relative z-[60] w-full rounded-t-xl"
                )}
-               style={{ height: '60%' }}
+               style={{ minHeight: '55dvh' }}
              >
                {isSpecialEditMode ? (
                  <EditModePanel

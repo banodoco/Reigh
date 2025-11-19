@@ -66,17 +66,17 @@ export default function EditImagesPage() {
   };
 
   return (
-    <div className="w-full h-[calc(100vh-64px)] flex flex-col">
+    <div className="w-full h-[calc(100dvh-64px)] flex flex-col overflow-hidden">
       {!selectedMedia ? (
         <div className="w-full h-full flex flex-col md:flex-row bg-transparent">
           {/* Left Panel - Placeholder */}
           <div 
-            className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[40%] md:w-[60%] md:h-full md:flex-1 rounded-b-xl md:rounded-b-none md:rounded-l-xl overflow-hidden"
+            className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-b-xl md:rounded-b-none md:rounded-l-xl overflow-hidden"
           >
-             <div className="flex flex-col items-center justify-center space-y-6 p-8">
-                <div className="text-center space-y-2 max-w-md">
-                  <h1 className="text-3xl font-light tracking-tight text-white">Edit Images</h1>
-                  <p className="text-white/90">
+             <div className="flex flex-col items-center justify-center space-y-2 md:space-y-6 p-4 md:p-8">
+                <div className="text-center space-y-1 md:space-y-2 max-w-md">
+                  <h1 className="text-xl md:text-3xl font-light tracking-tight text-white">Edit Images</h1>
+                  <p className="text-white/90 text-xs md:text-base hidden md:block">
                     Select an image from the right or upload a new one to start editing.
                   </p>
                 </div>
@@ -100,7 +100,7 @@ export default function EditImagesPage() {
           {/* Right Panel - Selection UI */}
           <div 
             className={cn(
-              "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[60%] md:w-[40%] md:h-full rounded-t-xl md:rounded-none md:rounded-r-xl"
+              "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[80%] md:w-[40%] md:h-full rounded-t-xl md:rounded-none md:rounded-r-xl"
             )}
           >
              <ImageSelectionModal 
@@ -190,7 +190,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
         </TabsList>
       </div>
 
-      <TabsContent value="gallery" className="flex-1 overflow-y-auto p-0 m-0 relative pt-4">
+      <TabsContent value="gallery" className="flex-1 overflow-y-auto overscroll-contain p-0 m-0 relative pt-4 px-4 md:px-6">
          <ImageGallery 
             images={generationsData?.items || []}
             isLoading={isGalleryLoading}
