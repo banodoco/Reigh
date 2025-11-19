@@ -378,6 +378,13 @@ export function usePositionManagement({
           const maxFrame = Math.max(0, ...Array.from(positions.values()));
           
           const imageKey = matchingImage.shotImageEntryId ?? matchingImage.id;
+          
+          console.log('[PositionDebug] ⚠️ Fallback positioning triggered:', {
+            id: imageKey.substring(0, 8),
+            sg_timeline_frame: sg.timeline_frame,
+            newPosition: maxFrame + 50
+          });
+
           // [Position0Debug] Check if we're about to overwrite a position 0 item with fallback
           const existingPosition = positions.get(imageKey);
           if (existingPosition === 0) {

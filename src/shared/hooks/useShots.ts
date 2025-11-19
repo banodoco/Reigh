@@ -1369,17 +1369,12 @@ export const useDuplicateImageInShot = () => {
             const nextFrame = nextImageInTimeline 
               ? (nextImageInTimeline as any).timeline_frame  // Use the actual timeline_frame value
               : (originalTimelineFrame + 60); // Default spacing if no next image
-            const duplicateTimelineFrame = Math.floor((originalTimelineFrame + nextFrame) / 2);
             
-            console.log('[DUPLICATE_DEBUG] 🔧 OPTIMISTIC - FRAME CALCULATION DEBUG:', {
-              hasNextImage: !!nextImageInTimeline,
-              nextImageTimelineFrame: nextImageInTimeline ? (nextImageInTimeline as any).timeline_frame : null,
-              nextFrameUsed: nextFrame,
-              originalTimelineFrame,
-              calculatedMidpoint: duplicateTimelineFrame,
-              issue: nextFrame === originalTimelineFrame ? 'NEXT_FRAME_EQUALS_ORIGINAL!' : 'OK'
-            });
-
+            // Ensure safe calculation with integer result
+            const calculatedMidpoint = Math.floor((originalTimelineFrame + nextFrame) / 2);
+            // Fallback to safe offset if calculation fails (shouldn't happen)
+            const duplicateTimelineFrame = isNaN(calculatedMidpoint) ? originalTimelineFrame + 30 : calculatedMidpoint;
+            
             console.log('[DUPLICATE_DEBUG] 🧮 OPTIMISTIC - TIMELINE FRAME CALCULATION:', {
               originalTimelineFrame,
               nextFrame,
@@ -1443,6 +1438,7 @@ export const useDuplicateImageInShot = () => {
       console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after duplicate operation (100ms delay)');
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] }); // Also invalidate full list
         // IMPORTANT: Also invalidate two-phase cache keys
         queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });

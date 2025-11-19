@@ -1423,6 +1423,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 enableAdjacentPagePreloading={!isMobile}
                 onCreateShot={handleCreateShot}
                 onBackfillRequest={handleBackfillRequest}
+                showShare={!isMobile}
               />
               </div>
             )}
