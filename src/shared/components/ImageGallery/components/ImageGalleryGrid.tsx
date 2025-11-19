@@ -214,7 +214,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
       />
 
       {/* Gallery content wrapper with minimum height to prevent layout jump when there are images */}
-      <div className={paginatedImages.length > 0 && !reducedSpacing ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
+      <div className={paginatedImages.length > 0 && !reducedSpacing && !hideBottomPagination ? "min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]" : ""}>
         {/* No items match filters message */}
         {images.length > 0 && filteredImages.length === 0 && hasFilters && !isGalleryLoading && (
           <div className={`text-center py-10 mt-6 rounded-lg ${

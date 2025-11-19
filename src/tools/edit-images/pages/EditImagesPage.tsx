@@ -190,7 +190,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
         </TabsList>
       </div>
 
-      <TabsContent value="gallery" className="flex-1 overflow-y-auto p-0 m-0 h-full relative pt-4">
+      <TabsContent value="gallery" className="flex-1 overflow-y-auto p-0 m-0 relative pt-4">
          <ImageGallery 
             images={generationsData?.items || []}
             isLoading={isGalleryLoading}
