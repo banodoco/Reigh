@@ -80,6 +80,13 @@ interface ImageGalleryItemProps {
   // Project dimensions
   projectAspectRatio?: string;
   showShare?: boolean;
+  showDelete?: boolean;
+  showDownload?: boolean;
+  showEdit?: boolean;
+  showStar?: boolean;
+  showAddToShot?: boolean;
+  enableSingleClick?: boolean;
+  onImageClick?: (image: GeneratedImageWithMetadata) => void;
 }
 
 export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
@@ -124,6 +131,13 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   currentViewingShotId,
   projectAspectRatio,
   showShare = true,
+  showDelete = true,
+  showDownload = true,
+  showEdit = true,
+  showStar = true,
+  showAddToShot = true,
+  enableSingleClick = false,
+  onImageClick,
 }) => {
   // Local pending state to scope star button disabled to this item only
   const [isTogglingStar, setIsTogglingStar] = useState<boolean>(false);
@@ -832,6 +846,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onClick={enableSingleClick ? (e) => {
+          if (onImageClick) {
+            e.stopPropagation();
+            onImageClick(image);
+          } else {
+            // Fallback to standard behavior if onImageClick not provided but enabled
+            onOpenLightbox(image);
+          }
+        } : undefined}
     >
       <div className="relative w-full">
       <div 
@@ -985,7 +1008,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           )}
           
           {/* Add to Shot UI - Top Left (for non-video content) */}
-          {simplifiedShotOptions.length > 0 && onAddToLastShot && (
+          {showAddToShot && simplifiedShotOptions.length > 0 && onAddToLastShot && (
           <div className="absolute top-2 left-2 flex flex-col items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               {!isVideoContent && (
               <ShotSelector
@@ -1324,7 +1347,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           {/* Action buttons - Top Right (Delete, Info & Apply) */}
           <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8 z-20">
               {/* Delete button - Mobile Top Right */}
-              {isMobile && onDelete && (
+              {showDelete && isMobile && onDelete && (
                 <Button 
                     variant="destructive" 
                     size="icon" 
@@ -1467,7 +1490,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           </div>
 
           {/* Delete button - Desktop Bottom Right */}
-              {!isMobile && onDelete && (
+              {!isMobile && onDelete && showDelete && (
               <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
                   {/* Delete button - Desktop */}
                   <Button 
@@ -1487,6 +1510,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       )}
                   </Button>
                   {/* Download Button - Desktop Bottom Right (next to Delete) */}
+                  {showDownload && (
                   <Button
                       variant="secondary"
                       size="icon"
@@ -1504,6 +1528,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   >
                       <Download className="h-3.5 w-3.5" />
                   </Button>
+                  )}
               </div>
           )}
 
@@ -1512,6 +1537,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
             image.starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}>
               {/* Star Button */}
+              {showStar && (
               <Button
                   variant="secondary"
                   size="icon"
@@ -1545,6 +1571,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                       className={`h-3.5 w-3.5 ${image.starred ? 'fill-current' : ''}`} 
                   />
               </Button>
+              )}
 
               {/* Apply Settings Button - Bottom Left (next to Star) */}
               {image.metadata && onApplySettings && (
@@ -1582,7 +1609,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
               
               {/* Edit Image Button - Desktop and Mobile, images only */}
-              {!image.isVideo && (
+              {!image.isVideo && showEdit && (
                 <Button
                     variant="secondary"
                     size="icon"

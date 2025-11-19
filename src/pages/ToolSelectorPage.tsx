@@ -56,6 +56,15 @@ const processTools = [
 // Define assistant tools
 const assistantTools = [
   {
+    id: 'edit-images',
+    name: 'Edit\nImages',
+    description: 'Transform, reimagine, and enhance images.',
+    tool: toolsUIManifest.find(t => t.id === 'edit-images'),
+    icon: Edit,
+    gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
+    accent: 'wes-yellow',
+  },
+  {
     id: 'join-clips',
     name: 'Join Clips',
     description: 'Seamlessly connect video clips.',
@@ -391,7 +400,7 @@ const ToolSelectorPage: React.FC = () => {
 
             {/* Assistant Tools Column */}
             <div className="w-full c-lg:w-1/2">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 px-2 py-2`}>
+              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 c-lg:grid-cols-3 px-2 py-2`}>
                 {assistantTools.map((tool, index) => {
                   const isVisible = isToolVisible(tool.tool, tool.id);
                   

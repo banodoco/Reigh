@@ -7,7 +7,6 @@ import { SourceGenerationDisplay } from './SourceGenerationDisplay';
 import { DerivedGenerationsGrid } from './DerivedGenerationsGrid';
 import { GenerationRow } from '@/types/shots';
 import type { LoraMode } from '../hooks';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 
 export interface EditModePanelProps {
   // Source generation
@@ -22,7 +21,6 @@ export interface EditModePanelProps {
   editMode: 'text' | 'inpaint' | 'annotate';
   setEditMode: (mode: 'text' | 'inpaint' | 'annotate') => void;
   setIsInpaintMode: (value: boolean) => void;
-  showTextModeHint?: boolean; // Show tooltip hint when trying to draw in text mode
   
   // Prompt state
   inpaintPrompt: string;
@@ -82,7 +80,6 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   editMode,
   setEditMode,
   setIsInpaintMode,
-  showTextModeHint = false,
   inpaintPrompt,
   setInpaintPrompt,
   inpaintNumGenerations,
@@ -206,7 +203,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         <h2 className={`${headerSize} font-light`}>Edit Image</h2>
         
         {/* Three-way toggle: Text | Inpaint | Annotate - Segmented control style */}
-        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30 relative">
+        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden bg-muted/30">
             <button
               onClick={() => {
                 setIsInpaintMode(true);
@@ -222,32 +219,21 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
               <Type className={toggleIconSize} />
               Text
             </button>
-            
-            <TooltipProvider>
-              <Tooltip open={showTextModeHint && editMode === 'text'}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      setIsInpaintMode(true);
-                      setEditMode('inpaint');
-                    }}
-                    className={cn(
-                      `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
-                      editMode === 'inpaint'
-                        ? "bg-background text-foreground font-medium shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    )}
-                  >
-                    <Paintbrush className={toggleIconSize} />
-                    Inpaint
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="bg-primary text-primary-foreground">
-                  <p className="text-sm font-medium">Switch to Inpaint mode to draw</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
+            <button
+              onClick={() => {
+                setIsInpaintMode(true);
+                setEditMode('inpaint');
+              }}
+              className={cn(
+                `flex ${isMobile ? 'flex-1 justify-center' : ''} items-center gap-1.5 ${togglePadding} ${toggleTextSize} transition-all border-r border-border`,
+                editMode === 'inpaint'
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+            >
+              <Paintbrush className={toggleIconSize} />
+              Inpaint
+            </button>
             <button
               onClick={() => {
                 setIsInpaintMode(true);

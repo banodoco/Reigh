@@ -17,6 +17,7 @@ import CharacterAnimatePage from '@/tools/character-animate/pages/CharacterAnima
 import JoinClipsPage from '@/tools/join-clips/pages/JoinClipsPage';
 // Keep other heavy tools lazy-loaded to preserve bundle size
 const EditTravelToolPage = lazy(() => import('@/tools/edit-travel/pages/EditTravelToolPage'));
+const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPage'));
 const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage'; // Assuming NotFoundPage will be moved here or created
 import { LastAffectedShotProvider } from '@/shared/contexts/LastAffectedShotContext';
@@ -117,6 +118,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: '/tools/edit-images',
+        element: (
+          <Suspense fallback={<LazyLoadingFallback />}>
+            <EditImagesPage />
+          </Suspense>
+        ),
+      },
+      {
         path: '/tools/training-data-helper',
         element: (
           <Suspense fallback={<LazyLoadingFallback />}>
@@ -155,4 +164,4 @@ const router = createBrowserRouter([
 
 export function AppRoutes() {
   return <RouterProvider router={router} />;
-} 
+}

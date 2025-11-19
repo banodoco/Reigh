@@ -100,7 +100,13 @@ export interface ImageGalleryProps {
   enableAdjacentPagePreloading?: boolean;
   onCreateShot?: (shotName: string, files: File[]) => Promise<void>;
   onBackfillRequest?: (deletedCount: number, currentPage: number, itemsPerPage: number) => Promise<GeneratedImageWithMetadata[]>;
+  showDelete?: boolean;
+  showDownload?: boolean;
   showShare?: boolean;
-  isLoading?: boolean;
+  showEdit?: boolean;
+  showStar?: boolean;
+  showAddToShot?: boolean;
+  enableSingleClick?: boolean;
+  onImageClick?: (image: GeneratedImageWithMetadata) => void;
 }
 

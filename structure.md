@@ -209,6 +209,7 @@ tool-name/
 | **Image Generation** | ✅ Active | [`tool_image_generation.md`](docs/structure_detail/tool_image_generation.md) | Multi-model generation (Wan 2.2, Qwen.Image), LoRA & resource-based style reference support |
 | **Video Travel** | ✅ Active | [`tool_video_travel.md`](docs/structure_detail/tool_video_travel.md) | Frame-accurate timeline with dynamic spacing, batch processing, drag-and-drop shot reordering |
 | **Animate Characters** | ✅ Active | - | Motion transfer from reference videos to static images |
+| **Edit Images** | ✅ Active | - | Transform and edit images directly with inpainting and magic edit |
 | **Join Clips** | ✅ Active | - | AI-generated transitions between two video clips with LoRA support |
 | **Edit Travel** | ⚠️ Hidden | [`tool_edit_travel.md`](docs/structure_detail/tool_edit_travel.md) | Text-guided transformations |
 | **Training Data** | ⚠️ Hidden | [`tool_training_data_helper.md`](docs/structure_detail/tool_training_data_helper.md) | Video upload & segmentation |

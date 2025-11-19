@@ -483,7 +483,7 @@ const StyleReferenceSection: React.FC<{
         {/* Second Row: Settings in Two Columns */}
         <div className="flex gap-4 flex-col md:flex-row">
           {/* Left column - Reference Mode Selector */}
-          <div className="flex-1 space-y-2">
+          <div className="flex-[2] space-y-2">
             <Label className="text-sm font-medium">How would you like to use this reference?</Label>
             <RadioGroup 
               value={referenceMode} 
@@ -516,7 +516,7 @@ const StyleReferenceSection: React.FC<{
           </div>
 
           {/* Right column - Strength sliders and subject description */}
-          <div className="flex-1 space-y-4">
+          <div className="flex-[3] space-y-4">
             {/* Scene strength slider - only show in scene mode */}
             {referenceMode === 'scene' && (
               <div className="flex gap-4">

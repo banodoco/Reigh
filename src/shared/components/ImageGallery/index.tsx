@@ -107,8 +107,14 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     onCreateShot,
     lastShotNameForTooltip,
     onBackfillRequest,
+    showDelete = true,
+    showDownload = true,
     showShare = true,
-    isLoading = false
+    showEdit = true,
+    showStar = true,
+    showAddToShot = true,
+    enableSingleClick = false,
+    onImageClick,
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
@@ -634,11 +640,9 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           reducedSpacing={reducedSpacing}
           whiteText={whiteText}
           gridColumnClasses={gridColumnClasses}
-          columnsPerRow={columnsPerRow}
           projectAspectRatio={projectAspectRatio}
           
           // Loading props
-          isLoading={isLoading}
           isGalleryLoading={paginationHook.isGalleryLoading}
           setIsGalleryLoading={paginationHook.setIsGalleryLoading}
           isServerPagination={paginationHook.isServerPagination}
@@ -705,7 +709,14 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           toggleStarMutation={toggleStarMutation}
           onCreateShot={onCreateShot}
           currentViewingShotId={currentViewingShotId}
+          showDelete={showDelete}
+          showDownload={showDownload}
           showShare={showShare}
+          showEdit={showEdit}
+          showStar={showStar}
+          showAddToShot={showAddToShot}
+          enableSingleClick={enableSingleClick}
+          onImageClick={onImageClick}
         />
         
         {/* Bottom Pagination Controls */}
