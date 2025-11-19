@@ -336,6 +336,22 @@ const ToolSelectorPage: React.FC = () => {
   const topMargin = isLg ? 'mt-0' : isSm ? 'mt-0' : 'mt-0';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
+  // Filter visible assistant tools excluding "More Soon"
+  const visibleAssistantTools = assistantTools.filter(t => t.id !== 'moon-soon' && isToolVisible(t.tool, t.id));
+  
+  // Determine if "More Soon" should be shown: only if we have an odd number of visible tools
+  // This ensures we don't have a single orphan in a 2-column layout, or fill a 3-column layout
+  const shouldShowMoreSoon = visibleAssistantTools.length % 2 !== 0;
+  
+  // Construct final list of assistant tools to display
+  const displayedAssistantTools = [...visibleAssistantTools];
+  if (shouldShowMoreSoon) {
+    const moreSoonTool = assistantTools.find(t => t.id === 'moon-soon');
+    if (moreSoonTool) {
+      displayedAssistantTools.push(moreSoonTool);
+    }
+  }
+
   return (
     <PageFadeIn className="min-h-[70vh] relative">
       {/* Background elements removed to prevent inset-0 overlay issues */}
@@ -371,8 +387,8 @@ const ToolSelectorPage: React.FC = () => {
             {/* Assistant Tools Column */}
             <div className="w-full c-lg:w-1/2">
               <div className={`grid ${itemGap} ${topMargin} grid-cols-2 c-lg:grid-cols-3 px-2 py-2`}>
-                {assistantTools.map((tool, index) => {
-                  const isVisible = isToolVisible(tool.tool, tool.id);
+                {displayedAssistantTools.map((tool, index) => {
+                  const isVisible = true; // Already filtered
                   
                   return (
                     <FadeInSection key={tool.id}>
