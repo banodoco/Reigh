@@ -148,7 +148,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
   const [searchTerm, setSearchTerm] = useState("");
   const { data: shots } = useListShots(selectedProjectId);
   const isMobile = useIsMobile();
-  const itemsPerPage = 20;
+  const itemsPerPage = 15;
   
   const {
     data: generationsData,
