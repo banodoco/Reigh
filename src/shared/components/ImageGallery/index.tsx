@@ -718,6 +718,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           showAddToShot={showAddToShot}
           enableSingleClick={enableSingleClick}
           onImageClick={onImageClick}
+          hideBottomPagination={hideBottomPagination}
         />
         
         {/* Bottom Pagination Controls */}

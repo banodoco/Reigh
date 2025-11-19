@@ -55,6 +55,9 @@ export interface ImageGalleryGridProps {
   setBackfillSkeletonCount?: (count: number) => void;
   onSkeletonCleared?: () => void;
   
+  // Pagination display state
+  hideBottomPagination?: boolean;
+
   // ImageGalleryItem props - passing through all the props it needs
   [key: string]: any; // This allows passing through all other props
 }
@@ -106,6 +109,9 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   setBackfillSkeletonCount,
   onSkeletonCleared,
   
+  // Pagination display state
+  hideBottomPagination = false,
+
   // Pass through all other props for ImageGalleryItem
   ...itemProps
 }) => {
@@ -286,7 +292,7 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
           >
             {(showImageIndices) => (
               <div>
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${reducedSpacing ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
+                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${(reducedSpacing || hideBottomPagination) ? 'mb-4' : 'mb-12'} ${gridColumnClasses}`}>
                   {paginatedImages.map((image, index) => {
                     const shouldShow = showImageIndices.has(index);
                     
