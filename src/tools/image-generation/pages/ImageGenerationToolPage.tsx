@@ -320,7 +320,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Debug logging removed for performance
   
   // Fetch generations using a resilient project ID; enable when effectiveProjectId is available
-  const { data: generationsResponse, isLoading: isLoadingGenerations } = useGenerations(
+  const { data: generationsResponse, isLoading: isLoadingGenerations, isPlaceholderData } = useGenerations(
     effectiveProjectId, 
     currentPage, 
     itemsPerPage, 
@@ -1424,6 +1424,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 onCreateShot={handleCreateShot}
                 onBackfillRequest={handleBackfillRequest}
                 showShare={!isMobile}
+                isLoading={isPlaceholderData}
               />
               </div>
             )}

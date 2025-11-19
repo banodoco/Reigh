@@ -1,5 +1,6 @@
 import React from "react";
 import { Filter, Sparkles } from "lucide-react";
+import { SkeletonGallery } from "@/shared/components/ui/skeleton-gallery";
 import { ProgressiveLoadingManager } from "@/shared/components/ProgressiveLoadingManager";
 import { ImagePreloadManager } from "@/shared/components/ImagePreloadManager";
 import { ImageGalleryItem } from "@/shared/components/ImageGalleryItem";
@@ -17,9 +18,11 @@ export interface ImageGalleryGridProps {
   reducedSpacing?: boolean;
   whiteText?: boolean;
   gridColumnClasses: string;
+  columnsPerRow?: number;
   projectAspectRatio?: string;
   
   // Loading props
+  isLoading?: boolean;
   isGalleryLoading: boolean;
   setIsGalleryLoading: (loading: boolean) => void;
   isServerPagination: boolean;
@@ -66,9 +69,11 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
   reducedSpacing = false,
   whiteText = false,
   gridColumnClasses,
+  columnsPerRow = 5,
   projectAspectRatio,
   
   // Loading props
+  isLoading = false,
   isGalleryLoading,
   setIsGalleryLoading,
   isServerPagination,
@@ -163,6 +168,28 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
     }
     return `${padding}%`;
   }, [projectAspectRatio]);
+
+  // Show full skeleton gallery when loading new data
+  if (isLoading) {
+    return (
+      <div className={reducedSpacing ? "" : "min-h-[400px]"}>
+        <SkeletonGallery
+          count={itemsPerPage}
+          columns={{ 
+            base: 2, 
+            sm: Math.min(3, columnsPerRow), 
+            md: Math.min(4, columnsPerRow), 
+            lg: columnsPerRow, 
+            xl: columnsPerRow,
+            '2xl': columnsPerRow
+          }}
+          whiteText={whiteText}
+          showControls={false}
+          projectAspectRatio={projectAspectRatio}
+        />
+      </div>
+    );
+  }
 
   return (
     <>

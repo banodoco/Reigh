@@ -107,7 +107,8 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     onCreateShot,
     lastShotNameForTooltip,
     onBackfillRequest,
-    showShare = true
+    showShare = true,
+    isLoading = false
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
@@ -633,9 +634,11 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           reducedSpacing={reducedSpacing}
           whiteText={whiteText}
           gridColumnClasses={gridColumnClasses}
+          columnsPerRow={columnsPerRow}
           projectAspectRatio={projectAspectRatio}
           
           // Loading props
+          isLoading={isLoading}
           isGalleryLoading={paginationHook.isGalleryLoading}
           setIsGalleryLoading={paginationHook.setIsGalleryLoading}
           isServerPagination={paginationHook.isServerPagination}
