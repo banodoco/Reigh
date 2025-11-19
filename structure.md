@@ -60,6 +60,7 @@
 | **Railway Deployment** | `railway.toml`, `nixpacks.toml`, `.dockerignore` | Optimized Railway deployment config: npm-based builds, excludes node_modules/bun.lock/dist from Docker context for faster builds (~60-90s improvement) |
 | **Instrumentation System** | [instrumentation/README.md](src/integrations/supabase/instrumentation/README.md) | Centralized instrumentation management, diagnostics, and debugging tools |
 | **Shot Generation Data Flow** | See "Data Flow Architecture" section below | How shot image data flows from database to UI components |
+| **Resource Pagination** | See `useResources.ts` | Client-side pagination implementation for resources >1000 items to bypass Supabase API limits |
 
 This document is meant to serve as a comprehensive view of Reigh's architecture. 
 
@@ -206,7 +207,7 @@ tool-name/
 
 | Tool | Status | Documentation | Key Features |
 |------|--------|---------------|--------------|
-| **Image Generation** | ✅ Active | [`tool_image_generation.md`](docs/structure_detail/tool_image_generation.md) | Multi-model generation (Wan 2.2, Qwen.Image), LoRA & resource-based style reference support |
+| **Image Generation** | ✅ Active | [`tool_image_generation.md`](docs/structure_detail/tool_image_generation.md) | Multi-model image generation (Wan 2.2, Qwen.Image), LoRA & resource-based style reference support |
 | **Video Travel** | ✅ Active | [`tool_video_travel.md`](docs/structure_detail/tool_video_travel.md) | Frame-accurate timeline with dynamic spacing, batch processing, drag-and-drop shot reordering |
 | **Animate Characters** | ✅ Active | - | Motion transfer from reference videos to static images |
 | **Edit Images** | ✅ Active | - | Transform and edit images directly with inpainting and magic edit |

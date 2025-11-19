@@ -60,38 +60,56 @@ export interface Resource {
 // List public resources (available to all users)
 export const useListPublicResources = (type: ResourceType) => {
     return useQuery<Resource[], Error>({
-        queryKey: ['public-resources', type],
+        queryKey: ['public-resources', type, 'v2'],
         queryFn: async () => {
-            console.log('[PublicResources] Fetching public resources:', { type, timestamp: Date.now() });
+            console.log('[PublicResources] Fetching public resources (v2 - paginated):', { type, timestamp: Date.now() });
             
-            // Public resources should be readable by anyone
-            // Filter for is_public = true using proper JSONB boolean check
-            const { data, error } = await supabase
-                .from('resources')
-                .select('*')
-                .eq('type', type)
-                .filter('metadata->is_public', 'eq', true);
-            
-            if (error) {
-                console.error('[PublicResources] Query error:', { type, error, timestamp: Date.now() });
-                throw error;
+            // Manual pagination to bypass 1000 limit
+            let allData: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('resources')
+                    .select('*')
+                    .eq('type', type)
+                    .filter('metadata->is_public', 'eq', true)
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+                
+                if (error) {
+                    console.error('[PublicResources] Query error:', { type, error, timestamp: Date.now() });
+                    throw error;
+                }
+                
+                if (data) {
+                    allData = [...allData, ...data];
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
+                } else {
+                    hasMore = false;
+                }
+                
+                // Safety limit to prevent infinite loops
+                if (allData.length >= 20000) {
+                    console.warn('[PublicResources] Reached safety limit of 20k resources');
+                    hasMore = false;
+                }
             }
             
             console.log('[PublicResources] Query successful:', {
                 type,
-                count: data?.length || 0,
-                resources: data?.map(r => ({
-                    id: r.id?.substring(0, 8),
-                    userId: r.user_id?.substring(0, 8),
-                    name: (r.metadata as any)?.name || (r.metadata as any)?.Name,
-                    isPublic: (r.metadata as any)?.is_public,
-                })),
+                count: allData.length,
                 timestamp: Date.now()
             });
             
-            return data || [];
+            return allData;
         },
-        staleTime: 15 * 60 * 1000, // 15 minutes - increased for better performance since resources don't change often
+        staleTime: 15 * 60 * 1000, // 15 minutes
         gcTime: 30 * 60 * 1000, // keep in cache for 30 minutes
         refetchOnWindowFocus: false,
     });
@@ -100,19 +118,43 @@ export const useListPublicResources = (type: ResourceType) => {
 // List resources
 export const useListResources = (type: ResourceType) => {
     return useQuery<Resource[], Error>({
-        queryKey: ['resources', type],
+        queryKey: ['resources', type, 'v2'],
         queryFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
             
-            const { data, error } = await supabase
-                .from('resources')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('type', type);
-            
-            if (error) throw error;
-            return data || [];
+            // Manual pagination to bypass 1000 limit
+            let allData: any[] = [];
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data, error } = await supabase
+                    .from('resources')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('type', type)
+                    .range(page * pageSize, (page + 1) * pageSize - 1);
+                
+                if (error) throw error;
+
+                if (data) {
+                    allData = [...allData, ...data];
+                    if (data.length < pageSize) {
+                        hasMore = false;
+                    } else {
+                        page++;
+                    }
+                } else {
+                    hasMore = false;
+                }
+                
+                 // Safety limit
+                 if (allData.length >= 20000) break;
+            }
+
+            return allData;
         },
     });
 };
