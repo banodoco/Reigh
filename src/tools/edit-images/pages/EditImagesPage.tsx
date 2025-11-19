@@ -148,7 +148,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
   const [searchTerm, setSearchTerm] = useState("");
   const { data: shots } = useListShots(selectedProjectId);
   const isMobile = useIsMobile();
-  const itemsPerPage = isMobile ? 20 : 50;
+  const itemsPerPage = 20;
   
   const {
     data: generationsData,
@@ -214,6 +214,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
             showStar={false}
             showAddToShot={false}
             enableSingleClick={true}
+            hideBottomPagination={true}
          />
       </TabsContent>
 

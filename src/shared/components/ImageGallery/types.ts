@@ -108,5 +108,6 @@ export interface ImageGalleryProps {
   showAddToShot?: boolean;
   enableSingleClick?: boolean;
   onImageClick?: (image: GeneratedImageWithMetadata) => void;
+  hideBottomPagination?: boolean;
 }
 

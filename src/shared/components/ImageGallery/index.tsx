@@ -115,6 +115,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     showAddToShot = true,
     enableSingleClick = false,
     onImageClick,
+    hideBottomPagination = false,
   } = props;
 
   // [VideoSkeletonDebug] Mount/props summary for video gallery use
@@ -731,7 +732,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
           loadingButton={paginationHook.loadingButton}
           whiteText={whiteText}
           reducedSpacing={reducedSpacing}
-          hidePagination={hidePagination}
+          hidePagination={hidePagination || hideBottomPagination}
           onPageChange={paginationHook.handlePageChange}
           isBottom={true}
         />
