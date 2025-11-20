@@ -8,7 +8,7 @@ declare global {
 }
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Info, CornerDownLeft, Check, Share2, Copy, Loader2, Layers } from 'lucide-react';
+import { Trash2, Info, CornerDownLeft, Check, Share2, Copy, Loader2, Layers, Film } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useVideoLoader, useThumbnailLoader, useVideoElementIntegration } from '../hooks';
@@ -608,24 +608,33 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // MOBILE OPTIMIZATION: Use poster images instead of video elements on mobile to prevent autoplay budget exhaustion
   // ALL gallery videos use posters on mobile to leave maximum budget for lightbox autoplay
   const shouldUsePosterOnMobile = isMobile;
-  
-  // DEBUG: Log mobile poster decision
-  if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-    console.log('[MobileGalleryDebug] Mobile poster decision:', {
-      videoId: video.id?.substring(0, 8),
-      isMobile,
-      shouldUsePosterOnMobile,
-      willRenderStaticImage: shouldUsePosterOnMobile ? 'YES - Static <img> only' : 'NO - Will use <video> element',
-      timestamp: Date.now()
-    });
-  }
 
   // Determine poster image source: prefer thumbnail, fallback to video poster frame
   const posterImageSrc = (() => {
     if (video.thumbUrl) return video.thumbUrl; // Use thumbnail if available
+    
+    // On mobile, we cannot use video URL as image source
+    if (shouldUsePosterOnMobile) {
+      return video.imageUrl || null;
+    }
+
     if (video.location) return video.location; // Use video URL (browser will show first frame)
     return video.imageUrl; // Final fallback
   })();
+
+  // ALWAYS log to help diagnose autoplay issues
+  console.log('[MobileAutoplayDebug]', {
+    videoId: video.id?.substring(0, 8),
+    index,
+    isMobile,
+    shouldUsePosterOnMobile,
+    hasThumbnail: !!video.thumbUrl,
+    hasImageUrl: !!video.imageUrl,
+    posterImageSrc: posterImageSrc ? 'exists' : 'NULL',
+    willRender: shouldUsePosterOnMobile ? (posterImageSrc ? 'STATIC_IMG' : 'PLACEHOLDER_ICON') : 'VIDEO_ELEMENT_WITH_SCRUBBING',
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) : 'no-ua',
+    timestamp: Date.now()
+  });
 
   // Normalize URLs and append a stable identifier to avoid cross-item cache bleed
   const resolvedPosterUrl = posterImageSrc ? getDisplayUrl(posterImageSrc) : '/placeholder.svg';
@@ -657,19 +666,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
         {shouldUsePosterOnMobile ? (
           // MOBILE POSTER MODE: Show static image - clickable to open lightbox
-          (() => {
-            if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-              console.log('[MobileGalleryDebug] RENDERING MOBILE POSTER MODE - Static image only (NO <video> element)', {
-                videoId: video.id?.substring(0, 8),
-                posterSrc: posterImageSrc?.substring(posterImageSrc.lastIndexOf('/') + 1) || 'none',
-                hasThumbnail: !!video.thumbUrl,
-                timestamp: Date.now()
-              });
-            }
-            return null;
-          })(),
           <div
-            className="absolute inset-0 w-full h-full cursor-pointer"
+            className="absolute inset-0 w-full h-full cursor-pointer bg-gray-100"
             onClick={(e) => {
               // Don't interfere with touches inside action buttons
               const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
@@ -703,14 +701,20 @@ export const VideoItem = React.memo<VideoItemProps>(({
               onMobileTap(originalIndex);
             } : undefined}
           >
-            <img
-              key={`poster-${video.id}`}
-              src={posterSrcStable || resolvedPosterUrl}
-              alt="Video poster"
-              loading="eager"
-              decoding="sync"
-              className="w-full h-full object-cover"
-            />
+            {posterImageSrc ? (
+              <img
+                key={`poster-${video.id}`}
+                src={posterSrcStable || resolvedPosterUrl}
+                alt="Video poster"
+                loading="eager"
+                decoding="sync"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-300">
+                <Film className="h-8 w-8" />
+              </div>
+            )}
           </div>
         ) : (
           // DESKTOP OR PRIORITY VIDEO MODE: Use actual video element
@@ -799,6 +803,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   key={`video-${video.id}`}
                   src={video.location || video.imageUrl}
                   preload={shouldPreload as 'auto' | 'metadata' | 'none'}
+                  loadOnDemand={true}
                   className={`w-full h-full transition-opacity duration-500 ${videoPosterLoaded ? 'opacity-100' : 'opacity-0'
                     }`}
                   videoClassName="object-cover cursor-pointer"

@@ -13,6 +13,7 @@ interface GalleryControlsProps {
   totalPages: number;
   currentPage: number;
   cachedCount?: number | null; // Add cached count prop
+  totalCount?: number;
   showStarredOnly?: boolean;
   onStarredFilterChange?: (starredOnly: boolean) => void;
 }
@@ -24,6 +25,7 @@ export const GalleryControls = React.memo<GalleryControlsProps>(({
   totalPages,
   currentPage,
   cachedCount,
+  totalCount,
   showStarredOnly = false,
   onStarredFilterChange
 }) => (
@@ -35,7 +37,7 @@ export const GalleryControls = React.memo<GalleryControlsProps>(({
           // Show cached count immediately if available, otherwise skeleton
           typeof cachedCount === 'number' ? `(${cachedCount})` : <Skeleton className="h-5 w-8 inline-block" />
         ) : (
-          `(${sortedVideoOutputs.length})`
+          `(${totalCount ?? sortedVideoOutputs.length})`
         )}
       </h3>
       <div className="flex items-center gap-4">

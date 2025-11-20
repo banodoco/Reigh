@@ -128,7 +128,7 @@ async function fetchShotSpecificGenerations({
       upscaled_url,
       name,
       shot_data${includeTaskData ? ',tasks' : ''}
-    `)
+    `, { count: 'exact' })
     .not(`shot_data->${shotId}`, 'is', null) // GIN index filter - checks if shotId key exists
     .eq('project_id', projectId);
   
@@ -143,12 +143,17 @@ async function fetchShotSpecificGenerations({
   if (filters?.excludePositioned) {
     dataQuery = dataQuery.is(`shot_data->>${shotId}`, null);
   }
+
+  // Apply starred filter at DB level
+  if (filters?.starredOnly) {
+    dataQuery = dataQuery.eq('starred', true);
+  }
   
   // Apply ordering by created_at (can't order by JSONB value efficiently)
   dataQuery = dataQuery.order('created_at', { ascending: false });
   
-  // Execute single query with limit+1 to detect hasMore
-  console.log('[VideoGenMissing] Executing OPTIMIZED shot-specific query (no join, no count)...', {
+  // Execute query with count
+  console.log('[VideoGenMissing] Executing shot-specific query with exact count...', {
     projectId,
     shotId,
     offset,
@@ -158,7 +163,7 @@ async function fetchShotSpecificGenerations({
     timestamp: Date.now()
   });
   
-  const { data, error: dataError } = await dataQuery.range(offset, offset + limit);
+  const { data, count, error: dataError } = await dataQuery.range(offset, offset + limit);
   
   console.log('[VideoGenMissing] OPTIMIZED shot-specific query results:', {
     projectId,
@@ -249,11 +254,7 @@ async function fetchShotSpecificGenerations({
   // Store original count before client-side filtering
   const originalItemsCount = items.length;
   
-  // Apply remaining client-side filters (mediaType now handled at DB level)
-  
-  if (filters?.starredOnly) {
-    items = items.filter(item => item.starred);
-  }
+  // Apply remaining client-side filters (mediaType and starredOnly now handled at DB level)
   
   if (filters?.searchTerm?.trim()) {
     const searchTerm = filters.searchTerm.toLowerCase();
@@ -262,11 +263,19 @@ async function fetchShotSpecificGenerations({
     );
   }
   
-  // Use limit+1 pattern for hasMore detection (no count query needed)
-  const hasMore = items.length > limit; // If we got more than requested, there are more pages
-  const finalItems = items.slice(0, limit); // Take only the requested limit
-  const finalTotal = hasMore ? offset + finalItems.length + 1 : offset + finalItems.length; // Estimate total
-  const finalHasMore = hasMore;
+  // Use real count if available
+  const hasMore = items.length > limit;
+  const finalItems = items.slice(0, limit);
+  
+  // Use exact count from DB if available (handles pagination correctly)
+  // Otherwise fallback to estimation (limit + 1 pattern)
+  const finalTotal = (count !== null && count !== undefined) 
+    ? count 
+    : (hasMore ? offset + finalItems.length + 1 : offset + finalItems.length);
+    
+  const finalHasMore = (count !== null && count !== undefined)
+    ? (offset + finalItems.length < count)
+    : hasMore;
   
   const result = { items: finalItems, total: finalTotal, hasMore: finalHasMore };
   

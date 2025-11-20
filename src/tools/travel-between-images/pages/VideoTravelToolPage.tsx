@@ -206,6 +206,7 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Mobile detection for mode handling
   const isMobile = useIsMobile();
+  const itemsPerPage = isMobile ? 20 : 12; // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
   
   // Preload all shot video counts for the project
   const { getShotVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
@@ -848,12 +849,18 @@ const VideoTravelToolPage: React.FC = () => {
   const [shotSortMode, setShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('ordered');
   
   // Video gallery filter state
+  const [videoPage, setVideoPage] = useState<number>(1);
   const [videoShotFilter, setVideoShotFilter] = useState<string>('all');
   const [videoExcludePositioned, setVideoExcludePositioned] = useState<boolean>(false);
   const [videoSearchTerm, setVideoSearchTerm] = useState<string>('');
   const [videoMediaTypeFilter, setVideoMediaTypeFilter] = useState<'all' | 'image' | 'video'>('video');
   const [videoToolTypeFilter, setVideoToolTypeFilter] = useState<boolean>(true);
   const [videoStarredOnly, setVideoStarredOnly] = useState<boolean>(false);
+
+  // Reset video page when project changes
+  useEffect(() => {
+    setVideoPage(1);
+  }, [selectedProjectId]);
   
   // Track highlighted shot for duplication feedback
   const [highlightedShotId, setHighlightedShotId] = useState<string | null>(null);
@@ -925,6 +932,7 @@ const VideoTravelToolPage: React.FC = () => {
       setVideosViewJustEnabled(true);
       console.log('[VideoSkeletonDebug] Setting videosViewJustEnabled=true to show skeletons during transition');
       // Reset video filters when entering videos view
+      setVideoPage(1);
       setVideoShotFilter('all');
       setVideoExcludePositioned(false);
       setVideoSearchTerm('');
@@ -1002,8 +1010,8 @@ const VideoTravelToolPage: React.FC = () => {
     error: videosError 
   } = useGenerations(
     selectedProjectId, 
-    1, // page
-    100, // limit
+    videoPage, // page
+    itemsPerPage, // limit
     showVideosView, // only enable when showing videos view
     {
       toolType: videoToolTypeFilter ? 'travel-between-images' : undefined,
@@ -1871,22 +1879,27 @@ const VideoTravelToolPage: React.FC = () => {
                     // Omitting these props completely hides the workflow controls in the lightbox
                     currentToolType="travel-between-images"
                     currentToolTypeName="Travel Between Images"
+                    // Pagination props
+                    totalCount={(videosData as any)?.total}
+                    serverPage={videoPage}
+                    onServerPageChange={(page) => setVideoPage(page)}
+                    itemsPerPage={itemsPerPage}
+                    
                     initialMediaTypeFilter={videoMediaTypeFilter}
-                    onMediaTypeFilterChange={setVideoMediaTypeFilter}
+                    onMediaTypeFilterChange={(val) => { setVideoMediaTypeFilter(val); setVideoPage(1); }}
                     initialToolTypeFilter={videoToolTypeFilter}
-                    onToolTypeFilterChange={setVideoToolTypeFilter}
+                    onToolTypeFilterChange={(val) => { setVideoToolTypeFilter(val); setVideoPage(1); }}
                     showShotFilter={true}
                     initialShotFilter={videoShotFilter}
-                    onShotFilterChange={setVideoShotFilter}
+                    onShotFilterChange={(val) => { setVideoShotFilter(val); setVideoPage(1); }}
                     initialExcludePositioned={videoExcludePositioned}
-                    onExcludePositionedChange={setVideoExcludePositioned}
+                    onExcludePositionedChange={(val) => { setVideoExcludePositioned(val); setVideoPage(1); }}
                     showSearch={true}
                     initialSearchTerm={videoSearchTerm}
-                    onSearchChange={setVideoSearchTerm}
+                    onSearchChange={(val) => { setVideoSearchTerm(val); setVideoPage(1); }}
                     initialStarredFilter={videoStarredOnly}
-                    onStarredFilterChange={setVideoStarredOnly}
+                    onStarredFilterChange={(val) => { setVideoStarredOnly(val); setVideoPage(1); }}
                     columnsPerRow={3}
-                    itemsPerPage={isMobile ? 20 : 12} // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
                     showShare={false}
                   />
                 </div>

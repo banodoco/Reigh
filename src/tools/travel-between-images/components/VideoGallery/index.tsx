@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useVideoHover } from './hooks';
 import { useExternalGenerations } from '@/shared/components/ShotImageManager/hooks/useExternalGenerations';
 import { useDerivedNavigation } from '@/shared/hooks/useDerivedNavigation';
+import { useBackgroundThumbnailGenerator } from '@/shared/hooks/useBackgroundThumbnailGenerator';
 import { toast } from 'sonner';
 import {
   VideoItem,
@@ -221,7 +222,23 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       const tabletUA = /iPad|Tablet|Android(?!.*Mobile)|Silk|Kindle|PlayBook/i.test(ua);
       const maxTouchPoints = (navigator as any)?.maxTouchPoints || 0;
       const isIpadOsLike = (navigator as any)?.platform === 'MacIntel' && maxTouchPoints > 1;
-      return Boolean(isMobile || coarsePointer || tabletUA || isIpadOsLike);
+      const result = Boolean(isMobile || coarsePointer || tabletUA || isIpadOsLike);
+      
+      // ALWAYS log to help diagnose autoplay issues
+      console.log('[MobileAutoplayDebug] Device detection:', {
+        isMobile,
+        coarsePointer,
+        tabletUA,
+        maxTouchPoints,
+        isIpadOsLike,
+        finalResult: result,
+        expectedBehavior: result ? 'STATIC_IMAGES_ONLY' : 'VIDEO_SCRUBBING_ENABLED',
+        userAgent: ua.substring(0, 80),
+        platform: (navigator as any)?.platform,
+        timestamp: Date.now()
+      });
+      
+      return result;
     } catch {
       return isMobile;
     }
@@ -473,6 +490,38 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       timestamp: Date.now()
     });
   }, [currentPage, totalPages, currentVideoOutputs.length, generationsData]);
+
+  // ===============================================================================
+  // BACKGROUND THUMBNAIL GENERATION
+  // ===============================================================================
+
+  // Background thumbnail generation for videos without thumbnails
+  console.log('[VideoOutputsGallery] Calling useBackgroundThumbnailGenerator:', {
+    videosCount: videoOutputs.length,
+    sortedVideosCount: sortedVideoOutputs.length,
+    displayVideosCount: displaySortedVideoOutputs.length,
+    currentPageVideosCount: currentVideoOutputs.length,
+    isLoadingGenerations,
+    projectId: projectId?.substring(0, 8) || 'none',
+    readOnly,
+    enabled: !readOnly && !!projectId && !!shotId && !isLoadingGenerations && currentVideoOutputs.length > 0,
+    firstVideo: currentVideoOutputs[0] ? {
+      id: currentVideoOutputs[0].id?.substring(0, 8),
+      isVideo: currentVideoOutputs[0].isVideo,
+      hasLocation: !!currentVideoOutputs[0].location,
+      hasUrl: !!currentVideoOutputs[0].url,
+      hasThumbUrl: !!currentVideoOutputs[0].thumbUrl,
+      thumbUrl: currentVideoOutputs[0].thumbUrl?.substring(0, 50),
+      location: currentVideoOutputs[0].location?.substring(0, 50),
+    } : 'no videos',
+    timestamp: Date.now()
+  });
+  
+  useBackgroundThumbnailGenerator({
+    videos: currentVideoOutputs, // Use currentVideoOutputs (the displayed videos)
+    projectId,
+    enabled: !readOnly && !!projectId && !!shotId && !isLoadingGenerations && currentVideoOutputs.length > 0, // Wait for data to load
+  });
 
   // ===============================================================================
   // TASK DATA HOOKS
@@ -891,6 +940,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           totalPages={totalPages}
           currentPage={currentPage}
           cachedCount={cachedCount}
+          totalCount={(generationsData as any)?.total}
           showStarredOnly={showStarredOnly}
           onStarredFilterChange={setShowStarredOnly}
         />
@@ -919,7 +969,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     originalIndex={originalIndex}
                     isFirstVideo={isFirstVideo}
                     shouldPreload={shouldPreload}
-                    isMobile={isMobile}
+                    isMobile={isTouchLikeDevice}
                     projectAspectRatio={projectAspectRatio}
                     onLightboxOpen={setLightboxIndex}
                     onMobileTap={handleMobileTap}

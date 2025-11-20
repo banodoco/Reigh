@@ -7,6 +7,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
+import { useBackgroundThumbnailGenerator } from '@/shared/hooks/useBackgroundThumbnailGenerator';
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { ImageGalleryPagination } from "@/shared/components/ImageGalleryPagination";
 
@@ -298,6 +299,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   
   // Derive input images from multiple possible locations within task params
   const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
+
+  // Background thumbnail generation for videos without thumbnails
+  useBackgroundThumbnailGenerator({
+    videos: paginationHook.paginatedImages || [],
+    projectId: selectedProjectId,
+    enabled: !!selectedProjectId && (paginationHook.paginatedImages?.length || 0) > 0,
+  });
 
   // Calculate effective page for progressive loading
   const effectivePage = paginationHook.isServerPagination
