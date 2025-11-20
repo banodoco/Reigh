@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
-import { ReighLoading } from '@/shared/components/ReighLoading';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { PANE_CONFIG } from '@/shared/config/panes';
 
@@ -208,11 +207,7 @@ export const PanesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   return (
     <PanesContext.Provider value={value}>
-      {(isLoading && !isMobile) ? (
-        <ReighLoading />
-      ) : (
-        children
-      )}
+      {children}
     </PanesContext.Provider>
   );
 };

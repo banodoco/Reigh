@@ -608,6 +608,17 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // MOBILE OPTIMIZATION: Use poster images instead of video elements on mobile to prevent autoplay budget exhaustion
   // ALL gallery videos use posters on mobile to leave maximum budget for lightbox autoplay
   const shouldUsePosterOnMobile = isMobile;
+  
+  // DEBUG: Log mobile poster decision
+  if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+    console.log('[MobileGalleryDebug] Mobile poster decision:', {
+      videoId: video.id?.substring(0, 8),
+      isMobile,
+      shouldUsePosterOnMobile,
+      willRenderStaticImage: shouldUsePosterOnMobile ? 'YES - Static <img> only' : 'NO - Will use <video> element',
+      timestamp: Date.now()
+    });
+  }
 
   // Determine poster image source: prefer thumbnail, fallback to video poster frame
   const posterImageSrc = (() => {
@@ -646,6 +657,17 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
         {shouldUsePosterOnMobile ? (
           // MOBILE POSTER MODE: Show static image - clickable to open lightbox
+          (() => {
+            if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+              console.log('[MobileGalleryDebug] RENDERING MOBILE POSTER MODE - Static image only (NO <video> element)', {
+                videoId: video.id?.substring(0, 8),
+                posterSrc: posterImageSrc?.substring(posterImageSrc.lastIndexOf('/') + 1) || 'none',
+                hasThumbnail: !!video.thumbUrl,
+                timestamp: Date.now()
+              });
+            }
+            return null;
+          })(),
           <div
             className="absolute inset-0 w-full h-full cursor-pointer"
             onClick={(e) => {
@@ -693,6 +715,19 @@ export const VideoItem = React.memo<VideoItemProps>(({
         ) : (
           // DESKTOP OR PRIORITY VIDEO MODE: Use actual video element
           <>
+            {(() => {
+              if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+                console.log('[MobileGalleryDebug] RENDERING DESKTOP MODE - Will use <video> element', {
+                  videoId: video.id?.substring(0, 8),
+                  isMobile,
+                  shouldLoad,
+                  hasThumbnail: !!video.thumbUrl,
+                  reason: 'shouldUsePosterOnMobile is false',
+                  timestamp: Date.now()
+                });
+              }
+              return null;
+            })()}
             {/* Thumbnail - shows immediately if available, stays visible until video fully transitions */}
             {hasThumbnail && !thumbnailError && (
               <img

@@ -416,8 +416,9 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     }
     
     // Sync shot_data in background for fast loading stability (Phase 1)
+    // IMPORTANT: Await this so it completes BEFORE refetchQueries runs
     if (shotGen.generation_id) {
-      syncShotData(shotGen.generation_id, shotId, frame);
+      await syncShotData(shotGen.generation_id, shotId, frame);
     }
 
     // Refetch instead of invalidate to preserve data
@@ -499,11 +500,13 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
           .eq('id', sgB.id)
           .eq('shot_id', shotId);
         
-        // Sync shot_data for fast loading (Phase 1)
-        if (sgA.generation_id) syncShotData(sgA.generation_id, shotId, frameB);
-        if (sgB.generation_id) syncShotData(sgB.generation_id, shotId, frameA);
+        // Sync shot_data for fast loading (Phase 1) - Ensure completion before refetch
+        const syncPromises = [];
+        if (sgA.generation_id) syncPromises.push(syncShotData(sgA.generation_id, shotId, frameB));
+        if (sgB.generation_id) syncPromises.push(syncShotData(sgB.generation_id, shotId, frameA));
 
-        const [resA, resB] = await Promise.all([updateA, updateB]);
+        // Await both updates and syncs
+        const [resA, resB] = await Promise.all([updateA, updateB, ...syncPromises]);
         
         if (resA.error) throw resA.error;
         if (resB.error) throw resB.error;
@@ -542,16 +545,19 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
         return;
       }
 
-      // Sync shot_data for fast loading (Phase 1)
-      if (shotGen.generation_id) {
-        syncShotData(shotGen.generation_id, shotId, newFrame);
-      }
+      // Sync shot_data for fast loading (Phase 1) - Start in parallel
+      const syncPromise = shotGen.generation_id 
+        ? syncShotData(shotGen.generation_id, shotId, newFrame)
+        : Promise.resolve();
 
       const { error } = await supabase
         .from('shot_generations')
         .update({ timeline_frame: newFrame })
         .eq('id', shotGen.id)
         .eq('shot_id', shotId);
+        
+      // Ensure sync completes before finishing this update promise
+      await syncPromise;
 
       if (error) {
         console.error('[TimelinePositionUtils] Error updating position:', error);
