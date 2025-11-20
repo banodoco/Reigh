@@ -191,8 +191,21 @@ export function usePositionManagement({
     const currentDeps = { shotGenerations, images, frameSpacing, shotId };
     const prevDeps = prevDepsRef.current;
     
+    console.log('[DUPLICATE_POSITIONS] 🔍 usePositionManagement framePositions calculation:', {
+      imagesCount: images.length,
+      isLocked: positionLockRef.current.isLocked,
+      lockedPositionsSize: positionLockRef.current.lockedPositions.size,
+      willBypassLock: images.length !== positionLockRef.current.lockedPositions.size,
+      imagesSample: images.slice(0, 3).map(img => ({
+        id: (img.shotImageEntryId ?? img.id)?.substring(0, 8),
+        timeline_frame: (img as any).timeline_frame,
+        isTemp: (img.shotImageEntryId ?? img.id)?.startsWith('temp-')
+      }))
+    });
+    
     // 🔒 POSITION LOCK: If positions are locked, return the locked positions instead of fresh data
-    if (positionLockRef.current.isLocked) {
+    // EXCEPTION: If item count changes, it means we received the update (duplicate/delete), so use fresh data
+    if (positionLockRef.current.isLocked && images.length === positionLockRef.current.lockedPositions.size) {
       const timeSinceLock = Date.now() - positionLockRef.current.lockTimestamp;
       if (timeSinceLock < 3000) { // 3 second maximum lock duration (covers refetch period)
         // IMPROVED FIX: Match by POSITION ORDER instead of ID
@@ -262,7 +275,8 @@ export function usePositionManagement({
     
     // 🛡️ REFETCH PROTECTION: If we detect data is inconsistent during refetch, use previous positions
     // This prevents glitches when delete/duplicate operations trigger cache invalidation
-    if (prevDeps && positionLockRef.current.lockedPositions.size > 0) {
+    // EXCEPTION: If item count changes, we assume it's the mutation result and allow it
+    if (prevDeps && positionLockRef.current.lockedPositions.size > 0 && images.length === positionLockRef.current.lockedPositions.size) {
       const timeSinceLock = Date.now() - positionLockRef.current.lockTimestamp;
       // If recent lock (within 500ms) and data is changing, maintain previous positions
       if (timeSinceLock < 500) {
@@ -492,15 +506,35 @@ export function usePositionManagement({
       source = 'database';
     }
 
+    // 🛡️ FALLBACK PATCH: Ensure all images with valid timeline_frame are included
+    // This covers the gap where framePositions might be stale during optimistic->DB transition
+    const finalPositions = new Map(selectedPositions);
+    let patchedCount = 0;
+    
+    images.forEach(img => {
+      const key = img.shotImageEntryId ?? img.id;
+      const frame = (img as any).timeline_frame;
+      // Only patch if missing AND has a valid frame
+      if (!finalPositions.has(key) && frame !== null && frame !== undefined) {
+        finalPositions.set(key, frame);
+        patchedCount++;
+      }
+    });
+    
+    if (patchedCount > 0) {
+       console.log(`[TimelineVisibility] 🩹 Patched ${patchedCount} missing display positions`);
+    }
+
     // 🎯 MOVEMENT TRACKING: Log display position source changes
     console.log(`[TimelineVisibility] 🎨 displayPositions UPDATE:`, {
       shotId: shotId.substring(0, 8),
-      source,
-      positionsCount: selectedPositions.size,
+      source: patchedCount > 0 ? `${source} + patched` : source,
+      positionsCount: finalPositions.size,
       isDragInProgress,
       isPersistingPositions,
       isLoading,
-      positions: Array.from(selectedPositions.entries()).map(([id, pos]) => ({
+      patchedCount,
+      positions: Array.from(finalPositions.entries()).map(([id, pos]) => ({
         id: id.substring(0, 8),
         position: pos
       })).slice(0, 10), // First 10 items
@@ -508,7 +542,7 @@ export function usePositionManagement({
     });
 
     // [Position0Debug] Only log if there are position 0 items or if we're missing expected position 0 items
-    const position0Items = Array.from(selectedPositions.entries()).filter(([id, pos]) => pos === 0);
+    const position0Items = Array.from(finalPositions.entries()).filter(([id, pos]) => pos === 0);
     
     if (position0Items.length > 0) {
       console.log(`[Position0Debug] 📊 POSITION 0 FOUND in ${source}:`, {
@@ -516,16 +550,16 @@ export function usePositionManagement({
       });
     } else {
       // Check if we should have position 0 items but don't
-      const allPositions = Array.from(selectedPositions.entries()).sort((a, b) => a[1] - b[1]);
+      const allPositions = Array.from(finalPositions.entries()).sort((a, b) => a[1] - b[1]);
       console.log(`[Position0Debug] 📊 NO POSITION 0 in ${source}:`, {
-        totalItems: selectedPositions.size,
+        totalItems: finalPositions.size,
         minPosition: allPositions.length > 0 ? allPositions[0][1] : null,
         first3Items: allPositions.slice(0, 3).map(([id, pos]) => ({ id: id.substring(0, 8), position: pos }))
       });
     }
 
-    return selectedPositions;
-  }, [isDragInProgress, isPersistingPositions, isLoading, stablePositions, framePositions, shotId]);
+    return finalPositions;
+  }, [isDragInProgress, isPersistingPositions, isLoading, stablePositions, framePositions, shotId, images]);
 
   // Enhanced position change analysis
   const analyzePositionChanges = useCallback((

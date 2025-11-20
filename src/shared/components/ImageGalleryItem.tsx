@@ -869,11 +869,6 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     // Proceed with click logic
     e.preventDefault();
     
-    // Scroll to top when an item is clicked on mobile
-    if (isMobile) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
     if (enableSingleClick && onImageClick) {
       onImageClick(image);
     } else {

@@ -219,6 +219,7 @@ export const useAllShotGenerations = (
     refetchOnMount: !options?.disableRefetch,
     refetchOnWindowFocus: !options?.disableRefetch,
     refetchOnReconnect: !options?.disableRefetch,
+    placeholderData: (previousData) => previousData, // Keep previous data during refetch (for optimistic updates)
     queryFn: async ({ signal }) => {
       const startTime = Date.now();
       console.log('[TwoPhaseLoad] Phase 1 START - Fast query from generations table', { 
@@ -299,7 +300,7 @@ export const useAllShotGenerations = (
           // These will be populated in Phase 2
           shotImageEntryId: null, 
           shot_generation_id: null,
-          metadata: null,
+          metadata: {}, // Default to empty object so isTimelineGeneration passes immediately
         };
       });
 
@@ -355,6 +356,7 @@ export const useAllShotGenerations = (
     refetchOnMount: !options?.disableRefetch,
     refetchOnWindowFocus: !options?.disableRefetch,
     refetchOnReconnect: !options?.disableRefetch,
+    placeholderData: (previousData) => previousData, // Keep previous data during refetch
     queryFn: async ({ signal }) => {
       const startTime = Date.now();
       const BATCH_SIZE = 500; // PostgreSQL .in() works well with ~500 items max
@@ -458,12 +460,36 @@ export const useAllShotGenerations = (
   // ============================================================================
   // MERGE: Combine Phase 1 and Phase 2 data
   // ============================================================================
+  
+  // Keep track of last valid Phase 2 data to prevent flashing during key changes
+  const lastPhase2DataRef = React.useRef<any[]>([]);
+  React.useEffect(() => {
+    if (phase2Query.data && phase2Query.data.length > 0) {
+      lastPhase2DataRef.current = phase2Query.data;
+    }
+  }, [phase2Query.data]);
+
   const mergedData = React.useMemo(() => {
     if (!phase1Query.data) return undefined;
     
-    // If Phase 2 hasn't loaded yet, return Phase 1 data
+    // Determine which Phase 2 data to use
+    let metaData = phase2Query.data;
+    let usingCachedData = false;
+    
+    // If current Phase 2 is empty/loading but we have cached data, use cache
+    // This handles the "key change" scenario where data momentarily disappears
+    if ((!metaData || metaData.length === 0) && lastPhase2DataRef.current.length > 0) {
+       // Check if we're in a loading state where we expect data but don't have it yet
+       if (phase2Query.isLoading || phase2Query.isFetching) {
+         console.log('[TwoPhaseLoad] Using cached Phase 2 data during transition');
+         metaData = lastPhase2DataRef.current;
+         usingCachedData = true;
+       }
+    }
+    
+    // If Phase 2 hasn't loaded yet (and no cache), return Phase 1 data
     // (user can see images immediately, mutations will work once Phase 2 loads)
-    if (!phase2Query.data || phase2Query.data.length === 0) {
+    if (!metaData || metaData.length === 0) {
       console.log('[TwoPhaseLoad] Using Phase 1 data only (Phase 2 pending)', {
         shotId: stableShotId,
         imageCount: phase1Query.data.length,
@@ -474,7 +500,7 @@ export const useAllShotGenerations = (
 
     // Create lookup map for Phase 2 data
     const metadataMap = new Map(
-      phase2Query.data.map(sg => [sg.generation_id, sg])
+      metaData.map((sg: any) => [sg.generation_id, sg])
     );
 
     // Merge Phase 2 data into Phase 1 data
@@ -498,6 +524,7 @@ export const useAllShotGenerations = (
       totalImages: merged.length,
       withMetadata: merged.filter(g => g.metadata).length,
       withShotGenId: merged.filter(g => g.shotImageEntryId).length,
+      usingCachedData
     });
     
     console.log('[DataTrace] 📦 DB → Phase 2 merged:', {
@@ -508,7 +535,7 @@ export const useAllShotGenerations = (
     });
 
     return merged;
-  }, [phase1Query.data, phase2Query.data, stableShotId]);
+  }, [phase1Query.data, phase2Query.data, phase2Query.isLoading, phase2Query.isFetching, stableShotId]);
 
   // ============================================================================
   // Return merged query result with phase status

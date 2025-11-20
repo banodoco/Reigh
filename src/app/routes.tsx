@@ -11,6 +11,7 @@ import SharePage from '@/pages/SharePage';
 import ImageGenerationToolPage from '@/tools/image-generation/pages/ImageGenerationToolPage';
 // Import VideoTravelToolPage eagerly to avoid dynamic import issues on some mobile browsers (e.g. Safari)
 import VideoTravelToolPage from '@/tools/travel-between-images/pages/VideoTravelToolPage';
+import SegmentsPage from '@/tools/travel-between-images/pages/SegmentsPage';
 // Import CharacterAnimatePage eagerly for consistency with other main tools
 import CharacterAnimatePage from '@/tools/character-animate/pages/CharacterAnimatePage';
 // Import JoinClipsPage eagerly for consistency with other main tools
@@ -40,24 +41,17 @@ const router = createBrowserRouter([
   // HomePage route without Layout (no header) when in web environment
   ...(currentEnv === AppEnv.WEB ? [{
     path: '/',
-    loader: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        return redirect('/tools');
-      }
-      return null;
-    },
     element: <HomePage />,
     errorElement: <NotFoundPage />,
   }] : []),
-  
+
   // Add /home route that also leads to HomePage
   {
     path: '/home',
     element: <HomePage />,
     errorElement: <NotFoundPage />,
   },
-  
+
   // Payment pages (outside of Layout to avoid auth requirements)
   {
     path: '/payments/success',
@@ -69,7 +63,7 @@ const router = createBrowserRouter([
     element: <PaymentCancelPage />,
     errorElement: <NotFoundPage />,
   },
-  
+
   // Share page (public, outside of Layout)
   {
     path: '/share/:shareId',
@@ -77,7 +71,7 @@ const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
   },
 
-  
+
   {
     element: <Layout />,
     errorElement: <NotFoundPage />,
@@ -100,6 +94,10 @@ const router = createBrowserRouter([
       {
         path: '/tools/travel-between-images',
         element: <VideoTravelToolPage />, // No Suspense wrapper needed – component is loaded synchronously
+      },
+      {
+        path: '/tools/travel-between-images/segments/:parentId',
+        element: <SegmentsPage />,
       },
       {
         path: '/tools/character-animate',
@@ -156,9 +154,9 @@ const router = createBrowserRouter([
   {
     path: '*',
     element: <NotFoundPage /> // This can be a child of Layout or a separate top-level route
-                            // If child of Layout: { path: '*', element: <NotFoundPage /> }
-                            // If you want NotFoundPage to also have the Layout, put it in children array.
-                            // For a non-layout 404, keep it separate or rely on the errorElement.
+    // If child of Layout: { path: '*', element: <NotFoundPage /> }
+    // If you want NotFoundPage to also have the Layout, put it in children array.
+    // For a non-layout 404, keep it separate or rely on the errorElement.
   }
 ]);
 

@@ -299,6 +299,15 @@ export const useGenerationActions = ({
       return;
     }
 
+    // Guard: Prevent deleting optimistic items (mutations in progress)
+    if (shotImageEntryId.startsWith('temp-')) {
+      console.warn('[DELETE:useGenerationActions] ⚠️ Attempted to delete optimistic item, ignoring', {
+        shotImageEntryId
+      });
+      toast.warning("Please wait for the previous operation to complete.");
+      return;
+    }
+
     console.log('[DELETE:useGenerationActions] ✅ Calling removeImageFromShotMutation with:', {
       shot_id: selectedShot.id.substring(0, 8),
       shotImageEntryId: shotImageEntryId.substring(0, 8),
@@ -359,12 +368,30 @@ export const useGenerationActions = ({
       return;
     }
 
+    // Guard: Prevent duplicating optimistic items (mutations in progress)
+    if (shotImageEntryId.startsWith('temp-')) {
+      console.warn('[DUPLICATE:useGenerationActions] ⚠️ Attempted to duplicate optimistic item, ignoring', {
+        shotImageEntryId
+      });
+      toast.warning("Please wait for the previous operation to complete.");
+      return;
+    }
+
     const originalImage = orderedShotImages.find(img => (img.shotImageEntryId ?? img.id) === shotImageEntryId);
     if (!originalImage) {
       toast.error("Original image not found for duplication.");
       return;
     }
+    
+    // Additional guard: Check if the generation ID is also temporary
     const generationId = originalImage.id;
+    if (generationId.startsWith('temp-')) {
+      console.warn('[DUPLICATE:useGenerationActions] ⚠️ Generation ID is temporary, ignoring', {
+        generationId
+      });
+      toast.warning("Please wait for the image to finish uploading.");
+      return;
+    }
     
     console.log('[DUPLICATE_DEBUG] 📍 FOUND ORIGINAL IMAGE:', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),

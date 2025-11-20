@@ -8,7 +8,7 @@ declare global {
 }
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Info, CornerDownLeft, Check, Share2, Copy, Loader2 } from 'lucide-react';
+import { Trash2, Info, CornerDownLeft, Check, Share2, Copy, Loader2, Layers } from 'lucide-react';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { TimeStamp } from '@/shared/components/TimeStamp';
 import { useVideoLoader, useThumbnailLoader, useVideoElementIntegration } from '../hooks';
@@ -45,51 +45,53 @@ interface VideoItemProps {
   onApplySettingsFromTask: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
   existingShareSlug?: string;
   onShareCreated?: (videoId: string, shareSlug: string) => void;
+  onViewSegments?: (video: GenerationRow) => void;
 }
 
-export const VideoItem = React.memo<VideoItemProps>(({ 
-  video, 
-  index, 
-  originalIndex, 
-  isFirstVideo, 
-  shouldPreload, 
-  isMobile, 
+export const VideoItem = React.memo<VideoItemProps>(({
+  video,
+  index,
+  originalIndex,
+  isFirstVideo,
+  shouldPreload,
+  isMobile,
   projectAspectRatio,
-  onLightboxOpen, 
-  onMobileTap, 
+  onLightboxOpen,
+  onMobileTap,
   onMobilePreload,
-  onDelete, 
-  deletingVideoId, 
-  onHoverStart, 
+  onDelete,
+  deletingVideoId,
+  onHoverStart,
   onHoverEnd,
   onMobileModalOpen,
   selectedVideoForDetails,
   showTaskDetailsModal,
   onApplySettingsFromTask,
   existingShareSlug,
-  onShareCreated
+  onShareCreated,
+  onViewSegments
 }) => {
   // Get task mapping for this video to enable Apply Settings button
   const { data: taskMapping } = useTaskFromUnifiedCache(video.id || '');
-  
+
   // Track success state for Apply Settings button
   const [settingsApplied, setSettingsApplied] = useState(false);
-  
+
   // Track share state
   const [shareSlug, setShareSlug] = useState<string | null>(null);
   const [isCreatingShare, setIsCreatingShare] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-  
+
   // Toast notifications
   const { toast } = useToast();
-  
+
   // Initialize share slug from prop (batch fetched by parent)
   useEffect(() => {
     if (existingShareSlug) {
       setShareSlug(existingShareSlug);
     }
   }, [existingShareSlug]);
-  
+
   // DEBUG: Track re-renders to verify memo is working
   if (process.env.NODE_ENV === 'development' && isFirstVideo) {
     console.log('[HoverIssue] 🔄 VideoItem re-render (first item):', {
@@ -97,21 +99,21 @@ export const VideoItem = React.memo<VideoItemProps>(({
       timestamp: Date.now()
     });
   }
-  
+
   // ===============================================================================
   // HOOKS - Use extracted hooks for cleaner separation of concerns
   // ===============================================================================
-  
+
   const videoLoader = useVideoLoader(video, index, isFirstVideo, shouldPreload);
   const thumbnailLoader = useThumbnailLoader(video);
-  
+
   // Destructure for easier access
   const { shouldLoad, videoMetadataLoaded, videoPosterLoaded, logVideoEvent } = videoLoader;
-  const { 
-    thumbnailLoaded, 
-    setThumbnailLoaded, 
-    thumbnailError, 
-    setThumbnailError, 
+  const {
+    thumbnailLoaded,
+    setThumbnailLoaded,
+    thumbnailError,
+    setThumbnailError,
     hasThumbnail,
     isInitiallyCached,
     inPreloaderCache,
@@ -131,29 +133,29 @@ export const VideoItem = React.memo<VideoItemProps>(({
       timestamp: Date.now()
     });
   }, [video.id, thumbnailLoaded, thumbnailError, hasThumbnail, isInitiallyCached, inPreloaderCache, inBrowserCache]);
-  
+
   // Hook for video element integration
   useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader, isMobile);
-  
+
   // ===============================================================================
   // VIDEO TRANSITION STATE - Smooth transition from thumbnail to video
   // ===============================================================================
-  
+
   // Track when video is fully visible to prevent flashing
   const [videoFullyVisible, setVideoFullyVisible] = useState(false);
-  
+
   // ===============================================================================
   // MOBILE PRELOADING STATE - Video preloading on first tap
   // ===============================================================================
-  
+
   // Track mobile video preloading state
   const [isMobilePreloading, setIsMobilePreloading] = useState(false);
   const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
-  
+
   // ===============================================================================
   // MOBILE VIDEO PRELOADING FUNCTION
   // ===============================================================================
-  
+
   const startMobileVideoPreload = React.useCallback(() => {
     if (!isMobile || isMobilePreloading || preloadVideoRef.current) {
       console.log('[MobilePreload] Skipping preload', {
@@ -165,15 +167,15 @@ export const VideoItem = React.memo<VideoItemProps>(({
       });
       return;
     }
-    
+
     console.log('[MobilePreload] Starting video preload', {
       videoId: video.id?.substring(0, 8),
       videoSrc: video.location?.substring(video.location.lastIndexOf('/') + 1) || 'no-src',
       timestamp: Date.now()
     });
-    
+
     setIsMobilePreloading(true);
-    
+
     // Create hidden video element for preloading
     const preloadVideo = document.createElement('video');
     const resolvedSrc = getDisplayUrl((video.location || video.imageUrl || '') as string);
@@ -185,7 +187,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     preloadVideo.style.position = 'absolute';
     preloadVideo.style.top = '-9999px';
     preloadVideo.style.left = '-9999px';
-    
+
     // Add event listeners for preload tracking
     const handleCanPlay = () => {
       console.log('[MobilePreload] Video can play - preload successful', {
@@ -194,7 +196,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         timestamp: Date.now()
       });
     };
-    
+
     const handleLoadedData = () => {
       console.log('[MobilePreload] Video data loaded - preload progressing', {
         videoId: video.id?.substring(0, 8),
@@ -202,7 +204,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         timestamp: Date.now()
       });
     };
-    
+
     const handleError = () => {
       console.warn('[MobilePreload] Video preload failed', {
         videoId: video.id?.substring(0, 8),
@@ -210,15 +212,15 @@ export const VideoItem = React.memo<VideoItemProps>(({
         timestamp: Date.now()
       });
     };
-    
+
     preloadVideo.addEventListener('canplay', handleCanPlay);
     preloadVideo.addEventListener('loadeddata', handleLoadedData);
     preloadVideo.addEventListener('error', handleError);
-    
+
     // Store ref and append to DOM (hidden)
     preloadVideoRef.current = preloadVideo;
     document.body.appendChild(preloadVideo);
-    
+
     // Cleanup function
     const cleanup = () => {
       if (preloadVideoRef.current) {
@@ -231,7 +233,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         preloadVideoRef.current = null;
       }
     };
-    
+
     // Auto-cleanup after 30 seconds if video not opened
     const timeoutId = setTimeout(() => {
       console.log('[MobilePreload] Auto-cleanup preload video after timeout', {
@@ -241,13 +243,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
       cleanup();
       setIsMobilePreloading(false);
     }, 30000);
-    
+
     // Store cleanup function for manual cleanup
     preloadVideo.dataset.cleanupTimeoutId = timeoutId.toString();
-    
+
     return cleanup;
   }, [isMobile, isMobilePreloading, video.id, video.location, video.imageUrl]);
-  
+
   // Cleanup preload video on unmount or video change
   useEffect(() => {
     return () => {
@@ -263,16 +265,16 @@ export const VideoItem = React.memo<VideoItemProps>(({
       }
     };
   }, [video.id]);
-  
+
   // ===============================================================================
   // MOBILE PRELOAD TRIGGER - Connect to parent callback
   // ===============================================================================
-  
+
   // Create stable preload handler for this video item
   const handleMobilePreload = React.useCallback(() => {
     startMobileVideoPreload();
   }, [startMobileVideoPreload]);
-  
+
   // Expose preload function to parent via callback effect
   React.useEffect(() => {
     if (onMobilePreload) {
@@ -282,17 +284,17 @@ export const VideoItem = React.memo<VideoItemProps>(({
         window.mobileVideoPreloadMap = new Map();
       }
       window.mobileVideoPreloadMap.set(originalIndex, handleMobilePreload);
-      
+
       return () => {
         window.mobileVideoPreloadMap?.delete(originalIndex);
       };
     }
   }, [originalIndex, handleMobilePreload, onMobilePreload]);
-  
+
   // ===============================================================================
   // SHARE FUNCTIONALITY
   // ===============================================================================
-  
+
   /**
    * Generate a short, URL-friendly random string (like nanoid)
    */
@@ -301,11 +303,11 @@ export const VideoItem = React.memo<VideoItemProps>(({
     let result = '';
     const randomValues = new Uint8Array(length);
     crypto.getRandomValues(randomValues);
-    
+
     for (let i = 0; i < length; i++) {
       result += chars[randomValues[i] % chars.length];
     }
-    
+
     return result;
   };
 
@@ -315,7 +317,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
    */
   const handleShare = React.useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!taskMapping?.taskId) {
       toast({
         title: "Cannot create share",
@@ -324,7 +326,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
       });
       return;
     }
-    
+
     // If share already exists, copy to clipboard
     if (shareSlug) {
       const shareUrl = `${window.location.origin}/share/${shareSlug}`;
@@ -335,7 +337,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
           title: "Link copied!",
           description: "Share link copied to clipboard"
         });
-        
+
         // Reset copied state after 2 seconds
         setTimeout(() => {
           setShareCopied(false);
@@ -350,13 +352,13 @@ export const VideoItem = React.memo<VideoItemProps>(({
       }
       return;
     }
-    
+
     // Create new share (client-side)
     setIsCreatingShare(true);
-    
+
     try {
       const { data: session } = await supabase.auth.getSession();
-      
+
       if (!session?.session?.access_token) {
         toast({
           title: "Authentication required",
@@ -366,12 +368,12 @@ export const VideoItem = React.memo<VideoItemProps>(({
         setIsCreatingShare(false);
         return;
       }
-      
+
       // First, check if share already exists
       const { data: existingShare, error: existingError } = await supabase
-        .from('shared_generations')
+        .from('shared_generations' as any)
         .select('share_slug')
-        .eq('generation_id', video.id)
+        .eq('generation_id', video.id as string)
         .eq('creator_id', session.session.user.id)
         .maybeSingle();
 
@@ -390,7 +392,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         // Share already exists, just copy it
         setShareSlug(existingShare.share_slug);
         const shareUrl = `${window.location.origin}/share/${existingShare.share_slug}`;
-        
+
         try {
           await navigator.clipboard.writeText(shareUrl);
           toast({
@@ -403,21 +405,21 @@ export const VideoItem = React.memo<VideoItemProps>(({
             description: "Click the copy button to copy the link",
           });
         }
-        
+
         setIsCreatingShare(false);
         return;
       }
 
       // Fetch full generation and task data for caching
       const [generationResult, taskResult] = await Promise.all([
-        supabase.from('generations').select('*').eq('id', video.id).single(),
+        supabase.from('generations').select('*').eq('id', video.id as string).single(),
         supabase.from('tasks').select('*').eq('id', taskMapping.taskId).single()
       ]);
 
       if (generationResult.error || taskResult.error) {
-        console.error('[Share] Failed to fetch data:', { 
-          generationError: generationResult.error, 
-          taskError: taskResult.error 
+        console.error('[Share] Failed to fetch data:', {
+          generationError: generationResult.error,
+          taskError: taskResult.error
         });
         toast({
           title: "Share failed",
@@ -435,7 +437,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
       while (attempts < maxAttempts && !newSlug) {
         const candidateSlug = generateShareSlug(10);
-        
+
         // Fetch creator profile basics
         const { data: creatorRow } = await supabase
           .from('users')
@@ -445,11 +447,11 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
         // Try to insert - unique constraint will prevent duplicates
         const { data: newShare, error: insertError } = await supabase
-          .from('shared_generations')
+          .from('shared_generations' as any)
           .insert({
             share_slug: candidateSlug,
             task_id: taskMapping.taskId,
-            generation_id: video.id,
+            generation_id: video.id as string,
             creator_id: session.session.user.id,
             creator_username: (creatorRow as any)?.username ?? null,
             creator_name: (creatorRow as any)?.name ?? null,
@@ -495,12 +497,12 @@ export const VideoItem = React.memo<VideoItemProps>(({
       }
 
       setShareSlug(newSlug);
-      
+
       // Notify parent to update batch cache
       if (video.id) {
         onShareCreated?.(video.id, newSlug);
       }
-      
+
       // Automatically copy to clipboard
       const shareUrl = `${window.location.origin}/share/${newSlug}`;
       try {
@@ -526,7 +528,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
       setIsCreatingShare(false);
     }
   }, [shareSlug, taskMapping, video.id, toast, onShareCreated]);
-  
+
   useEffect(() => {
     if (videoPosterLoaded) {
       // Delay hiding thumbnail until video transition completes
@@ -542,23 +544,23 @@ export const VideoItem = React.memo<VideoItemProps>(({
           });
         }
       }, 350); // Slightly longer than the 300ms transition
-      
+
       return () => clearTimeout(timer);
     } else {
       setVideoFullyVisible(false);
     }
   }, [videoPosterLoaded, index, video.id]);
-  
+
   // ===============================================================================
   // STATE TRACKING - Unified video lifecycle logging
   // ===============================================================================
-  
+
   const lastLoggedStateRef = useRef<string>('');
   useEffect(() => {
     const currentState = `${shouldLoad}-${videoPosterLoaded}-${videoMetadataLoaded}-${thumbnailLoaded}-${hasThumbnail}`;
     if (currentState !== lastLoggedStateRef.current && process.env.NODE_ENV === 'development') {
       const { phase, readyToShow } = determineVideoPhase(shouldLoad, videoPosterLoaded, videoMetadataLoaded, thumbnailLoaded, hasThumbnail);
-      
+
       logVideoEvent(phase, {
         readyToShow,
         shouldLoad,
@@ -571,7 +573,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         videoUrl: video.location,
         summary: createLoadingSummary(hasThumbnail, thumbnailLoaded, videoPosterLoaded, shouldLoad)
       });
-      
+
       lastLoggedStateRef.current = currentState;
     }
   }, [shouldLoad, videoPosterLoaded, videoMetadataLoaded, thumbnailLoaded, hasThumbnail, thumbnailError, logVideoEvent, video.thumbUrl, video.location]);
@@ -579,52 +581,26 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // ===============================================================================
   // ASPECT RATIO CALCULATION - Dynamic aspect ratio based on project settings
   // ===============================================================================
-  
+
   // Calculate aspect ratio for video container based on project dimensions
   const aspectRatioStyle = React.useMemo(() => {
     if (!projectAspectRatio) {
       return { aspectRatio: '16/9' }; // Default to 16:9 if no project aspect ratio
     }
-    
+
     const [width, height] = projectAspectRatio.split(':').map(Number);
     if (width && height) {
       return { aspectRatio: `${width}/${height}` };
     }
-    
+
     return { aspectRatio: '16/9' }; // Fallback to 16:9
   }, [projectAspectRatio]);
 
   // ===============================================================================
   // GRID LAYOUT CALCULATION - Dynamic grid based on project aspect ratio
   // ===============================================================================
-  
-  // Calculate grid classes based on project aspect ratio
-  const gridClasses = React.useMemo(() => {
-    if (!projectAspectRatio) {
-      return "w-1/2 lg:w-1/3"; // Default: 2 per row mobile, 3 per row desktop
-    }
-    
-    const [width, height] = projectAspectRatio.split(':').map(Number);
-    if (width && height) {
-      const aspectRatio = width / height;
-      
-      // For very wide aspect ratios (16:9 and wider), show 2 videos per row
-      if (aspectRatio >= 16/9) {
-        return "w-1/2"; // 2 videos per row on all screen sizes
-      }
-      // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
-      else if (aspectRatio < 4/3) {
-        return "w-1/4 sm:w-1/4"; // 4 videos per row on all screen sizes
-      }
-      // For moderate aspect ratios (4:3 to 16:9), use responsive layout
-      else {
-        return "w-1/2 lg:w-1/3"; // 2 per row mobile, 3 per row desktop
-      }
-    }
-    
-    return "w-1/2 lg:w-1/3"; // Fallback
-  }, [projectAspectRatio]);
 
+  // Calculate grid classes based on project aspect ratio
   // ===============================================================================
   // RENDER - Clean component rendering
   // ===============================================================================
@@ -632,7 +608,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // MOBILE OPTIMIZATION: Use poster images instead of video elements on mobile to prevent autoplay budget exhaustion
   // ALL gallery videos use posters on mobile to leave maximum budget for lightbox autoplay
   const shouldUsePosterOnMobile = isMobile;
-  
+
   // Determine poster image source: prefer thumbnail, fallback to video poster frame
   const posterImageSrc = (() => {
     if (video.thumbUrl) return video.thumbUrl; // Use thumbnail if available
@@ -650,7 +626,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   const thumbSrcStable = resolvedThumbUrl
     ? `${resolvedThumbUrl}${resolvedThumbUrl.includes('?') ? '&' : '?'}vid=${encodeURIComponent(video.id || '')}`
     : null;
-  
+
   if (process.env.NODE_ENV === 'development' && shouldUsePosterOnMobile) {
     console.log('[AutoplayDebugger:GALLERY] 📱 Using poster optimization', {
       videoId: video.id?.substring(0, 8),
@@ -662,15 +638,15 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }
 
   return (
-    <div className={`${gridClasses} px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4 relative group`}>
-      <div 
+    <div className="relative group">
+      <div
         className="bg-gray-100 rounded-lg overflow-hidden shadow-sm border relative"
         style={aspectRatioStyle}
       >
-        
+
         {shouldUsePosterOnMobile ? (
           // MOBILE POSTER MODE: Show static image - clickable to open lightbox
-          <div 
+          <div
             className="absolute inset-0 w-full h-full cursor-pointer"
             onClick={(e) => {
               // Don't interfere with touches inside action buttons
@@ -725,41 +701,40 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 alt="Video thumbnail"
                 loading="eager"
                 decoding="sync"
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
-                  videoFullyVisible ? 'opacity-0' : 'opacity-100'
-                }`}
-            onLoad={() => {
-              setThumbnailLoaded(true);
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_LOADED:`, {
-                  videoId: video.id,
-                  thumbnailUrl: video.thumbUrl,
-                  phase: 'THUMBNAIL_LOADED',
-                  nextPhase: 'Will transition to video when ready',
-                  wasInitiallyCached: isInitiallyCached,
-                  inPreloaderCache,
-                  inBrowserCache,
-                  timestamp: Date.now()
-                });
-                console.log(`[VideoGalleryPreload] THUMBNAIL_LOADED - URL: ${video.thumbUrl}`);
-              }
-            }}
-            onError={() => {
-              setThumbnailError(true);
-              if (process.env.NODE_ENV === 'development') {
-                console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_FAILED:`, {
-                  videoId: video.id,
-                  thumbnailUrl: video.thumbUrl,
-                  phase: 'THUMBNAIL_FAILED',
-                  fallback: 'Will show video loading directly',
-                  timestamp: Date.now()
-                });
-                console.warn(`[VideoGalleryPreload] THUMBNAIL_FAILED - URL: ${video.thumbUrl}`);
-              }
-            }}
-          />
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${videoFullyVisible ? 'opacity-0' : 'opacity-100'
+                  }`}
+                onLoad={() => {
+                  setThumbnailLoaded(true);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_LOADED:`, {
+                      videoId: video.id,
+                      thumbnailUrl: video.thumbUrl,
+                      phase: 'THUMBNAIL_LOADED',
+                      nextPhase: 'Will transition to video when ready',
+                      wasInitiallyCached: isInitiallyCached,
+                      inPreloaderCache,
+                      inBrowserCache,
+                      timestamp: Date.now()
+                    });
+                    console.log(`[VideoGalleryPreload] THUMBNAIL_LOADED - URL: ${video.thumbUrl}`);
+                  }
+                }}
+                onError={() => {
+                  setThumbnailError(true);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn(`🎬 [VideoLifecycle] Video ${index + 1} - THUMBNAIL_FAILED:`, {
+                      videoId: video.id,
+                      thumbnailUrl: video.thumbUrl,
+                      phase: 'THUMBNAIL_FAILED',
+                      fallback: 'Will show video loading directly',
+                      timestamp: Date.now()
+                    });
+                    console.warn(`[VideoGalleryPreload] THUMBNAIL_FAILED - URL: ${video.thumbUrl}`);
+                  }
+                }}
+              />
             )}
-            
+
             {/* Loading placeholder - shows until thumbnail or video poster is ready */}
             {/* Don't show loading if thumbnail was initially cached */}
             {!thumbnailLoaded && !videoPosterLoaded && !isInitiallyCached && (() => {
@@ -780,7 +755,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 </div>
               );
             })()}
-            
+
             {/* Only render video when it's time to load */}
             {shouldLoad && (
               <div className="relative w-full h-full">
@@ -789,9 +764,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   key={`video-${video.id}`}
                   src={video.location || video.imageUrl}
                   preload={shouldPreload as 'auto' | 'metadata' | 'none'}
-                  className={`w-full h-full transition-opacity duration-500 ${
-                    videoPosterLoaded ? 'opacity-100' : 'opacity-0'
-                  }`}
+                  className={`w-full h-full transition-opacity duration-500 ${videoPosterLoaded ? 'opacity-100' : 'opacity-0'
+                    }`}
                   videoClassName="object-cover cursor-pointer"
                   poster={thumbSrcStable || video.thumbUrl}
                   data-video-id={video.id}
@@ -812,7 +786,53 @@ export const VideoItem = React.memo<VideoItemProps>(({
             )}
           </>
         )}
-        
+
+
+        {/* Top Overlay - Timestamp in top-left */}
+        <div className="absolute top-0 left-0 p-3 transition-opacity duration-300 z-20 pointer-events-none">
+          <div className="pointer-events-auto inline-flex whitespace-nowrap">
+            <TimeStamp createdAt={video.created_at} />
+          </div>
+        </div>
+
+        {/* Bottom Overlay - View Segments Button & Variant Name */}
+        <div className="absolute bottom-0 left-0 right-0 pb-2 pl-3 pr-3 pt-6 flex justify-between items-end bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
+          <div className="flex flex-col items-start gap-2 pointer-events-auto">
+            {/* View Segments Button */}
+            {onViewSegments && !video.parent_generation_id && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 bg-black/80 hover:bg-black text-white rounded-full backdrop-blur-md border border-white/20 shadow-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onViewSegments) {
+                          onViewSegments(video);
+                        }
+                      }}
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View segments</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Variant Name Display */}
+            {video.variant_name && (
+              <div className="text-[10px] font-medium text-white/90 bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm border border-white/10 max-w-[120px] truncate">
+                {video.variant_name}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Action buttons – positioned directly on the video/poster container */}
         <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
           {/* Share Button */}
@@ -825,11 +845,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
                     size="icon"
                     onClick={handleShare}
                     disabled={isCreatingShare}
-                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${
-                      shareCopied 
-                        ? 'bg-green-500 hover:bg-green-600' 
-                        : 'bg-black/50 hover:bg-black/70'
-                    }`}
+                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${shareCopied
+                      ? 'bg-green-500 hover:bg-green-600'
+                      : 'bg-black/50 hover:bg-black/70'
+                      }`}
                   >
                     {isCreatingShare ? (
                       <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
@@ -848,7 +867,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
               </Tooltip>
             </TooltipProvider>
           )}
-          
+
           <Button
             variant="secondary"
             size="icon"
@@ -859,7 +878,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 videoId: video.id,
                 timestamp: Date.now()
               });
-              
+
               if (isMobile) {
                 // On mobile, open the modal
                 console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
@@ -892,7 +911,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
           >
             <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           </Button>
-          
+
+
+
           {/* Apply Settings Button */}
           {taskMapping?.taskId && (
             <TooltipProvider>
@@ -928,11 +949,10 @@ export const VideoItem = React.memo<VideoItemProps>(({
                       }
                     }}
                     disabled={settingsApplied}
-                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${
-                      settingsApplied 
-                        ? 'bg-green-500 hover:bg-green-600' 
-                        : 'bg-black/50 hover:bg-black/70'
-                    }`}
+                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${settingsApplied
+                      ? 'bg-green-500 hover:bg-green-600'
+                      : 'bg-black/50 hover:bg-black/70'
+                      }`}
                   >
                     {settingsApplied ? (
                       <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -969,22 +989,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
           </Button>
         </div>
       </div>
-      
-      {/* Timestamp - Top Left */}
-      <TimeStamp 
-        createdAt={video.createdAt || (video as { created_at?: string | null }).created_at} 
-        position="top-left"
-        className="z-10 !top-1 !left-4 sm:!top-2 sm:!left-4"
-        showOnHover={false}
-      />
-      
-      {/* Variant Name - Bottom Left */}
-      {(video as { name?: string }).name && (
-        <div className="absolute bottom-1 left-2 sm:bottom-2 sm:left-3 z-10 bg-black/50 text-white text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md">
-          {(video as { name?: string }).name}
-        </div>
-      )}
     </div>
+
   );
 }, (prevProps, nextProps) => {
   // ============================================================================
@@ -1006,7 +1012,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // TESTING: Watch for "[HoverIssue] 🔄 VideoItem re-render" logs - with this fix,
   // the first item should NOT re-render on every query refetch.
   // ============================================================================
-  
+
   // Only re-render if meaningful props have changed
   return (
     prevProps.video.id === nextProps.video.id &&

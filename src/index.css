@@ -2510,3 +2510,31 @@
 }
 
 
+
+/* Banodoco Icon Burst Animation */
+@keyframes burstAndFlash {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+    filter: brightness(0.75) hue-rotate(-30deg) saturate(1.5);
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 1;
+    /* Flash/Hover state */
+    filter: brightness(1.0) hue-rotate(-15deg) saturate(1.5);
+  }
+  80% {
+    transform: scale(0.95);
+    filter: brightness(0.9) hue-rotate(-20deg) saturate(1.5);
+  }
+  100% {
+    transform: scale(1);
+    /* Resting state */
+    filter: brightness(0.75) hue-rotate(-30deg) saturate(1.5);
+  }
+}
+
+.animate-burst-and-flash {
+  animation: burstAndFlash 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

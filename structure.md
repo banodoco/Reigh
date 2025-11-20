@@ -37,6 +37,7 @@
 |-------|------|-------------|
 | **Development Setup** | [README.md](README.md) | Local environment setup, commands, troubleshooting |
 | **Database & Storage** | [db_and_storage.md](docs/structure_detail/db_and_storage.md) | Schema map, migration workflow, storage buckets |
+| **Deployment** | [deployment_and_migration_guide.md](docs/structure_detail/deployment_and_migration_guide.md) | Safe database migrations and Edge Function deployment workflow |
 | **Data Persistence** | [data_persistence.md](docs/structure_detail/data_persistence.md) | State management patterns, hooks, storage layers |
 | **Task System** | [task_worker_lifecycle.md](docs/structure_detail/task_worker_lifecycle.md) | Async task queue, worker polling, Edge Functions |
 | **Unified Task Creation** | [unified_task_creation.md](docs/structure_detail/unified_task_creation.md) | Client-side task creation pattern, migration guide, authentication flow |

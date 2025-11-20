@@ -10,6 +10,7 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useDeviceDetection } from "@/shared/hooks/useDeviceDetection";
 import { arrayMove } from '@dnd-kit/sortable';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { GenerationRow } from '@/types/shots';
 import VideoOutputsGallery from "../VideoOutputsGallery";
 import BatchSettingsForm from "../BatchSettingsForm";
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
@@ -203,7 +204,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Load complete shot data and images
   const { shots } = useShots(); // Get shots from context for shot metadata
-  const selectedShot = shots?.find(shot => shot.id === selectedShotId);
+  
+  // [FlickerFix] Persist the last valid shot object to prevent UI flickering during refetches
+  // When duplicating items, the shots list might briefly refetch, causing selectedShot to be undefined
+  const foundShot = useMemo(() => shots?.find(shot => shot.id === selectedShotId), [shots, selectedShotId]);
+  const lastValidShotRef = useRef<typeof foundShot>();
+  
+  // Update ref if we found the shot
+  if (foundShot) {
+    lastValidShotRef.current = foundShot;
+  }
+  
+  // Use found shot if available, otherwise fallback to cached version if shots list is loading/refreshing
+  // Only fallback if shots is undefined/null (loading), not if it's an empty array (loaded but missing)
+  const selectedShot = foundShot || (shots === undefined ? lastValidShotRef.current : undefined);
   
   // Shot management hooks for external generation viewing
   const { mutateAsync: createShotMutation } = useCreateShot();
@@ -309,8 +323,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     timestamp: Date.now()
   });
   
-  // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
+    // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
+  
+  // [FlickerFix] Persist last valid images list to prevent empty flashes during refetches
+  const lastValidImagesRef = useRef<GenerationRow[]>([]);
+
   const orderedShotImages = React.useMemo(() => {
     // [ShotNavPerf] PERFORMANCE FIX: Prioritize showing content immediately
     // Use context images when query is fetching to prevent blank screen during navigation
@@ -320,7 +338,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Priority: fullImages > contextImages (while fetching) > empty
     // This ensures instant display when navigating via arrows
-    let result: typeof contextImages;
+    let result: typeof contextImages = [];
     let dataSource: string;
     
     if (hasValidFullImages) {
@@ -334,7 +352,43 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       dataSource = 'contextImages (no query)';
     } else {
       result = fullShotImages; // Fallback to query result even if empty
-      dataSource = 'fullImages (no context available)';
+      dataSource = 'fullImages (fallback)';
+    }
+
+    // [FlickerFix] Persist last valid state if result is empty OR PARTIAL during refetch
+    // This prevents the timeline from disappearing or showing incomplete data during duplications/updates
+    const isRefetching = fullImagesQueryResult.isFetching || fullImagesQueryResult.isLoading;
+    
+    console.log('[DUPLICATE_UI] 🔍 ShotEditor data flow:', {
+      resultCount: result.length,
+      cachedCount: lastValidImagesRef.current.length,
+      isRefetching,
+      dataSource,
+      fullImagesCount: fullShotImages.length,
+      contextImagesCount: contextImages.length,
+      queryStatus: fullImagesQueryResult.status,
+      queryFetchStatus: fullImagesQueryResult.fetchStatus
+    });
+    
+    if (result.length > 0 && !isRefetching) {
+      // Only update cache when we have data AND are not currently refetching
+      // This prevents caching partial/transitional data
+      console.log('[DUPLICATE_UI] 💾 Updating lastValidImagesRef cache');
+      lastValidImagesRef.current = result;
+    } else if (lastValidImagesRef.current.length > 0 && isRefetching) {
+       // If we are refetching and result is LESS than cache, it's likely partial/stale data
+       // Use cached data to maintain stability
+       if (result.length < lastValidImagesRef.current.length || result.length === 0) {
+         console.log('[DUPLICATE_UI] ⚠️ Partial/empty result during refetch - using cached images', {
+           resultCount: result.length,
+           cachedCount: lastValidImagesRef.current.length,
+           isRefetching,
+           dataSource: dataSource,
+           difference: lastValidImagesRef.current.length - result.length
+         });
+         result = lastValidImagesRef.current;
+         dataSource = 'cached (partial data prevention)';
+       }
     }
     
     console.log('[ShotNavPerf] 🔄 Data source decision:', {

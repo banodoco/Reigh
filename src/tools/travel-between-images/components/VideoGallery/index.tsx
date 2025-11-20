@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // TypeScript declaration for global mobile video preload map
 declare global {
@@ -8,7 +9,6 @@ declare global {
 }
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Card } from '@/shared/components/ui/card';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import TaskDetailsModal from '../TaskDetailsModal';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useVideoHover } from './hooks';
 import { useExternalGenerations } from '@/shared/components/ShotImageManager/hooks/useExternalGenerations';
 import { useDerivedNavigation } from '@/shared/hooks/useDerivedNavigation';
+import { toast } from 'sonner';
 import {
   VideoItem,
   VideoHoverPreview,
@@ -94,7 +95,7 @@ interface VideoOutputsGalleryProps {
   // Data source
   projectId: string | null;
   shotId: string | null;
-  
+
   // Event handlers (keeping the same interface for compatibility)
   onDelete: (generationId: string) => void;
   deletingVideoId: string | null;
@@ -107,17 +108,17 @@ interface VideoOutputsGalleryProps {
    * Key to identify which shot/context these videos belong to - used to reset state when shot changes
    */
   shotKey?: string;
-  
+
   /**
    * Project-wide video count lookup function for instant skeleton display
    */
   getShotVideoCount?: (shotId: string | null) => number | null;
-  
+
   /**
    * Function to invalidate video counts cache when videos are added/deleted
    */
   invalidateVideoCountsCache?: () => void;
-  
+
   /**
    * Project aspect ratio for proper video dimensions (e.g., "4:3", "16:9")
    */
@@ -128,13 +129,13 @@ interface VideoOutputsGalleryProps {
    * Used to immediately show the empty state before project-wide counts load.
    */
   localZeroHint?: boolean;
-  
+
   /**
    * Optional pre-loaded generation data (for shared/read-only views)
    * If provided, bypasses database queries
    */
   preloadedGenerations?: GenerationRow[];
-  
+
   /**
    * Read-only mode - disables delete/edit actions
    */
@@ -159,40 +160,41 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // STATE MANAGEMENT
   // ===============================================================================
-  
+
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [selectedVideoForDetails, setSelectedVideoForDetails] = useState<GenerationRow | null>(null);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<Set<string>>(new Set());
   const [showStarredOnly, setShowStarredOnly] = useState(false);
-  
+  const navigate = useNavigate();
+
   // Ref for lightbox index setter (needed for external generations)
-  const setLightboxIndexRef = useRef<(index: number) => void>(() => {});
+  const setLightboxIndexRef = useRef<(index: number) => void>(() => { });
   useEffect(() => {
     setLightboxIndexRef.current = setLightboxIndex;
   }, [setLightboxIndex]);
-  
+
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
-  
+
   // Calculate items per page based on project aspect ratio to optimize pagination
   const itemsPerPage = React.useMemo(() => {
     if (!projectAspectRatio) {
       return 6; // Default: 2 rows of 3 items each
     }
-    
+
     const [width, height] = projectAspectRatio.split(':').map(Number);
     if (width && height) {
       const aspectRatio = width / height;
-      
+
       // For very wide aspect ratios (16:9 and wider), show 2 videos per row
       // 6 items per page = 3 rows of 2 items each
-      if (aspectRatio >= 16/9) {
+      if (aspectRatio >= 16 / 9) {
         return 6;
       }
       // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
       // 8 items per page = 2 rows of 4 items each
-      else if (aspectRatio < 4/3) {
+      else if (aspectRatio < 4 / 3) {
         return 8;
       }
       // For moderate aspect ratios (4:3 to 16:9), use default
@@ -201,10 +203,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         return 6;
       }
     }
-    
+
     return 6; // Fallback
   }, [projectAspectRatio]);
-  
+
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
@@ -224,14 +226,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       return isMobile;
     }
   }, [isMobile]);
-  
+
   // Video count cache for instant skeleton display
   const { getCachedCount, setCachedCount } = useVideoCountCache();
-  
+
   // Stable video count to prevent data loss
   const lastGoodCountRef = useRef<number | null>(null);
   const prevShotIdRef = useRef<string | null>(null);
-  
+
   // Track the current shot key to detect changes
   const prevShotKeyRef = useRef<string | undefined>(shotKey);
 
@@ -242,14 +244,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // HOOKS
   // ===============================================================================
-  
+
   const hoverHook = useVideoHover(isMobile);
   const { hoveredVideo, hoverPosition, isInitialHover, handleHoverStart, handleHoverEnd, handlePreviewEnter, handlePreviewLeave, clearHoverTimeout } = hoverHook;
 
   // ===============================================================================
   // DATA FETCHING
   // ===============================================================================
-  
+
   // Reset state when shot changes to prevent stale data
   useEffect(() => {
     if (shotId !== prevShotIdRef.current) {
@@ -259,10 +261,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         resettingLastGoodCount: lastGoodCountRef.current,
         timestamp: Date.now()
       });
-      
+
       // CRITICAL: Reset lastGoodCountRef to prevent cross-shot contamination
       lastGoodCountRef.current = null;
-      
+
       // Clear any cached count for the previous shot to prevent contamination
       if (prevShotIdRef.current) {
         setCachedCount(prevShotIdRef.current, null);
@@ -273,9 +275,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         try {
           window.mobileVideoPreloadMap.clear();
           console.log('[MobilePreload] Cleared mobileVideoPreloadMap on shot change');
-        } catch {}
+        } catch { }
       }
-      
+
       prevShotIdRef.current = shotId;
     }
   }, [shotId, setCachedCount]);
@@ -306,9 +308,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     preloadTaskData: true, // Background preload for better UX
     enabled: !preloadedGenerations && !!(projectId && shotId), // Disable if preloaded data provided
   });
-  
+
   // Use preloaded data if provided, otherwise use fetched data
-  const generationsData = preloadedGenerations 
+  const generationsData = preloadedGenerations
     ? { items: preloadedGenerations, total: preloadedGenerations.length }
     : fetchedGenerationsData;
 
@@ -342,7 +344,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_EMPTY: No generations data items`);
       return [];
     }
-    
+
     // Debug log the raw data structure to see thumbnails
     console.log('[ThumbnailDebug] Raw generationsData.items:', {
       itemCount: (generationsData as any).items.length,
@@ -350,7 +352,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       itemsWithThumbs: (generationsData as any).items.filter((item: any) => item.thumbUrl && item.thumbUrl !== item.url).length,
       timestamp: Date.now()
     });
-    
+
     const transformed = transformUnifiedGenerationsData((generationsData as any).items);
     console.log(`[VideoGalleryPreload] VIDEO_OUTPUTS_TRANSFORMED:`, {
       originalCount: (generationsData as any).items.length,
@@ -362,37 +364,37 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       })),
       timestamp: Date.now()
     });
-    
-    
+
+
     return transformed;
   }, [(generationsData as any)?.items, currentPage]);
 
   // Enhanced generations with automatic task data preloading via context
   const enhancedVideoOutputs = useEnhancedGenerations(videoOutputs);
-  
+
   // Background preload task data for current page
   useGenerationTaskPreloader(videoOutputs, !!projectId && !!shotId);
-  
+
   // Batch fetch share slugs for CURRENT PAGE only (not all videos)
   const [shareSlugs, setShareSlugs] = useState<Record<string, string>>({});
   useEffect(() => {
     const fetchShareSlugs = async () => {
       if (!videoOutputs.length || readOnly) return;
-      
+
       const generationIds = videoOutputs.map(v => v.id).filter(Boolean) as string[];
       if (!generationIds.length) return;
-      
+
       console.log('[VideoGallery] Fetching share slugs for current page:', {
         page: currentPage,
         count: generationIds.length
       });
-      
+
       try {
         const { data, error } = await supabase
           .from('shared_generations')
           .select('generation_id, share_slug')
           .in('generation_id', generationIds);
-        
+
         if (!error && data) {
           const slugMap: Record<string, string> = {};
           data.forEach(item => {
@@ -404,15 +406,15 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         console.error('[VideoGallery] Failed to batch fetch share slugs:', err);
       }
     };
-    
+
     fetchShareSlugs();
   }, [videoOutputs, readOnly, currentPage]);
-  
+
   // Handle share creation callback to update batch cache
   const handleShareCreated = useCallback((videoId: string, shareSlug: string) => {
     setShareSlugs(prev => ({ ...prev, [videoId]: shareSlug }));
   }, []);
-  
+
   // Server already sorted and filtered data - just use it directly
   // No need for client-side sorting since database handles it efficiently
   const sortedVideoOutputs = useMemo(() => {
@@ -438,8 +440,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Apply optimistic deletions to the displayed list and combine with external generations
   const displaySortedVideoOutputs = useMemo(() => {
-    const filtered = optimisticallyRemovedIds.size === 0 
-      ? sortedVideoOutputs 
+    const filtered = optimisticallyRemovedIds.size === 0
+      ? sortedVideoOutputs
       : sortedVideoOutputs.filter(v => !optimisticallyRemovedIds.has(v.id));
     // Combine with external generations for "Based on" navigation
     return [...filtered, ...externalGens.externalGenerations, ...externalGens.tempDerivedGenerations];
@@ -448,16 +450,16 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Server-side pagination - data is already paginated, just calculate total pages
   const totalPages = Math.ceil(((generationsData as any)?.total || 0) / itemsPerPage);
   const currentVideoOutputs = displaySortedVideoOutputs; // Already paginated from server
-  
+
   // Page change handler - updates server query
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
   }, []);
-  
+
   const resetToFirstPage = useCallback(() => {
     setCurrentPage(1);
   }, []);
-  
+
   // DEEP DEBUG: Log pagination changes
   useEffect(() => {
     console.log(`[VideoGalleryPreload] SERVER_PAGINATION_STATE:`, {
@@ -475,12 +477,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // TASK DATA HOOKS
   // ===============================================================================
-  
+
   // Hooks for task details (now using unified cache)
   const lightboxVideoId = lightboxIndex !== null && displaySortedVideoOutputs[lightboxIndex] ? displaySortedVideoOutputs[lightboxIndex].id : null;
   const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxVideoId || '');
   const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(lightboxTaskMapping?.taskId || '');
-  
+
   // Hooks for hover preview (now using unified cache)
   const { data: hoverTaskMapping } = useTaskFromUnifiedCache(hoveredVideo?.id || '');
   const { data: hoverTask, isLoading: isLoadingHoverTask } = useGetTask(hoverTaskMapping?.taskId || '');
@@ -492,12 +494,12 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // DATA CACHING AND SKELETON LOGIC
   // ===============================================================================
-  
+
   // Track when generationsData becomes available and cache video count
   useEffect(() => {
     const newTotal = (generationsData as any)?.total;
     const projectVideoCount = getShotVideoCount?.(shotId) ?? null;
-    
+
     if (shotId && typeof newTotal === 'number' && newTotal >= 0) {
       // Check for cache mismatch; do NOT invalidate globally to avoid transient nulls/flicker.
       // We immediately update the per-shot cache below which resolves the mismatch.
@@ -509,10 +511,10 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           timestamp: Date.now()
         });
       }
-      
+
       // Always update cache immediately when we get valid data (including 0)
       setCachedCount(shotId, newTotal);
-      
+
       // Only update lastGoodCountRef if we have a positive count or it's the first time
       if (newTotal > 0 || lastGoodCountRef.current === null) {
         lastGoodCountRef.current = newTotal;
@@ -566,9 +568,9 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const hasEverFetched = !isLoadingGenerations || videoOutputs.length > 0 || generationsError;
   // Suppress skeletons if cache says 0 for this shot
   const showSkeletons = isLoadingGenerations && videoOutputs.length === 0 && !hasEverFetched && (cachedCount === null || cachedCount > 0);
-  
+
   const skeletonCount = showSkeletons ? Math.min(cachedCount || itemsPerPage, itemsPerPage) : 0;
-  
+
   // UNIQUE DEBUG ID for tracking this specific issue
   const debugId = `[VideoSkeletonDebug]`;
   console.log(`${debugId} SKELETON_DECISION for shot gallery:`, {
@@ -590,7 +592,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     willRender: showSkeletons ? 'SKELETONS' : 'VIDEOS_OR_EMPTY',
     timestamp: Date.now()
   });
-  
+
   // AGGRESSIVE DEBUG: Always log skeleton state (no useEffect gating)
   console.log(`[VideoGallerySimplified] SKELETON_DEBUG:`, {
     showSkeletons,
@@ -615,7 +617,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     (sortedVideoOutputs.length === 0 && effectiveZero) ||
     (!isLoadingGenerations && sortedVideoOutputs.length === 0)
   );
-  
+
   // Log empty state decision
   console.log(`${debugId} EMPTY_STATE_DECISION:`, {
     shouldShowEmpty,
@@ -633,14 +635,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // EVENT HANDLERS
   // ===============================================================================
-  
+
   // Mobile video preload handler
   const handleMobilePreload = useCallback((index: number) => {
     console.log('[MobilePreload] Gallery received preload request', {
       index,
       timestamp: Date.now()
     });
-    
+
     // Call the VideoItem's preload function via the global map
     if (window.mobileVideoPreloadMap?.has(index)) {
       const preloadFunction = window.mobileVideoPreloadMap.get(index);
@@ -674,7 +676,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   );
 
   // Stable callback for showing task details
-  const handleShowTaskDetails = useCallback(() => 
+  const handleShowTaskDetails = useCallback(() =>
     createTaskDetailsHandler(
       lightboxIndex,
       displaySortedVideoOutputs,
@@ -753,7 +755,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // EFFECT HANDLERS
   // ===============================================================================
-  
+
   useEffect(() => {
     if (selectedVideoForDetails && taskDetailsButtonRef.current) {
       taskDetailsButtonRef.current.click();
@@ -773,24 +775,24 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Reset internal state when shot changes
   useEffect(() => {
     const hasChanged = prevShotKeyRef.current !== shotKey;
-    
+
     if (hasChanged && prevShotKeyRef.current !== undefined) {
       console.log('[VideoOutputsGallery] Shot changed, resetting internal state', {
         prevShotKey: prevShotKeyRef.current,
         newShotKey: shotKey,
         timestamp: Date.now()
       });
-      
+
       // Reset all internal state
       resetToFirstPage();
       setLightboxIndex(null);
       setSelectedVideoForDetails(null);
       setShowStarredOnly(false); // Reset starred filter (will trigger new server query)
       handleHoverEnd();
-      
+
       // Reset stable count for new shot
       lastGoodCountRef.current = null;
-      
+
       // Clear any pending timeouts
       clearHoverTimeout();
       if (doubleTapTimeoutRef.current) {
@@ -798,11 +800,11 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         doubleTapTimeoutRef.current = null;
       }
     }
-    
+
     // Update the ref for next comparison
     prevShotKeyRef.current = shotKey;
   }, [shotKey, resetToFirstPage, handleHoverEnd, clearHoverTimeout]);
-  
+
   // Reset to first page when starred filter changes
   useEffect(() => {
     setCurrentPage(1);
@@ -816,7 +818,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       hasLoggedStrategyRef.current = true;
     }
   }, [currentVideoOutputs, currentPage]);
-  
+
   // Reset the flag when page changes
   useEffect(() => {
     hasLoggedStrategyRef.current = false;
@@ -825,50 +827,52 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // ===============================================================================
   // RENDER CALCULATIONS (MUST BE AT TOP LEVEL - BEFORE EARLY RETURNS)
   // ===============================================================================
-  
+
   // Calculate aspect ratio for skeleton items based on project dimensions (MUST be at top level)
   const aspectRatioStyle = React.useMemo(() => {
     if (!projectAspectRatio) return { aspectRatio: '16/9' }; // Default 16:9
-    
+
     const [width, height] = projectAspectRatio.split(':').map(Number);
     if (width && height) {
       return { aspectRatio: `${width}/${height}` };
     }
-    
+
     return { aspectRatio: '16/9' }; // Fallback
   }, [projectAspectRatio]);
 
-  // Calculate grid classes for skeletons based on project aspect ratio (MUST be at top level)
-  const skeletonGridClasses = React.useMemo(() => {
+  // Calculate skeleton columns based on aspect ratio
+  const skeletonColumns = React.useMemo(() => {
+    const defaultCols = { base: 2, lg: 3 };
+
     if (!projectAspectRatio) {
-      return "w-1/2 lg:w-1/3"; // Default: 2 per row mobile, 3 per row desktop
+      return defaultCols;
     }
-    
+
     const [width, height] = projectAspectRatio.split(':').map(Number);
     if (width && height) {
       const aspectRatio = width / height;
-      
+
       // For very wide aspect ratios (16:9 and wider), show 2 videos per row
-      if (aspectRatio >= 16/9) {
-        return "w-1/2"; // 2 videos per row on all screen sizes
+      if (aspectRatio >= 16 / 9) {
+        return { base: 2, lg: 2 };
       }
       // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
-      else if (aspectRatio < 4/3) {
-        return "w-1/4 sm:w-1/4"; // 4 videos per row on all screen sizes
+      else if (aspectRatio < 4 / 3) {
+        return { base: 2, lg: 4 };
       }
-      // For moderate aspect ratios (4:3 to 16:9), use responsive layout
+      // For moderate aspect ratios (4:3 to 16:9), use default
       else {
-        return "w-1/2 lg:w-1/3"; // 2 per row mobile, 3 per row desktop
+        return defaultCols;
       }
     }
-    
-    return "w-1/2 lg:w-1/3"; // Fallback
+
+    return defaultCols;
   }, [projectAspectRatio]);
 
   // ===============================================================================
   // RENDER
   // ===============================================================================
-  
+
   // Show empty state if needed
   if (shouldShowEmpty) {
     return <EmptyState cachedCount={cachedCount} />;
@@ -878,7 +882,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
 
   return (
-    <Card className="p-4 sm:p-6">
+    <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <GalleryControls
           sortedVideoOutputs={displaySortedVideoOutputs}
@@ -891,161 +895,162 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           onStarredFilterChange={setShowStarredOnly}
         />
 
-        {/* SIMPLIFIED: Show video-specific skeleton layout or videos */}
-        {showSkeletons ? (
-          <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-            {Array.from({ length: skeletonCount }, (_, index) => (
-              <div key={`skeleton-${index}`} className={`${skeletonGridClasses} px-1 sm:px-1.5 md:px-2 mb-2 sm:mb-3 md:mb-4`}>
-                <div 
-                  className="bg-muted rounded-lg animate-pulse border"
-                  style={aspectRatioStyle}
-                ></div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-wrap -mx-1 sm:-mx-1.5 md:-mx-2">
-            {currentVideoOutputs.map((video, index) => {
-              const originalIndex = (currentPage - 1) * itemsPerPage + index;
-              const isFirstVideo = index === 0; // Prioritize first video
-              const shouldPreload = isFirstVideo ? "metadata" : "none"; // Only preload first video
-              
-              return (
-                <VideoItem
-                  key={video.id}
-                  video={video}
-                  index={index}
-                  originalIndex={originalIndex}
-                  isFirstVideo={isFirstVideo}
-                  shouldPreload={shouldPreload}
-                  isMobile={isMobile}
-                  projectAspectRatio={projectAspectRatio}
-                  onLightboxOpen={setLightboxIndex}
-                  onMobileTap={handleMobileTap}
-                  onMobilePreload={isMobile ? handleMobilePreload : undefined}
-                  onDelete={handleDeleteOptimistic}
-                  deletingVideoId={deletingVideoId}
-                  onHoverStart={handleHoverStart}
-                  onHoverEnd={handleHoverEnd}
-                  onMobileModalOpen={handleMobileModalOpen}
-                  selectedVideoForDetails={selectedVideoForDetails}
-                  showTaskDetailsModal={showTaskDetailsModal}
-                  onApplySettingsFromTask={onApplySettingsFromTask}
-                  existingShareSlug={video.id ? shareSlugs[video.id] : undefined}
-                  onShareCreated={handleShareCreated}
-                />
-              );
-            })}
-          </div>
-        )}
-        
-
-
-        <GalleryPagination
-          totalPages={totalPages}
-          currentPage={currentPage}
-          isLoadingGenerations={isLoadingGenerations}
-          isFetchingGenerations={isFetchingGenerations}
-          onPageChange={handlePageChange}
-        />
-
-        {lightboxIndex !== null && (
-          <MediaLightbox
-            media={(() => {
-              const media = displaySortedVideoOutputs[lightboxIndex];
-              console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
-                mediaId: media.id,
-                mediaKeys: Object.keys(media),
-                hasStarred: 'starred' in media,
-                starredValue: (media as { starred?: boolean }).starred,
-                timestamp: Date.now()
-              });
-              return media;
-            })()}
-            onClose={handleCloseLightbox}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onImageSaved={onImageSaved}
-            showNavigation={true}
-            showImageEditTools={false}
-            showDownload={true}
-            hasNext={derivedHasNext}
-            hasPrevious={derivedHasPrevious}
-            starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
-            shotId={shotId || undefined}
-            showTaskDetails={true}
-            onNavigateToGeneration={(generationId: string) => {
-              console.log('[VideoGallery:DerivedNav] 📍 Navigate to generation', {
-                generationId: generationId.substring(0, 8),
-                sortedVideoOutputsCount: sortedVideoOutputs.length,
-                externalGenerationsCount: externalGens.externalGenerations.length,
-                tempDerivedCount: externalGens.tempDerivedGenerations.length,
-                totalCount: displaySortedVideoOutputs.length
-              });
-              // Search in combined videos (sorted + external + derived)
-              const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
-              if (index !== -1) {
-                console.log('[VideoGallery:DerivedNav] ✅ Found at index', index);
-                setLightboxIndex(index);
-              } else {
-                console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current videos');
-                toast.info('This generation is not currently loaded');
-              }
-            }}
-            onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
-            taskDetailsData={{
-              task,
-              isLoading: isLoadingTask,
-              error: taskError,
-              inputImages,
-              taskId: lightboxTaskMapping?.taskId || null,
-              onApplySettingsFromTask,
-              onClose: () => setLightboxIndex(null)
-            }}
-            onShowTaskDetails={isTouchLikeDevice ? handleShowTaskDetails : undefined}
+        {/* Loading state */}
+        {isLoadingGenerations ? (
+          <SkeletonGallery
+            count={6}
+            columns={skeletonColumns}
+            projectAspectRatio={projectAspectRatio}
           />
-        )}
+        ) : (
+          <>
+            {/* Video grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+              {displaySortedVideoOutputs.map((video, index) => {
+                const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
+                const isFirstVideo = index === 0;
+                const shouldPreload = isFirstVideo ? 'metadata' : 'none';
 
-        {selectedVideoForDetails && showTaskDetailsModal && (
-          <TaskDetailsModal
-            generationId={selectedVideoForDetails.id}
-            open={showTaskDetailsModal}
-            onOpenChange={(open) => {
-              console.log('[TaskToggle] VideoOutputsGallery: TaskDetailsModal onOpenChange', { open, selectedVideo: selectedVideoForDetails?.id });
-              if (!open) {
-                // When closing, reset both states
-                setShowTaskDetailsModal(false);
-                setSelectedVideoForDetails(null);
-              }
-            }}
-            onApplySettingsFromTask={(taskId, replaceImages, inputImages) => {
-              onApplySettingsFromTask(taskId, replaceImages, inputImages);
-              setSelectedVideoForDetails(null);
-              setShowTaskDetailsModal(false);
-            }}
-            onClose={() => {
-              setSelectedVideoForDetails(null);
-              setShowTaskDetailsModal(false);
-            }}
-            onShowVideo={isMobile ? () => {
-              setShowTaskDetailsModal(false);
-              const index = displaySortedVideoOutputs.findIndex(v => v.id === selectedVideoForDetails.id);
-              if (index !== -1) {
-                setLightboxIndex(index);
-              }
-              setSelectedVideoForDetails(null);
-            } : undefined}
-            isVideoContext={isMobile}
-          >
-            <Button 
-              ref={taskDetailsButtonRef}
-              className="hidden"
-            >
-              Open Details
-            </Button>
-          </TaskDetailsModal>
+                return (
+                  <VideoItem
+                    key={video.id}
+                    video={video}
+                    index={index}
+                    originalIndex={originalIndex}
+                    isFirstVideo={isFirstVideo}
+                    shouldPreload={shouldPreload}
+                    isMobile={isMobile}
+                    projectAspectRatio={projectAspectRatio}
+                    onLightboxOpen={setLightboxIndex}
+                    onMobileTap={handleMobileTap}
+                    onMobilePreload={isMobile ? handleMobilePreload : undefined}
+                    onDelete={handleDeleteOptimistic}
+                    deletingVideoId={deletingVideoId}
+                    onHoverStart={handleHoverStart}
+                    onHoverEnd={handleHoverEnd}
+                    onMobileModalOpen={handleMobileModalOpen}
+                    selectedVideoForDetails={selectedVideoForDetails}
+                    showTaskDetailsModal={showTaskDetailsModal}
+                    onApplySettingsFromTask={onApplySettingsFromTask}
+                    existingShareSlug={video.id ? shareSlugs[video.id] : undefined}
+                    onShareCreated={handleShareCreated}
+                    onViewSegments={(video) => {
+                      navigate(`/tools/travel-between-images/segments/${video.id}`);
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            <GalleryPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              isLoadingGenerations={isLoadingGenerations}
+              isFetchingGenerations={isFetchingGenerations}
+            />
+          </>
         )}
       </div>
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && (
+        <MediaLightbox
+          media={(() => {
+            const media = displaySortedVideoOutputs[lightboxIndex];
+            console.log('[StarDebug:VideoOutputsGallery] MediaLightbox media', {
+              mediaId: media.id,
+              mediaKeys: Object.keys(media),
+              hasStarred: 'starred' in media,
+              starredValue: (media as { starred?: boolean }).starred,
+              timestamp: Date.now()
+            });
+            return media;
+          })()}
+          onClose={handleCloseLightbox}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onImageSaved={onImageSaved}
+          showNavigation={true}
+          showImageEditTools={false}
+          showDownload={true}
+          hasNext={derivedHasNext}
+          hasPrevious={derivedHasPrevious}
+          starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
+          shotId={shotId || undefined}
+          showTaskDetails={true}
+          onNavigateToGeneration={(generationId: string) => {
+            console.log('[VideoGallery:DerivedNav] 📍 Navigate to generation', {
+              generationId: generationId.substring(0, 8),
+              sortedVideoOutputsCount: sortedVideoOutputs.length,
+              externalGenerationsCount: externalGens.externalGenerations.length,
+              tempDerivedCount: externalGens.tempDerivedGenerations.length,
+              totalCount: displaySortedVideoOutputs.length
+            });
+            // Search in combined videos (sorted + external + derived)
+            const index = displaySortedVideoOutputs.findIndex((video: any) => video.id === generationId);
+            if (index !== -1) {
+              console.log('[VideoGallery:DerivedNav] ✅ Found at index', index);
+              setLightboxIndex(index);
+            } else {
+              console.log('[VideoGallery:DerivedNav] ⚠️ Not found in current videos');
+              toast.info('This generation is not currently loaded');
+            }
+          }}
+          onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
+          taskDetailsData={{
+            task,
+            isLoading: isLoadingTask,
+            error: taskError,
+            inputImages,
+            taskId: lightboxTaskMapping?.taskId || null,
+            onApplySettingsFromTask,
+            onClose: () => setLightboxIndex(null)
+          }}
+          onShowTaskDetails={isTouchLikeDevice ? handleShowTaskDetails : undefined}
+        />
+      )}
+
+      {selectedVideoForDetails && showTaskDetailsModal && (
+        <TaskDetailsModal
+          generationId={selectedVideoForDetails.id}
+          open={showTaskDetailsModal}
+          onOpenChange={(open) => {
+            console.log('[TaskToggle] VideoOutputsGallery: TaskDetailsModal onOpenChange', { open, selectedVideo: selectedVideoForDetails?.id });
+            if (!open) {
+              // When closing, reset both states
+              setShowTaskDetailsModal(false);
+              setSelectedVideoForDetails(null);
+            }
+          }}
+          onApplySettingsFromTask={(taskId, replaceImages, inputImages) => {
+            onApplySettingsFromTask(taskId, replaceImages, inputImages);
+            setSelectedVideoForDetails(null);
+            setShowTaskDetailsModal(false);
+          }}
+          onClose={() => {
+            setSelectedVideoForDetails(null);
+            setShowTaskDetailsModal(false);
+          }}
+          onShowVideo={isMobile ? () => {
+            setShowTaskDetailsModal(false);
+            const index = displaySortedVideoOutputs.findIndex(v => v.id === selectedVideoForDetails.id);
+            if (index !== -1) {
+              setLightboxIndex(index);
+            }
+            setSelectedVideoForDetails(null);
+          } : undefined}
+          isVideoContext={isMobile}
+        >
+          <Button
+            ref={taskDetailsButtonRef}
+            className="hidden"
+          >
+            Open Details
+          </Button>
+        </TaskDetailsModal>
+      )}
 
       {/* Hover Preview Tooltip */}
       <VideoHoverPreview
@@ -1061,7 +1066,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         onPreviewEnter={handlePreviewEnter}
         onPreviewLeave={handlePreviewLeave}
       />
-    </Card>
+    </div>
   );
 };
 

@@ -355,81 +355,20 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     return () => clearTimeout(timer);
   }, [zoomLevel]);
 
-  // Preserve scroll position when timeline dimensions change (e.g., when tasks complete)
-  // Track previous scroll position and timeline dimensions
-  const prevScrollStateRef = useRef<{
-    scrollLeft: number;
-    scrollFraction: number;
-    fullRange: number;
-    fullMin: number;
-  } | null>(null);
+  // REMOVED: "Preserve scroll position" effect (lines 358-420)
+  // This was conflicting with useZoom's center preservation and causing jitters/drift.
+  // useZoom now handles logical center preservation, and the effect below handles scroll sync.
 
-  useEffect(() => {
-    // Skip during active zooming or dragging - those have their own scroll management
-    if (isZooming || dragState.isDragging) {
-      return;
-    }
-
-    const scrollContainer = timelineRef.current;
-    const timelineContainer = containerRef.current;
-    
-    if (!scrollContainer || !timelineContainer) return;
-
-    // Only preserve scroll when zoomed in
-    if (zoomLevel <= 1) {
-      prevScrollStateRef.current = null;
-      return;
-    }
-
-    // Get current state
-    const currentScrollLeft = scrollContainer.scrollLeft;
-    const currentScrollWidth = timelineContainer.scrollWidth;
-    const currentScrollFraction = currentScrollWidth > 0 ? currentScrollLeft / currentScrollWidth : 0;
-
-    // Check if timeline dimensions changed
-    const prev = prevScrollStateRef.current;
-    const dimensionsChanged = prev && (prev.fullRange !== fullRange || prev.fullMin !== fullMin);
-
-    if (dimensionsChanged && prev) {
-      // Timeline dimensions changed - restore scroll position proportionally
-      const timer = setTimeout(() => {
-        const scrollContainer = timelineRef.current;
-        const timelineContainer = containerRef.current;
-        
-        if (!scrollContainer || !timelineContainer) return;
-
-        const newScrollWidth = timelineContainer.scrollWidth;
-        const restoredScrollLeft = prev.scrollFraction * newScrollWidth;
-
-        scrollContainer.scrollTo({
-          left: Math.max(0, restoredScrollLeft),
-          behavior: 'instant'
-        });
-      }, 10);
-
-      return () => clearTimeout(timer);
-    }
-
-    // Save current state for next comparison
-    prevScrollStateRef.current = {
-      scrollLeft: currentScrollLeft,
-      scrollFraction: currentScrollFraction,
-      fullRange,
-      fullMin
-    };
-  }, [fullRange, fullMin, zoomLevel, isZooming, dragState.isDragging]);
-
-  // Scroll timeline to center on zoom center when zooming
+  // Scroll timeline to center on zoom center when zooming OR when timeline dimensions change
   // IMPORTANT: Don't adjust scroll during drag operations to prevent view jumping
-  // CRITICAL: Only adjust scroll when actively zooming, NOT when timeline dimensions change
   useEffect(() => {
-    // Skip scroll adjustment if a drag is in progress or if the change is not from zooming
-    if (dragState.isDragging || !isZooming) {
+    // Skip scroll adjustment if a drag is in progress or if not zoomed
+    if (dragState.isDragging || zoomLevel <= 1) {
       return;
     }
     
-    if (zoomLevel > 1 && timelineRef.current && containerRef.current) {
-      // Small delay to allow DOM to reflow after zoom, then instantly scroll
+    if (timelineRef.current && containerRef.current) {
+      // Small delay to allow DOM to reflow after zoom/data change, then instantly scroll
       const timer = setTimeout(() => {
         const scrollContainer = timelineRef.current;
         const timelineContainer = containerRef.current;
@@ -447,7 +386,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         // Scroll so the center point is in the middle of the viewport
         const targetScroll = centerPixelInZoomedTimeline - (scrollContainerWidth / 2);
         
-        // Use instant scroll for immediate zoom-to-position effect (no two-step animation)
+        // Use instant scroll for immediate zoom-to-position effect
         scrollContainer.scrollTo({
           left: Math.max(0, targetScroll),
           behavior: 'instant'
@@ -456,7 +395,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [zoomLevel, zoomCenter, dragState.isDragging, isZooming]);
+  }, [zoomLevel, zoomCenter, dragState.isDragging, fullMin, fullRange]); // Added fullMin/fullRange dependencies
 
   // Unified drop hook (handles both file drops and generation drops)
   const {
@@ -468,8 +407,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleDragLeave,
     handleDrop,
   } = useUnifiedDrop({ onImageDrop, onGenerationDrop, fullMin, fullRange });
-
-  // Simple drag state tracking - remove excessive logging
 
   // Effect to handle context visibility delay when not dragging
   useEffect(() => {
@@ -931,7 +868,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           })()}
           {images.map((image, idx) => {
             const imageKey = image.shotImageEntryId ?? image.id;
-            const framePosition = currentPositions.get(imageKey) ?? idx * 50;
+            // Prioritize timeline_frame from image data over generic fallback
+            // This ensures stable positioning during optimistic update -> DB sync transitions
+            // where framePositions map might not yet have the new key
+            const framePosition = currentPositions.get(imageKey) ?? image.timeline_frame ?? idx * 50;
             const isDragging = dragState.isDragging && dragState.activeId === imageKey;
 
             // [Position0Debug] Track position lookup failures for item 50bbb119

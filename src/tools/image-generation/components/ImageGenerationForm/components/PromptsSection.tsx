@@ -9,6 +9,11 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/shared/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/shared/components/ui/popover";
 import { PromptEntry, PromptMode } from "../types";
 import { PromptInputRow } from "./PromptInputRow";
 import { SectionHeader } from "./SectionHeader";
@@ -115,20 +120,39 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
             <Label htmlFor="masterPromptText" className="text-sm font-light block mb-1.5">
               Master Prompt
             </Label>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+            {isMobile ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button 
+                    type="button" 
+                    className="absolute top-0 right-0 text-muted-foreground hover:text-foreground transition-colors bg-transparent border-0 p-0"
+                  >
                     <Info className="h-4 w-4" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
+                    <span className="sr-only">Info</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 text-sm" side="left" align="start">
                   <p>
                     AI will generate multiple prompt variations based on this description
                   </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      AI will generate multiple prompt variations based on this description
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
           <Textarea
             id="masterPromptText"

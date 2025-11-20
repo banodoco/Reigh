@@ -26,15 +26,12 @@ export type NewMyTable = typeof myTable.$inferInsert;
 ```
 
 ### Database Changes
-All actual database changes are managed via Supabase migrations:
+All database changes and deployments must follow the [Deployment & Migration Guide](deployment_and_migration_guide.md).
 
+**Key Command:**
 ```bash
-# Create new migration
-supabase migration new my_feature_name
-
-# Edit the generated SQL file in /supabase/migrations/
-# Apply to database
-supabase db push
+# Safe production deployment
+npx supabase db push --linked
 ```
 
 ### Development Data Seeding

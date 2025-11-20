@@ -13,8 +13,8 @@ import { transformGeneration, type RawGeneration, type TransformOptions } from '
  * Fetch generations using direct Supabase call with pagination support
  */
 export async function fetchGenerations(
-  projectId: string | null, 
-  limit: number = 100, 
+  projectId: string | null,
+  limit: number = 100,
   offset: number = 0,
   filters?: {
     toolType?: string;
@@ -23,17 +23,19 @@ export async function fetchGenerations(
     excludePositioned?: boolean;
     starredOnly?: boolean;
     searchTerm?: string;
+    includeChildren?: boolean;
+    parentGenerationId?: string;
   }
 ): Promise<{
   items: GeneratedImageWithMetadata[];
   total: number;
   hasMore: boolean;
 }> {
-  
+
   if (!projectId) {
     return { items: [], total: 0, hasMore: false };
   }
-  
+
   // Build count query
   let countQuery = supabase
     .from('generations')
@@ -41,6 +43,17 @@ export async function fetchGenerations(
     .eq('project_id', projectId);
 
   // Apply server-side filters to count query
+
+  // Parent/Child filtering
+  if (filters?.parentGenerationId) {
+    // Fetch specific children of a parent
+    countQuery = countQuery.eq('parent_generation_id', filters.parentGenerationId);
+  } else if (!filters?.includeChildren) {
+    // Default: Exclude child generations (show only parents/standalone)
+    // is_child is boolean NOT NULL DEFAULT false, so we can just check for false
+    countQuery = countQuery.eq('is_child', false);
+  }
+
   // NOTE: Skip tool type filter when shot filter is active - shot filter takes precedence
   // Users want to see ALL generations in a shot, not just ones from the current tool
   if (filters?.toolType && !filters?.shotId) {
@@ -79,12 +92,12 @@ export async function fetchGenerations(
 
   // Apply shot filter if provided - using JSONB shot_data column
   if (filters?.shotId) {
-    
+
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
     // shot_data->'shot_id' checks if the key exists (returns the value or null if key missing)
     // We want: WHERE shot_data->'shot_id' IS NOT NULL (meaning key exists)
     countQuery = countQuery.not(`shot_data->${filters.shotId}`, 'is', null);
-    
+
     // Add positioned filter if needed
     if (filters.excludePositioned) {
       // Filter to only unpositioned: shot_data->>'shot_id' IS NULL
@@ -96,7 +109,7 @@ export async function fetchGenerations(
   // 🚀 PERFORMANCE FIX: Skip expensive count query for small pages
   // DISABLED: Enable full count for accurate pagination
   const shouldSkipCount = false; // limit <= 100 && !filters?.searchTerm?.trim();
-  
+
   if (!shouldSkipCount) {
     const { count, error: countError } = await countQuery;
     if (countError) {
@@ -120,9 +133,24 @@ export async function fetchGenerations(
       based_on,
       upscaled_url,
       shot_data,
-      name
+      name,
+      is_child,
+      parent_generation_id,
+      child_order
     `)
     .eq('project_id', projectId);
+
+  // Apply same filters to data query
+
+  // Parent/Child filtering
+  if (filters?.parentGenerationId) {
+    dataQuery = dataQuery.eq('parent_generation_id', filters.parentGenerationId);
+    // Order children by child_order
+    dataQuery = dataQuery.order('child_order', { ascending: true });
+  } else if (!filters?.includeChildren) {
+    dataQuery = dataQuery.eq('is_child', false);
+  }
+
 
   // Apply same filters to data query
   // NOTE: Skip tool type filter when shot filter is active - shot filter takes precedence
@@ -159,7 +187,7 @@ export async function fetchGenerations(
   if (filters?.shotId) {
     // Check if generation is in this shot (uses GIN index: idx_generations_shot_data_gin)
     dataQuery = dataQuery.not(`shot_data->${filters.shotId}`, 'is', null);
-    
+
     // Add positioned filter if needed
     if (filters.excludePositioned) {
       dataQuery = dataQuery.is(`shot_data->>${filters.shotId}`, null);
@@ -168,16 +196,16 @@ export async function fetchGenerations(
 
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
-  
+
   // Execute query with standard server-side pagination
   const { data, error } = await dataQuery
     .order('created_at', { ascending: false })
     .range(offset, offset + fetchLimit - 1);
-  
+
   if (error) {
     throw error;
   }
-  
+
   if (!data) {
     return { items: [], total: totalCount, hasMore: false };
   }
@@ -200,7 +228,7 @@ export async function fetchGenerations(
   // Calculate hasMore and process results based on count strategy
   let finalData = data || [];
   let hasMore = false;
-  
+
   if (shouldSkipCount) {
     // Fast pagination: detect hasMore by checking if we got limit+1 items
     hasMore = finalData.length > limit;
@@ -221,7 +249,7 @@ export async function fetchGenerations(
         upscaled_url: item.upscaled_url?.substring(0, 60)
       });
     }
-    
+
     // Transform using shared function - handles all the complex logic
     return transformGeneration(item as RawGeneration, {
       shotId: filters?.shotId,
@@ -237,12 +265,12 @@ export async function fetchGenerations(
  */
 async function updateGenerationLocation(id: string, location: string, thumbUrl?: string): Promise<void> {
   const updateData: { location: string; thumbnail_url?: string } = { location };
-  
+
   // If thumbUrl is provided, update it as well (important for flipped images)
   if (thumbUrl) {
     updateData.thumbnail_url = thumbUrl;
   }
-  
+
   const { error } = await supabase
     .from('generations')
     .update(updateData)
@@ -296,10 +324,10 @@ async function createGeneration(params: {
  * Star/unstar a generation using direct Supabase call
  */
 async function toggleGenerationStar(id: string, starred: boolean): Promise<void> {
-  console.log('[StarPersist] 🚀 Starting database UPDATE', { 
-    id, 
-    starred, 
-    timestamp: Date.now() 
+  console.log('[StarPersist] 🚀 Starting database UPDATE', {
+    id,
+    starred,
+    timestamp: Date.now()
   });
 
   const { data, error } = await supabase
@@ -308,14 +336,14 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
     .eq('id', id)
     .select('id, starred'); // Select to verify update
 
-  console.log('[StarPersist] 📊 Database UPDATE response', { 
-    id, 
-    starred, 
+  console.log('[StarPersist] 📊 Database UPDATE response', {
+    id,
+    starred,
     responseData: data,
     hasData: !!data,
     dataLength: data?.length,
     error: error?.message,
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
 
   if (error) {
@@ -324,19 +352,19 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
   }
 
   if (!data || data.length === 0) {
-    console.error('[StarPersist] ⚠️ Database UPDATE returned no rows - possible RLS block', { 
-      id, 
-      starred, 
-      hint: 'Check Row Level Security policies on generations table' 
+    console.error('[StarPersist] ⚠️ Database UPDATE returned no rows - possible RLS block', {
+      id,
+      starred,
+      hint: 'Check Row Level Security policies on generations table'
     });
     throw new Error(`Failed to update generation: No rows updated (possible RLS policy issue)`);
   }
 
-  console.log('[StarPersist] ✅ Database UPDATE successful', { 
-    id, 
-    starred, 
+  console.log('[StarPersist] ✅ Database UPDATE successful', {
+    id,
+    starred,
     updatedData: data[0],
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
 }
 
@@ -344,10 +372,10 @@ async function toggleGenerationStar(id: string, starred: boolean): Promise<void>
  * Update generation name using direct Supabase call
  */
 async function updateGenerationName(id: string, name: string): Promise<void> {
-  console.log('[GenerationUpdate] 🚀 Starting generation name UPDATE', { 
-    id, 
-    name, 
-    timestamp: Date.now() 
+  console.log('[GenerationUpdate] 🚀 Starting generation name UPDATE', {
+    id,
+    name,
+    timestamp: Date.now()
   });
 
   // Update the 'name' column directly
@@ -362,11 +390,11 @@ async function updateGenerationName(id: string, name: string): Promise<void> {
     throw new Error(`Failed to update generation name: ${error.message}`);
   }
 
-  console.log('[GenerationUpdate] ✅ Database UPDATE successful', { 
-    id, 
-    name, 
+  console.log('[GenerationUpdate] ✅ Database UPDATE successful', {
+    id,
+    name,
     updatedData: data?.[0],
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
 }
 
@@ -377,9 +405,9 @@ export type GenerationsPaginatedResponse = {
 };
 
 export function useGenerations(
-  projectId: string | null, 
-  page: number = 1, 
-  limit: number = 100, 
+  projectId: string | null,
+  page: number = 1,
+  limit: number = 100,
   enabled: boolean = true,
   filters?: {
     toolType?: string;
@@ -388,6 +416,8 @@ export function useGenerations(
     excludePositioned?: boolean;
     starredOnly?: boolean;
     searchTerm?: string;
+    includeChildren?: boolean;
+    parentGenerationId?: string;
   },
   options?: {
     disablePolling?: boolean; // Disable smart polling (useful for long-running tasks)
@@ -402,7 +432,7 @@ export function useGenerations(
   // 🎯 SMART POLLING: Use DataFreshnessManager for intelligent polling decisions
   // Can be disabled for tools with long-running tasks to prevent gallery flicker
   const smartPollingConfig = useSmartPollingConfig(['generations', projectId]);
-  const pollingConfig = options?.disablePolling 
+  const pollingConfig = options?.disablePolling
     ? { refetchInterval: false, staleTime: Infinity }
     : smartPollingConfig;
 
@@ -417,7 +447,7 @@ export function useGenerations(
     // Cache management to prevent memory leaks as pagination grows
     gcTime: 10 * 60 * 1000, // 10 minutes, slightly longer gcTime
     refetchOnWindowFocus: false, // Prevent double-fetches
-    
+
     // 🎯 SMART POLLING: Intelligent polling based on realtime health (or disabled)
     ...pollingConfig,
     refetchIntervalInBackground: !options?.disablePolling, // Only poll in background if polling is enabled
@@ -443,11 +473,11 @@ export function useDeleteGeneration() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-  const { error } = await supabase
-    .from('generations')
-    .delete()
+      const { error } = await supabase
+        .from('generations')
+        .delete()
         .eq('id', id);
-  
+
       if (error) {
         throw new Error(`Failed to delete generation: ${error.message}`);
       }
@@ -498,7 +528,7 @@ export function useUpdateGenerationName() {
         if (!old?.items) return old;
         return {
           ...old,
-          items: old.items.map((item: any) => 
+          items: old.items.map((item: any) =>
             item.id === id ? { ...item, name } : item
           )
         };
@@ -525,20 +555,20 @@ export function useUpdateGenerationName() {
 // NOTE: useGetTaskIdForGeneration moved to generationTaskBridge.ts for centralization
 
 export function useCreateGeneration() {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: createGeneration,
-        onSuccess: (data, variables) => {
+  return useMutation({
+    mutationFn: createGeneration,
+    onSuccess: (data, variables) => {
       // Emit domain event for generation creation
-            // Generation insertion events are now handled by DataFreshnessManager via realtime events
-        },
-        onError: (error: Error) => {
+      // Generation insertion events are now handled by DataFreshnessManager via realtime events
+    },
+    onError: (error: Error) => {
       console.error('Error creating generation:', error);
       toast.error(error.message || 'Failed to create generation');
     },
-            });
-        }
+  });
+}
 
 /**
  * Fetch generations that are derived from a specific source generation (based_on tracking)
@@ -547,12 +577,12 @@ export async function fetchDerivedGenerations(
   sourceGenerationId: string | null
 ): Promise<GeneratedImageWithMetadata[]> {
   console.log('[BasedOnDebug] fetchDerivedGenerations called', { sourceGenerationId });
-  
+
   if (!sourceGenerationId) {
     console.log('[BasedOnDebug] fetchDerivedGenerations returning empty - no sourceGenerationId');
     return [];
   }
-  
+
   const { data, error } = await supabase
     .from('generations')
     .select(`
@@ -570,28 +600,28 @@ export async function fetchDerivedGenerations(
     .eq('based_on', sourceGenerationId)
     .order('starred', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
-  
+
   if (error) {
     console.error('[BasedOnDebug] fetchDerivedGenerations error', error);
     throw error;
   }
-  
+
   console.log('[BasedOnDebug] fetchDerivedGenerations result', {
     sourceGenerationId,
     count: data?.length || 0,
     data: data?.map(d => ({ id: d.id, based_on: (d as any).based_on }))
   });
-  
+
   // Fetch counts of generations based on each derived generation
   const derivedIds = data?.map(d => d.id) || [];
   let derivedCounts: Record<string, number> = {};
-  
+
   if (derivedIds.length > 0) {
     const { data: countsData, error: countsError } = await supabase
       .from('generations')
       .select('based_on')
       .in('based_on', derivedIds);
-    
+
     if (!countsError && countsData) {
       // Count how many times each ID appears as based_on
       derivedCounts = countsData.reduce((acc, item) => {
@@ -601,12 +631,12 @@ export async function fetchDerivedGenerations(
       }, {} as Record<string, number>);
     }
   }
-  
+
   const items = data?.map((item: any) => {
     const mainUrl = item.location;
     const thumbnailUrl = item.thumbnail_url || mainUrl;
     const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
-    
+
     // Debug based_on field
     if (process.env.NODE_ENV === 'development') {
       console.log('[BasedOnDebug] 🔍 useGenerations mapping item:');
@@ -619,14 +649,14 @@ export async function fetchDerivedGenerations(
       console.log('  paramsKeys:', item.params ? Object.keys(item.params) : 'no params');
       console.log('  timestamp:', Date.now());
     }
-    
+
     const baseItem: GeneratedImageWithMetadata = {
       id: item.id,
       url: mainUrl,
       thumbUrl: thumbnailUrl,
-      prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
-              item.params?.prompt || 
-              'No prompt',
+      prompt: item.params?.originalParams?.orchestrator_details?.prompt ||
+        item.params?.prompt ||
+        'No prompt',
       metadata: {
         ...(item.params || {}),
         taskId
@@ -639,21 +669,21 @@ export async function fetchDerivedGenerations(
       derivedCount: derivedCounts[item.id] || 0,
       based_on: item.based_on || item.params?.based_on || null, // Include based_on from database or params
     };
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log('[BasedOnDebug] ✅ Created baseItem:');
       console.log('  baseItemId:', baseItem.id?.substring(0, 8));
       console.log('  baseItem.based_on:', baseItem.based_on);
       console.log('  baseItemKeys:', Object.keys(baseItem));
     }
-    
+
     // Include shot association data
     const shotGenerations = item.shot_generations || [];
     const normalizePosition = (timelineFrame: number | null | undefined) => {
       if (timelineFrame === null || timelineFrame === undefined) return null;
       return Math.floor(timelineFrame / 50);
     };
-    
+
     if (shotGenerations.length > 0) {
       if (shotGenerations.length === 1) {
         const singleShot = shotGenerations[0];
@@ -664,13 +694,13 @@ export async function fetchDerivedGenerations(
           timeline_frame: singleShot.timeline_frame,
         };
       }
-      
+
       const allAssociations = shotGenerations.map((sg: any) => ({
         shot_id: sg.shot_id,
         timeline_frame: sg.timeline_frame,
         position: normalizePosition(sg.timeline_frame),
-        }));
-      
+      }));
+
       const primaryShot = shotGenerations[0];
       return {
         ...baseItem,
@@ -680,10 +710,10 @@ export async function fetchDerivedGenerations(
         all_shot_associations: allAssociations,
       };
     }
-    
+
     return baseItem;
   }) || [];
-  
+
   return items;
 }
 
@@ -696,13 +726,13 @@ export function useDerivedGenerations(
 ) {
   // 🎯 SMART POLLING: Use intelligent polling for derived generations so new edits appear immediately
   const smartPollingConfig = useSmartPollingConfig(['derived-generations', sourceGenerationId]);
-  
+
   return useQuery<GeneratedImageWithMetadata[], Error>({
     queryKey: ['derived-generations', sourceGenerationId],
     queryFn: () => fetchDerivedGenerations(sourceGenerationId),
     enabled: !!sourceGenerationId && enabled,
     gcTime: 5 * 60 * 1000, // 5 minutes
-    
+
     // 🎯 SMART POLLING: Intelligent polling based on realtime health
     ...smartPollingConfig,
     refetchIntervalInBackground: true, // Continue polling when tab inactive
@@ -718,12 +748,12 @@ export async function fetchSourceGeneration(
   sourceGenerationId: string | null
 ): Promise<GeneratedImageWithMetadata | null> {
   console.log('[BasedOnDebug] fetchSourceGeneration called', { sourceGenerationId });
-  
+
   if (!sourceGenerationId) {
     console.log('[BasedOnDebug] fetchSourceGeneration returning null - no sourceGenerationId');
     return null;
   }
-  
+
   const { data, error } = await supabase
     .from('generations')
     .select(`
@@ -740,30 +770,30 @@ export async function fetchSourceGeneration(
     `)
     .eq('id', sourceGenerationId)
     .single();
-  
+
   if (error || !data) {
     console.error('[BasedOnDebug] fetchSourceGeneration error or no data', { error, hasData: !!data });
     return null;
   }
-  
+
   console.log('[BasedOnDebug] fetchSourceGeneration found generation', {
     id: data.id,
     hasLocation: !!data.location,
     hasThumbnail: !!data.thumbnail_url
   });
-  
+
   const item = data;
   const mainUrl = item.location;
   const thumbnailUrl = item.thumbnail_url || mainUrl;
   const taskId = Array.isArray(item.tasks) && item.tasks.length > 0 ? item.tasks[0] : null;
-  
+
   const baseItem: GeneratedImageWithMetadata = {
     id: item.id,
     url: mainUrl,
     thumbUrl: thumbnailUrl,
-    prompt: item.params?.originalParams?.orchestrator_details?.prompt || 
-            item.params?.prompt || 
-            'No prompt',
+    prompt: item.params?.originalParams?.orchestrator_details?.prompt ||
+      item.params?.prompt ||
+      'No prompt',
     metadata: {
       ...(item.params || {}),
       taskId
@@ -774,14 +804,14 @@ export async function fetchSourceGeneration(
     position: null,
     timeline_frame: null,
   };
-  
+
   // Include shot association data
   const shotGenerations = item.shot_generations || [];
   const normalizePosition = (timelineFrame: number | null | undefined) => {
     if (timelineFrame === null || timelineFrame === undefined) return null;
     return Math.floor(timelineFrame / 50);
   };
-  
+
   if (shotGenerations.length > 0) {
     if (shotGenerations.length === 1) {
       const singleShot = shotGenerations[0];
@@ -792,13 +822,13 @@ export async function fetchSourceGeneration(
         timeline_frame: singleShot.timeline_frame,
       };
     }
-    
+
     const allAssociations = shotGenerations.map((sg: any) => ({
       shot_id: sg.shot_id,
       timeline_frame: sg.timeline_frame,
       position: normalizePosition(sg.timeline_frame),
     }));
-    
+
     const primaryShot = shotGenerations[0];
     return {
       ...baseItem,
@@ -808,7 +838,7 @@ export async function fetchSourceGeneration(
       all_shot_associations: allAssociations,
     };
   }
-  
+
   return baseItem;
 }
 
@@ -838,7 +868,7 @@ export function useToggleGenerationStar() {
     },
     onMutate: async ({ id, starred, shotId }) => {
       console.log('[StarPersist] 🟡 onMutate: Optimistically updating caches', { id, starred, shotId });
-      
+
       // Cancel outgoing refetches so they don't overwrite our optimistic update
       await Promise.all([
         queryClient.cancelQueries({ queryKey: ['unified-generations'] }),
@@ -859,26 +889,26 @@ export function useToggleGenerationStar() {
         newStarred: starred,
         queryKeys: generationsQueries.map(([key]) => key)
       });
-      
+
       generationsQueries.forEach(([queryKey, data]) => {
         if (data && typeof data === 'object' && 'items' in data) {
           previousGenerationsQueries.set(queryKey, data);
-          
+
           const oldItem = (data as any).items.find((g: any) => g.id === id);
           const updated = {
             ...data,
             items: (data as any).items.map((g: any) => (g.id === id ? { ...g, starred } : g)),
           };
-          
-          console.log('[StarPersist] 🎨 Updating generations cache:', { 
-            queryKey, 
+
+          console.log('[StarPersist] 🎨 Updating generations cache:', {
+            queryKey,
             itemsCount: updated.items.length,
             foundItem: !!oldItem,
             oldStarred: oldItem?.starred,
             newStarred: starred,
             updatedItem: updated.items.find((g: any) => g.id === id)
           });
-          
+
           queryClient.setQueryData(queryKey, updated);
         } else {
           console.log('[StarPersist] ⚠️ Skipping query (no items):', { queryKey, hasData: !!data, dataKeys: data ? Object.keys(data) : [] });
@@ -888,7 +918,7 @@ export function useToggleGenerationStar() {
       // 2) Optimistically update all shots caches so star reflects in Shot views / timelines
       const shotsQueries = queryClient.getQueriesData({ queryKey: ['shots'] });
       console.log('[StarDebug:useToggleGenerationStar] Found shots queries:', shotsQueries.length);
-      
+
       shotsQueries.forEach(([queryKey, data]) => {
         if (Array.isArray(data)) {
           previousShotsQueries.set(queryKey, data);
@@ -938,20 +968,20 @@ export function useToggleGenerationStar() {
         console.log('[StarPersist] ⚠️ No shotId provided, skipping all-shot-generations cache update.');
       }
 
-      console.log('[StarDebug:useToggleGenerationStar] onMutate complete', { 
+      console.log('[StarDebug:useToggleGenerationStar] onMutate complete', {
         generationsQueriesUpdated: previousGenerationsQueries.size,
         shotsQueriesUpdated: previousShotsQueries.size,
-        allShotGenerationsQueriesUpdated: previousAllShotGenerationsQueries.size 
+        allShotGenerationsQueriesUpdated: previousAllShotGenerationsQueries.size
       });
 
       return { previousGenerationsQueries, previousShotsQueries, previousAllShotGenerationsQueries };
     },
     onError: (error: Error, _variables, context) => {
-      console.error('[StarPersist] ❌ onError: Mutation failed, rolling back', { 
+      console.error('[StarPersist] ❌ onError: Mutation failed, rolling back', {
         error: error.message,
-        variables: _variables 
+        variables: _variables
       });
-      
+
       // Rollback optimistic updates
       if (context?.previousGenerationsQueries) {
         context.previousGenerationsQueries.forEach((data, key) => {
@@ -973,22 +1003,22 @@ export function useToggleGenerationStar() {
       toast.error(error.message || 'Failed to toggle star');
     },
     onSuccess: (data, variables) => {
-      console.log('[StarPersist] ✅ onSuccess: Mutation completed successfully', { 
-        variables, 
+      console.log('[StarPersist] ✅ onSuccess: Mutation completed successfully', {
+        variables,
         data,
-        willWaitForRealtime: true 
+        willWaitForRealtime: true
       });
       // Emit domain event for generation star toggle
       // Generation star toggle events are now handled by DataFreshnessManager via realtime events
-      
+
       // Emit custom event so Timeline knows to refetch star data
       if (variables.shotId) {
         console.log('[StarPersist] 📢 Emitting star-updated event for shot:', variables.shotId);
-        window.dispatchEvent(new CustomEvent('generation-star-updated', { 
+        window.dispatchEvent(new CustomEvent('generation-star-updated', {
           detail: { generationId: variables.id, shotId: variables.shotId, starred: variables.starred }
         }));
       }
-      
+
       console.log('[StarPersist] ✨ Optimistic updates complete - all caches updated');
     },
     onSettled: () => {

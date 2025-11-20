@@ -58,7 +58,7 @@ const assistantTools = [
   {
     id: 'edit-images',
     name: 'Edit\nImages',
-    description: 'Transform, reimagine, and enhance images.',
+    description: 'Transform and enhance images.',
     tool: toolsUIManifest.find(t => t.id === 'edit-images'),
     icon: Edit,
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
@@ -76,7 +76,7 @@ const assistantTools = [
   {
     id: 'character-animate',
     name: 'Animate Characters',
-    description: 'Bring characters to life with motion.',
+    description: 'Bring characters to life.',
     tool: toolsUIManifest.find(t => t.id === 'character-animate'),
     icon: Users,
     gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
@@ -85,7 +85,7 @@ const assistantTools = [
   {
     id: 'moon-soon',
     name: 'More Soon',
-    description: "We're adding more tools all the time!",
+    description: "We're adding more tools!",
     tool: null,
     icon: Sparkles,
     gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',

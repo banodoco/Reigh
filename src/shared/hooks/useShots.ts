@@ -784,6 +784,120 @@ export const useAddImageToShot = () => {
       log('MobileNetworkDebug', `Successfully added image to shot in ${Date.now() - startTime}ms`);
       return shotGeneration;
     },
+    onMutate: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id, timelineFrame }) => {
+      console.log('[ADD:useAddImageToShot] 🔄 onMutate starting optimistic update', {
+        shot_id,
+        generation_id,
+        imageUrl: imageUrl ? 'provided' : 'missing',
+        timelineFrame,
+        timestamp: Date.now()
+      });
+
+      if (!project_id) return { previousShots: undefined, previousFastGens: undefined, project_id: undefined, shot_id: undefined };
+
+      await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
+      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shot_id] });
+
+      const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shot_id]);
+
+      // Only perform optimistic update if we have image URL to show
+      if (imageUrl || thumbUrl) {
+        const createOptimisticItem = (currentImages: any[]) => {
+          let resolvedFrame = timelineFrame;
+          if (resolvedFrame === undefined) {
+            // If no frame provided, guess the next position (append)
+            const positionedImages = currentImages.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined);
+            const maxFrame = positionedImages.length > 0 
+              ? Math.max(...positionedImages.map(g => g.timeline_frame || 0)) 
+              : -60; // Start at 0 ( -60 + 60 )
+            resolvedFrame = maxFrame + 60;
+          }
+
+          const tempId = `temp-${Date.now()}-${Math.random()}`;
+          return {
+            id: generation_id || tempId,
+            shotImageEntryId: tempId,
+            shot_generation_id: tempId,
+            // Match phase1Query structure
+            location: imageUrl,
+            thumbnail_url: thumbUrl || imageUrl,
+            imageUrl: imageUrl,
+            thumbUrl: thumbUrl || imageUrl,
+            timeline_frame: resolvedFrame,
+            type: 'image',
+            created_at: new Date().toISOString(),
+            starred: false,
+            upscaled_url: null,
+            name: null,
+            based_on: null,
+            params: {},
+            shot_data: { [shot_id]: resolvedFrame },  // Include shot_data for consistency
+            _optimistic: true
+          };
+        };
+
+        // Update 'shot-generations-fast' (Timeline)
+        if (previousFastGens) {
+          const optimisticItem = createOptimisticItem(previousFastGens);
+          queryClient.setQueryData(['shot-generations-fast', shot_id], [...previousFastGens, optimisticItem]);
+        }
+
+        // Update ALL 'shots' cache variants (Sidebar/Context)
+        const shotsCacheKeys = [
+          ['shots', project_id],
+          ['shots', project_id, 0],
+          ['shots', project_id, 2],
+          ['shots', project_id, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          const cachedShots = queryClient.getQueryData<Shot[]>(cacheKey);
+          if (cachedShots) {
+            const updatedShots = cachedShots.map(shot => {
+              if (shot.id === shot_id) {
+                const optimisticItem = createOptimisticItem(shot.images);
+                return { ...shot, images: [...shot.images, optimisticItem] };
+              }
+              return shot;
+            });
+            queryClient.setQueryData(cacheKey, updatedShots);
+          }
+        });
+      }
+
+      return { previousShots, previousFastGens, project_id, shot_id };
+    },
+    onError: (error: Error, variables, context) => {
+      console.error('Error adding image to shot:', error);
+      
+      // Rollback ALL cache variants
+      if (context?.previousShots && context.project_id) {
+        const shotsCacheKeys = [
+          ['shots', context.project_id],
+          ['shots', context.project_id, 0],
+          ['shots', context.project_id, 2],
+          ['shots', context.project_id, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, context.previousShots);
+        });
+      }
+      if (context?.previousFastGens && context.shot_id) {
+        queryClient.setQueryData(['shot-generations-fast', context.shot_id], context.previousFastGens);
+      }
+      
+      // Provide more helpful error messages for common mobile issues
+      let userMessage = error.message;
+      if (error.message.includes('Load failed') || error.message.includes('TypeError')) {
+        userMessage = 'Network connection issue. Please check your internet connection and try again.';
+      } else if (error.message.includes('fetch')) {
+        userMessage = 'Unable to connect to server. Please try again in a moment.';
+      } else if (isQuotaOrServerError(error)) {
+        userMessage = 'Server is temporarily busy. Please wait a moment before trying again.';
+      }
+      
+      toast.error(`Failed to add image to shot: ${userMessage}`);
+    },
     onSuccess: (_, variables) => {
       // Emit domain event for shot-generation change
       const { project_id, shot_id } = variables;
@@ -1289,161 +1403,196 @@ export const useDuplicateImageInShot = () => {
       return newShotGeneration;
     },
     onMutate: async ({ shot_id, generation_id, project_id, silent }) => {
-      console.log('[DUPLICATE] onMutate optimistic update', {
-        shot_id,
-        generation_id,
+      console.log('[DUPLICATE_OPTIMISTIC] 🚀 onMutate START', {
+        shot_id: shot_id?.substring(0, 8),
+        generation_id: generation_id?.substring(0, 8),
+        project_id: project_id?.substring(0, 8),
         timestamp: Date.now()
       });
 
       // Cancel outgoing refetches
+      console.log('[DUPLICATE_OPTIMISTIC] 🛑 Canceling queries...');
       await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
+      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shot_id] });
       
       // Snapshot the previous value
       const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shot_id]);
       
-      // Optimistically update
-      if (previousShots) {
-        const updatedShots = previousShots.map(shot => {
-          if (shot.id === shot_id) {
-            // Find the generation to duplicate
-            const genToDuplicate = shot.images.find(img => img.id === generation_id);
-            if (!genToDuplicate) return shot;
-            
-            // Get timeline_frame from the original image
-            const originalTimelineFrame = (genToDuplicate as any).timeline_frame || 0;
-            
-            console.log('[DUPLICATE] Found generation to duplicate', {
-              genToDuplicate: genToDuplicate.shotImageEntryId,
-              originalTimelineFrame
-            });
+      // DEBUG: Check all shots-related cache keys to see what's available
+      const allShotsCacheKeys = [
+        ['shots', project_id],
+        ['shots', project_id, 0],
+        ['shots', project_id, 2],
+        ['shots', project_id, 5],
+      ];
+      const cacheDebug = allShotsCacheKeys.map(key => ({
+        key: JSON.stringify(key),
+        exists: !!queryClient.getQueryData(key),
+        count: (queryClient.getQueryData(key) as any)?.length || 0
+      }));
+      
+      console.log('[DUPLICATE_OPTIMISTIC] 📸 Snapshots taken:', {
+        previousShotsCount: previousShots?.length,
+        previousFastGensCount: previousFastGens?.length,
+        cacheDebug,
+        previousFastGensSample: previousFastGens?.slice(0, 3).map(g => ({
+          id: g.id?.substring(0, 8),
+          shotImageEntryId: g.shotImageEntryId?.substring(0, 8),
+          timeline_frame: g.timeline_frame
+        }))
+      });
+      
+      // Helper to calculate duplicate frame and create optimistic item
+      const createOptimisticDuplicate = (images: any[]) => {
+        const genToDuplicate = images.find(img => img.id === generation_id || img.generation_id === generation_id);
+        if (!genToDuplicate) return null;
 
-            console.log('[DUPLICATE_DEBUG] 🎯 OPTIMISTIC UPDATE - Starting calculation:', {
-              shot_id: shot_id.substring(0, 8),
-              generation_id: generation_id.substring(0, 8),
-              originalTimelineFrame,
-              totalImagesInShot: shot.images.length
-            });
+        const originalTimelineFrame = genToDuplicate.timeline_frame || 0;
 
-            // Calculate the duplicate's timeline_frame (same logic as in mutationFn)
-            // Find all images sorted by timeline_frame
-            const sortedByTimelineFrame = shot.images
-              .filter(img => (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined)
-              .sort((a, b) => ((a as any).timeline_frame || 0) - ((b as any).timeline_frame || 0));
-            
-            console.log('[DUPLICATE_DEBUG] 📋 OPTIMISTIC - SORTED BY TIMELINE_FRAME:', {
-              sortedImages: sortedByTimelineFrame.map((img, index) => ({
-                index,
-                shotImageEntryId: img.shotImageEntryId.substring(0, 8),
-                id: img.id.substring(0, 8),
-                timeline_frame: (img as any).timeline_frame,
-                isOriginal: img.id === generation_id
-              }))
-            });
-            
-            // Find the next image after the original in timeline order with a DIFFERENT timeline_frame
-            const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === generation_id);
-            
-            // Look for the next image with a different timeline_frame value
-            let nextImageInTimeline = null;
-            for (let i = originalIndex + 1; i < sortedByTimelineFrame.length; i++) {
-              const candidate = sortedByTimelineFrame[i];
-              if ((candidate as any).timeline_frame !== originalTimelineFrame) {
-                nextImageInTimeline = candidate;
-                break;
+        const sortedByTimelineFrame = images
+          .filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined)
+          .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+        
+        const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === genToDuplicate.id || img.generation_id === genToDuplicate.id);
+        
+        let nextImageInTimeline = null;
+        for (let i = originalIndex + 1; i < sortedByTimelineFrame.length; i++) {
+          const candidate = sortedByTimelineFrame[i];
+          if (candidate.timeline_frame !== originalTimelineFrame) {
+            nextImageInTimeline = candidate;
+            break;
+          }
+        }
+
+        const nextFrame = nextImageInTimeline 
+          ? nextImageInTimeline.timeline_frame
+          : (originalTimelineFrame + 60);
+        
+        const duplicateTimelineFrame = Math.floor((originalTimelineFrame + nextFrame) / 2);
+
+        // Create optimistic item matching the EXACT structure returned by phase1Query
+        // This ensures compatibility with useAllShotGenerations merge logic
+        const tempId = `temp-${Date.now()}-${Math.random()}`;
+        return {
+          ...genToDuplicate,
+          id: tempId,  // Use temp ID for the generation
+          shotImageEntryId: tempId,  // Same temp ID for shot_generation entry
+          shot_generation_id: tempId,
+          timeline_frame: duplicateTimelineFrame,
+          // Ensure compatibility with phase1 query structure
+          location: genToDuplicate.location || genToDuplicate.imageUrl,
+          thumbnail_url: genToDuplicate.thumbnail_url || genToDuplicate.thumbUrl,
+          imageUrl: genToDuplicate.imageUrl || genToDuplicate.location,
+          thumbUrl: genToDuplicate.thumbUrl || genToDuplicate.thumbnail_url,
+          // Mark as optimistic so UI can show loading state if needed
+          _optimistic: true  // Use _ prefix to avoid conflicts
+        };
+      };
+
+      // Optimistically update 'shot-generations-fast' (Timeline)
+      if (previousFastGens) {
+        const optimisticItem = createOptimisticDuplicate(previousFastGens);
+        if (optimisticItem) {
+          const updatedGens = [...previousFastGens, optimisticItem];
+          console.log('[DUPLICATE_OPTIMISTIC] ✨ Created optimistic item for fast cache:', {
+            optimisticId: optimisticItem.id?.substring(0, 8),
+            optimisticShotImageEntryId: optimisticItem.shotImageEntryId?.substring(0, 8),
+            timeline_frame: optimisticItem.timeline_frame,
+            previousCount: previousFastGens.length,
+            newCount: updatedGens.length
+          });
+          queryClient.setQueryData(['shot-generations-fast', shot_id], updatedGens);
+          console.log('[DUPLICATE_OPTIMISTIC] 💾 Updated shot-generations-fast cache');
+        } else {
+          console.warn('[DUPLICATE_OPTIMISTIC] ⚠️ Failed to create optimistic item for fast cache');
+        }
+      } else {
+        console.warn('[DUPLICATE_OPTIMISTIC] ⚠️ No previousFastGens available for optimistic update');
+      }
+
+      // Optimistically update 'shots' (Sidebar/Context)
+      // CRITICAL: Update ALL cache key variants used by useListShots (with different maxImagesPerShot)
+      const shotsCacheKeys = [
+        ['shots', project_id],
+        ['shots', project_id, 0],
+        ['shots', project_id, 2],
+        ['shots', project_id, 5],
+      ];
+      
+      let updatedAnyShotsCache = false;
+      shotsCacheKeys.forEach(cacheKey => {
+        const cachedShots = queryClient.getQueryData<Shot[]>(cacheKey);
+        if (cachedShots) {
+          const updatedShots = cachedShots.map(shot => {
+            if (shot.id === shot_id) {
+              const optimisticItem = createOptimisticDuplicate(shot.images);
+              if (optimisticItem) {
+                console.log('[DUPLICATE_OPTIMISTIC] ✨ Created optimistic item for shots cache:', {
+                  cacheKey: JSON.stringify(cacheKey),
+                  optimisticId: optimisticItem.id?.substring(0, 8),
+                  previousImagesCount: shot.images.length,
+                  newImagesCount: shot.images.length + 1
+                });
+                return { ...shot, images: [...shot.images, optimisticItem] };
               }
             }
-            
-            console.log('[DUPLICATE_DEBUG] 🔍 OPTIMISTIC - NEXT IMAGE SEARCH:', {
-              originalIndex,
-              totalSortedImages: sortedByTimelineFrame.length,
-              hasNextImage: !!nextImageInTimeline,
-              nextImageInTimeline: nextImageInTimeline ? {
-                shotImageEntryId: nextImageInTimeline.shotImageEntryId.substring(0, 8),
-                id: nextImageInTimeline.id.substring(0, 8),
-                timeline_frame: (nextImageInTimeline as any).timeline_frame
-              } : null,
-              isLastImage: originalIndex === sortedByTimelineFrame.length - 1
-            });
-            
-            // Calculate timeline frame as midpoint
-            const nextFrame = nextImageInTimeline 
-              ? (nextImageInTimeline as any).timeline_frame  // Use the actual timeline_frame value
-              : (originalTimelineFrame + 60); // Default spacing if no next image
-            
-            // Ensure safe calculation with integer result
-            const calculatedMidpoint = Math.floor((originalTimelineFrame + nextFrame) / 2);
-            // Fallback to safe offset if calculation fails (shouldn't happen)
-            const duplicateTimelineFrame = isNaN(calculatedMidpoint) ? originalTimelineFrame + 30 : calculatedMidpoint;
-            
-            console.log('[DUPLICATE_DEBUG] 🧮 OPTIMISTIC - TIMELINE FRAME CALCULATION:', {
-              originalTimelineFrame,
-              nextFrame,
-              duplicateTimelineFrame,
-              calculationMethod: nextImageInTimeline ? 'midpoint_between_images' : 'default_spacing_after_last',
-              midpointFormula: `Math.floor((${originalTimelineFrame} + ${nextFrame}) / 2) = ${duplicateTimelineFrame}`
-            });
-
-            // Create a new shot generation entry with timeline_frame
-            const duplicatedImage = {
-              ...genToDuplicate,
-              shotImageEntryId: `temp-${Date.now()}`, // Temporary ID for optimistic update
-              shot_generation_id: `temp-${Date.now()}`,
-              timeline_frame: duplicateTimelineFrame
-            };
-            
-            console.log('[DUPLICATE_DEBUG] ✅ OPTIMISTIC - Created duplicate image:', {
-              originalTimelineFrame,
-              nextFrame,
-              duplicateTimelineFrame,
-              duplicatedImageId: duplicatedImage.shotImageEntryId,
-              nextImageInTimeline: nextImageInTimeline ? (nextImageInTimeline as any).timeline_frame : 'none'
-            });
-
-            // Simply add the duplicate to the images array - no position shifting needed
-            // The timeline will sort by timeline_frame automatically
-            const updatedImages = [...shot.images, duplicatedImage];
-            
-            console.log('[DUPLICATE] Added duplicate image', {
-              imageCount: updatedImages.length,
-              duplicateTimelineFrame
-            });
-
-            return { ...shot, images: updatedImages };
-          }
-          return shot;
-        });
-        
-        queryClient.setQueryData(['shots', project_id], updatedShots);
+            return shot;
+          });
+          queryClient.setQueryData(cacheKey, updatedShots);
+          updatedAnyShotsCache = true;
+          console.log('[DUPLICATE_OPTIMISTIC] 💾 Updated shots cache:', JSON.stringify(cacheKey));
+        }
+      });
+      
+      if (!updatedAnyShotsCache) {
+        console.warn('[DUPLICATE_OPTIMISTIC] ⚠️ No shots cache available for optimistic update (tried all variants)');
       }
       
-      return { previousShots };
+      console.log('[DUPLICATE_OPTIMISTIC] ✅ onMutate COMPLETE');
+      return { previousShots, previousFastGens, project_id, shot_id };
     },
     onError: (err, { project_id, silent }, context) => {
-      // Rollback on error
-      if (context?.previousShots) {
-        queryClient.setQueryData(['shots', project_id], context.previousShots);
+      console.error('[DUPLICATE_OPTIMISTIC] ❌ onError - Mutation failed, rolling back:', err);
+      
+      // Rollback ALL shots cache variants
+      const shotsCacheKeys = [
+        ['shots', project_id],
+        ['shots', project_id, 0],
+        ['shots', project_id, 2],
+        ['shots', project_id, 5],
+      ];
+      shotsCacheKeys.forEach(cacheKey => {
+        const cached = queryClient.getQueryData(cacheKey);
+        if (cached && context?.previousShots) {
+          console.log('[DUPLICATE_OPTIMISTIC] 🔙 Rolling back shots cache:', JSON.stringify(cacheKey));
+          queryClient.setQueryData(cacheKey, context.previousShots);
+        }
+      });
+      
+      if (context?.previousFastGens && context.shot_id) {
+        console.log('[DUPLICATE_OPTIMISTIC] 🔙 Rolling back shot-generations-fast cache');
+        queryClient.setQueryData(['shot-generations-fast', context.shot_id], context.previousFastGens);
       }
       console.error('Error duplicating image in shot:', err);
       if (!silent) {
         toast.error('Failed to duplicate image');
       }
     },
-    onSuccess: (_, { project_id, shot_id }) => {
-      // Invalidate to get fresh data
-      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-      // Also invalidate unpositioned-count in case duplication affects positions
-      queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
-
-      // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
-      console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after duplicate operation (100ms delay)');
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shot_id] }); // Also invalidate full list
-        // IMPORTANT: Also invalidate two-phase cache keys
-        queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
-        queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
-        console.log('[DataTrace] 🔄 Invalidated all caches after duplicate');
-      }, 100);
+    onSuccess: (data, { project_id, shot_id }) => {
+      console.log('[DUPLICATE_OPTIMISTIC] ✅ onSuccess - Refetching in background to sync with DB', {
+        shot_id: shot_id?.substring(0, 8),
+        project_id: project_id?.substring(0, 8)
+      });
+      
+      // Use refetchQueries instead of invalidateQueries to avoid clearing cache
+      // This keeps optimistic data visible while background sync happens
+      queryClient.refetchQueries({ queryKey: ['shots', project_id] });
+      queryClient.refetchQueries({ queryKey: ['unpositioned-count', shot_id] });
+      queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shot_id] });
+      queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shot_id] });
+      
+      console.log('[DUPLICATE_OPTIMISTIC] ✅ All background refetches queued');
     }
   });
 };
@@ -1516,33 +1665,53 @@ export const useRemoveImageFromShot = () => {
         timestamp: Date.now()
       });
 
-      // Use project_id from arguments if provided
-      if (!project_id) {
-        console.log('[DELETE:useRemoveImageFromShot] ⚠️ No project_id, skipping optimistic update');
-        return { previousShots: undefined, project_id: undefined };
+      // Always update timeline cache (shot-generations-fast) - works even without project_id
+      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shot_id] });
+      
+      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shot_id]);
+      if (previousFastGens) {
+        const updatedGens = previousFastGens.filter(img => img.shotImageEntryId !== shotImageEntryId);
+        queryClient.setQueryData(['shot-generations-fast', shot_id], updatedGens);
+        console.log('[DELETE:useRemoveImageFromShot] 💾 Updated shot-generations-fast cache (optimistic)');
       }
 
-      await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+      // Update project-level caches only if project_id is available
+      let previousShots;
+      if (project_id) {
+        await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
+        
+        previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
+        
+        console.log('[DELETE:useRemoveImageFromShot] 📝 Applying optimistic update to shots cache', {
+          previousShotsCount: previousShots?.length || 0,
+          previousFastGensCount: previousFastGens?.length || 0,
+        });
 
-      console.log('[DELETE:useRemoveImageFromShot] 📝 Applying optimistic update', {
-        previousShotsCount: previousShots?.length || 0,
-        timestamp: Date.now()
-      });
-
-      queryClient.setQueryData<Shot[]>(['shots', project_id], (oldShots = []) =>
-        oldShots.map(shot => {
-          if (shot.id === shot_id) {
-            return {
-              ...shot,
-              images: shot.images.filter(image => image.shotImageEntryId !== shotImageEntryId),
-            };
-          }
-          return shot;
-        })
-      );
+        // Optimistically update ALL 'shots' cache variants (Sidebar/Context)
+        const shotsCacheKeys = [
+          ['shots', project_id],
+          ['shots', project_id, 0],
+          ['shots', project_id, 2],
+          ['shots', project_id, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData<Shot[]>(cacheKey, (oldShots = []) =>
+            oldShots.map(shot => {
+              if (shot.id === shot_id) {
+                return {
+                  ...shot,
+                  images: shot.images.filter(image => image.shotImageEntryId !== shotImageEntryId),
+                };
+              }
+              return shot;
+            })
+          );
+        });
+      } else {
+        console.log('[DELETE:useRemoveImageFromShot] ⚠️ No project_id, skipping shots cache update (but timeline updated)');
+      }
       
-      return { previousShots, project_id };
+      return { previousShots, previousFastGens, project_id, shot_id };
     },
     onError: (err, args, context) => {
       console.error('[DELETE:useRemoveImageFromShot] ❌ STEP 5: onError - Mutation failed!', {
@@ -1557,53 +1726,43 @@ export const useRemoveImageFromShot = () => {
         timestamp: Date.now()
       });
       if (context?.previousShots && context.project_id) {
-        console.log('[DELETE:useRemoveImageFromShot] 🔙 Reverting optimistic update');
-        queryClient.setQueryData<Shot[]>(['shots', context.project_id], context.previousShots);
+        // Rollback ALL cache variants
+        const shotsCacheKeys = [
+          ['shots', context.project_id],
+          ['shots', context.project_id, 0],
+          ['shots', context.project_id, 2],
+          ['shots', context.project_id, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          console.log('[DELETE:useRemoveImageFromShot] 🔙 Reverting optimistic update (shots):', JSON.stringify(cacheKey));
+          queryClient.setQueryData<Shot[]>(cacheKey, context.previousShots);
+        });
+      }
+      if (context?.previousFastGens && context.shot_id) {
+        console.log('[DELETE:useRemoveImageFromShot] 🔙 Reverting optimistic update (fast gens)');
+        queryClient.setQueryData(['shot-generations-fast', context.shot_id], context.previousFastGens);
       }
       toast.error(`Failed to remove image: ${err.message}`);
     },
-    onSettled: (data, error, variables) => {
-      console.log('[DELETE:useRemoveImageFromShot] 🏁 STEP 6: onSettled - Finalizing', {
-        success: !error,
-        error: error?.message,
+    onSuccess: (data, variables) => {
+      console.log('[DELETE:useRemoveImageFromShot] ✅ onSuccess - Refetching in background', {
         shot_id: variables.shot_id?.substring(0, 8),
         shotImageEntryId: variables.shotImageEntryId?.substring(0, 8),
         project_id: variables.project_id?.substring(0, 8),
         timestamp: Date.now()
       });
 
-      // Use project_id from variables
       const project_id = variables.project_id;
       
       if (project_id) {
-        console.log('[DELETE:useRemoveImageFromShot] 🔄 Invalidating queries immediately', {
-          project_id: project_id.substring(0, 8),
-          shot_id: variables.shot_id.substring(0, 8),
-          timestamp: Date.now()
-        });
-
-        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        // Also invalidate unified generations cache so GenerationsPane updates immediately
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
-        // Ensure unpositioned-count updates after deletion
-        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
-
-        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
-        console.log('[DELETE:useRemoveImageFromShot] ⏱️ Scheduling shot-specific query invalidation (100ms delay)');
-        setTimeout(() => {
-          console.log('[DELETE:useRemoveImageFromShot] 🔄 Delayed invalidation executing', {
-            shot_id: variables.shot_id.substring(0, 8),
-            timestamp: Date.now()
-          });
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', variables.shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', variables.shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', variables.shot_id] });
-          console.log('[DELETE:useRemoveImageFromShot] ✅ DELETION COMPLETE!', {
-            timestamp: Date.now()
-          });
-        }, 100);
-      } else {
-        console.warn('[DELETE:useRemoveImageFromShot] ⚠️ No project_id, skipping query invalidation');
+        // Use refetchQueries to keep optimistic data visible during sync
+        queryClient.refetchQueries({ queryKey: ['shots', project_id] });
+        queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', project_id] });
+        queryClient.refetchQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
+        queryClient.refetchQueries({ queryKey: ['shot-generations-fast', variables.shot_id] });
+        queryClient.refetchQueries({ queryKey: ['shot-generations-meta', variables.shot_id] });
+        
+        console.log('[DELETE:useRemoveImageFromShot] ✅ All background refetches queued');
       }
     },
   });

@@ -13,7 +13,7 @@ export interface GenerationMetadata {
   auto_initialized?: boolean;
   drag_source?: string;
   drag_session_id?: string;
-  
+
   // Pair prompts (stored on the first item of each pair)
   pair_prompt?: string;
   pair_negative_prompt?: string;
@@ -44,6 +44,12 @@ export interface GenerationRow {
   upscaled_url?: string | null; // URL of upscaled version if available
   derivedCount?: number; // Number of generations based on this one
   based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
+  params?: any; // JSON parameters for the generation (prompt, settings, etc.)
+  created_at?: string; // DB column name
+  parent_generation_id?: string | null;
+  variant_name?: string;
+  is_child?: boolean;
+  child_order?: number | null;
 }
 
 /**

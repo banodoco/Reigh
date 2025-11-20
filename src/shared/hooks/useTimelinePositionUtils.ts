@@ -28,6 +28,12 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   
+  console.log('[SWAP_OPTIMISTIC] 🎯 useTimelinePositionUtils initialized:', {
+    shotId: shotId?.substring(0, 8),
+    projectId: projectId?.substring(0, 8),
+    generationsCount: generations.length
+  });
+  
   console.log('[TimelinePositionUtils] Hook state:', {
     shotId: shotId?.substring(0, 8),
     generationsCount: generations.length,
@@ -74,6 +80,38 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
   /**
    * Load positions from database (refresh)
    */
+  // Helper to sync shot_data in generations table (critical for Phase 1 fast loading stability)
+  const syncShotData = useCallback(async (generationId: string, targetShotId: string, frame: number) => {
+    try {
+      // 1. Fetch current shot_data
+      const { data: genData, error: fetchError } = await supabase
+        .from('generations')
+        .select('shot_data')
+        .eq('id', generationId)
+        .single();
+        
+      if (fetchError || !genData) {
+        return;
+      }
+
+      // 2. Update shot_data map
+      const currentShotData = (genData.shot_data as Record<string, number>) || {};
+      // Only update if changed
+      if (currentShotData[targetShotId] === frame) return;
+      
+      const newShotData = { ...currentShotData, [targetShotId]: frame };
+
+      // 3. Write back
+      await supabase
+        .from('generations')
+        .update({ shot_data: newShotData })
+        .eq('id', generationId);
+        
+    } catch (err) {
+      console.warn('[TimelinePositionUtils] Background sync of shot_data failed:', err);
+    }
+  }, []);
+
   const loadPositions = useCallback(async (opts?: { silent?: boolean; reason?: string }) => {
     if (!shotId) {
       console.warn('[TimelinePositionUtils] No shotId provided');
@@ -323,9 +361,13 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
 
     await Promise.all(updatePromises);
 
-    console.log('[DataTrace] ✅ All distribution updates complete, invalidating caches');
-    await loadPositions({ silent: true, reason: 'midpoint_reorder' });
-  }, [shotId, shotGenerations, loadPositions]);
+    console.log('[DataTrace] ✅ All distribution updates complete, refetching in background');
+    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
+    if (projectId) {
+      queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+    }
+  }, [shotId, shotGenerations, loadPositions, queryClient, projectId]);
 
   /**
    * Update timeline frame for a single generation
@@ -372,10 +414,19 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     if (error) {
       throw error;
     }
+    
+    // Sync shot_data in background for fast loading stability (Phase 1)
+    if (shotGen.generation_id) {
+      syncShotData(shotGen.generation_id, shotId, frame);
+    }
 
-    // Invalidate caches
-    await loadPositions({ silent: true, reason: 'timeline_frame_update' });
-  }, [shotId, shotGenerations, loadPositions]);
+    // Refetch instead of invalidate to preserve data
+    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
+    if (projectId) {
+      queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+    }
+  }, [shotId, shotGenerations, loadPositions, queryClient, projectId, syncShotData]);
 
   /**
    * Batch exchange positions between generations
@@ -448,6 +499,10 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
           .eq('id', sgB.id)
           .eq('shot_id', shotId);
         
+        // Sync shot_data for fast loading (Phase 1)
+        if (sgA.generation_id) syncShotData(sgA.generation_id, shotId, frameB);
+        if (sgB.generation_id) syncShotData(sgB.generation_id, shotId, frameA);
+
         const [resA, resB] = await Promise.all([updateA, updateB]);
         
         if (resA.error) throw resA.error;
@@ -456,8 +511,14 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       
       await Promise.all(swapUpdates);
       
-      console.log('[TimelinePositionUtils] All swaps complete, invalidating caches');
-      await loadPositions({ silent: true, reason: 'batch_pair_swap' });
+      console.log('[TimelinePositionUtils] All swaps complete, refetching in background');
+      
+      // Use refetchQueries instead of invalidate to preserve data during sync
+      queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
+      if (projectId) {
+        queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+      }
       return;
     }
 
@@ -481,6 +542,11 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
         return;
       }
 
+      // Sync shot_data for fast loading (Phase 1)
+      if (shotGen.generation_id) {
+        syncShotData(shotGen.generation_id, shotId, newFrame);
+      }
+
       const { error } = await supabase
         .from('shot_generations')
         .update({ timeline_frame: newFrame })
@@ -495,9 +561,14 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
 
     await Promise.all(updates);
 
-    // Invalidate caches
-    await loadPositions({ silent: true, reason: 'batch_position_exchange' });
-  }, [shotId, shotGenerations, loadPositions]);
+    // Refetch instead of invalidate to preserve data
+    console.log('[TimelinePositionUtils] All absolute updates complete, refetching in background');
+    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
+    if (projectId) {
+      queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+    }
+  }, [shotId, shotGenerations, loadPositions, queryClient, projectId, syncShotData]);
 
   /**
    * Initialize timeline frames for unpositioned images
@@ -596,13 +667,17 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     }
 
     console.log('[PairPromptFlow] ✅ Supabase UPDATE SUCCESS');
-    console.log('[PairPromptFlow] 🔄 Invalidating query caches...');
+    console.log('[PairPromptFlow] 🔄 Refetching query caches in background...');
 
-    // Invalidate caches
-    await loadPositions({ silent: true, reason: 'pair_prompt_update' });
+    // Refetch instead of invalidate
+    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
+    if (projectId) {
+      queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+    }
     
-    console.log('[PairPromptFlow] ✅ Cache invalidation complete - UI should refresh with new data');
-  }, [shotId, shotGenerations, loadPositions]);
+    console.log('[PairPromptFlow] ✅ Refetch queued - UI should refresh with new data');
+  }, [shotId, shotGenerations, loadPositions, queryClient, projectId]);
 
   /**
    * Clear enhanced prompt for a generation
@@ -640,9 +715,13 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       throw error;
     }
 
-    console.log('[PairPromptFlow] ✅ Enhanced prompt cleared, invalidating caches...');
-    await loadPositions({ silent: true, reason: 'clear_enhanced_prompt' });
-    console.log('[PairPromptFlow] ✅ Cache invalidation complete');
+    console.log('[PairPromptFlow] ✅ Enhanced prompt cleared, refetching caches...');
+    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
+    if (projectId) {
+      queryClient.refetchQueries({ queryKey: ['shots', projectId] });
+    }
+    console.log('[PairPromptFlow] ✅ Refetch queued');
   }, [shotId, shotGenerations, loadPositions]);
 
   return {

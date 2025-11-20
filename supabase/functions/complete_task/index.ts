@@ -67,8 +67,8 @@ declare const Deno: any;
  * - 403 Forbidden if token invalid or user not authorized
  * - 404 Not found if file referenced in MODE 4 doesn't exist
  * - 500 Internal Server Error
- */ 
-serve(async (req)=>{
+ */
+serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", {
       status: 405
@@ -105,19 +105,19 @@ serve(async (req)=>{
       });
     }
 
-    const { 
-      task_id: bodyTaskId, 
-      file_data, 
-      filename: bodyFilename, 
-      first_frame_data, 
+    const {
+      task_id: bodyTaskId,
+      file_data,
+      filename: bodyFilename,
+      first_frame_data,
       first_frame_filename: bodyFirstFrameFilename,
       storage_path,  // MODE 3
       thumbnail_storage_path  // MODE 3
     } = body;
-    
+
     console.log(`[COMPLETE-TASK-DEBUG] Received JSON request with task_id: ${bodyTaskId}`);
     console.log(`[COMPLETE-TASK-DEBUG] Body keys: ${Object.keys(body)}`);
-    
+
     task_id = bodyTaskId;
 
     // Check if storage_path is provided (MODE 3: strict validation or MODE 4: relaxed)
@@ -125,20 +125,20 @@ serve(async (req)=>{
       if (!task_id) {
         return new Response("task_id required", { status: 400 });
       }
-      
+
       const pathParts = storage_path.split('/');
       const isMode3Format = pathParts.length >= 4 && pathParts[1] === 'tasks';
-      
+
       if (isMode3Format) {
         // MODE 3: Pre-signed URL upload with strict validation
         console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Pre-signed URL - file already uploaded to: ${storage_path}`);
-        
+
         // SECURITY: Validate that storage_path contains the correct task_id
         // Expected format: userId/tasks/{task_id}/filename or userId/tasks/{task_id}/thumbnails/filename
         const pathTaskId = pathParts[2];
         if (pathTaskId !== task_id) {
           console.log(`[COMPLETE-TASK-DEBUG] storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id}) - checking if orchestrator task`);
-          
+
           // EXCEPTION: Allow orchestrator tasks to reference other task outputs
           // Security is already enforced by:
           // 1. Task ownership verification (caller must own the task being completed)
@@ -151,21 +151,21 @@ serve(async (req)=>{
             return new Response("Server configuration error", { status: 500 });
           }
           const tempClient = createClient(supabaseUrl, serviceKey);
-          
+
           const { data: currentTask, error: taskFetchError } = await tempClient
             .from('tasks')
             .select('task_type')
             .eq('id', task_id)
             .single();
-          
+
           if (taskFetchError) {
             console.error(`[COMPLETE-TASK-DEBUG] Error fetching task for validation: ${taskFetchError.message}`);
             return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
           }
-          
+
           // Check if this is an orchestrator task
           const isOrchestrator = currentTask?.task_type?.includes('orchestrator');
-          
+
           if (isOrchestrator) {
             console.log(`[COMPLETE-TASK-DEBUG] ✅ Orchestrator task ${task_id} referencing task ${pathTaskId} output - allowing (will verify file exists)`);
             // Allow orchestrator tasks to reference other task outputs
@@ -177,7 +177,7 @@ serve(async (req)=>{
         } else {
           console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
         }
-        
+
         // Validate thumbnail path if provided
         if (thumbnail_storage_path) {
           const thumbParts = thumbnail_storage_path.split('/');
@@ -195,18 +195,18 @@ serve(async (req)=>{
               return new Response("Server configuration error", { status: 500 });
             }
             const tempClient = createClient(supabaseUrl, serviceKey);
-            
+
             const { data: taskForThumb, error: taskFetchError } = await tempClient
               .from('tasks')
               .select('task_type')
               .eq('id', task_id)
               .single();
-            
+
             if (taskFetchError) {
               console.error(`[COMPLETE-TASK-DEBUG] Error fetching task for thumbnail validation: ${taskFetchError.message}`);
               return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
             }
-            
+
             const isOrchestrator = taskForThumb?.task_type?.includes('orchestrator');
             if (isOrchestrator) {
               console.log(`[COMPLETE-TASK-DEBUG] ✅ Orchestrator task ${task_id} referencing thumbnail from task ${thumbTaskId} - allowing`);
@@ -220,27 +220,27 @@ serve(async (req)=>{
         // MODE 4: Reference existing storage path (relaxed validation for orchestrator completion)
         // Used when orchestrator task needs to reference a file uploaded by its child task
         console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Reference existing storage path (orchestrator completion): ${storage_path}`);
-        
+
         // Basic validation: ensure path has at least userId/filename structure
         if (pathParts.length < 2) {
           return new Response("Invalid storage_path format. Must be at least userId/filename", { status: 400 });
         }
-        
+
         // File verification will happen after supabaseAdmin client is created
         console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Will verify file exists after client initialization`);
       }
-      
+
       storagePathProvided = storage_path;
       thumbnailPathProvided = thumbnail_storage_path;
-      
+
       // Extract filename from storage path
       filename = pathParts[pathParts.length - 1];
-      
+
       // Skip to authorization - no file upload needed
     } else {
       // MODE 1: Legacy base64 upload
       console.log(`[COMPLETE-TASK-DEBUG] MODE 1: Processing JSON request with base64 data`);
-      
+
       if (!bodyTaskId || !file_data || !bodyFilename) {
         return new Response("task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)", {
           status: 400
@@ -265,7 +265,7 @@ serve(async (req)=>{
       // Decode base64 file data
       try {
         console.log(`[COMPLETE-TASK-DEBUG] Decoding base64 file data (length: ${file_data.length} chars)`);
-        const fileBuffer = Uint8Array.from(atob(file_data), (c)=>c.charCodeAt(0));
+        const fileBuffer = Uint8Array.from(atob(file_data), (c) => c.charCodeAt(0));
         fileUploadBody = fileBuffer;
         fileContentType = getContentType(filename);
         console.log(`[COMPLETE-TASK-DEBUG] Decoded file buffer size: ${fileBuffer.length} bytes`);
@@ -278,7 +278,7 @@ serve(async (req)=>{
       if (first_frame_data && bodyFirstFrameFilename) {
         try {
           console.log(`[COMPLETE-TASK-DEBUG] Decoding base64 thumbnail data`);
-          const thumbBuffer = Uint8Array.from(atob(first_frame_data), (c)=>c.charCodeAt(0));
+          const thumbBuffer = Uint8Array.from(atob(first_frame_data), (c) => c.charCodeAt(0));
           first_frame_filename = bodyFirstFrameFilename;
           firstFrameUploadBody = thumbBuffer;
           firstFrameContentType = getContentType(first_frame_filename);
@@ -294,7 +294,7 @@ serve(async (req)=>{
   // Convert task_id to string early to avoid UUID casting issues
   const taskIdString = String(task_id);
   console.log(`[COMPLETE-TASK-DEBUG] Converted task_id to string: ${taskIdString}`);
-  
+
   // Get environment variables
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -304,16 +304,16 @@ serve(async (req)=>{
       status: 500
     });
   }
-  
+
   // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-  
+
   // Authenticate request using shared utility
   const auth = await authenticateRequest(req, supabaseAdmin, "[COMPLETE-TASK-DEBUG]");
-  
+
   if (!auth.success) {
-    return new Response(auth.error || "Authentication failed", { 
-      status: auth.statusCode || 403 
+    return new Response(auth.error || "Authentication failed", {
+      status: auth.statusCode || 403
     });
   }
 
@@ -324,28 +324,28 @@ serve(async (req)=>{
     // Verify task ownership if user token
     if (!isServiceRole && callerId) {
       const ownershipResult = await verifyTaskOwnership(
-        supabaseAdmin, 
-        taskIdString, 
-        callerId, 
+        supabaseAdmin,
+        taskIdString,
+        callerId,
         "[COMPLETE-TASK-DEBUG]"
       );
-      
+
       if (!ownershipResult.success) {
-        return new Response(ownershipResult.error || "Forbidden", { 
-          status: ownershipResult.statusCode || 403 
+        return new Response(ownershipResult.error || "Forbidden", {
+          status: ownershipResult.statusCode || 403
         });
       }
     }
-    
+
     // 4.5) MODE 4: Verify referenced file exists (if MODE 4 storage path provided)
     if (storagePathProvided) {
       const pathParts = storagePathProvided.split('/');
       const isMode3Format = pathParts.length >= 4 && pathParts[1] === 'tasks';
-      
+
       if (!isMode3Format) {
         // MODE 4: Verify file exists in storage
         console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Verifying referenced file exists: ${storagePathProvided}`);
-        
+
         try {
           const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(storagePathProvided);
           if (!urlData?.publicUrl) {
@@ -359,16 +359,16 @@ serve(async (req)=>{
         }
       }
     }
-    
+
     // 5) Prepare for storage operations
     let publicUrl: string;
     let objectPath: string;
-    
+
     // MODE 3: File already uploaded via pre-signed URL
     if (storagePathProvided) {
       console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Using pre-uploaded file at ${storagePathProvided}`);
       objectPath = storagePathProvided;
-      
+
       // Just get the public URL - file is already in storage
       const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
       publicUrl = urlData.publicUrl;
@@ -377,48 +377,48 @@ serve(async (req)=>{
       // MODE 1 & 2: Need to upload file
       const effectiveContentType = fileContentType || getContentType(filename);
       console.log(`[COMPLETE-TASK-DEBUG] Upload body ready. filename=${filename}, contentType=${effectiveContentType}`);
-      
-    // 6) Determine the storage path
-    let userId;
-    if (isServiceRole) {
+
+      // 6) Determine the storage path
+      let userId;
+      if (isServiceRole) {
         // For service role, look up task owner using shared utility
         const taskUserResult = await getTaskUserId(supabaseAdmin, taskIdString, "[COMPLETE-TASK-DEBUG]");
-        
+
         if (taskUserResult.error) {
-          return new Response(taskUserResult.error, { 
-            status: taskUserResult.statusCode || 404 
+          return new Response(taskUserResult.error, {
+            status: taskUserResult.statusCode || 404
           });
         }
-        
+
         userId = taskUserResult.userId;
         console.log(`[COMPLETE-TASK-DEBUG] Service role storing file for task ${taskIdString} in user ${userId}'s folder`);
-    } else {
-      // For user tokens, use the authenticated user's ID
-      userId = callerId;
-    }
+      } else {
+        // For user tokens, use the authenticated user's ID
+        userId = callerId;
+      }
       objectPath = `${userId}/${filename}`;
-      
-    // 7) Upload to Supabase Storage
+
+      // 7) Upload to Supabase Storage
       console.log(`[COMPLETE-TASK-DEBUG] Uploading to storage: ${objectPath}`);
       const { data: uploadData, error: uploadError } = await supabaseAdmin.storage.from('image_uploads').upload(objectPath, fileUploadBody as any, {
         contentType: effectiveContentType,
-      upsert: true
-    });
-    if (uploadError) {
-      console.error("Storage upload error:", uploadError);
-      return new Response(`Storage upload failed: ${uploadError.message}`, {
-        status: 500
+        upsert: true
       });
-    }
-      
-    // 8) Get the public URL
-    const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        return new Response(`Storage upload failed: ${uploadError.message}`, {
+          status: 500
+        });
+      }
+
+      // 8) Get the public URL
+      const { data: urlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(objectPath);
       publicUrl = urlData.publicUrl;
       console.log(`[COMPLETE-TASK-DEBUG] Upload successful: ${publicUrl}`);
     }
     // 8.1) Handle thumbnail
     let thumbnailUrl: string | null = null;
-    
+
     // MODE 3: Thumbnail already uploaded
     if (thumbnailPathProvided) {
       console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Using pre-uploaded thumbnail at ${thumbnailPathProvided}`);
@@ -439,7 +439,7 @@ serve(async (req)=>{
           const pathParts = objectPath.split('/');
           userId = pathParts[0];
         }
-        
+
         // Create thumbnail path
         const thumbnailPath = `${userId}/thumbnails/${first_frame_filename}`;
         // Upload thumbnail to storage (buffer already prepared earlier)
@@ -449,7 +449,7 @@ serve(async (req)=>{
         });
         if (thumbnailUploadError) {
           console.error("Thumbnail upload error:", thumbnailUploadError);
-        // Don't fail the main upload, just log the error
+          // Don't fail the main upload, just log the error
         } else {
           // Get the public URL for the thumbnail
           const { data: thumbnailUrlData } = supabaseAdmin.storage.from('image_uploads').getPublicUrl(thumbnailPath);
@@ -458,7 +458,7 @@ serve(async (req)=>{
         }
       } catch (thumbnailError) {
         console.error("Error processing thumbnail:", thumbnailError);
-      // Don't fail the main upload, just log the error
+        // Don't fail the main upload, just log the error
       }
     }
     // 8.2) If no thumbnail provided and this is an image, auto-generate a thumbnail (1/3 size)
@@ -555,22 +555,22 @@ serve(async (req)=>{
 
         const taskTypeInfo = currentTask.task_types;
         const toolType = taskTypeInfo?.tool_type;
-        
+
         console.log(`[COMPLETE-TASK-DEBUG] Task type: ${currentTask.task_type}, tool_type: ${toolType}`);
 
         // Extract shot_id based on tool_type from task_types table
         if (toolType === 'travel-between-images') {
           // For travel-between-images tasks, try multiple possible locations
           extractedShotId = currentTask.params?.originalParams?.orchestrator_details?.shot_id ||
-                            currentTask.params?.orchestrator_details?.shot_id ||
-                            currentTask.params?.full_orchestrator_payload?.shot_id;
+            currentTask.params?.orchestrator_details?.shot_id ||
+            currentTask.params?.full_orchestrator_payload?.shot_id;
         } else if (toolType === 'image-generation') {
           // For image generation tasks, shot_id is typically at top level
           extractedShotId = currentTask.params?.shot_id;
         } else {
           // Fallback for other task types - try common locations
           extractedShotId = currentTask.params?.shot_id ||
-                            currentTask.params?.orchestrator_details?.shot_id;
+            currentTask.params?.orchestrator_details?.shot_id;
         }
         // If there's a shot_id, validate it exists
         if (extractedShotId) {
@@ -646,7 +646,7 @@ serve(async (req)=>{
         if (thumbnailUrl) {
           console.log(`[COMPLETE-TASK-DEBUG] Adding thumbnail_url to task parameters: ${thumbnailUrl}`);
           needsParamsUpdate = true;
-          
+
           // Handle thumbnail URL based on task type and existing parameter structure
           if (currentTask.task_type === 'travel_stitch') {
             // For travel_stitch tasks, add to full_orchestrator_payload.thumbnail_url
@@ -680,7 +680,7 @@ serve(async (req)=>{
           }).eq("id", taskIdString);
           if (paramsUpdateError) {
             console.error(`[COMPLETE-TASK-DEBUG] Failed to update task parameters:`, paramsUpdateError);
-          // Continue anyway - better to complete the task than fail entirely
+            // Continue anyway - better to complete the task than fail entirely
           } else if (thumbnailUrl) {
             console.log(`[COMPLETE-TASK-DEBUG] Successfully added thumbnail_url to task parameters`);
           }
@@ -688,7 +688,7 @@ serve(async (req)=>{
       }
     } catch (shotValidationError) {
       console.error(`[COMPLETE-TASK-DEBUG] Error during shot validation:`, shotValidationError);
-    // Continue anyway - don't fail task completion due to validation errors
+      // Continue anyway - don't fail task completion due to validation errors
     }
     // 8.6) Handle thumbnail URL if we couldn't update through the main parameter update flow
     if (thumbnailUrl) {
@@ -748,7 +748,7 @@ serve(async (req)=>{
         }
       } catch (thumbnailParamError) {
         console.error(`[COMPLETE-TASK-DEBUG] Error adding thumbnail to parameters:`, thumbnailParamError);
-      // Continue anyway - don't fail task completion
+        // Continue anyway - don't fail task completion
       }
     }
     // 9) Create generation FIRST (so realtime fires when generation is ready)
@@ -761,22 +761,25 @@ serve(async (req)=>{
         .select("id, task_type, project_id, params")
         .eq("id", taskIdString)
         .single();
-      
+
       if (taskError || !taskData) {
         console.error(`[GenMigration] Failed to fetch task:`, taskError);
         return;
       }
-      
-      // CRITICAL: Skip generation creation for sub-tasks (segments) - only orchestrators create generations
-      // Sub-tasks are identified by having orchestrator_task_id_ref in their params
+
+      // CRITICAL: Sub-tasks (segments) now create child generations, so we DO NOT skip them anymore.
+      // The createGenerationFromTask function handles the parent/child logic.
       const isSubTask = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
       if (isSubTask) {
-        console.log(`[GenMigration] Task ${taskIdString} is a sub-task of orchestrator ${isSubTask} - skipping generation creation (parent will create it)`);
-      } else {
+        console.log(`[GenMigration] Task ${taskIdString} is a sub-task of orchestrator ${isSubTask} - proceeding to create child generation`);
+      }
+
+      // Proceed with generation creation logic for all tasks (including sub-tasks)
+      {
         // Not a sub-task - proceed with generation creation logic
         // Resolve tool_type with potential override from params
         const toolTypeInfo = await resolveToolType(supabaseAdmin, taskData.task_type, taskData.params);
-        
+
         if (!toolTypeInfo) {
           console.error(`[GenMigration] Failed to resolve tool_type for task ${taskIdString}`);
         } else {
@@ -791,173 +794,173 @@ serve(async (req)=>{
           };
 
           if (taskCategory === 'generation') {
-          console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
-          try {
-            await createGenerationFromTask(
-              supabaseAdmin,
-              taskIdString,
-              combinedTaskData,
-              publicUrl,
-              thumbnailUrl || undefined
-            );
-          } catch (genError) {
-            console.error(`[GenMigration] Error creating generation for task ${taskIdString}:`, genError);
-            // Fail the request to keep atomic semantics
-            return new Response(`Generation creation failed: ${genError.message}`, { status: 500 });
-          }
-        } else if (taskCategory === 'upscale') {
-          // Special handling for upscale tasks: update existing generation with upscaled_url
-          console.log(`[ImageUpscale] Processing upscale task ${taskIdString} (task_type: ${taskData.task_type})`);
-          
-          const generationId = taskData.params?.generation_id;
-          if (generationId) {
+            console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
             try {
-              console.log(`[ImageUpscale] Updating generation ${generationId} with upscaled_url: ${publicUrl}`);
-              const { error: updateError } = await supabaseAdmin
-                .from('generations')
-                .update({ upscaled_url: publicUrl })
-                .eq('id', generationId);
-              
-              if (updateError) {
-                console.error(`[ImageUpscale] Error updating generation ${generationId}:`, updateError);
-                // Don't fail the task - the upscaled image is still in output_location
-              } else {
-                console.log(`[ImageUpscale] Successfully updated generation ${generationId} with upscaled_url`);
-              }
-            } catch (updateErr) {
-              console.error(`[ImageUpscale] Exception updating generation:`, updateErr);
-              // Don't fail the task
-            }
-          } else {
-            console.log(`[ImageUpscale] No generation_id in task params, skipping generation update`);
-          }
-        } else if (taskCategory === 'inpaint') {
-          // Special handling for inpaint tasks: create new generation(s) based on source
-          console.log(`[ImageInpaint] Processing inpaint task ${taskIdString} (task_type: ${taskData.task_type})`);
-          console.log(`[ImageInpaint] Task params:`, JSON.stringify(taskData.params, null, 2));
-          
-          // Inpaint creates generation(s) as usual, but should link via based_on to source generation
-          const sourceGenerationId = extractBasedOn(taskData.params);
-          
-          if (sourceGenerationId) {
-            console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
-            
-            // Extract shot_id from task params
-            const shotIdForInpaint = taskData.params?.shot_id;
-            if (shotIdForInpaint) {
-              console.log(`[ImageInpaint] Shot ID found in task params: ${shotIdForInpaint}`);
-            }
-            
-            // Build inpaint generation params
-            const inpaintParams = {
-              ...taskData.params,
-              based_on: sourceGenerationId, // Link to source generation
-              tool_type: taskData.tool_type,
-              prompt: taskData.params?.prompt, // Inpaint prompt
-              num_generations: taskData.params?.num_generations || 1,
-              mask_url: taskData.params?.mask_url, // Reference to mask used
-            };
-            
-            // For inpaint tasks, always use 'image' as the type since inpainting always produces images
-            // even if tool_type override suggests video (tool_type is for tracking/UI, not content type)
-            console.log(`[ImageInpaint] Using 'image' type for inpaint generation (ignoring tool_type override if present)`);
-            
-            // Create generation record for inpaint result
-            const newGenerationId = crypto.randomUUID();
-            const generationRecord = {
-              id: newGenerationId,
-              tasks: [taskIdString],
-              params: inpaintParams,
-              location: publicUrl,
-              type: 'image', // Inpaint always produces images regardless of tool_type
-              project_id: taskData.project_id,
-              thumbnail_url: thumbnailUrl,
-              based_on: sourceGenerationId, // Track lineage
-              created_at: new Date().toISOString()
-            };
-            
-            try {
-              const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
-              console.log(`[ImageInpaint] Created inpaint generation ${newGeneration.id} based on ${sourceGenerationId}`);
-              
-              // Link to shot if shot_id is provided (unpositioned by default)
-              if (shotIdForInpaint) {
-                console.log(`[ImageInpaint] Linking inpaint generation ${newGeneration.id} to shot ${shotIdForInpaint} (unpositioned)`);
-                await linkGenerationToShot(supabaseAdmin, shotIdForInpaint, newGeneration.id, false);
-                console.log(`[ImageInpaint] Successfully linked generation to shot without position`);
-              }
+              await createGenerationFromTask(
+                supabaseAdmin,
+                taskIdString,
+                combinedTaskData,
+                publicUrl,
+                thumbnailUrl || undefined
+              );
             } catch (genError) {
-              console.error(`[ImageInpaint] Error creating inpaint generation:`, genError);
-              // Don't fail the task - the inpaint result is still in output_location
+              console.error(`[GenMigration] Error creating generation for task ${taskIdString}:`, genError);
+              // Fail the request to keep atomic semantics
+              return new Response(`Generation creation failed: ${genError.message}`, { status: 500 });
             }
-          } else {
-            console.log(`[ImageInpaint] No based_on in task params, treating as regular generation`);
-            // Fall back to regular generation creation
-            await createGenerationFromTask(
-              supabaseAdmin,
-              taskIdString,
-              combinedTaskData,
-              publicUrl,
-              thumbnailUrl || undefined
-            );
-          }
-        } else if (taskCategory === 'orchestration') {
-          // Special handling for orchestrator tasks: create generation for the final orchestrated output
-          console.log(`[Orchestrator] Processing orchestrator task ${taskIdString} (task_type: ${taskData.task_type})`);
-          
-          // Only create generation if there's an actual output (video/image file)
-          // Some orchestrators might just coordinate without producing their own output
-          if (publicUrl && contentType) {
-            console.log(`[Orchestrator] Creating generation for orchestrator output: ${publicUrl} (type: ${contentType})`);
-            
-            try {
-              // Extract shot information
-              const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
-              console.log(`[Orchestrator] Extracted shot_id: ${shotId}, add_in_position: ${addInPosition}`);
-              
+          } else if (taskCategory === 'upscale') {
+            // Special handling for upscale tasks: update existing generation with upscaled_url
+            console.log(`[ImageUpscale] Processing upscale task ${taskIdString} (task_type: ${taskData.task_type})`);
+
+            const generationId = taskData.params?.generation_id;
+            if (generationId) {
+              try {
+                console.log(`[ImageUpscale] Updating generation ${generationId} with upscaled_url: ${publicUrl}`);
+                const { error: updateError } = await supabaseAdmin
+                  .from('generations')
+                  .update({ upscaled_url: publicUrl })
+                  .eq('id', generationId);
+
+                if (updateError) {
+                  console.error(`[ImageUpscale] Error updating generation ${generationId}:`, updateError);
+                  // Don't fail the task - the upscaled image is still in output_location
+                } else {
+                  console.log(`[ImageUpscale] Successfully updated generation ${generationId} with upscaled_url`);
+                }
+              } catch (updateErr) {
+                console.error(`[ImageUpscale] Exception updating generation:`, updateErr);
+                // Don't fail the task
+              }
+            } else {
+              console.log(`[ImageUpscale] No generation_id in task params, skipping generation update`);
+            }
+          } else if (taskCategory === 'inpaint') {
+            // Special handling for inpaint tasks: create new generation(s) based on source
+            console.log(`[ImageInpaint] Processing inpaint task ${taskIdString} (task_type: ${taskData.task_type})`);
+            console.log(`[ImageInpaint] Task params:`, JSON.stringify(taskData.params, null, 2));
+
+            // Inpaint creates generation(s) as usual, but should link via based_on to source generation
+            const sourceGenerationId = extractBasedOn(taskData.params);
+
+            if (sourceGenerationId) {
+              console.log(`[ImageInpaint] Will create new generation(s) based on source: ${sourceGenerationId}`);
+
+              // Extract shot_id from task params
+              const shotIdForInpaint = taskData.params?.shot_id;
+              if (shotIdForInpaint) {
+                console.log(`[ImageInpaint] Shot ID found in task params: ${shotIdForInpaint}`);
+              }
+
+              // Build inpaint generation params
+              const inpaintParams = {
+                ...taskData.params,
+                based_on: sourceGenerationId, // Link to source generation
+                tool_type: taskData.tool_type,
+                prompt: taskData.params?.prompt, // Inpaint prompt
+                num_generations: taskData.params?.num_generations || 1,
+                mask_url: taskData.params?.mask_url, // Reference to mask used
+              };
+
+              // For inpaint tasks, always use 'image' as the type since inpainting always produces images
+              // even if tool_type override suggests video (tool_type is for tracking/UI, not content type)
+              console.log(`[ImageInpaint] Using 'image' type for inpaint generation (ignoring tool_type override if present)`);
+
+              // Create generation record for inpaint result
               const newGenerationId = crypto.randomUUID();
               const generationRecord = {
                 id: newGenerationId,
                 tasks: [taskIdString],
-                params: {
-                  ...taskData.params,
-                  tool_type: toolType,
-                  orchestrator_type: taskData.task_type, // Track which orchestrator created this
-                },
+                params: inpaintParams,
                 location: publicUrl,
-                type: contentType, // Use content_type from task_types (e.g., 'video' for join_clips_orchestrator)
+                type: 'image', // Inpaint always produces images regardless of tool_type
                 project_id: taskData.project_id,
                 thumbnail_url: thumbnailUrl,
-                name: taskData.params?.generation_name || taskData.params?.orchestrator_details?.generation_name,
+                based_on: sourceGenerationId, // Track lineage
                 created_at: new Date().toISOString()
               };
-              
-              const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
-              console.log(`[Orchestrator] Created generation ${newGeneration.id} for orchestrator task ${taskIdString}`);
-              
-              // Link to shot if applicable
-              if (shotId) {
-                await linkGenerationToShot(supabaseAdmin, shotId, newGeneration.id, addInPosition);
-                console.log(`[Orchestrator] Linked generation ${newGeneration.id} to shot ${shotId} (add_in_position: ${addInPosition})`);
+
+              try {
+                const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
+                console.log(`[ImageInpaint] Created inpaint generation ${newGeneration.id} based on ${sourceGenerationId}`);
+
+                // Link to shot if shot_id is provided (unpositioned by default)
+                if (shotIdForInpaint) {
+                  console.log(`[ImageInpaint] Linking inpaint generation ${newGeneration.id} to shot ${shotIdForInpaint} (unpositioned)`);
+                  await linkGenerationToShot(supabaseAdmin, shotIdForInpaint, newGeneration.id, false);
+                  console.log(`[ImageInpaint] Successfully linked generation to shot without position`);
+                }
+              } catch (genError) {
+                console.error(`[ImageInpaint] Error creating inpaint generation:`, genError);
+                // Don't fail the task - the inpaint result is still in output_location
               }
-              
-              // Mark task as having created a generation
-              await supabaseAdmin
-                .from('tasks')
-                .update({ generation_created: true })
-                .eq('id', taskIdString);
-              
-              console.log(`[Orchestrator] Marked task ${taskIdString} as generation_created=true`);
-            } catch (genError) {
-              console.error(`[Orchestrator] Error creating generation for orchestrator task ${taskIdString}:`, genError);
-              // Don't fail the task - the output is still in output_location
+            } else {
+              console.log(`[ImageInpaint] No based_on in task params, treating as regular generation`);
+              // Fall back to regular generation creation
+              await createGenerationFromTask(
+                supabaseAdmin,
+                taskIdString,
+                combinedTaskData,
+                publicUrl,
+                thumbnailUrl || undefined
+              );
+            }
+          } else if (taskCategory === 'orchestration') {
+            // Special handling for orchestrator tasks: create generation for the final orchestrated output
+            console.log(`[Orchestrator] Processing orchestrator task ${taskIdString} (task_type: ${taskData.task_type})`);
+
+            // Only create generation if there's an actual output (video/image file)
+            // Some orchestrators might just coordinate without producing their own output
+            if (publicUrl && contentType) {
+              console.log(`[Orchestrator] Creating generation for orchestrator output: ${publicUrl} (type: ${contentType})`);
+
+              try {
+                // Extract shot information
+                const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
+                console.log(`[Orchestrator] Extracted shot_id: ${shotId}, add_in_position: ${addInPosition}`);
+
+                const newGenerationId = crypto.randomUUID();
+                const generationRecord = {
+                  id: newGenerationId,
+                  tasks: [taskIdString],
+                  params: {
+                    ...taskData.params,
+                    tool_type: toolType,
+                    orchestrator_type: taskData.task_type, // Track which orchestrator created this
+                  },
+                  location: publicUrl,
+                  type: contentType, // Use content_type from task_types (e.g., 'video' for join_clips_orchestrator)
+                  project_id: taskData.project_id,
+                  thumbnail_url: thumbnailUrl,
+                  name: taskData.params?.generation_name || taskData.params?.orchestrator_details?.generation_name,
+                  created_at: new Date().toISOString()
+                };
+
+                const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
+                console.log(`[Orchestrator] Created generation ${newGeneration.id} for orchestrator task ${taskIdString}`);
+
+                // Link to shot if applicable
+                if (shotId) {
+                  await linkGenerationToShot(supabaseAdmin, shotId, newGeneration.id, addInPosition);
+                  console.log(`[Orchestrator] Linked generation ${newGeneration.id} to shot ${shotId} (add_in_position: ${addInPosition})`);
+                }
+
+                // Mark task as having created a generation
+                await supabaseAdmin
+                  .from('tasks')
+                  .update({ generation_created: true })
+                  .eq('id', taskIdString);
+
+                console.log(`[Orchestrator] Marked task ${taskIdString} as generation_created=true`);
+              } catch (genError) {
+                console.error(`[Orchestrator] Error creating generation for orchestrator task ${taskIdString}:`, genError);
+                // Don't fail the task - the output is still in output_location
+              }
+            } else {
+              console.log(`[Orchestrator] Skipping generation creation - no output file (orchestrator may only coordinate)`);
             }
           } else {
-            console.log(`[Orchestrator] Skipping generation creation - no output file (orchestrator may only coordinate)`);
+            console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
           }
-        } else {
-          console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
-        }
         }
       }
     } else {
@@ -992,7 +995,7 @@ serve(async (req)=>{
           .select("params")
           .eq("id", taskIdString)
           .single();
-        
+
         // Skip cost calculation for sub-tasks - parent orchestrator will be billed instead
         if (taskForCostCheck?.params?.orchestrator_task_id_ref) {
           console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a sub-task of orchestrator ${taskForCostCheck.params.orchestrator_task_id_ref}, skipping cost calculation`);
@@ -1022,7 +1025,7 @@ serve(async (req)=>{
         }
       } catch (costErr) {
         console.error("[COMPLETE-TASK-DEBUG] Error triggering cost calculation:", costErr);
-      // Do not fail the main request because of cost calc issues
+        // Do not fail the main request because of cost calc issues
       }
     }
     console.log(`[COMPLETE-TASK-DEBUG] Successfully completed task ${taskIdString} by ${isServiceRole ? 'service-role' : `user ${callerId}`}`);
@@ -1064,7 +1067,7 @@ function extractFromParams(params: any, fieldName: string, paths: string[][], lo
     for (const path of paths) {
       let value = params;
       let pathValid = true;
-      
+
       // Traverse the path
       for (const key of path) {
         if (value && typeof value === 'object' && key in value) {
@@ -1074,7 +1077,7 @@ function extractFromParams(params: any, fieldName: string, paths: string[][], lo
           break;
         }
       }
-      
+
       // If we successfully traversed the path and got a value
       if (pathValid && value !== null && value !== undefined) {
         const pathStr = path.join('.');
@@ -1082,7 +1085,7 @@ function extractFromParams(params: any, fieldName: string, paths: string[][], lo
         return String(value);
       }
     }
-    
+
     console.log(`[${logTag}] No ${fieldName} found in task params`);
     return null;
   } catch (error) {
@@ -1131,7 +1134,7 @@ function extractShotAndPosition(params: any): { shotId?: string, addInPosition: 
 
   // Extract add_in_position flag from multiple locations
   let addInPosition = false; // Default: unpositioned
-  
+
   const addInPositionValue = extractFromParams(
     params,
     'add_in_position',
@@ -1143,7 +1146,7 @@ function extractShotAndPosition(params: any): { shotId?: string, addInPosition: 
     ],
     'GenMigration'
   );
-  
+
   if (addInPositionValue !== null) {
     addInPosition = addInPositionValue === 'true' || addInPositionValue === '1';
     console.log(`[GenMigration] Extracted add_in_position: ${addInPosition}`);
@@ -1188,16 +1191,16 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
   const paramsToolType = taskParams?.tool_type;
   if (paramsToolType) {
     console.log(`[ToolTypeResolver] Found tool_type override in params: ${paramsToolType}`);
-    
+
     // Validate that the override tool_type is a known valid tool type
     const { data: validToolTypes } = await supabase
       .from("task_types")
       .select("tool_type")
       .not("tool_type", "is", null)
       .eq("is_active", true);
-    
+
     const validToolTypeSet = new Set(validToolTypes?.map(t => t.tool_type) || []);
-    
+
     if (validToolTypeSet.has(paramsToolType)) {
       console.log(`[ToolTypeResolver] Using tool_type override: ${paramsToolType} (was: ${finalToolType})`);
       console.log(`[ToolTypeResolver] Content type remains: ${finalContentType} (from base task_type, not override)`);
@@ -1220,20 +1223,20 @@ async function resolveToolType(supabase: any, taskType: string, taskParams: any)
  */
 function buildGenerationParams(baseParams: any, toolType: string, shotId?: string, thumbnailUrl?: string): any {
   let generationParams = { ...baseParams };
-  
+
   // Add tool_type to the params JSONB
   generationParams.tool_type = toolType;
-  
+
   // Add shot_id if present and valid
   if (shotId) {
     generationParams.shotId = shotId;
   }
-  
+
   // Add thumbnail_url to params if available
   if (thumbnailUrl) {
     generationParams.thumbnailUrl = thumbnailUrl;
   }
-  
+
   return generationParams;
 }
 
@@ -1248,12 +1251,12 @@ async function findExistingGeneration(supabase: any, taskId: string): Promise<an
       .select('*')
       .contains('tasks', JSON.stringify([taskId]))
       .single();
-    
+
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
       console.error(`[GenMigration] Error finding existing generation:`, error);
       return null;
     }
-    
+
     return data;
   } catch (error) {
     console.error(`[GenMigration] Exception finding existing generation:`, error);
@@ -1270,11 +1273,11 @@ async function insertGeneration(supabase: any, record: any): Promise<any> {
     .insert(record)
     .select()
     .single();
-  
+
   if (error) {
     throw new Error(`Failed to insert generation: ${error.message}`);
   }
-  
+
   return data;
 }
 
@@ -1286,10 +1289,10 @@ async function findSourceGenerationByImageUrl(supabase: any, imageUrl: string): 
   if (!imageUrl) {
     return null;
   }
-  
+
   try {
     console.log(`[BasedOn] Looking for source generation with image URL: ${imageUrl}`);
-    
+
     // Query generations by location (main image URL)
     const { data, error } = await supabase
       .from('generations')
@@ -1298,17 +1301,17 @@ async function findSourceGenerationByImageUrl(supabase: any, imageUrl: string): 
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    
+
     if (error) {
       console.error(`[BasedOn] Error finding source generation:`, error);
       return null;
     }
-    
+
     if (data) {
       console.log(`[BasedOn] Found source generation: ${data.id}`);
       return data.id;
     }
-    
+
     console.log(`[BasedOn] No source generation found for image URL`);
     return null;
   } catch (error) {
@@ -1327,7 +1330,7 @@ async function linkGenerationToShot(supabase: any, shotId: string, generationId:
       p_generation_id: generationId,
       p_with_position: addInPosition
     });
-    
+
     if (error) {
       console.error(`[ShotLink] Failed to link generation ${generationId} to shot ${shotId}:`, error);
       // Don't throw - match current DB behavior (log and continue)
@@ -1345,38 +1348,168 @@ async function linkGenerationToShot(supabase: any, shotId: string, generationId:
  * This replicates the logic from create_generation_on_task_complete() trigger
  */
 async function createGenerationFromTask(
-  supabase: any, 
-  taskId: string, 
-  taskData: any, 
-  publicUrl: string, 
+  supabase: any,
+  taskId: string,
+  taskData: any,
+  publicUrl: string,
   thumbnailUrl: string | null | undefined
 ): Promise<any> {
   console.log(`[GenMigration] Starting generation creation for task ${taskId}`);
-  
+
   try {
     // Check if generation already exists (idempotency)
     const existingGeneration = await findExistingGeneration(supabase, taskId);
     if (existingGeneration) {
       console.log(`[GenMigration] Generation already exists for task ${taskId}: ${existingGeneration.id}`);
-      
+
       // Ensure shot link if needed
       const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
       if (shotId) {
         await linkGenerationToShot(supabase, shotId, existingGeneration.id, addInPosition);
       }
-      
+
       // Ensure generation_created flag is set
       await supabase
         .from('tasks')
         .update({ generation_created: true })
         .eq('id', taskId);
-      
+
       return existingGeneration;
     }
-    
+
+    // Check if this is a sub-task (segment)
+    const orchestratorTaskId = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
+    let parentGenerationId: string | null = null;
+    let isChild = false;
+    let childOrder: number | null = null;
+
+    if (orchestratorTaskId) {
+      console.log(`[GenMigration] Task ${taskId} is a sub-task of orchestrator ${orchestratorTaskId}`);
+
+      // Get or create the parent generation (Lazy Parent Creation)
+      const parentGen = await getOrCreateParentGeneration(supabase, orchestratorTaskId, taskData.project_id);
+      if (parentGen) {
+        parentGenerationId = parentGen.id;
+        isChild = true;
+        console.log(`[GenMigration] Linked to parent generation ${parentGenerationId}`);
+
+        // Extract child order (segment index)
+        // Try multiple locations for index
+        const segmentIndex = taskData.params?.segment_index ??
+          taskData.params?.index ??
+          taskData.params?.sequence_index;
+
+        if (segmentIndex !== undefined && segmentIndex !== null) {
+          childOrder = parseInt(String(segmentIndex), 10);
+          console.log(`[GenMigration] Extracted child_order: ${childOrder}`);
+
+          // Extract child-specific params from orchestrator_details if available
+          const orchDetails = taskData.params?.orchestrator_details;
+          if (orchDetails && !isNaN(childOrder)) {
+            console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
+
+            // Create a copy of params to modify for this child generation
+            // We want to override generic arrays with specific values for this segment
+            const specificParams = { ...taskData.params };
+
+            // Helper to extract from array safely
+            const extractFromArray = (arr: any[], index: number) => {
+              if (Array.isArray(arr) && index >= 0 && index < arr.length) {
+                return arr[index];
+              }
+              return undefined;
+            };
+
+            // Extract specific prompt
+            const specificPrompt = extractFromArray(orchDetails.base_prompts_expanded, childOrder);
+            if (specificPrompt !== undefined) {
+              specificParams.prompt = specificPrompt;
+              console.log(`[GenMigration] Set child prompt: "${specificPrompt.substring(0, 20)}..."`);
+            }
+
+            // Extract specific negative prompt
+            const specificNegativePrompt = extractFromArray(orchDetails.negative_prompts_expanded, childOrder);
+            if (specificNegativePrompt !== undefined) {
+              specificParams.negative_prompt = specificNegativePrompt;
+            }
+
+            // Extract specific frames count
+            const specificFrames = extractFromArray(orchDetails.segment_frames_expanded, childOrder);
+            if (specificFrames !== undefined) {
+              specificParams.num_frames = specificFrames;
+            }
+
+            // Extract specific overlap
+            const specificOverlap = extractFromArray(orchDetails.frame_overlap_expanded, childOrder);
+            if (specificOverlap !== undefined) {
+              specificParams.frame_overlap = specificOverlap;
+            }
+
+            // Use these specific params for the generation
+            taskData.params = specificParams;
+          }
+        }
+      }
+    } else if (taskData.task_type === 'travel_stitch' && (taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id)) {
+      // SPECIAL CASE: travel_stitch IS the final output of the orchestrator.
+      // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
+      const orchId = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
+      console.log(`[GenMigration] travel_stitch task ${taskId} completing for orchestrator ${orchId} - updating parent generation`);
+
+      const parentGen = await getOrCreateParentGeneration(supabase, orchId, taskData.project_id);
+      if (parentGen) {
+        console.log(`[GenMigration] Updating parent generation ${parentGen.id} with final video URL`);
+
+        // Update the parent generation with the location (video URL) and thumbnail
+        const { error: updateError } = await supabase
+          .from('generations')
+          .update({
+            location: publicUrl,
+            thumbnail_url: thumbnailUrl,
+            // Ensure type is video (should already be, but just in case)
+            type: 'video'
+          })
+          .eq('id', parentGen.id);
+
+        if (updateError) {
+          console.error(`[GenMigration] Error updating parent generation with final video:`, updateError);
+        } else {
+          console.log(`[GenMigration] Successfully updated parent generation with final video`);
+        }
+
+        // We return the parent generation as the result
+        return parentGen;
+      }
+    } else if (taskData.task_types?.category === 'orchestration') {
+      // This IS the orchestrator task completing
+      // Check if a placeholder generation already exists (created by a child)
+      console.log(`[GenMigration] Orchestrator task ${taskId} completing - checking for existing placeholder generation`);
+
+      // We need to find a generation that lists this task as its creator (tasks array)
+      // BUT for the "Lazy Parent" pattern, the placeholder was created with tasks=[orchestratorTaskId]
+      // So findExistingGeneration should have already found it above IF we had already added this task ID to it.
+      // However, the placeholder is created with the orchestrator ID in the tasks array.
+      // So findExistingGeneration(taskId) SHOULD have found it if taskId == orchestratorTaskId.
+
+      // If we are here, it means findExistingGeneration didn't find it, OR it found it but we want to update it.
+      // Wait, if findExistingGeneration found it, we returned early above.
+      // So if we are here, either it doesn't exist, OR findExistingGeneration logic needs to be robust.
+
+      // Actually, if the orchestrator is completing, we want to UPDATE the placeholder if it exists,
+      // or CREATE it if it doesn't (no children finished yet? unlikely for travel, but possible).
+
+      // Let's try to find it again specifically by looking for the orchestrator ID in the tasks array
+      // (which findExistingGeneration does).
+
+      // If we are here, it means NO generation exists for this orchestrator task yet.
+      // This implies no children have finished yet (or they failed to create parent).
+      // So we proceed to create it as a new generation (which becomes the parent).
+      console.log(`[GenMigration] No existing generation found for orchestrator, creating new one`);
+    }
+
     // Extract shot information
     const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
-    
+
     // Validate shot exists if shotId is provided
     if (shotId) {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1389,52 +1522,52 @@ async function createGenerationFromTask(
           .select('id')
           .eq('id', shotId)
           .single();
-        
+
         if (shotError || !shotData) {
           console.log(`[GenMigration] Shot ${shotId} does not exist, proceeding without shot link`);
           // Continue without shot linking - don't fail the generation
         }
       }
     }
-    
+
     // Use content_type from taskData (already resolved from task_types table)
     const generationType = taskData.content_type || 'image'; // Default to image if not set
     console.log(`[GenMigration] Using content_type for generation: ${generationType}`);
-    
+
     // Build generation params
     const generationParams = buildGenerationParams(
-      taskData.params, 
-      taskData.tool_type, 
-      shotId, 
+      taskData.params,
+      taskData.tool_type,
+      shotId,
       thumbnailUrl || undefined
     );
-    
+
     // Generate new UUID for generation
     const newGenerationId = crypto.randomUUID();
-    
+
     // Extract generation_name from params
     // Check multiple locations: top-level, orchestrator_details, or full_orchestrator_payload
-    let generationName = taskData.params?.generation_name || 
-                        taskData.params?.orchestrator_details?.generation_name ||
-                        taskData.params?.full_orchestrator_payload?.generation_name ||
-                        undefined;
-    
+    let generationName = taskData.params?.generation_name ||
+      taskData.params?.orchestrator_details?.generation_name ||
+      taskData.params?.full_orchestrator_payload?.generation_name ||
+      undefined;
+
     console.log(`[GenMigration] Extracted generation_name: ${generationName}`);
-    
+
     // Find source generation for based_on tracking
     let basedOnGenerationId: string | null = null;
-    
+
     // PRIORITY 1: Check if based_on is provided in task params (searches multiple nested paths)
     basedOnGenerationId = extractBasedOn(taskData.params);
-    
+
     // PRIORITY 2: Fall back to looking up by image URL (for magic edit tasks without explicit based_on)
     if (!basedOnGenerationId) {
       const sourceImageUrl = taskData.params?.image; // Magic edit tasks have source image in params.image
-      
+
       if (sourceImageUrl) {
         console.log(`[BasedOn] Task has source image, looking for source generation: ${sourceImageUrl}`);
         basedOnGenerationId = await findSourceGenerationByImageUrl(supabase, sourceImageUrl);
-        
+
         if (basedOnGenerationId) {
           console.log(`[BasedOn] Will link new generation to source: ${basedOnGenerationId}`);
         } else {
@@ -1442,7 +1575,7 @@ async function createGenerationFromTask(
         }
       }
     }
-    
+
     // Insert generation record
     const generationRecord = {
       id: newGenerationId,
@@ -1454,29 +1587,120 @@ async function createGenerationFromTask(
       thumbnail_url: thumbnailUrl,
       name: generationName, // Add generation name to the record
       based_on: basedOnGenerationId, // Link to source generation if found
+
+      // Parent/Child fields
+      parent_generation_id: parentGenerationId,
+      is_child: isChild,
+      child_order: childOrder,
+
       created_at: new Date().toISOString()
     };
-    
+
     const newGeneration = await insertGeneration(supabase, generationRecord);
     console.log(`[GenMigration] Created generation ${newGeneration.id} for task ${taskId}`);
-    
+
     // Link to shot if applicable
-    if (shotId) {
+    // NOTE: For child generations, we typically DON'T link them to the shot directly if the parent is linked
+    // But the user might want them to appear in the shot's generation list?
+    // Usually, only the parent (final video) is the "shot generation".
+    // The children are just details of that parent.
+    // So if isChild is true, we might SKIP linking to shot, OR link it but maybe the UI handles it.
+    // For now, we'll link it if shotId is present, but maybe we should check logic.
+    // If the parent is linked, the children are accessible via the parent.
+    // Linking children to the shot might clutter the shot's generation list.
+    // Let's SKIP linking to shot if it is a child generation.
+    if (shotId && !isChild) {
       await linkGenerationToShot(supabase, shotId, newGeneration.id, addInPosition);
+    } else if (shotId && isChild) {
+      console.log(`[GenMigration] Skipping direct shot link for child generation ${newGeneration.id} (parent will be linked)`);
     }
-    
+
     // Mark task as having created a generation
     await supabase
       .from('tasks')
       .update({ generation_created: true })
       .eq('id', taskId);
-    
+
     console.log(`[GenMigration] Successfully completed generation creation for task ${taskId}`);
     return newGeneration;
-    
+
   } catch (error) {
     console.error(`[GenMigration] Error creating generation for task ${taskId}:`, error);
     throw error;
+  }
+}
+
+/**
+ * Get existing parent generation or create a placeholder
+ * This implements the "Lazy Parent Creation" pattern
+ */
+async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: string, projectId: string): Promise<any> {
+  try {
+    // 1. Try to find existing generation for this orchestrator task
+    const existing = await findExistingGeneration(supabase, orchestratorTaskId);
+    if (existing) {
+      return existing;
+    }
+
+    console.log(`[GenMigration] Creating placeholder parent generation for orchestrator ${orchestratorTaskId}`);
+
+    // 2. Create placeholder parent
+    // We need to fetch orchestrator task details to get correct params/type if possible,
+    // but we might not have access to it easily or it might be expensive.
+    // For now, create a minimal placeholder.
+
+    // Try to fetch orchestrator task to get better metadata
+    const { data: orchTask } = await supabase
+      .from('tasks')
+      .select('task_type, params')
+      .eq('id', orchestratorTaskId)
+      .single();
+
+    const generationType = 'video'; // Orchestrators usually produce video (travel, etc)
+    // If we could look up task_type -> content_type that would be better, but 'video' is safe for now for travel.
+
+    const newId = crypto.randomUUID();
+    const placeholderRecord = {
+      id: newId,
+      tasks: [orchestratorTaskId],
+      project_id: projectId,
+      type: generationType,
+      is_child: false,
+      // Mark as placeholder? We don't have a specific flag, but location is null.
+      location: null,
+      created_at: new Date().toISOString(),
+      params: orchTask?.params || {}
+    };
+
+    const { data: newParent, error } = await supabase
+      .from('generations')
+      .insert(placeholderRecord)
+      .select()
+      .single();
+
+    if (error) {
+      // Handle race condition: if insert failed because unique constraint (unlikely on UUID) 
+      // or if someone else created it in the meantime (if we had a unique constraint on tasks... which we don't really enforce strictly in DB but logic implies it)
+      console.error(`[GenMigration] Error creating placeholder parent:`, error);
+      // Try to find it again just in case of race condition
+      return await findExistingGeneration(supabase, orchestratorTaskId);
+    }
+
+    console.log(`[GenMigration] Created placeholder parent ${newId}`);
+
+    // Link parent to shot if orchestrator has shot_id
+    if (orchTask) {
+      const { shotId, addInPosition } = extractShotAndPosition(orchTask.params);
+      if (shotId) {
+        await linkGenerationToShot(supabase, shotId, newId, addInPosition);
+      }
+    }
+
+    return newParent;
+
+  } catch (error) {
+    console.error(`[GenMigration] Exception in getOrCreateParentGeneration:`, error);
+    return null;
   }
 }
 
@@ -1484,7 +1708,7 @@ async function createGenerationFromTask(
 
 function getContentType(filename) {
   const ext = filename.toLowerCase().split('.').pop();
-  switch(ext){
+  switch (ext) {
     case 'png':
       return 'image/png';
     case 'jpg':

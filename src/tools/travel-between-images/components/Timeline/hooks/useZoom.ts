@@ -111,24 +111,21 @@ export const useZoom = ({ fullMin, fullMax, fullRange, containerRef }: UseZoomPr
     
     if (coordinateSystemChanged) {
       // Only adjust if we're currently zoomed in and this isn't the initial mount
-      if (zoomLevel > 1 && prev.fullRange > 0 && (prev.fullMin !== 0 || prev.fullMax !== 0)) {
-        // Calculate the relative position of zoom center in the old coordinate system
-        const relativePosition = (zoomCenter - prev.fullMin) / prev.fullRange;
+      if (zoomLevel > 1 && prev.fullRange > 0) {
+        // FIX: Don't scale relatively! This causes drift when adding items.
+        // Instead, just clamp the current zoomCenter to the new bounds.
+        // This ensures if we're looking at Frame 50, we STAY looking at Frame 50 (unless it's now out of bounds).
         
-        // Map to the new coordinate system, preserving the relative viewing position
-        const newZoomCenter = fullMin + (relativePosition * fullRange);
+        const newZoomCenter = Math.max(fullMin, Math.min(fullMax, zoomCenter));
         
-        console.log('[ZoomPreserve] Coordinate system changed, adjusting zoom center:', {
-          oldSystem: { fullMin: prev.fullMin, fullMax: prev.fullMax, fullRange: prev.fullRange },
-          newSystem: { fullMin, fullMax, fullRange },
-          oldZoomCenter: zoomCenter,
-          newZoomCenter,
-          relativePosition: relativePosition.toFixed(3),
-          zoomLevel
-        });
-        
-        // Don't trigger isZooming flag since this is a coordinate system adjustment, not a user action
-        setZoomCenter(newZoomCenter);
+        if (newZoomCenter !== zoomCenter) {
+          console.log('[ZoomPreserve] Clamping zoom center to new bounds:', {
+            oldCenter: zoomCenter,
+            newCenter: newZoomCenter,
+            bounds: { min: fullMin, max: fullMax }
+          });
+          setZoomCenter(newZoomCenter);
+        }
       }
       
       // Update ref for next comparison

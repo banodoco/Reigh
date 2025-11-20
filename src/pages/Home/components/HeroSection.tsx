@@ -57,8 +57,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   assetsLoaded,
 }) => {
   const [mounted, setMounted] = useState(false);
-  const [barWidth, setBarWidth] = useState('100%');
+  const [barWidth, setBarWidth] = useState('0%');
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
+  const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
+
+  useEffect(() => {
+    if (assetsLoaded) {
+      setBarWidth('100%');
+    } else {
+      setBarWidth('30%');
+    }
+  }, [assetsLoaded]);
 
   useEffect(() => {
     // Trigger expansion shortly after mount
@@ -69,6 +78,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (mounted && assetsLoaded) {
+      // Trigger Banodoco burst after other elements have loaded
+      const timer = setTimeout(() => {
+        setBanodocoState('animating');
+        setTimeout(() => {
+          setBanodocoState('visible');
+        }, 600);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [mounted, assetsLoaded]);
 
   // Helper for staggering animations based on mount state
   const getFadeStyle = (delayIndex: number, forceWait: boolean = false) => ({
@@ -116,7 +138,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               className="absolute top-0 left-0 h-full bg-gradient-to-r from-wes-pink to-wes-vintage-gold rounded-full shadow-inner-vintage ease-out"
               style={{ 
                 width: barWidth, 
-                transition: 'width 0s' 
+                transition: 'width 0.8s cubic-bezier(0.22, 1, 0.36, 1)' 
               }}
             ></div>
           </div>
@@ -281,22 +303,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
 
               {/* Banodoco Logo */}
-              <div style={getFadeStyle(3, !assetsLoaded)}>
-                <div className="flex justify-center">
-                  <div className="mt-2">
-                    <a
-                      href="http://banodoco.ai/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block transition-all duration-700 ease-in-out"
-                    >
-                      <img 
-                        src="/banodoco-gold.png" 
-                        alt="Banodoco" 
-                        className="w-[34px] h-[34px] object-contain opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 transition-all duration-700 ease-in-out hover:saturate-150 hover:hue-rotate-[-15deg]" 
-                      />
-                    </a>
-                  </div>
+              <div className="flex justify-center">
+                <div className="mt-2">
+                  <a
+                    href="http://banodoco.ai/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <img 
+                      src="/banodoco-gold.png" 
+                      alt="Banodoco" 
+                      className={`w-[34px] h-[34px] object-contain 
+                        ${banodocoState === 'hidden' ? 'opacity-0' : ''}
+                        ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
+                        ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
+                      `} 
+                    />
+                  </a>
                 </div>
               </div>
             </div>
