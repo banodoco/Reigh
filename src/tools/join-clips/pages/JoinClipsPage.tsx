@@ -27,6 +27,7 @@ import { cn } from '@/shared/lib/utils';
 import { extractVideoPosterFrame, extractVideoFinalFrame } from '@/shared/utils/videoPosterExtractor';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
 import { generateUUID } from '@/shared/lib/taskCreation';
+import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import {
   DndContext,
   closestCenter,

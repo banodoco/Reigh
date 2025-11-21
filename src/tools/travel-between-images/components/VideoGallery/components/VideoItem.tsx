@@ -62,6 +62,7 @@ interface VideoItemProps {
   onShareCreated?: (videoId: string, shareSlug: string) => void;
   onViewSegments?: (video: GenerationRow) => void;
   projectId?: string | null;
+  hideActions?: boolean;
 }
 
 export const VideoItem = React.memo<VideoItemProps>(({
@@ -86,7 +87,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
   existingShareSlug,
   onShareCreated,
   onViewSegments,
-  projectId
+  projectId,
+  hideActions = false
 }) => {
   // Get task mapping for this video to enable Apply Settings button
   const { data: taskMapping } = useTaskFromUnifiedCache(video.id || '');
@@ -813,6 +815,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
     return video.imageUrl; // Final fallback
   })();
 
+  // NEW: Check if we should show collage (parent with no output but has segments)
+  const showCollage = !video.location && childGenerations.length > 0;
+
   // ALWAYS log to help diagnose autoplay issues
   console.log('[MobileAutoplayDebug]', {
     videoId: video.id?.substring(0, 8),
@@ -822,7 +827,9 @@ export const VideoItem = React.memo<VideoItemProps>(({
     hasThumbnail: !!video.thumbUrl,
     hasImageUrl: !!video.imageUrl,
     posterImageSrc: posterImageSrc ? 'exists' : 'NULL',
-    willRender: shouldUsePosterOnMobile ? (posterImageSrc ? 'STATIC_IMG' : 'PLACEHOLDER_ICON') : 'VIDEO_ELEMENT_WITH_SCRUBBING',
+    showCollage,
+    childCount: childGenerations.length,
+    willRender: showCollage ? 'COLLAGE' : (shouldUsePosterOnMobile ? (posterImageSrc ? 'STATIC_IMG' : 'PLACEHOLDER_ICON') : 'VIDEO_ELEMENT_WITH_SCRUBBING'),
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) : 'no-ua',
     timestamp: Date.now()
   });
@@ -855,7 +862,37 @@ export const VideoItem = React.memo<VideoItemProps>(({
         style={aspectRatioStyle}
       >
 
-        {shouldUsePosterOnMobile ? (
+        {showCollage ? (
+          // COLLAGE MODE: Show grid of segments for parents without output
+          <div
+            className="absolute inset-0 w-full h-full cursor-pointer bg-black/5 grid grid-cols-2 gap-0.5 overflow-hidden"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (onViewSegments) onViewSegments(video);
+            }}
+          >
+            {childGenerations.slice(0, 4).map((child, idx) => (
+              <div key={child.id || idx} className="relative w-full h-full overflow-hidden bg-black/20">
+                {(child.thumbUrl || child.imageUrl) && (
+                  <img
+                    src={getDisplayUrl(child.thumbUrl || child.imageUrl || '')}
+                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                    alt={`Segment ${idx + 1}`}
+                    loading="lazy"
+                  />
+                )}
+              </div>
+            ))}
+            {/* Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/5 transition-colors group-hover:bg-black/20">
+              <div className="bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-lg border border-white/10 transform transition-transform group-hover:scale-105">
+                <Layers className="w-4 h-4" />
+                View {childGenerations.length} Segments
+              </div>
+            </div>
+          </div>
+        ) : shouldUsePosterOnMobile ? (
           // MOBILE POSTER MODE: Show static image - clickable to open lightbox
           <div
             className="absolute inset-0 w-full h-full cursor-pointer bg-gray-100"
@@ -1055,39 +1092,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
               </TooltipProvider>
             )}
 
-            {/* Join Clips Button - always shown for parent generations without output */}
-            {shouldShowJoinButton && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className={`h-7 w-7 text-white rounded-full backdrop-blur-md border border-white/20 shadow-sm ${
-                        joinClipsSuccess
-                          ? 'bg-green-500 hover:bg-green-600'
-                          : canJoinClips
-                          ? 'bg-black/80 hover:bg-black'
-                          : 'bg-black/40 cursor-not-allowed'
-                      }`}
-                      onClick={handleJoinClipsClick}
-                      disabled={!canJoinClips || isJoiningClips || joinClipsSuccess}
-                    >
-                      {isJoiningClips ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : joinClipsSuccess ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        <Film className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{getJoinTooltipMessage()}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
 
             {/* Variant Name Display */}
             {video.variant_name && (
@@ -1226,160 +1230,162 @@ export const VideoItem = React.memo<VideoItemProps>(({
       </Dialog>
 
         {/* Action buttons – positioned directly on the video/poster container */}
-        <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
-          {/* Share Button */}
-          {taskMapping?.taskId && (
-            <TooltipProvider>
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleShare}
-                    disabled={isCreatingShare}
-                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${shareCopied
-                      ? 'bg-green-500 hover:bg-green-600'
-                      : 'bg-black/50 hover:bg-black/70'
-                      }`}
-                  >
-                    {isCreatingShare ? (
-                      <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
-                    ) : shareCopied ? (
-                      <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    ) : shareSlug ? (
-                      <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    ) : (
-                      <Share2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  <p>{shareCopied ? 'Link copied!' : shareSlug ? 'Copy share link' : 'Share this video'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+        {!hideActions && (
+          <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">
+            {/* Share Button */}
+            {taskMapping?.taskId && (
+              <TooltipProvider>
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleShare}
+                      disabled={isCreatingShare}
+                      className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${shareCopied
+                        ? 'bg-green-500 hover:bg-green-600'
+                        : 'bg-black/50 hover:bg-black/70'
+                        }`}
+                    >
+                      {isCreatingShare ? (
+                        <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
+                      ) : shareCopied ? (
+                        <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                      ) : shareSlug ? (
+                        <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                      ) : (
+                        <Share2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>{shareCopied ? 'Link copied!' : shareSlug ? 'Copy share link' : 'Share this video'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('[MobileButtonDebug] [InfoButton] Button clicked START:', {
-                isMobile,
-                videoId: video.id,
-                timestamp: Date.now()
-              });
-
-              if (isMobile) {
-                // On mobile, open the modal
-                console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
-                onMobileModalOpen(video);
-              } else {
-                // On desktop, open the lightbox
-                console.log('[MobileButtonDebug] [InfoButton] Desktop - opening lightbox');
-                onLightboxOpen(originalIndex);
-              }
-            }}
-            onMouseEnter={(e) => {
-              if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                console.log('[HoverIssue] 👆 Hover START on first item Info button:', {
-                  videoId: video.id?.substring(0, 8),
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('[MobileButtonDebug] [InfoButton] Button clicked START:', {
+                  isMobile,
+                  videoId: video.id,
                   timestamp: Date.now()
                 });
-              }
-              onHoverStart(video, e);
-            }}
-            onMouseLeave={() => {
-              if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                console.log('[HoverIssue] 👇 Hover END on first item Info button:', {
-                  videoId: video.id?.substring(0, 8),
-                  timestamp: Date.now()
-                });
-              }
-              onHoverEnd();
-            }}
-            className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-          >
-            <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-          </Button>
+
+                if (isMobile) {
+                  // On mobile, open the modal
+                  console.log('[MobileButtonDebug] [InfoButton] Setting modal state...');
+                  onMobileModalOpen(video);
+                } else {
+                  // On desktop, open the lightbox
+                  console.log('[MobileButtonDebug] [InfoButton] Desktop - opening lightbox');
+                  onLightboxOpen(originalIndex);
+                }
+              }}
+              onMouseEnter={(e) => {
+                if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+                  console.log('[HoverIssue] 👆 Hover START on first item Info button:', {
+                    videoId: video.id?.substring(0, 8),
+                    timestamp: Date.now()
+                  });
+                }
+                onHoverStart(video, e);
+              }}
+              onMouseLeave={() => {
+                if (process.env.NODE_ENV === 'development' && isFirstVideo) {
+                  console.log('[HoverIssue] 👇 Hover END on first item Info button:', {
+                    videoId: video.id?.substring(0, 8),
+                    timestamp: Date.now()
+                  });
+                }
+                onHoverEnd();
+              }}
+              className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+            >
+              <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            </Button>
 
 
 
-          {/* Apply Settings Button */}
-          {taskMapping?.taskId && (
-            <TooltipProvider>
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      console.log('[ApplySettings] Button clicked:', {
-                        videoId: video.id?.substring(0, 8),
-                        taskId: taskMapping.taskId,
-                        settingsApplied,
-                        onApplySettingsFromTaskType: typeof onApplySettingsFromTask,
-                        timestamp: Date.now()
-                      });
-                      if (taskMapping.taskId && !settingsApplied) {
-                        console.log('[ApplySettings] Calling onApplySettingsFromTask...');
-                        // Call with empty inputImages array - will be populated from task data on server side
-                        onApplySettingsFromTask(taskMapping.taskId, false, []);
-                        // Show success state
-                        setSettingsApplied(true);
-                        // Reset after 2 seconds
-                        setTimeout(() => {
-                          setSettingsApplied(false);
-                        }, 2000);
-                      } else {
-                        console.log('[ApplySettings] Click ignored:', {
-                          hasTaskId: !!taskMapping.taskId,
-                          settingsApplied
+            {/* Apply Settings Button */}
+            {taskMapping?.taskId && (
+              <TooltipProvider>
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[ApplySettings] Button clicked:', {
+                          videoId: video.id?.substring(0, 8),
+                          taskId: taskMapping.taskId,
+                          settingsApplied,
+                          onApplySettingsFromTaskType: typeof onApplySettingsFromTask,
+                          timestamp: Date.now()
                         });
-                      }
-                    }}
-                    disabled={settingsApplied}
-                    className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${settingsApplied
-                      ? 'bg-green-500 hover:bg-green-600'
-                      : 'bg-black/50 hover:bg-black/70'
-                      }`}
-                  >
-                    {settingsApplied ? (
-                      <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    ) : (
-                      <CornerDownLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  <p>{settingsApplied ? 'Settings applied!' : 'Apply settings from this video to the current shot'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
-                videoId: video.id,
-                deletingVideoId,
-                isDisabled: deletingVideoId === video.id,
-                timestamp: Date.now()
-              });
-              onDelete(video.id);
-              console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
-            }}
-            disabled={deletingVideoId === video.id}
-            className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
-            title="Delete video"
-          >
-            <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-          </Button>
-        </div>
+                        if (taskMapping.taskId && !settingsApplied) {
+                          console.log('[ApplySettings] Calling onApplySettingsFromTask...');
+                          // Call with empty inputImages array - will be populated from task data on server side
+                          onApplySettingsFromTask(taskMapping.taskId, false, []);
+                          // Show success state
+                          setSettingsApplied(true);
+                          // Reset after 2 seconds
+                          setTimeout(() => {
+                            setSettingsApplied(false);
+                          }, 2000);
+                        } else {
+                          console.log('[ApplySettings] Click ignored:', {
+                            hasTaskId: !!taskMapping.taskId,
+                            settingsApplied
+                          });
+                        }
+                      }}
+                      disabled={settingsApplied}
+                      className={`h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full text-white transition-all ${settingsApplied
+                        ? 'bg-green-500 hover:bg-green-600'
+                        : 'bg-black/50 hover:bg-black/70'
+                        }`}
+                    >
+                      {settingsApplied ? (
+                        <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                      ) : (
+                        <CornerDownLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>{settingsApplied ? 'Settings applied!' : 'Apply settings from this video to the current shot'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <Button
+              variant="destructive"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
+                  videoId: video.id,
+                  deletingVideoId,
+                  isDisabled: deletingVideoId === video.id,
+                  timestamp: Date.now()
+                });
+                onDelete(video.id);
+                console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
+              }}
+              disabled={deletingVideoId === video.id}
+              className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
+              title="Delete video"
+            >
+              <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
 

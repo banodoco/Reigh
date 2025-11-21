@@ -222,19 +222,11 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     // Clear existing timeout
     if (mouseMoveTimeoutRef.current) {
       clearTimeout(mouseMoveTimeoutRef.current);
+      mouseMoveTimeoutRef.current = null;
     }
 
-    // Set a new timeout to start playing after mouse stops moving
-    mouseMoveTimeoutRef.current = setTimeout(() => {
-      if (videoRef.current && isHoveringRef.current) {
-        // Start fade out of scrubber before video plays
-        setScrubberVisible(false);
-        
-        videoRef.current.play().catch(() => {
-          // Ignore play errors
-        });
-      }
-    }, 150); // Start playing 150ms after mouse stops moving
+    // Removed auto-play on stop hover as per user request
+    // The video will only scrub, not play automatically
   }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, preloadProp, src]);
 
   const handleMouseEnter = useCallback(() => {
@@ -327,7 +319,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     }
     if (videoRef.current) {
       videoRef.current.pause();
-      videoRef.current.currentTime = 0; // Reset to beginning
+      // Reset to beginning when mouse leaves
+      videoRef.current.currentTime = 0;
     }
   }, [isMobile, disableScrubbing, autoplayOnHover]);
 

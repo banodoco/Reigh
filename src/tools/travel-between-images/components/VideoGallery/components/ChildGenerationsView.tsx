@@ -8,13 +8,17 @@ import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
-import { ChevronLeft, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { Card, CardContent } from '@/shared/components/ui/card';
-
+import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
+import { useQueryClient } from '@tanstack/react-query';
+import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import MediaLightbox from '@/shared/components/MediaLightbox';
+import { useLoraManager, type LoraModel } from '@/shared/hooks/useLoraManager';
+import { useListPublicResources } from '@/shared/hooks/useResources';
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -101,8 +105,93 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const handleLightboxNext = () => setLightboxIndex((prev) => (prev !== null ? (prev + 1) % sortedChildren.length : null));
     const handleLightboxPrev = () => setLightboxIndex((prev) => (prev !== null ? (prev - 1 + sortedChildren.length) % sortedChildren.length : null));
 
+    // Join Clips State
+    const [isJoiningClips, setIsJoiningClips] = useState(false);
+    const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
+    // const [showJoinModal, setShowJoinModal] = useState(false); // Removed modal state
+    const [joinPrompt, setJoinPrompt] = useState('');
+    const [joinNegativePrompt, setJoinNegativePrompt] = useState('');
+    const [joinContextFrames, setJoinContextFrames] = useState(10);
+    const [joinGapFrames, setJoinGapFrames] = useState(33);
+    const [joinReplaceMode, setJoinReplaceMode] = useState(true);
+    const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
+    const queryClient = useQueryClient();
+
+    // Fetch available LoRAs
+    const publicLorasResult = useListPublicResources('lora');
+    const availableLoras = ((publicLorasResult.data || []) as any[]).map((resource: any) => resource.metadata || {}) as LoraModel[];
+
+    // Initialize LoRA manager
+    const loraManager = useLoraManager(availableLoras, {
+        projectId: projectId || undefined,
+        persistenceScope: 'project',
+        enableProjectPersistence: true,
+        persistenceKey: 'join-clips-segments',
+    });
+
+    const handleConfirmJoin = async () => {
+        if (!projectId || sortedChildren.length < 2) return;
+
+        setIsJoiningClips(true);
+
+        try {
+            const clips = sortedChildren.map((child, index) => ({
+                url: child.location || '',
+                name: `Segment ${index + 1}`,
+            })).filter(c => c.url);
+
+            // Convert selected LoRAs
+            const lorasForTask = loraManager.selectedLoras.map(lora => ({
+                path: lora.path,
+                strength: lora.strength,
+            }));
+
+            console.log('[JoinClips] Creating join task for segments:', {
+                clipCount: clips.length,
+                prompt: joinPrompt,
+                contextFrames: joinContextFrames,
+                gapFrames: joinGapFrames,
+                replaceMode: joinReplaceMode,
+                loras: lorasForTask.length
+            });
+
+            await createJoinClipsTask({
+                project_id: projectId,
+                clips,
+                prompt: joinPrompt,
+                negative_prompt: joinNegativePrompt,
+                context_frame_count: joinContextFrames,
+                gap_frame_count: joinGapFrames,
+                replace_mode: joinReplaceMode,
+                model: 'wan_2_2_vace_lightning_baseline_2_2_2',
+                num_inference_steps: 6,
+                guidance_scale: 3.0,
+                seed: -1,
+                ...(lorasForTask.length > 0 && { loras: lorasForTask }),
+            });
+
+            toast({
+                title: 'Join task created',
+                description: `Joining ${clips.length} segments into one video`,
+            });
+
+            setJoinClipsSuccess(true);
+            setTimeout(() => setJoinClipsSuccess(false), 3000);
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        } catch (error: any) {
+            console.error('[JoinClips] Error creating join task:', error);
+            toast({
+                title: 'Failed to create join task',
+                description: error.message || 'An error occurred',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsJoiningClips(false);
+        }
+    };
+
     return (
-        <div className="w-full min-h-screen bg-background">
+        <div className="w-full min-h-screen bg-background pb-20">
             {/* Header */}
             <div className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
                 <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-4">
@@ -164,6 +253,35 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Join Clips Section */}
+            {sortedChildren.length >= 2 && sortedChildren.some(c => c.location) && (
+                <div className="max-w-[1920px] mx-auto px-4 sm:px-6 pt-8 pb-20 mt-8">
+                    <Card className="p-6 sm:p-8 shadow-sm border bg-card/50 backdrop-blur-sm">
+                        <h2 className="text-2xl font-light tracking-tight mb-6">Join Segments</h2>
+                        
+                        <JoinClipsSettingsForm 
+                            gapFrames={joinGapFrames}
+                            setGapFrames={setJoinGapFrames}
+                            contextFrames={joinContextFrames}
+                            setContextFrames={setJoinContextFrames}
+                            replaceMode={joinReplaceMode}
+                            setReplaceMode={setJoinReplaceMode}
+                            prompt={joinPrompt}
+                            setPrompt={setJoinPrompt}
+                            negativePrompt={joinNegativePrompt}
+                            setNegativePrompt={setJoinNegativePrompt}
+                            availableLoras={availableLoras}
+                            projectId={projectId}
+                            loraPersistenceKey="join-clips-segments"
+                            onGenerate={handleConfirmJoin}
+                            isGenerating={isJoiningClips}
+                            generateSuccess={joinClipsSuccess}
+                            generateButtonText={`Generate Joined Video (${sortedChildren.length} Segments)`}
+                        />
+                    </Card>
+                </div>
+            )}
 
             {/* Lightbox */}
             {lightboxIndex !== null && sortedChildren[lightboxIndex] && (
@@ -341,9 +459,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
         <Card className="overflow-hidden flex flex-col">
             {/* Video Preview */}
             <div className="relative aspect-video bg-black group">
-                <div className="absolute top-2 left-2 z-10 bg-background/90 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium border">
-                    Segment {index + 1}
-                </div>
                 <VideoItem
                     video={child}
                     index={index}
@@ -362,6 +477,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                     selectedVideoForDetails={null}
                     showTaskDetailsModal={false}
                     onApplySettingsFromTask={() => { }}
+                    hideActions={true}
                 />
             </div>
 
