@@ -61,6 +61,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [barWidth, setBarWidth] = useState('0%');
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
   const [showUnderlineWave, setShowUnderlineWave] = useState(false);
+  const [minLoadTimePassed, setMinLoadTimePassed] = useState(false);
+
+  // Enforce minimum loading time
+  useEffect(() => {
+    const timer = setTimeout(() => setMinLoadTimePassed(true), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Master animation orchestrator
   useEffect(() => {
@@ -70,7 +77,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       return () => clearTimeout(timer);
     }
     
-    if (phase === 'loading' && assetsLoaded && barTransitionCompleted) {
+    if (phase === 'loading' && assetsLoaded && barTransitionCompleted && minLoadTimePassed) {
       // Bar has reached 100%, wait for it to settle
       const timer = setTimeout(() => setPhase('bar-complete'), 300);
       return () => clearTimeout(timer);
@@ -101,7 +108,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         clearTimeout(banodocoTimer);
       };
     }
-  }, [phase, assetsLoaded, barTransitionCompleted]);
+  }, [phase, assetsLoaded, barTransitionCompleted, minLoadTimePassed]);
 
   // Bar width management
   useEffect(() => {
@@ -112,13 +119,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   // Calculated to match the grid-template-rows expansion (1000ms ease-out)
   const getFadeStyle = (delayIndex: number, distance: number = 0, forceWait: boolean = false) => {
     const duration = '1000ms';
+    // Special case for subtitle (-60) and title (20) to make them slightly faster (0.8s)
+    const actualDuration = (distance === -60 || distance === 20) ? '800ms' : duration;
+    
     const delay = delayIndex * 0.1;
     const isRevealing = phase === 'content-revealing' || phase === 'complete';
     const isVisible = isRevealing && !forceWait;
     
     return {
       opacity: isVisible ? 1 : 0,
-      transition: `opacity ${duration} ease-out ${delay}s, transform ${duration} cubic-bezier(0.2, 0, 0.2, 1) ${delay}s`,
+      transition: `opacity ${actualDuration} ease-out ${delay}s, transform ${actualDuration} cubic-bezier(0.2, 0, 0.2, 1) ${delay}s`,
       transform: isVisible ? 'translateY(0)' : `translateY(${distance}px)`, 
       willChange: 'transform, opacity'
     };

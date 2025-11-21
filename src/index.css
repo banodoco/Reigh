@@ -1408,7 +1408,7 @@
   .sparkle-underline[data-state="open"]:hover::after {
     opacity: 0 !important;
   }
-
+   
   /* Wave animation for underlines on page load */
   @keyframes underlineWaveIn {
     0% {
