@@ -457,6 +457,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
   // Determine model name based on structure video presence
   let actualModelName = getModelName();
+  let modelType = 'i2v';
   
   // If there is a structure video, use VACE model
   if (structureVideoPath) {
@@ -465,6 +466,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     } else {
       actualModelName = 'wan_2_2_vace_lightning_baseline_2_2_2';
     }
+    modelType = 'vace';
     console.log('[Generation] Structure video present - using VACE model:', actualModelName);
   } else {
     // No structure video - use I2V model
@@ -473,6 +475,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     } else {
       actualModelName = 'wan_2_2_i2v_lightning_baseline_2_2_2';
     }
+    modelType = 'i2v';
     console.log('[Generation] No structure video - using I2V model:', actualModelName);
   }
   
@@ -540,6 +543,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // This prevents the backend from duplicating base_prompt into enhanced_prompts_expanded
     ...(hasValidEnhancedPrompts ? { enhanced_prompts: enhancedPromptsArray } : {}),
     model_name: actualModelName,
+    model_type: modelType,
     seed: steerableMotionSettings.seed,
     // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)
     ...(advancedMode ? {} : { steps: batchVideoSteps }),

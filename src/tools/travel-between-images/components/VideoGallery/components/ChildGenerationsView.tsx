@@ -42,7 +42,51 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
     );
 
-    const children = (data as any)?.items || [];
+    // Transform children to match GenerationRow format expected by VideoItem and SegmentCard
+    const children = React.useMemo(() => {
+        const items = (data as any)?.items || [];
+        return items.map((item: any) => ({
+            ...item,
+            // Map GeneratedImageWithMetadata format to GenerationRow format
+            location: item.url || item.location,
+            imageUrl: item.url || item.imageUrl,
+            params: item.metadata || item.params, // params are stored in metadata by transformer
+            created_at: item.createdAt || item.created_at,
+        }));
+    }, [data]);
+
+    // Log raw data to understand structure
+    React.useEffect(() => {
+        if (children.length > 0) {
+            const firstChild = children[0];
+            console.log('[SegmentCardPopulation] Transformed children data', {
+                hasData: !!data,
+                dataKeys: data ? Object.keys(data) : [],
+                itemsCount: children.length,
+                firstChild: {
+                    id: firstChild.id?.substring(0, 8),
+                    location: firstChild.location,
+                    imageUrl: firstChild.imageUrl,
+                    thumbUrl: firstChild.thumbUrl,
+                    hasParams: !!firstChild.params,
+                    paramsType: typeof firstChild.params,
+                    paramsIsString: typeof firstChild.params === 'string',
+                    paramsKeys: firstChild.params && typeof firstChild.params === 'object' ? Object.keys(firstChild.params) : [],
+                    paramsPreview: firstChild.params ? (typeof firstChild.params === 'string' ? firstChild.params.substring(0, 200) : JSON.stringify(firstChild.params).substring(0, 200)) : 'null',
+                    allKeys: Object.keys(firstChild)
+                },
+                timestamp: Date.now()
+            });
+        } else {
+            console.log('[SegmentCardPopulation] Transformed children data', {
+                hasData: !!data,
+                dataKeys: data ? Object.keys(data) : [],
+                itemsCount: 0,
+                firstChild: null,
+                timestamp: Date.now()
+            });
+        }
+    }, [data, children]);
 
     // Sort children by child_order
     const sortedChildren = React.useMemo(() => {
@@ -112,6 +156,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 key={child.id}
                                 child={child}
                                 index={index}
+                                projectId={projectId}
                                 onLightboxOpen={() => setLightboxIndex(index)}
                                 onUpdate={refetch}
                             />
@@ -140,11 +185,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 interface SegmentCardProps {
     child: GenerationRow;
     index: number;
+    projectId: string | null;
     onLightboxOpen: () => void;
     onUpdate: () => void;
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, onLightboxOpen, onUpdate }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onUpdate }) => {
     const { toast } = useToast();
     const [params, setParams] = useState<any>(child.params || {});
     const [isDirty, setIsDirty] = useState(false);
@@ -156,6 +202,107 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, onLightboxOpen,
         setParams(child.params || {});
         setIsDirty(false);
     }, [child.params]);
+
+    // Check for extended params (expanded arrays from orchestrator) if standard params are missing
+    useEffect(() => {
+        console.log('[SegmentCardPopulation] Starting population check', {
+            childId: child.id?.substring(0, 8),
+            hasParams: !!child.params,
+            paramsKeys: child.params ? Object.keys(child.params) : [],
+            timestamp: Date.now()
+        });
+        
+        if (!child.params) {
+            console.log('[SegmentCardPopulation] No params found, skipping');
+            return;
+        }
+        
+        const currentParams = child.params as any;
+        const orchestratorDetails = currentParams.orchestrator_details || {};
+        const segmentIndex = currentParams.segment_index;
+        
+        console.log('[SegmentCardPopulation] Params inspection', {
+            childId: child.id?.substring(0, 8),
+            hasOrchestratorDetails: !!orchestratorDetails,
+            orchestratorDetailsKeys: Object.keys(orchestratorDetails),
+            segmentIndex,
+            currentNumFrames: currentParams.num_frames,
+            currentFrameOverlap: currentParams.frame_overlap,
+            currentPrompt: currentParams.prompt?.substring(0, 50),
+            segmentFramesExpanded: orchestratorDetails.segment_frames_expanded,
+            frameOverlapExpanded: orchestratorDetails.frame_overlap_expanded,
+            enhancedPromptsExpanded: orchestratorDetails.enhanced_prompts_expanded?.map((p: string) => p?.substring(0, 30)),
+            timestamp: Date.now()
+        });
+        
+        let updates: any = {};
+        let hasUpdates = false;
+        
+        // Check if we need to populate missing fields from orchestrator arrays
+        if (segmentIndex !== undefined) {
+            console.log('[SegmentCardPopulation] Segment index found:', segmentIndex);
+            
+            // Populate frames if missing
+            if (!currentParams.num_frames && orchestratorDetails.segment_frames_expanded && orchestratorDetails.segment_frames_expanded[segmentIndex]) {
+                console.log('[SegmentCardPopulation] Populating num_frames from segment_frames_expanded[' + segmentIndex + ']:', orchestratorDetails.segment_frames_expanded[segmentIndex]);
+                updates.num_frames = orchestratorDetails.segment_frames_expanded[segmentIndex];
+                hasUpdates = true;
+            } else if (!currentParams.num_frames && orchestratorDetails.segment_frames_target) {
+                console.log('[SegmentCardPopulation] Populating num_frames from segment_frames_target:', orchestratorDetails.segment_frames_target);
+                updates.num_frames = orchestratorDetails.segment_frames_target;
+                hasUpdates = true;
+            } else {
+                console.log('[SegmentCardPopulation] NOT populating num_frames', {
+                    hasCurrentNumFrames: !!currentParams.num_frames,
+                    hasSegmentFramesExpanded: !!orchestratorDetails.segment_frames_expanded,
+                    hasSegmentFramesTarget: !!orchestratorDetails.segment_frames_target,
+                    segmentFramesExpandedValue: orchestratorDetails.segment_frames_expanded?.[segmentIndex]
+                });
+            }
+            
+            // Populate overlap if missing
+            if (!currentParams.frame_overlap && orchestratorDetails.frame_overlap_expanded && orchestratorDetails.frame_overlap_expanded[segmentIndex]) {
+                console.log('[SegmentCardPopulation] Populating frame_overlap from frame_overlap_expanded[' + segmentIndex + ']:', orchestratorDetails.frame_overlap_expanded[segmentIndex]);
+                updates.frame_overlap = orchestratorDetails.frame_overlap_expanded[segmentIndex];
+                hasUpdates = true;
+            } else if (!currentParams.frame_overlap && orchestratorDetails.frame_overlap_with_next) {
+                console.log('[SegmentCardPopulation] Populating frame_overlap from frame_overlap_with_next:', orchestratorDetails.frame_overlap_with_next);
+                updates.frame_overlap = orchestratorDetails.frame_overlap_with_next;
+                hasUpdates = true;
+            } else {
+                console.log('[SegmentCardPopulation] NOT populating frame_overlap', {
+                    hasCurrentFrameOverlap: !!currentParams.frame_overlap,
+                    hasFrameOverlapExpanded: !!orchestratorDetails.frame_overlap_expanded,
+                    hasFrameOverlapWithNext: !!orchestratorDetails.frame_overlap_with_next,
+                    frameOverlapExpandedValue: orchestratorDetails.frame_overlap_expanded?.[segmentIndex]
+                });
+            }
+            
+             // Populate prompt if missing or empty
+            if ((!currentParams.prompt || currentParams.prompt === "") && orchestratorDetails.enhanced_prompts_expanded && orchestratorDetails.enhanced_prompts_expanded[segmentIndex]) {
+                console.log('[SegmentCardPopulation] Populating prompt from enhanced_prompts_expanded[' + segmentIndex + ']:', orchestratorDetails.enhanced_prompts_expanded[segmentIndex]?.substring(0, 50));
+                updates.prompt = orchestratorDetails.enhanced_prompts_expanded[segmentIndex];
+                hasUpdates = true;
+            } else {
+                console.log('[SegmentCardPopulation] NOT populating prompt', {
+                    hasCurrentPrompt: !!currentParams.prompt,
+                    currentPromptEmpty: currentParams.prompt === "",
+                    hasEnhancedPromptsExpanded: !!orchestratorDetails.enhanced_prompts_expanded,
+                    enhancedPromptsExpandedValue: orchestratorDetails.enhanced_prompts_expanded?.[segmentIndex]?.substring(0, 30)
+                });
+            }
+        } else {
+            console.log('[SegmentCardPopulation] No segment index found, cannot populate from expanded arrays');
+        }
+        
+        if (hasUpdates) {
+            console.log('[SegmentCardPopulation] Applying updates:', updates);
+            setParams(prev => ({ ...prev, ...updates }));
+            // We don't set dirty here as this is just initializing display values
+        } else {
+            console.log('[SegmentCardPopulation] No updates needed');
+        }
+    }, [child.params, child.id]);
 
     const handleChange = (key: string, value: any) => {
         setParams(prev => ({ ...prev, [key]: value }));
@@ -202,7 +349,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, onLightboxOpen,
                     index={index}
                     originalIndex={index}
                     isFirstVideo={false}
-                    shouldPreload="none"
+                    shouldPreload="metadata"
                     isMobile={false}
                     projectId={projectId}
                     onLightboxOpen={onLightboxOpen}

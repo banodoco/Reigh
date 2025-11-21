@@ -246,3 +246,4 @@ async function generateThumbnailsForReferences() {
 // Run the migration
 generateThumbnailsForReferences();
 
+

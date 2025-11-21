@@ -25,6 +25,7 @@ export interface TravelBetweenImagesTaskParams {
   frame_overlap: number[];
   resolution?: string;
   model_name?: string;
+  model_type?: string;
   seed?: number;
   debug?: boolean;
   params_json_str?: string;
@@ -190,6 +191,7 @@ function buildTravelBetweenImagesPayload(
     frame_overlap_expanded: frameOverlapExpanded,
     parsed_resolution_wh: finalResolution,
     model_name: params.model_name ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.model_name,
+    model_type: params.model_type,
     seed_base: finalSeed,
     // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase)
     ...(params.advanced_mode ? {} : { steps: stepsValue }),

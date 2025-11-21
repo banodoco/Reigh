@@ -3,3 +3,4 @@ ALTER TABLE "generations" ADD COLUMN "child_order" integer;
 ALTER TABLE "generations" ADD COLUMN "is_child" boolean DEFAULT false NOT NULL;
 ALTER TABLE "generations" ADD COLUMN "children" jsonb;
 
+

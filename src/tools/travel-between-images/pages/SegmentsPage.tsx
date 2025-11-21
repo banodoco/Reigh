@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 const SegmentsPage: React.FC = () => {
     const { parentId } = useParams<{ parentId: string }>();
     const navigate = useNavigate();
-    const { currentProject } = useProject();
+    const { selectedProjectId } = useProject();
     const [shotId, setShotId] = React.useState<string | null>(null);
 
     // Fetch parent generation's shot_id from shot_generations for back navigation
@@ -50,7 +50,7 @@ const SegmentsPage: React.FC = () => {
     return (
         <ChildGenerationsView
             parentGenerationId={parentId}
-            projectId={currentProject?.id || null}
+            projectId={selectedProjectId}
             onBack={handleBack}
         />
     );

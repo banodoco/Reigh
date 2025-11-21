@@ -109,6 +109,10 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
   const isMobile = useIsMobile();
   
+  // Safely handle potentially missing or placeholder sources
+  const displaySrc = getDisplayUrl(src);
+  const hasValidVideoSrc = displaySrc && displaySrc !== '/placeholder.svg';
+  
   // Debug mobile detection (development only)
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -134,22 +138,50 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   }, [isMobile, src, poster, disableScrubbing, thumbnailMode]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    console.log('[SegmentCardPopulation] handleMouseMove called', {
+      src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
+      isMobile,
+      thumbnailMode,
+      disableScrubbing,
+      autoplayOnHover,
+      loadOnDemand,
+      hasLoadedOnDemand,
+      hasVideoRef: !!videoRef.current,
+      hasContainerRef: !!containerRef.current,
+      duration,
+      timestamp: Date.now()
+    });
     
     // Skip hover interactions on mobile devices or when scrubbing is disabled
-    if (isMobile || thumbnailMode || disableScrubbing || autoplayOnHover) return;
+    if (isMobile || thumbnailMode || disableScrubbing || autoplayOnHover) {
+      console.log('[SegmentCardPopulation] Skipping mouse move - conditions not met', {
+        isMobile,
+        thumbnailMode,
+        disableScrubbing,
+        autoplayOnHover
+      });
+      return;
+    }
 
     if (loadOnDemand && !hasLoadedOnDemand) {
+      console.log('[SegmentCardPopulation] Load on demand - setting hasLoadedOnDemand');
       setHasLoadedOnDemand(true);
       return;
     }
 
-    if (!videoRef.current || !containerRef.current) return;
+    if (!videoRef.current || !containerRef.current) {
+      console.log('[SegmentCardPopulation] Missing refs', {
+        hasVideoRef: !!videoRef.current,
+        hasContainerRef: !!containerRef.current
+      });
+      return;
+    }
 
     // Additional fallback: Prime video loading on mouse move if it still hasn't loaded
     if (preloadProp === 'none' && videoRef.current.readyState < 2) {
       if (process.env.NODE_ENV === 'development') {
         console.log('[VideoStallFix] Fallback priming video load on mouse move', {
-          src: src.substring(src.lastIndexOf('/') + 1) || 'no-src',
+          src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
           readyState: videoRef.current.readyState,
           timestamp: Date.now()
         });
@@ -163,7 +195,16 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
-    if (duration === 0) return;
+    if (duration === 0) {
+      console.log('[SegmentCardPopulation] Duration is 0, skipping scrubbing');
+      return;
+    }
+    
+    console.log('[SegmentCardPopulation] Processing mouse move for scrubbing', {
+      duration,
+      videoReadyState: videoRef.current.readyState,
+      timestamp: Date.now()
+    });
 
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -197,8 +238,20 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   }, [duration, isMobile, thumbnailMode, disableScrubbing, loadOnDemand, hasLoadedOnDemand, autoplayOnHover, preloadProp, src]);
 
   const handleMouseEnter = useCallback(() => {
+    console.log('[SegmentCardPopulation] handleMouseEnter called', {
+      src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
+      isMobile,
+      disableScrubbing,
+      autoplayOnHover,
+      timestamp: Date.now()
+    });
+    
     // Skip hover interactions on mobile devices or when scrubbing is disabled
     if (isMobile || disableScrubbing) {
+      console.log('[SegmentCardPopulation] Skipping mouse enter', {
+        isMobile,
+        disableScrubbing
+      });
       if (isMobile) {
         if (process.env.NODE_ENV === 'development') {
           console.log('[MobileVideoAutoplay] Mouse enter detected on mobile (should be ignored)', {
@@ -211,10 +264,12 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     }
 
     if (autoplayOnHover) {
+      console.log('[SegmentCardPopulation] Autoplay on hover enabled, playing video');
       videoRef.current?.play();
       return;
     }
     
+    console.log('[SegmentCardPopulation] Setting isHoveringRef to true');
     isHoveringRef.current = true;
     if (videoRef.current) {
       // Fix for video stalling: Prime video loading on first hover for preload="none"
@@ -222,7 +277,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       if (preloadProp === 'none' && videoRef.current.readyState === 0) {
         if (process.env.NODE_ENV === 'development') {
           console.log('[VideoStallFix] Priming video load on hover for preload="none"', {
-            src: src.substring(src.lastIndexOf('/') + 1) || 'no-src',
+            src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
             readyState: videoRef.current.readyState,
             timestamp: Date.now()
           });
@@ -285,6 +340,15 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
+      console.log('[SegmentCardPopulation] handleLoadedMetadata called', {
+        src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
+        videoDuration: videoRef.current.duration,
+        videoPaused: videoRef.current.paused,
+        videoReadyState: videoRef.current.readyState,
+        disableScrubbing,
+        timestamp: Date.now()
+      });
+      
       if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
         console.log('[MobileVideoAutoplay] handleLoadedMetadata called', {
           isMobile,
@@ -297,6 +361,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
 
       setDuration(videoRef.current.duration);
+      console.log('[SegmentCardPopulation] Duration set to:', videoRef.current.duration);
       
       // Ensure video is paused first to prevent autoplay
       if (!videoRef.current.paused) {
@@ -532,18 +597,33 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     };
   }, [isMobile, src, disableScrubbing]);
 
+  // Log component render state
+  React.useEffect(() => {
+    console.log('[SegmentCardPopulation] HoverScrubVideo render state', {
+      src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
+      hasValidVideoSrc,
+      displaySrc: displaySrc?.substring(displaySrc.lastIndexOf('/') + 1) || 'no-src',
+      isMobile,
+      disableScrubbing,
+      thumbnailMode,
+      duration,
+      willAttachHandlers: !(isMobile || disableScrubbing || thumbnailMode),
+      timestamp: Date.now()
+    });
+  }, [src, hasValidVideoSrc, displaySrc, isMobile, disableScrubbing, thumbnailMode, duration]);
+
   return (
     <div
       ref={containerRef}
       className={cn('relative group', className)}
       onMouseEnter={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseEnter}
-      onMouseLeave={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseLeave}
+      onMouseLeave={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseMove}
       onMouseMove={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseMove}
       {...rest}
     >
       <video
         ref={videoRef}
-        src={getDisplayUrl(src)}
+        src={hasValidVideoSrc ? displaySrc : undefined}
         poster={poster ? getDisplayUrl(poster) : undefined}
         preload={thumbnailMode ? 'none' : (isMobile ? 'metadata' : preloadProp)}
         controls={showNativeControls}

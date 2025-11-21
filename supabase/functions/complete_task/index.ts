@@ -793,8 +793,8 @@ serve(async (req) => {
             content_type: contentType
           };
 
-          if (taskCategory === 'generation') {
-            console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete...`);
+          if (taskCategory === 'generation' || (taskCategory === 'processing' && isSubTask)) {
+            console.log(`[GenMigration] Creating generation for task ${taskIdString} before marking Complete (category=${taskCategory}, isSubTask=${!!isSubTask})...`);
             try {
               await createGenerationFromTask(
                 supabaseAdmin,
@@ -905,58 +905,35 @@ serve(async (req) => {
               );
             }
           } else if (taskCategory === 'orchestration') {
-            // Special handling for orchestrator tasks: create generation for the final orchestrated output
+            // Special handling for orchestrator tasks: ensure placeholder generation exists
+            // The orchestrator itself doesn't produce output - the travel_stitch child task does
             console.log(`[Orchestrator] Processing orchestrator task ${taskIdString} (task_type: ${taskData.task_type})`);
 
-            // Only create generation if there's an actual output (video/image file)
-            // Some orchestrators might just coordinate without producing their own output
-            if (publicUrl && contentType) {
-              console.log(`[Orchestrator] Creating generation for orchestrator output: ${publicUrl} (type: ${contentType})`);
-
-              try {
-                // Extract shot information
-                const { shotId, addInPosition } = extractShotAndPosition(taskData.params);
-                console.log(`[Orchestrator] Extracted shot_id: ${shotId}, add_in_position: ${addInPosition}`);
-
-                const newGenerationId = crypto.randomUUID();
-                const generationRecord = {
-                  id: newGenerationId,
-                  tasks: [taskIdString],
-                  params: {
-                    ...taskData.params,
-                    tool_type: toolType,
-                    orchestrator_type: taskData.task_type, // Track which orchestrator created this
-                  },
-                  location: publicUrl,
-                  type: contentType, // Use content_type from task_types (e.g., 'video' for join_clips_orchestrator)
-                  project_id: taskData.project_id,
-                  thumbnail_url: thumbnailUrl,
-                  name: taskData.params?.generation_name || taskData.params?.orchestrator_details?.generation_name,
-                  created_at: new Date().toISOString()
-                };
-
-                const newGeneration = await insertGeneration(supabaseAdmin, generationRecord);
-                console.log(`[Orchestrator] Created generation ${newGeneration.id} for orchestrator task ${taskIdString}`);
-
-                // Link to shot if applicable
-                if (shotId) {
-                  await linkGenerationToShot(supabaseAdmin, shotId, newGeneration.id, addInPosition);
-                  console.log(`[Orchestrator] Linked generation ${newGeneration.id} to shot ${shotId} (add_in_position: ${addInPosition})`);
+            try {
+              // Check if placeholder generation already exists (created by first child)
+              const existingGen = await findExistingGeneration(supabaseAdmin, taskIdString);
+              
+              if (existingGen) {
+                console.log(`[Orchestrator] Placeholder generation ${existingGen.id} already exists - nothing to do`);
+              } else {
+                // Create placeholder if it doesn't exist (edge case where orchestrator completes before any children)
+                console.log(`[Orchestrator] Creating placeholder generation for orchestrator ${taskIdString}`);
+                
+                const parentGen = await getOrCreateParentGeneration(supabaseAdmin, taskIdString, taskData.project_id);
+                if (parentGen) {
+                  console.log(`[Orchestrator] Created placeholder generation ${parentGen.id}`);
                 }
-
-                // Mark task as having created a generation
-                await supabaseAdmin
-                  .from('tasks')
-                  .update({ generation_created: true })
-                  .eq('id', taskIdString);
-
-                console.log(`[Orchestrator] Marked task ${taskIdString} as generation_created=true`);
-              } catch (genError) {
-                console.error(`[Orchestrator] Error creating generation for orchestrator task ${taskIdString}:`, genError);
-                // Don't fail the task - the output is still in output_location
               }
-            } else {
-              console.log(`[Orchestrator] Skipping generation creation - no output file (orchestrator may only coordinate)`);
+              
+              // Mark task as having created a generation
+              await supabaseAdmin
+                .from('tasks')
+                .update({ generation_created: true })
+                .eq('id', taskIdString);
+                
+            } catch (genError) {
+              console.error(`[Orchestrator] Error handling generation for orchestrator task ${taskIdString}:`, genError);
+              // Don't fail the task
             }
           } else {
             console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
