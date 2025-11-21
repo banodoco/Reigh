@@ -118,7 +118,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     
     return {
       opacity: isVisible ? 1 : 0,
-      transition: `opacity ${duration} ease-out ${delay}s, transform ${duration} ease-out ${delay}s`,
+      transition: `opacity ${duration} ease-out ${delay}s, transform ${duration} cubic-bezier(0.2, 0, 0.2, 1) ${delay}s`,
       transform: isVisible ? 'translateY(0)' : `translateY(${distance}px)`, 
       willChange: 'transform, opacity'
     };
