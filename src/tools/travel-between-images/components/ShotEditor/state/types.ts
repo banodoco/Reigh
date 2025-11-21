@@ -49,7 +49,7 @@ export interface SteerableMotionSettings {
 // Default values for steerable motion settings - single source of truth
 export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
   negative_prompt: '',
-  model_name: 'lightning_baseline_2_2_2',
+  model_name: 'wan_2_2_i2v_lightning_baseline_2_2_2',
   seed: 789,
   debug: false,
   show_input_images: false,

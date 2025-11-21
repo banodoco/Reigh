@@ -879,7 +879,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
 
   // Set model based on turbo mode
   useEffect(() => {
-    const targetModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
+    const targetModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'wan_2_2_i2v_lightning_baseline_2_2_2';
     if (steerableMotionSettings.model_name !== targetModel) {
       console.log(`[ShotEditor] Setting model based on turbo mode: ${targetModel} (turbo: ${turboMode})`);
       onSteerableMotionSettingsChange({ 
@@ -1068,12 +1068,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       let selectedModel: string;
       
       if (numPhases === 2) {
-        selectedModel = 'lightning_baseline_3_3';
+        selectedModel = 'wan_2_2_i2v_lightning_baseline_3_3';
       } else if (numPhases === 3) {
-        selectedModel = 'lightning_baseline_2_2_2';
+        selectedModel = 'wan_2_2_i2v_lightning_baseline_2_2_2';
       } else {
         // Fallback for other num_phases values
-        selectedModel = 'lightning_baseline_2_2_2';
+        selectedModel = 'wan_2_2_i2v_lightning_baseline_2_2_2';
       }
       
       console.log('[ModelSelection] Advanced Mode - Selected model based on phases:', {
@@ -1087,7 +1087,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
     
     // In normal mode, use turbo mode setting
-    const selectedModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'lightning_baseline_2_2_2';
+    const selectedModel = turboMode ? 'vace_14B_fake_cocktail_2_2' : 'wan_2_2_i2v_lightning_baseline_2_2_2';
     
     console.log('[ModelSelection] Normal Mode - Selected model based on turbo:', {
       turboMode,

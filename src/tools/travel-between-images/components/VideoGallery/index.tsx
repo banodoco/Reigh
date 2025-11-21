@@ -971,6 +971,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     shouldPreload={shouldPreload}
                     isMobile={isTouchLikeDevice}
                     projectAspectRatio={projectAspectRatio}
+                    projectId={projectId}
                     onLightboxOpen={setLightboxIndex}
                     onMobileTap={handleMobileTap}
                     onMobilePreload={isMobile ? handleMobilePreload : undefined}

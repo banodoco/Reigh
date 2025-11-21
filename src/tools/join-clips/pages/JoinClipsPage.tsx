@@ -852,7 +852,7 @@ const JoinClipsPage: React.FC = () => {
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
-        model: joinSettings.settings.model || 'lightning_baseline_2_2_2',
+        model: joinSettings.settings.model || 'wan_2_2_vace_lightning_baseline_2_2_2',
         num_inference_steps: joinSettings.settings.numInferenceSteps || 6,
         guidance_scale: joinSettings.settings.guidanceScale || 3.0,
         seed: joinSettings.settings.seed || -1,

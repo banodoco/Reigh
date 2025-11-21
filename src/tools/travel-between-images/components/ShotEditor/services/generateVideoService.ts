@@ -455,8 +455,26 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     negativePrompts = [steerableMotionSettings.negative_prompt];
   }
 
-  // Use model based on turbo mode for task creation
-  const actualModelName = getModelName();
+  // Determine model name based on structure video presence
+  let actualModelName = getModelName();
+  
+  // If there is a structure video, use VACE model
+  if (structureVideoPath) {
+    if (actualModelName.includes('baseline_3_3')) {
+      actualModelName = 'wan_2_2_vace_lightning_baseline_3_3';
+    } else {
+      actualModelName = 'wan_2_2_vace_lightning_baseline_2_2_2';
+    }
+    console.log('[Generation] Structure video present - using VACE model:', actualModelName);
+  } else {
+    // No structure video - use I2V model
+    if (actualModelName.includes('baseline_3_3')) {
+      actualModelName = 'wan_2_2_i2v_lightning_baseline_3_3';
+    } else {
+      actualModelName = 'wan_2_2_i2v_lightning_baseline_2_2_2';
+    }
+    console.log('[Generation] No structure video - using I2V model:', actualModelName);
+  }
   
   // Validate and debug log phase config before sending
   if (advancedMode && phaseConfig) {
@@ -547,6 +565,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Text before/after prompts
     ...(textBeforePrompts ? { text_before_prompts: textBeforePrompts } : {}),
     ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
+    // Always set independent segments to true
+    independent_segments: true,
   };
 
   // Only add regular LoRAs if Advanced Mode is OFF

@@ -74,7 +74,7 @@ const DEFAULT_JOIN_CLIPS_VALUES = {
   gap_frame_count: 53,
   prompt: '',
   replace_mode: true,
-  model: 'lightning_baseline_2_2_2',
+  model: 'wan_2_2_vace_lightning_baseline_2_2_2',
   num_inference_steps: 6,
   guidance_scale: 3.0,
   seed: -1,

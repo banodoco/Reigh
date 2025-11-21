@@ -204,6 +204,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, onLightboxOpen,
                     isFirstVideo={false}
                     shouldPreload="none"
                     isMobile={false}
+                    projectId={projectId}
                     onLightboxOpen={onLightboxOpen}
                     onMobileTap={() => { }}
                     onDelete={() => { }}

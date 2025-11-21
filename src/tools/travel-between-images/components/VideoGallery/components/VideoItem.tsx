@@ -23,6 +23,21 @@ import {
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
+import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
+import { Label } from '@/shared/components/ui/label';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { Input } from '@/shared/components/ui/input';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
 
 interface VideoItemProps {
   video: GenerationRow;
@@ -46,6 +61,7 @@ interface VideoItemProps {
   existingShareSlug?: string;
   onShareCreated?: (videoId: string, shareSlug: string) => void;
   onViewSegments?: (video: GenerationRow) => void;
+  projectId?: string | null;
 }
 
 export const VideoItem = React.memo<VideoItemProps>(({
@@ -69,10 +85,12 @@ export const VideoItem = React.memo<VideoItemProps>(({
   onApplySettingsFromTask,
   existingShareSlug,
   onShareCreated,
-  onViewSegments
+  onViewSegments,
+  projectId
 }) => {
   // Get task mapping for this video to enable Apply Settings button
   const { data: taskMapping } = useTaskFromUnifiedCache(video.id || '');
+  const queryClient = useQueryClient();
 
   // Track success state for Apply Settings button
   const [settingsApplied, setSettingsApplied] = useState(false);
@@ -85,12 +103,185 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // Toast notifications
   const { toast } = useToast();
 
+  // State for join clips feature
+  const [childGenerations, setChildGenerations] = useState<GenerationRow[]>([]);
+  const [isLoadingChildren, setIsLoadingChildren] = useState(false);
+  const [isJoiningClips, setIsJoiningClips] = useState(false);
+  const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  
+  // Join settings state (matches JoinClipsPage)
+  const [joinPrompt, setJoinPrompt] = useState('');
+  const [joinNegativePrompt, setJoinNegativePrompt] = useState('');
+  const [joinContextFrames, setJoinContextFrames] = useState(10);
+  const [joinGapFrames, setJoinGapFrames] = useState(33);
+  const [joinReplaceMode, setJoinReplaceMode] = useState(true);
+
   // Initialize share slug from prop (batch fetched by parent)
   useEffect(() => {
     if (existingShareSlug) {
       setShareSlug(existingShareSlug);
     }
   }, [existingShareSlug]);
+
+  // Fetch child generations when video has no location but might have segments
+  useEffect(() => {
+    const shouldCheckForChildren = !video.parent_generation_id && !video.location && video.id;
+    
+    if (shouldCheckForChildren) {
+      setIsLoadingChildren(true);
+      
+      // Fetch child generations ordered by child_order
+      supabase
+        .from('generations')
+        .select('*')
+        .eq('parent_generation_id', video.id)
+        .order('child_order', { ascending: true })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('[JoinClips] Error fetching child generations:', error);
+            return;
+          }
+          
+          if (data) {
+            // Transform to GenerationRow format
+            const children = data.map(gen => ({
+              id: gen.id,
+              location: gen.location || '',
+              imageUrl: gen.location || '',
+              thumbUrl: gen.thumbnail_url || '',
+              type: gen.type || 'video',
+              created_at: gen.created_at || new Date().toISOString(),
+              createdAt: gen.created_at || new Date().toISOString(),
+              params: gen.params as any,
+              parent_generation_id: gen.parent_generation_id,
+              child_order: (gen as any).child_order,
+            })) as GenerationRow[];
+            
+            console.log('[JoinClips] Found child generations:', {
+              parentId: video.id?.substring(0, 8),
+              childCount: children.length,
+              allHaveLocations: children.every(c => c.location),
+            });
+            
+            setChildGenerations(children);
+          }
+          
+          setIsLoadingChildren(false);
+        });
+    }
+  }, [video.id, video.parent_generation_id, video.location]);
+
+  // Determine if we should show "Join clips" button (always show for parent generations without output)
+  const shouldShowJoinButton = !video.parent_generation_id && !video.location;
+  
+  // Determine if join is ready (all conditions met)
+  const canJoinClips = shouldShowJoinButton && 
+                       childGenerations.length >= 2 && 
+                       childGenerations.every(child => child.location);
+  
+  // Generate helpful tooltip message
+  const getJoinTooltipMessage = () => {
+    if (joinClipsSuccess) {
+      return 'Join task created!';
+    }
+    if (isJoiningClips) {
+      return 'Creating join task...';
+    }
+    if (isLoadingChildren) {
+      return 'Checking for segments...';
+    }
+    if (childGenerations.length === 0) {
+      return 'No segments found - generate segments first';
+    }
+    if (childGenerations.length === 1) {
+      return 'Need at least 2 segments to join';
+    }
+    const segmentsWithoutOutput = childGenerations.filter(c => !c.location).length;
+    if (segmentsWithoutOutput > 0) {
+      return `Waiting for ${segmentsWithoutOutput} segment${segmentsWithoutOutput > 1 ? 's' : ''} to finish generating`;
+    }
+    return `Join ${childGenerations.length} segments into one video`;
+  };
+
+  // Handler for opening join modal
+  const handleJoinClipsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!canJoinClips) {
+      return;
+    }
+    
+    setShowJoinModal(true);
+  };
+  
+  // Handler for confirming join with settings
+  const handleConfirmJoin = async () => {
+    if (!projectId || !canJoinClips) {
+      return;
+    }
+    
+    setIsJoiningClips(true);
+    setShowJoinModal(false);
+    
+    try {
+      // Create clips array from child generations
+      const clips = childGenerations.map((child, index) => ({
+        url: child.location,
+        name: `Segment ${index + 1}`,
+      }));
+      
+      console.log('[JoinClips] Creating join task for segments:', {
+        parentId: video.id?.substring(0, 8),
+        clipCount: clips.length,
+        prompt: joinPrompt,
+        contextFrames: joinContextFrames,
+        gapFrames: joinGapFrames,
+        replaceMode: joinReplaceMode,
+        clips: clips.map(c => ({ name: c.name, url: c.url?.substring(0, 50) + '...' })),
+      });
+      
+      // Create the join clips task with user settings
+      await createJoinClipsTask({
+        project_id: projectId,
+        clips,
+        prompt: joinPrompt,
+        negative_prompt: joinNegativePrompt,
+        context_frame_count: joinContextFrames,
+        gap_frame_count: joinGapFrames,
+        replace_mode: joinReplaceMode,
+        model: 'wan_2_2_vace_lightning_baseline_2_2_2',
+        num_inference_steps: 6,
+        guidance_scale: 3.0,
+        seed: -1,
+      });
+      
+      toast({
+        title: 'Join task created',
+        description: `Joining ${clips.length} segments into one video`,
+      });
+      
+      // Show success state
+      setJoinClipsSuccess(true);
+      setTimeout(() => setJoinClipsSuccess(false), 3000);
+      
+      // Invalidate queries to refresh task list
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['unified-generations', 'project', projectId]
+      });
+      
+    } catch (error) {
+      console.error('[JoinClips] Error creating join task:', error);
+      toast({
+        title: 'Failed to create join task',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsJoiningClips(false);
+    }
+  };
 
   // DEBUG: Track re-renders to verify memo is working
   if (process.env.NODE_ENV === 'development' && isFirstVideo) {
@@ -835,7 +1026,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
           </div>
         </div>
 
-        {/* Bottom Overlay - View Segments Button & Variant Name */}
+        {/* Bottom Overlay - View Segments Button, Join Clips Button & Variant Name */}
         <div className="absolute bottom-0 left-0 right-0 pb-2 pl-3 pr-3 pt-6 flex justify-between items-end bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
           <div className="flex flex-col items-start gap-2 pointer-events-auto">
             {/* View Segments Button */}
@@ -859,6 +1050,40 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>View segments</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Join Clips Button - always shown for parent generations without output */}
+            {shouldShowJoinButton && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className={`h-7 w-7 text-white rounded-full backdrop-blur-md border border-white/20 shadow-sm ${
+                        joinClipsSuccess
+                          ? 'bg-green-500 hover:bg-green-600'
+                          : canJoinClips
+                          ? 'bg-black/80 hover:bg-black'
+                          : 'bg-black/40 cursor-not-allowed'
+                      }`}
+                      onClick={handleJoinClipsClick}
+                      disabled={!canJoinClips || isJoiningClips || joinClipsSuccess}
+                    >
+                      {isJoiningClips ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : joinClipsSuccess ? (
+                        <Check className="h-3.5 w-3.5" />
+                      ) : (
+                        <Film className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{getJoinTooltipMessage()}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -1065,6 +1290,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     prevProps.shouldPreload === nextProps.shouldPreload &&
     prevProps.isMobile === nextProps.isMobile &&
     prevProps.projectAspectRatio === nextProps.projectAspectRatio &&
+    prevProps.projectId === nextProps.projectId &&
     prevProps.deletingVideoId === nextProps.deletingVideoId &&
     prevProps.selectedVideoForDetails?.id === nextProps.selectedVideoForDetails?.id &&
     prevProps.showTaskDetailsModal === nextProps.showTaskDetailsModal &&

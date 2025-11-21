@@ -70,6 +70,7 @@ export interface TravelBetweenImagesTaskParams {
   };
   // Selected phase config preset ID (for UI state restoration)
   selected_phase_preset_id?: string | null;
+  independent_segments?: boolean;
 }
 
 /**
@@ -208,6 +209,7 @@ function buildTravelBetweenImagesPayload(
     ...(params.advanced_mode && params.regenerate_anchors !== undefined ? { regenerate_anchors: params.regenerate_anchors } : {}),
     // Include generation_name in orchestrator payload so it flows to child tasks
     generation_name: params.generation_name ?? undefined,
+    independent_segments: params.independent_segments ?? true,
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { PaletteIcon } from '@/shared/components/PaletteIcon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Github, MessageCircle, Plus } from 'lucide-react';
 import { PaintParticles } from '@/shared/components/PaintParticles';
-import { SocialIcons } from '@/shared/components/SocialIcons';
 import type { Session } from '@supabase/supabase-js';
 
 interface ExampleStyle {
@@ -35,6 +34,8 @@ interface HeroSectionProps {
   assetsLoaded: boolean;
 }
 
+type AnimationPhase = 'initial' | 'loading' | 'bar-complete' | 'content-revealing' | 'complete';
+
 export const HeroSection: React.FC<HeroSectionProps> = ({
   barTransitionCompleted,
   openTipOpen,
@@ -56,49 +57,78 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   navigate,
   assetsLoaded,
 }) => {
-  const [mounted, setMounted] = useState(false);
+  const [phase, setPhase] = useState<AnimationPhase>('initial');
   const [barWidth, setBarWidth] = useState('0%');
-  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
 
+  // Master animation orchestrator
   useEffect(() => {
-    if (assetsLoaded) {
-      setBarWidth('100%');
-    } else {
-      setBarWidth('30%');
-    }
-  }, [assetsLoaded]);
-
-  useEffect(() => {
-    // Trigger expansion shortly after mount
-    const timer = setTimeout(() => {
-      setMounted(true);
-      // Enable overflow after animation completes (1s duration + small buffer)
-      setTimeout(() => setIsAnimationComplete(true), 1050);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && assetsLoaded) {
-      // Trigger Banodoco burst after other elements have loaded
-      const timer = setTimeout(() => {
-        setBanodocoState('animating');
-        setTimeout(() => {
-          setBanodocoState('visible');
-        }, 600);
-      }, 800);
+    if (phase === 'initial') {
+      // Start after brief mount delay
+      const timer = setTimeout(() => setPhase('loading'), 100);
       return () => clearTimeout(timer);
     }
-  }, [mounted, assetsLoaded]);
+    
+    if (phase === 'loading' && assetsLoaded && barTransitionCompleted) {
+      // Bar has reached 100%, wait for it to settle
+      const timer = setTimeout(() => setPhase('bar-complete'), 300);
+      return () => clearTimeout(timer);
+    }
+    
+    if (phase === 'bar-complete') {
+      // Start content reveal immediately
+      setPhase('content-revealing');
+      // Mark as complete after animations finish (1000ms content + buffer)
+      const timer = setTimeout(() => setPhase('complete'), 1050);
+      return () => clearTimeout(timer);
+    }
+    
+    if (phase === 'content-revealing') {
+      // Trigger Banodoco after second social icon + 500ms pause (950ms + 500ms = 1450ms)
+      const timer = setTimeout(() => {
+        setBanodocoState('animating');
+        setTimeout(() => setBanodocoState('visible'), 1800); // 1800ms animation duration
+      }, 1450);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, assetsLoaded, barTransitionCompleted]);
 
-  // Helper for staggering animations based on mount state
-  const getFadeStyle = (delayIndex: number, forceWait: boolean = false) => ({
-    opacity: mounted && !forceWait ? 1 : 0,
-    transition: `opacity 0.8s ease-out ${delayIndex * 0.1}s`,
-    transform: mounted && !forceWait ? 'translateY(0)' : 'translateY(10px)',
-    transitionProperty: 'opacity, transform'
-  });
+  // Bar width management
+  useEffect(() => {
+    setBarWidth(assetsLoaded ? '100%' : '30%');
+  }, [assetsLoaded]);
+
+  // Helper for staggering animations based on animation phase
+  // Calculated to match the grid-template-rows expansion (1000ms ease-out)
+  const getFadeStyle = (delayIndex: number, distance: number = 0, forceWait: boolean = false) => {
+    const duration = '1000ms';
+    const delay = delayIndex * 0.1;
+    const isRevealing = phase === 'content-revealing' || phase === 'complete';
+    const isVisible = isRevealing && !forceWait;
+    
+    return {
+      opacity: isVisible ? 1 : 0,
+      transition: `opacity ${duration} ease-out ${delay}s, transform ${duration} ease-out ${delay}s`,
+      transform: isVisible ? 'translateY(0)' : `translateY(${distance}px)`, 
+      willChange: 'transform, opacity'
+    };
+  };
+
+  // Helper for pop-in animations (scale-based, independent of other animations)
+  const getPopStyle = (absoluteDelay: number, forceWait: boolean = false) => {
+    const duration = '400ms';
+    // Use absolute delay in seconds (e.g., 1.5 = 1500ms after content-revealing starts)
+    const isRevealing = phase === 'content-revealing' || phase === 'complete';
+    const isVisible = isRevealing && !forceWait;
+    
+    return {
+      opacity: isVisible ? 1 : 0,
+      transition: `opacity ${duration} ease-out ${absoluteDelay}s, transform ${duration} cubic-bezier(0.34, 1.56, 0.64, 1) ${absoluteDelay}s`,
+      transform: isVisible ? 'scale(1)' : 'scale(0)', 
+      willChange: 'transform, opacity',
+      transformOrigin: 'center center'
+    };
+  };
 
   return (
     <div className="container mx-auto px-4 relative flex items-center justify-center min-h-screen py-8">
@@ -109,16 +139,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Use grid-template-rows for height animation from 0 to auto */}
           <div 
             className="grid transition-[grid-template-rows] duration-1000 ease-out"
-            style={{ gridTemplateRows: mounted ? '1fr' : '0fr' }}
+            style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
-            <div className={isAnimationComplete ? "overflow-visible" : "overflow-hidden"}>
+            <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Icon above title - wait for assets */}
-              <div style={getFadeStyle(0, !assetsLoaded)} className="relative z-30">
+              <div style={getFadeStyle(0, 20, !assetsLoaded)} className="relative z-30">
                 <PaletteIcon className="mb-6 mt-0" />
               </div>
               
               {/* Main title */}
-              <div style={getFadeStyle(1)}>
+              <div style={getFadeStyle(0.5, 20)}>
                 <h1 className="font-theme text-6xl md:text-8xl font-theme-heading text-primary mb-8 text-shadow-vintage">
                   Reigh
                 </h1>
@@ -146,11 +176,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Bottom Section: Subtitle + Buttons + Footer */}
           <div 
             className="grid transition-[grid-template-rows] duration-1000 ease-out"
-            style={{ gridTemplateRows: mounted ? '1fr' : '0fr' }}
+            style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
             <div className="overflow-hidden">
-              {/* Subtitle */}
-              <div className="mt-8" style={getFadeStyle(2)}>
+              {/* Subtitle - Start -60px (UP) to simulate coming from bar */}
+              <div className="mt-8" style={getFadeStyle(0.5, -60, false)}>
                 <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
                   An{' '}
                   <TooltipProvider>
@@ -234,8 +264,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </p>
               </div>
               
-              {/* Sign-in button below hero */}
-              <div style={getFadeStyle(3)}>
+              {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}
+              <div style={getFadeStyle(1, -140, false)}>
                 {!session ? (
                   <div className="group">
                     <button
@@ -294,35 +324,64 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+          </div>
 
-              {/* Social Icons */}
-              <div style={getFadeStyle(4)}>
-                <div className="mt-8">
-                  <SocialIcons />
-                </div>
-              </div>
-
-              {/* Banodoco Logo */}
-              <div className="flex justify-center">
-                <div className="mt-2">
+          {/* Social Icons - Pop-in animation (completely independent) */}
+          <div className="mt-8 flex justify-center pt-2 pb-4">
+            <div className="flex flex-col items-center space-y-3">
+              {/* GitHub and Discord icons side by side */}
+              <div className="flex items-center space-x-3">
+                <div style={getPopStyle(0.8, false)}>
                   <a
-                    href="http://banodoco.ai/"
+                    href="http://github.com/peteromallet/reigh"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block"
+                    className="block p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
                   >
-                    <img 
-                      src="/banodoco-gold.png" 
-                      alt="Banodoco" 
-                      className={`w-[34px] h-[34px] object-contain 
-                        ${banodocoState === 'hidden' ? 'opacity-0' : ''}
-                        ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
-                        ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
-                      `} 
-                    />
+                    <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                  </a>
+                </div>
+                <div style={getPopStyle(0.95, false)}>
+                  <a
+                    href="https://discord.gg/D5K2c6kfhy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
+                  >
+                    <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
                   </a>
                 </div>
               </div>
+              
+              {/* Placeholder icon beneath them */}
+              <div style={getPopStyle(1.1, false)}>
+                <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
+                  <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Banodoco Logo */}
+          <div className="flex justify-center">
+            <div className="mt-2">
+              <a
+                href="http://banodoco.ai/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block"
+              >
+                <img 
+                  src="/banodoco-gold.png" 
+                  alt="Banodoco" 
+                  className={`w-[34px] h-[34px] object-contain 
+                    ${banodocoState === 'hidden' ? 'opacity-0' : ''}
+                    ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
+                    ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
+                  `} 
+                />
+              </a>
             </div>
           </div>
 
