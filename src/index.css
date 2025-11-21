@@ -1443,11 +1443,11 @@
   }
 
   .underline-wave-second::before {
-    animation: sparkleColorWave 3s linear infinite, underlineWaveIn 2.4s ease-in-out 0.6s 1 !important;
+    animation: sparkleColorWave 3s linear infinite, underlineWaveIn 2.4s ease-in-out 0.15s 1 !important;
   }
 
   .underline-wave-second::after {
-    animation: underlineWaveOut 2.4s ease-in-out 0.6s 1 !important;
+    animation: underlineWaveOut 2.4s ease-in-out 0.15s 1 !important;
   }
    
   /* Multicolour border for tooltips on hover */

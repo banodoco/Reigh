@@ -85,10 +85,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
     
     if (phase === 'content-revealing') {
-      // Trigger underline wave after content is revealed (1200ms after content starts)
+      // Trigger underline wave when content animations finish (1000ms after content starts)
       const waveTimer = setTimeout(() => {
         setShowUnderlineWave(true);
-      }, 1200);
+      }, 1000);
       
       // Trigger Banodoco after second social icon + 500ms pause (950ms + 500ms = 1450ms)
       const banodocoTimer = setTimeout(() => {
@@ -190,7 +190,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             <div className="overflow-hidden">
               {/* Subtitle - Start -60px (UP) to simulate coming from bar */}
-              <div className="mt-8" style={getFadeStyle(0.5, -60, false)}>
+              <div className="mt-8" style={getFadeStyle(4.5, -60, false)}>
                 <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
                   An{' '}
                   <TooltipProvider>
@@ -274,8 +274,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </p>
               </div>
               
-              {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}
-              <div style={getFadeStyle(1, -140, false)}>
+              {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
+              <div style={getFadeStyle(2.5, -140, false)}>
                 {!session ? (
                   <div className="group">
                     <button
@@ -337,61 +337,68 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
           </div>
 
-          {/* Social Icons - Pop-in animation (completely independent) */}
-          <div className="mt-8 flex justify-center pt-2 pb-4">
-            <div className="flex flex-col items-center space-y-3">
-              {/* GitHub and Discord icons side by side */}
-              <div className="flex items-center space-x-3">
-                <div style={getPopStyle(0.8, false)}>
-                  <a
-                    href="http://github.com/peteromallet/reigh"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
-                  >
-                    <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
-                  </a>
-                </div>
-                <div style={getPopStyle(0.95, false)}>
-                  <a
-                    href="https://discord.gg/D5K2c6kfhy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
-                  >
-                    <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
-                  </a>
+          {/* Social Icons & Banodoco - Pop-in animation (completely independent) */}
+          <div 
+            className="grid transition-[grid-template-rows] duration-1000 ease-out"
+            style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
+          >
+            <div className="overflow-hidden">
+              <div className="mt-8 flex justify-center pt-2 pb-4">
+                <div className="flex flex-col items-center space-y-3">
+                  {/* GitHub and Discord icons side by side */}
+                  <div className="flex items-center space-x-3">
+                    <div style={getPopStyle(0.8, false)}>
+                      <a
+                        href="http://github.com/peteromallet/reigh"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
+                      >
+                        <Github className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                      </a>
+                    </div>
+                    <div style={getPopStyle(0.95, false)}>
+                      <a
+                        href="https://discord.gg/D5K2c6kfhy"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-2 bg-white/50 backdrop-blur-sm rounded-full border border-wes-vintage-gold/20 hover:border-wes-vintage-gold/40 transition-all duration-300 hover:bg-white/70 group opacity-80 hover:opacity-100 shadow-md"
+                      >
+                        <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
+                      </a>
+                    </div>
+                  </div>
+                  
+                  {/* Placeholder icon beneath them */}
+                  <div style={getPopStyle(1.1, false)}>
+                    <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
+                      <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              {/* Placeholder icon beneath them */}
-              <div style={getPopStyle(1.1, false)}>
-                <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
-                  <Plus className="w-2.5 h-2.5 text-wes-vintage-gold/40" />
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Banodoco Logo */}
-          <div className="flex justify-center">
-            <div className="mt-2">
-              <a
-                href="http://banodoco.ai/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <img 
-                  src="/banodoco-gold.png" 
-                  alt="Banodoco" 
-                  className={`w-[34px] h-[34px] object-contain 
-                    ${banodocoState === 'hidden' ? 'opacity-0' : ''}
-                    ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
-                    ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
-                  `} 
-                />
-              </a>
+              {/* Banodoco Logo */}
+              <div className="flex justify-center">
+                <div className="mt-2">
+                  <a
+                    href="http://banodoco.ai/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <img 
+                      src="/banodoco-gold.png" 
+                      alt="Banodoco" 
+                      className={`w-[34px] h-[34px] object-contain 
+                        ${banodocoState === 'hidden' ? 'opacity-0' : ''}
+                        ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
+                        ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
+                      `} 
+                    />
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
