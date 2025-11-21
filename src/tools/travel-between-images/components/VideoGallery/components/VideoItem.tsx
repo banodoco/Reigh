@@ -110,7 +110,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
   const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   
-  // Join settings state (matches JoinClipsPage)
+  // Join settings state (matches JoinClipsPage defaults)
   const [joinPrompt, setJoinPrompt] = useState('');
   const [joinNegativePrompt, setJoinNegativePrompt] = useState('');
   const [joinContextFrames, setJoinContextFrames] = useState(10);
@@ -1026,7 +1026,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
           </div>
         </div>
 
-        {/* Bottom Overlay - View Segments Button, Join Clips Button & Variant Name */}
+        {/* Bottom Overlay - View Segments Button & Variant Name */}
         <div className="absolute bottom-0 left-0 right-0 pb-2 pl-3 pr-3 pt-6 flex justify-between items-end bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
           <div className="flex flex-col items-start gap-2 pointer-events-auto">
             {/* View Segments Button */}
@@ -1097,6 +1097,133 @@ export const VideoItem = React.memo<VideoItemProps>(({
             )}
           </div>
         </div>
+        
+        {/* Join Clips Settings Modal */}
+        <Dialog open={showJoinModal} onOpenChange={setShowJoinModal}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Join {childGenerations.length} Segments</DialogTitle>
+            <DialogDescription>
+              Configure settings for joining the segments into a single video
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Prompts */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="join-prompt">Prompt (Optional)</Label>
+                <Textarea
+                  id="join-prompt"
+                  value={joinPrompt}
+                  onChange={(e) => setJoinPrompt(e.target.value)}
+                  placeholder="Describe what you want for the transitions between segments"
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="join-negative-prompt">Negative Prompt (Optional)</Label>
+                <Textarea
+                  id="join-negative-prompt"
+                  value={joinNegativePrompt}
+                  onChange={(e) => setJoinNegativePrompt(e.target.value)}
+                  placeholder="What to avoid in the transitions"
+                  rows={2}
+                  className="resize-none"
+                />
+              </div>
+            </div>
+            
+            {/* Frame Controls */}
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="join-gap-frames" className="text-sm">
+                    Gap Frames
+                  </Label>
+                  <span className="text-sm font-medium">{joinGapFrames}</span>
+                </div>
+                <Slider
+                  id="join-gap-frames"
+                  min={1}
+                  max={Math.max(1, 81 - (joinContextFrames * 2))}
+                  step={1}
+                  value={[Math.max(1, joinGapFrames)]}
+                  onValueChange={(values) => {
+                    const val = Math.max(1, values[0]);
+                    setJoinGapFrames(val);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">Frames to generate in each transition</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="join-context-frames" className="text-sm">
+                  Context Frames
+                </Label>
+                <Input
+                  id="join-context-frames"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={joinContextFrames}
+                  onChange={(e) => {
+                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                    if (!isNaN(val) && val > 0) {
+                      const maxGap = Math.max(1, 81 - (val * 2));
+                      const newGapFrames = joinGapFrames > maxGap ? maxGap : joinGapFrames;
+                      setJoinContextFrames(val);
+                      setJoinGapFrames(newGapFrames);
+                    }
+                  }}
+                  className="text-center"
+                />
+                <p className="text-xs text-muted-foreground">Context frames from each clip</p>
+              </div>
+              
+              <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
+                <Label htmlFor="join-replace-mode" className="text-sm text-center flex-1 cursor-pointer">
+                  Replace Frames
+                </Label>
+                <Switch
+                  id="join-replace-mode"
+                  checked={!joinReplaceMode}
+                  onCheckedChange={(checked) => {
+                    setJoinReplaceMode(!checked);
+                  }}
+                />
+                <Label htmlFor="join-replace-mode" className="text-sm text-center flex-1 cursor-pointer">
+                  Generate New
+                </Label>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowJoinModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmJoin}
+              disabled={isJoiningClips}
+            >
+              {isJoiningClips ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating Task...
+                </>
+              ) : (
+                `Join ${childGenerations.length} Segments`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
         {/* Action buttons – positioned directly on the video/poster container */}
         <div className="absolute top-1/2 right-2 sm:right-3 flex flex-col items-end gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -translate-y-1/2 z-20 pointer-events-auto">

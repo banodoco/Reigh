@@ -377,8 +377,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         <MessageCircle className="w-4 h-4 text-wes-vintage-gold/80 group-hover:text-wes-vintage-gold transition-colors duration-300" />
                       </a>
                     </div>
-                  </div>
-                  
+              </div>
+
                   {/* Placeholder icon beneath them */}
                   <div style={getPopStyle(1.1, false)}>
                     <div className="p-1.5 bg-white/20 backdrop-blur-sm rounded-full border border-wes-vintage-gold/5 opacity-30">
