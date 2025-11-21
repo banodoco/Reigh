@@ -60,6 +60,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [phase, setPhase] = useState<AnimationPhase>('initial');
   const [barWidth, setBarWidth] = useState('0%');
   const [banodocoState, setBanodocoState] = useState<'hidden' | 'animating' | 'visible'>('hidden');
+  const [showUnderlineWave, setShowUnderlineWave] = useState(false);
 
   // Master animation orchestrator
   useEffect(() => {
@@ -84,12 +85,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     }
     
     if (phase === 'content-revealing') {
+      // Trigger underline wave after content is revealed (1200ms after content starts)
+      const waveTimer = setTimeout(() => {
+        setShowUnderlineWave(true);
+      }, 1200);
+      
       // Trigger Banodoco after second social icon + 500ms pause (950ms + 500ms = 1450ms)
-      const timer = setTimeout(() => {
+      const banodocoTimer = setTimeout(() => {
         setBanodocoState('animating');
         setTimeout(() => setBanodocoState('visible'), 1800); // 1800ms animation duration
       }, 1450);
-      return () => clearTimeout(timer);
+      
+      return () => {
+        clearTimeout(waveTimer);
+        clearTimeout(banodocoTimer);
+      };
     }
   }, [phase, assetsLoaded, barTransitionCompleted]);
 
@@ -189,7 +199,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         <span
                           onClick={handleOpenToolActivate}
                           onMouseLeave={() => { if(openTipDisabled) setOpenTipDisabled(false);} }
-                          className={`sparkle-underline cursor-pointer transition-colors duration-200 ${openTipOpen ? 'tooltip-open' : ''} ${openTipDisabled ? 'pointer-events-none' : ''} ${
+                          className={`sparkle-underline cursor-pointer transition-colors duration-200 ${openTipOpen ? 'tooltip-open' : ''} ${openTipDisabled ? 'pointer-events-none' : ''} ${showUnderlineWave ? 'underline-wave-first' : ''} ${
                             showCreativePartner ? 'pointer-events-none opacity-60' : showPhilosophy || showExamples ? 'opacity-40 pointer-events-none brightness-50 transition-all duration-100' : 'opacity-100 pointer-events-auto transition-all duration-300'
                           }`}
                         >
@@ -224,7 +234,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                           onMouseLeave={() => {
                             if (emergingTipDisabled) setEmergingTipDisabled(false);
                           }}
-                          className={`sparkle-underline cursor-pointer transition-colors duration-200 whitespace-nowrap ${emergingTipOpen ? 'tooltip-open' : ''} ${emergingTipDisabled ? 'pointer-events-none' : ''} ${
+                          className={`sparkle-underline cursor-pointer transition-colors duration-200 whitespace-nowrap ${emergingTipOpen ? 'tooltip-open' : ''} ${emergingTipDisabled ? 'pointer-events-none' : ''} ${showUnderlineWave ? 'underline-wave-second' : ''} ${
                             showExamples
                               ? 'pointer-events-none opacity-60'
                               : showCreativePartner || showPhilosophy

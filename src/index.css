@@ -1408,6 +1408,47 @@
   .sparkle-underline[data-state="open"]:hover::after {
     opacity: 0 !important;
   }
+
+  /* Wave animation for underlines on page load */
+  @keyframes underlineWaveIn {
+    0% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes underlineWaveOut {
+    0% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .underline-wave-first::before {
+    animation: sparkleColorWave 3s linear infinite, underlineWaveIn 2.4s ease-in-out 1 !important;
+  }
+
+  .underline-wave-first::after {
+    animation: underlineWaveOut 2.4s ease-in-out 1 !important;
+  }
+
+  .underline-wave-second::before {
+    animation: sparkleColorWave 3s linear infinite, underlineWaveIn 2.4s ease-in-out 0.6s 1 !important;
+  }
+
+  .underline-wave-second::after {
+    animation: underlineWaveOut 2.4s ease-in-out 0.6s 1 !important;
+  }
    
   /* Multicolour border for tooltips on hover */
   .tooltip-content:hover {
