@@ -14,12 +14,13 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { joinClipsSettings } from '@/tools/join-clips/settings';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useLoraManager, type LoraModel } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -118,6 +119,22 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [keepBridgingImages, setKeepBridgingImages] = useState(joinClipsSettings.defaults.keepBridgingImages);
     const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
     const queryClient = useQueryClient();
+
+    // Fetch parent generation details to check for final output
+    const { data: parentGeneration } = useQuery({
+        queryKey: ['generation', parentGenerationId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('generations')
+                .select('*')
+                .eq('id', parentGenerationId)
+                .single();
+            
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!parentGenerationId,
+    });
 
     // Fetch available LoRAs
     const publicLorasResult = useListPublicResources('lora');
@@ -236,6 +253,30 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             </div>
 
             {/* Content */}
+            {/* Parent Generation Video (Final Output) */}
+            {parentGeneration?.location && (
+                <div className="max-w-7xl mx-auto px-4 pt-5 pb-0">
+                    <Card className="overflow-hidden border-primary/20 shadow-sm">
+                        <div className="p-4 border-b bg-muted/30">
+                            <h2 className="text-lg font-medium flex items-center gap-2">
+                                <Film className="w-5 h-5 text-primary" />
+                                Final Video
+                            </h2>
+                        </div>
+                        <div className="bg-black w-full flex items-center justify-center min-h-[300px] max-h-[60vh] relative group">
+                            <video
+                                src={getDisplayUrl(parentGeneration.location)}
+                                controls
+                                loop
+                                playsInline
+                                className="w-full h-full object-contain max-h-[60vh]"
+                                poster={parentGeneration.thumbnail_url ? getDisplayUrl(parentGeneration.thumbnail_url) : undefined}
+                            />
+                        </div>
+                    </Card>
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto px-4 pt-5 pb-6">
                 <Card className="p-6 sm:p-8 shadow-sm border">
                     <h2 className="text-2xl font-light tracking-tight mb-6">Segments</h2>
