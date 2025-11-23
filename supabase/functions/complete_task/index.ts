@@ -1427,10 +1427,10 @@ async function createGenerationFromTask(
           }
         }
       }
-    } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && taskData.params?.parent_generation_id) {
+    } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)) {
+      const parentGenId = taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id;
       // SPECIAL CASE: travel_stitch or join_clips_orchestrator IS the final output of the orchestrator.
       // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
-      const parentGenId = taskData.params.parent_generation_id;
       console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing - updating parent generation ${parentGenId}`);
 
       // Fetch the parent generation directly
@@ -1465,7 +1465,6 @@ async function createGenerationFromTask(
 
         // We return the parent generation as the result
         return parentGen;
-      }
     } else if (taskData.task_types?.category === 'orchestration') {
       // This IS the orchestrator task completing
       // Check if a placeholder generation already exists (created by a child)
