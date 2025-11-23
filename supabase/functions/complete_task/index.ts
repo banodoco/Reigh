@@ -1427,14 +1427,23 @@ async function createGenerationFromTask(
           }
         }
       }
-    } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && (taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id)) {
+    } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && taskData.params?.parent_generation_id) {
       // SPECIAL CASE: travel_stitch or join_clips_orchestrator IS the final output of the orchestrator.
       // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
-      const orchId = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
-      console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing for orchestrator ${orchId} - updating parent generation`);
+      const parentGenId = taskData.params.parent_generation_id;
+      console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing - updating parent generation ${parentGenId}`);
 
-      const parentGen = await getOrCreateParentGeneration(supabase, orchId, taskData.project_id);
-      if (parentGen) {
+      // Fetch the parent generation directly
+      const { data: parentGen, error: fetchError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', parentGenId)
+        .single();
+
+      if (fetchError || !parentGen) {
+        console.error(`[GenMigration] Error fetching parent generation ${parentGenId}:`, fetchError);
+        // Continue with regular generation creation as fallback
+      } else {
         console.log(`[GenMigration] Updating parent generation ${parentGen.id} with final video URL`);
 
         // Update the parent generation with the location (video URL) and thumbnail
