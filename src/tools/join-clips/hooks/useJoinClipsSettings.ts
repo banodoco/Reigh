@@ -2,8 +2,8 @@ import { useToolPageSettings } from '@/shared/hooks/useToolPageSettings';
 import { JoinClipsSettings } from '../settings';
 
 const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
-  contextFrameCount: 10,
-  gapFrameCount: 33,
+  contextFrameCount: 8,
+  gapFrameCount: 12,
   replaceMode: true,
   keepBridgingImages: true,
   model: 'wan_2_2_vace_lightning_baseline_2_2_2',

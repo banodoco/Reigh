@@ -8,7 +8,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
-import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/shared/components/ui/card';
 import { createJoinClipsTask } from '@/shared/lib/tasks/joinClips';
 import { useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
+import { joinClipsSettings } from '@/tools/join-clips/settings';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useLoraManager, type LoraModel } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
@@ -111,10 +112,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // const [showJoinModal, setShowJoinModal] = useState(false); // Removed modal state
     const [joinPrompt, setJoinPrompt] = useState('');
     const [joinNegativePrompt, setJoinNegativePrompt] = useState('');
-    const [joinContextFrames, setJoinContextFrames] = useState(10);
-    const [joinGapFrames, setJoinGapFrames] = useState(33);
-    const [joinReplaceMode, setJoinReplaceMode] = useState(true);
-    const [keepBridgingImages, setKeepBridgingImages] = useState(true);
+    const [joinContextFrames, setJoinContextFrames] = useState(joinClipsSettings.defaults.contextFrameCount);
+    const [joinGapFrames, setJoinGapFrames] = useState(joinClipsSettings.defaults.gapFrameCount);
+    const [joinReplaceMode, setJoinReplaceMode] = useState(joinClipsSettings.defaults.replaceMode);
+    const [keepBridgingImages, setKeepBridgingImages] = useState(joinClipsSettings.defaults.keepBridgingImages);
     const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
     const queryClient = useQueryClient();
 
@@ -129,6 +130,20 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         enableProjectPersistence: true,
         persistenceKey: 'join-clips-segments',
     });
+
+    const handleRestoreDefaults = () => {
+        setJoinContextFrames(joinClipsSettings.defaults.contextFrameCount);
+        setJoinGapFrames(joinClipsSettings.defaults.gapFrameCount);
+        setJoinReplaceMode(joinClipsSettings.defaults.replaceMode);
+        setKeepBridgingImages(joinClipsSettings.defaults.keepBridgingImages);
+        setJoinPrompt('');
+        setJoinNegativePrompt('');
+        loraManager.clearLoras();
+        toast({
+            title: "Settings restored",
+            description: "Join clips settings have been reset to defaults.",
+        });
+    };
 
     const handleConfirmJoin = async () => {
         if (!projectId || sortedChildren.length < 2) return;
@@ -192,10 +207,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     };
 
     return (
-        <div className="w-full min-h-screen bg-background pb-20">
+        <div className="w-full min-h-screen">
             {/* Header */}
-            <div className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-                <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-4">
+            <div className="sticky top-0 z-10">
+                <div className="max-w-7xl mx-auto px-4 pt-4 pb-0">
                     <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
@@ -220,48 +235,62 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             </div>
 
             {/* Content */}
-            <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-6">
-                {isLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {[1, 2, 3, 4].map((i) => (
-                            <Card key={i}>
-                                <CardContent className="p-4 space-y-3">
-                                    <Skeleton className="w-full aspect-video rounded-lg" />
-                                    <Skeleton className="h-4 w-3/4" />
-                                    <Skeleton className="h-20 w-full" />
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                ) : sortedChildren.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-20">
+            <div className="max-w-7xl mx-auto px-4 pt-5 pb-6">
+                <Card className="p-6 sm:p-8 shadow-sm border">
+                    <h2 className="text-2xl font-light tracking-tight mb-6">Segments</h2>
+                    
+                    {isLoading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {[1, 2, 3, 4].map((i) => (
+                                <Card key={i}>
+                                    <CardContent className="p-4 space-y-3">
+                                        <Skeleton className="w-full aspect-video rounded-lg" />
+                                        <Skeleton className="h-4 w-3/4" />
+                                        <Skeleton className="h-20 w-full" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : sortedChildren.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 border rounded-lg bg-muted/10">
                             <p className="text-muted-foreground">No segments found for this generation.</p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {sortedChildren.map((child, index) => (
-                            <SegmentCard
-                                key={child.id}
-                                child={child}
-                                index={index}
-                                projectId={projectId}
-                                onLightboxOpen={() => setLightboxIndex(index)}
-                                onUpdate={refetch}
-                            />
-                        ))}
-                    </div>
-                )}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {sortedChildren.map((child, index) => (
+                                <SegmentCard
+                                    key={child.id}
+                                    child={child}
+                                    index={index}
+                                    projectId={projectId}
+                                    onLightboxOpen={() => setLightboxIndex(index)}
+                                    onUpdate={refetch}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </Card>
             </div>
 
             {/* Join Clips Section */}
             {sortedChildren.length >= 2 && sortedChildren.some(c => c.location) && (
-                <div className="max-w-[1920px] mx-auto px-4 sm:px-6 pt-8 pb-20 mt-8">
-                    <Card className="p-6 sm:p-8 shadow-sm border bg-card/50 backdrop-blur-sm">
-                        <h2 className="text-2xl font-light tracking-tight mb-6">Join Segments</h2>
-                        
+                <div className="max-w-7xl mx-auto px-4 pb-4">
+                    <Card className="p-6 sm:p-8 shadow-sm border">
                         <JoinClipsSettingsForm 
+                            headerContent={
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-2xl font-light tracking-tight">Join Segments</h2>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleRestoreDefaults}
+                                        className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        Restore defaults
+                                    </Button>
+                                </div>
+                            }
                             gapFrames={joinGapFrames}
                             setGapFrames={setJoinGapFrames}
                             contextFrames={joinContextFrames}
@@ -560,24 +589,21 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                     </CollapsibleContent>
                 </Collapsible>
 
-                {/* Save Button */}
-                {isDirty && (
-                    <Button
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="w-full gap-2"
-                    >
-                        {isSaving ? (
-                            <>Saving...</>
-                        ) : (
-                            <>
-                                <Save className="w-3 h-3" />
-                                Save Changes
-                            </>
-                        )}
-                    </Button>
-                )}
+                {/* Regenerate Video Button */}
+                <Button
+                    size="sm"
+                    onClick={() => {
+                        // TODO: Implement regenerate video functionality
+                        toast({
+                            title: "Regenerate Video",
+                            description: "This feature is coming soon!",
+                        });
+                    }}
+                    className="w-full gap-2"
+                >
+                    <Film className="w-3 h-3" />
+                    Regenerate Video
+                </Button>
             </CardContent>
         </Card>
     );
