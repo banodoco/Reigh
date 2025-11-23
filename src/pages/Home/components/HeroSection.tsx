@@ -198,7 +198,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             className="grid transition-[grid-template-rows] duration-1000 ease-out"
             style={{ gridTemplateRows: phase === 'content-revealing' || phase === 'complete' ? '1fr' : '0fr' }}
           >
-            <div className="overflow-hidden">
+            <div className={phase === 'complete' ? "overflow-visible" : "overflow-hidden"}>
               {/* Subtitle - Start -60px (UP) to simulate coming from bar */}
               <div className="mt-8" style={getFadeStyle(4.5, -60, false)}>
                 <p className="font-theme text-xl md:text-2xl font-theme-body text-muted-foreground leading-relaxed tracking-wide mb-8">
@@ -284,10 +284,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 </p>
               </div>
               
-              {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
-              <div style={getFadeStyle(2.5, -140, false)}>
-                {!session ? (
-                  <div className="group">
+            {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
+            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6">
+              {!session ? (
+                <div className="group">
                     <button
                       onClick={handleDiscordSignIn}
                       className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-wes-vintage-gold to-wes-coral rounded-full border-2 border-wes-vintage-gold/40 hover:border-wes-vintage-gold/60 shadow-wes-vintage hover:shadow-wes-hover text-white text-lg font-light mx-auto relative overflow-hidden"
@@ -397,15 +397,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     rel="noopener noreferrer"
                     className="block"
                   >
-                    <img 
-                      src="/banodoco-gold.png" 
-                      alt="Banodoco" 
-                      className={`w-[34px] h-[34px] object-contain 
-                        ${banodocoState === 'hidden' ? 'opacity-0' : ''}
-                        ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
-                        ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
-                      `} 
-                    />
+                  <img 
+                    src="/banodoco-gold.png" 
+                    alt="Banodoco" 
+                    className={`w-[34px] h-[34px] object-contain image-rendering-pixelated
+                      ${banodocoState === 'hidden' ? 'opacity-0' : ''}
+                      ${banodocoState === 'animating' ? 'animate-burst-and-flash' : ''}
+                      ${banodocoState === 'visible' ? 'opacity-100 brightness-[0.75] hue-rotate-[-30deg] saturate-150 hover:brightness-100 hover:saturate-150 hover:hue-rotate-[-15deg] transition-all duration-700 ease-in-out' : ''}
+                    `} 
+                    style={{ imageRendering: 'auto' }}
+                  />
                   </a>
                 </div>
               </div>
