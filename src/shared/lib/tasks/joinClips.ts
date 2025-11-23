@@ -250,7 +250,8 @@ function buildJoinClipsPayload(
   }
 
   return {
-    orchestrator_details: orchestratorDetails
+    orchestrator_details: orchestratorDetails,
+    parent_generation_id: params.parent_generation_id,
   };
 }
 
