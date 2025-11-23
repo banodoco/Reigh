@@ -112,7 +112,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
   // Bar width management
   useEffect(() => {
-    setBarWidth(assetsLoaded ? '100%' : '30%');
+    setBarWidth(assetsLoaded ? '100%' : '92%');
   }, [assetsLoaded]);
 
   // Helper for staggering animations based on animation phase
