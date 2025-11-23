@@ -348,10 +348,6 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('batchVideoFrames', frames);
   }, [shotSettings]);
 
-  const handleBatchVideoContextChange = useCallback((context: number) => {
-    shotSettings.updateField('batchVideoContext', context);
-  }, [shotSettings]);
-
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
     console.log('[BatchVideoSteps] User changing steps to:', steps);
     shotSettings.updateField('batchVideoSteps', steps);
@@ -800,7 +796,6 @@ const VideoTravelToolPage: React.FC = () => {
     videoControlMode = 'batch',
     batchVideoPrompt = '',
     batchVideoFrames = 60,
-    batchVideoContext = 10,
     batchVideoSteps = 6,
     enhancePrompt = false,
     autoCreateIndividualPrompts = true,
@@ -1944,7 +1939,6 @@ const VideoTravelToolPage: React.FC = () => {
               videoControlMode={videoControlMode}
               batchVideoPrompt={batchVideoPrompt}
               batchVideoFrames={batchVideoFrames}
-              batchVideoContext={batchVideoContext}
               onShotImagesUpdate={handleShotImagesUpdate}
               onBack={handleBackToShotList}
               onVideoControlModeChange={handleVideoControlModeChange}
@@ -1968,7 +1962,6 @@ const VideoTravelToolPage: React.FC = () => {
               isGeneratingVideo={isGeneratingVideo}
               videoJustQueued={videoJustQueued}
               onBatchVideoFramesChange={handleBatchVideoFramesChange}
-              onBatchVideoContextChange={handleBatchVideoContextChange}
               batchVideoSteps={batchVideoSteps}
               onBatchVideoStepsChange={handleBatchVideoStepsChange}
               dimensionSource={dimensionSource}

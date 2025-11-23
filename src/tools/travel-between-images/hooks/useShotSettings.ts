@@ -11,7 +11,6 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   videoControlMode: 'batch',
   batchVideoPrompt: '',
   batchVideoFrames: 60,
-  batchVideoContext: 10,
   batchVideoSteps: 6,
   steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   enhancePrompt: false,

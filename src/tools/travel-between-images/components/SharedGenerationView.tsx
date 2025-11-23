@@ -407,7 +407,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                   projectId="shared-project"
                   shotName="Shared Generation"
                   batchVideoFrames={taskSettings.frames}
-                  batchVideoContext={taskSettings.context_frames}
                   onImageReorder={() => {}} // Read-only
                   onImageSaved={async () => {}} // Read-only
                   onContextFramesChange={() => {}} // Read-only
@@ -461,8 +460,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                 onBatchVideoPromptChange={() => {}} // No-op
                 batchVideoFrames={taskSettings.frames}
                 onBatchVideoFramesChange={() => {}} // No-op
-                batchVideoContext={taskSettings.context_frames}
-                onBatchVideoContextChange={() => {}} // No-op
                 batchVideoSteps={taskSettings.steps}
                 onBatchVideoStepsChange={() => {}} // No-op
                 dimensionSource="custom"

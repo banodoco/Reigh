@@ -61,7 +61,6 @@ export interface ShotSettings {
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;
   batchVideoFrames: number;
-  batchVideoContext: number;
   batchVideoSteps: number;
   steerableMotionSettings: SteerableMotionSettings;
   generationMode: 'batch' | 'timeline' | 'by-pair';
@@ -91,14 +90,12 @@ export interface ShotEditorProps {
   videoControlMode?: 'individual' | 'batch';
   batchVideoPrompt?: string;
   batchVideoFrames?: number;
-  batchVideoContext?: number;
   onShotImagesUpdate: () => void;
   onBack: () => void;
   onVideoControlModeChange?: (mode: 'individual' | 'batch') => void;
   onPairConfigChange: (pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => void;
   onBatchVideoPromptChange?: (prompt: string) => void;
   onBatchVideoFramesChange?: (frames: number) => void;
-  onBatchVideoContextChange?: (context: number) => void;
   batchVideoSteps?: number;
   onBatchVideoStepsChange?: (steps: number) => void;
   dimensionSource?: 'project' | 'firstImage' | 'custom';

@@ -29,7 +29,6 @@ interface ApplySettingsContext {
   onBatchVideoPromptChange: (prompt: string) => void;
   onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
   onBatchVideoFramesChange: (frames: number) => void;
-  onBatchVideoContextChange: (context: number) => void;
   onBatchVideoStepsChange: (steps: number) => void;
   onDimensionSourceChange: (source: 'project' | 'firstImage' | 'custom') => void;
   onCustomWidthChange: (width?: number) => void;
@@ -64,7 +63,6 @@ interface ApplySettingsContext {
   textAfterPrompts: string;
   batchVideoSteps: number;
   batchVideoFrames: number;
-  batchVideoContext: number;
   steerableMotionSettings: SteerableMotionSettings;
   
   // Managers/Mutations
@@ -159,7 +157,6 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         onBatchVideoPromptChange: ctx.onBatchVideoPromptChange,
         onSteerableMotionSettingsChange: ctx.onSteerableMotionSettingsChange,
         onBatchVideoFramesChange: ctx.onBatchVideoFramesChange,
-        onBatchVideoContextChange: ctx.onBatchVideoContextChange,
         onBatchVideoStepsChange: ctx.onBatchVideoStepsChange,
         onGenerationModeChange: ctx.onGenerationModeChange,
         onAdvancedModeChange: ctx.onAdvancedModeChange,
@@ -180,7 +177,6 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
         // Current values for comparison
         steerableMotionSettings: ctx.steerableMotionSettings,
         batchVideoFrames: ctx.batchVideoFrames,
-        batchVideoContext: ctx.batchVideoContext,
         batchVideoSteps: ctx.batchVideoSteps,
         textBeforePrompts: ctx.textBeforePrompts,
         textAfterPrompts: ctx.textAfterPrompts,

@@ -42,8 +42,6 @@ interface ShotImagesEditorProps {
   shotName?: string;
   /** Frame spacing (frames between key-frames) */
   batchVideoFrames: number;
-  /** Context frames value */
-  batchVideoContext: number;
   /** Reordering callback – receives ordered ids */
   onImageReorder: (orderedIds: string[]) => void;
   /** Image saved callback (e.g. after in-place edit) */
@@ -137,7 +135,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   projectId,
   shotName,
   batchVideoFrames,
-  batchVideoContext,
   onImageReorder,
   onImageSaved,
   onContextFramesChange,
@@ -194,7 +191,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     generationMode: string;
     readOnly: boolean;
     batchVideoFrames?: number;
-    batchVideoContext?: number;
     pendingPositionsSize: number;
     columns: number;
     unpositionedGenerationsCount: number;
@@ -243,7 +239,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       generationMode,
       readOnly,
       batchVideoFrames,
-      batchVideoContext,
       pendingPositionsSize: pendingPositions.size,
       columns,
       unpositionedGenerationsCount,
@@ -856,7 +851,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 shotId={selectedShotId}
                 projectId={projectId}
                 frameSpacing={batchVideoFrames}
-                contextFrames={batchVideoContext}
                 onImageReorder={onImageReorder}
                 onImageSaved={onImageSaved}
                 onContextFramesChange={onContextFramesChange}

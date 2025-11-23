@@ -24,8 +24,6 @@ interface BatchSettingsFormProps {
   onBatchVideoPromptChange: (value: string) => void;
   batchVideoFrames: number;
   onBatchVideoFramesChange: (value: number) => void;
-  batchVideoContext: number;
-  onBatchVideoContextChange: (value: number) => void;
   batchVideoSteps: number;
   onBatchVideoStepsChange: (value: number) => void;
   dimensionSource: 'project' | 'firstImage' | 'custom';
@@ -104,8 +102,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onBatchVideoPromptChange,
   batchVideoFrames,
   onBatchVideoFramesChange,
-  batchVideoContext,
-  onBatchVideoContextChange,
   batchVideoSteps,
   onBatchVideoStepsChange,
   dimensionSource,
@@ -363,58 +359,33 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
               </div>
             )}
             
-            {/* Frames per pair and Context frames - shown in both Timeline and Batch modes */}
-            <div className={`grid grid-cols-1 gap-4 ${(isTimelineMode || imageCount >= 2) ? 'md:grid-cols-2' : ''}`}>
-              <div className="relative">
-                <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
-                  {isTimelineMode ? 'Duration per pair' : (imageCount === 1 ? 'Duration to generate' : 'Duration per pair')}: {framesToSeconds(batchVideoFrames)} ({batchVideoFrames} frames)
-                </Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                      <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.
-                      {turboMode && <><br /><br /><strong>Turbo Mode:</strong> Duration is fixed at {framesToSeconds(81)} (81 frames) for optimal speed.</>}
-                      </p>
-                  </TooltipContent>
-                </Tooltip>
-                <Slider
-                  id="batchVideoFrames"
-                  min={10}
-                  max={81} 
-                  step={1}
-                  value={[batchVideoFrames]}
-                  onValueChange={(value) => onBatchVideoFramesChange(value[0])}
-                  disabled={turboMode || isTimelineMode}
-                  className={(turboMode || isTimelineMode) ? 'opacity-50' : ''}
-                />
-              </div>
-              {(isTimelineMode || imageCount >= 2) && !turboMode && (
-                <div className="relative">
-                  <Label htmlFor="batchVideoContext" className="text-sm font-light block mb-1">Context: {framesToSeconds(batchVideoContext)} ({batchVideoContext} frames)</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                        <Info className="h-4 w-4" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>How many frames from one segment to reference for the next. <br /> Helps create smoother transitions.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Slider
-                    id="batchVideoContext"
-                    min={1}
-                    max={24}
-                    step={1}
-                    value={[batchVideoContext]}
-                    onValueChange={(value) => onBatchVideoContextChange(value[0])}
-                  />
-                </div>
-              )}
+            {/* Frames per pair - shown in both Timeline and Batch modes */}
+            <div className="relative">
+              <Label htmlFor="batchVideoFrames" className="text-sm font-light block mb-1">
+                {isTimelineMode ? 'Duration per pair' : (imageCount === 1 ? 'Duration to generate' : 'Duration per pair')}: {framesToSeconds(batchVideoFrames)} ({batchVideoFrames} frames)
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="absolute top-0 right-0 text-muted-foreground cursor-help hover:text-foreground transition-colors">
+                    <Info className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.
+                    {turboMode && <><br /><br /><strong>Turbo Mode:</strong> Duration is fixed at {framesToSeconds(81)} (81 frames) for optimal speed.</>}
+                    </p>
+                </TooltipContent>
+              </Tooltip>
+              <Slider
+                id="batchVideoFrames"
+                min={10}
+                max={81} 
+                step={1}
+                value={[batchVideoFrames]}
+                onValueChange={(value) => onBatchVideoFramesChange(value[0])}
+                disabled={turboMode || isTimelineMode}
+                className={(turboMode || isTimelineMode) ? 'opacity-50' : ''}
+              />
             </div>
 
             

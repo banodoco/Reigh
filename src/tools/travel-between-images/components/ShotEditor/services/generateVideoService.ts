@@ -31,7 +31,6 @@ export interface GenerateVideoParams {
   
   // Video settings
   batchVideoFrames: number;
-  batchVideoContext: number;
   batchVideoSteps: number;
   
   // Model settings
@@ -97,7 +96,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     textBeforePrompts,
     textAfterPrompts,
     batchVideoFrames,
-    batchVideoContext,
     batchVideoSteps,
     steerableMotionSettings,
     getModelName,
@@ -407,7 +405,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     }) : [''];
     
     segmentFrames = frameGaps.length > 0 ? frameGaps : [batchVideoFrames];
-    frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => batchVideoContext) : [batchVideoContext];
+    frameOverlap = frameGaps.length > 0 ? frameGaps.map(() => 10) : [10]; // Fixed context of 10 frames
     
     negativePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
       // Use pair-specific negative prompt if available, otherwise fall back to default
@@ -451,7 +449,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // batch mode - send empty string, backend will use base_prompt
     basePrompts = [''];
     segmentFrames = [batchVideoFrames];
-    frameOverlap = [batchVideoContext];
+    frameOverlap = [10]; // Fixed context of 10 frames
     negativePrompts = [steerableMotionSettings.negative_prompt];
   }
 

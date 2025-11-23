@@ -94,7 +94,6 @@ export const TOOL_FIELD_CATEGORIES = {
     configuration: [
       'videoControlMode',   // Individual vs batch
       'batchVideoFrames',   // Number of frames
-      'batchVideoContext',  // Context frames
       'batchVideoSteps',    // Generation steps
       'dimensionSource',    // project/firstImage/custom
       'customWidth',        // Custom dimensions

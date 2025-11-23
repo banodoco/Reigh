@@ -71,7 +71,6 @@ export interface ApplyContext {
   onBatchVideoPromptChange: (prompt: string) => void;
   onSteerableMotionSettingsChange: (settings: any) => void;
   onBatchVideoFramesChange: (frames: number) => void;
-  onBatchVideoContextChange: (context: number) => void;
   onBatchVideoStepsChange: (steps: number) => void;
   onGenerationModeChange: (mode: 'batch' | 'timeline') => void;
   onAdvancedModeChange: (advanced: boolean) => void;
@@ -107,7 +106,6 @@ export interface ApplyContext {
   // Current values for comparison
   steerableMotionSettings: { model_name: string };
   batchVideoFrames: number;
-  batchVideoContext: number;
   batchVideoSteps: number;
   textBeforePrompts?: string;
   textAfterPrompts?: string;
@@ -476,12 +474,9 @@ export const applyGenerationSettings = async (
   }
   
   // Apply context
+  // Context frames removed - now fixed at 10 frames
   if (typeof settings.context === 'number' && !Number.isNaN(settings.context)) {
-    console.log('[ApplySettings] 🔗 Applying context:', {
-      context: settings.context,
-      currentContext: context.batchVideoContext
-    });
-    context.onBatchVideoContextChange(settings.context);
+    console.log('[ApplySettings] ⚠️ Context frames setting ignored - now fixed at 10 frames');
   } else {
     console.log('[ApplySettings] ⏭️  Skipping context (invalid or undefined)');
   }

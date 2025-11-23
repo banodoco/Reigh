@@ -66,7 +66,6 @@ export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
   batchVideoPrompt: string;
   batchVideoFrames: number;
-  batchVideoContext: number;
   batchVideoSteps: number;
   dimensionSource?: 'project' | 'firstImage' | 'custom'; // DEPRECATED - now using aspect ratios only
   customWidth?: number; // DEPRECATED - now using aspect ratios only
@@ -128,7 +127,6 @@ export const videoTravelSettings = {
     // Configuration fields (can inherit to new projects)
     videoControlMode: 'batch' as const,
     batchVideoFrames: 60,
-    batchVideoContext: 10,
     batchVideoSteps: 6,
     dimensionSource: 'firstImage' as const,
     generationMode: 'batch' as const,

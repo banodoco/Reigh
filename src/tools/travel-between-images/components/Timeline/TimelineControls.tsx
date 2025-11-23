@@ -8,14 +8,12 @@ import { framesToSeconds } from './utils/time-utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
 
 interface TimelineControlsProps {
-  contextFrames: number;
-  onContextFramesChange: (context: number) => void;
   zoomLevel: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
   onZoomToStart: () => void;
-  onResetFrames?: (gap: number, contextFrames: number) => void;
+  onResetFrames?: (gap: number) => void;
   // Structure video props
   shotId?: string;
   projectId?: string;
@@ -31,8 +29,6 @@ interface TimelineControlsProps {
 }
 
 const TimelineControls: React.FC<TimelineControlsProps> = ({
-  contextFrames,
-  onContextFramesChange,
   zoomLevel,
   onZoomIn,
   onZoomOut,
@@ -47,21 +43,14 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
   onStructureVideoChange,
 }) => {
   const [resetGap, setResetGap] = React.useState<number>(10);
-  // Separate pending context frames from active context frames
-  const [pendingContextFrames, setPendingContextFrames] = React.useState<number>(contextFrames);
   
-  // Sync pending context frames when active context frames change (from external sources)
-  React.useEffect(() => {
-    setPendingContextFrames(contextFrames);
-  }, [contextFrames]);
-  
-  // Keep resetGap limited by pending contextFrames for live adjustment
-  const maxGap = 81 - pendingContextFrames;
+  // Fixed max gap of 81
+  const maxGap = 81;
   React.useEffect(() => {
     if (resetGap > maxGap) {
       setResetGap(maxGap);
     }
-  }, [pendingContextFrames, maxGap, resetGap]);
+  }, [maxGap, resetGap]);
   return (
     <div className="flex flex-col gap-3 mb-3">
       {/* Timeline controls */}
@@ -81,29 +70,13 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
               className="w-full mt-1"
             />
           </div>
-          <div className="w-40">
-            <div className="flex items-center gap-2 mb-1">
-              <Label htmlFor="contextFrames" className="text-sm font-light">
-                Context frames: {pendingContextFrames}
-              </Label>
-            </div>
-            <Slider
-              id="contextFrames"
-              min={1}
-              max={24}
-              step={1}
-              value={[pendingContextFrames]}
-              onValueChange={(value) => setPendingContextFrames(value[0])}
-              className="w-full"
-            />
-          </div>
           <Tooltip>
             <TooltipTrigger asChild>
               <span>
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => onResetFrames?.(resetGap, pendingContextFrames)}
+                  onClick={() => onResetFrames?.(resetGap)}
                   disabled={!onResetFrames}
                   className="mt-4"
                 >
@@ -112,7 +85,7 @@ const TimelineControls: React.FC<TimelineControlsProps> = ({
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              <p>This will reset to a {framesToSeconds(resetGap)} gap with {framesToSeconds(pendingContextFrames)} context</p>
+              <p>This will reset to a {framesToSeconds(resetGap)} gap</p>
             </TooltipContent>
           </Tooltip>
         </div>

@@ -329,7 +329,19 @@ const JoinClipsPage: React.FC = () => {
     contextFrameCount = 10,
     gapFrameCount = 33,
     replaceMode = true,
+    keepBridgingImages,
   } = joinSettings.settings;
+  
+  // Track whether settings have completed their initial load
+  const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
+  
+  // Initialize keepBridgingImages to true if undefined (new field for existing projects)
+  useEffect(() => {
+    if (keepBridgingImages === undefined && settingsLoaded) {
+      console.log('[JoinClips] Initializing keepBridgingImages to true');
+      joinSettings.updateField('keepBridgingImages', true);
+    }
+  }, [keepBridgingImages, settingsLoaded, joinSettings]);
   
   // Local UI state (not persisted)
   const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
@@ -352,10 +364,6 @@ const JoinClipsPage: React.FC = () => {
   // Track drag state per clip
   const [draggingOverClipId, setDraggingOverClipId] = useState<string | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
-  
-  // Settings are now managed by joinSettings hook above
-  // Track whether settings have completed their initial load
-  const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
   
   // Get current project for aspect ratio
   const { projects } = useProject();
@@ -853,6 +861,7 @@ const JoinClipsPage: React.FC = () => {
         context_frame_count: contextFrameCount,
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
+        keep_bridging_images: keepBridgingImages ?? true,
         model: joinSettings.settings.model || 'wan_2_2_vace_lightning_baseline_2_2_2',
         num_inference_steps: joinSettings.settings.numInferenceSteps || 6,
         guidance_scale: joinSettings.settings.guidanceScale || 3.0,
@@ -1062,168 +1071,39 @@ const JoinClipsPage: React.FC = () => {
           </DndContext>
         )}
 
-        {/* Global Settings */}
-        <div className="space-y-6 pt-6 border-t">
-          <h2 className="text-xl font-medium">Global Settings</h2>
-            
-          {/* Frame Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                  <Label htmlFor="gapFrameCount" className="text-sm">
-                  Gap Frames
-                </Label>
-                <span className="text-sm font-medium">{gapFrameCount}</span>
-              </div>
-              <Slider
-                  id="gapFrameCount"
-                min={1}
-                max={Math.max(1, 81 - (contextFrameCount * 2))}
-                step={1}
-                value={[Math.max(1, gapFrameCount)]}
-                onValueChange={(values) => {
-                  const val = Math.max(1, values[0]);
-                  joinSettings.updateField('gapFrameCount', val);
-                }}
-              />
-                <p className="text-xs text-muted-foreground">Frames to generate in each transition</p>
-            </div>
-              
-            <div className="space-y-2">
-                <Label htmlFor="contextFrameCount" className="text-sm">
-                Context Frames
-              </Label>
-              <Input
-                  id="contextFrameCount"
-                type="number"
-                min={1}
-                max={30}
-                value={contextFrameCount}
-                onChange={(e) => {
-                  const val = Math.max(1, parseInt(e.target.value) || 1);
-                  if (!isNaN(val) && val > 0) {
-                    const maxGap = Math.max(1, 81 - (val * 2));
-                    const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
-                    
-                    if (contextFramesTimerRef.current) {
-                      clearTimeout(contextFramesTimerRef.current);
-                    }
-                    contextFramesTimerRef.current = setTimeout(() => {
-                      joinSettings.updateFields({ 
-                        contextFrameCount: val, 
-                        gapFrameCount: newGapFrames 
-                      });
-                    }, 300);
-                  }
-                }}
-                className="text-center"
-              />
-                <p className="text-xs text-muted-foreground">Context frames from each clip</p>
-          </div>
-          
-              <div className="flex flex-col justify-center space-y-2">
-          <div className="flex items-center justify-between gap-3 px-3 py-3 border rounded-lg">
-                  <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
-              Replace Frames
-            </Label>
-            <Switch
-                    id="replaceMode"
-              checked={!replaceMode}
-              onCheckedChange={(checked) => {
-                joinSettings.updateField('replaceMode', !checked);
-              }}
-            />
-                  <Label htmlFor="replaceMode" className="text-sm text-center flex-1">
-              Generate New
-            </Label>
-                </div>
-          </div>
-        </div>
-
-            {/* Prompts and LoRA */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-                {/* Global Prompt */}
-            <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="globalPrompt">Global Prompt</Label>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="useIndividualPrompts" className="text-xs text-muted-foreground cursor-pointer">
-                        Set individually
-                      </Label>
-                      <Switch
-                        id="useIndividualPrompts"
-                        checked={useIndividualPrompts}
-                        onCheckedChange={setUseIndividualPrompts}
-                      />
-                    </div>
-                  </div>
-              <Textarea
-                    id="globalPrompt"
-                    value={globalPrompt}
-                  onChange={(e) => {
-                      joinSettings.updateField('prompt', e.target.value);
-                    }}
-                    placeholder={useIndividualPrompts 
-                      ? "Appended to each individual transition prompt" 
-                      : "Describe what you want for all transitions"
-                    }
-                    rows={3}
-                className="resize-none"
-              />
-                  {useIndividualPrompts && (
-                    <p className="text-xs text-muted-foreground">
-                      💡 This will be inserted after each individual prompt
-                    </p>
-                  )}
-            </div>
-            
-                {/* Negative Prompt */}
-            <div className="space-y-2">
-              <Label htmlFor="negativePrompt">Negative Prompt</Label>
-              <Textarea
-                id="negativePrompt"
-                value={negativePrompt}
-                onChange={(e) => {
-                      joinSettings.updateField('negativePrompt', e.target.value);
-                    }}
-                    placeholder="What to avoid in all transitions (optional)"
-                    rows={3}
-                className="resize-none"
-              />
-            </div>
-          </div>
-
-          {/* LoRA Section */}
-          <div className="space-y-2">
-            <LoraManager
-              availableLoras={availableLoras}
-              projectId={selectedProjectId || undefined}
-              persistenceScope="project"
-              enableProjectPersistence={true}
-              persistenceKey="join-clips"
-              title="LoRA Models (Optional)"
-              addButtonText="Add or Manage LoRAs"
-            />
-              </div>
-          </div>
-        </div>
-
-        {/* Generate Button */}
-        <div className="flex justify-center">
-          <Button
-            onClick={handleGenerate}
-              disabled={clips.filter(c => c.url).length < 2 || generateJoinClipsMutation.isPending || showSuccessState}
-              className="w-full max-w-md"
-            size="lg"
-            variant={showSuccessState ? 'default' : 'default'}
-          >
-            {generateJoinClipsMutation.isPending 
-              ? 'Creating Task...' 
-              : showSuccessState 
-              ? '✓ Task Created!' 
-                : `Generate (${clips.filter(c => c.url).length - 1} transition${clips.filter(c => c.url).length - 1 !== 1 ? 's' : ''})`}
-          </Button>
+        {/* Global Settings using JoinClipsSettingsForm */}
+        <div className="pt-6 border-t">
+          <JoinClipsSettingsForm
+            gapFrames={gapFrameCount}
+            setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
+            contextFrames={contextFrameCount}
+            setContextFrames={(val) => {
+              const maxGap = Math.max(1, 81 - (val * 2));
+              const newGapFrames = gapFrameCount > maxGap ? maxGap : gapFrameCount;
+              joinSettings.updateFields({ 
+                contextFrameCount: val, 
+                gapFrameCount: newGapFrames 
+              });
+            }}
+            replaceMode={replaceMode}
+            setReplaceMode={(val) => joinSettings.updateField('replaceMode', val)}
+            keepBridgingImages={keepBridgingImages}
+            setKeepBridgingImages={(val) => joinSettings.updateField('keepBridgingImages', val)}
+            prompt={globalPrompt}
+            setPrompt={(val) => joinSettings.updateField('prompt', val)}
+            negativePrompt={negativePrompt}
+            setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
+            useIndividualPrompts={useIndividualPrompts}
+            setUseIndividualPrompts={setUseIndividualPrompts}
+            availableLoras={availableLoras}
+            projectId={selectedProjectId}
+            loraPersistenceKey="join-clips"
+            onGenerate={handleGenerate}
+            isGenerating={generateJoinClipsMutation.isPending}
+            generateSuccess={showSuccessState}
+            generateButtonText={`Generate (${clips.filter(c => c.url).length - 1} transition${clips.filter(c => c.url).length - 1 !== 1 ? 's' : ''})`}
+            isGenerateDisabled={clips.filter(c => c.url).length < 2}
+          />
         </div>
 
         {/* Results Gallery */}

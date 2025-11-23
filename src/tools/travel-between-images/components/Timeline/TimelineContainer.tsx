@@ -34,7 +34,6 @@ interface TimelineContainerProps {
   shotId: string;
   projectId?: string;
   images: GenerationRow[];
-  contextFrames: number;
   framePositions: Map<string, number>;
   setFramePositions: (positions: Map<string, number>) => Promise<void>;
   onImageReorder: (orderedIds: string[]) => void;
@@ -43,8 +42,7 @@ interface TimelineContainerProps {
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
   setIsDragInProgress: (dragging: boolean) => void;
   // Control props
-  onContextFramesChange: (context: number) => void;
-  onResetFrames: (gap: number, contextFrames: number) => Promise<void>;
+  onResetFrames: (gap: number) => Promise<void>;
   // Pair-specific props
   onPairClick?: (pairIndex: number, pairData: any) => void;
   pairPrompts?: Record<number, { prompt: string; negativePrompt: string }>;
@@ -92,7 +90,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   images,
   isUploadingImage = false,
   uploadProgress = 0,
-  contextFrames,
   framePositions,
   setFramePositions,
   onImageReorder,
@@ -100,7 +97,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   onImageDrop,
   onGenerationDrop,
   setIsDragInProgress,
-  onContextFramesChange,
   onResetFrames,
   onPairClick,
   pairPrompts,
@@ -128,21 +124,21 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 }) => {
   // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(50);
-  const maxGap = Math.max(1, 81 - contextFrames);
+  const maxGap = 81;
   
   // File input ref for Add Images button
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Adjust resetGap when contextFrames changes to keep it within valid range
+  // Adjust resetGap when maxGap changes to keep it within valid range
   useEffect(() => {
     if (resetGap > maxGap) {
       setResetGap(maxGap);
     }
-  }, [contextFrames, maxGap, resetGap]);
+  }, [maxGap, resetGap]);
   
   // Handle reset button click
   const handleReset = () => {
-    onResetFrames(resetGap, contextFrames);
+    onResetFrames(resetGap);
   };
   
   // Refs
@@ -186,7 +182,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     setFramePositions,
     images,
     onImageReorder,
-    contextFrames,
     fullMin,
     fullMax,
     fullRange,
@@ -212,7 +207,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       intermediatePositions,
       imageId,
       targetFrame,
-      contextFrames,
       undefined,
       fullMin,
       fullMax
@@ -232,7 +226,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     await setFramePositions(finalPositions);
     
     console.log('[TapToMove] Position update completed');
-  }, [framePositions, setFramePositions, contextFrames, fullMin, fullMax]);
+  }, [framePositions, setFramePositions, fullMin, fullMax]);
   
   const tapToMove = useTapToMove({
     isEnabled: enableTapToMove,
@@ -438,9 +432,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
   // Prepare data
   const currentPositions = dynamicPositions();
-  const pairInfo = getPairInfo(currentPositions, contextFrames);
+  const pairInfo = getPairInfo(currentPositions);
   const numPairs = Math.max(0, images.length - 1);
-  const maxAllowedGap = calculateMaxGap(contextFrames);
+  const maxAllowedGap = 81;
 
   // Calculate whether to show pair labels globally
   // Check if the average pair has enough space for labels
@@ -602,7 +596,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           structureVideoPath ? (
             // FIX: Show video strip if there's a path, even without metadata (metadata can be fetched from video)
             // Show video strip if there's a video (even in readOnly mode for viewing)
-            <GuidanceVideoStrip
+              <GuidanceVideoStrip
               videoUrl={structureVideoPath}
               videoMetadata={structureVideoMetadata || null}
               treatment={structureVideoTreatment}
@@ -627,7 +621,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               containerWidth={containerWidth}
               zoomLevel={zoomLevel}
               timelineFrameCount={images.length}
-              frameSpacing={contextFrames}
+              frameSpacing={50} // Use default spacing as contextFrames is removed
               readOnly={readOnly}
             />
           ) : !readOnly ? (
@@ -757,7 +751,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             const startPercent = (startPixel / containerWidth) * 100;
             const endPercent = (endPixel / containerWidth) * 100;
 
-            const contextStartFrameUnclipped = actualEndFrame - contextFrames;
+            const contextStartFrameUnclipped = actualEndFrame;
             const contextStartFrame = Math.max(0, contextStartFrameUnclipped);
             const visibleContextFrames = Math.max(0, actualEndFrame - contextStartFrame);
             
@@ -794,7 +788,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 actualFrames={actualFrames}
                 visibleContextFrames={visibleContextFrames}
                 isDragging={dragState.isDragging}
-                contextFrames={contextFrames}
+                contextFrames={0}
                 numPairs={numPairs}
                 startFrame={pair.startFrame}
                 endFrame={pair.endFrame}

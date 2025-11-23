@@ -78,10 +78,8 @@ export interface TimelineProps {
   shotId: string;
   projectId?: string;
   frameSpacing: number;
-  contextFrames: number;
   onImageReorder: (orderedIds: string[]) => void;
   onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
-  onContextFramesChange: (context: number) => void;
   onFramePositionsChange?: (framePositions: Map<string, number>) => void;
   onImageDrop?: (files: File[], targetFrame?: number) => Promise<void>;
   onGenerationDrop?: (generationId: string, imageUrl: string, thumbUrl: string | undefined, targetFrame?: number) => Promise<void>;
@@ -166,10 +164,8 @@ const Timeline: React.FC<TimelineProps> = ({
   shotId,
   projectId,
   frameSpacing,
-  contextFrames,
   onImageReorder,
   onImageSaved,
-  onContextFramesChange,
   onFramePositionsChange,
   onImageDrop,
   onGenerationDrop,
@@ -597,155 +593,20 @@ const Timeline: React.FC<TimelineProps> = ({
   }, [shotId, hookData]);
 
   // Track previous context frames to detect increases
-  const prevContextFramesRef = useRef<number>(contextFrames);
-  const isAdjustingRef = useRef<boolean>(false);
+  // const prevContextFramesRef = useRef<number>(contextFrames);
+  // const isAdjustingRef = useRef<boolean>(false);
   
   // Auto-adjust timeline positions when context frames increases
-  useEffect(() => {
-    // Skip if already adjusting to prevent loops
-    if (isAdjustingRef.current) {
-      return;
-    }
-    
-    const prevContext = prevContextFramesRef.current;
-    const currentContext = contextFrames;
-    
-    console.log('[ContextAdjust] 🎚️ useEffect triggered:', { 
-      from: prevContext, 
-      to: currentContext,
-      isIncrease: currentContext > prevContext,
-      hasImages: images.length > 0,
-      positionsCount: framePositions.size
-    });
-    
-    // Only adjust on increases (not decreases)
-    if (currentContext <= prevContext || images.length === 0 || isLoading) {
-      prevContextFramesRef.current = currentContext;
-      return;
-    }
-    
-    console.log('[ContextAdjust] 📈 Context frames increased from', prevContext, 'to', currentContext);
-    
-    // Use framePositions (source of truth)
-    const currentPositions = new Map(framePositions);
-    if (currentPositions.size === 0) {
-      console.log('[ContextAdjust] ⏸️ No positions to adjust yet');
-      prevContextFramesRef.current = currentContext;
-      return;
-    }
-    
-    const isValid = validateGaps(currentPositions, currentContext);
-    
-    if (!isValid) {
-      console.log('[ContextAdjust] ⚠️ Current positions violate new constraint, adjusting...');
-      isAdjustingRef.current = true;
-      
-      // Calculate new maxGap
-      const newMaxGap = calculateMaxGap(currentContext);
-      
-      console.log('[ContextAdjust] 🔧 Adjustment parameters:', {
-        currentContext,
-        newMaxGap,
-        itemCount: currentPositions.size
-      });
-      
-      // Sort items by position
-      const sorted = Array.from(currentPositions.entries())
-        .sort((a, b) => a[1] - b[1]);
-      
-      console.log('[ContextAdjust] 📊 Current positions (sorted):', 
-        sorted.map(([id, pos]) => ({ id: id.substring(0, 8), pos }))
-      );
-      
-      // Adjust positions to fit within constraints
-      const adjusted = new Map<string, number>();
-      let prevPosition = 0;
-      
-      for (const [id, currentPos] of sorted) {
-        if (currentPos === 0) {
-          // Keep frame 0 at 0
-          adjusted.set(id, 0);
-          prevPosition = 0;
-          console.log('[ContextAdjust] 📌 Item at frame 0, keeping:', id.substring(0, 8));
-        } else {
-          // Calculate the allowed range
-          const minAllowedPosition = prevPosition + 1;
-          const maxAllowedPosition = prevPosition + newMaxGap;
-          
-          console.log('[ContextAdjust] 🔍 Evaluating item:', {
-            id: id.substring(0, 8),
-            currentPos,
-            prevPosition,
-            minAllowedPosition,
-            maxAllowedPosition,
-            gap: currentPos - prevPosition
-          });
-          
-          let newPosition = currentPos;
-          
-          if (currentPos < minAllowedPosition) {
-            // Too close - push down to minimum allowed
-            console.log('[ContextAdjust] 🔽 Too close! Pushing down from', currentPos, 'to', minAllowedPosition);
-            newPosition = minAllowedPosition;
-          } else if (currentPos > maxAllowedPosition) {
-            // Too far - pull closer to fit within maxGap (this moves items to lower positions)
-            console.log('[ContextAdjust] 🔼 Gap too large! Pulling closer from', currentPos, 'to', maxAllowedPosition);
-            newPosition = maxAllowedPosition;
-          } else {
-            // Position is valid, keep it
-            console.log('[ContextAdjust] ✓ Position valid, keeping at', currentPos);
-            newPosition = currentPos;
-          }
-          
-          adjusted.set(id, newPosition);
-          prevPosition = newPosition;
-        }
-      }
-      
-      console.log('[ContextAdjust] 📊 Adjusted positions:', 
-        Array.from(adjusted.entries()).map(([id, pos]) => ({ id: id.substring(0, 8), pos }))
-      );
-      
-      // Check if we actually changed anything
-      const hasChanges = Array.from(adjusted.entries()).some(
-        ([id, newPos]) => newPos !== currentPositions.get(id)
-      );
-      
-      console.log('[ContextAdjust] 🔄 Has changes?', hasChanges);
-      
-      if (hasChanges) {
-        console.log('[ContextAdjust] ✅ Applying adjusted positions:', {
-          changes: Array.from(adjusted.entries())
-            .filter(([id, newPos]) => newPos !== currentPositions.get(id))
-            .map(([id, newPos]) => ({
-              id: id.substring(0, 8),
-              old: currentPositions.get(id),
-              new: newPos
-            }))
-        });
-        
-        // Apply the adjusted positions
-        setFramePositions(adjusted).then(() => {
-          isAdjustingRef.current = false;
-          console.log('[ContextAdjust] 🎉 Positions successfully updated');
-        }).catch((error) => {
-          console.error('[ContextAdjust] ❌ Failed to adjust positions:', error);
-          isAdjustingRef.current = false;
-        });
-      } else {
-        isAdjustingRef.current = false;
-      }
-    } else {
-      console.log('[ContextAdjust] ✅ Current positions are valid, no adjustment needed');
-    }
-    
-    prevContextFramesRef.current = currentContext;
-  }, [contextFrames, framePositions, images.length, isLoading, setFramePositions]);
+  /*
+  // REMOVED: Auto-adjust logic for context frames as context frames are being removed
+  // The logic was checking if currentContext > prevContext and adjusting positions if gaps were too small
+  // or too large based on calculateMaxGap(contextFrames).
+  */
 
   // Handle resetting frames to evenly spaced intervals and setting context frames
-  const handleResetFrames = useCallback(async (gap: number, newContextFrames: number) => {
+  const handleResetFrames = useCallback(async (gap: number) => {
     // First set the context frames (this will trigger all constraint recalculations)
-    onContextFramesChange(newContextFrames);
+    // onContextFramesChange(newContextFrames); // Removed
     
     // Then set the positions with the specified gap
     const newPositions = new Map<string, number>();
@@ -754,7 +615,7 @@ const Timeline: React.FC<TimelineProps> = ({
     });
 
     await setFramePositions(newPositions);
-  }, [images, setFramePositions, onContextFramesChange]);
+  }, [images, setFramePositions]);
 
   // Check if timeline is empty
   const hasNoImages = images.length === 0;
@@ -926,9 +787,7 @@ const Timeline: React.FC<TimelineProps> = ({
         shotId={shotId}
         projectId={projectId}
         images={images}
-        contextFrames={contextFrames}
         framePositions={displayPositions}
-        onContextFramesChange={onContextFramesChange}
         onResetFrames={handleResetFrames}
         setFramePositions={setFramePositions}
         onImageReorder={onImageReorder}

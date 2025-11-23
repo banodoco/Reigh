@@ -114,6 +114,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [joinContextFrames, setJoinContextFrames] = useState(10);
     const [joinGapFrames, setJoinGapFrames] = useState(33);
     const [joinReplaceMode, setJoinReplaceMode] = useState(true);
+    const [keepBridgingImages, setKeepBridgingImages] = useState(true);
     const [useIndividualPrompts, setUseIndividualPrompts] = useState(false);
     const queryClient = useQueryClient();
 
@@ -267,6 +268,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             setContextFrames={setJoinContextFrames}
                             replaceMode={joinReplaceMode}
                             setReplaceMode={setJoinReplaceMode}
+                            keepBridgingImages={keepBridgingImages}
+                            setKeepBridgingImages={setKeepBridgingImages}
                             prompt={joinPrompt}
                             setPrompt={setJoinPrompt}
                             negativePrompt={joinNegativePrompt}

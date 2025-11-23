@@ -1,15 +1,13 @@
 import { log } from "@/shared/lib/logger";
 
 // Calculate max gap based on context frames
-export const calculateMaxGap = (contextFrames: number): number => {
-  const maxGap = 81 - contextFrames;
-  return Math.max(maxGap, contextFrames + 10);
+export const calculateMaxGap = (): number => {
+  return 81;
 };
 
 // Validate gap constraints
 export const validateGaps = (
   testPositions: Map<string, number>, 
-  contextFrames: number,
   excludeId?: string
 ): boolean => {
   const positions = [...testPositions.entries()]
@@ -18,7 +16,7 @@ export const validateGaps = (
   positions.push(0); // Always include frame 0
   positions.sort((a, b) => a - b);
 
-  const maxGap = calculateMaxGap(contextFrames);
+  const maxGap = calculateMaxGap();
 
   // Debug: log every validation attempt
   log('TimelineFrameLimitIssue', 'validateGaps check', { excludeId, maxGap, positions });
@@ -26,10 +24,8 @@ export const validateGaps = (
   for (let i = 1; i < positions.length; i++) {
     const diff = positions[i] - positions[i - 1];
     
-    // FIRST GAP (first pair): Constrained to 81 frames (starts from beginning, no context needed)
-    // SUBSEQUENT GAPS: Constrained to 81 - contextFrames (need context from previous pair)
-    const isFirstGap = (i === 1);
-    const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+    // All gaps constrained to 81 frames
+    const effectiveMaxGap = maxGap;
     
     if (diff > effectiveMaxGap) {
       log('TimelineFrameLimitIssue', 'Gap violation detected', {
@@ -38,7 +34,6 @@ export const validateGaps = (
         nextFrame: positions[i],
         diff,
         maxGap: effectiveMaxGap,
-        isFirstGap,
       });
       return false;
     }
@@ -49,15 +44,13 @@ export const validateGaps = (
 // ---------------------------------------------------------------------------
 // Utility: shrink oversized gaps by left-shifting subsequent frames so that
 // every gap ≤ maxGap.  Returns a **new** Map (does not mutate input).
-// NOTE: First gap (first pair) is constrained to 81 frames (no context needed).
-// Subsequent gaps are constrained to 81 - contextFrames (need context from previous pair).
+// NOTE: All gaps are constrained to 81 frames.
 // ---------------------------------------------------------------------------
 export const shrinkOversizedGaps = (
   positions: Map<string, number>,
-  contextFrames: number,
   excludeId?: string,
 ): Map<string, number> => {
-  const maxGap = calculateMaxGap(contextFrames);
+  const maxGap = calculateMaxGap();
 
   // Create sortable copy excluding optional id
   const entries = [...positions.entries()].filter(([id]) => id !== excludeId);
@@ -83,10 +76,8 @@ export const shrinkOversizedGaps = (
     } else {
       const desiredPos = Math.max(originalPos, prev + 1); // keep minGap of 1
       
-      // FIRST GAP (i === 1): Constrained to 81 frames (first pair from start)
-      // SUBSEQUENT GAPS (i > 1): Constrained to 81 - contextFrames
-      const isFirstGap = (i === 1);
-      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      // All gaps constrained to 81 frames
+      const effectiveMaxGap = maxGap;
       const allowedPos = Math.min(desiredPos, prev + effectiveMaxGap);
       
       result.set(id, allowedPos);
@@ -153,12 +144,11 @@ export const applyFluidTimeline = (
   positions: Map<string, number>,
   draggedId: string,
   targetFrame: number,
-  contextFrames: number,
   excludeId?: string,
   fullMin: number = 0,
   fullMax: number = Number.MAX_SAFE_INTEGER
 ): Map<string, number> => {
-  const maxGap = calculateMaxGap(contextFrames);
+  const maxGap = calculateMaxGap();
   const originalPos = positions.get(draggedId) ?? 0;
   const movementAmount = targetFrame - originalPos;
 
@@ -173,7 +163,6 @@ export const applyFluidTimeline = (
     movementAmount,
     limitedMovementAmount,
     maxGap,
-    contextFrames,
     timestamp: new Date().toISOString()
   });
 
@@ -208,7 +197,7 @@ export const applyFluidTimeline = (
   const originalDraggedIndex = originalSorted.findIndex(([id, _]) => id === draggedId);
   if (originalDraggedIndex === -1) {
     console.log('[FluidTimelineCore] ⚠️ DRAGGED ITEM NOT FOUND - Falling back to shrinkOversizedGaps');
-    return shrinkOversizedGaps(result, contextFrames, excludeId);
+    return shrinkOversizedGaps(result, excludeId);
   }
 
   // Get adjacent items based on ORIGINAL positions, not the moved position
@@ -233,19 +222,16 @@ export const applyFluidTimeline = (
     let wouldCreateViolation = false;
 
     // Use the original adjacent items for gap calculations
-    // First gap (when prevItem is at position 0): constrained to 81 frames
-    // Subsequent gaps: constrained to 81 - contextFrames
+    // All gaps constrained to 81 frames
     if (prevItem) {
-      const isFirstGap = (prevItem[1] === 0);
-      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      const effectiveMaxGap = maxGap;
       if (limitedTargetFrame - prevItem[1] > effectiveMaxGap) {
         wouldCreateViolation = true;
       }
     }
 
     if (nextItem) {
-      const isFirstGap = (originalPos === 0);
-      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      const effectiveMaxGap = maxGap;
       if (nextItem[1] - limitedTargetFrame > effectiveMaxGap) {
         wouldCreateViolation = true;
       }
@@ -265,8 +251,7 @@ export const applyFluidTimeline = (
 
   // Also check for gap violations (traditional logic) with the actual target frame
   if (prevItem) {
-    const isFirstGap = (prevItem[1] === 0);
-    const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+    const effectiveMaxGap = maxGap;
     if (targetFrame - prevItem[1] > effectiveMaxGap) {
       violations.push({
         type: 'GAP_VIOLATION',
@@ -279,8 +264,7 @@ export const applyFluidTimeline = (
   }
 
   if (nextItem) {
-    const isFirstGap = (originalPos === 0);
-    const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+    const effectiveMaxGap = maxGap;
     if (nextItem[1] - targetFrame > effectiveMaxGap) {
       violations.push({
         type: 'GAP_VIOLATION',
@@ -354,7 +338,6 @@ export const applyFluidTimeline = (
       movementAmount,
       limitedMovementAmount,
       maxGap,
-      contextFrames
     },
 
     // Adjacent Items Analysis
@@ -429,7 +412,7 @@ export const applyFluidTimeline = (
 
   if (!needsShift) {
     console.log('[FluidTimelineCore] ✅ NO MOVEMENT - Using standard gap enforcement');
-    return shrinkOversizedGaps(result, contextFrames, excludeId);
+    return shrinkOversizedGaps(result, excludeId);
   }
 
   // Apply shifting to handle violations (both gap violations and boundary collisions)
@@ -456,10 +439,9 @@ export const applyFluidTimeline = (
   // If no boundary violations, use traditional logic for gap violations
   if (itemsToShift.length === 0) {
     // FIXED: Only shift immediately adjacent items, not all items on one side
-    // First gap (when prevItem is at position 0): constrained to 81 frames
-    // Subsequent gaps: constrained to 81 - contextFrames
-    const prevGapViolation = prevItem ? (targetFrame - prevItem[1] > (prevItem[1] === 0 ? 81 : maxGap)) : false;
-    const nextGapViolation = nextItem ? (nextItem[1] - targetFrame > (originalPos === 0 ? 81 : maxGap)) : false;
+    // All gaps constrained to 81 frames
+    const prevGapViolation = prevItem ? (targetFrame - prevItem[1] > maxGap) : false;
+    const nextGapViolation = nextItem ? (nextItem[1] - targetFrame > maxGap) : false;
 
     if (limitedMovementAmount > 0 && prevGapViolation && prevItem) {
       // Right drag stretching gap to the left → only shift the immediately previous item
@@ -540,9 +522,7 @@ export const applyFluidTimeline = (
       // Apply gap constraint between dragged item and new adjacent item
       // For rightward drags, allow the dragged item to move past the next item
       // For leftward drags, allow the dragged item to move past the previous item
-      // Check if this is the first gap (when the adjacent item is at position 0)
-      const isFirstGap = (nextItemAfterShift.pos === 0);
-      const effectiveMaxGap = isFirstGap ? 81 : maxGap;
+      const effectiveMaxGap = maxGap;
       
       const constraint = limitedMovementAmount > 0
         ? nextItemAfterShift.pos + effectiveMaxGap  // Allow dragging past the next item
@@ -659,7 +639,6 @@ export const applyFluidTimeline = (
 
     // Context and Limits
     context: {
-      contextFrames,
       maxGap,
       containerWidth: 1000
     },
@@ -684,7 +663,6 @@ export const findClosestValidPosition = (
   targetFrame: number, 
   activeId: string,
   framePositions: Map<string, number>,
-  contextFrames: number
 ): number => {
   const originalPos = framePositions.get(activeId) ?? 0;
 
@@ -692,7 +670,6 @@ export const findClosestValidPosition = (
     activeId: activeId.substring(0, 8),
     targetFrame,
     originalPos,
-    contextFrames,
     timestamp: new Date().toISOString()
   });
 
@@ -712,7 +689,7 @@ export const findClosestValidPosition = (
       }
     }
 
-    const isValid = validateGaps(testMap, contextFrames);
+    const isValid = validateGaps(testMap);
 
     if (!isValid) {
       console.log('[SnapToPosition] ❌ POSITION INVALID:', {
@@ -844,7 +821,9 @@ export const clamp = (value: number, min: number, max: number): number => {
 // Get pair information from positions
 export const getPairInfo = (
   framePositions: Map<string, number>,
-  contextFrames: number
+  // contextFrames is no longer used for calculation but might be kept for other visualizations if needed,
+  // but based on the request, we should just ignore it for "full width" logic.
+  // However, I'll remove it to match the cleanup.
 ) => {
   const sortedPositions = [...framePositions.entries()]
     .map(([id, pos]) => ({ id, pos }))
@@ -856,9 +835,7 @@ export const getPairInfo = (
     const endFrame = sortedPositions[i + 1].pos;
     const pairFrames = endFrame - startFrame;
 
-    const generationStart = (i === 0)
-      ? startFrame
-      : (sortedPositions[i].pos - contextFrames);
+    const generationStart = startFrame;
 
     pairs.push({
       index: i,
@@ -866,7 +843,7 @@ export const getPairInfo = (
       endFrame,
       frames: pairFrames,
       generationStart,
-      contextStart: endFrame - contextFrames,
+      contextStart: endFrame, // No context overlap, or effectively 0
       contextEnd: endFrame,
     });
   }

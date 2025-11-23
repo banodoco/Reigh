@@ -53,7 +53,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   videoControlMode,
   batchVideoPrompt,
   batchVideoFrames,
-  batchVideoContext,
+  // batchVideoContext, // Removed
   onShotImagesUpdate,
   onBack,
   onVideoControlModeChange,
@@ -73,7 +73,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onPairConfigChange,
   onBatchVideoPromptChange,
   onBatchVideoFramesChange,
-  onBatchVideoContextChange,
+  // onBatchVideoContextChange, // Removed
   batchVideoSteps,
   onBatchVideoStepsChange,
   dimensionSource,
@@ -147,7 +147,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (prevPropsRef.current.projectId !== projectId) changedProps.push('projectId');
       if (prevPropsRef.current.generationMode !== generationMode) changedProps.push('generationMode');
       if (prevPropsRef.current.batchVideoFrames !== batchVideoFrames) changedProps.push('batchVideoFrames');
-      if (prevPropsRef.current.batchVideoContext !== batchVideoContext) changedProps.push('batchVideoContext');
+      // if (prevPropsRef.current.batchVideoContext !== batchVideoContext) changedProps.push('batchVideoContext'); // Removed
       if (prevPropsRef.current.enhancePrompt !== enhancePrompt) changedProps.push('enhancePrompt');
       if (prevPropsRef.current.turboMode !== turboMode) changedProps.push('turboMode');
       if (prevPropsRef.current.advancedMode !== advancedMode) changedProps.push('advancedMode');
@@ -158,7 +158,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       if (prevPropsRef.current.onBack !== onBack) changedCallbacks.push('onBack');
       if (prevPropsRef.current.onGenerationModeChange !== onGenerationModeChange) changedCallbacks.push('onGenerationModeChange');
       if (prevPropsRef.current.onBatchVideoFramesChange !== onBatchVideoFramesChange) changedCallbacks.push('onBatchVideoFramesChange');
-      if (prevPropsRef.current.onBatchVideoContextChange !== onBatchVideoContextChange) changedCallbacks.push('onBatchVideoContextChange');
+      // if (prevPropsRef.current.onBatchVideoContextChange !== onBatchVideoContextChange) changedCallbacks.push('onBatchVideoContextChange'); // Removed
       if (prevPropsRef.current.onEnhancePromptChange !== onEnhancePromptChange) changedCallbacks.push('onEnhancePromptChange');
       if (prevPropsRef.current.onTurboModeChange !== onTurboModeChange) changedCallbacks.push('onTurboModeChange');
       if (prevPropsRef.current.onAdvancedModeChange !== onAdvancedModeChange) changedCallbacks.push('onAdvancedModeChange');
@@ -187,10 +187,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     
     // Save current props for next comparison
     prevPropsRef.current = {
-      selectedShotId, projectId, generationMode, batchVideoFrames, batchVideoContext,
+      selectedShotId, projectId, generationMode, batchVideoFrames,
+      // batchVideoContext, // Removed
       enhancePrompt, turboMode, advancedMode, settingsLoading,
       onShotImagesUpdate, onBack, onGenerationModeChange, onBatchVideoFramesChange,
-      onBatchVideoContextChange, onEnhancePromptChange, onTurboModeChange,
+      // onBatchVideoContextChange, // Removed
+      onEnhancePromptChange, onTurboModeChange,
       onAdvancedModeChange, onGenerateAllSegments, onPreviousShot, onNextShot,
       onUpdateShotName, getShotVideoCount, invalidateVideoCountsCache
     };
@@ -1122,7 +1124,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     onBatchVideoPromptChange,
     onSteerableMotionSettingsChange,
     onBatchVideoFramesChange,
-    onBatchVideoContextChange,
+    // onBatchVideoContextChange, // Removed
     onBatchVideoStepsChange,
     onDimensionSourceChange,
     onCustomWidthChange,
@@ -1149,7 +1151,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     textAfterPrompts,
     batchVideoSteps,
     batchVideoFrames,
-    batchVideoContext,
+    // batchVideoContext, // Removed
     steerableMotionSettings,
     loraManager,
     addImageToShotMutation,
@@ -1233,7 +1235,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       textBeforePrompts,
       textAfterPrompts,
       batchVideoFrames,
-      batchVideoContext,
+      // batchVideoContext, // Removed
       batchVideoSteps,
       steerableMotionSettings,
       getModelName,
@@ -1284,7 +1286,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     textBeforePrompts,
     textAfterPrompts,
     batchVideoFrames,
-    batchVideoContext,
+    // batchVideoContext, // Removed
     batchVideoSteps,
     steerableMotionSettings,
     getModelName,
@@ -1516,11 +1518,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             projectId={projectId}
             shotName={selectedShot.name}
             batchVideoFrames={batchVideoFrames}
-            batchVideoContext={batchVideoContext}
+            // batchVideoContext={batchVideoContext} // Removed
             preloadedImages={orderedShotImages}
             onImageReorder={handleReorderImagesInShot}
             onImageSaved={handleImageSaved}
-            onContextFramesChange={onBatchVideoContextChange}
+            onContextFramesChange={() => {}} // No-op as context frames removed
             onFramePositionsChange={undefined}
             onImageDrop={generationActions.handleTimelineImageDrop}
             onGenerationDrop={generationActions.handleTimelineGenerationDrop}
@@ -1589,8 +1591,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onBatchVideoPromptChange={onBatchVideoPromptChange}
                             batchVideoFrames={batchVideoFrames}
                             onBatchVideoFramesChange={onBatchVideoFramesChange}
-                            batchVideoContext={batchVideoContext}
-                            onBatchVideoContextChange={onBatchVideoContextChange}
+                            // batchVideoContext={batchVideoContext} // Removed
+                            // onBatchVideoContextChange={onBatchVideoContextChange} // Removed
                             batchVideoSteps={batchVideoSteps}
                             onBatchVideoStepsChange={handleStepsChange}
                             dimensionSource={dimensionSource}

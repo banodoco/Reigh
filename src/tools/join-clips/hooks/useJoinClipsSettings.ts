@@ -5,6 +5,7 @@ const DEFAULT_JOIN_CLIPS_SETTINGS: JoinClipsSettings = {
   contextFrameCount: 10,
   gapFrameCount: 33,
   replaceMode: true,
+  keepBridgingImages: true,
   model: 'wan_2_2_vace_lightning_baseline_2_2_2',
   numInferenceSteps: 6,
   guidanceScale: 3.0,
