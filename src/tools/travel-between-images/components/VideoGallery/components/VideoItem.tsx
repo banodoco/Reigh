@@ -1068,7 +1068,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         <div className="absolute bottom-0 left-0 right-0 pb-2 pl-3 pr-3 pt-6 flex justify-between items-end bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
           <div className="flex flex-col items-start gap-2 pointer-events-auto">
             {/* View Segments Button */}
-            {onViewSegments && !video.parent_generation_id && (
+            {onViewSegments && !video.parent_generation_id && !hideActions && !showCollage && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>

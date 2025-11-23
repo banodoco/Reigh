@@ -1427,11 +1427,11 @@ async function createGenerationFromTask(
           }
         }
       }
-    } else if (taskData.task_type === 'travel_stitch' && (taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id)) {
-      // SPECIAL CASE: travel_stitch IS the final output of the orchestrator.
+    } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && (taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id)) {
+      // SPECIAL CASE: travel_stitch or join_clips_orchestrator IS the final output of the orchestrator.
       // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
       const orchId = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
-      console.log(`[GenMigration] travel_stitch task ${taskId} completing for orchestrator ${orchId} - updating parent generation`);
+      console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing for orchestrator ${orchId} - updating parent generation`);
 
       const parentGen = await getOrCreateParentGeneration(supabase, orchId, taskData.project_id);
       if (parentGen) {

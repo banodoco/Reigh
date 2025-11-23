@@ -183,6 +183,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 num_inference_steps: 6,
                 guidance_scale: 3.0,
                 seed: -1,
+                parent_generation_id: parentGenerationId,
                 ...(lorasForTask.length > 0 && { loras: lorasForTask }),
             });
 

@@ -505,7 +505,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
             contextFrames
         });
     }, [keepBridgingImages, keepBridgingImagesValue, replaceMode, gapFrames, contextFrames]);
-
+    
     // Handle context frames change with auto-adjustment of gap frames
     const handleContextFramesChange = (val: number) => {
         const newContextFrames = Math.max(4, val);
@@ -523,7 +523,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
             {/* Global Settings & Visualization */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Controls Column */}
-                <div className="space-y-6">
+            <div className="space-y-6">
                     {headerContent && (
                         <div className="mb-6">
                             {headerContent}
@@ -532,51 +532,51 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                     <div className="grid grid-cols-2 gap-x-6 gap-y-8">
                         {/* Row 1: Gap Frames | Context Frames */}
                         
-                        {/* Gap Frames */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
+                    {/* Gap Frames */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
                                 <Label htmlFor="join-gap-frames" className="text-sm font-medium">Gap Frames</Label>
                                 <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{gapFrames}</span>
-                            </div>
-                            <Slider
-                                id="join-gap-frames"
+                        </div>
+                        <Slider
+                            id="join-gap-frames"
                                 min={8}
                                 max={Math.max(8, 81 - (contextFrames * 2))}
-                                step={1}
+                            step={1}
                                 value={[Math.max(8, gapFrames)]}
-                                onValueChange={(values) => setGapFrames(values[0])}
+                            onValueChange={(values) => setGapFrames(values[0])}
                                 className="py-2"
-                            />
-                        </div>
+                        />
+                    </div>
 
-                        {/* Context Frames */}
+                    {/* Context Frames */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="join-context-frames" className="text-sm font-medium">Context Frames</Label>
                                 <span className="text-sm font-mono bg-muted px-2 py-0.5 rounded">{contextFrames}</span>
                             </div>
                             <Slider
-                                id="join-context-frames"
+                            id="join-context-frames"
                                 min={4}
-                                max={30}
+                            max={30}
                                 step={1}
                                 value={[contextFrames]}
                                 onValueChange={(values) => handleContextFramesChange(values[0])}
                                 className="py-2"
                             />
-                        </div>
+                    </div>
 
                         {/* Row 2: Replace Mode | Keep Bridge Images */}
 
-                        {/* Replace Mode */}
+                    {/* Replace Mode */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between h-5">
                                 <Label className="text-sm font-medium">Transition Mode</Label>
                             </div>
                             <div className="flex items-center justify-between gap-2 border rounded-lg p-2 bg-background/50">
                                 <span className={cn("text-xs transition-colors", !replaceMode ? "font-medium text-foreground" : "text-muted-foreground")}>Insert</span>
-                                <Switch
-                                    id="join-replace-mode"
+                            <Switch
+                                id="join-replace-mode"
                                     checked={replaceMode}
                                     onCheckedChange={setReplaceMode}
                                 />

@@ -65,6 +65,7 @@ export interface JoinClipsTaskParams {
   negative_prompt?: string;
   priority?: number;
   loras?: Array<{ path: string; strength: number }>; // LoRA models to apply
+  parent_generation_id?: string;
 }
 
 /**
@@ -193,6 +194,7 @@ function buildJoinClipsPayload(
     seed: params.seed ?? DEFAULT_JOIN_CLIPS_VALUES.seed,
     negative_prompt: params.negative_prompt ?? DEFAULT_JOIN_CLIPS_VALUES.negative_prompt,
     priority: params.priority ?? DEFAULT_JOIN_CLIPS_VALUES.priority,
+    parent_generation_id: params.parent_generation_id,
   };
 
   if (params.resolution) {
