@@ -927,11 +927,46 @@ serve(async (req) => {
                 } else {
                   console.log(`[Orchestrator] Updating parent generation ${parentGen.id} with final video URL`);
                   
+                  // SPECIAL CASE: For travel orchestrators with only 2 images, use the original generation output instead of stitch
+                  let finalPublicUrl = publicUrl;
+                  let finalThumbnailUrl = thumbnailUrl;
+                  
+                  if (taskData.task_type === 'travel_stitch') {
+                    // Extract image URLs from orchestrator payload
+                    const imageUrls = taskData.params?.orchestrator_details?.input_image_paths_resolved || 
+                                     taskData.params?.full_orchestrator_payload?.input_image_paths_resolved;
+                    
+                    if (imageUrls && Array.isArray(imageUrls) && imageUrls.length === 2) {
+                      console.log(`[TravelStitch2Images] Detected travel orchestrator with only 2 images - checking for original generation output`);
+                      
+                      // Try to find the child generation (segment 0) that was created for this orchestrator
+                      const { data: childGen, error: childGenError } = await supabaseAdmin
+                        .from('generations')
+                        .select('id, location, thumbnail_url')
+                        .eq('parent_generation_id', parentGenId)
+                        .eq('child_order', 0)
+                        .maybeSingle();
+                      
+                      if (childGenError) {
+                        console.error(`[TravelStitch2Images] Error fetching child generation:`, childGenError);
+                      } else if (childGen && childGen.location) {
+                        console.log(`[TravelStitch2Images] Found child generation ${childGen.id} with location - using it instead of stitch`);
+                        finalPublicUrl = childGen.location;
+                        finalThumbnailUrl = childGen.thumbnail_url || thumbnailUrl;
+                        console.log(`[TravelStitch2Images] Using original generation output: ${finalPublicUrl}`);
+                      } else {
+                        console.log(`[TravelStitch2Images] No child generation found or no location set - using stitch output as fallback`);
+                      }
+                    } else {
+                      console.log(`[TravelStitch2Images] Not a 2-image travel orchestrator (${imageUrls?.length || 0} images) - using stitch output normally`);
+                    }
+                  }
+                  
                   const { error: updateError } = await supabaseAdmin
                     .from('generations')
                     .update({
-                      location: publicUrl,
-                      thumbnail_url: thumbnailUrl,
+                      location: finalPublicUrl,
+                      thumbnail_url: finalThumbnailUrl,
                       type: 'video'
                     })
                     .eq('id', parentGen.id);
@@ -1485,12 +1520,49 @@ async function createGenerationFromTask(
       } else {
         console.log(`[GenMigration] Updating parent generation ${parentGen.id} with final video URL`);
 
+        // SPECIAL CASE: For travel orchestrators with only 2 images, use the original generation output instead of stitch
+        // Check if this is a travel orchestrator (not join_clips) and has only 2 images
+        let finalPublicUrl = publicUrl;
+        let finalThumbnailUrl = thumbnailUrl;
+        
+        if (taskData.task_type === 'travel_stitch') {
+          // Extract image URLs from orchestrator payload
+          const imageUrls = taskData.params?.orchestrator_details?.input_image_paths_resolved || 
+                           taskData.params?.full_orchestrator_payload?.input_image_paths_resolved;
+          
+          if (imageUrls && Array.isArray(imageUrls) && imageUrls.length === 2) {
+            console.log(`[TravelStitch2Images] Detected travel orchestrator with only 2 images - checking for original generation output`);
+            
+            // Try to find the child generation (segment 0) that was created for this orchestrator
+            // The child generation should have parent_generation_id = parentGenId and child_order = 0
+            const { data: childGen, error: childGenError } = await supabase
+              .from('generations')
+              .select('id, location, thumbnail_url')
+              .eq('parent_generation_id', parentGenId)
+              .eq('child_order', 0)
+              .maybeSingle();
+            
+            if (childGenError) {
+              console.error(`[TravelStitch2Images] Error fetching child generation:`, childGenError);
+            } else if (childGen && childGen.location) {
+              console.log(`[TravelStitch2Images] Found child generation ${childGen.id} with location - using it instead of stitch`);
+              finalPublicUrl = childGen.location;
+              finalThumbnailUrl = childGen.thumbnail_url || thumbnailUrl;
+              console.log(`[TravelStitch2Images] Using original generation output: ${finalPublicUrl}`);
+            } else {
+              console.log(`[TravelStitch2Images] No child generation found or no location set - using stitch output as fallback`);
+            }
+          } else {
+            console.log(`[TravelStitch2Images] Not a 2-image travel orchestrator (${imageUrls?.length || 0} images) - using stitch output normally`);
+          }
+        }
+
         // Update the parent generation with the location (video URL) and thumbnail
         const { error: updateError } = await supabase
           .from('generations')
           .update({
-            location: publicUrl,
-            thumbnail_url: thumbnailUrl,
+            location: finalPublicUrl,
+            thumbnail_url: finalThumbnailUrl,
             // Ensure type is video (should already be, but just in case)
             type: 'video'
           })

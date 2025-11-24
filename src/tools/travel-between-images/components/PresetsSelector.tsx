@@ -5,7 +5,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Library, Pencil } from 'lucide-react';
 import { PhaseConfig } from '../settings';
 import { PhaseConfigSelectorModal } from '@/shared/components/PhaseConfigSelectorModal';
-import { useQuery } from '@tantml:react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
 import { framesToSeconds } from '../components/Timeline/utils/time-utils';
