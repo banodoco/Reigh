@@ -672,6 +672,21 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   const [userName, setUserName] = useState<string>('');
   const isMobile = useIsMobile();
   
+  // Update form from current settings when they change (and not editing)
+  useEffect(() => {
+    if (!editingPreset && currentSettings) {
+      setAddForm(prev => ({
+        ...prev,
+        presetPromptPrefix: currentSettings.textBeforePrompts || '',
+        presetPromptSuffix: currentSettings.textAfterPrompts || '',
+        presetBasePrompt: currentSettings.basePrompt || '',
+        presetNegativePrompt: currentSettings.negativePrompt || '',
+        presetEnhancePrompt: currentSettings.enhancePrompt ?? false,
+        presetDurationFrames: currentSettings.durationFrames ?? 60,
+      }));
+    }
+  }, [currentSettings, editingPreset]);
+
   // Pre-populate form when editing
   useEffect(() => {
     if (editingPreset && editingPreset.metadata) {
