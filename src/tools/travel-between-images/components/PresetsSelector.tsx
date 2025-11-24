@@ -8,7 +8,6 @@ import { PhaseConfigSelectorModal } from '@/shared/components/PhaseConfigSelecto
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
-import { framesToSeconds } from '../components/Timeline/utils/time-utils';
 
 interface SelectedPresetCardProps {
   presetId: string;
@@ -75,82 +74,6 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
               <p className="text-xs text-blue-700 dark:text-blue-300">
                 {metadata.description}
               </p>
-            </div>
-          )}
-          
-          {/* Preset Prompt Settings */}
-          {(metadata?.presetPromptPrefix || metadata?.presetPromptSuffix || metadata?.presetBasePrompt || metadata?.presetNegativePrompt) && (
-            <div className="mb-3 p-3 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-2">
-                Prompt Settings:
-              </p>
-              <div className="space-y-2">
-                {(metadata?.presetPromptPrefix || metadata?.presetPromptSuffix) && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {metadata?.presetPromptPrefix && (
-                      <div>
-                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
-                          Before:
-                        </p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">
-                          {metadata.presetPromptPrefix}
-                        </p>
-                      </div>
-                    )}
-                    {metadata?.presetPromptSuffix && (
-                      <div>
-                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
-                          After:
-                        </p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">
-                          {metadata.presetPromptSuffix}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {metadata?.presetBasePrompt && (
-                  <div>
-                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
-                      Base Prompt:
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 font-mono line-clamp-2">
-                      {metadata.presetBasePrompt}
-                    </p>
-                  </div>
-                )}
-                {metadata?.presetNegativePrompt && (
-                  <div>
-                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
-                      Negative:
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 font-mono line-clamp-2">
-                      {metadata.presetNegativePrompt}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Additional Settings */}
-          {(metadata?.presetEnhancePrompt || metadata?.presetDurationFrames) && (
-            <div className="mb-3 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1.5">
-                Additional Settings:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {metadata?.presetEnhancePrompt && (
-                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
-                    Enhance/Create Prompts
-                  </Badge>
-                )}
-                {metadata?.presetDurationFrames && (
-                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
-                    Duration: {framesToSeconds(metadata.presetDurationFrames)}
-                  </Badge>
-                )}
-              </div>
             </div>
           )}
           

@@ -742,12 +742,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     const initialForm = {
       name: generatedName,
       description: '',
-      presetPromptPrefix: currentSettings?.textBeforePrompts || '',
-      presetPromptSuffix: currentSettings?.textAfterPrompts || '',
-      presetBasePrompt: currentSettings?.basePrompt || '',
-      presetNegativePrompt: currentSettings?.negativePrompt || '',
-      presetEnhancePrompt: currentSettings?.enhancePrompt ?? false,
-      presetDurationFrames: currentSettings?.durationFrames ?? 60,
       created_by_is_you: true,
       created_by_username: '',
       is_public: true,
@@ -783,12 +777,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       
       const newFields = {
         name: generatedName, // Auto-generate name
-        presetPromptPrefix: currentSettings.textBeforePrompts || '',
-        presetPromptSuffix: currentSettings.textAfterPrompts || '',
-        presetBasePrompt: currentSettings.basePrompt || '',
-        presetNegativePrompt: currentSettings.negativePrompt || '',
-        presetEnhancePrompt: currentSettings.enhancePrompt ?? false,
-        presetDurationFrames: currentSettings.durationFrames ?? 60,
       };
       console.log('[PresetAutoPopulate] AddNewTab updating form with:', newFields);
       
@@ -817,12 +805,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
          setAddForm({
           name: metadata.name || '',
           description: metadata.description || '',
-          presetPromptPrefix: currentSettings.textBeforePrompts || '',
-          presetPromptSuffix: currentSettings.textAfterPrompts || '',
-          presetBasePrompt: currentSettings.basePrompt || '',
-          presetNegativePrompt: currentSettings.negativePrompt || '',
-          presetEnhancePrompt: currentSettings.enhancePrompt ?? false,
-          presetDurationFrames: currentSettings.durationFrames ?? 60,
           created_by_is_you: metadata.created_by?.is_you ?? true,
           created_by_username: metadata.created_by?.username || '',
           is_public: metadata.is_public ?? true,
@@ -848,12 +830,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         setAddForm({
           name: metadata.name || '',
           description: metadata.description || '',
-          presetPromptPrefix: metadata.presetPromptPrefix || '',
-          presetPromptSuffix: metadata.presetPromptSuffix || '',
-          presetBasePrompt: metadata.presetBasePrompt || '',
-          presetNegativePrompt: metadata.presetNegativePrompt || '',
-          presetEnhancePrompt: metadata.presetEnhancePrompt ?? false,
-          presetDurationFrames: metadata.presetDurationFrames ?? 60,
           created_by_is_you: metadata.created_by?.is_you ?? true,
           created_by_username: metadata.created_by?.username || '',
           is_public: metadata.is_public ?? true,
@@ -1000,12 +976,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         main_generation: mainGeneration,
         use_count: isEditMode ? (editingPreset?.metadata.use_count || 0) : 0,
         created_at: isEditMode ? (editingPreset?.metadata.created_at || new Date().toISOString()) : new Date().toISOString(),
-        presetPromptPrefix: addForm.presetPromptPrefix || undefined,
-        presetPromptSuffix: addForm.presetPromptSuffix || undefined,
-        presetBasePrompt: addForm.presetBasePrompt || undefined,
-        presetNegativePrompt: addForm.presetNegativePrompt || undefined,
-        presetEnhancePrompt: addForm.presetEnhancePrompt ? addForm.presetEnhancePrompt : undefined,
-        presetDurationFrames: addForm.presetDurationFrames !== 60 ? addForm.presetDurationFrames : undefined,
       };
 
       if (isEditMode && editingPreset) {
@@ -1023,12 +993,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       setAddForm({
         name: '',
         description: '',
-        presetPromptPrefix: '',
-        presetPromptSuffix: '',
-        presetBasePrompt: '',
-        presetNegativePrompt: '',
-        presetEnhancePrompt: false,
-        presetDurationFrames: 60,
         created_by_is_you: true,
         created_by_username: '',
         is_public: true,
@@ -1070,12 +1034,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               setAddForm({
                 name: '',
                 description: '',
-                presetPromptPrefix: '',
-                presetPromptSuffix: '',
-                presetBasePrompt: '',
-                presetNegativePrompt: '',
-                presetEnhancePrompt: false,
-                presetDurationFrames: 60,
                 created_by_is_you: true,
                 created_by_username: '',
                 is_public: true,
@@ -1122,89 +1080,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             />
           </div>
 
-          {/* Prompt Settings Section */}
-          <div className="space-y-3 pt-2 border-t">
-            <div className="space-y-1">
-              <Label className="text-base font-medium">Prompt Settings (optional)</Label>
-              <p className="text-xs text-muted-foreground">
-                Configure how prompts are generated and enhanced when this preset is applied
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="preset-prompt-prefix" className="text-sm">Before each prompt</Label>
-                <Input 
-                  id="preset-prompt-prefix" 
-                  placeholder="e.g., cinematic, 4k" 
-                  value={addForm.presetPromptPrefix} 
-                  onChange={e => handleFormChange('presetPromptPrefix', e.target.value)} 
-                  maxLength={200}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="preset-prompt-suffix" className="text-sm">After each prompt</Label>
-                <Input 
-                  id="preset-prompt-suffix" 
-                  placeholder="e.g., highly detailed, 8k" 
-                  value={addForm.presetPromptSuffix} 
-                  onChange={e => handleFormChange('presetPromptSuffix', e.target.value)} 
-                  maxLength={200}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="preset-base-prompt" className="text-sm">Base/Default Prompt</Label>
-              <Textarea 
-                id="preset-base-prompt" 
-                placeholder="e.g., smooth camera movement, professional cinematography" 
-                value={addForm.presetBasePrompt} 
-                onChange={e => handleFormChange('presetBasePrompt', e.target.value)} 
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="preset-negative-prompt" className="text-sm">Negative Prompt</Label>
-              <Textarea 
-                id="preset-negative-prompt" 
-                placeholder="e.g., blurry, low quality, distorted" 
-                value={addForm.presetNegativePrompt} 
-                onChange={e => handleFormChange('presetNegativePrompt', e.target.value)} 
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="preset-duration-frames" className="text-sm">
-                Duration per pair: {framesToSeconds(addForm.presetDurationFrames)} ({addForm.presetDurationFrames} frames)
-              </Label>
-              <Slider
-                id="preset-duration-frames"
-                min={10}
-                max={81}
-                step={1}
-                value={[addForm.presetDurationFrames]}
-                onValueChange={(value) => handleFormChange('presetDurationFrames', value[0])}
-              />
-              <p className="text-xs text-muted-foreground">
-                Default: {framesToSeconds(60)} (60 frames)
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2 pt-2">
-              <Checkbox 
-                id="preset-enhance-prompt" 
-                checked={addForm.presetEnhancePrompt}
-                onCheckedChange={(checked) => handleFormChange('presetEnhancePrompt', checked)}
-              />
-              <Label htmlFor="preset-enhance-prompt" className="font-normal cursor-pointer">
-                Enhance/Create Prompts
-              </Label>
-            </div>
-          </div>
 
           <div className="space-y-2">
             {/* Display existing samples when editing */}
