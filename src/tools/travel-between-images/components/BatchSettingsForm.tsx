@@ -6,7 +6,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
 import { Input } from "@/shared/components/ui/input";
-import { Info, Plus, Sparkles } from 'lucide-react';
+import { Info, Plus, Sparkles, Eraser } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { SteerableMotionSettings, DEFAULT_STEERABLE_MOTION_SETTINGS } from './ShotEditor/state/types';
 import { Project } from '@/types/project';
@@ -278,27 +278,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     Enhance/Create Prompts
                   </Label>
                 </div>
-                {onClearEnhancedPrompts && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        await onClearEnhancedPrompts();
-                      } catch (error) {
-                        console.error('Error clearing enhanced prompts:', error);
-                      }
-                    }}
-                    className="text-[11px] leading-tight"
-                  >
-                    <span className="text-center">
-                      Clear current
-                      <br />
-                      enhanced prompts
-                    </span>
-                  </Button>
-                )}
               </div>
             )}
             

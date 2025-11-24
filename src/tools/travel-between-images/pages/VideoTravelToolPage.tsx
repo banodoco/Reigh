@@ -6,7 +6,14 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { Shot } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { ChevronLeft, ChevronRight, ArrowUp } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select";
+import { ChevronLeft, ChevronRight, ArrowUp, Search } from 'lucide-react';
 import { useProject } from "@/shared/contexts/ProjectContext";
 import CreateShotModal from '@/shared/components/CreateShotModal';
 import ShotListDisplay from '../components/ShotListDisplay';
@@ -1261,15 +1268,27 @@ const VideoTravelToolPage: React.FC = () => {
   // useVideoTravelHeader({ ... });
 
   // Auto-disable turbo mode when cloud generation is disabled
+  // CRITICAL: Skip during settings loading to prevent race condition where
+  // loaded settings get immediately overwritten by auto-disable logic
   useEffect(() => {
+    if (shotSettings.status === 'loading') {
+      return; // Don't auto-disable while settings are loading
+    }
+    
     if (!isCloudGenerationEnabled && turboMode) {
       console.log('[VideoTravelToolPage] Auto-disabling turbo mode - cloud generation is disabled');
       shotSettingsRef.current.updateField('turboMode', false);
     }
-  }, [isCloudGenerationEnabled, turboMode]);
+  }, [isCloudGenerationEnabled, turboMode, shotSettings.status]);
 
   // Auto-disable advanced mode when turbo mode is on
+  // CRITICAL: Skip during settings loading to prevent race condition where
+  // loaded settings get immediately overwritten by auto-disable logic
   useEffect(() => {
+    if (shotSettings.status === 'loading') {
+      return; // Don't auto-disable while settings are loading
+    }
+    
     if (turboMode && advancedMode) {
       console.log('[VideoTravelToolPage] Auto-disabling advanced mode - turbo mode is active');
       shotSettingsRef.current.updateFields({
@@ -1277,7 +1296,7 @@ const VideoTravelToolPage: React.FC = () => {
         selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
       });
     }
-  }, [turboMode, advancedMode]);
+  }, [turboMode, advancedMode, shotSettings.status]);
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
   const selectedShotRef = useRef(selectedShot);
@@ -1807,6 +1826,38 @@ const VideoTravelToolPage: React.FC = () => {
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
               <div className="flex items-center gap-3">
+                {/* Search and Sort - Only show in Shots view */}
+                {!showVideosView && (
+                  <>
+                    <div className="relative w-40 sm:w-52 hidden sm:block">
+                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                        <Search className="h-3.5 w-3.5" />
+                      </div>
+                      <Input
+                        ref={searchInputRef}
+                        placeholder="Search shots..."
+                        value={shotSearchQuery}
+                        onChange={(e) => setShotSearchQuery(e.target.value)}
+                        className="h-8 text-xs pl-8"
+                      />
+                    </div>
+
+                    <Select
+                      value={shotSortMode}
+                      onValueChange={(value: 'ordered' | 'newest' | 'oldest') => setShotSortMode(value)}
+                    >
+                      <SelectTrigger className="w-[110px] h-8 text-xs">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ordered">Ordered</SelectItem>
+                        <SelectItem value="newest">Newest</SelectItem>
+                        <SelectItem value="oldest">Oldest</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+
                 {/* Shots vs Videos Toggle */}
                 <div className="inline-flex items-center bg-muted rounded-full p-1">
                   <button

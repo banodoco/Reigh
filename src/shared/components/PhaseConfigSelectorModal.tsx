@@ -39,6 +39,7 @@ interface PhaseConfigSelectorModalProps {
   selectedPresetId: string | null;
   currentPhaseConfig?: PhaseConfig; // The current config (for "Save Current" feature)
   initialTab?: 'browse' | 'add-new'; // Which tab to open with
+  intent?: 'load' | 'overwrite'; // Mode of operation
   // Current settings to pre-populate the form
   currentSettings?: {
     textBeforePrompts?: string;
@@ -58,9 +59,9 @@ interface BrowsePresetsTabProps {
   selectedPresetId: string | null;
   myPresetsResource: UseQueryResult<Resource[], Error>;
   publicPresetsResource: UseQueryResult<Resource[], Error>;
-  createResource: UseMutationResult<Resource, Error, { type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
-  updateResource: UseMutationResult<Resource, Error, { id: string; type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
-  deleteResource: UseMutationResult<void, Error, { id: string; type: "phase-config"; }, unknown>;
+  createResource: ReturnType<typeof useCreateResource>;
+  updateResource: ReturnType<typeof useUpdateResource>;
+  deleteResource: ReturnType<typeof useDeleteResource>;
   onClose: () => void;
   onEdit: (preset: Resource & { metadata: PhaseConfigMetadata }) => void;
   showMyPresetsOnly: boolean;
@@ -69,6 +70,8 @@ interface BrowsePresetsTabProps {
   setShowSelectedPresetOnly: (value: boolean) => void;
   onProcessedPresetsLengthChange: (length: number) => void;
   onPageChange?: (page: number, totalPages: number, setPage: (page: number) => void) => void;
+  intent?: 'load' | 'overwrite';
+  onOverwrite?: (preset: Resource & { metadata: PhaseConfigMetadata }) => void;
 }
 
 const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({ 
@@ -87,7 +90,9 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
   showSelectedPresetOnly,
   setShowSelectedPresetOnly,
   onProcessedPresetsLengthChange,
-  onPageChange
+  onPageChange,
+  intent = 'load',
+  onOverwrite
 }) => {
   const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
@@ -303,7 +308,16 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                           </div>
                           {/* Mobile buttons */}
                           <div className={`flex gap-2 flex-shrink-0 ${isMobile ? '' : 'hidden'}`}>
-                            {isSelected ? (
+                            {intent === 'overwrite' ? (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => onOverwrite?.(preset as Resource & { metadata: PhaseConfigMetadata })}
+                                className="bg-orange-600 hover:bg-orange-700"
+                              >
+                                Overwrite
+                              </Button>
+                            ) : isSelected ? (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -355,7 +369,16 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                       {/* Desktop buttons */}
                       <div className={`flex flex-col lg:items-end gap-2 flex-shrink-0 ${isMobile ? 'hidden' : 'hidden lg:flex'}`}>
                         <div className="flex gap-2">
-                          {isSelected ? (
+                          {intent === 'overwrite' ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => onOverwrite?.(preset as Resource & { metadata: PhaseConfigMetadata })}
+                              className="bg-orange-600 hover:bg-orange-700"
+                            >
+                              Overwrite
+                            </Button>
+                          ) : isSelected ? (
                             <Button
                               variant="outline"
                               size="sm"
@@ -634,12 +657,13 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
 };
 
 interface AddNewTabProps {
-  createResource: UseMutationResult<Resource, Error, { type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
-  updateResource: UseMutationResult<Resource, Error, { id: string; type: 'phase-config'; metadata: PhaseConfigMetadata; }, unknown>;
+  createResource: ReturnType<typeof useCreateResource>;
+  updateResource: ReturnType<typeof useUpdateResource>;
   onSwitchToBrowse: () => void;
   currentPhaseConfig?: PhaseConfig;
   editingPreset?: (Resource & { metadata: PhaseConfigMetadata }) | null;
   onClearEdit: () => void;
+  isOverwriting?: boolean;
   currentSettings?: {
     textBeforePrompts?: string;
     textAfterPrompts?: string;
@@ -703,7 +727,7 @@ const generatePresetName = (
   return parts.join(' - ');
 };
 
-const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings }) => {
+const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false }) => {
   const isEditMode = !!editingPreset;
   
   console.log('[PresetAutoPopulate] AddNewTab received currentSettings:', currentSettings);
@@ -786,27 +810,69 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   useEffect(() => {
     if (editingPreset && editingPreset.metadata) {
       const metadata = editingPreset.metadata;
-      setAddForm({
-        name: metadata.name || '',
-        description: metadata.description || '',
-        presetPromptPrefix: metadata.presetPromptPrefix || '',
-        presetPromptSuffix: metadata.presetPromptSuffix || '',
-        presetBasePrompt: metadata.presetBasePrompt || '',
-        presetNegativePrompt: metadata.presetNegativePrompt || '',
-        presetEnhancePrompt: metadata.presetEnhancePrompt ?? false,
-        presetDurationFrames: metadata.presetDurationFrames ?? 60,
-        created_by_is_you: metadata.created_by?.is_you ?? true,
-        created_by_username: metadata.created_by?.username || '',
-        is_public: metadata.is_public ?? true,
-      });
+      
+      // If overwriting, we use the name/description from the preset, 
+      // but current settings for the configuration and prompt details
+      if (isOverwriting && currentSettings) {
+         setAddForm({
+          name: metadata.name || '',
+          description: metadata.description || '',
+          presetPromptPrefix: currentSettings.textBeforePrompts || '',
+          presetPromptSuffix: currentSettings.textAfterPrompts || '',
+          presetBasePrompt: currentSettings.basePrompt || '',
+          presetNegativePrompt: currentSettings.negativePrompt || '',
+          presetEnhancePrompt: currentSettings.enhancePrompt ?? false,
+          presetDurationFrames: currentSettings.durationFrames ?? 60,
+          created_by_is_you: metadata.created_by?.is_you ?? true,
+          created_by_username: metadata.created_by?.username || '',
+          is_public: metadata.is_public ?? true,
+        });
+        
+        // When overwriting, we start with no samples (user can add new ones), 
+        // unless there's a last generated video they might want to use.
+        // Or should we keep old samples? Overwriting config likely invalidates old samples.
+        // Let's clear old samples and allow adding new ones.
+        setSampleFiles([]);
+        setDeletedExistingSampleUrls([]); // We'll effectively remove them by not including them? 
+        // Actually, if we're in overwrite mode, we probably shouldn't show the "Existing Samples" section
+        // or we should show them as available but maybe not selected?
+        // Let's assume overwrite means "fresh start" for samples except maybe keeping name.
+        
+        // Wait, if I overwrite, I'm updating the resource. If I don't send sample_generations, 
+        // they might be lost or kept depending on how I construct the update.
+        // The handleAddPresetFromForm constructs metadata.
+        
+        // If isOverwriting, we might want to default to clearing samples.
+      } else {
+        // Normal Edit Mode
+        setAddForm({
+          name: metadata.name || '',
+          description: metadata.description || '',
+          presetPromptPrefix: metadata.presetPromptPrefix || '',
+          presetPromptSuffix: metadata.presetPromptSuffix || '',
+          presetBasePrompt: metadata.presetBasePrompt || '',
+          presetNegativePrompt: metadata.presetNegativePrompt || '',
+          presetEnhancePrompt: metadata.presetEnhancePrompt ?? false,
+          presetDurationFrames: metadata.presetDurationFrames ?? 60,
+          created_by_is_you: metadata.created_by?.is_you ?? true,
+          created_by_username: metadata.created_by?.username || '',
+          is_public: metadata.is_public ?? true,
+        });
+      }
       
       // Reset new uploads and deleted samples when switching to a different preset
       setSampleFiles([]);
       setDeletedExistingSampleUrls([]);
       setMainGenerationIndex(0);
       setFileInputKey(prev => prev + 1);
+      
+      // If overwriting and we have a last generated video, use it
+      if (isOverwriting && currentSettings?.lastGeneratedVideoUrl) {
+        setInitialVideoSample(currentSettings.lastGeneratedVideoUrl);
+        setInitialVideoDeleted(false);
+      }
     }
-  }, [editingPreset]);
+  }, [editingPreset, isOverwriting, currentSettings]);
 
   // Manage preview URLs for sample files
   useEffect(() => {
@@ -869,8 +935,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     }
     
     // When editing, we can use the existing phase config from the preset
-    // When creating, we need a current phase config
-    const phaseConfigToUse = isEditMode ? (editingPreset?.metadata.phaseConfig || currentPhaseConfig) : currentPhaseConfig;
+    // When creating or overwriting, we need a current phase config
+    const phaseConfigToUse = (isEditMode && !isOverwriting) ? (editingPreset?.metadata.phaseConfig || currentPhaseConfig) : currentPhaseConfig;
     if (!phaseConfigToUse) {
       toast.error("No phase config available to save");
       return;
@@ -892,12 +958,15 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       }
 
       // Combine existing samples (minus deleted ones) with new uploads
+      // If overwriting, we don't include existing samples by default unless we want to keep them?
+      // For now, let's treat overwrite as "keep existing samples unless deleted" just like edit, 
+      // but user can delete them.
       const existingSamples = isEditMode 
         ? (editingPreset?.metadata.sample_generations || []).filter(s => !deletedExistingSampleUrls.includes(s.url))
         : [];
       
-      // Include initial video sample if present and not deleted (only when creating new preset)
-      const initialSample = (!isEditMode && initialVideoSample && !initialVideoDeleted) 
+      // Include initial video sample if present and not deleted (only when creating new preset OR overwriting)
+      const initialSample = ((!isEditMode || isOverwriting) && initialVideoSample && !initialVideoDeleted) 
         ? [{ url: initialVideoSample, type: 'video' as const, alt_text: 'Latest video generation' }]
         : [];
       
@@ -905,8 +974,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
       // Determine main generation
       let mainGeneration: string | undefined;
-      if (!isEditMode && initialVideoSample && !initialVideoDeleted) {
-        // Use initial video as main generation when creating new preset
+      if ((!isEditMode || isOverwriting) && initialVideoSample && !initialVideoDeleted) {
+        // Use initial video as main generation when creating new preset or overwriting
         mainGeneration = initialVideoSample;
       } else if (uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex]) {
         mainGeneration = uploadedSamples[mainGenerationIndex].url;
@@ -982,11 +1051,15 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   return (
     <div className="space-y-4">
       {isEditMode && (
-        <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div className={`flex items-center justify-between p-3 border rounded-lg ${
+          isOverwriting 
+            ? 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800' 
+            : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'
+        }`}>
           <div className="flex items-center gap-2">
-            <Pencil className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              Editing: {editingPreset?.metadata.name}
+            <Pencil className={`h-4 w-4 ${isOverwriting ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400'}`} />
+            <span className={`text-sm font-medium ${isOverwriting ? 'text-orange-900 dark:text-orange-100' : 'text-blue-900 dark:text-blue-100'}`}>
+              {isOverwriting ? `Overwriting: ${editingPreset?.metadata.name}` : `Editing: ${editingPreset?.metadata.name}`}
             </span>
           </div>
           <Button 
@@ -1019,9 +1092,11 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       )}
       <Card>
         <CardHeader>
-          <CardTitle>{isEditMode ? 'Edit Phase Config Preset' : 'Create New Phase Config Preset'}</CardTitle>
+          <CardTitle>{isEditMode ? (isOverwriting ? 'Overwrite Preset' : 'Edit Phase Config Preset') : 'Create New Phase Config Preset'}</CardTitle>
           <CardDescription>
-            {isEditMode ? 'Update your phase configuration preset.' : 'Save your current phase configuration for reuse.'}
+            {isEditMode 
+              ? (isOverwriting ? 'Update this preset with your current configuration.' : 'Update your phase configuration preset.') 
+              : 'Save your current phase configuration for reuse.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -1201,8 +1276,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               </div>
             )}
 
-            {/* Display initial video sample from last generation (when not editing) */}
-            {!isEditMode && initialVideoSample && !initialVideoDeleted && (
+            {/* Display initial video sample from last generation (when not editing OR overwriting) */}
+            {(!isEditMode || isOverwriting) && initialVideoSample && !initialVideoDeleted && (
               <div className="space-y-2 mb-3">
                 <Label className="text-sm font-light">Last Generated Video (auto-included)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1357,7 +1432,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             <Label>Current Phase Configuration *</Label>
             {currentPhaseConfig ? (
               <div className="p-3 bg-accent/20 rounded-lg border space-y-2">
-                <p className="text-sm font-medium">This preset will save your current configuration:</p>
+                <p className="text-sm font-medium">
+                  {isOverwriting ? "New configuration to be saved:" : "This preset will save your current configuration:"}
+                </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-muted-foreground">Phases:</span>
@@ -1434,12 +1511,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             disabled={
               isSubmitting || 
               !addForm.name.trim() || 
-              (!isEditMode && !currentPhaseConfig)
+              ((!isEditMode || isOverwriting) && !currentPhaseConfig)
             }
           >
             {isSubmitting 
               ? (isEditMode ? 'Saving Changes...' : 'Creating Preset...') 
-              : (isEditMode ? 'Save Changes' : 'Create Preset')
+              : (isEditMode ? (isOverwriting ? 'Overwrite Preset' : 'Save Changes') : 'Create Preset')
             }
           </Button>
         </ItemCardFooter>
@@ -1457,6 +1534,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   currentPhaseConfig,
   initialTab = 'browse',
   currentSettings,
+  intent = 'load'
 }) => {
   console.log('[PresetAutoPopulate] PhaseConfigSelectorModal rendered:', { isOpen, currentSettings });
   
@@ -1479,10 +1557,22 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   
   // Edit state management
   const [editingPreset, setEditingPreset] = useState<(Resource & { metadata: PhaseConfigMetadata }) | null>(null);
+  const [isOverwriting, setIsOverwriting] = useState(false);
   
   // Filter state for footer controls
   const [showMyPresetsOnly, setShowMyPresetsOnly] = useState(false);
   const [showSelectedPresetOnly, setShowSelectedPresetOnly] = useState(false);
+  
+  // Auto-set showMyPresetsOnly when intent is overwrite
+  useEffect(() => {
+    if (intent === 'overwrite') {
+      setShowMyPresetsOnly(true);
+    } else {
+      // Reset when closing or changing intent
+      setShowMyPresetsOnly(false);
+    }
+  }, [intent, isOpen]);
+  
   const [processedPresetsLength, setProcessedPresetsLength] = useState(0);
   
   // Pagination state
@@ -1500,12 +1590,21 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   // Handle edit action
   const handleEdit = (preset: Resource & { metadata: PhaseConfigMetadata }) => {
     setEditingPreset(preset);
+    setIsOverwriting(false);
+    setActiveTab('add-new');
+  };
+
+  // Handle overwrite action
+  const handleOverwrite = (preset: Resource & { metadata: PhaseConfigMetadata }) => {
+    setEditingPreset(preset);
+    setIsOverwriting(true);
     setActiveTab('add-new');
   };
   
   // Handle clear edit
   const handleClearEdit = () => {
     setEditingPreset(null);
+    setIsOverwriting(false);
   };
   
   // Modal styling and scroll fade
@@ -1561,6 +1660,8 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   deleteResource={deleteResource}
                   onClose={onClose}
                   onEdit={handleEdit}
+                  intent={intent}
+                  onOverwrite={handleOverwrite}
                   showMyPresetsOnly={showMyPresetsOnly}
                   setShowMyPresetsOnly={setShowMyPresetsOnly}
                   showSelectedPresetOnly={showSelectedPresetOnly}
@@ -1581,6 +1682,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   editingPreset={editingPreset}
                   onClearEdit={handleClearEdit}
                   currentSettings={currentSettings}
+                  isOverwriting={isOverwriting}
                 />
               </TabsContent>
             </Tabs>

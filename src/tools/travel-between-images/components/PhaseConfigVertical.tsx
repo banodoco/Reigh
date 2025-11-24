@@ -8,7 +8,7 @@ import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/shared/components/ui/dropdown-menu';
-import { Info, RotateCcw, Trash2, Download, Search, Save, Library } from 'lucide-react';
+import { Info, RotateCcw, Trash2, Download, Search, Save, Library, FilePlus } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '../settings';
 import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
@@ -55,6 +55,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
   const [focusedLoraInput, setFocusedLoraInput] = useState<string | null>(null);
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [presetModalTab, setPresetModalTab] = useState<'browse' | 'add-new'>('browse');
+  const [modalIntent, setModalIntent] = useState<'load' | 'overwrite'>('load');
 
   // Phase labels based on number of phases
   const phaseLabels2 = ["High Noise Sampler", "Low Noise Sampler"];
@@ -71,7 +72,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Header with Load Preset, Save As Preset and Restore Defaults */}
+      {/* Header with Load Preset, Save As Preset, Overwrite Preset and Restore Defaults */}
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-lg font-medium truncate">Phase Configuration</h3>
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -83,6 +84,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                 className="w-8 h-8 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
+                  setModalIntent('load');
                   setPresetModalTab('browse');
                   setIsPresetModalOpen(true);
                 }}
@@ -95,33 +97,57 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
               <p>Load Preset</p>
             </TooltipContent>
           </Tooltip>
+          
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 sm:w-auto w-8 h-8 sm:h-auto p-0 sm:px-3"
+                className="w-8 h-8 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
+                  setModalIntent('load');
                   setPresetModalTab('add-new');
                   setIsPresetModalOpen(true);
                 }}
                 type="button"
               >
-                <Save className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Save As Preset</span>
+                <FilePlus className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent className="sm:hidden">
+            <TooltipContent>
               <p>Save As Preset</p>
             </TooltipContent>
           </Tooltip>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 sm:w-auto w-8 h-8 sm:h-auto p-0 sm:px-3"
+                className="w-8 h-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModalIntent('overwrite');
+                  setPresetModalTab('browse');
+                  setIsPresetModalOpen(true);
+                }}
+                type="button"
+              >
+                <Save className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Overwrite Preset</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-8 h-8 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
                   onPhaseConfigChange(DEFAULT_PHASE_CONFIG);
@@ -129,10 +155,9 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                 type="button"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Restore Defaults</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent className="sm:hidden">
+            <TooltipContent>
               <p>Restore Defaults</p>
             </TooltipContent>
           </Tooltip>
@@ -379,6 +404,12 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                               key={predefinedLora.url}
                               onClick={() => {
                                 const newPhases = [...phaseConfig.phases];
+                                // Shallow copy phase object before modifying
+                                newPhases[phaseIdx] = { 
+                                  ...newPhases[phaseIdx],
+                                  loras: newPhases[phaseIdx].loras.filter(l => l.url && l.url.trim() !== "")
+                                };
+
                                 newPhases[phaseIdx].loras.push({
                                   url: predefinedLora.url,
                                   multiplier: "1.0"
@@ -469,6 +500,12 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                 <button
                   onClick={() => {
                     const newPhases = [...phaseConfig.phases];
+                    // Shallow copy phase object before modifying
+                    newPhases[phaseIdx] = { 
+                      ...newPhases[phaseIdx],
+                      loras: newPhases[phaseIdx].loras.filter(l => l.url && l.url.trim() !== "")
+                    };
+
                     newPhases[phaseIdx].loras.push({
                       url: "",
                       multiplier: "1.0"
@@ -511,6 +548,12 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
             });
             
             const newPhases = [...phaseConfig.phases];
+            // Shallow copy phase object before modifying
+            newPhases[activePhaseForLoraSelection] = { 
+              ...newPhases[activePhaseForLoraSelection],
+              loras: newPhases[activePhaseForLoraSelection].loras.filter(l => l.url && l.url.trim() !== "")
+            };
+
             newPhases[activePhaseForLoraSelection].loras.push({
               url: loraUrl,
               multiplier: "1.0"
@@ -529,7 +572,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
       />
 
       {/* Phase Config Preset Selector Modal (for loading/saving presets) */}
-      {console.log('[PresetAutoPopulate] PhaseConfigVertical passing currentSettings to Modal:', currentSettings)}
+      {(() => { console.log('[PresetAutoPopulate] PhaseConfigVertical passing currentSettings to Modal:', currentSettings); return null; })()}
       <PhaseConfigSelectorModal
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
@@ -548,6 +591,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
         currentPhaseConfig={phaseConfig}
         initialTab={presetModalTab}
         currentSettings={currentSettings}
+        intent={modalIntent}
       />
     </div>
   );
