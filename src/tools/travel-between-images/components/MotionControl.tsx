@@ -33,12 +33,18 @@ export interface MotionControlProps {
   selectedPhasePresetId?: string | null;
   onPhasePresetSelect: (presetId: string, config: PhaseConfig) => void;
   onPhasePresetRemove: () => void;
+  currentSettings?: {
+    textBeforePrompts?: string;
+    textAfterPrompts?: string;
+    basePrompt?: string;
+    negativePrompt?: string;
+    enhancePrompt?: boolean;
+    durationFrames?: number;
+  };
   
   // Advanced mode props
   advancedMode: boolean;
   onAdvancedModeChange: (value: boolean) => void;
-  regenerateAnchors?: boolean;
-  onRegenerateAnchorsChange?: (value: boolean) => void;
   phaseConfig?: PhaseConfig;
   onPhaseConfigChange: (config: PhaseConfig) => void;
   onBlurSave?: () => void;
@@ -64,10 +70,9 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   selectedPhasePresetId,
   onPhasePresetSelect,
   onPhasePresetRemove,
+  currentSettings,
   advancedMode,
   onAdvancedModeChange,
-  regenerateAnchors,
-  onRegenerateAnchorsChange,
   phaseConfig,
   onPhaseConfigChange,
   onBlurSave,
@@ -176,6 +181,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
             onPhasePresetRemove={onPhasePresetRemove}
             phaseConfig={phaseConfig}
             onSwitchToAdvanced={handleSwitchToAdvanced}
+            currentSettings={currentSettings}
           />
         </TabsContent>
 
@@ -188,8 +194,6 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               onBlurSave={onBlurSave}
               randomSeed={randomSeed}
               onRandomSeedChange={onRandomSeedChange}
-              regenerateAnchors={regenerateAnchors}
-              onRegenerateAnchorsChange={onRegenerateAnchorsChange}
               availableLoras={availableLoras}
               selectedPhasePresetId={selectedPhasePresetId}
               onPhasePresetSelect={onPhasePresetSelect}

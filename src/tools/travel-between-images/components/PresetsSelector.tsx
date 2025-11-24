@@ -189,6 +189,14 @@ interface PresetsSelectorProps {
   onPhasePresetRemove: () => void;
   phaseConfig?: PhaseConfig;
   onSwitchToAdvanced?: () => void;
+  currentSettings?: {
+    textBeforePrompts?: string;
+    textAfterPrompts?: string;
+    basePrompt?: string;
+    negativePrompt?: string;
+    enhancePrompt?: boolean;
+    durationFrames?: number;
+  };
 }
 
 export const PresetsSelector: React.FC<PresetsSelectorProps> = ({
@@ -196,7 +204,8 @@ export const PresetsSelector: React.FC<PresetsSelectorProps> = ({
   onPhasePresetSelect,
   onPhasePresetRemove,
   phaseConfig,
-  onSwitchToAdvanced
+  onSwitchToAdvanced,
+  currentSettings
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState<'browse' | 'add-new'>('browse');
@@ -257,6 +266,7 @@ export const PresetsSelector: React.FC<PresetsSelectorProps> = ({
         selectedPresetId={selectedPhasePresetId || null}
         currentPhaseConfig={phaseConfig}
         initialTab={modalInitialTab}
+        currentSettings={currentSettings}
       />
     </div>
   );

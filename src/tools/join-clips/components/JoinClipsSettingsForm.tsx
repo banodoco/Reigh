@@ -164,7 +164,7 @@ const Visualization: React.FC<{
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p className="max-w-xs text-xs">Context frames from Clip A - fed into generation to understand motion and maintain continuity</p>
+                                    <p className="max-w-xs text-xs">Context frames from Clip A - fed into generation to understand motion and maintain continuity. These will be blended between the original and the new.</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>

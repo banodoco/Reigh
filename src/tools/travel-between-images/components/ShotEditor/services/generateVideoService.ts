@@ -57,7 +57,6 @@ export interface GenerateVideoParams {
   advancedMode: boolean;
   phaseConfig?: PhaseConfig;
   selectedPhasePresetId?: string;
-  regenerateAnchors?: boolean;
   
   // LoRAs
   selectedLoras: Array<{ id: string; path: string; strength: number; name: string }>;
@@ -109,7 +108,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     advancedMode,
     phaseConfig,
     selectedPhasePresetId,
-    regenerateAnchors,
     selectedLoras,
     structureVideoPath,
     structureVideoType,
@@ -595,8 +593,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     advanced_mode: advancedMode,
     motion_mode: motionMode, // Motion control mode (basic/presets/advanced)
     phase_config: advancedMode && adjustedPhaseConfig ? adjustedPhaseConfig : undefined,
-    // Include regenerate_anchors if in Advanced Mode
-    ...(advancedMode && regenerateAnchors !== undefined ? { regenerate_anchors: regenerateAnchors } : {}),
+    // Always set regenerate_anchors to false
+    ...(advancedMode ? { regenerate_anchors: false } : {}),
     // Include selected phase preset ID for UI state restoration
     selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
     // Add generation name if provided

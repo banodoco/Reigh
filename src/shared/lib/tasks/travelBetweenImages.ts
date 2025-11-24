@@ -207,8 +207,8 @@ function buildTravelBetweenImagesPayload(
     // Only include amount_of_motion if NOT in Advanced Mode
     ...(params.advanced_mode ? {} : { amount_of_motion: params.amount_of_motion ?? DEFAULT_TRAVEL_BETWEEN_IMAGES_VALUES.amount_of_motion }),
     advanced_mode: params.advanced_mode ?? false,
-    // Only include regenerate_anchors if in Advanced Mode
-    ...(params.advanced_mode && params.regenerate_anchors !== undefined ? { regenerate_anchors: params.regenerate_anchors } : {}),
+    // Always set regenerate_anchors to false in Advanced Mode
+    ...(params.advanced_mode ? { regenerate_anchors: false } : {}),
     // Include generation_name in orchestrator payload so it flows to child tasks
     generation_name: params.generation_name ?? undefined,
     independent_segments: params.independent_segments ?? true,

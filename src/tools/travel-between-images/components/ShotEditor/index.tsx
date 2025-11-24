@@ -96,8 +96,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onMotionModeChange,
   advancedMode,
   onAdvancedModeChange,
-  regenerateAnchors,
-  onRegenerateAnchorsChange,
   phaseConfig,
   onPhaseConfigChange,
   selectedPhasePresetId,
@@ -1248,7 +1246,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       advancedMode,
       phaseConfig,
       selectedPhasePresetId,
-      regenerateAnchors,
       selectedLoras: loraManager.selectedLoras.map(lora => ({
         id: lora.id,
         path: lora.path,
@@ -1299,7 +1296,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     advancedMode,
     phaseConfig,
     selectedPhasePresetId,
-    regenerateAnchors,
     loraManager.selectedLoras,
     structureVideoPath,
     structureVideoType,
@@ -1659,10 +1655,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             selectedPhasePresetId={selectedPhasePresetId}
                             onPhasePresetSelect={onPhasePresetSelect || (() => {})}
                             onPhasePresetRemove={onPhasePresetRemove || (() => {})}
+                            currentSettings={{
+                                textBeforePrompts,
+                                textAfterPrompts,
+                                basePrompt: batchVideoPrompt,
+                                negativePrompt: steerableMotionSettings.negative_prompt,
+                                enhancePrompt,
+                                durationFrames: batchVideoFrames
+                            }}
                             advancedMode={advancedMode || false}
                             onAdvancedModeChange={onAdvancedModeChange || (() => {})}
-                            regenerateAnchors={regenerateAnchors}
-                            onRegenerateAnchorsChange={onRegenerateAnchorsChange}
                             phaseConfig={phaseConfig}
                             onPhaseConfigChange={onPhaseConfigChange || (() => {})}
                             onBlurSave={onBlurSave}

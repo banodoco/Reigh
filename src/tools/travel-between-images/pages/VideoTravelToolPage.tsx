@@ -458,10 +458,6 @@ const VideoTravelToolPage: React.FC = () => {
     }
   }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
-  const handleRegenerateAnchorsChange = useCallback((regenerate: boolean) => {
-    shotSettings.updateField('regenerateAnchors', regenerate);
-  }, [shotSettings]);
-
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
     // Auto-set model_switch_phase to 1 when num_phases is 2
     const adjustedConfig = config.num_phases === 2 
@@ -844,7 +840,6 @@ const VideoTravelToolPage: React.FC = () => {
     turboMode = false,
     amountOfMotion = 50,
     advancedMode = false,
-    regenerateAnchors = false,
     motionMode = 'basic',
     phaseConfig,
     selectedPhasePresetId,
@@ -2029,8 +2024,6 @@ const VideoTravelToolPage: React.FC = () => {
               onMotionModeChange={handleMotionModeChange}
               advancedMode={advancedMode}
               onAdvancedModeChange={handleAdvancedModeChange}
-              regenerateAnchors={regenerateAnchors}
-              onRegenerateAnchorsChange={handleRegenerateAnchorsChange}
               phaseConfig={phaseConfig}
               onPhaseConfigChange={handlePhaseConfigChange}
               selectedPhasePresetId={selectedPhasePresetId}

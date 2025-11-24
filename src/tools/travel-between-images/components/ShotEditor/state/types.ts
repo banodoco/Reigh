@@ -132,8 +132,6 @@ export interface ShotEditorProps {
   // Advanced mode
   advancedMode?: boolean;
   onAdvancedModeChange?: (advanced: boolean) => void;
-  regenerateAnchors?: boolean;
-  onRegenerateAnchorsChange?: (regenerate: boolean) => void;
   phaseConfig?: any; // PhaseConfig type from settings
   onPhaseConfigChange?: (config: any) => void;
   // Phase preset props

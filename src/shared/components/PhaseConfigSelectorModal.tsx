@@ -39,6 +39,15 @@ interface PhaseConfigSelectorModalProps {
   selectedPresetId: string | null;
   currentPhaseConfig?: PhaseConfig; // The current config (for "Save Current" feature)
   initialTab?: 'browse' | 'add-new'; // Which tab to open with
+  // Current settings to pre-populate the form
+  currentSettings?: {
+    textBeforePrompts?: string;
+    textAfterPrompts?: string;
+    basePrompt?: string;
+    negativePrompt?: string;
+    enhancePrompt?: boolean;
+    durationFrames?: number;
+  };
 }
 
 interface BrowsePresetsTabProps {
@@ -629,19 +638,27 @@ interface AddNewTabProps {
   currentPhaseConfig?: PhaseConfig;
   editingPreset?: (Resource & { metadata: PhaseConfigMetadata }) | null;
   onClearEdit: () => void;
+  currentSettings?: {
+    textBeforePrompts?: string;
+    textAfterPrompts?: string;
+    basePrompt?: string;
+    negativePrompt?: string;
+    enhancePrompt?: boolean;
+    durationFrames?: number;
+  };
 }
 
-const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit }) => {
+const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings }) => {
   const isEditMode = !!editingPreset;
   const [addForm, setAddForm] = useState({
     name: '',
     description: '',
-    presetPromptPrefix: '',
-    presetPromptSuffix: '',
-    presetBasePrompt: '',
-    presetNegativePrompt: '',
-    presetEnhancePrompt: false,
-    presetDurationFrames: 60,
+    presetPromptPrefix: currentSettings?.textBeforePrompts || '',
+    presetPromptSuffix: currentSettings?.textAfterPrompts || '',
+    presetBasePrompt: currentSettings?.basePrompt || '',
+    presetNegativePrompt: currentSettings?.negativePrompt || '',
+    presetEnhancePrompt: currentSettings?.enhancePrompt ?? false,
+    presetDurationFrames: currentSettings?.durationFrames ?? 60,
     created_by_is_you: true,
     created_by_username: '',
     is_public: true,
@@ -1274,6 +1291,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   selectedPresetId,
   currentPhaseConfig,
   initialTab = 'browse',
+  currentSettings,
 }) => {
   const isMobile = useIsMobile();
   const myPresetsResource = useListResources('phase-config');
@@ -1395,6 +1413,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   currentPhaseConfig={currentPhaseConfig}
                   editingPreset={editingPreset}
                   onClearEdit={handleClearEdit}
+                  currentSettings={currentSettings}
                 />
               </TabsContent>
             </Tabs>

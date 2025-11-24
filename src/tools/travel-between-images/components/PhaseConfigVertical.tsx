@@ -21,8 +21,6 @@ interface PhaseConfigVerticalProps {
   onBlurSave?: () => void;
   randomSeed: boolean;
   onRandomSeedChange: (value: boolean) => void;
-  regenerateAnchors?: boolean;
-  onRegenerateAnchorsChange?: (value: boolean) => void;
   availableLoras?: LoraModel[];
   selectedPhasePresetId?: string | null;
   onPhasePresetSelect?: (presetId: string, config: PhaseConfig, presetMetadata?: any) => void;
@@ -35,8 +33,6 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
   onBlurSave,
   randomSeed,
   onRandomSeedChange,
-  regenerateAnchors = false,
-  onRegenerateAnchorsChange,
   availableLoras = [],
   selectedPhasePresetId,
   onPhasePresetSelect,
@@ -264,16 +260,6 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                   onCheckedChange={onRandomSeedChange}
                 />
                 <Label htmlFor="random-seed" className="text-sm">Random Seed</Label>
-              </div>
-
-              {/* Regenerate Anchors */}
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="regenerate-anchors"
-                  checked={regenerateAnchors}
-                  onCheckedChange={onRegenerateAnchorsChange}
-                />
-                <Label htmlFor="regenerate-anchors" className="text-sm">Regenerate Anchors</Label>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
+import { Slider } from '@/shared/components/ui/slider';
 import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
@@ -419,10 +420,10 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
             orchestratorDetailsKeys: Object.keys(orchestratorDetails),
             segmentIndex,
             currentNumFrames: currentParams.num_frames,
-            currentFrameOverlap: currentParams.frame_overlap,
             currentPrompt: currentParams.prompt?.substring(0, 50),
+            currentBasePrompt: currentParams.base_prompt?.substring(0, 50),
             segmentFramesExpanded: orchestratorDetails.segment_frames_expanded,
-            frameOverlapExpanded: orchestratorDetails.frame_overlap_expanded,
+            basePromptsExpanded: orchestratorDetails.base_prompts_expanded,
             enhancedPromptsExpanded: orchestratorDetails.enhanced_prompts_expanded?.map((p: string) => p?.substring(0, 30)),
             timestamp: Date.now()
         });
@@ -452,36 +453,32 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                 });
             }
             
-            // Populate overlap if missing
-            if (!currentParams.frame_overlap && orchestratorDetails.frame_overlap_expanded && orchestratorDetails.frame_overlap_expanded[segmentIndex]) {
-                console.log('[SegmentCardPopulation] Populating frame_overlap from frame_overlap_expanded[' + segmentIndex + ']:', orchestratorDetails.frame_overlap_expanded[segmentIndex]);
-                updates.frame_overlap = orchestratorDetails.frame_overlap_expanded[segmentIndex];
-                hasUpdates = true;
-            } else if (!currentParams.frame_overlap && orchestratorDetails.frame_overlap_with_next) {
-                console.log('[SegmentCardPopulation] Populating frame_overlap from frame_overlap_with_next:', orchestratorDetails.frame_overlap_with_next);
-                updates.frame_overlap = orchestratorDetails.frame_overlap_with_next;
-                hasUpdates = true;
+             // Populate base_prompt if missing or empty
+            // Try enhanced_prompts_expanded first, then base_prompts_expanded
+            if (!currentParams.base_prompt || currentParams.base_prompt === "") {
+                if (orchestratorDetails.enhanced_prompts_expanded && orchestratorDetails.enhanced_prompts_expanded[segmentIndex]) {
+                    console.log('[SegmentCardPopulation] Populating base_prompt from enhanced_prompts_expanded[' + segmentIndex + ']:', orchestratorDetails.enhanced_prompts_expanded[segmentIndex]?.substring(0, 50));
+                    updates.base_prompt = orchestratorDetails.enhanced_prompts_expanded[segmentIndex];
+                    hasUpdates = true;
+                } else if (orchestratorDetails.base_prompts_expanded && orchestratorDetails.base_prompts_expanded[segmentIndex]) {
+                    console.log('[SegmentCardPopulation] Populating base_prompt from base_prompts_expanded[' + segmentIndex + ']:', orchestratorDetails.base_prompts_expanded[segmentIndex]?.substring(0, 50));
+                    updates.base_prompt = orchestratorDetails.base_prompts_expanded[segmentIndex];
+                    hasUpdates = true;
+                } else if (orchestratorDetails.base_prompt) {
+                    console.log('[SegmentCardPopulation] Populating base_prompt from orchestrator_details.base_prompt:', orchestratorDetails.base_prompt?.substring(0, 50));
+                    updates.base_prompt = orchestratorDetails.base_prompt;
+                    hasUpdates = true;
+                } else {
+                    console.log('[SegmentCardPopulation] NOT populating base_prompt', {
+                        hasCurrentBasePrompt: !!currentParams.base_prompt,
+                        currentBasePromptEmpty: currentParams.base_prompt === "",
+                        hasEnhancedPromptsExpanded: !!orchestratorDetails.enhanced_prompts_expanded,
+                        hasBasePromptsExpanded: !!orchestratorDetails.base_prompts_expanded,
+                        hasOrchestratorBasePrompt: !!orchestratorDetails.base_prompt
+                    });
+                }
             } else {
-                console.log('[SegmentCardPopulation] NOT populating frame_overlap', {
-                    hasCurrentFrameOverlap: !!currentParams.frame_overlap,
-                    hasFrameOverlapExpanded: !!orchestratorDetails.frame_overlap_expanded,
-                    hasFrameOverlapWithNext: !!orchestratorDetails.frame_overlap_with_next,
-                    frameOverlapExpandedValue: orchestratorDetails.frame_overlap_expanded?.[segmentIndex]
-                });
-            }
-            
-             // Populate prompt if missing or empty
-            if ((!currentParams.prompt || currentParams.prompt === "") && orchestratorDetails.enhanced_prompts_expanded && orchestratorDetails.enhanced_prompts_expanded[segmentIndex]) {
-                console.log('[SegmentCardPopulation] Populating prompt from enhanced_prompts_expanded[' + segmentIndex + ']:', orchestratorDetails.enhanced_prompts_expanded[segmentIndex]?.substring(0, 50));
-                updates.prompt = orchestratorDetails.enhanced_prompts_expanded[segmentIndex];
-                hasUpdates = true;
-            } else {
-                console.log('[SegmentCardPopulation] NOT populating prompt', {
-                    hasCurrentPrompt: !!currentParams.prompt,
-                    currentPromptEmpty: currentParams.prompt === "",
-                    hasEnhancedPromptsExpanded: !!orchestratorDetails.enhanced_prompts_expanded,
-                    enhancedPromptsExpandedValue: orchestratorDetails.enhanced_prompts_expanded?.[segmentIndex]?.substring(0, 30)
-                });
+                console.log('[SegmentCardPopulation] base_prompt already exists, not populating');
             }
         } else {
             console.log('[SegmentCardPopulation] No segment index found, cannot populate from expanded arrays');
@@ -560,32 +557,34 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                 <div className="space-y-2 flex-1">
                     <Label className="text-xs font-medium">Prompt</Label>
                     <Textarea
-                        value={params.prompt || ''}
-                        onChange={(e) => handleChange('prompt', e.target.value)}
+                        value={params.base_prompt || params.prompt || ''}
+                        onChange={(e) => {
+                            // Update both base_prompt and prompt to keep them in sync
+                            setParams(prev => ({
+                                ...prev,
+                                base_prompt: e.target.value,
+                                prompt: e.target.value
+                            }));
+                            setIsDirty(true);
+                        }}
                         className="h-20 text-sm resize-none"
                         placeholder="Describe this segment..."
                     />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1.5">
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium">Frames</Label>
-                        <Input
-                            type="number"
-                            value={params.num_frames || ''}
-                            onChange={(e) => handleChange('num_frames', parseInt(e.target.value) || 0)}
-                            className="h-9 text-sm"
-                        />
+                        <span className="text-xs text-muted-foreground">{params.num_frames || 0}</span>
                     </div>
-                    <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">Overlap</Label>
-                        <Input
-                            type="number"
-                            value={params.frame_overlap || ''}
-                            onChange={(e) => handleChange('frame_overlap', parseInt(e.target.value) || 0)}
-                            className="h-9 text-sm"
-                        />
-                    </div>
+                    <Slider
+                        value={[params.num_frames || 0]}
+                        onValueChange={([value]) => handleChange('num_frames', value)}
+                        min={1}
+                        max={81}
+                        step={1}
+                        className="w-full"
+                    />
                 </div>
 
                 <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
