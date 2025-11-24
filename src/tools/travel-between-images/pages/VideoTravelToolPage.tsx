@@ -488,11 +488,18 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('phaseConfig', adjustedConfig);
   }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
 
-  const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => {
+  const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetMetadata?: any) => {
     console.log('[PhasePreset] User selected preset:', {
       presetId: presetId.substring(0, 8),
       shotId: selectedShot?.id?.substring(0, 8),
-      presetPromptPrefix: presetPromptPrefix || '(none)',
+      presetMetadata: presetMetadata ? {
+        hasPrefix: !!presetMetadata.presetPromptPrefix,
+        hasSuffix: !!presetMetadata.presetPromptSuffix,
+        hasBasePrompt: !!presetMetadata.presetBasePrompt,
+        hasNegativePrompt: !!presetMetadata.presetNegativePrompt,
+        enhancePrompt: presetMetadata.presetEnhancePrompt,
+        autoCreate: presetMetadata.presetAutoCreateIndividualPrompts
+      } : '(none)',
       timestamp: Date.now()
     });
     
@@ -502,19 +509,54 @@ const VideoTravelToolPage: React.FC = () => {
       phaseConfig: config
     };
     
-    // If preset has a prompt prefix, prepend it to textBeforePrompts
-    if (presetPromptPrefix) {
-      const currentTextBefore = shotSettings.settings.textBeforePrompts || '';
-      const newTextBefore = currentTextBefore 
-        ? `${presetPromptPrefix} ${currentTextBefore}` 
-        : presetPromptPrefix;
-      fieldsToUpdate.textBeforePrompts = newTextBefore;
+    if (presetMetadata) {
+      // If preset has a prompt prefix, prepend it to textBeforePrompts
+      if (presetMetadata.presetPromptPrefix) {
+        const currentTextBefore = shotSettings.settings.textBeforePrompts || '';
+        const newTextBefore = currentTextBefore 
+          ? `${presetMetadata.presetPromptPrefix} ${currentTextBefore}` 
+          : presetMetadata.presetPromptPrefix;
+        fieldsToUpdate.textBeforePrompts = newTextBefore;
+        
+        console.log('[PhasePreset] Applying preset prompt prefix:', {
+          presetPrefix: presetMetadata.presetPromptPrefix,
+          currentText: currentTextBefore || '(empty)',
+          newText: newTextBefore
+        });
+      }
       
-      console.log('[PhasePreset] Merging preset prompt prefix:', {
-        presetPrefix: presetPromptPrefix,
-        currentText: currentTextBefore || '(empty)',
-        newText: newTextBefore
-      });
+      // If preset has a prompt suffix, set textAfterPrompts
+      if (presetMetadata.presetPromptSuffix) {
+        fieldsToUpdate.textAfterPrompts = presetMetadata.presetPromptSuffix;
+        console.log('[PhasePreset] Applying preset prompt suffix:', presetMetadata.presetPromptSuffix);
+      }
+      
+      // If preset has a base prompt, set batchVideoPrompt
+      if (presetMetadata.presetBasePrompt) {
+        fieldsToUpdate.batchVideoPrompt = presetMetadata.presetBasePrompt;
+        console.log('[PhasePreset] Applying preset base prompt:', presetMetadata.presetBasePrompt);
+      }
+      
+      // If preset has a negative prompt, set it in steerableMotionSettings
+      if (presetMetadata.presetNegativePrompt) {
+        fieldsToUpdate.steerableMotionSettings = {
+          ...shotSettings.settings.steerableMotionSettings,
+          negative_prompt: presetMetadata.presetNegativePrompt
+        };
+        console.log('[PhasePreset] Applying preset negative prompt:', presetMetadata.presetNegativePrompt);
+      }
+      
+      // If preset has enhance prompt setting, apply it
+      if (presetMetadata.presetEnhancePrompt !== undefined) {
+        fieldsToUpdate.enhancePrompt = presetMetadata.presetEnhancePrompt;
+        console.log('[PhasePreset] Applying preset enhance prompt setting:', presetMetadata.presetEnhancePrompt);
+      }
+      
+      // If preset has auto-create individual prompts setting, apply it
+      if (presetMetadata.presetAutoCreateIndividualPrompts !== undefined) {
+        fieldsToUpdate.autoCreateIndividualPrompts = presetMetadata.presetAutoCreateIndividualPrompts;
+        console.log('[PhasePreset] Applying preset auto-create prompts setting:', presetMetadata.presetAutoCreateIndividualPrompts);
+      }
     }
     
     // Save all fields

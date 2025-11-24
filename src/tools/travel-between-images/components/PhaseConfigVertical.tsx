@@ -25,7 +25,7 @@ interface PhaseConfigVerticalProps {
   onRegenerateAnchorsChange?: (value: boolean) => void;
   availableLoras?: LoraModel[];
   selectedPhasePresetId?: string | null;
-  onPhasePresetSelect?: (presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => void;
+  onPhasePresetSelect?: (presetId: string, config: PhaseConfig, presetMetadata?: any) => void;
   onPhasePresetRemove?: () => void;
 }
 
@@ -537,7 +537,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
         onClose={() => setIsPresetModalOpen(false)}
         onSelectPreset={(preset) => {
           if (preset.metadata.phaseConfig && onPhasePresetSelect) {
-            onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata.presetPromptPrefix);
+            onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata);
           }
           setIsPresetModalOpen(false);
         }}

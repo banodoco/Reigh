@@ -6,7 +6,8 @@ import { resolveImageUrl } from '@/shared/lib/imageUrlResolver';
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
-import { DEFAULT_STEERABLE_MOTION_SETTINGS, PhaseConfig } from '../state/types';
+import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
+import { PhaseConfig } from '../../../settings';
 
 export interface GenerateVideoParams {
   // Core IDs
@@ -477,11 +478,47 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     console.log('[Generation] No structure video - using I2V model:', actualModelName);
   }
   
+  // Swap LoRAs in phase config based on structure video presence
+  // I2V models use Seko V1 LoRAs, VACE models use Seko V2.0 LoRAs
+  let adjustedPhaseConfig = phaseConfig;
+  if (advancedMode && phaseConfig && structureVideoPath) {
+    // Structure video present - swap I2V LoRAs to VACE LoRAs
+    console.log('[Generation] Structure video present - swapping I2V LoRAs to VACE LoRAs');
+    adjustedPhaseConfig = {
+      ...phaseConfig,
+      phases: phaseConfig.phases.map(phase => ({
+        ...phase,
+        loras: phase.loras.map(lora => {
+          // Swap I2V Seko V1 to VACE Seko V2.0
+          if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors')) {
+            return {
+              ...lora,
+              url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/high_noise_model.safetensors'
+            };
+          }
+          if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors')) {
+            return {
+              ...lora,
+              url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/low_noise_model.safetensors'
+            };
+          }
+          // Keep other LoRAs unchanged
+          return lora;
+        })
+      }))
+    };
+    
+    console.log('[Generation] LoRA swap complete:', {
+      originalLoraUrls: phaseConfig.phases.map(p => p.loras.map(l => l.url.split('/').pop())),
+      adjustedLoraUrls: adjustedPhaseConfig.phases.map(p => p.loras.map(l => l.url.split('/').pop()))
+    });
+  }
+  
   // Validate and debug log phase config before sending
-  if (advancedMode && phaseConfig) {
-    const phasesLength = phaseConfig.phases?.length || 0;
-    const stepsLength = phaseConfig.steps_per_phase?.length || 0;
-    const numPhases = phaseConfig.num_phases;
+  if (advancedMode && adjustedPhaseConfig) {
+    const phasesLength = adjustedPhaseConfig.phases?.length || 0;
+    const stepsLength = adjustedPhaseConfig.steps_per_phase?.length || 0;
+    const numPhases = adjustedPhaseConfig.num_phases;
     
     // Final validation check before sending to backend
     if (numPhases !== phasesLength || numPhases !== stepsLength) {
@@ -490,20 +527,20 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         phases_array_length: phasesLength,
         steps_array_length: stepsLength,
         ERROR: 'This WILL cause backend validation errors!',
-        phases_data: phaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
-        steps_per_phase: phaseConfig.steps_per_phase
+        phases_data: adjustedPhaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+        steps_per_phase: adjustedPhaseConfig.steps_per_phase
       });
       toast.error(`Invalid phase configuration: num_phases (${numPhases}) doesn't match arrays (phases: ${phasesLength}, steps: ${stepsLength}). Please reset to defaults.`);
       return { success: false, error: 'Invalid phase configuration' };
     }
     
     console.log('[PhaseConfigDebug] Preparing to send phase_config:', {
-      num_phases: phaseConfig.num_phases,
-      model_switch_phase: phaseConfig.model_switch_phase,
+      num_phases: adjustedPhaseConfig.num_phases,
+      model_switch_phase: adjustedPhaseConfig.model_switch_phase,
       phases_array_length: phasesLength,
       steps_array_length: stepsLength,
-      phases_data: phaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
-      steps_per_phase: phaseConfig.steps_per_phase,
+      phases_data: adjustedPhaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+      steps_per_phase: adjustedPhaseConfig.steps_per_phase,
       VALIDATION: 'PASSED'
     });
   }
@@ -557,7 +594,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Advanced mode flag and phase config
     advanced_mode: advancedMode,
     motion_mode: motionMode, // Motion control mode (basic/presets/advanced)
-    phase_config: advancedMode && phaseConfig ? phaseConfig : undefined,
+    phase_config: advancedMode && adjustedPhaseConfig ? adjustedPhaseConfig : undefined,
     // Include regenerate_anchors if in Advanced Mode
     ...(advancedMode && regenerateAnchors !== undefined ? { regenerate_anchors: regenerateAnchors } : {}),
     // Include selected phase preset ID for UI state restoration

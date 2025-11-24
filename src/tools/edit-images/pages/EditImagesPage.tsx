@@ -104,7 +104,7 @@ export default function EditImagesPage() {
   return (
     <div className={cn(
       "w-full flex flex-col",
-      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "h-[calc(100dvh-96px)] overflow-hidden"
+      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "h-[calc(100dvh-96px)]"
     )}>
       {!selectedMedia ? (
         <div className="w-full h-full px-4">
@@ -150,10 +150,10 @@ export default function EditImagesPage() {
           </div>
         </div>
       ) : (
-        <div className="w-full h-full px-4">
+        <div className="w-full h-full px-4 pt-4 overflow-hidden">
           <div className={cn(
-            "max-w-7xl mx-auto h-full relative",
-            isEditingOnMobile ? "flex flex-col" : "overflow-hidden"
+            "max-w-7xl mx-auto relative",
+            isEditingOnMobile ? "flex flex-col min-h-full" : "h-full overflow-hidden"
           )}>
             <InlineEditView 
               media={selectedMedia} 

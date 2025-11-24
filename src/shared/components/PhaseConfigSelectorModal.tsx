@@ -634,6 +634,11 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     name: '',
     description: '',
     presetPromptPrefix: '',
+    presetPromptSuffix: '',
+    presetBasePrompt: '',
+    presetNegativePrompt: '',
+    presetEnhancePrompt: false,
+    presetAutoCreateIndividualPrompts: false,
     created_by_is_you: true,
     created_by_username: '',
     is_public: true,
@@ -655,6 +660,11 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         name: metadata.name || '',
         description: metadata.description || '',
         presetPromptPrefix: metadata.presetPromptPrefix || '',
+        presetPromptSuffix: metadata.presetPromptSuffix || '',
+        presetBasePrompt: metadata.presetBasePrompt || '',
+        presetNegativePrompt: metadata.presetNegativePrompt || '',
+        presetEnhancePrompt: metadata.presetEnhancePrompt ?? false,
+        presetAutoCreateIndividualPrompts: metadata.presetAutoCreateIndividualPrompts ?? false,
         created_by_is_you: metadata.created_by?.is_you ?? true,
         created_by_username: metadata.created_by?.username || '',
         is_public: metadata.is_public ?? true,
@@ -783,6 +793,11 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         use_count: isEditMode ? (editingPreset?.metadata.use_count || 0) : 0,
         created_at: isEditMode ? (editingPreset?.metadata.created_at || new Date().toISOString()) : new Date().toISOString(),
         presetPromptPrefix: addForm.presetPromptPrefix || undefined,
+        presetPromptSuffix: addForm.presetPromptSuffix || undefined,
+        presetBasePrompt: addForm.presetBasePrompt || undefined,
+        presetNegativePrompt: addForm.presetNegativePrompt || undefined,
+        presetEnhancePrompt: addForm.presetEnhancePrompt ? addForm.presetEnhancePrompt : undefined,
+        presetAutoCreateIndividualPrompts: addForm.presetAutoCreateIndividualPrompts ? addForm.presetAutoCreateIndividualPrompts : undefined,
       };
 
       if (isEditMode && editingPreset) {
@@ -801,6 +816,11 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         name: '',
         description: '',
         presetPromptPrefix: '',
+        presetPromptSuffix: '',
+        presetBasePrompt: '',
+        presetNegativePrompt: '',
+        presetEnhancePrompt: false,
+        presetAutoCreateIndividualPrompts: false,
         created_by_is_you: true,
         created_by_username: '',
         is_public: true,
@@ -838,6 +858,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               setAddForm({
                 name: '',
                 description: '',
+                presetPromptPrefix: '',
+                presetPromptSuffix: '',
+                presetBasePrompt: '',
+                presetNegativePrompt: '',
+                presetEnhancePrompt: false,
+                presetAutoCreateIndividualPrompts: false,
                 created_by_is_you: true,
                 created_by_username: '',
                 is_public: true,
@@ -894,6 +920,68 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             <p className="text-xs text-muted-foreground">
               This text will be automatically added before the "Before each prompt" field when this preset is selected.
             </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="preset-prompt-suffix">Text to append after prompts (optional)</Label>
+            <Input 
+              id="preset-prompt-suffix" 
+              placeholder="e.g., highly detailed, 8k" 
+              value={addForm.presetPromptSuffix} 
+              onChange={e => handleFormChange('presetPromptSuffix', e.target.value)} 
+              maxLength={200}
+            />
+            <p className="text-xs text-muted-foreground">
+              This text will be automatically added to the "After each prompt" field when this preset is selected.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="preset-base-prompt">Base/Default Prompt (optional)</Label>
+            <Textarea 
+              id="preset-base-prompt" 
+              placeholder="e.g., smooth camera movement, professional cinematography" 
+              value={addForm.presetBasePrompt} 
+              onChange={e => handleFormChange('presetBasePrompt', e.target.value)} 
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground">
+              This will be used as the default/base prompt when this preset is selected.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="preset-negative-prompt">Negative Prompt (optional)</Label>
+            <Textarea 
+              id="preset-negative-prompt" 
+              placeholder="e.g., blurry, low quality, distorted" 
+              value={addForm.presetNegativePrompt} 
+              onChange={e => handleFormChange('presetNegativePrompt', e.target.value)} 
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground">
+              This will be used as the negative prompt when this preset is selected.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Prompt Enhancement Settings (optional)</Label>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="preset-enhance-prompt" 
+                checked={addForm.presetEnhancePrompt}
+                onCheckedChange={(checked) => handleFormChange('presetEnhancePrompt', checked)}
+              />
+              <Label htmlFor="preset-enhance-prompt" className="font-normal">Enhance prompts with AI</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="preset-auto-create-prompts" 
+                checked={addForm.presetAutoCreateIndividualPrompts}
+                onCheckedChange={(checked) => handleFormChange('presetAutoCreateIndividualPrompts', checked)}
+              />
+              <Label htmlFor="preset-auto-create-prompts" className="font-normal">Auto-create individual prompts</Label>
+            </div>
           </div>
 
           <div className="space-y-2">

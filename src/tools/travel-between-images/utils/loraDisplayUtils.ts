@@ -3,16 +3,40 @@ import { LoraModel } from '@/shared/components/LoraSelectorModal';
 // Pre-defined LoRA options for quick selection
 export const PREDEFINED_LORAS = [
   {
+    name: "I2V High Noise (Seko V1)",
+    displayName: "I2V High Noise (Seko V1)",
+    url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
+    category: "Lightning Official I2V"
+  },
+  {
+    name: "I2V Low Noise (Seko V1)",
+    displayName: "I2V Low Noise (Seko V1)",
+    url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors",
+    category: "Lightning Official I2V"
+  },
+  {
+    name: "VACE High Noise (Seko V2.0)",
+    displayName: "VACE High Noise (Seko V2.0)",
+    url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/high_noise_model.safetensors",
+    category: "Lightning Official VACE"
+  },
+  {
+    name: "VACE Low Noise (Seko V2.0)",
+    displayName: "VACE Low Noise (Seko V2.0)",
+    url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/low_noise_model.safetensors",
+    category: "Lightning Official VACE"
+  },
+  {
     name: "High Noise (Official 250928)",
     displayName: "High Noise (Official 250928)",
     url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
-    category: "Lightning Official"
+    category: "Lightning Official Legacy"
   },
   {
     name: "Low Noise (Official 250928)",
     displayName: "Low Noise (Official 250928)",
     url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors",
-    category: "Lightning Official"
+    category: "Lightning Official Legacy"
   },
   {
     name: "Fun InP - High Noise HPS2.1",

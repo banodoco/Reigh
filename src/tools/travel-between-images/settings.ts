@@ -34,7 +34,7 @@ export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
       guidance_scale: 3.0,
       loras: [
         {
-          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
           multiplier: "0.75"
         }
       ]
@@ -44,7 +44,7 @@ export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
       guidance_scale: 1.0,
       loras: [
         {
-          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors",
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors",
           multiplier: "1.0"
         }
       ]
@@ -54,7 +54,7 @@ export const DEFAULT_PHASE_CONFIG: PhaseConfig = {
       guidance_scale: 1.0,
       loras: [
         {
-          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors",
+          url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors",
           multiplier: "1.0"
         }
       ]

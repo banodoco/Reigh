@@ -77,15 +77,70 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
             </div>
           )}
           
-          {/* Preset Prompt Prefix */}
-          {metadata?.presetPromptPrefix && (
+          {/* Preset Prompt Settings */}
+          {(metadata?.presetPromptPrefix || metadata?.presetPromptSuffix || metadata?.presetBasePrompt || metadata?.presetNegativePrompt) && (
+            <div className="mb-3 space-y-2">
+              {metadata?.presetPromptPrefix && (
+                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                    Before Prompt:
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
+                    {metadata.presetPromptPrefix}
+                  </p>
+                </div>
+              )}
+              {metadata?.presetPromptSuffix && (
+                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                    After Prompt:
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
+                    {metadata.presetPromptSuffix}
+                  </p>
+                </div>
+              )}
+              {metadata?.presetBasePrompt && (
+                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                    Base Prompt:
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
+                    {metadata.presetBasePrompt}
+                  </p>
+                </div>
+              )}
+              {metadata?.presetNegativePrompt && (
+                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                    Negative Prompt:
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
+                    {metadata.presetNegativePrompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Prompt Enhancement Settings */}
+          {(metadata?.presetEnhancePrompt || metadata?.presetAutoCreateIndividualPrompts) && (
             <div className="mb-3 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
               <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                Prompt Prefix:
+                Prompt Settings:
               </p>
-              <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
-                {metadata.presetPromptPrefix}
-              </p>
+              <div className="flex flex-wrap gap-2">
+                {metadata?.presetEnhancePrompt && (
+                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
+                    Enhance Prompts
+                  </Badge>
+                )}
+                {metadata?.presetAutoCreateIndividualPrompts && (
+                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
+                    Auto-Create Prompts
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
           
@@ -120,7 +175,7 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
 
 interface PresetsSelectorProps {
   selectedPhasePresetId?: string | null;
-  onPhasePresetSelect: (presetId: string, config: PhaseConfig, presetPromptPrefix?: string) => void;
+  onPhasePresetSelect: (presetId: string, config: PhaseConfig, presetMetadata?: any) => void;
   onPhasePresetRemove: () => void;
   phaseConfig?: PhaseConfig;
   onSwitchToAdvanced?: () => void;
@@ -184,7 +239,7 @@ export const PresetsSelector: React.FC<PresetsSelectorProps> = ({
         onClose={() => setIsModalOpen(false)}
         onSelectPreset={(preset) => {
           if (preset.metadata.phaseConfig) {
-            onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata.presetPromptPrefix);
+            onPhasePresetSelect(preset.id, preset.metadata.phaseConfig, preset.metadata);
           }
           setIsModalOpen(false);
         }}

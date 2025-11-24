@@ -23,6 +23,11 @@ export interface PhaseConfigMetadata {
     }[];
     main_generation?: string;
     presetPromptPrefix?: string; // Text to prepend to prompts when this preset is selected
+    presetPromptSuffix?: string; // Text to append after prompts when this preset is selected
+    presetBasePrompt?: string; // Base/default prompt when this preset is selected
+    presetNegativePrompt?: string; // Negative prompt when this preset is selected
+    presetEnhancePrompt?: boolean; // Enhance prompt setting when this preset is selected
+    presetAutoCreateIndividualPrompts?: boolean; // Auto create individual prompts setting when this preset is selected
 }
 
 export interface StyleReferenceMetadata {
