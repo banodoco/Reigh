@@ -497,7 +497,8 @@ const VideoTravelToolPage: React.FC = () => {
         hasSuffix: !!presetMetadata.presetPromptSuffix,
         hasBasePrompt: !!presetMetadata.presetBasePrompt,
         hasNegativePrompt: !!presetMetadata.presetNegativePrompt,
-        enhancePrompt: presetMetadata.presetEnhancePrompt
+        enhancePrompt: presetMetadata.presetEnhancePrompt,
+        durationFrames: presetMetadata.presetDurationFrames
       } : '(none)',
       timestamp: Date.now()
     });
@@ -549,6 +550,12 @@ const VideoTravelToolPage: React.FC = () => {
       if (presetMetadata.presetEnhancePrompt !== undefined) {
         fieldsToUpdate.enhancePrompt = presetMetadata.presetEnhancePrompt;
         console.log('[PhasePreset] Applying preset enhance/create prompts setting:', presetMetadata.presetEnhancePrompt);
+      }
+      
+      // If preset has duration frames setting, apply it
+      if (presetMetadata.presetDurationFrames !== undefined) {
+        fieldsToUpdate.batchVideoFrames = presetMetadata.presetDurationFrames;
+        console.log('[PhasePreset] Applying preset duration frames:', presetMetadata.presetDurationFrames);
       }
     }
     

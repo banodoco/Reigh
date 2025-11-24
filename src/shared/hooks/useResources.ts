@@ -27,6 +27,7 @@ export interface PhaseConfigMetadata {
     presetBasePrompt?: string; // Base/default prompt when this preset is selected
     presetNegativePrompt?: string; // Negative prompt when this preset is selected
     presetEnhancePrompt?: boolean; // Enhance/create prompts setting when this preset is selected
+    presetDurationFrames?: number; // Duration per pair in frames (10-81) when this preset is selected
 }
 
 export interface StyleReferenceMetadata {

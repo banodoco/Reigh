@@ -26,6 +26,8 @@ import { Badge } from "@/shared/components/ui/badge";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import { framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
+import { Slider } from "@/shared/components/ui/slider";
 
 type SortOption = 'default' | 'newest' | 'oldest' | 'mostUsed' | 'name';
 
@@ -639,6 +641,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     presetBasePrompt: '',
     presetNegativePrompt: '',
     presetEnhancePrompt: false,
+    presetDurationFrames: 60,
     created_by_is_you: true,
     created_by_username: '',
     is_public: true,
@@ -664,6 +667,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         presetBasePrompt: metadata.presetBasePrompt || '',
         presetNegativePrompt: metadata.presetNegativePrompt || '',
         presetEnhancePrompt: metadata.presetEnhancePrompt ?? false,
+        presetDurationFrames: metadata.presetDurationFrames ?? 60,
         created_by_is_you: metadata.created_by?.is_you ?? true,
         created_by_username: metadata.created_by?.username || '',
         is_public: metadata.is_public ?? true,
@@ -796,6 +800,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         presetBasePrompt: addForm.presetBasePrompt || undefined,
         presetNegativePrompt: addForm.presetNegativePrompt || undefined,
         presetEnhancePrompt: addForm.presetEnhancePrompt ? addForm.presetEnhancePrompt : undefined,
+        presetDurationFrames: addForm.presetDurationFrames !== 60 ? addForm.presetDurationFrames : undefined,
       };
 
       if (isEditMode && editingPreset) {
@@ -818,6 +823,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         presetBasePrompt: '',
         presetNegativePrompt: '',
         presetEnhancePrompt: false,
+        presetDurationFrames: 60,
         created_by_is_you: true,
         created_by_username: '',
         is_public: true,
@@ -860,6 +866,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 presetBasePrompt: '',
                 presetNegativePrompt: '',
                 presetEnhancePrompt: false,
+                presetDurationFrames: 60,
                 created_by_is_you: true,
                 created_by_username: '',
                 is_public: true,
@@ -957,6 +964,23 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 onChange={e => handleFormChange('presetNegativePrompt', e.target.value)} 
                 rows={2}
               />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="preset-duration-frames" className="text-sm">
+                Duration per pair: {framesToSeconds(addForm.presetDurationFrames)} ({addForm.presetDurationFrames} frames)
+              </Label>
+              <Slider
+                id="preset-duration-frames"
+                min={10}
+                max={81}
+                step={1}
+                value={[addForm.presetDurationFrames]}
+                onValueChange={(value) => handleFormChange('presetDurationFrames', value[0])}
+              />
+              <p className="text-xs text-muted-foreground">
+                Default: {framesToSeconds(60)} (60 frames)
+              </p>
             </div>
 
             <div className="flex items-center space-x-2 pt-2">

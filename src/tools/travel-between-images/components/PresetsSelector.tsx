@@ -5,9 +5,10 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Library, Pencil } from 'lucide-react';
 import { PhaseConfig } from '../settings';
 import { PhaseConfigSelectorModal } from '@/shared/components/PhaseConfigSelectorModal';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tantml:react-query';
 import { supabase } from '@/integrations/supabase/client';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
+import { framesToSeconds } from '../components/Timeline/utils/time-utils';
 
 interface SelectedPresetCardProps {
   presetId: string;
@@ -132,15 +133,24 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
             </div>
           )}
           
-          {/* Prompt Enhancement */}
-          {metadata?.presetEnhancePrompt && (
+          {/* Additional Settings */}
+          {(metadata?.presetEnhancePrompt || metadata?.presetDurationFrames) && (
             <div className="mb-3 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                Prompt Enhancement:
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1.5">
+                Additional Settings:
               </p>
-              <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
-                Enhance/Create Prompts
-              </Badge>
+              <div className="flex flex-wrap gap-2">
+                {metadata?.presetEnhancePrompt && (
+                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
+                    Enhance/Create Prompts
+                  </Badge>
+                )}
+                {metadata?.presetDurationFrames && (
+                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
+                    Duration: {framesToSeconds(metadata.presetDurationFrames)}
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
           
