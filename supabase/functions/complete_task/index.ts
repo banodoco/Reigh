@@ -1420,7 +1420,32 @@ async function createGenerationFromTask(
           console.log(`[GenMigration] Extracted child_order: ${childOrder}`);
 
           // Extract child-specific params from orchestrator_details if available
-          const orchDetails = taskData.params?.orchestrator_details;
+          let orchDetails = taskData.params?.orchestrator_details;
+          
+          // If orchestrator_details doesn't have enhanced_prompts_expanded, fetch it from the orchestrator task
+          if (orchDetails && !orchDetails.enhanced_prompts_expanded) {
+            console.log(`[GenMigration] orchestrator_details missing enhanced_prompts_expanded, fetching from orchestrator task ${orchestratorTaskId}`);
+            const { data: orchestratorTask, error: orchError } = await supabase
+              .from('tasks')
+              .select('params')
+              .eq('id', orchestratorTaskId)
+              .single();
+            
+            if (!orchError && orchestratorTask?.params) {
+              const orchParams = orchestratorTask.params;
+              // Check multiple possible locations for enhanced_prompts_expanded
+              const enhancedPrompts = orchParams.enhanced_prompts_expanded || 
+                                    orchParams.orchestrator_details?.enhanced_prompts_expanded ||
+                                    orchParams.full_orchestrator_payload?.enhanced_prompts_expanded;
+              
+              if (enhancedPrompts && Array.isArray(enhancedPrompts)) {
+                console.log(`[GenMigration] Found enhanced_prompts_expanded in orchestrator task (${enhancedPrompts.length} prompts)`);
+                // Add it to orchDetails so downstream code can use it
+                orchDetails = { ...orchDetails, enhanced_prompts_expanded: enhancedPrompts };
+              }
+            }
+          }
+          
           if (orchDetails && !isNaN(childOrder)) {
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
