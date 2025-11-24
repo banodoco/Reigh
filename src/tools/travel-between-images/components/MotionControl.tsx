@@ -188,6 +188,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
         {/* Advanced Mode: Phase Configuration */}
         <TabsContent value="advanced" className="mt-4">
+          {console.log('[PresetAutoPopulate] MotionControl passing currentSettings to PhaseConfigVertical:', currentSettings)}
           {phaseConfig ? (
             <PhaseConfigVertical
               phaseConfig={phaseConfig}
@@ -199,6 +200,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
               selectedPhasePresetId={selectedPhasePresetId}
               onPhasePresetSelect={onPhasePresetSelect}
               onPhasePresetRemove={onPhasePresetRemove}
+              currentSettings={currentSettings}
             />
           ) : (
             <div className="text-sm text-muted-foreground p-4">

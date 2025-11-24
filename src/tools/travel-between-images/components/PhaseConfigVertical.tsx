@@ -25,6 +25,14 @@ interface PhaseConfigVerticalProps {
   selectedPhasePresetId?: string | null;
   onPhasePresetSelect?: (presetId: string, config: PhaseConfig, presetMetadata?: any) => void;
   onPhasePresetRemove?: () => void;
+  currentSettings?: {
+    textBeforePrompts?: string;
+    textAfterPrompts?: string;
+    basePrompt?: string;
+    negativePrompt?: string;
+    enhancePrompt?: boolean;
+    durationFrames?: number;
+  };
 }
 
 export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
@@ -36,7 +44,8 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
   availableLoras = [],
   selectedPhasePresetId,
   onPhasePresetSelect,
-  onPhasePresetRemove
+  onPhasePresetRemove,
+  currentSettings
 }) => {
   // State for LoRA selector modal for each phase
   const [activePhaseForLoraSelection, setActivePhaseForLoraSelection] = useState<number | null>(null);
@@ -518,6 +527,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
       />
 
       {/* Phase Config Preset Selector Modal (for loading/saving presets) */}
+      {console.log('[PresetAutoPopulate] PhaseConfigVertical passing currentSettings to Modal:', currentSettings)}
       <PhaseConfigSelectorModal
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
@@ -535,6 +545,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
         selectedPresetId={selectedPhasePresetId || null}
         currentPhaseConfig={phaseConfig}
         initialTab={presetModalTab}
+        currentSettings={currentSettings}
       />
     </div>
   );
