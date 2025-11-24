@@ -908,79 +908,97 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             />
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="preset-prompt-prefix">Text to prepend to prompts (optional)</Label>
-            <Input 
-              id="preset-prompt-prefix" 
-              placeholder="e.g., cinematic, 4k, " 
-              value={addForm.presetPromptPrefix} 
-              onChange={e => handleFormChange('presetPromptPrefix', e.target.value)} 
-              maxLength={200}
-            />
-            <p className="text-xs text-muted-foreground">
-              This text will be automatically added before the "Before each prompt" field when this preset is selected.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="preset-prompt-suffix">Text to append after prompts (optional)</Label>
-            <Input 
-              id="preset-prompt-suffix" 
-              placeholder="e.g., highly detailed, 8k" 
-              value={addForm.presetPromptSuffix} 
-              onChange={e => handleFormChange('presetPromptSuffix', e.target.value)} 
-              maxLength={200}
-            />
-            <p className="text-xs text-muted-foreground">
-              This text will be automatically added to the "After each prompt" field when this preset is selected.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="preset-base-prompt">Base/Default Prompt (optional)</Label>
-            <Textarea 
-              id="preset-base-prompt" 
-              placeholder="e.g., smooth camera movement, professional cinematography" 
-              value={addForm.presetBasePrompt} 
-              onChange={e => handleFormChange('presetBasePrompt', e.target.value)} 
-              rows={2}
-            />
-            <p className="text-xs text-muted-foreground">
-              This will be used as the default/base prompt when this preset is selected.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="preset-negative-prompt">Negative Prompt (optional)</Label>
-            <Textarea 
-              id="preset-negative-prompt" 
-              placeholder="e.g., blurry, low quality, distorted" 
-              value={addForm.presetNegativePrompt} 
-              onChange={e => handleFormChange('presetNegativePrompt', e.target.value)} 
-              rows={2}
-            />
-            <p className="text-xs text-muted-foreground">
-              This will be used as the negative prompt when this preset is selected.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Prompt Enhancement Settings (optional)</Label>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="preset-enhance-prompt" 
-                checked={addForm.presetEnhancePrompt}
-                onCheckedChange={(checked) => handleFormChange('presetEnhancePrompt', checked)}
-              />
-              <Label htmlFor="preset-enhance-prompt" className="font-normal">Enhance prompts with AI</Label>
+          {/* Prompt Settings Section */}
+          <div className="space-y-3 pt-2 border-t">
+            <div className="space-y-1">
+              <Label className="text-base font-medium">Prompt Settings (optional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Configure how prompts are generated and enhanced when this preset is applied
+              </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="preset-auto-create-prompts" 
-                checked={addForm.presetAutoCreateIndividualPrompts}
-                onCheckedChange={(checked) => handleFormChange('presetAutoCreateIndividualPrompts', checked)}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="preset-prompt-prefix" className="text-sm">Before each prompt</Label>
+                <Input 
+                  id="preset-prompt-prefix" 
+                  placeholder="e.g., cinematic, 4k" 
+                  value={addForm.presetPromptPrefix} 
+                  onChange={e => handleFormChange('presetPromptPrefix', e.target.value)} 
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="preset-prompt-suffix" className="text-sm">After each prompt</Label>
+                <Input 
+                  id="preset-prompt-suffix" 
+                  placeholder="e.g., highly detailed, 8k" 
+                  value={addForm.presetPromptSuffix} 
+                  onChange={e => handleFormChange('presetPromptSuffix', e.target.value)} 
+                  maxLength={200}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="preset-base-prompt" className="text-sm">Base/Default Prompt</Label>
+              <Textarea 
+                id="preset-base-prompt" 
+                placeholder="e.g., smooth camera movement, professional cinematography" 
+                value={addForm.presetBasePrompt} 
+                onChange={e => handleFormChange('presetBasePrompt', e.target.value)} 
+                rows={2}
               />
-              <Label htmlFor="preset-auto-create-prompts" className="font-normal">Auto-create individual prompts</Label>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="preset-negative-prompt" className="text-sm">Negative Prompt</Label>
+              <Textarea 
+                id="preset-negative-prompt" 
+                placeholder="e.g., blurry, low quality, distorted" 
+                value={addForm.presetNegativePrompt} 
+                onChange={e => handleFormChange('presetNegativePrompt', e.target.value)} 
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Label className="text-sm">Prompt Generation Mode</Label>
+              <RadioGroup 
+                value={
+                  addForm.presetEnhancePrompt 
+                    ? 'enhance' 
+                    : addForm.presetAutoCreateIndividualPrompts 
+                      ? 'auto-create' 
+                      : 'none'
+                }
+                onValueChange={(value) => {
+                  if (value === 'enhance') {
+                    handleFormChange('presetEnhancePrompt', true);
+                    handleFormChange('presetAutoCreateIndividualPrompts', false);
+                  } else if (value === 'auto-create') {
+                    handleFormChange('presetEnhancePrompt', false);
+                    handleFormChange('presetAutoCreateIndividualPrompts', true);
+                  } else {
+                    handleFormChange('presetEnhancePrompt', false);
+                    handleFormChange('presetAutoCreateIndividualPrompts', false);
+                  }
+                }}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="none" id="preset-prompt-none" />
+                  <Label htmlFor="preset-prompt-none" className="font-normal cursor-pointer">Use prompts as-is</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="enhance" id="preset-enhance-prompt" />
+                  <Label htmlFor="preset-enhance-prompt" className="font-normal cursor-pointer">Enhance prompts with AI</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="auto-create" id="preset-auto-create-prompts" />
+                  <Label htmlFor="preset-auto-create-prompts" className="font-normal cursor-pointer">Auto-create individual prompts</Label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
 

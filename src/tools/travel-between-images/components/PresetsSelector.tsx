@@ -79,68 +79,70 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
           
           {/* Preset Prompt Settings */}
           {(metadata?.presetPromptPrefix || metadata?.presetPromptSuffix || metadata?.presetBasePrompt || metadata?.presetNegativePrompt) && (
-            <div className="mb-3 space-y-2">
-              {metadata?.presetPromptPrefix && (
-                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                    Before Prompt:
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
-                    {metadata.presetPromptPrefix}
-                  </p>
-                </div>
-              )}
-              {metadata?.presetPromptSuffix && (
-                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                    After Prompt:
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
-                    {metadata.presetPromptSuffix}
-                  </p>
-                </div>
-              )}
-              {metadata?.presetBasePrompt && (
-                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                    Base Prompt:
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
-                    {metadata.presetBasePrompt}
-                  </p>
-                </div>
-              )}
-              {metadata?.presetNegativePrompt && (
-                <div className="p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
-                  <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                    Negative Prompt:
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 font-mono">
-                    {metadata.presetNegativePrompt}
-                  </p>
-                </div>
-              )}
+            <div className="mb-3 p-3 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-2">
+                Prompt Settings:
+              </p>
+              <div className="space-y-2">
+                {(metadata?.presetPromptPrefix || metadata?.presetPromptSuffix) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {metadata?.presetPromptPrefix && (
+                      <div>
+                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
+                          Before:
+                        </p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">
+                          {metadata.presetPromptPrefix}
+                        </p>
+                      </div>
+                    )}
+                    {metadata?.presetPromptSuffix && (
+                      <div>
+                        <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
+                          After:
+                        </p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-mono">
+                          {metadata.presetPromptSuffix}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {metadata?.presetBasePrompt && (
+                  <div>
+                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
+                      Base Prompt:
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-mono line-clamp-2">
+                      {metadata.presetBasePrompt}
+                    </p>
+                  </div>
+                )}
+                {metadata?.presetNegativePrompt && (
+                  <div>
+                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-0.5">
+                      Negative:
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-mono line-clamp-2">
+                      {metadata.presetNegativePrompt}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
-          {/* Prompt Enhancement Settings */}
+          {/* Prompt Generation Mode */}
           {(metadata?.presetEnhancePrompt || metadata?.presetAutoCreateIndividualPrompts) && (
             <div className="mb-3 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
               <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                Prompt Settings:
+                Prompt Generation Mode:
               </p>
-              <div className="flex flex-wrap gap-2">
-                {metadata?.presetEnhancePrompt && (
-                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
-                    Enhance Prompts
-                  </Badge>
-                )}
-                {metadata?.presetAutoCreateIndividualPrompts && (
-                  <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
-                    Auto-Create Prompts
-                  </Badge>
-                )}
-              </div>
+              <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
+                {metadata?.presetEnhancePrompt 
+                  ? 'Enhance Prompts with AI' 
+                  : 'Auto-Create Individual Prompts'}
+              </Badge>
             </div>
           )}
           
