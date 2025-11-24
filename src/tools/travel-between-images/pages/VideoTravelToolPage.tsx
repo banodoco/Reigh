@@ -497,8 +497,7 @@ const VideoTravelToolPage: React.FC = () => {
         hasSuffix: !!presetMetadata.presetPromptSuffix,
         hasBasePrompt: !!presetMetadata.presetBasePrompt,
         hasNegativePrompt: !!presetMetadata.presetNegativePrompt,
-        enhancePrompt: presetMetadata.presetEnhancePrompt,
-        autoCreate: presetMetadata.presetAutoCreateIndividualPrompts
+        enhancePrompt: presetMetadata.presetEnhancePrompt
       } : '(none)',
       timestamp: Date.now()
     });
@@ -549,13 +548,7 @@ const VideoTravelToolPage: React.FC = () => {
       // If preset has enhance prompt setting, apply it
       if (presetMetadata.presetEnhancePrompt !== undefined) {
         fieldsToUpdate.enhancePrompt = presetMetadata.presetEnhancePrompt;
-        console.log('[PhasePreset] Applying preset enhance prompt setting:', presetMetadata.presetEnhancePrompt);
-      }
-      
-      // If preset has auto-create individual prompts setting, apply it
-      if (presetMetadata.presetAutoCreateIndividualPrompts !== undefined) {
-        fieldsToUpdate.autoCreateIndividualPrompts = presetMetadata.presetAutoCreateIndividualPrompts;
-        console.log('[PhasePreset] Applying preset auto-create prompts setting:', presetMetadata.presetAutoCreateIndividualPrompts);
+        console.log('[PhasePreset] Applying preset enhance/create prompts setting:', presetMetadata.presetEnhancePrompt);
       }
     }
     

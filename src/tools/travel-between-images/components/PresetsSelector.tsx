@@ -132,16 +132,14 @@ const SelectedPresetCard: React.FC<SelectedPresetCardProps> = ({
             </div>
           )}
           
-          {/* Prompt Generation Mode */}
-          {(metadata?.presetEnhancePrompt || metadata?.presetAutoCreateIndividualPrompts) && (
+          {/* Prompt Enhancement */}
+          {metadata?.presetEnhancePrompt && (
             <div className="mb-3 p-2 rounded border border-blue-200 dark:border-blue-800 bg-blue-100/50 dark:bg-blue-900/30">
               <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
-                Prompt Generation Mode:
+                Prompt Enhancement:
               </p>
               <Badge variant="outline" className="text-xs bg-white dark:bg-blue-950">
-                {metadata?.presetEnhancePrompt 
-                  ? 'Enhance Prompts with AI' 
-                  : 'Auto-Create Individual Prompts'}
+                Enhance/Create Prompts
               </Badge>
             </div>
           )}

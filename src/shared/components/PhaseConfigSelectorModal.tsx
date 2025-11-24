@@ -639,7 +639,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     presetBasePrompt: '',
     presetNegativePrompt: '',
     presetEnhancePrompt: false,
-    presetAutoCreateIndividualPrompts: false,
     created_by_is_you: true,
     created_by_username: '',
     is_public: true,
@@ -665,7 +664,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         presetBasePrompt: metadata.presetBasePrompt || '',
         presetNegativePrompt: metadata.presetNegativePrompt || '',
         presetEnhancePrompt: metadata.presetEnhancePrompt ?? false,
-        presetAutoCreateIndividualPrompts: metadata.presetAutoCreateIndividualPrompts ?? false,
         created_by_is_you: metadata.created_by?.is_you ?? true,
         created_by_username: metadata.created_by?.username || '',
         is_public: metadata.is_public ?? true,
@@ -798,7 +796,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         presetBasePrompt: addForm.presetBasePrompt || undefined,
         presetNegativePrompt: addForm.presetNegativePrompt || undefined,
         presetEnhancePrompt: addForm.presetEnhancePrompt ? addForm.presetEnhancePrompt : undefined,
-        presetAutoCreateIndividualPrompts: addForm.presetAutoCreateIndividualPrompts ? addForm.presetAutoCreateIndividualPrompts : undefined,
       };
 
       if (isEditMode && editingPreset) {
@@ -821,7 +818,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         presetBasePrompt: '',
         presetNegativePrompt: '',
         presetEnhancePrompt: false,
-        presetAutoCreateIndividualPrompts: false,
         created_by_is_you: true,
         created_by_username: '',
         is_public: true,
@@ -864,7 +860,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 presetBasePrompt: '',
                 presetNegativePrompt: '',
                 presetEnhancePrompt: false,
-                presetAutoCreateIndividualPrompts: false,
                 created_by_is_you: true,
                 created_by_username: '',
                 is_public: true,
@@ -964,42 +959,15 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               />
             </div>
 
-            <div className="space-y-2 pt-2">
-              <Label className="text-sm">Prompt Generation Mode</Label>
-              <RadioGroup 
-                value={
-                  addForm.presetEnhancePrompt 
-                    ? 'enhance' 
-                    : addForm.presetAutoCreateIndividualPrompts 
-                      ? 'auto-create' 
-                      : 'none'
-                }
-                onValueChange={(value) => {
-                  if (value === 'enhance') {
-                    handleFormChange('presetEnhancePrompt', true);
-                    handleFormChange('presetAutoCreateIndividualPrompts', false);
-                  } else if (value === 'auto-create') {
-                    handleFormChange('presetEnhancePrompt', false);
-                    handleFormChange('presetAutoCreateIndividualPrompts', true);
-                  } else {
-                    handleFormChange('presetEnhancePrompt', false);
-                    handleFormChange('presetAutoCreateIndividualPrompts', false);
-                  }
-                }}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="none" id="preset-prompt-none" />
-                  <Label htmlFor="preset-prompt-none" className="font-normal cursor-pointer">Use prompts as-is</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="enhance" id="preset-enhance-prompt" />
-                  <Label htmlFor="preset-enhance-prompt" className="font-normal cursor-pointer">Enhance prompts with AI</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="auto-create" id="preset-auto-create-prompts" />
-                  <Label htmlFor="preset-auto-create-prompts" className="font-normal cursor-pointer">Auto-create individual prompts</Label>
-                </div>
-              </RadioGroup>
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="preset-enhance-prompt" 
+                checked={addForm.presetEnhancePrompt}
+                onCheckedChange={(checked) => handleFormChange('presetEnhancePrompt', checked)}
+              />
+              <Label htmlFor="preset-enhance-prompt" className="font-normal cursor-pointer">
+                Enhance/Create Prompts
+              </Label>
             </div>
           </div>
 
