@@ -397,9 +397,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const legacyHookData = useEnhancedShotPositions(preloadedImages ? null : selectedShotId);
   
   // NEW: Use utility hook when preloaded images are provided
+  // CRITICAL: Pass the same generations array that we use for display
+  // Otherwise clearEnhancedPrompt will look in a different/empty array
   const utilsData = useTimelinePositionUtils({
     shotId: preloadedImages ? selectedShotId : null,
-    generations: preloadedImages || [],
+    generations: preloadedImages || legacyHookData.shotGenerations,  // Use legacyHookData as fallback
     projectId: projectId, // Pass projectId to invalidate ShotsPane cache
   });
   
@@ -887,31 +889,69 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
                 onClearEnhancedPrompt={async (pairIndex) => {
+                  console.log('[ClearEnhancedPrompt-Timeline] 🔵 Starting clear for pair index:', pairIndex);
+                  console.log('[ClearEnhancedPrompt-Timeline] Total shotGenerations:', shotGenerations.length);
+                  if (shotGenerations.length > 0) {
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0] keys:', Object.keys(shotGenerations[0]));
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].shotImageEntryId:', (shotGenerations[0] as any).shotImageEntryId);
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].id:', shotGenerations[0].id);
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].type:', shotGenerations[0].type);
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].location:', shotGenerations[0].location);
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation?.type:', shotGenerations[0].generation?.type);
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation?.location:', shotGenerations[0].generation?.location);
+                  }
                   try {
                     // Convert pairIndex to generation ID using the same logic as pair prompts
                     // Filter out videos to match the timeline display
-                    const filteredGenerations = shotGenerations.filter(sg => {
-                      if (!sg.generation) return false;
-                      const isVideo = sg.generation.type === 'video' ||
-                                     sg.generation.type === 'video_travel_output' ||
-                                     (sg.generation.location && sg.generation.location.endsWith('.mp4'));
+                    const filteredGenerations = shotGenerations.filter((sg, idx) => {
+                      // Check if type is on sg directly or nested in sg.generation
+                      const type = sg.type || sg.generation?.type;
+                      const location = sg.location || sg.generation?.location;
+                      
+                      if (idx === 0) {
+                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] type:', type);
+                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] location:', location);
+                      }
+                      
+                      const isVideo = type === 'video' ||
+                                     type === 'video_travel_output' ||
+                                     (location && location.endsWith('.mp4'));
+                      
+                      if (idx === 0) {
+                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] isVideo:', isVideo);
+                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] returning:', !isVideo);
+                      }
+                      
                       return !isVideo;
                     });
+                    console.log('[ClearEnhancedPrompt-Timeline] Filtered generations count:', filteredGenerations.length);
 
                     const sortedGenerations = [...filteredGenerations]
                       .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+                    console.log('[ClearEnhancedPrompt-Timeline] Sorted generations count:', sortedGenerations.length);
 
                     // Get the first item of the pair
                     const firstItem = sortedGenerations[pairIndex];
                     if (!firstItem) {
-                      console.error('[ClearEnhancedPrompt] No generation found for pair index:', pairIndex);
+                      console.error('[ClearEnhancedPrompt-Timeline] ❌ No generation found for pair index:', pairIndex);
                       return;
                     }
 
-                    console.log('[ClearEnhancedPrompt] Clearing enhanced prompt for pair:', pairIndex, 'generation:', firstItem.id.substring(0, 8));
-                    await clearEnhancedPrompt(firstItem.id);
+                    console.log('[ClearEnhancedPrompt-Timeline] 🎯 Found generation at pairIndex:', pairIndex);
+                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.shotImageEntryId:', (firstItem as any).shotImageEntryId);
+                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.id:', firstItem.id);
+                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.hasMetadata:', !!firstItem.metadata);
+                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.hasEnhancedPrompt:', !!firstItem.metadata?.enhanced_prompt);
+                    
+                    const usingShotImageEntryId = !!(firstItem as any).shotImageEntryId;
+                    console.log('[ClearEnhancedPrompt-Timeline] Using shotImageEntryId:', usingShotImageEntryId);
+                    
+                    const idToUse = usingShotImageEntryId ? (firstItem as any).shotImageEntryId : firstItem.id;
+                    console.log('[ClearEnhancedPrompt-Timeline] 📞 Calling clearEnhancedPrompt with:', idToUse);
+                    
+                    await clearEnhancedPrompt(idToUse);
                   } catch (error) {
-                    console.error('[ClearEnhancedPrompt] Error:', error);
+                    console.error('[ClearEnhancedPrompt-Timeline] ❌ Error:', error);
                   }
                 }}
                 // Structure video props
@@ -1052,6 +1092,73 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   })()}
                   defaultPrompt={defaultPrompt}
                   defaultNegativePrompt={defaultNegativePrompt}
+                  onClearEnhancedPrompt={async (pairIndex) => {
+                    try {
+                      console.log('[ClearEnhancedPrompt-Batch] 🔵 Starting clear for pair index:', pairIndex);
+                      console.log('[ClearEnhancedPrompt-Batch] Total shotGenerations:', shotGenerations.length);
+                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].id:', shotGenerations[0]?.id);
+                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].generation_id:', shotGenerations[0]?.generation_id);
+                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].shotImageEntryId:', (shotGenerations[0] as any)?.shotImageEntryId);
+                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].type:', shotGenerations[0]?.type);
+                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].generation?.type:', shotGenerations[0]?.generation?.type);
+                      
+                      // Convert pairIndex to generation ID using the same logic as pair prompts
+                      // Filter out videos to match the display
+                      // Handle both direct properties and nested generation properties
+                      const filteredGenerations = shotGenerations.filter(sg => {
+                        // Check if type is on sg directly or nested in sg.generation
+                        const type = sg.type || sg.generation?.type;
+                        const location = sg.location || sg.generation?.location;
+                        
+                        const isVideo = type === 'video' ||
+                                       type === 'video_travel_output' ||
+                                       (location && location.endsWith('.mp4'));
+                        return !isVideo;
+                      });
+
+                      console.log('[ClearEnhancedPrompt-Batch] Filtered generations count:', filteredGenerations.length);
+
+                      const sortedGenerations = [...filteredGenerations]
+                        .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+
+                      console.log('[ClearEnhancedPrompt-Batch] Sorted generations count:', sortedGenerations.length);
+                      sortedGenerations.forEach((sg, i) => {
+                        console.log(`[ClearEnhancedPrompt-Batch] Sorted[${i}].id:`, sg.id?.substring(0, 8));
+                        console.log(`[ClearEnhancedPrompt-Batch] Sorted[${i}].timeline_frame:`, sg.timeline_frame);
+                        console.log(`[ClearEnhancedPrompt-Batch] Sorted[${i}].hasEnhancedPrompt:`, !!sg.metadata?.enhanced_prompt);
+                      });
+
+                      // Get the first item of the pair
+                      const firstItem = sortedGenerations[pairIndex];
+                      if (!firstItem) {
+                        console.error('[ClearEnhancedPrompt-Batch] ❌ No generation found for pair index:', pairIndex);
+                        return;
+                      }
+
+                      console.log('[ClearEnhancedPrompt-Batch] 🎯 Found generation at pairIndex:', pairIndex);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.id:', firstItem.id);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.id (short):', firstItem.id?.substring(0, 8));
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.generation_id:', firstItem.generation_id);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.generation_id (short):', firstItem.generation_id?.substring(0, 8));
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.shotImageEntryId:', (firstItem as any).shotImageEntryId);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.shotImageEntryId (short):', (firstItem as any).shotImageEntryId?.substring(0, 8));
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.hasMetadata:', !!firstItem.metadata);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.hasEnhancedPrompt:', !!firstItem.metadata?.enhanced_prompt);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.enhancedPromptPreview:', firstItem.metadata?.enhanced_prompt?.substring(0, 50));
+                      
+                      // The clearEnhancedPrompt function expects shot_generation.id
+                      // CRITICAL: shotImageEntryId is the actual shot_generation.id, NOT firstItem.id!
+                      const shotGenerationId = (firstItem as any).shotImageEntryId || firstItem.id;
+                      
+                      console.log('[ClearEnhancedPrompt-Batch] 📞 Calling clearEnhancedPrompt with shot_generation.id:', shotGenerationId);
+                      console.log('[ClearEnhancedPrompt-Batch] shot_generation.id (short):', shotGenerationId?.substring(0, 8));
+                      console.log('[ClearEnhancedPrompt-Batch] Using shotImageEntryId:', !!((firstItem as any).shotImageEntryId));
+                      await clearEnhancedPrompt(shotGenerationId);
+                      console.log('[ClearEnhancedPrompt-Batch] ✅ clearEnhancedPrompt completed');
+                    } catch (error) {
+                      console.error('[ClearEnhancedPrompt-Batch] ❌ Error:', error);
+                    }
+                  }}
                 />
                 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

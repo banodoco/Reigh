@@ -35,6 +35,7 @@ export interface ShotImageManagerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
 }
 
 export interface DerivedNavContext {
@@ -70,6 +71,7 @@ export interface BaseShotImageManagerProps {
   enhancedPrompts?: Record<number, string>;
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
 }
 
 export interface MobileImageItemProps {

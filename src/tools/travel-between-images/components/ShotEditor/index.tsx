@@ -534,17 +534,27 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Wrap onBatchVideoPromptChange to also clear all enhanced prompts when base prompt changes
   const handleBatchVideoPromptChangeWithClear = useCallback(async (newPrompt: string) => {
+    console.log('[PromptClearLog] 🔔 BASE PROMPT CHANGED - Starting clear process', {
+      trigger: 'base_prompt_change',
+      oldPrompt: batchVideoPrompt,
+      newPrompt: newPrompt,
+      shotId: selectedShotId?.substring(0, 8)
+    });
+    
     // First update the base prompt
     onBatchVideoPromptChange(newPrompt);
     
     // Then clear all enhanced prompts for the shot
     try {
       await clearAllEnhancedPrompts();
-      console.log('[ShotEditor] 🧹 Cleared all enhanced prompts after base prompt change');
+      console.log('[PromptClearLog] ✅ BASE PROMPT CHANGED - Successfully cleared all enhanced prompts', {
+        trigger: 'base_prompt_change',
+        shotId: selectedShotId?.substring(0, 8)
+      });
     } catch (error) {
-      console.error('[ShotEditor] Error clearing enhanced prompts:', error);
+      console.error('[PromptClearLog] ❌ BASE PROMPT CHANGED - Error clearing enhanced prompts:', error);
     }
-  }, [onBatchVideoPromptChange, clearAllEnhancedPrompts]);
+  }, [onBatchVideoPromptChange, clearAllEnhancedPrompts, batchVideoPrompt, selectedShotId]);
   
   // Check if all pairs (except the last one) have custom prompts
   const allPairsHavePrompts = React.useMemo(() => {
@@ -1721,6 +1731,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             randomSeed={randomSeed}
                             onRandomSeedChange={handleRandomSeedChange}
                             turboMode={turboMode}
+                            settingsLoading={settingsLoading}
                         />
                     </div>
                 </div>

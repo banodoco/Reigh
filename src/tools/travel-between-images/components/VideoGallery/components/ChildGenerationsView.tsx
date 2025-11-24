@@ -4,10 +4,8 @@ import { GenerationRow } from '@/types/shots';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
-import { Switch } from '@/shared/components/ui/switch';
 import { Slider } from '@/shared/components/ui/slider';
 import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,14 +50,49 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     // Transform children to match GenerationRow format expected by VideoItem and SegmentCard
     const children = React.useMemo(() => {
         const items = (data as any)?.items || [];
-        return items.map((item: any) => ({
-            ...item,
-            // Map GeneratedImageWithMetadata format to GenerationRow format
-            location: item.url || item.location,
-            imageUrl: item.url || item.imageUrl,
-            params: item.metadata || item.params, // params are stored in metadata by transformer
-            created_at: item.createdAt || item.created_at,
-        }));
+        
+        // Debug: Log raw data structure to see if thumbUrl exists
+        if (items.length > 0) {
+            console.log('[ChildGenThumbDebug] Raw items from useGenerations:', {
+                itemCount: items.length,
+                firstItem: {
+                    id: items[0].id?.substring(0, 8),
+                    hasThumbUrl: !!items[0].thumbUrl,
+                    thumbUrl: items[0].thumbUrl?.substring(0, 50),
+                    hasThumbnail_url: !!items[0].thumbnail_url,
+                    thumbnail_url: items[0].thumbnail_url?.substring(0, 50),
+                    url: items[0].url?.substring(0, 50),
+                    location: items[0].location?.substring(0, 50),
+                    allKeys: Object.keys(items[0])
+                },
+                timestamp: Date.now()
+            });
+        }
+        
+        return items.map((item: any) => {
+            const transformed = {
+                ...item,
+                // Map GeneratedImageWithMetadata format to GenerationRow format
+                location: item.url || item.location,
+                imageUrl: item.url || item.imageUrl,
+                thumbUrl: item.thumbUrl || item.thumbnail_url || item.url || item.location, // Explicitly map thumbUrl
+                params: item.metadata || item.params, // params are stored in metadata by transformer
+                created_at: item.createdAt || item.created_at,
+            };
+            
+            // Debug first transformed item
+            if (item === items[0]) {
+                console.log('[ChildGenThumbDebug] Transformed first item:', {
+                    id: transformed.id?.substring(0, 8),
+                    hasThumbUrl: !!transformed.thumbUrl,
+                    thumbUrl: transformed.thumbUrl?.substring(0, 50),
+                    location: transformed.location?.substring(0, 50),
+                    timestamp: Date.now()
+                });
+            }
+            
+            return transformed;
+        });
     }, [data]);
 
     // Log raw data to understand structure
@@ -186,6 +219,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 contextFrames: joinContextFrames,
                 gapFrames: joinGapFrames,
                 replaceMode: joinReplaceMode,
+                keepBridgingImages: keepBridgingImages,
                 loras: lorasForTask.length
             });
 
@@ -197,6 +231,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 context_frame_count: joinContextFrames,
                 gap_frame_count: joinGapFrames,
                 replace_mode: joinReplaceMode,
+                keep_bridging_images: keepBridgingImages,
                 model: 'wan_2_2_vace_lightning_baseline_2_2_2',
                 num_inference_steps: 6,
                 guidance_scale: 3.0,
@@ -605,26 +640,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                                 value={params.negative_prompt || ''}
                                 onChange={(e) => handleChange('negative_prompt', e.target.value)}
                                 className="h-16 text-xs resize-none"
-                            />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <Label className="text-xs font-medium">Enhance Prompt</Label>
-                            <Switch
-                                checked={params.enhancePrompt || false}
-                                onCheckedChange={(checked) => handleChange('enhancePrompt', checked)}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Motion Amount (0-100)</Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={params.amountOfMotion || ''}
-                                onChange={(e) => handleChange('amountOfMotion', parseInt(e.target.value) || 0)}
-                                className="h-9 text-xs"
                             />
                         </div>
                     </CollapsibleContent>

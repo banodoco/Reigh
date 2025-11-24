@@ -55,6 +55,9 @@ export interface MotionControlProps {
   
   // Turbo mode affects availability
   turboMode?: boolean;
+  
+  // Loading state - prevents sync effects from running during initial load
+  settingsLoading?: boolean;
 }
 
 export const MotionControl: React.FC<MotionControlProps> = ({
@@ -80,11 +83,20 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   onBlurSave,
   randomSeed,
   onRandomSeedChange,
-  turboMode
+  turboMode,
+  settingsLoading
 }) => {
   // Sync motionMode with advancedMode state
   // When switching to advanced, enable advancedMode; when leaving, disable it
+  // CRITICAL: Skip sync during initial load to prevent race condition where
+  // default 'basic' motionMode triggers onAdvancedModeChange(false) before
+  // the actual settings are loaded from the database
   useEffect(() => {
+    if (settingsLoading) {
+      console.log('[MotionControl] Skipping sync - settings still loading');
+      return;
+    }
+    
     if (motionMode === 'advanced' || motionMode === 'presets') {
       if (!advancedMode) {
         onAdvancedModeChange(true);
@@ -94,7 +106,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
         onAdvancedModeChange(false);
       }
     }
-  }, [motionMode, advancedMode, onAdvancedModeChange]);
+  }, [motionMode, advancedMode, onAdvancedModeChange, settingsLoading]);
 
   // Handle mode change with validation
   const handleModeChange = useCallback((newMode: string) => {

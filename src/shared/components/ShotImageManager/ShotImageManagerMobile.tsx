@@ -432,6 +432,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       startFrame={(index - 1) * batchVideoFrames}
                       endFrame={index * batchVideoFrames}
                       isMobile={true}
+                      onClearEnhancedPrompt={onClearEnhancedPrompt}
                       onPairClick={() => {
                         console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (left)', { pairIndex: index - 1 });
                         onPairClick(index - 1, {
@@ -525,6 +526,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                       startFrame={index * batchVideoFrames}
                       endFrame={(index + 1) * batchVideoFrames}
                       isMobile={true}
+                      onClearEnhancedPrompt={onClearEnhancedPrompt}
                       onPairClick={() => {
                         console.log('[PairIndicatorDebug] Mobile: Pair indicator clicked (right)', { index });
                         onPairClick(index, {

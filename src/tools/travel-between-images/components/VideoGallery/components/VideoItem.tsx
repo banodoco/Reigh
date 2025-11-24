@@ -115,8 +115,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
   // Join settings state (matches JoinClipsPage defaults)
   const [joinPrompt, setJoinPrompt] = useState('');
   const [joinNegativePrompt, setJoinNegativePrompt] = useState('');
-  const [joinContextFrames, setJoinContextFrames] = useState(10);
-  const [joinGapFrames, setJoinGapFrames] = useState(33);
+  const [joinContextFrames, setJoinContextFrames] = useState(8);
+  const [joinGapFrames, setJoinGapFrames] = useState(12);
   const [joinReplaceMode, setJoinReplaceMode] = useState(true);
   const [keepBridgingImages, setKeepBridgingImages] = useState(true);
 
@@ -241,6 +241,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         contextFrames: joinContextFrames,
         gapFrames: joinGapFrames,
         replaceMode: joinReplaceMode,
+        keepBridgingImages: keepBridgingImages,
         clips: clips.map(c => ({ name: c.name, url: c.url?.substring(0, 50) + '...' })),
       });
       
@@ -253,6 +254,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
         context_frame_count: joinContextFrames,
         gap_frame_count: joinGapFrames,
         replace_mode: joinReplaceMode,
+        keep_bridging_images: keepBridgingImages,
         model: 'wan_2_2_vace_lightning_baseline_2_2_2',
         num_inference_steps: 6,
         guidance_scale: 3.0,

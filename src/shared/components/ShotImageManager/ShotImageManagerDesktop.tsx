@@ -128,6 +128,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
             enhancedPrompts={props.enhancedPrompts}
             defaultPrompt={props.defaultPrompt}
             defaultNegativePrompt={props.defaultNegativePrompt}
+            onClearEnhancedPrompt={props.onClearEnhancedPrompt}
           />
         </SortableContext>
         

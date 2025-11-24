@@ -173,29 +173,29 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     return unsubscribe;
   }, [shotId, queryClient, loadPositions, isPersistingPositions, isDragInProgress]);
 
-  // Realtime: force reload when a generation is updated (e.g., upscaled_url added)
+  // Realtime: force reload when a generation is updated (e.g., upscaled_url added, location changed)
   useEffect(() => {
     const handler = (e: any) => {
       if (!shotId) return;
       if (isDragInProgress || isPersistingPositions) return;
-      // Be permissive: reload positions when any generation updates arrive
-      try {
-        const detail = e?.detail;
-        const payloads = detail?.payloads || [];
-        // If payload contains explicit shot context, ensure it matches, otherwise reload
-        const affectsThisShot = payloads.some((p: any) => {
-          const newRecord = p?.new;
-          const params = newRecord?.params || {};
-          const paramShotId = params?.shot_id || params?.shotId;
-          return !paramShotId || paramShotId === shotId;
-        });
-        if (affectsThisShot || payloads.length === 0) {
-          loadPositions({ reason: 'invalidation' });
-        }
-      } catch {
-        loadPositions({ reason: 'invalidation' });
-      }
+      
+      // CRITICAL: Generation updates (location, thumbnail, upscale) don't include shot_id
+      // They only have project_id. Since we can't easily determine which shot is affected,
+      // we reload ALL shot positions when ANY generation in the project updates.
+      // This is safe because:
+      // 1. Updates are batched (100ms window) to prevent spam
+      // 2. loadPositions is already optimized with query caching
+      // 3. Generation updates are relatively rare (only when videos finish processing)
+      
+      console.log('[SimpleRealtime] 🔄 Generation update detected, reloading shot positions:', {
+        shotId: shotId.substring(0, 8),
+        reason: 'generation-update',
+        timestamp: Date.now()
+      });
+      
+      loadPositions({ reason: 'invalidation', silent: true });
     };
+    
     window.addEventListener('realtime:generation-update-batch' as any, handler as any);
     return () => window.removeEventListener('realtime:generation-update-batch' as any, handler as any);
   }, [shotId, isDragInProgress, isPersistingPositions, loadPositions]);
@@ -297,7 +297,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!shotId || shotGenerationIds.length === 0) return;
 
     try {
-      console.log('[EnhancedPrompts-Position] 🧹 Clearing enhanced prompts for generations:', shotGenerationIds.map(id => id.substring(0, 8)));
+      console.log('[PromptClearLog] 🔔 POSITION CHANGE - Starting selective clear', {
+        trigger: 'position_change',
+        shotId: shotId.substring(0, 8),
+        affectedCount: shotGenerationIds.length,
+        shotGenerationIds: shotGenerationIds.map(id => id.substring(0, 8))
+      });
 
       // Get the generations and their metadata
       const { data: generations, error: fetchError } = await supabase
@@ -339,7 +344,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       const results = await Promise.all(updates);
       const successCount = results.filter(r => r.success).length;
       
-      console.log(`[EnhancedPrompts-Position] ✅ Cleared ${successCount}/${generations.length} enhanced prompts`);
+      console.log(`[PromptClearLog] ✅ POSITION CHANGE - Successfully cleared prompts`, {
+        trigger: 'position_change',
+        successCount,
+        totalCount: generations.length,
+        shotId: shotId.substring(0, 8)
+      });
 
       // Invalidate cache to refresh UI
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
@@ -478,17 +488,18 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           itemsToClear.add(itemBeforeB);
         }
         
-        console.log(`[ExchangePositions] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (next neighbor changed):`, {
+        console.log(`[PromptClearLog] 🔔 EXCHANGE POSITIONS - Clearing prompts for swapped items`, {
+          trigger: 'exchange_positions',
           itemA: itemA.id.substring(0, 8),
           itemB: itemB.id.substring(0, 8),
           itemBeforeA: itemBeforeA?.substring(0, 8) || 'none',
           itemBeforeB: itemBeforeB?.substring(0, 8) || 'none',
           totalToClear: itemsToClear.size,
-          note: 'Exchange swaps positions, so both items and their predecessors affected'
+          shotId: shotId.substring(0, 8)
         });
         
         clearEnhancedPromptsForGenerations(Array.from(itemsToClear)).catch(err => {
-          console.error('[exchangePositions] Error clearing enhanced prompts:', err);
+          console.error('[PromptClearLog] ❌ EXCHANGE POSITIONS - Error clearing enhanced prompts:', err);
         });
       }
       
@@ -566,17 +577,18 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         itemsToClear.add(itemBeforeB);
       }
       
-      console.log(`[BatchModeReorderFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (next neighbor changed):`, {
+      console.log(`[PromptClearLog] 🔔 BATCH EXCHANGE - Clearing prompts for swapped items`, {
+        trigger: 'batch_exchange',
         itemA: shotGenerationIdA.substring(0, 8),
         itemB: shotGenerationIdB.substring(0, 8),
         itemBeforeA: itemBeforeA?.substring(0, 8) || 'none',
         itemBeforeB: itemBeforeB?.substring(0, 8) || 'none',
         totalToClear: itemsToClear.size,
-        note: 'Exchange swaps positions, so both items and their predecessors affected'
+        shotId: shotId.substring(0, 8)
       });
       
       clearEnhancedPromptsForGenerations(Array.from(itemsToClear)).catch(err => {
-        console.error('[exchangePositionsNoReload] Error clearing enhanced prompts:', err);
+        console.error('[PromptClearLog] ❌ BATCH EXCHANGE - Error clearing enhanced prompts:', err);
       });
       
       // No position reload - caller will handle this
@@ -858,18 +870,27 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           }
         }
         
-        console.log(`[TimelineDragFlow] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts (order changed):`, {
+        console.log(`[PromptClearLog] 🔔 TIMELINE DRAG - Clearing prompts for reordered items`, {
+          trigger: 'timeline_drag_reorder',
           movedItem: shotGenerationId.substring(0, 8),
+          oldIndex,
+          newIndex,
           oldPrevious: oldPrevious?.substring(0, 8) || 'none',
           newPrevious: newPrevious?.substring(0, 8) || 'none',
           totalToClear: itemsToClear.length,
-          reason: 'Clearing items whose next neighbor changed'
+          shotId: shotId.substring(0, 8)
         });
         
         // Clear prompts and AWAIT it to ensure consistency before UI updates
         await clearEnhancedPromptsForGenerations(itemsToClear);
       } else {
-        console.log(`[TimelineDragFlow] [SKIP_CLEAR] ⏭️ Skipping prompt clear (order unchanged, only spacing adjusted)`);
+        console.log(`[PromptClearLog] ⏭️ TIMELINE DRAG - Skipped (order unchanged, only spacing adjusted)`, {
+          trigger: 'timeline_drag_spacing_only',
+          movedItem: shotGenerationId.substring(0, 8),
+          oldIndex,
+          newIndex,
+          shotId: shotId.substring(0, 8)
+        });
       }
       
     } catch (err) {
@@ -961,9 +982,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       const itemsToClear = Array.from(allAffectedIds);
       
       if (itemsToClear.length > 0) {
-        console.log(`[ApplyTimelineFrames] [CLEAR_PROMPTS] 🧹 Clearing enhanced prompts for ${itemsToClear.length} affected items (${changedItems.length} changed + neighbors)`);
+        console.log(`[PromptClearLog] 🔔 APPLY TIMELINE FRAMES - Clearing prompts for batch update`, {
+          trigger: 'apply_timeline_frames',
+          changedItemsCount: changedItems.length,
+          totalToClear: itemsToClear.length,
+          shotId: shotId.substring(0, 8)
+        });
         clearEnhancedPromptsForGenerations(itemsToClear).catch(err => {
-          console.error('[applyTimelineFrames] Error clearing enhanced prompts:', err);
+          console.error('[PromptClearLog] ❌ APPLY TIMELINE FRAMES - Error clearing enhanced prompts:', err);
         });
       }
 
@@ -999,6 +1025,21 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       console.error('[updatePairPrompts] CURRENT metadata.pair_negative_prompt:', generation.metadata?.pair_negative_prompt);
       console.error('[updatePairPrompts] CURRENT metadata.enhanced_prompt:', generation.metadata?.enhanced_prompt);
 
+      // Check if there was an enhanced_prompt to clear
+      const hadEnhancedPrompt = !!generation.metadata?.enhanced_prompt?.trim();
+      
+      // Log before clearing if there was an enhanced prompt
+      if (hadEnhancedPrompt) {
+        console.log('[PromptClearLog] 🔔 MANUAL PAIR PROMPT EDIT - Clearing enhanced prompt for this pair', {
+          trigger: 'manual_pair_prompt_edit',
+          shotGenerationId: generationId.substring(0, 8),
+          shotId: shotId.substring(0, 8),
+          pairIndex: 'N/A (clearing single pair)',
+          hadEnhancedPrompt: true,
+          enhancedPromptPreview: generation.metadata?.enhanced_prompt?.substring(0, 50) || ''
+        });
+      }
+
       // Update metadata with pair prompts
       // CRITICAL: Clear enhanced_prompt when user manually edits pair_prompt
       const updatedMetadata: PositionMetadata = {
@@ -1025,15 +1066,33 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - error:', error);
       console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - hasData:', !!data);
       console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.id:', data?.id?.substring(0, 8));
-      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.pair_prompt:', data?.metadata?.pair_prompt);
-      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.pair_negative_prompt:', data?.metadata?.pair_negative_prompt);
-      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.enhanced_prompt:', data?.metadata?.enhanced_prompt);
+      const responseMetadata = data?.metadata as PositionMetadata | null;
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.pair_prompt:', responseMetadata?.pair_prompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.pair_negative_prompt:', responseMetadata?.pair_negative_prompt);
+      console.error('[updatePairPrompts] DATABASE UPDATE RESPONSE - data.metadata.enhanced_prompt:', responseMetadata?.enhanced_prompt);
 
       if (error) {
         console.error('[PairPrompts] Error updating pair prompts:', error);
+        if (hadEnhancedPrompt) {
+          console.error('[PromptClearLog] ❌ MANUAL PAIR PROMPT EDIT - Failed to clear enhanced prompt', {
+            trigger: 'manual_pair_prompt_edit',
+            error: error.message,
+            shotGenerationId: generationId.substring(0, 8)
+          });
+        }
         throw error;
       }
 
+      // Log success if we cleared an enhanced prompt
+      if (hadEnhancedPrompt) {
+        console.log('[PromptClearLog] ✅ MANUAL PAIR PROMPT EDIT - Successfully cleared enhanced prompt', {
+          trigger: 'manual_pair_prompt_edit',
+          shotGenerationId: generationId.substring(0, 8),
+          shotId: shotId.substring(0, 8),
+          pairPromptSet: !!pairPrompt?.trim(),
+          pairNegativePromptSet: !!pairNegativePrompt?.trim()
+        });
+      }
 
       console.log('[PairPrompts] ✅ Database updated successfully, now updating local state and invalidating cache');
 
@@ -1255,7 +1314,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!shotId) return;
 
     try {
-      console.log('[EnhancedPrompts] 🧹 Clearing all enhanced prompts for shot:', shotId.substring(0, 8));
+      console.log('[PromptClearLog] 🔔 CLEAR ALL - Starting clear all enhanced prompts', {
+        trigger: 'clear_all_enhanced_prompts',
+        shotId: shotId.substring(0, 8)
+      });
 
       // Get all shot_generations for this shot
       const { data: generations, error: fetchError } = await supabase
@@ -1296,7 +1358,12 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       const results = await Promise.all(updates);
       const successCount = results.filter(r => r.success).length;
       
-      console.log(`[EnhancedPrompts] ✅ Cleared ${successCount}/${generations.length} enhanced prompts`);
+      console.log(`[PromptClearLog] ✅ CLEAR ALL - Successfully cleared all enhanced prompts`, {
+        trigger: 'clear_all_enhanced_prompts',
+        successCount,
+        totalCount: generations.length,
+        shotId: shotId.substring(0, 8)
+      });
 
       // Invalidate cache to refresh UI
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
@@ -1305,7 +1372,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
     } catch (err) {
-      console.error('[clearAllEnhancedPrompts] Error:', err);
+      console.error('[PromptClearLog] ❌ CLEAR ALL - Error clearing enhanced prompts:', err);
       throw err;
     }
   }, [shotId, queryClient]);

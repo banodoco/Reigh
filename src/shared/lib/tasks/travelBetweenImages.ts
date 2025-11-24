@@ -144,9 +144,13 @@ function buildTravelBetweenImagesPayload(
   // Expand arrays if they have a single element and numSegments > 1
   const basePromptsExpanded = expandArrayToCount(params.base_prompts, numSegments);
   const negativePromptsExpanded = expandArrayToCount(params.negative_prompts, numSegments) || Array(numSegments).fill("");
-  // CRITICAL FIX: Only expand enhanced_prompts if they were actually provided
-  // Don't fill with empty strings - let the backend orchestrator handle missing enhanced prompts
-  const enhancedPromptsExpanded = params.enhanced_prompts ? expandArrayToCount(params.enhanced_prompts, numSegments) : undefined;
+  
+  // CRITICAL FIX: Only expand enhanced_prompts if they were actually provided OR if enhance_prompt is requested
+  // If enhance_prompt is true, we must provide an array (even if empty strings) for the backend to populate
+  const enhancedPromptsExpanded = params.enhanced_prompts 
+    ? expandArrayToCount(params.enhanced_prompts, numSegments) 
+    : (params.enhance_prompt ? Array(numSegments).fill("") : undefined);
+    
   const segmentFramesExpanded = expandArrayToCount(params.segment_frames, numSegments);
   const frameOverlapExpanded = expandArrayToCount(params.frame_overlap, numSegments);
 

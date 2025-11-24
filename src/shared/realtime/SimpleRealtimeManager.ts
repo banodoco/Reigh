@@ -539,15 +539,25 @@ export class SimpleRealtimeManager {
     const generationId = newRecord?.id;
     const upscaledUrl = newRecord?.upscaled_url;
     const oldUpscaledUrl = oldRecord?.upscaled_url;
+    const location = newRecord?.location;
+    const oldLocation = oldRecord?.location;
+    const thumbnailUrl = newRecord?.thumbnail_url;
+    const oldThumbnailUrl = oldRecord?.thumbnail_url;
     
-    // Check if upscaled_url was added
+    // Check what changed
     const upscaleCompleted = !oldUpscaledUrl && upscaledUrl;
+    const locationChanged = location !== oldLocation;
+    const thumbnailChanged = thumbnailUrl !== oldThumbnailUrl;
     
     console.log('[SimpleRealtime] 🎯 Generation update analysis:', {
       generationId: generationId?.substring(0, 8),
       upscaleCompleted,
+      locationChanged,
+      thumbnailChanged,
       upscaledUrl: upscaledUrl ? 'present' : 'none',
-      oldUpscaledUrl: oldUpscaledUrl ? 'present' : 'none'
+      oldUpscaledUrl: oldUpscaledUrl ? 'present' : 'none',
+      location: location ? location.substring(0, 50) + '...' : 'none',
+      oldLocation: oldLocation ? oldLocation.substring(0, 50) + '...' : 'none'
     });
     
     if (!generationId) {
@@ -555,9 +565,9 @@ export class SimpleRealtimeManager {
       return;
     }
     
-    // Invalidate queries to pick up the upscaled_url
+    // Invalidate queries to pick up any generation changes (location, upscaled_url, thumbnail, etc.)
     console.log('[SimpleRealtime:Batching] 📦 Batching generation update:', generationId.substring(0, 8));
-    this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted });
+    this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted, locationChanged, thumbnailChanged });
   }
 
   private updateGlobalSnapshot(channelState: string, lastEventAt?: number) {

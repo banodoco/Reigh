@@ -1,6 +1,7 @@
 import React from 'react';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, X } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/shared/lib/utils';
 
 interface PairPromptIndicatorProps {
@@ -16,6 +17,7 @@ interface PairPromptIndicatorProps {
   defaultNegativePrompt?: string;
   className?: string;
   isMobile?: boolean;
+  onClearEnhancedPrompt?: (pairIndex: number) => void;
 }
 
 /**
@@ -35,6 +37,7 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
   defaultNegativePrompt,
   className,
   isMobile = false,
+  onClearEnhancedPrompt,
 }) => {
   console.log('[PairIndicatorDebug] PairPromptIndicator render:', {
     pairIndex,
@@ -118,7 +121,27 @@ export const PairPromptIndicator: React.FC<PairPromptIndicatorProps> = ({
               </div>
               {enhancedPrompt && enhancedPrompt.trim() && (
                 <div className="pt-1 border-t border-border/50">
-                  <span className="font-medium">Enhanced Prompt:</span>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium">Enhanced Prompt:</span>
+                    {onClearEnhancedPrompt ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          console.log('[PairPromptIndicator] ❌ X button clicked!', { pairIndex, hasHandler: !!onClearEnhancedPrompt });
+                          e.stopPropagation();
+                          e.preventDefault();
+                          onClearEnhancedPrompt(pairIndex);
+                        }}
+                        className="h-5 w-5 p-0 hover:bg-destructive/10 hover:text-destructive"
+                        title="Clear enhanced prompt"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">(no handler)</span>
+                    )}
+                  </div>
                   <p className="text-sm">
                     {enhancedPrompt.trim()}
                   </p>

@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   autoCreateIndividualPrompts: true,
   turboMode: false,
   amountOfMotion: 50,
+  motionMode: 'basic',  // Must be included to prevent reset during loading
   advancedMode: false,
   phaseConfig: undefined,
   generationMode: 'batch',

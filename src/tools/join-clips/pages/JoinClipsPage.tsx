@@ -326,8 +326,8 @@ const JoinClipsPage: React.FC = () => {
   const {
     prompt: globalPrompt = '',
     negativePrompt = '',
-    contextFrameCount = 10,
-    gapFrameCount = 33,
+    contextFrameCount = 8,
+    gapFrameCount = 12,
     replaceMode = true,
     keepBridgingImages,
   } = joinSettings.settings;

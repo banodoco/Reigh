@@ -180,7 +180,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     const contentType = taskTypeInfo?.content_type;
     const isVideoTask = contentType === 'video';
     const isImageTask = contentType === 'image';
-    const isCompletedVideoTask = isVideoTask && task.status === 'Complete';
+    const isCompletedVideoTask = isVideoTask && task.status === 'Complete' && !!task.outputLocation;
     const isCompletedImageTask = isImageTask && task.status === 'Complete';
     // Show tooltips for all video and image tasks
     const showsTooltip = (isVideoTask || isImageTask);
@@ -197,7 +197,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       isSingleImageTask: isImageTask,
       isCompletedTravelTask: isCompletedVideoTask
     };
-  }, [taskTypeInfo?.content_type, task.status]);
+  }, [taskTypeInfo?.content_type, task.status, task.outputLocation]);
 
   // Check if this is a successful Image Generation task with output
   const hasGeneratedImage = React.useMemo(() => {
@@ -836,7 +836,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
               >
                 Visit Shot
               </Button>
-              {taskInfo.isCompletedVideoTask && (
+              {taskInfo.isCompletedVideoTask && travelData.videoOutputs && travelData.videoOutputs.length > 0 && travelData.videoOutputs[0]?.videoUrl && (
                 <Button
                   variant="ghost"
                   size="sm"

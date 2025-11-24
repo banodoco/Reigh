@@ -274,10 +274,29 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       }
     };
 
+    // NEW: Handle batched generation updates (upscale, location changes, etc.)
+    const handleGenerationUpdateBatch = (event: CustomEvent) => {
+      const { count } = event.detail;
+      console.log('[SimpleRealtimeProvider:Batching] 📦 Batched generation updates received:', {
+        count,
+        timestamp: Date.now()
+      });
+
+      // Invalidate generation queries to show new URLs/locations
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generation'] }); // For single generation queries (e.g. parent generation in ChildGenerationsView)
+      // Also invalidate shot-generations as they contain generation data
+      queryClient.invalidateQueries({ queryKey: ['shot-generations'] });
+      // Invalidate shots as they might contain generation data (thumbnails etc)
+      queryClient.invalidateQueries({ queryKey: ['shots'] });
+    };
+
     // Listen for BATCHED events (new, efficient)
     window.addEventListener('realtime:task-update-batch', handleTaskUpdateBatch as EventListener);
     window.addEventListener('realtime:task-new-batch', handleNewTaskBatch as EventListener);
     window.addEventListener('realtime:shot-generation-change-batch', handleShotGenerationChangeBatch as EventListener);
+    window.addEventListener('realtime:generation-update-batch', handleGenerationUpdateBatch as EventListener);
     
     // Keep legacy event listeners for backward compatibility
     window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
@@ -289,6 +308,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       window.removeEventListener('realtime:task-update-batch', handleTaskUpdateBatch as EventListener);
       window.removeEventListener('realtime:task-new-batch', handleNewTaskBatch as EventListener);
       window.removeEventListener('realtime:shot-generation-change-batch', handleShotGenerationChangeBatch as EventListener);
+      window.removeEventListener('realtime:generation-update-batch', handleGenerationUpdateBatch as EventListener);
       
       // Remove legacy event listeners
       window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);

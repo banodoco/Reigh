@@ -1420,39 +1420,7 @@ async function createGenerationFromTask(
           console.log(`[GenMigration] Extracted child_order: ${childOrder}`);
 
           // Extract child-specific params from orchestrator_details if available
-          let orchDetails = taskData.params?.orchestrator_details;
-          
-          // If orchestrator_details doesn't have enhanced_prompts_expanded, fetch it from the orchestrator task
-          if (orchDetails && !orchDetails.enhanced_prompts_expanded) {
-            console.log(`[GenMigration] orchestrator_details missing enhanced_prompts_expanded, fetching from orchestrator task ${orchestratorTaskId}`);
-            const { data: orchestratorTask, error: orchError } = await supabase
-              .from('tasks')
-              .select('params')
-              .eq('id', orchestratorTaskId)
-              .single();
-            
-            if (orchError) {
-              console.error(`[GenMigration] ❌ Failed to fetch orchestrator task params:`, orchError);
-            } else if (orchestratorTask?.params) {
-              const orchParams = orchestratorTask.params;
-              console.log(`[GenMigration] Fetched orchestrator task params. Checking for enhanced prompts...`);
-              
-              // Check multiple possible locations for enhanced_prompts_expanded
-              const enhancedPrompts = orchParams.enhanced_prompts_expanded || 
-                                    orchParams.orchestrator_details?.enhanced_prompts_expanded ||
-                                    orchParams.full_orchestrator_payload?.enhanced_prompts_expanded;
-              
-              if (enhancedPrompts && Array.isArray(enhancedPrompts)) {
-                console.log(`[GenMigration] ✅ Found enhanced_prompts_expanded in orchestrator task (${enhancedPrompts.length} prompts)`);
-                // Add it to orchDetails so downstream code can use it
-                orchDetails = { ...orchDetails, enhanced_prompts_expanded: enhancedPrompts };
-              } else {
-                console.log(`[GenMigration] ⚠️ enhanced_prompts_expanded NOT found in orchestrator task params either. Available keys:`, Object.keys(orchParams));
-                if (orchParams.orchestrator_details) console.log(`[GenMigration] orchestrator_details keys:`, Object.keys(orchParams.orchestrator_details));
-              }
-            }
-          }
-          
+          const orchDetails = taskData.params?.orchestrator_details;
           if (orchDetails && !isNaN(childOrder)) {
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
@@ -1501,19 +1469,10 @@ async function createGenerationFromTask(
             };
 
             // Extract specific prompt
-            // First try enhanced_prompts_expanded, then fall back to base_prompts_expanded
-            const enhancedPrompt = extractFromArray(orchDetails.enhanced_prompts_expanded, childOrder);
-            const basePrompt = extractFromArray(orchDetails.base_prompts_expanded, childOrder);
-            
-            // Use enhanced prompt if available, otherwise use base prompt
-            const specificPrompt = enhancedPrompt !== undefined ? enhancedPrompt : basePrompt;
+            const specificPrompt = extractFromArray(orchDetails.base_prompts_expanded, childOrder);
             if (specificPrompt !== undefined) {
               specificParams.prompt = specificPrompt;
-              if (enhancedPrompt !== undefined) {
-                console.log(`[GenMigration] Set child prompt from enhanced_prompts_expanded[${childOrder}]: "${enhancedPrompt.substring(0, 20)}..."`);
-              } else {
-                console.log(`[GenMigration] Set child prompt from base_prompts_expanded[${childOrder}]: "${specificPrompt.substring(0, 20)}..."`);
-              }
+              console.log(`[GenMigration] Set child prompt: "${specificPrompt.substring(0, 20)}..."`);
             }
 
             // Extract specific negative prompt
@@ -1532,26 +1491,6 @@ async function createGenerationFromTask(
             const specificOverlap = extractFromArray(orchDetails.frame_overlap_expanded, childOrder);
             if (specificOverlap !== undefined) {
               specificParams.frame_overlap = specificOverlap;
-            }
-
-            // Pass through the full enhanced_prompts_expanded array if it exists
-            // This allows child tasks to access all enhanced prompts, not just their own
-            if (orchDetails.enhanced_prompts_expanded && Array.isArray(orchDetails.enhanced_prompts_expanded)) {
-              specificParams.enhanced_prompts_expanded = orchDetails.enhanced_prompts_expanded;
-              
-              // CRITICAL: Also update the orchestrator_details inside specificParams 
-              // This is required because the frontend (ChildGenerationsView) looks for it inside orchestrator_details
-              if (specificParams.orchestrator_details) {
-                 specificParams.orchestrator_details = {
-                    ...specificParams.orchestrator_details,
-                    enhanced_prompts_expanded: orchDetails.enhanced_prompts_expanded
-                 };
-                 console.log(`[GenMigration] ✅ Added enhanced_prompts_expanded to specificParams.orchestrator_details`);
-              }
-              
-              console.log(`[GenMigration] Passed enhanced_prompts_expanded array to child task params (${orchDetails.enhanced_prompts_expanded.length} prompts)`);
-            } else {
-              console.log(`[GenMigration] ℹ️ Skipping enhanced_prompts_expanded pass-through (not found or invalid)`);
             }
 
             // Use these specific params for the generation

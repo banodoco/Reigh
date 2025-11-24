@@ -662,10 +662,11 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       updatingFields: ['metadata.pair_prompt', 'metadata.pair_negative_prompt'],
     });
     
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('shot_generations')
       .update({ metadata: updatedMetadata as any })
-      .eq('id', shotGen.id);
+      .eq('id', shotGen.id)
+      .select();
 
     if (error) {
       console.error('[PairPromptFlow] ❌ Supabase UPDATE FAILED:', error);
@@ -673,6 +674,12 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     }
 
     console.log('[PairPromptFlow] ✅ Supabase UPDATE SUCCESS');
+    console.log('[PairPromptFlow] 📊 Updated record returned from DB:', {
+      id: data?.[0]?.id?.substring(0, 8),
+      metadata: data?.[0]?.metadata,
+      metadata_pair_prompt: (data?.[0]?.metadata as any)?.pair_prompt?.substring(0, 50),
+      metadata_pair_negative_prompt: (data?.[0]?.metadata as any)?.pair_negative_prompt?.substring(0, 50),
+    });
     console.log('[PairPromptFlow] 🔄 Refetching query caches in background...');
 
     // Refetch instead of invalidate

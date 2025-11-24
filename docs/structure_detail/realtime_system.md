@@ -79,20 +79,25 @@ UI Components ◀──────── React Query cache (data)
 ### Supabase Channel Events (current coverage)
 - Broadcast: `task-update`
 - Postgres changes: `tasks` (INSERT, UPDATE), filtered by `project_id`
-
-Note: There is no direct subscription to the `generations` table. Generation-related UI stays in sync via task-driven events and React Query invalidation.
+- Postgres changes: `shot_generations` (INSERT, UPDATE)
+- Postgres changes: `generations` (UPDATE), filtered by `project_id`
 
 ### Custom DOM Events
-- `realtime:task-update` — fired when task updates are received
-- `realtime:task-new` — fired when new tasks are created
+- `realtime:task-update-batch` — fired when task updates are received
+- `realtime:task-new-batch` — fired when new tasks are created
+- `realtime:shot-generation-change-batch` — fired when shot generation links/positions change
+- `realtime:generation-update-batch` — fired when generations update (e.g. upscaling, location changes)
 
 ### React Query Invalidation (primary mechanism)
 On realtime events, the provider invalidates these query key families:
 - `['tasks']` — paginated tasks, single task queries, etc.
 - `['task-status-counts']` — counts used by task panes and badges
 - `['unified-generations']` — all variants (project/shot/paginated)
+- `['generations']` — project-wide generation lists
+- `['generation']` — single generation details
 - `['derived-generations']` — generations based on source images (lineage tracking)
 - `['shots']` — shot lists and shot details influenced by task outcomes
+- `['shot-generations']` — shot-specific generations (timeline)
 - `['unpositioned-count']` — per-shot generation counts
 - `['project-video-counts']` — aggregated video counts by project
 

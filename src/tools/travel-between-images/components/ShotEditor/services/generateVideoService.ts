@@ -84,6 +84,14 @@ export interface GenerateVideoResult {
  * This function handles all the complexity of preparing and submitting a video generation task
  */
 export async function generateVideo(params: GenerateVideoParams): Promise<GenerateVideoResult> {
+  console.log('[BasePromptsDebug] ========================================');
+  console.log('[BasePromptsDebug] 🚀 GENERATION STARTED');
+  console.log('[BasePromptsDebug] Generation mode:', params.generationMode);
+  console.log('[BasePromptsDebug] Shot ID:', params.selectedShotId?.substring(0, 8));
+  console.log('[BasePromptsDebug] Batch video frames:', params.batchVideoFrames);
+  console.log('[BasePromptsDebug] Batch video prompt:', params.batchVideoPrompt);
+  console.log('[BasePromptsDebug] ========================================');
+  
   const {
     projectId,
     selectedShotId,
@@ -251,6 +259,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   let enhancedPromptsArray: string[] = [];
 
   if (generationMode === 'timeline') {
+    console.log('[BasePromptsDebug] ✅ Entered TIMELINE mode branch');
+    console.log('[BasePromptsDebug] Will fetch shot_generations from database with metadata');
+    
     // Timeline positions are now managed by useEnhancedShotPositions
     // Frame gaps will be extracted from the database-driven positions
     
@@ -260,6 +271,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     let sortedPositions: Array<{id: string, pos: number}> = [];
     
     try {
+      console.log('[BasePromptsDebug] 🔍 Querying shot_generations table for shot:', selectedShotId.substring(0, 8));
       const { data: shotGenerationsData, error } = await supabase
         .from('shot_generations')
         .select(`
@@ -279,7 +291,19 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
       if (error) {
         console.error('[Generation] Error fetching shot generations:', error);
+        console.error('[BasePromptsDebug] ❌ Query failed:', error);
       } else if (shotGenerationsData) {
+        console.log('[BasePromptsDebug] ✅ Query returned data');
+        console.log('[BasePromptsDebug] Total records from DB:', shotGenerationsData.length);
+        console.log('[BasePromptsDebug] Records summary:', shotGenerationsData.map((sg, i) => ({
+          index: i,
+          id: sg.id?.substring(0, 8),
+          generation_id: sg.generation_id?.substring(0, 8),
+          timeline_frame: sg.timeline_frame,
+          has_metadata: !!sg.metadata,
+          has_generations: !!sg.generations
+        })));
+        
         // Build sorted positions from timeline_frame data
         // CRITICAL: Filter out videos to match absoluteImageUrls filtering
         // MUST match the UI filtering logic exactly (only filter videos, NOT timeline_frame)
@@ -294,6 +318,14 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
                          (gen?.location && gen.location.endsWith('.mp4'));
           return !isVideo;
         });
+
+        console.log('[BasePromptsDebug] After filtering out videos:', filteredShotGenerations.length);
+        console.log('[BasePromptsDebug] Filtered records:', filteredShotGenerations.map((sg, i) => ({
+          index: i,
+          id: sg.id?.substring(0, 8),
+          timeline_frame: sg.timeline_frame,
+          has_metadata: !!sg.metadata
+        })));
 
         // Build sorted positions ONLY from items with valid timeline_frame
         // (needed for calculating frame gaps)
@@ -311,43 +343,53 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         
         // CRITICAL FIX: Extract pair prompts from FILTERED data (not raw data)
         // This ensures pair prompt indexes match the actual image pairs being generated
-        console.log('[PairPrompts-LOAD] 📚 Starting to extract pair prompts from database:', {
-          totalFilteredGenerations: filteredShotGenerations.length,
-          expectedPairs: filteredShotGenerations.length - 1
+        console.log('[BasePromptsDebug] 📚 Starting to extract pair prompts from database');
+        console.log('[BasePromptsDebug] Total filtered generations:', filteredShotGenerations.length);
+        console.log('[BasePromptsDebug] Expected pairs:', filteredShotGenerations.length - 1);
+        console.log('[BasePromptsDebug] All generation IDs:', filteredShotGenerations.map(g => g.id.substring(0, 8)));
+        console.log('[BasePromptsDebug] All timeline frames:', filteredShotGenerations.map(g => g.timeline_frame));
+        
+        // Log FULL metadata for all items to diagnose the issue
+        console.log('[BasePromptsDebug] FULL METADATA DUMP:');
+        filteredShotGenerations.forEach((gen, idx) => {
+          console.log(`[BasePromptsDebug] Generation ${idx}:`, {
+            id: gen.id.substring(0, 8),
+            generation_id: gen.generation_id?.substring(0, 8),
+            timeline_frame: gen.timeline_frame,
+            metadata: gen.metadata,
+            has_metadata: !!gen.metadata,
+            metadata_type: typeof gen.metadata,
+            metadata_keys: gen.metadata ? Object.keys(gen.metadata) : []
+          });
         });
         
         for (let i = 0; i < filteredShotGenerations.length - 1; i++) {
           const firstItem = filteredShotGenerations[i];
           const metadata = firstItem.metadata as any;
-          console.log(`[PairPrompts-LOAD] 🔍 Checking pair ${i}:`, {
-            shotGenId: firstItem.id.substring(0, 8),
-            timeline_frame: firstItem.timeline_frame,
-            has_pair_prompt: !!metadata?.pair_prompt,
-            has_pair_negative_prompt: !!metadata?.pair_negative_prompt,
-            has_enhanced_prompt: !!metadata?.enhanced_prompt
-          });
+          
+          console.log(`[BasePromptsDebug] 🔍 Pair ${i} (Image ${i} -> Image ${i+1})`);
+          console.log(`[BasePromptsDebug]   shotGenId: ${firstItem.id.substring(0, 8)}`);
+          console.log(`[BasePromptsDebug]   timeline_frame: ${firstItem.timeline_frame}`);
+          console.log(`[BasePromptsDebug]   has_pair_prompt: ${!!metadata?.pair_prompt}`);
+          console.log(`[BasePromptsDebug]   pair_prompt value: "${metadata?.pair_prompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
+          console.log(`[BasePromptsDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!metadata?.enhanced_prompt}`);
           
           if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
             pairPrompts[i] = {
               prompt: metadata.pair_prompt || '',
               negativePrompt: metadata.pair_negative_prompt || '',
             };
-            console.log(`[PairPrompts-LOAD] ✅ Loaded pair prompt ${i} from metadata:`, {
-              prompt: metadata.pair_prompt || '(none)',
-              negativePrompt: metadata.pair_negative_prompt || '(none)',
-              shotGenId: firstItem.id.substring(0, 8),
-              timeline_frame: firstItem.timeline_frame
-            });
+            console.log(`[BasePromptsDebug] ✅ Loaded pair prompt ${i} from metadata`);
+          } else {
+            console.log(`[BasePromptsDebug] ⚠️ No custom prompt for pair ${i} - will use default`);
           }
           
           // Extract enhanced prompt if present
           if (metadata?.enhanced_prompt) {
             enhancedPrompts[i] = metadata.enhanced_prompt;
-            console.log(`[PairPrompts-LOAD] ✅ Loaded enhanced prompt ${i} from metadata:`, {
-              enhancedPrompt: metadata.enhanced_prompt,
-              shotGenId: firstItem.id.substring(0, 8),
-              timeline_frame: firstItem.timeline_frame
-            });
+            console.log(`[BasePromptsDebug] ✅ Loaded enhanced prompt ${i} from metadata`);
           }
         }
         
@@ -381,25 +423,25 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       gapsMatch: frameGaps.length === sortedPositions.length - 1
     });
 
-    console.log('[PairPrompts-GENERATION] 🎯 Building prompts array:', {
-      totalGaps: frameGaps.length,
-      availablePairPrompts: Object.keys(pairPrompts).length,
-      pairPromptsIndexes: Object.keys(pairPrompts).map(Number),
-      batchVideoPromptDefault: batchVideoPrompt,
-      fullPairPromptsObject: pairPrompts
-    });
+    console.log('[BasePromptsDebug] 🎯 Building prompts array');
+    console.log('[BasePromptsDebug] Total gaps:', frameGaps.length);
+    console.log('[BasePromptsDebug] Available pair prompts:', Object.keys(pairPrompts).length);
+    console.log('[BasePromptsDebug] Pair prompts indexes:', Object.keys(pairPrompts).map(Number));
+    console.log('[BasePromptsDebug] Batch video prompt (default):', batchVideoPrompt);
+    console.log('[BasePromptsDebug] Full pairPrompts object:', pairPrompts);
 
     basePrompts = frameGaps.length > 0 ? frameGaps.map((_, index) => {
       // CRITICAL: Only use pair-specific prompt if it exists
       // Send EMPTY STRING if no custom prompt - backend will use base_prompt (singular)
       const pairPrompt = pairPrompts[index]?.prompt;
       const finalPrompt = (pairPrompt && pairPrompt.trim()) ? pairPrompt.trim() : '';
-      console.log(`[PairPrompts-GENERATION] 📝 Pair ${index}:`, {
-        hasPairPrompt: !!pairPrompt,
-        pairPromptRaw: pairPrompt || '(none)',
-        finalPromptUsed: finalPrompt || '(empty - will use base_prompt)',
-        isCustom: pairPrompt && pairPrompt.trim() ? true : false
-      });
+      
+      console.log(`[BasePromptsDebug] 📝 Pair ${index}:`);
+      console.log(`[BasePromptsDebug]   hasPairPrompt: ${!!pairPrompt}`);
+      console.log(`[BasePromptsDebug]   pairPromptRaw: "${pairPrompt || '(none)'}"`);
+      console.log(`[BasePromptsDebug]   finalPromptUsed: "${finalPrompt || '(empty - will use base_prompt)'}"`);
+      console.log(`[BasePromptsDebug]   isCustom: ${pairPrompt && pairPrompt.trim() ? true : false}`);
+      
       return finalPrompt;
     }) : [''];
     
@@ -445,11 +487,160 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
     console.log(`[Generation] Timeline mode - Final prompts:`, { basePrompts, negativePrompts, pairPrompts, enhancedPrompts, enhancedPromptsArray });
   } else {
-    // batch mode - send empty string, backend will use base_prompt
-    basePrompts = [''];
-    segmentFrames = [batchVideoFrames];
-    frameOverlap = [10]; // Fixed context of 10 frames
-    negativePrompts = [steerableMotionSettings.negative_prompt];
+    console.log('[BasePromptsDebug] ⚠️ Entered BATCH mode branch');
+    console.log('[BasePromptsDebug] Will query database for pair prompts (just like timeline mode)');
+    
+    // BATCH MODE: Query database for pair prompts
+    // Individual prompts work in BOTH batch and timeline modes!
+    let pairPrompts: Record<number, { prompt: string; negativePrompt: string }> = {};
+    let enhancedPrompts: Record<number, string> = {};
+    
+    try {
+      console.log('[BasePromptsDebug] 🔍 Querying shot_generations table for shot:', selectedShotId.substring(0, 8));
+      const { data: shotGenerationsData, error } = await supabase
+        .from('shot_generations')
+        .select(`
+          id,
+          generation_id,
+          metadata,
+          generations:generation_id (
+            id,
+            type,
+            location
+          )
+        `)
+        .eq('shot_id', selectedShotId)
+        .order('timeline_frame', { ascending: true });
+
+      if (error) {
+        console.error('[BasePromptsDebug] ❌ Query failed:', error);
+      } else if (shotGenerationsData) {
+        console.log('[BasePromptsDebug] ✅ Query returned data');
+        console.log('[BasePromptsDebug] Total records from DB:', shotGenerationsData.length);
+        
+        // Filter to get only images (same logic as timeline mode)
+        const filteredShotGenerations = shotGenerationsData.filter(sg => {
+          if (!sg.generations) return false;
+          const gen = sg.generations as any;
+          const isVideo = gen?.type === 'video' ||
+                         gen?.type === 'video_travel_output' ||
+                         (gen?.location && gen.location.endsWith('.mp4'));
+          return !isVideo;
+        });
+        
+        console.log('[BasePromptsDebug] After filtering out videos:', filteredShotGenerations.length);
+        console.log('[BasePromptsDebug] Filtered records:', filteredShotGenerations.map((sg, i) => ({
+          index: i,
+          id: sg.id?.substring(0, 8),
+          has_metadata: !!sg.metadata
+        })));
+        
+        // BATCH MODE: Extract pair prompts for ALL pairs (not just first)
+        console.log('[BasePromptsDebug] 📚 Extracting pair prompts from metadata');
+        console.log('[BasePromptsDebug] Total filtered generations:', filteredShotGenerations.length);
+        console.log('[BasePromptsDebug] Expected pairs:', filteredShotGenerations.length - 1);
+        
+        // Log FULL metadata for all items
+        console.log('[BasePromptsDebug] FULL METADATA DUMP:');
+        filteredShotGenerations.forEach((gen, idx) => {
+          console.log(`[BasePromptsDebug] Generation ${idx}:`, {
+            id: gen.id.substring(0, 8),
+            generation_id: gen.generation_id?.substring(0, 8),
+            metadata: gen.metadata,
+            has_metadata: !!gen.metadata,
+            metadata_type: typeof gen.metadata,
+            metadata_keys: gen.metadata ? Object.keys(gen.metadata) : []
+          });
+        });
+        
+        for (let i = 0; i < filteredShotGenerations.length - 1; i++) {
+          const firstItem = filteredShotGenerations[i];
+          const metadata = firstItem.metadata as any;
+          
+          console.log(`[BasePromptsDebug] 🔍 Pair ${i} (Image ${i} -> Image ${i+1})`);
+          console.log(`[BasePromptsDebug]   shotGenId: ${firstItem.id.substring(0, 8)}`);
+          console.log(`[BasePromptsDebug]   has_pair_prompt: ${!!metadata?.pair_prompt}`);
+          console.log(`[BasePromptsDebug]   pair_prompt value: "${metadata?.pair_prompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   has_pair_negative_prompt: ${!!metadata?.pair_negative_prompt}`);
+          console.log(`[BasePromptsDebug]   pair_negative_prompt value: "${metadata?.pair_negative_prompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   has_enhanced_prompt: ${!!metadata?.enhanced_prompt}`);
+          
+          if (metadata?.pair_prompt || metadata?.pair_negative_prompt) {
+            pairPrompts[i] = {
+              prompt: metadata.pair_prompt || '',
+              negativePrompt: metadata.pair_negative_prompt || '',
+            };
+            console.log(`[BasePromptsDebug] ✅ Loaded pair prompt ${i} from metadata`);
+          } else {
+            console.log(`[BasePromptsDebug] ⚠️ No custom prompt for pair ${i} - will use default`);
+          }
+          
+          // Extract enhanced prompt if present
+          if (metadata?.enhanced_prompt) {
+            enhancedPrompts[i] = metadata.enhanced_prompt;
+            console.log(`[BasePromptsDebug] ✅ Loaded enhanced prompt ${i} from metadata`);
+          }
+        }
+        
+        // Build arrays with one entry per pair
+        const numPairs = filteredShotGenerations.length - 1;
+        
+        console.log('[BasePromptsDebug] 🎯 Building prompts arrays for batch mode');
+        console.log('[BasePromptsDebug] Number of pairs:', numPairs);
+        console.log('[BasePromptsDebug] Available custom prompts:', Object.keys(pairPrompts).length);
+        
+        basePrompts = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          const pairPrompt = pairPrompts[index]?.prompt;
+          const finalPrompt = (pairPrompt && pairPrompt.trim()) ? pairPrompt.trim() : '';
+          
+          console.log(`[BasePromptsDebug] 📝 Pair ${index}:`);
+          console.log(`[BasePromptsDebug]   hasPairPrompt: ${!!pairPrompt}`);
+          console.log(`[BasePromptsDebug]   pairPromptRaw: "${pairPrompt || '(none)'}"`);
+          console.log(`[BasePromptsDebug]   finalPromptUsed: "${finalPrompt || '(empty - will use base_prompt)'}"`);
+          console.log(`[BasePromptsDebug]   isCustom: ${pairPrompt && pairPrompt.trim() ? true : false}`);
+          
+          return finalPrompt;
+        }) : [''];
+        
+        negativePrompts = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          const pairNegativePrompt = pairPrompts[index]?.negativePrompt;
+          const finalNegativePrompt = (pairNegativePrompt && pairNegativePrompt.trim()) ? pairNegativePrompt.trim() : steerableMotionSettings.negative_prompt;
+          
+          console.log(`[BasePromptsDebug] 🚫 Pair ${index} negative:`);
+          console.log(`[BasePromptsDebug]   hasPairNegativePrompt: ${!!pairNegativePrompt}`);
+          console.log(`[BasePromptsDebug]   finalNegativePromptUsed: "${finalNegativePrompt?.substring(0, 30) || '(none)'}"`);
+          
+          return finalNegativePrompt;
+        }) : [steerableMotionSettings.negative_prompt];
+        
+        enhancedPromptsArray = numPairs > 0 ? Array.from({ length: numPairs }, (_, index) => {
+          const enhancedPrompt = enhancedPrompts[index] || '';
+          console.log(`[BasePromptsDebug] 🌟 Pair ${index} enhanced:`);
+          console.log(`[BasePromptsDebug]   hasEnhancedPrompt: ${!!enhancedPrompt}`);
+          console.log(`[BasePromptsDebug]   promptPreview: "${enhancedPrompt ? enhancedPrompt.substring(0, 50) : '(none)'}"`);
+          return enhancedPrompt;
+        }) : [];
+        
+        segmentFrames = numPairs > 0 ? Array.from({ length: numPairs }, () => batchVideoFrames) : [batchVideoFrames];
+        frameOverlap = numPairs > 0 ? Array.from({ length: numPairs }, () => 10) : [10];
+        
+        console.log('[BasePromptsDebug] ✅ Final arrays for batch mode:', {
+          basePrompts,
+          negativePrompts,
+          enhancedPrompts: enhancedPromptsArray,
+          segmentFrames,
+          frameOverlap,
+          pairPromptsObject: pairPrompts
+        });
+      }
+    } catch (err) {
+      console.error('[BasePromptsDebug] ❌ Error fetching pair prompts:', err);
+      // Fallback to old behavior
+      basePrompts = [''];
+      segmentFrames = [batchVideoFrames];
+      frameOverlap = [10];
+      negativePrompts = [steerableMotionSettings.negative_prompt];
+    }
   }
 
   // Determine model name based on structure video presence
@@ -605,6 +796,20 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Always set independent segments to true
     independent_segments: true,
   };
+
+  // Debug log the exact request body being sent
+  console.log('[BasePromptsDebug] 📤 REQUEST BODY BEING SENT TO BACKEND:');
+  console.log('[BasePromptsDebug]   base_prompts:', requestBody.base_prompts);
+  console.log('[BasePromptsDebug]   base_prompts length:', requestBody.base_prompts?.length);
+  console.log('[BasePromptsDebug]   base_prompts values:', requestBody.base_prompts?.map((p: string, i: number) => 
+    `[${i}]: "${p || '(empty)'}"`
+  ));
+  console.log('[BasePromptsDebug]   base_prompt (singular):', requestBody.base_prompt);
+  console.log('[BasePromptsDebug]   negative_prompts:', requestBody.negative_prompts?.map((p: string, i: number) => 
+    `[${i}]: "${p?.substring(0, 30) || '(empty)'}"`
+  ));
+  console.log('[BasePromptsDebug]   image_urls count:', requestBody.image_urls?.length);
+  console.log('[BasePromptsDebug]   segment_frames:', requestBody.segment_frames);
 
   // Only add regular LoRAs if Advanced Mode is OFF
   // In Advanced Mode, LoRAs are defined per-phase in phase_config
