@@ -1531,7 +1531,18 @@ async function createGenerationFromTask(
             // This allows child tasks to access all enhanced prompts, not just their own
             if (orchDetails.enhanced_prompts_expanded && Array.isArray(orchDetails.enhanced_prompts_expanded)) {
               specificParams.enhanced_prompts_expanded = orchDetails.enhanced_prompts_expanded;
-              console.log(`[GenMigration] Passed enhanced_prompts_expanded array to child task (${orchDetails.enhanced_prompts_expanded.length} prompts)`);
+              
+              // CRITICAL: Also update the orchestrator_details inside specificParams 
+              // This is required because the frontend (ChildGenerationsView) looks for it inside orchestrator_details
+              if (specificParams.orchestrator_details) {
+                 specificParams.orchestrator_details = {
+                    ...specificParams.orchestrator_details,
+                    enhanced_prompts_expanded: orchDetails.enhanced_prompts_expanded
+                 };
+                 console.log(`[GenMigration] Added enhanced_prompts_expanded to specificParams.orchestrator_details`);
+              }
+              
+              console.log(`[GenMigration] Passed enhanced_prompts_expanded array to child task params (${orchDetails.enhanced_prompts_expanded.length} prompts)`);
             }
 
             // Use these specific params for the generation
