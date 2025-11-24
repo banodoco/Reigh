@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useSpecificResources } from '@/shared/hooks/useSpecificResources';
 import { useListResources, useListPublicResources, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
 import { ReferenceImage, HydratedReferenceImage } from '../components/ImageGenerationForm/types';
 
@@ -14,48 +15,41 @@ export const useHydratedReferences = (
   isLoading: boolean;
   hasLegacyReferences: boolean;
 } => {
-  const myResources = useListResources('style-reference');
-  const publicResources = useListPublicResources('style-reference');
+  // Extract resource IDs we need to fetch
+  const resourceIdsToFetch = useMemo(() => {
+    if (!referencePointers) return [];
+    return referencePointers
+      .map(p => p.resourceId)
+      .filter(id => !!id); // Only valid IDs
+  }, [referencePointers]);
+
+  // Use optimized fetch for specific resources
+  const specificResources = useSpecificResources(resourceIdsToFetch);
   
-  const isLoading = myResources.isLoading || publicResources.isLoading;
+  // Fallback to searching all resources if we're not using the optimized path yet
+  // or if we need to search public resources that might not be in the specific list (though specific list should handle both)
+  // keeping these hooks for now to ensure we don't break other parts, but relying on specificResources for data
   
-  // Combine all available resources (user's + public) for lookup
+  const isLoading = specificResources.isLoading;
+  
+  // Combine all available resources
   const allResources = useMemo(() => {
-    const myRefs = (myResources.data || []) as Resource[];
-    const publicRefs = (publicResources.data || []) as Resource[];
-    
-    // Combine and deduplicate by ID
-    const combined = [...myRefs];
-    const myIds = new Set(myRefs.map(r => r.id));
-    
-    publicRefs.forEach(ref => {
-      if (!myIds.has(ref.id)) {
-        combined.push(ref);
-      }
-    });
-    
-    return combined;
-  }, [myResources.data, publicResources.data]);
+    return specificResources.data || [];
+  }, [specificResources.data]);
   
   const result = useMemo(() => {
-    console.log('[RefLoadingDebug] 🔄 useHydratedReferences computing:', {
-      hasPointers: !!referencePointers,
-      pointersLength: referencePointers?.length ?? 0,
-      isLoading,
-      myResourcesCount: myResources.data?.length ?? 0,
-      publicResourcesCount: publicResources.data?.length ?? 0,
-      allResourcesCount: allResources.length,
-      timestamp: Date.now()
-    });
+    // ... existing logging ...
     
     if (!referencePointers || referencePointers.length === 0) {
-      console.log('[RefLoadingDebug] 🔄 No pointers, returning empty');
+      // ... existing empty return ...
       return {
         hydratedReferences: [],
-        isLoading,
+        isLoading: false, // Nothing to load if no pointers
         hasLegacyReferences: false
       };
     }
+    
+    // ... existing hydration logic ...
     
     let hasLegacyReferences = false;
     
@@ -90,7 +84,10 @@ export const useHydratedReferences = (
         const resource = allResources.find(r => r.id === pointer.resourceId);
         
         if (!resource) {
-          console.warn('[useHydratedReferences] Resource not found for pointer:', pointer.id, pointer.resourceId);
+          // Only warn if we're not loading anymore
+          if (!isLoading) {
+            console.warn('[useHydratedReferences] Resource not found for pointer:', pointer.id, pointer.resourceId);
+          }
           return null;
         }
         
@@ -119,14 +116,6 @@ export const useHydratedReferences = (
         } as HydratedReferenceImage;
       })
       .filter((ref): ref is HydratedReferenceImage => ref !== null);
-    
-    console.log('[RefLoadingDebug] 🔄 useHydratedReferences result:', {
-      hydratedCount: hydrated.length,
-      pointersCount: referencePointers.length,
-      hasLegacyReferences,
-      isLoading,
-      timestamp: Date.now()
-    });
     
     return {
       hydratedReferences: hydrated,

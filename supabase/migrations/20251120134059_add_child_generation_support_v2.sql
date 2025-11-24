@@ -4,3 +4,4 @@ ALTER TABLE "generations" ADD COLUMN "is_child" boolean DEFAULT false NOT NULL;
 ALTER TABLE "generations" ADD COLUMN "children" jsonb;
 
 
+

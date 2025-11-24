@@ -39,3 +39,4 @@ SELECT 'Renamed join_clips to join_clips_segment and updated existing tasks' as 
 
 
 
+

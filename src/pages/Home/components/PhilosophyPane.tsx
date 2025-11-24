@@ -230,3 +230,4 @@ export const PhilosophyPane: React.FC<PhilosophyPaneProps> = ({
 };
 
 
+

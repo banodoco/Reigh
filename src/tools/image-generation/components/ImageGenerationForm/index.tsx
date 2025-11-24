@@ -2158,6 +2158,12 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
               onPromptModeChange={(mode) => {
                 markAsInteracted();
                 setPromptMode(mode);
+                // Auto-set imagesPerPrompt based on mode
+                if (mode === 'automated') {
+                  setImagesPerPrompt(8);
+                } else if (mode === 'managed') {
+                  setImagesPerPrompt(1);
+                }
               }}
               masterPromptText={masterPromptText}
               onMasterPromptTextChange={handleTextChange(setMasterPromptText)}

@@ -905,37 +905,75 @@ serve(async (req) => {
               );
             }
           } else if (taskCategory === 'orchestration') {
-            // Special handling for orchestrator tasks: ensure placeholder generation exists
-            // The orchestrator itself doesn't produce output - the travel_stitch child task does
+            // Special handling for orchestrator tasks
             console.log(`[Orchestrator] Processing orchestrator task ${taskIdString} (task_type: ${taskData.task_type})`);
 
-            try {
-              // Check if placeholder generation already exists (created by first child)
-              const existingGen = await findExistingGeneration(supabaseAdmin, taskIdString);
+            // 1. Check if this is a FINAL OUTPUT orchestrator (like join_clips with parent_generation_id)
+            // If it has a parent_generation_id in params, it means this task PRODUCED the final output for that parent
+            if (taskData.params?.parent_generation_id) {
+              const parentGenId = taskData.params.parent_generation_id;
+              console.log(`[Orchestrator] Task has parent_generation_id ${parentGenId} - updating final output`);
               
-              if (existingGen) {
-                console.log(`[Orchestrator] Placeholder generation ${existingGen.id} already exists - nothing to do`);
-              } else {
-                // Create placeholder if it doesn't exist (edge case where orchestrator completes before any children)
-                console.log(`[Orchestrator] Creating placeholder generation for orchestrator ${taskIdString}`);
-                
-                const parentGen = await getOrCreateParentGeneration(supabaseAdmin, taskIdString, taskData.project_id);
-                if (parentGen) {
-                  console.log(`[Orchestrator] Created placeholder generation ${parentGen.id}`);
+              try {
+                // Fetch and update parent generation directly
+                const { data: parentGen, error: fetchError } = await supabaseAdmin
+                  .from('generations')
+                  .select('id')
+                  .eq('id', parentGenId)
+                  .single();
+
+                if (fetchError || !parentGen) {
+                  console.error(`[Orchestrator] Error fetching parent generation ${parentGenId}:`, fetchError);
+                } else {
+                  console.log(`[Orchestrator] Updating parent generation ${parentGen.id} with final video URL`);
+                  
+                  const { error: updateError } = await supabaseAdmin
+                    .from('generations')
+                    .update({
+                      location: publicUrl,
+                      thumbnail_url: thumbnailUrl,
+                      type: 'video'
+                    })
+                    .eq('id', parentGen.id);
+
+                  if (updateError) {
+                    console.error(`[Orchestrator] Error updating parent generation:`, updateError);
+                  } else {
+                    console.log(`[Orchestrator] Successfully updated parent generation with final video`);
+                  }
                 }
+              } catch (err) {
+                console.error(`[Orchestrator] Exception updating parent generation:`, err);
               }
-              
-              // Mark task as having created a generation
-              await supabaseAdmin
-                .from('tasks')
-                .update({ generation_created: true })
-                .eq('id', taskIdString);
+            } 
+            // 2. Fallback: Ensure placeholder exists (for lazy parent creation)
+            else {
+              try {
+                // Check if placeholder generation already exists (created by first child)
+                const existingGen = await findExistingGeneration(supabaseAdmin, taskIdString);
                 
-            } catch (genError) {
-              console.error(`[Orchestrator] Error handling generation for orchestrator task ${taskIdString}:`, genError);
-              // Don't fail the task
+                if (existingGen) {
+                  console.log(`[Orchestrator] Placeholder generation ${existingGen.id} already exists - nothing to do`);
+                } else {
+                  // Create placeholder if it doesn't exist (edge case where orchestrator completes before any children)
+                  console.log(`[Orchestrator] Creating placeholder generation for orchestrator ${taskIdString}`);
+                  
+                  const parentGen = await getOrCreateParentGeneration(supabaseAdmin, taskIdString, taskData.project_id);
+                  if (parentGen) {
+                    console.log(`[Orchestrator] Created placeholder generation ${parentGen.id}`);
+                  }
+                }
+              } catch (genError) {
+                console.error(`[Orchestrator] Error handling generation for orchestrator task ${taskIdString}:`, genError);
+                // Don't fail the task
+              }
             }
-          } else {
+            
+            // Mark task as having created a generation
+            await supabaseAdmin
+              .from('tasks')
+              .update({ generation_created: true })
+              .eq('id', taskIdString); else {
             console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
           }
         }
@@ -1428,9 +1466,9 @@ async function createGenerationFromTask(
         }
       }
     } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)) {
-      const parentGenId = taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id;
       // SPECIAL CASE: travel_stitch or join_clips_orchestrator IS the final output of the orchestrator.
       // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
+      const parentGenId = taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id;
       console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing - updating parent generation ${parentGenId}`);
 
       // Fetch the parent generation directly
@@ -1465,6 +1503,7 @@ async function createGenerationFromTask(
 
         // We return the parent generation as the result
         return parentGen;
+      }
     } else if (taskData.task_types?.category === 'orchestration') {
       // This IS the orchestrator task completing
       // Check if a placeholder generation already exists (created by a child)
