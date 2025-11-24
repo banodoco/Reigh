@@ -25,6 +25,7 @@ export async function fetchGenerations(
     searchTerm?: string;
     includeChildren?: boolean;
     parentGenerationId?: string;
+    sort?: 'newest' | 'oldest';
   }
 ): Promise<{
   items: GeneratedImageWithMetadata[];
@@ -197,9 +198,13 @@ export async function fetchGenerations(
   // 🚀 PERFORMANCE FIX: Use limit+1 pattern for fast pagination when count is skipped
   const fetchLimit = shouldSkipCount ? limit + 1 : limit;
 
+  // Determine sort order
+  const sort = filters?.sort || 'newest';
+  const ascending = sort === 'oldest';
+
   // Execute query with standard server-side pagination
   const { data, error } = await dataQuery
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending })
     .range(offset, offset + fetchLimit - 1);
 
   if (error) {
@@ -418,6 +423,7 @@ export function useGenerations(
     searchTerm?: string;
     includeChildren?: boolean;
     parentGenerationId?: string;
+    sort?: 'newest' | 'oldest';
   },
   options?: {
     disablePolling?: boolean; // Disable smart polling (useful for long-running tasks)

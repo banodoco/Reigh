@@ -312,6 +312,7 @@ export async function createTravelBetweenImagesTask(params: TravelBetweenImagesT
       project_id: params.project_id,
       task_type: taskType,
       params: {
+        tool_type: 'travel-between-images', // Override tool_type for proper generation tagging
         orchestrator_details: orchestratorPayload,
         // Also store at top level for direct access (redundant but useful for consistency)
         ...(params.generation_name ? { generation_name: params.generation_name } : {}),

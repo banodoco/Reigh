@@ -895,6 +895,7 @@ const VideoTravelToolPage: React.FC = () => {
   const [videoMediaTypeFilter, setVideoMediaTypeFilter] = useState<'all' | 'image' | 'video'>('video');
   const [videoToolTypeFilter, setVideoToolTypeFilter] = useState<boolean>(true);
   const [videoStarredOnly, setVideoStarredOnly] = useState<boolean>(false);
+  const [videoSortMode, setVideoSortMode] = useState<'newest' | 'oldest'>('newest');
 
   // Reset video page when project changes
   useEffect(() => {
@@ -1058,7 +1059,8 @@ const VideoTravelToolPage: React.FC = () => {
       shotId: videoShotFilter !== 'all' ? videoShotFilter : undefined,
       excludePositioned: videoExcludePositioned,
       starredOnly: videoStarredOnly,
-      searchTerm: videoSearchTerm
+      searchTerm: videoSearchTerm,
+      sort: videoSortMode
     }
   );
 
@@ -1858,6 +1860,42 @@ const VideoTravelToolPage: React.FC = () => {
                   </>
                 )}
 
+                {/* Search and Sort - Videos View */}
+                {showVideosView && (
+                  <>
+                    <div className="relative w-40 sm:w-52 hidden sm:block">
+                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                        <Search className="h-3.5 w-3.5" />
+                      </div>
+                      <Input
+                        placeholder="Search videos..."
+                        value={videoSearchTerm}
+                        onChange={(e) => {
+                          setVideoSearchTerm(e.target.value);
+                          setVideoPage(1);
+                        }}
+                        className="h-8 text-xs pl-8"
+                      />
+                    </div>
+
+                    <Select
+                      value={videoSortMode}
+                      onValueChange={(value: 'newest' | 'oldest') => {
+                        setVideoSortMode(value);
+                        setVideoPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-[110px] h-8 text-xs">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="newest">Newest</SelectItem>
+                        <SelectItem value="oldest">Oldest</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+
                 {/* Shots vs Videos Toggle */}
                 <div className="inline-flex items-center bg-muted rounded-full p-1">
                   <button
@@ -1977,7 +2015,7 @@ const VideoTravelToolPage: React.FC = () => {
                     onShotFilterChange={(val) => { setVideoShotFilter(val); setVideoPage(1); }}
                     initialExcludePositioned={videoExcludePositioned}
                     onExcludePositionedChange={(val) => { setVideoExcludePositioned(val); setVideoPage(1); }}
-                    showSearch={true}
+                    showSearch={false}
                     initialSearchTerm={videoSearchTerm}
                     onSearchChange={(val) => { setVideoSearchTerm(val); setVideoPage(1); }}
                     initialStarredFilter={videoStarredOnly}
