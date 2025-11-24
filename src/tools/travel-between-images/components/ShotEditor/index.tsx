@@ -25,7 +25,7 @@ import { useAllShotGenerations } from '@/shared/hooks/useShotGenerations';
 import usePersistentState from '@/shared/hooks/usePersistentState';
 import { useShots } from '@/shared/contexts/ShotsContext';
 import SettingsModal from '@/shared/components/SettingsModal';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 // Import modular components and hooks
@@ -322,6 +322,32 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     fetchStatus: fullImagesQueryResult.fetchStatus,
     timestamp: Date.now()
   });
+
+  // Query for the most recent video generation for this shot (for preset sample)
+  const { data: lastVideoGeneration } = useQuery({
+    queryKey: ['last-video-generation', selectedShotId],
+    queryFn: async () => {
+      if (!selectedShotId) return null;
+      
+      const { data, error } = await supabase
+        .from('generations')
+        .select('id, location, type, created_at')
+        .not(`shot_data->${selectedShotId}`, 'is', null)
+        .like('type', '%video%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.log('[PresetAutoPopulate] No last video found for shot:', error);
+        return null;
+      }
+      
+      return data?.location || null;
+    },
+    enabled: !!selectedShotId,
+    staleTime: 30000, // Cache for 30 seconds
+  });
   
     // CRITICAL FIX: Always use full images when available in editor mode to ensure consistency
   // This prevents video pair config mismatches between VideoTravelToolPage and ShotEditor
@@ -505,6 +531,20 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Get pair prompts data for checking if all pairs have prompts
   const { pairPrompts, shotGenerations, clearAllEnhancedPrompts, updatePairPromptsByIndex, loadPositions } = useEnhancedShotPositions(selectedShotId);
+  
+  // Wrap onBatchVideoPromptChange to also clear all enhanced prompts when base prompt changes
+  const handleBatchVideoPromptChangeWithClear = useCallback(async (newPrompt: string) => {
+    // First update the base prompt
+    onBatchVideoPromptChange(newPrompt);
+    
+    // Then clear all enhanced prompts for the shot
+    try {
+      await clearAllEnhancedPrompts();
+      console.log('[ShotEditor] 🧹 Cleared all enhanced prompts after base prompt change');
+    } catch (error) {
+      console.error('[ShotEditor] Error clearing enhanced prompts:', error);
+    }
+  }, [onBatchVideoPromptChange, clearAllEnhancedPrompts]);
   
   // Check if all pairs (except the last one) have custom prompts
   const allPairsHavePrompts = React.useMemo(() => {
@@ -1584,7 +1624,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         </div>
                         <BatchSettingsForm
                             batchVideoPrompt={batchVideoPrompt}
-                            onBatchVideoPromptChange={onBatchVideoPromptChange}
+                            onBatchVideoPromptChange={handleBatchVideoPromptChangeWithClear}
                             batchVideoFrames={batchVideoFrames}
                             onBatchVideoFramesChange={onBatchVideoFramesChange}
                             // batchVideoContext={batchVideoContext} // Removed
@@ -1662,11 +1702,17 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     basePrompt: batchVideoPrompt,
                                     negativePrompt: steerableMotionSettings.negative_prompt,
                                     enhancePrompt,
-                                    durationFrames: batchVideoFrames
+                                    durationFrames: batchVideoFrames,
+                                    lastGeneratedVideoUrl: lastVideoGeneration || undefined,
+                                    selectedLoras: loraManager.selectedLoras.map(lora => ({
+                                        id: lora.id,
+                                        name: lora.name,
+                                        strength: lora.strength
+                                    }))
                                 };
                                 console.log('[PresetAutoPopulate] ShotEditor creating currentSettings:', settings);
                                 return settings;
-                            }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames])}
+                            }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames, lastVideoGeneration, loraManager.selectedLoras])}
                             advancedMode={advancedMode || false}
                             onAdvancedModeChange={onAdvancedModeChange || (() => {})}
                             phaseConfig={phaseConfig}

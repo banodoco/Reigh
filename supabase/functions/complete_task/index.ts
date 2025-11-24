@@ -1469,10 +1469,19 @@ async function createGenerationFromTask(
             };
 
             // Extract specific prompt
-            const specificPrompt = extractFromArray(orchDetails.base_prompts_expanded, childOrder);
+            // First try enhanced_prompts_expanded, then fall back to base_prompts_expanded
+            const enhancedPrompt = extractFromArray(orchDetails.enhanced_prompts_expanded, childOrder);
+            const basePrompt = extractFromArray(orchDetails.base_prompts_expanded, childOrder);
+            
+            // Use enhanced prompt if available, otherwise use base prompt
+            const specificPrompt = enhancedPrompt !== undefined ? enhancedPrompt : basePrompt;
             if (specificPrompt !== undefined) {
               specificParams.prompt = specificPrompt;
-              console.log(`[GenMigration] Set child prompt: "${specificPrompt.substring(0, 20)}..."`);
+              if (enhancedPrompt !== undefined) {
+                console.log(`[GenMigration] Set child prompt from enhanced_prompts_expanded[${childOrder}]: "${enhancedPrompt.substring(0, 20)}..."`);
+              } else {
+                console.log(`[GenMigration] Set child prompt from base_prompts_expanded[${childOrder}]: "${specificPrompt.substring(0, 20)}..."`);
+              }
             }
 
             // Extract specific negative prompt
@@ -1491,6 +1500,13 @@ async function createGenerationFromTask(
             const specificOverlap = extractFromArray(orchDetails.frame_overlap_expanded, childOrder);
             if (specificOverlap !== undefined) {
               specificParams.frame_overlap = specificOverlap;
+            }
+
+            // Pass through the full enhanced_prompts_expanded array if it exists
+            // This allows child tasks to access all enhanced prompts, not just their own
+            if (orchDetails.enhanced_prompts_expanded && Array.isArray(orchDetails.enhanced_prompts_expanded)) {
+              specificParams.enhanced_prompts_expanded = orchDetails.enhanced_prompts_expanded;
+              console.log(`[GenMigration] Passed enhanced_prompts_expanded array to child task (${orchDetails.enhanced_prompts_expanded.length} prompts)`);
             }
 
             // Use these specific params for the generation

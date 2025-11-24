@@ -33,13 +33,15 @@ export interface MotionControlProps {
   selectedPhasePresetId?: string | null;
   onPhasePresetSelect: (presetId: string, config: PhaseConfig) => void;
   onPhasePresetRemove: () => void;
-  currentSettings?: {
+  currentSettings: {
     textBeforePrompts?: string;
     textAfterPrompts?: string;
     basePrompt?: string;
     negativePrompt?: string;
     enhancePrompt?: boolean;
     durationFrames?: number;
+    lastGeneratedVideoUrl?: string;
+    selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
   
   // Advanced mode props

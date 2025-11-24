@@ -196,6 +196,8 @@ interface PresetsSelectorProps {
     negativePrompt?: string;
     enhancePrompt?: boolean;
     durationFrames?: number;
+    lastGeneratedVideoUrl?: string;
+    selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
 }
 

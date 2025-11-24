@@ -47,6 +47,8 @@ interface PhaseConfigSelectorModalProps {
     negativePrompt?: string;
     enhancePrompt?: boolean;
     durationFrames?: number;
+    lastGeneratedVideoUrl?: string;
+    selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
 }
 
@@ -645,8 +647,61 @@ interface AddNewTabProps {
     negativePrompt?: string;
     enhancePrompt?: boolean;
     durationFrames?: number;
+    lastGeneratedVideoUrl?: string;
+    selectedLoras?: Array<{ id: string; name: string; strength: number }>;
   };
 }
+
+// Generate a preset name based on current settings
+const generatePresetName = (
+  phaseConfig?: PhaseConfig,
+  basePrompt?: string,
+  selectedLoras?: Array<{ id: string; name: string; strength: number }>
+): string => {
+  const randomWords = [
+    'Cloud', 'Storm', 'River', 'Mountain', 'Ocean', 'Forest', 'Desert', 
+    'Glacier', 'Valley', 'Canyon', 'Meadow', 'Prairie', 'Tundra', 'Jungle',
+    'Sunset', 'Dawn', 'Eclipse', 'Aurora', 'Comet', 'Nebula', 'Stellar',
+    'Cosmic', 'Lunar', 'Solar', 'Crystal', 'Diamond', 'Emerald', 'Sapphire'
+  ];
+  
+  // Count phases
+  const phaseCount = phaseConfig?.num_phases || 0;
+  const phaseText = phaseCount > 0 ? `${phaseCount} Phase` : 'Custom';
+  
+  // Extract and truncate prompt (remove common words, take meaningful parts)
+  let promptPart = '';
+  if (basePrompt) {
+    const cleaned = basePrompt
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .filter(word => word.length > 3) // Filter out short words
+      .slice(0, 3) // Take first 3 meaningful words
+      .join(' ');
+    promptPart = cleaned.substring(0, 20);
+  }
+  
+  // Extract and truncate LoRA names
+  let loraPart = '';
+  if (selectedLoras && selectedLoras.length > 0) {
+    loraPart = selectedLoras
+      .map(lora => lora.name)
+      .join(', ')
+      .substring(0, 20);
+  }
+  
+  // Pick random word
+  const randomWord = randomWords[Math.floor(Math.random() * randomWords.length)];
+  
+  // Build name
+  const parts = [phaseText];
+  if (promptPart) parts.push(`"${promptPart}"`);
+  if (loraPart) parts.push(loraPart);
+  parts.push(randomWord);
+  
+  return parts.join(' - ');
+};
 
 const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings }) => {
   const isEditMode = !!editingPreset;
@@ -654,8 +709,14 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   console.log('[PresetAutoPopulate] AddNewTab received currentSettings:', currentSettings);
   
   const [addForm, setAddForm] = useState(() => {
+    const generatedName = generatePresetName(
+      currentPhaseConfig,
+      currentSettings?.basePrompt,
+      currentSettings?.selectedLoras
+    );
+    
     const initialForm = {
-      name: '',
+      name: generatedName,
       description: '',
       presetPromptPrefix: currentSettings?.textBeforePrompts || '',
       presetPromptSuffix: currentSettings?.textAfterPrompts || '',
@@ -677,6 +738,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [fileInputKey, setFileInputKey] = useState<number>(0);
   const [userName, setUserName] = useState<string>('');
+  const [initialVideoSample, setInitialVideoSample] = useState<string | null>(null);
+  const [initialVideoDeleted, setInitialVideoDeleted] = useState(false);
   const isMobile = useIsMobile();
   
   // Update form from current settings when they change (and not editing)
@@ -688,7 +751,14 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     });
     
     if (!editingPreset && currentSettings) {
+      const generatedName = generatePresetName(
+        currentPhaseConfig,
+        currentSettings.basePrompt,
+        currentSettings.selectedLoras
+      );
+      
       const newFields = {
+        name: generatedName, // Auto-generate name
         presetPromptPrefix: currentSettings.textBeforePrompts || '',
         presetPromptSuffix: currentSettings.textAfterPrompts || '',
         presetBasePrompt: currentSettings.basePrompt || '',
@@ -702,8 +772,15 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         ...prev,
         ...newFields
       }));
+      
+      // Also set the initial video sample if available
+      if (currentSettings.lastGeneratedVideoUrl) {
+        setInitialVideoSample(currentSettings.lastGeneratedVideoUrl);
+        setInitialVideoDeleted(false); // Reset deletion flag
+        console.log('[PresetAutoPopulate] Set initial video sample:', currentSettings.lastGeneratedVideoUrl);
+      }
     }
-  }, [currentSettings, editingPreset]);
+  }, [currentSettings, editingPreset, currentPhaseConfig]);
 
   // Pre-populate form when editing
   useEffect(() => {
@@ -818,11 +895,20 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       const existingSamples = isEditMode 
         ? (editingPreset?.metadata.sample_generations || []).filter(s => !deletedExistingSampleUrls.includes(s.url))
         : [];
-      const finalSamples = [...existingSamples, ...uploadedSamples];
+      
+      // Include initial video sample if present and not deleted (only when creating new preset)
+      const initialSample = (!isEditMode && initialVideoSample && !initialVideoDeleted) 
+        ? [{ url: initialVideoSample, type: 'video' as const, alt_text: 'Latest video generation' }]
+        : [];
+      
+      const finalSamples = [...initialSample, ...existingSamples, ...uploadedSamples];
 
       // Determine main generation
       let mainGeneration: string | undefined;
-      if (uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex]) {
+      if (!isEditMode && initialVideoSample && !initialVideoDeleted) {
+        // Use initial video as main generation when creating new preset
+        mainGeneration = initialVideoSample;
+      } else if (uploadedSamples.length > 0 && uploadedSamples[mainGenerationIndex]) {
         mainGeneration = uploadedSamples[mainGenerationIndex].url;
       } else if (isEditMode && editingPreset?.metadata.main_generation && !deletedExistingSampleUrls.includes(editingPreset.metadata.main_generation)) {
         // Keep existing main generation if it wasn't deleted
@@ -1111,6 +1197,52 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                         </div>
                       );
                     })}
+                </div>
+              </div>
+            )}
+
+            {/* Display initial video sample from last generation (when not editing) */}
+            {!isEditMode && initialVideoSample && !initialVideoDeleted && (
+              <div className="space-y-2 mb-3">
+                <Label className="text-sm font-light">Last Generated Video (auto-included)</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="relative group">
+                    <div className="relative rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/30 overflow-hidden">
+                      <div className="relative h-24 w-full">
+                        <HoverScrubVideo
+                          src={initialVideoSample}
+                          className="h-full w-full"
+                          videoClassName="object-cover"
+                          autoplayOnHover={!isMobile}
+                          preload="metadata"
+                          loop
+                          muted
+                        />
+                      </div>
+                      
+                      {/* Primary indicator */}
+                      <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                        Primary
+                      </div>
+                      
+                      {/* Delete button */}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInitialVideoDeleted(true);
+                        }}
+                        title="Remove from preset"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+                      Latest video generation
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
