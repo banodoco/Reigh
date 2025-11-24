@@ -104,14 +104,15 @@ export default function EditImagesPage() {
   return (
     <div className={cn(
       "w-full flex flex-col",
-      isEditingOnMobile ? "min-h-[calc(100dvh-64px)]" : "h-[calc(100dvh-64px)] overflow-hidden"
+      isEditingOnMobile ? "min-h-[calc(100dvh-96px)]" : "h-[calc(100dvh-96px)] overflow-hidden"
     )}>
       {!selectedMedia ? (
-        <div className="w-full h-full flex flex-col md:flex-row bg-transparent">
-          {/* Left Panel - Placeholder */}
-          <div 
-            className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-b-xl md:rounded-b-none md:rounded-l-xl overflow-hidden"
-          >
+        <div className="w-full h-full px-4">
+          <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row bg-transparent">
+            {/* Left Panel - Placeholder */}
+            <div 
+              className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-b-xl md:rounded-b-none md:rounded-l-xl overflow-hidden"
+            >
              <div className="flex flex-col items-center justify-center space-y-2 md:space-y-6 p-4 md:p-8">
                 <div className="text-center space-y-1 md:space-y-2 max-w-md">
                   <h1 className="text-xl md:text-3xl font-light tracking-tight text-white">Edit Images</h1>
@@ -145,39 +146,37 @@ export default function EditImagesPage() {
              <ImageSelectionModal 
                onSelect={(media) => setSelectedMedia(media)} 
              />
+            </div>
           </div>
         </div>
       ) : (
-        <div className={cn(
-          "flex-1 relative flex flex-col",
-          !isEditingOnMobile && "overflow-hidden"
-        )}>
+        <div className="w-full h-full px-4">
           <div className={cn(
-            "flex-1 relative bg-transparent",
-            !isEditingOnMobile && "overflow-hidden"
+            "max-w-7xl mx-auto h-full relative",
+            isEditingOnMobile ? "flex flex-col" : "overflow-hidden"
           )}>
-             <InlineEditView 
-               media={selectedMedia} 
-               onClose={() => setSelectedMedia(null)}
-               onImageSaved={async (newUrl, createNew) => {
-                  console.log("Image saved:", newUrl, createNew);
-               }}
-               onNavigateToGeneration={async (generationId) => {
-                  try {
-                    const { data, error } = await supabase
-                      .from('generations')
-                      .select('*')
-                      .eq('id', generationId)
-                      .single();
-                    
-                    if (data && !error) {
-                      setSelectedMedia(data as any);
-                    }
-                  } catch (e) {
-                    console.error("Failed to navigate to generation", e);
-                  }
-               }}
-             />
+            <InlineEditView 
+              media={selectedMedia} 
+              onClose={() => setSelectedMedia(null)}
+            onImageSaved={async (newUrl, createNew) => {
+              console.log("Image saved:", newUrl, createNew);
+            }}
+            onNavigateToGeneration={async (generationId) => {
+              try {
+                const { data, error } = await supabase
+                  .from('generations')
+                  .select('*')
+                  .eq('id', generationId)
+                  .single();
+                
+                if (data && !error) {
+                  setSelectedMedia(data as any);
+                }
+              } catch (e) {
+                console.error("Failed to navigate to generation", e);
+              }
+            }}
+            />
           </div>
         </div>
       )}
@@ -189,6 +188,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
   const { selectedProjectId } = useProject();
   const [activeTab, setActiveTab] = useState("gallery");
   const [shotFilter, setShotFilter] = useState<string>("all");
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>("image");
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const { data: shots } = useListShots(selectedProjectId);
@@ -205,6 +205,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
     true,
     {
       shotId: shotFilter === 'all' ? undefined : shotFilter,
+      mediaType: mediaTypeFilter,
       searchTerm: searchTerm.trim() || undefined
     } 
   );
@@ -212,7 +213,7 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [shotFilter, searchTerm]);
+  }, [shotFilter, searchTerm, mediaTypeFilter]);
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
@@ -236,31 +237,36 @@ function ImageSelectionModal({ onSelect }: { onSelect: (media: GenerationRow) =>
       </div>
 
       <TabsContent value="gallery" className="flex-1 overflow-y-auto p-0 m-0 relative pt-4 px-4 md:px-6">
-         <ImageGallery 
-            images={generationsData?.items || []}
-            isLoading={isGalleryLoading}
-            onImageClick={(media) => onSelect(media as any)}
-            allShots={shots || []}
-            showShotFilter={true}
-            initialShotFilter={shotFilter}
-            onShotFilterChange={setShotFilter}
-            showSearch={true}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            itemsPerPage={itemsPerPage}
-            offset={(currentPage - 1) * itemsPerPage}
-            totalCount={generationsData?.total || 0}
-            onServerPageChange={setCurrentPage}
-            serverPage={currentPage}
-            showDelete={false}
-            showDownload={false}
-            showShare={false}
-            showEdit={false}
-            showStar={false}
-            showAddToShot={false}
-            enableSingleClick={true}
-            hideBottomPagination={true}
-         />
+         {isGalleryLoading && !generationsData ? (
+            <ReighLoading />
+         ) : (
+            <ImageGallery 
+               images={(generationsData as any)?.items || []}
+               onImageClick={(media) => onSelect(media as any)}
+               allShots={shots || []}
+               showShotFilter={true}
+               initialShotFilter={shotFilter}
+               onShotFilterChange={setShotFilter}
+               showSearch={true}
+               initialSearchTerm={searchTerm}
+               onSearchChange={setSearchTerm}
+               initialMediaTypeFilter={mediaTypeFilter}
+               onMediaTypeFilterChange={setMediaTypeFilter}
+               itemsPerPage={itemsPerPage}
+               offset={(currentPage - 1) * itemsPerPage}
+               totalCount={(generationsData as any)?.total || 0}
+               onServerPageChange={setCurrentPage}
+               serverPage={currentPage}
+               showDelete={false}
+               showDownload={false}
+               showShare={false}
+               showEdit={false}
+               showStar={false}
+               showAddToShot={false}
+               enableSingleClick={true}
+               hideBottomPagination={true}
+            />
+         )}
       </TabsContent>
 
       <TabsContent value="shots" className="flex-1 overflow-y-auto p-4 m-0">
