@@ -1431,17 +1431,24 @@ async function createGenerationFromTask(
               .eq('id', orchestratorTaskId)
               .single();
             
-            if (!orchError && orchestratorTask?.params) {
+            if (orchError) {
+              console.error(`[GenMigration] ❌ Failed to fetch orchestrator task params:`, orchError);
+            } else if (orchestratorTask?.params) {
               const orchParams = orchestratorTask.params;
+              console.log(`[GenMigration] Fetched orchestrator task params. Checking for enhanced prompts...`);
+              
               // Check multiple possible locations for enhanced_prompts_expanded
               const enhancedPrompts = orchParams.enhanced_prompts_expanded || 
                                     orchParams.orchestrator_details?.enhanced_prompts_expanded ||
                                     orchParams.full_orchestrator_payload?.enhanced_prompts_expanded;
               
               if (enhancedPrompts && Array.isArray(enhancedPrompts)) {
-                console.log(`[GenMigration] Found enhanced_prompts_expanded in orchestrator task (${enhancedPrompts.length} prompts)`);
+                console.log(`[GenMigration] ✅ Found enhanced_prompts_expanded in orchestrator task (${enhancedPrompts.length} prompts)`);
                 // Add it to orchDetails so downstream code can use it
                 orchDetails = { ...orchDetails, enhanced_prompts_expanded: enhancedPrompts };
+              } else {
+                console.log(`[GenMigration] ⚠️ enhanced_prompts_expanded NOT found in orchestrator task params either. Available keys:`, Object.keys(orchParams));
+                if (orchParams.orchestrator_details) console.log(`[GenMigration] orchestrator_details keys:`, Object.keys(orchParams.orchestrator_details));
               }
             }
           }
@@ -1539,10 +1546,12 @@ async function createGenerationFromTask(
                     ...specificParams.orchestrator_details,
                     enhanced_prompts_expanded: orchDetails.enhanced_prompts_expanded
                  };
-                 console.log(`[GenMigration] Added enhanced_prompts_expanded to specificParams.orchestrator_details`);
+                 console.log(`[GenMigration] ✅ Added enhanced_prompts_expanded to specificParams.orchestrator_details`);
               }
               
               console.log(`[GenMigration] Passed enhanced_prompts_expanded array to child task params (${orchDetails.enhanced_prompts_expanded.length} prompts)`);
+            } else {
+              console.log(`[GenMigration] ℹ️ Skipping enhanced_prompts_expanded pass-through (not found or invalid)`);
             }
 
             // Use these specific params for the generation
