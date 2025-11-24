@@ -973,7 +973,8 @@ serve(async (req) => {
             await supabaseAdmin
               .from('tasks')
               .update({ generation_created: true })
-              .eq('id', taskIdString); else {
+              .eq('id', taskIdString);
+          } else {
             console.log(`[GenMigration] Skipping generation creation for task ${taskIdString} - category is '${taskCategory}', not 'generation'`);
           }
         }
