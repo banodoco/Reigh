@@ -253,6 +253,7 @@ export const PresetsSelector: React.FC<PresetsSelectorProps> = ({
       )}
 
       {/* Phase Config Selector Modal */}
+      {console.log('[PresetAutoPopulate] PresetsSelector passing currentSettings to Modal:', currentSettings)}
       <PhaseConfigSelectorModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

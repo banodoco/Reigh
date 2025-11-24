@@ -1655,14 +1655,18 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             selectedPhasePresetId={selectedPhasePresetId}
                             onPhasePresetSelect={onPhasePresetSelect || (() => {})}
                             onPhasePresetRemove={onPhasePresetRemove || (() => {})}
-                            currentSettings={useMemo(() => ({
-                                textBeforePrompts,
-                                textAfterPrompts,
-                                basePrompt: batchVideoPrompt,
-                                negativePrompt: steerableMotionSettings.negative_prompt,
-                                enhancePrompt,
-                                durationFrames: batchVideoFrames
-                            }), [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames])}
+                            currentSettings={useMemo(() => {
+                                const settings = {
+                                    textBeforePrompts,
+                                    textAfterPrompts,
+                                    basePrompt: batchVideoPrompt,
+                                    negativePrompt: steerableMotionSettings.negative_prompt,
+                                    enhancePrompt,
+                                    durationFrames: batchVideoFrames
+                                };
+                                console.log('[PresetAutoPopulate] ShotEditor creating currentSettings:', settings);
+                                return settings;
+                            }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames])}
                             advancedMode={advancedMode || false}
                             onAdvancedModeChange={onAdvancedModeChange || (() => {})}
                             phaseConfig={phaseConfig}

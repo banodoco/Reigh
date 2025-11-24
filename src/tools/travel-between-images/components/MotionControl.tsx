@@ -175,6 +175,7 @@ export const MotionControl: React.FC<MotionControlProps> = ({
 
         {/* Presets Mode: Preset Selector */}
         <TabsContent value="presets" className="mt-4">
+          {console.log('[PresetAutoPopulate] MotionControl passing currentSettings to PresetsSelector:', currentSettings)}
           <PresetsSelector
             selectedPhasePresetId={selectedPhasePresetId}
             onPhasePresetSelect={onPhasePresetSelect}

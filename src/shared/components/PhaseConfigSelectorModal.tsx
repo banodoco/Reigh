@@ -650,18 +650,25 @@ interface AddNewTabProps {
 
 const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings }) => {
   const isEditMode = !!editingPreset;
-  const [addForm, setAddForm] = useState({
-    name: '',
-    description: '',
-    presetPromptPrefix: currentSettings?.textBeforePrompts || '',
-    presetPromptSuffix: currentSettings?.textAfterPrompts || '',
-    presetBasePrompt: currentSettings?.basePrompt || '',
-    presetNegativePrompt: currentSettings?.negativePrompt || '',
-    presetEnhancePrompt: currentSettings?.enhancePrompt ?? false,
-    presetDurationFrames: currentSettings?.durationFrames ?? 60,
-    created_by_is_you: true,
-    created_by_username: '',
-    is_public: true,
+  
+  console.log('[PresetAutoPopulate] AddNewTab received currentSettings:', currentSettings);
+  
+  const [addForm, setAddForm] = useState(() => {
+    const initialForm = {
+      name: '',
+      description: '',
+      presetPromptPrefix: currentSettings?.textBeforePrompts || '',
+      presetPromptSuffix: currentSettings?.textAfterPrompts || '',
+      presetBasePrompt: currentSettings?.basePrompt || '',
+      presetNegativePrompt: currentSettings?.negativePrompt || '',
+      presetEnhancePrompt: currentSettings?.enhancePrompt ?? false,
+      presetDurationFrames: currentSettings?.durationFrames ?? 60,
+      created_by_is_you: true,
+      created_by_username: '',
+      is_public: true,
+    };
+    console.log('[PresetAutoPopulate] AddNewTab initializing form state:', initialForm);
+    return initialForm;
   });
   const [sampleFiles, setSampleFiles] = useState<File[]>([]);
   const [deletedExistingSampleUrls, setDeletedExistingSampleUrls] = useState<string[]>([]);
@@ -674,15 +681,26 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   
   // Update form from current settings when they change (and not editing)
   useEffect(() => {
+    console.log('[PresetAutoPopulate] AddNewTab useEffect triggered:', {
+      editingPreset: !!editingPreset,
+      currentSettings,
+      willUpdate: !editingPreset && !!currentSettings
+    });
+    
     if (!editingPreset && currentSettings) {
-      setAddForm(prev => ({
-        ...prev,
+      const newFields = {
         presetPromptPrefix: currentSettings.textBeforePrompts || '',
         presetPromptSuffix: currentSettings.textAfterPrompts || '',
         presetBasePrompt: currentSettings.basePrompt || '',
         presetNegativePrompt: currentSettings.negativePrompt || '',
         presetEnhancePrompt: currentSettings.enhancePrompt ?? false,
         presetDurationFrames: currentSettings.durationFrames ?? 60,
+      };
+      console.log('[PresetAutoPopulate] AddNewTab updating form with:', newFields);
+      
+      setAddForm(prev => ({
+        ...prev,
+        ...newFields
       }));
     }
   }, [currentSettings, editingPreset]);
@@ -1308,6 +1326,8 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   initialTab = 'browse',
   currentSettings,
 }) => {
+  console.log('[PresetAutoPopulate] PhaseConfigSelectorModal rendered:', { isOpen, currentSettings });
+  
   const isMobile = useIsMobile();
   const myPresetsResource = useListResources('phase-config');
   const publicPresetsResource = useListPublicResources('phase-config');
