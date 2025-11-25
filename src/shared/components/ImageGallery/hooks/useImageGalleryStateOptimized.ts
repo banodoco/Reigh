@@ -191,7 +191,14 @@ const imageGalleryStateReducer = (
     }
     
     case 'SET_SELECTED_SHOT_ID_LOCAL':
-      return { ...state, selectedShotIdLocal: action.payload };
+      // Clear optimistic IDs when switching shots - the optimistic state is per-shot
+      // and should not persist when changing to a different shot
+      return { 
+        ...state, 
+        selectedShotIdLocal: action.payload,
+        optimisticPositionedIds: new Set(),
+        optimisticUnpositionedIds: new Set(),
+      };
       
     case 'SET_SHOW_TICK_FOR_IMAGE_ID':
       return { ...state, showTickForImageId: action.payload };

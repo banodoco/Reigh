@@ -862,6 +862,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             selectedShotId={lightboxSelectedShotId || currentShotId || lastAffectedShotId || undefined}
             onShotChange={(shotId) => {
               setLightboxSelectedShotId(shotId);
+              // Clear optimistic IDs when switching shots - they are per-shot state
+              setOptimisticPositionedIds(new Set());
+              setOptimisticUnpositionedIds(new Set());
             }}
             onAddToShot={handleAddToShot}
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
