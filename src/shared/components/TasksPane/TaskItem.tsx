@@ -108,11 +108,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
     setSelectedShotId(newSelectedShotId);
   }, [currentShotId, lastAffectedShotId, shots]);
 
-  // Clear showTickForImageId when shot changes
-  useEffect(() => {
-    setShowTickForImageId(null);
-  }, [selectedShotId]);
-
   // Handler for adding image to shot
   const handleAddToShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     if (!selectedShotId) {
