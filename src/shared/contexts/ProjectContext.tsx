@@ -663,11 +663,19 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
              const loraSettings = storedLoras ? JSON.parse(storedLoras) : undefined;
 
              shotSettingsToInherit = {
-               'travel-between-images': mainSettings,
+               'travel-between-images': {
+                 ...mainSettings,
+                 // Scrub content fields for new project
+                 batchVideoPrompt: '',
+                 shotImageIds: [],
+                 pairConfigs: [],
+                 textBeforePrompts: '',
+                 textAfterPrompts: ''
+               },
                ...(loraSettings ? { 'travel-loras': loraSettings } : {})
              };
              
-             console.log('[ProjectContext] 🧬 Inheriting shot settings from localStorage:', {
+             console.log('[ProjectContext] 🧬 Inheriting shot settings from localStorage (scrubbed content):', {
                main: !!mainSettings,
                loras: !!loraSettings
              });
@@ -692,11 +700,21 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
           if (latestShot?.settings) {
             const shotSettings = latestShot.settings as any;
             if (shotSettings['travel-between-images'] || shotSettings['travel-loras']) {
+              const mainSettings = shotSettings['travel-between-images'] || {};
+              
               shotSettingsToInherit = {
-                'travel-between-images': shotSettings['travel-between-images'],
+                'travel-between-images': {
+                  ...mainSettings,
+                  // Scrub content fields for new project
+                  batchVideoPrompt: '',
+                  shotImageIds: [],
+                  pairConfigs: [],
+                  textBeforePrompts: '',
+                  textAfterPrompts: ''
+                },
                 ...(shotSettings['travel-loras'] ? { 'travel-loras': shotSettings['travel-loras'] } : {})
               };
-              console.log('[ProjectContext] 🧬 Inheriting shot settings from LATEST DB SHOT');
+              console.log('[ProjectContext] 🧬 Inheriting shot settings from LATEST DB SHOT (scrubbed content)');
             }
           }
         } catch (err) {
