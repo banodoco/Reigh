@@ -11,7 +11,8 @@ import React, { memo } from 'react';
 const TitleOverflowContext = createContext<{
   forceTwoLines: boolean;
   reportOverflow: () => void;
-}>({ forceTwoLines: false, reportOverflow: () => {} });
+  resizeKey: number;
+}>({ forceTwoLines: false, reportOverflow: () => {}, resizeKey: 0 });
 import { time, timeEnd } from '@/shared/lib/logger';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
@@ -87,7 +88,7 @@ const assistantTools = [
     id: 'character-animate',
     name: 'Animate Characters',
     description: 'Bring characters to life.',
-    descriptionMobile: 'Bring them to life',
+    descriptionMobile: 'Breathe life',
     tool: toolsUIManifest.find(t => t.id === 'character-animate'),
     icon: Users,
     gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
@@ -111,7 +112,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const navigate = useNavigate();
   const { triggerRipple, triggerRippleAtCenter, rippleStyles, isRippleActive } = useClickRipple();
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const { forceTwoLines, reportOverflow } = useContext(TitleOverflowContext);
+  const { forceTwoLines, reportOverflow, resizeKey } = useContext(TitleOverflowContext);
   
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
@@ -128,12 +129,16 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
     };
     
     // Check on mount and resize
-    checkOverflow();
+    // Small delay to ensure DOM has updated after forceTwoLines reset
+    const timeoutId = setTimeout(checkOverflow, 50);
     const observer = new ResizeObserver(checkOverflow);
     observer.observe(titleRef.current);
     
-    return () => observer.disconnect();
-  }, [isSquare, reportOverflow, item.name]);
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [isSquare, reportOverflow, item.name, resizeKey, forceTwoLines]);
 
   // Debug logging for tools
   useEffect(() => {
@@ -227,8 +232,11 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           {/* Tool Header without icon */}
           <div className={`wes-symmetry ${isSm ? 'mb-0.5' : 'mb-0'} relative`}>
             <div className={`${isSm ? 'px-1' : 'px-0'} w-full min-w-0`}>
-              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${!isSm ? 'whitespace-pre-line' : ''}`}>
-                {!isSm ? item.name.replace(' ', '\n') : item.name}
+              <h3 
+                ref={titleRef}
+                className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${forceTwoLines ? 'whitespace-pre-line' : ''}`}
+              >
+                {forceTwoLines ? item.name.replace(' ', '\n') : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
@@ -310,6 +318,33 @@ const ToolSelectorPage: React.FC = () => {
   // Content-responsive breakpoints and layout values
   const { isSm, isLg } = useContentResponsive();
   // Remove layoutDirection hook, use Tailwind classes instead
+  
+  // State to force all assistant tool titles to two lines when any overflows
+  const [forceTwoLines, setForceTwoLines] = useState(false);
+  const [resizeKey, setResizeKey] = useState(0);
+  const reportOverflow = useCallback(() => {
+    setForceTwoLines(true);
+  }, []);
+  
+  // Reset forceTwoLines on window resize so overflow can be re-checked
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
+    const handleResize = () => {
+      // Debounce: only reset after resize stops for 150ms
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setForceTwoLines(false);
+        setResizeKey(k => k + 1); // Force re-check of overflow
+      }, 150);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Initialize video gallery preloader in background
   const preloaderState = useVideoGalleryPreloader();
@@ -395,59 +430,61 @@ const ToolSelectorPage: React.FC = () => {
   }
 
   return (
-    <PageFadeIn className="min-h-[70vh] relative">
-      {/* Background elements removed to prevent inset-0 overlay issues */}
-      
-      {/* Reduced floating elements to prevent visual clutter */}
-      <div className="absolute top-20 right-20 w-32 h-32 bg-wes-pink/8 rounded-full blur-3xl animate-parallax-float"></div>
-      <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/8 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
-      
-      {/* Fixed container structure to prevent right shift */}
-      <div className={`w-full ${containerPadding} ${containerSpacing} relative z-10`}>
-        <div className="max-w-7xl mx-auto">
-          {/* Content-Responsive Layout */}
-          <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
-            {/* Process Column */}
-            <div className="w-full c-lg:w-1/2">
-              <div className={`flex flex-col ${itemGap} ${topMargin} px-2 py-2`}>
-                {processTools.map((tool, index) => {
-                  const isVisible = isToolVisible(tool.tool, tool.id);
-                  
-                  return (
-                    <FadeInSection key={tool.id}>
-                      <ToolCard
-                        item={tool}
-                        index={index}
-                        isVisible={isVisible}
-                      />
-                    </FadeInSection>
-                  );
-                })}
+    <TitleOverflowContext.Provider value={{ forceTwoLines, reportOverflow }}>
+      <PageFadeIn className="min-h-[70vh] relative">
+        {/* Background elements removed to prevent inset-0 overlay issues */}
+        
+        {/* Reduced floating elements to prevent visual clutter */}
+        <div className="absolute top-20 right-20 w-32 h-32 bg-wes-pink/8 rounded-full blur-3xl animate-parallax-float"></div>
+        <div className="absolute bottom-20 left-1/4 w-40 h-40 bg-wes-lavender/8 rounded-full blur-3xl animate-parallax-float" style={{ animationDelay: '4s' }}></div>
+        
+        {/* Fixed container structure to prevent right shift */}
+        <div className={`w-full ${containerPadding} ${containerSpacing} relative z-10`}>
+          <div className="max-w-7xl mx-auto">
+            {/* Content-Responsive Layout */}
+            <div className={`flex flex-col c-lg:flex-row ${sectionGap}`}>
+              {/* Process Column */}
+              <div className="w-full c-lg:w-1/2">
+                <div className={`flex flex-col ${itemGap} ${topMargin} px-2 py-2`}>
+                  {processTools.map((tool, index) => {
+                    const isVisible = isToolVisible(tool.tool, tool.id);
+                    
+                    return (
+                      <FadeInSection key={tool.id}>
+                        <ToolCard
+                          item={tool}
+                          index={index}
+                          isVisible={isVisible}
+                        />
+                      </FadeInSection>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            {/* Assistant Tools Column */}
-            <div className="w-full c-lg:w-1/2">
-              <div className={`grid ${itemGap} ${topMargin} grid-cols-2 sm:grid-cols-3 px-2 py-2`}>
-                {displayedAssistantTools.map((tool, index) => {
-                  const isVisible = true; // Already filtered
-                  
-                  return (
-                    <FadeInSection key={tool.id}>
-                      <ToolCard
-                        item={tool}
-                        isSquare
-                        isVisible={isVisible}
-                      />
-                    </FadeInSection>
-                  );
-                })}
+              {/* Assistant Tools Column */}
+              <div className="w-full c-lg:w-1/2">
+                <div className={`grid ${itemGap} ${topMargin} grid-cols-2 sm:grid-cols-3 px-2 py-2`}>
+                  {displayedAssistantTools.map((tool, index) => {
+                    const isVisible = true; // Already filtered
+                    
+                    return (
+                      <FadeInSection key={tool.id}>
+                        <ToolCard
+                          item={tool}
+                          isSquare
+                          isVisible={isVisible}
+                        />
+                      </FadeInSection>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </PageFadeIn>
+      </PageFadeIn>
+    </TitleOverflowContext.Provider>
   );
 };
 
