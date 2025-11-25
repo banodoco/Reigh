@@ -22,8 +22,6 @@ import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useTaskTimestamp } from '@/shared/hooks/useUpdatingTimestamp';
 import { useProcessingTimestamp, useCompletedTimestamp } from '@/shared/hooks/useProcessingTimestamp';
 import { GenerationRow } from '@/types/shots';
-import { useListShots, useAddImageToShot } from '@/shared/hooks/useShots';
-import { useLastAffectedShot } from '@/shared/hooks/useLastAffectedShot';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTaskGenerationMapping } from '@/shared/lib/generationTaskBridge';
@@ -93,70 +91,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   // No longer loading all 1000+ tasks into memory
 
   // Shot-related hooks
-  const { data: shots } = useListShots(selectedProjectId);
-  const { currentShotId } = useCurrentShot();
-  const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot();
-  const addImageToShotMutation = useAddImageToShot();
-
-  // No longer need local lightbox state - hoisted to TasksPane
-  const [selectedShotId, setSelectedShotId] = useState<string>('');
-  const [showTickForImageId, setShowTickForImageId] = useState<string | null>(null);
-
-  // Set initial selected shot
-  useEffect(() => {
-    const newSelectedShotId = currentShotId || lastAffectedShotId || (shots && shots.length > 0 ? shots[0].id : "");
-    setSelectedShotId(newSelectedShotId);
-  }, [currentShotId, lastAffectedShotId, shots]);
-
-  // Handler for adding image to shot
-  const handleAddToShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
-    if (!selectedShotId) {
-      toast({
-        title: "No shot selected",
-        description: "Please select a shot to add to.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!selectedProjectId) {
-      toast({
-        title: "No project selected",
-        description: "Please select a project first.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    try {
-      await addImageToShotMutation.mutateAsync({
-        shot_id: selectedShotId,
-        generation_id: generationId,
-        project_id: selectedProjectId,
-      });
-      
-      setLastAffectedShotId(selectedShotId);
-      return true;
-    } catch (error) {
-      console.error('Failed to add image to shot:', error);
-      toast({
-        title: "Failed to add image to shot",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
-
-  // Handler for shot selection change
-  const handleShotChange = (shotId: string) => {
-    setSelectedShotId(shotId);
-  };
-
-  // Handler for tick display
-  const handleShowTick = (imageId: string) => {
-    setShowTickForImageId(imageId);
-    setTimeout(() => setShowTickForImageId(null), 2000);
-  };
+  // Note: Local shot management logic removed (hoisted to TasksPane)
+  const { setCurrentShotId } = useCurrentShot();
 
   // Fetch task type information including content_type
   const { data: taskTypeInfo } = useTaskType(task.taskType);
@@ -450,7 +386,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
 
   // Navigation setup
   const navigate = useNavigate();
-  const { setCurrentShotId } = useCurrentShot();
   
   // State for hover functionality
   const [isHoveringTaskItem, setIsHoveringTaskItem] = useState<boolean>(false);

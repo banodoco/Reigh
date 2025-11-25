@@ -433,7 +433,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     imageUrl?: string,
     thumbUrl?: string
   ): Promise<boolean> => {
-    const targetShotId = currentShotId || lastAffectedShotId;
+    // Prefer the locally selected shot in the lightbox, falling back to global current shot
+    const targetShotId = lightboxSelectedShotId || currentShotId || lastAffectedShotId;
     
     if (!targetShotId) {
       console.error('[TasksPane:AddToShot] ❌ No shot selected');
@@ -473,7 +474,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       sonnerToast.error('Failed to add to shot');
       return false;
     }
-  }, [currentShotId, lastAffectedShotId, selectedProjectId, addImageToShotMutation, handleOptimisticPositioned]);
+  }, [lightboxSelectedShotId, currentShotId, lastAffectedShotId, selectedProjectId, addImageToShotMutation, handleOptimisticPositioned]);
   
   // Handler for adding generation to shot (without position)
   const handleAddToShotWithoutPosition = useCallback(async (
@@ -481,8 +482,9 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     imageUrl?: string,
     thumbUrl?: string
   ): Promise<boolean> => {
-    const targetShotId = currentShotId || lastAffectedShotId;
-    
+    // Prefer the locally selected shot in the lightbox, falling back to global current shot
+    const targetShotId = lightboxSelectedShotId || currentShotId || lastAffectedShotId;
+
     if (!targetShotId) {
       console.error('[TasksPane:AddToShot] ❌ No shot selected');
       sonnerToast.error('No shot selected. Please select a shot first.');
@@ -521,7 +523,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       sonnerToast.error('Failed to add to shot');
       return false;
     }
-  }, [currentShotId, lastAffectedShotId, selectedProjectId, addImageToShotWithoutPositionMutation, handleOptimisticUnpositioned]);
+  }, [lightboxSelectedShotId, currentShotId, lastAffectedShotId, selectedProjectId, addImageToShotWithoutPositionMutation, handleOptimisticUnpositioned]);
 
   // Handler for status indicator clicks
   const handleStatusIndicatorClick = (type: FilterGroup, count: number) => {
