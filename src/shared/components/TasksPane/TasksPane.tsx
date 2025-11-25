@@ -266,7 +266,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     if ((!isStatusCountsLoading && statusCounts) || (!displayStatusCounts && statusCounts)) {
       setDisplayStatusCounts(statusCounts);
     }
-  }, [statusCounts, isStatusCountsLoading, displayStatusCounts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusCounts, isStatusCountsLoading]);
   
   // Note: We now use status counts total instead of per-page visible count for badge consistency
 
