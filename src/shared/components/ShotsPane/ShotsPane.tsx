@@ -21,11 +21,11 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useBottomOffset } from '@/shared/hooks/useBottomOffset';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
-import { supabase } from '@/integrations/supabase/client';
+import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 
 const ShotsPaneComponent: React.FC = () => {
   const { selectedProjectId, projects } = useProject();
-  const { shots, isLoading, error } = useShots();
+  const { shots, isLoading, error, refetchShots } = useShots();
   
   // Get current project's aspect ratio
   const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -39,6 +39,12 @@ const ShotsPaneComponent: React.FC = () => {
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Highlighted shot for visual feedback after creation
+  const [highlightedShotId, setHighlightedShotId] = useState<string | null>(null);
+  
+  // Track loading state for the entire shot creation process (mutation + inheritance + refetch)
+  const [isCreatingShot, setIsCreatingShot] = useState(false);
 
   // Fetch project-level settings for defaults when creating new shots
   const { settings: projectSettings, update: updateProjectSettings } = useToolSettings<VideoTravelSettings>(
@@ -54,6 +60,10 @@ const ShotsPaneComponent: React.FC = () => {
     projectId: selectedProjectId, 
     enabled: !!selectedProjectId 
   });
+
+  // Fetch current shot's LoRA settings to inherit to new shots
+  // Note: We can't use currentShotId here because ShotsPane doesn't track the "active" shot
+  // Instead, we'll read from localStorage which stores the last active shot's settings
 
   // Fetch and manage shots pane UI settings with sort order
   const { settings: shotsPaneSettings, update: updateShotsPaneSettings } = useToolSettings<{
@@ -198,6 +208,29 @@ const ShotsPaneComponent: React.FC = () => {
     setCurrentPage(1);
   }, [searchQuery]);
   
+  // Listen for shot creation to provide visual feedback
+  useEffect(() => {
+    const handleShotCreated = (event: CustomEvent) => {
+      try {
+        const { shotId } = event.detail || {};
+        if (!shotId) return;
+        
+        // Apply highlight with a gentle fade
+        setHighlightedShotId(shotId);
+        setTimeout(() => {
+          setHighlightedShotId(null);
+        }, 3000); // 3 seconds - long enough to notice, not too long to be annoying
+      } catch (error) {
+        console.error('[ShotsPane] Error handling shot-created event:', error);
+      }
+    };
+    
+    window.addEventListener('shot-created' as any, handleShotCreated as EventListener);
+    return () => {
+      window.removeEventListener('shot-created' as any, handleShotCreated as EventListener);
+    };
+  }, []);
+  
   const createShotMutation = useCreateShot();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
   const navigate = useNavigate();
@@ -246,59 +279,117 @@ const ShotsPaneComponent: React.FC = () => {
   }, [isOpen]);
 
   const handleCreateShot = async (shotName: string, files: File[], aspectRatio: string | null) => {
-    if (!selectedProjectId) {
-      alert("Please select a project first.");
-      return;
-    }
+    // DEBUG ALERT - REMOVE BEFORE PRODUCTION
+    // alert(`handleCreateShot START: ${shotName}`); 
+    console.warn('[ShotSettingsInherit] 🚀 STARTER: handleCreateShot', { shotName, files: files.length });
+    
+    setIsCreatingShot(true);
+    try {
+      if (!selectedProjectId) {
+        console.warn('[ShotSettingsInherit] ⚠️ No project selected');
+        alert("Please select a project first.");
+        return;
+      }
 
-    let createdShot: any = null;
+      let createdShot: any = null;
 
-    if (files.length > 0) {
-      const result = await handleExternalImageDropMutation.mutateAsync({
-        imageFiles: files,
-        targetShotId: null,
-        currentProjectQueryKey: selectedProjectId,
-        currentShotCount: shots?.length ?? 0
-      });
-      const createdShotId = result?.shotId || null;
-      // For file uploads, we need to find the shot after the mutation completes
-      if (createdShotId) {
-        // The shot should be available in the cache after the mutation
-        const updatedShots = shots?.concat() || [];
-        createdShot = updatedShots.find(shot => shot.id === createdShotId) || { id: createdShotId, name: shotName };
-        
-        // Update shot with aspect ratio if provided
-        if (aspectRatio && createdShotId) {
-          await supabase
-            .from('shots')
-            .update({ aspect_ratio: aspectRatio } as any)
-            .eq('id', createdShotId);
+      if (files.length > 0) {
+        console.warn('[ShotSettingsInherit] 📁 Handling files');
+        const result = await handleExternalImageDropMutation.mutateAsync({
+          imageFiles: files,
+          targetShotId: null,
+          currentProjectQueryKey: selectedProjectId,
+          currentShotCount: shots?.length ?? 0
+        });
+        const createdShotId = result?.shotId || null;
+        // For file uploads, we need to find the shot after the mutation completes
+        if (createdShotId) {
+          // The shot should be available in the cache after the mutation
+          const updatedShots = shots?.concat() || [];
+          const foundShot = updatedShots.find(shot => shot.id === createdShotId);
+          // Ensure createdShot has all required fields for Shot interface
+          createdShot = foundShot || { 
+            id: createdShotId, 
+            name: shotName, 
+            images: [], 
+            position: 0,
+            project_id: selectedProjectId 
+          };
+          
+          // Update shot with aspect ratio if provided
+          if (aspectRatio && createdShotId) {
+            await supabase
+              .from('shots')
+              .update({ aspect_ratio: aspectRatio } as any)
+              .eq('id', createdShotId);
+          }
+        }
+      } else {
+        console.warn('[ShotSettingsInherit] 🔨 calling createShotMutation');
+        const newShotResult = await createShotMutation.mutateAsync({ 
+          name: shotName, 
+          projectId: selectedProjectId,
+          aspectRatio: aspectRatio || undefined,
+        } as any);
+        console.warn('[ShotSettingsInherit] ✅ Mutation finished', newShotResult);
+        // Ensure createdShot has all required fields for Shot interface
+        const shotData = newShotResult?.shot;
+        if (shotData) {
+          createdShot = {
+            ...shotData,
+            images: [], // New shot has no images
+            position: shotData.position ?? 0,
+          };
         }
       }
-    } else {
-      const newShotResult = await createShotMutation.mutateAsync({ 
-        name: shotName, 
-        projectId: selectedProjectId,
-        aspectRatio: aspectRatio || undefined,
-      } as any);
-      createdShot = newShotResult?.shot || null;
-    }
 
-    // Apply project defaults to the newly created shot if available
-    if (createdShot?.id && (projectSettings || projectUISettings)) {
-      const defaultsToApply = {
-        ...(projectSettings || {}),
-        // Include UI settings in a special key that will be handled separately
-        _uiSettings: projectUISettings || {}
-      };
-      // Store the new shot ID to apply defaults when settings load
-      sessionStorage.setItem(`apply-project-defaults-${createdShot.id}`, JSON.stringify(defaultsToApply));
-      console.log('[ShotsPane] Marked shot for project defaults application:', createdShot.id);
-    }
+      console.warn('[ShotSettingsInherit] 🧐 Checking createdShot', createdShot);
 
-    // Navigate to the newly created shot
-    if (createdShot) {
-      navigateToShot(createdShot, { closeMobilePanes: true });
+      // Apply standardized settings inheritance
+      if (createdShot?.id && selectedProjectId) {
+        await inheritSettingsForNewShot({
+          newShotId: createdShot.id,
+          projectId: selectedProjectId,
+          shots: shots || []
+        });
+      } else {
+        console.warn('[ShotSettingsInherit] ❌ No createdShot ID found!');
+      }
+
+      // Switch to "Newest First" to show the new shot at the top
+      if (createdShot) {
+        console.warn('[ShotSettingsInherit] 📋 Switching to newest first and highlighting new shot');
+        console.warn('[ShotSettingsInherit] ✅ NOT navigating to editor - staying in list view');
+        
+        // Refetch shots to update the list immediately
+        await refetchShots();
+        console.warn('[ShotSettingsInherit] ✅ Refetched shots - list should update now');
+        
+        // Switch sort order to newest first
+        if (sortOrder !== 'newest') {
+          handleSortOrderChange('newest');
+        }
+        
+        // Scroll to top of the pane
+        setTimeout(() => {
+          // Find the shots pane container and scroll to top
+          const shotsPane = document.querySelector('[data-shots-pane-content]');
+          if (shotsPane) {
+            shotsPane.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }, 100);
+        
+        // Dispatch event for visual feedback
+        window.dispatchEvent(new CustomEvent('shot-created', {
+          detail: { shotId: createdShot.id, shotName: createdShot.name }
+        }));
+      }
+    } catch (error) {
+      console.error('[ShotSettingsInherit] 💥 CRITICAL ERROR in handleCreateShot:', error);
+      console.warn('[ShotSettingsInherit] 💥 Error details:', error);
+      throw error; // Re-throw so modal can handle error state
+    } finally {
+      setIsCreatingShot(false);
     }
   };
 
@@ -371,7 +462,7 @@ const ShotsPaneComponent: React.FC = () => {
               {sortOrder === 'oldest' ? 'Oldest' : 'Newest'}
             </Button>
           </div>
-          <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide">
+          <div className="flex flex-col gap-4 px-3 py-4 flex-grow overflow-y-auto scrollbar-hide" data-shots-pane-content>
             {isSearchOpen ? (
               <div className="relative">
                 <Input
@@ -412,7 +503,7 @@ const ShotsPaneComponent: React.FC = () => {
             )}
             {filteredShots && filteredShots
               .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-              .map(shot => <ShotGroup key={shot.id} shot={shot} />)}
+              .map(shot => <ShotGroup key={shot.id} shot={shot} highlighted={shot.id === highlightedShotId} />)}
           </div>
           {/* Pagination Controls */}
           {filteredShots && filteredShots.length > pageSize && (
@@ -444,7 +535,7 @@ const ShotsPaneComponent: React.FC = () => {
             isOpen={isCreateModalOpen}
             onClose={() => setIsCreateModalOpen(false)}
             onSubmit={handleCreateShot}
-            isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
+            isLoading={isCreatingShot || createShotMutation.isPending || handleExternalImageDropMutation.isPending}
             defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
             projectAspectRatio={projectAspectRatio}
             initialAspectRatio={null}

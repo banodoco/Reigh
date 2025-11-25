@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useToolSettings } from '@/shared/hooks/useToolSettings';
+import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings, DEFAULT_PHASE_CONFIG } from '../settings';
 import { deepEqual } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,6 +65,7 @@ export const useShotSettings = (
   const currentShotIdRef = useRef<string | null>(null);
   const pendingSettingsRef = useRef<VideoTravelSettings | null>(null); // Track pending changes for flush
   const isUserEditingRef = useRef<boolean>(false); // Track if user is actively editing to prevent overwrites
+  const justAppliedInheritedSettingsRef = useRef<boolean>(false); // Prevent DB load from overwriting inherited settings
   
   // Fetch settings from database
   const { 
@@ -84,6 +85,23 @@ export const useShotSettings = (
     !deepEqual(settings, loadedSettingsRef.current),
     [settings]
   );
+
+  // Persist last active settings to localStorage for inheritance
+  // This allows new shots to inherit from the *currently edited* shot, not just the last created one
+  useEffect(() => {
+    if (shotId && projectId && status === 'ready' && settings) {
+        const storageKey = `last-active-shot-settings-${projectId}`;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(settings));
+          console.log('[ShotSettingsInherit] 💾 Saved active settings to localStorage for inheritance', { 
+            shotId: shotId.substring(0, 8),
+            prompt: settings.batchVideoPrompt?.substring(0, 20)
+          });
+        } catch (e) {
+          console.error('Failed to save settings to localStorage', e);
+        }
+    }
+  }, [settings, shotId, projectId, status]);
   
   // Flush pending saves when shot changes - runs BEFORE settings load
   useEffect(() => {
@@ -165,6 +183,7 @@ export const useShotSettings = (
       console.log('[useShotSettings] 🧹 Clearing editing flags for shot change');
       isUserEditingRef.current = false;
       pendingSettingsRef.current = null;
+      justAppliedInheritedSettingsRef.current = false; // Reset inherited settings flag on shot change
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
@@ -175,6 +194,7 @@ export const useShotSettings = (
     } else if (!previousShotId) {
       // First load
       currentShotIdRef.current = shotId;
+      justAppliedInheritedSettingsRef.current = false; // Reset on first load too
       setStatus('loading');
     }
   }, [shotId]); // Removed updateSettings dependency since we save directly to Supabase
@@ -183,6 +203,99 @@ export const useShotSettings = (
   useEffect(() => {
     if (!shotId) {
       return;
+    }
+
+    // Check for one-time initialization from session storage (for new shots created with inheritance)
+    if (typeof window !== 'undefined') {
+      const storageKey = `apply-project-defaults-${shotId}`;
+      const storedDefaults = sessionStorage.getItem(storageKey);
+      
+      console.log('[ShotSettingsInherit] 🔍 useShotSettings checking sessionStorage for:', shotId.substring(0, 8));
+      console.log('[ShotSettingsInherit] storageKey:', storageKey);
+      console.log('[ShotSettingsInherit] storedDefaults:', storedDefaults ? 'FOUND' : 'NOT FOUND');
+      
+      if (storedDefaults) {
+        console.log('[ShotSettingsInherit] 📦 Found session storage defaults for new shot:', shotId.substring(0, 8));
+        console.log('[ShotSettingsInherit] Raw storedDefaults (first 500 chars):', storedDefaults.substring(0, 500));
+        
+        try {
+          const defaults = JSON.parse(storedDefaults);
+          console.log('[ShotSettingsInherit] Parsed defaults keys:', Object.keys(defaults));
+          console.log('[ShotSettingsInherit] defaults.motionMode:', defaults.motionMode);
+          console.log('[ShotSettingsInherit] defaults.amountOfMotion:', defaults.amountOfMotion);
+          console.log('[ShotSettingsInherit] defaults.advancedMode:', defaults.advancedMode);
+          console.log('[ShotSettingsInherit] defaults.phaseConfig:', defaults.phaseConfig ? 'HAS DATA' : 'NULL');
+          console.log('[ShotSettingsInherit] defaults.steerableMotionSettings:', defaults.steerableMotionSettings);
+          console.log('[ShotSettingsInherit] defaults.batchVideoPrompt:', defaults.batchVideoPrompt?.substring(0, 50) || '(empty)');
+          
+          // remove _uiSettings if present as it's handled elsewhere
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { _uiSettings, ...validSettings } = defaults;
+          
+          const mergedSettings: VideoTravelSettings = {
+            ...DEFAULT_SETTINGS,
+            ...validSettings,
+             // Ensure nested objects are properly initialized
+            steerableMotionSettings: {
+              ...DEFAULT_STEERABLE_MOTION_SETTINGS,
+              ...(validSettings.steerableMotionSettings || {}),
+            },
+          };
+          
+          console.log('[ShotSettingsInherit] Merged settings:');
+          console.log('[ShotSettingsInherit] mergedSettings.motionMode:', mergedSettings.motionMode);
+          console.log('[ShotSettingsInherit] mergedSettings.amountOfMotion:', mergedSettings.amountOfMotion);
+          console.log('[ShotSettingsInherit] mergedSettings.advancedMode:', mergedSettings.advancedMode);
+          console.log('[ShotSettingsInherit] mergedSettings.phaseConfig:', mergedSettings.phaseConfig ? 'HAS DATA' : 'NULL');
+          console.log('[ShotSettingsInherit] mergedSettings.steerableMotionSettings:', mergedSettings.steerableMotionSettings);
+          
+          // Deep clone
+          const deepClonedSettings = JSON.parse(JSON.stringify(mergedSettings));
+          
+          setSettings(deepClonedSettings);
+          loadedSettingsRef.current = JSON.parse(JSON.stringify(deepClonedSettings));
+          setStatus('ready');
+          setError(null);
+          
+          // Set flag to prevent subsequent DB loads from overwriting these settings
+          justAppliedInheritedSettingsRef.current = true;
+          
+          console.log('[ShotSettingsInherit] ✅ Applied settings to state (flag set to prevent DB overwrite)');
+          
+          // Clear storage FIRST to prevent re-processing on subsequent effect runs
+          sessionStorage.removeItem(storageKey);
+          console.log('[ShotSettingsInherit] 🗑️ Cleared sessionStorage key:', storageKey);
+          
+          // Persist to DB immediately so the settings stick
+          // Use updateToolSettingsSupabase directly (async function) instead of the hook's update method
+          // which is debounced and doesn't return a promise
+          console.log('[ShotSettingsInherit] 💾 Saving to database...');
+          updateToolSettingsSupabase({
+            scope: 'shot',
+            id: shotId,
+            toolId: 'travel-between-images',
+            patch: deepClonedSettings
+          })
+            .then(() => {
+              console.log('[ShotSettingsInherit] ✅ Successfully saved inherited settings to database');
+              // Update our "clean" reference to match what was saved
+              loadedSettingsRef.current = JSON.parse(JSON.stringify(deepClonedSettings));
+              // Clear the flag after successful save - DB should now have correct data
+              justAppliedInheritedSettingsRef.current = false;
+              console.log('[ShotSettingsInherit] 🔓 Cleared inherited settings flag');
+            })
+            .catch((err) => {
+              console.error('[ShotSettingsInherit] ❌ Failed to save inherited settings:', err);
+              // Keep the flag set on error to prevent bad DB data from overwriting
+            });
+          
+          return; // Skip normal loading from DB
+        } catch (e) {
+          console.error('[ShotSettingsInherit] ❌ Failed to parse session storage defaults', e);
+        }
+      } else {
+        console.log('[ShotSettingsInherit] ℹ️ No sessionStorage defaults found, loading from DB normally');
+      }
     }
     
     if (isLoading) {
@@ -208,6 +321,13 @@ export const useShotSettings = (
     // no longer trigger automatic refetches. However, it's still valuable for manual invalidations.
     if (isUserEditingRef.current || saveTimeoutRef.current !== null || pendingSettingsRef.current !== null) {
       console.log('[useShotSettings] ⚠️ Skipping load - user is actively editing or has pending changes');
+      return;
+    }
+    
+    // Don't overwrite settings that were just inherited from another shot
+    // The DB might have stale data until our save completes
+    if (justAppliedInheritedSettingsRef.current) {
+      console.log('[ShotSettingsInherit] 🛡️ Skipping DB load - just applied inherited settings, waiting for save to complete');
       return;
     }
     

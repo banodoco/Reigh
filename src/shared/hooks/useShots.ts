@@ -96,8 +96,46 @@ export const useCreateShot = () => {
 
       return { shot: shotData, shouldSelectAfterCreation };
     },
-    onSuccess: (result) => {
-      // Shot creation events are now handled by DataFreshnessManager via realtime events
+    onSuccess: (result, variables) => {
+      // Manually update cache for immediate UI feedback (don't wait for realtime events)
+      if (variables.projectId && result.shot) {
+        const newShot = result.shot;
+        
+        const updateShotCache = (oldShots: Shot[] = []) => {
+          // Check if shot already exists (from realtime or previous update)
+          if (oldShots.some(shot => shot.id === newShot.id)) {
+            return oldShots;
+          }
+          
+          // Insert the new shot at the correct position based on its position value
+          const newShotPosition = (newShot as any).position || 0;
+          const insertionIndex = oldShots.findIndex(shot => 
+            (shot.position || 0) > newShotPosition
+          );
+          
+          if (insertionIndex === -1) {
+            // No shots with higher position found, append at end
+            return [...oldShots, newShot];
+          } else {
+            // Insert at the correct position
+            const updatedShots = [...oldShots];
+            updatedShots.splice(insertionIndex, 0, newShot);
+            return updatedShots;
+          }
+        };
+        
+        // Update all common cache key variants to prevent context errors
+        queryClient.setQueryData<Shot[]>(['shots', variables.projectId, 0], updateShotCache);
+        queryClient.setQueryData<Shot[]>(['shots', variables.projectId, 5], updateShotCache);
+        queryClient.setQueryData<Shot[]>(['shots', variables.projectId], updateShotCache);
+        
+        // Also ensure the shot is properly cached individually
+        queryClient.setQueryData(['shot', newShot.id], newShot);
+        
+        console.log('[useCreateShot] ✅ Manually updated cache for immediate UI feedback');
+      }
+      
+      // Realtime events will also update the cache, but this ensures immediate feedback
     },
     onError: (error: Error) => {
       console.error('Error creating shot:', error);
@@ -132,7 +170,7 @@ export const useDuplicateShot = () => {
       // Get the shot to duplicate (basic info only)
       const { data: originalShot, error: fetchError } = await supabase
         .from('shots')
-        .select('id, name, position, project_id')
+        .select('id, name, position, project_id, settings')
         .eq('id', shotId)
         .single();
       
@@ -145,6 +183,18 @@ export const useDuplicateShot = () => {
         shouldSelectAfterCreation: false,
         position: ((originalShot as any).position || 0) + 1
       })) as any as { shot: Shot };
+
+      // Copy settings if available
+      if ((originalShot as any).settings) {
+        const { error: settingsError } = await supabase
+          .from('shots')
+          .update({ settings: (originalShot as any).settings })
+          .eq('id', newShot.id);
+          
+        if (settingsError) {
+          console.error('[DuplicateShot] Failed to copy settings:', settingsError);
+        }
+      }
       
       // Use server-side function to copy shot_generations (no client data transfer!)
       console.log(`[DuplicateShot] 🚀 Calling server-side duplication function...`);

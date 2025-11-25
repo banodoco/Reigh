@@ -206,14 +206,28 @@ export const useLoraSync = ({
       prevSelectedLorasRef.current = currentLorasKey;
       console.log('[PromptRetentionDebug] [useLoraSync] LoRAs changed, saving:', loraManager.selectedLoras.length, 'loras');
       
-      if (loraManager.selectedLoras.length > 0) {
-        const lorasToSave = loraManager.selectedLoras.map(lora => ({
-          id: lora.id,
-          strength: lora.strength
-        }));
-        updateShotLoraSettings('shot', { loras: lorasToSave });
-      } else {
-        updateShotLoraSettings('shot', { loras: [] });
+      const lorasToSave = loraManager.selectedLoras.length > 0
+        ? loraManager.selectedLoras.map(lora => ({
+            id: lora.id,
+            strength: lora.strength
+          }))
+        : [];
+      
+      // Save to database
+      updateShotLoraSettings('shot', { loras: lorasToSave });
+      
+      // Also save to localStorage for inheritance to new shots
+      if (projectId) {
+        try {
+          const storageKey = `last-active-lora-settings-${projectId}`;
+          localStorage.setItem(storageKey, JSON.stringify({ loras: lorasToSave }));
+          console.log('[ShotSettingsInherit] 💾 Saved active LoRAs to localStorage for inheritance', {
+            shotId: selectedShot?.id?.substring(0, 8),
+            loraCount: lorasToSave.length
+          });
+        } catch (e) {
+          console.error('[ShotSettingsInherit] Failed to save LoRAs to localStorage', e);
+        }
       }
     }
   }, [

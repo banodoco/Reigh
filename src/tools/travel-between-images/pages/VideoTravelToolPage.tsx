@@ -26,6 +26,7 @@ import { VideoTravelSettings, PhaseConfig, DEFAULT_PHASE_CONFIG } from '../setti
 import { deepEqual, sanitizeSettings } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 import { PageFadeIn } from '@/shared/components/transitions';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { useContentResponsive } from '@/shared/hooks/useContentResponsive';
@@ -182,6 +183,7 @@ const VideoTravelToolPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const viaShotClick = location.state?.fromShotClick === true;
+  const shotFromState = location.state?.shotData;
   const { selectedProjectId, setSelectedProjectId, projects } = useProject();
   
   // Get current project's aspect ratio
@@ -259,9 +261,13 @@ const VideoTravelToolPage: React.FC = () => {
   console.log('[ShotNavPerf] ✅ useVideoTravelData returned in', Date.now() - videoTravelDataStart, 'ms');
   
   // NEW: Modern settings management using dedicated hook
-  console.log('[ShotNavPerf] 📡 Calling useShotSettings with shotId:', selectedShot?.id?.substring(0, 8) || 'none');
+  // IMPORTANT: Use currentShotId (from context) instead of selectedShot?.id
+  // This ensures useShotSettings reacts immediately when navigating to a new shot,
+  // even before the shots array is updated and selectedShot is set.
+  // This is critical for settings inheritance to work on newly created shots.
+  console.log('[ShotNavPerf] 📡 Calling useShotSettings with shotId:', currentShotId?.substring(0, 8) || 'none');
   const shotSettingsStart = Date.now();
-  const shotSettings = useShotSettings(selectedShot?.id, selectedProjectId);
+  const shotSettings = useShotSettings(currentShotId || undefined, selectedProjectId);
   console.log('[ShotNavPerf] ✅ useShotSettings returned in', Date.now() - shotSettingsStart, 'ms', {
     status: shotSettings.status,
     hasSettings: !!shotSettings.settings
@@ -286,6 +292,28 @@ const VideoTravelToolPage: React.FC = () => {
   // Ref to always access latest shotSettings without triggering effects
   const shotSettingsRef = useRef(shotSettings);
   shotSettingsRef.current = shotSettings;
+
+  // Track the settings of the last active shot to inherit when creating a new shot
+  const lastActiveShotSettingsRef = useRef<VideoTravelSettings | null>(null);
+  
+  useEffect(() => {
+    // Only update if we have a selected shot and settings are loaded
+    if (selectedShot?.id && shotSettings.settings && shotSettings.status === 'ready') {
+      console.log('[ShotSettingsInherit] 📝 Updating lastActiveShotSettingsRef for shot:', selectedShot.id.substring(0, 8));
+      console.log('[ShotSettingsInherit] motionMode:', shotSettings.settings.motionMode);
+      console.log('[ShotSettingsInherit] amountOfMotion:', shotSettings.settings.amountOfMotion);
+      console.log('[ShotSettingsInherit] advancedMode:', shotSettings.settings.advancedMode);
+      console.log('[ShotSettingsInherit] phaseConfig:', shotSettings.settings.phaseConfig ? 'HAS DATA' : 'NULL');
+      console.log('[ShotSettingsInherit] steerableMotionSettings:', shotSettings.settings.steerableMotionSettings);
+      lastActiveShotSettingsRef.current = shotSettings.settings;
+    } else {
+      console.log('[ShotSettingsInherit] ⏸️ Not updating lastActiveShotSettingsRef:', {
+        hasSelectedShot: !!selectedShot?.id,
+        hasSettings: !!shotSettings.settings,
+        status: shotSettings.status
+      });
+    }
+  }, [selectedShot?.id, shotSettings.settings, shotSettings.status]);
 
   // [VideoTravelDebug] Log the data loading states - reduced frequency
   if (videoRenderCount.current <= 5 || videoRenderCount.current % 10 === 0) {
@@ -525,6 +553,7 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.updateField('generationMode', mode);
   }, [shotSettings, selectedShot?.id, updateShotMode]);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
+  const [isCreatingShot, setIsCreatingShot] = useState(false);
   const queryClient = useQueryClient();
   // const { lastAffectedShotId, setLastAffectedShotId } = useLastAffectedShot(); // Keep for later if needed
   // const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
@@ -1057,17 +1086,27 @@ const VideoTravelToolPage: React.FC = () => {
     const shotExists = selectedShot || (viaShotClick && currentShotId && shots?.find(s => s.id === currentShotId));
     // Also check if we have a valid shot from hash
     const hashShotExists = hashShotId && shots?.find(s => s.id === hashShotId);
-    const result = !!(shotExists || hashShotExists);
+    // CRITICAL: Also check shotFromState for newly created shots that aren't in the cache yet
+    const shotFromStateExists = viaShotClick && shotFromState && shotFromState.id === currentShotId;
+    const result = !!(shotExists || hashShotExists || shotFromStateExists);
     console.log('[ShotNavPerf] 🎯 shouldShowShotEditor computed:', {
       result,
       shotExists: !!shotExists,
       hashShotExists: !!hashShotExists,
+      shotFromStateExists: !!shotFromStateExists,
       selectedShotId: selectedShot?.id?.substring(0, 8) || 'none'
     });
     return result;
-  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId, shotFromState]);
   
   const shotToEdit = useMemo(() => {
+    // Priority 1: Use shotFromState for newly created shots (not in cache yet)
+    // This ensures instant display when navigating from ShotsPane after creating a shot
+    if (viaShotClick && shotFromState && shotFromState.id === currentShotId) {
+      console.log('[ShotNavPerf] 📝 shotToEdit: Using shotFromState (optimistic)', shotFromState.name);
+      return shotFromState as Shot;
+    }
+    // Priority 2: Use shot from hash if available in shots array
     if (hashShotId && shots) {
       const hashShot = shots.find(s => s.id === hashShotId);
       if (hashShot) {
@@ -1075,10 +1114,11 @@ const VideoTravelToolPage: React.FC = () => {
         return hashShot;
       }
     }
+    // Priority 3: Use selectedShot or find from shots array
     const fallbackShot = selectedShot || (viaShotClick && currentShotId ? shots?.find(s => s.id === currentShotId) : null);
     console.log('[ShotNavPerf] 📝 shotToEdit: Using fallback shot', fallbackShot?.name || 'none');
     return fallbackShot;
-  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId]);
+  }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId, shotFromState]);
 
   // Get pane widths for positioning floating elements
   const { 
@@ -1154,10 +1194,16 @@ const VideoTravelToolPage: React.FC = () => {
     // Init: Try to select shot from hash if not already selected
     if (hashShotId && selectedShot?.id !== hashShotId) {
       const matchingShot = shots.find((s) => s.id === hashShotId);
-      if (matchingShot) {
-        console.log('[ShotFilterAutoSelectIssue] Setting shot from hash:', hashShotId);
-        setSelectedShot(matchingShot);
-        setCurrentShotId(matchingShot.id);
+      
+      // FIX: Also check if we have the shot in navigation state (newly created)
+      // This prevents redirecting away from a newly created shot before the cache updates
+      const matchingShotFromState = shotFromState && shotFromState.id === hashShotId ? (shotFromState as Shot) : null;
+      
+      if (matchingShot || matchingShotFromState) {
+        console.log('[ShotFilterAutoSelectIssue] Setting shot from hash/state:', hashShotId);
+        // Use state version if not in array yet
+        setSelectedShot(matchingShot || matchingShotFromState);
+        setCurrentShotId(hashShotId);
         // Return early to allow state update before sync
         return;
       } else {
@@ -1179,9 +1225,25 @@ const VideoTravelToolPage: React.FC = () => {
         window.history.replaceState(null, '', `${basePath}${desiredHash}`);
       }
     } else if (location.hash) {
-      window.history.replaceState(null, '', basePath);
+      // Only clear hash if we are NOT in the middle of an optimistic update
+      const isOptimisticUpdate = shotFromState && shotFromState.id === hashShotId;
+      if (!isOptimisticUpdate) {
+        window.history.replaceState(null, '', basePath);
+      }
     }
-  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate]);
+  }, [isLoading, shots, selectedShot, location.pathname, location.search, location.hash, navigate, shotFromState]);
+
+  // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
+  // Moved here to be before early returns
+  useEffect(() => {
+    // FIX: Don't redirect if we have valid shot data from state, even if not in shots array yet
+    const shotFromStateValid = shotFromState && shotFromState.id === hashShotId;
+    
+    if (hashShotId && shots && !shots.find(s => s.id === hashShotId) && !shotFromStateValid) {
+      console.log(`[VideoTravelToolPage] Hash shot ${hashShotId} not found in loaded shots, redirecting`);
+      navigate('/tools/travel-between-images', { replace: true });
+    }
+  }, [hashShotId, shots, navigate, shotFromState]);
 
   // [NavPerf] Stop timers once the page mounts
   useEffect(() => {
@@ -1407,6 +1469,17 @@ const VideoTravelToolPage: React.FC = () => {
       return;
     }
 
+    // Case 0: Optimistically use shot data from navigation state if available
+    // This allows instant transition before the full shots list updates
+    if (shotFromState && shotFromState.id === currentShotId) {
+       // Only update if not already selected to avoid loops
+       if (selectedShot?.id !== currentShotId) {
+         console.log('[VideoTravelTool] 🚀 Optimistically using shot data from navigation state:', shotFromState.id);
+         setSelectedShot(shotFromState as Shot);
+       }
+       return;
+    }
+
     // Case 1: No current shot ID - clear selection
     if (!currentShotId) {
       if (selectedShot) {
@@ -1428,13 +1501,21 @@ const VideoTravelToolPage: React.FC = () => {
       if (shotToSelect) {
         setSelectedShot(shotToSelect);
       } else {
-        // Shot not found, redirect to main view
-        console.log(`[VideoTravelTool] Shot ${currentShotId} not found, redirecting to main view`);
-        startTransition(() => {
-          setSelectedShot(null);
-          setCurrentShotId(null);
-        });
-        navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
+        console.log(`[VideoTravelTool] Shot ${currentShotId} not found in shots array yet, waiting for update...`);
+        // Only redirect if the shots array is fully loaded and still doesn't contain the shot
+        // after a reasonable time (handled by React Query refetch)
+        
+        // Safety timeout to redirect if shot never appears
+        setTimeout(() => {
+          if (currentShotId && !shots.find(s => s.id === currentShotId)) {
+             console.log(`[VideoTravelTool] Shot ${currentShotId} still not found after timeout, redirecting`);
+             startTransition(() => {
+               setSelectedShot(null);
+               setCurrentShotId(null);
+             });
+             navigate(location.pathname, { replace: true, state: { fromShotClick: false } });
+          }
+        }, 2000);
       }
     }
   }, [currentShotId, shots, viaShotClick, navigate, location.pathname, selectedShot, setCurrentShotId]);
@@ -1539,6 +1620,7 @@ const VideoTravelToolPage: React.FC = () => {
       return;
     }
 
+    setIsCreatingShot(true);
     try {
       let newShot: Shot;
       
@@ -1594,58 +1676,23 @@ const VideoTravelToolPage: React.FC = () => {
         newShot.aspect_ratio = aspectRatio;
       }
       
+      // Apply standardized settings inheritance
+      await inheritSettingsForNewShot({
+        newShotId: newShot.id,
+        projectId: selectedProjectId,
+        shots: shots || []
+      });
+      
       // Select the newly created shot
       setSelectedShot(newShot);
       setCurrentShotId(newShot.id);
       
-      // Mark this shot as needing project defaults applied
-      // IMPORTANT: This captures the "last edited" state from the previous shot,
-      // NOT just the saved project defaults. This ensures LoRA removals persist.
-      if (projectSettings || projectUISettings) {
-        const defaultsToApply = {
-          ...(projectSettings || {}),
-          // Include UI settings in a special key that will be handled separately
-          _uiSettings: projectUISettings || {}
-        };
-        // Store the new shot ID to apply defaults when settings load
-        sessionStorage.setItem(`apply-project-defaults-${newShot.id}`, JSON.stringify(defaultsToApply));
-      }
-      
-      // Save current shot's LoRA settings to the new shot (if any)
-      // This ensures new shots inherit the "last edited" LoRAs, not stale project defaults
-      if (shotLoraSettings?.loras !== undefined) {
-        // Save LoRAs from the current shot to the new shot using Supabase directly
-        // This happens before the shot editor loads, so it will use these LoRAs
-        console.log('[VideoTravelToolPage] Saving current shot LoRAs to new shot:', shotLoraSettings.loras);
-        (async () => {
-          try {
-            const { data: currentShot } = await supabase
-              .from('shots')
-              .select('settings')
-              .eq('id', newShot.id)
-              .single();
-            
-            const currentSettings = (currentShot?.settings as any) || {};
-            await supabase
-              .from('shots')
-              .update({
-                settings: {
-                  ...currentSettings,
-                  'travel-loras': {
-                    loras: shotLoraSettings.loras
-                  }
-                }
-              })
-              .eq('id', newShot.id);
-          } catch (error) {
-            console.error('[VideoTravelToolPage] Failed to save LoRAs to new shot:', error);
-          }
-        })();
-      }
-      
       // Modal will auto-close on successful submission
     } catch (error) {
       console.error("[VideoTravelToolPage] Error creating shot:", error);
+      throw error; // Re-throw so modal can handle error state
+    } finally {
+      setIsCreatingShot(false);
     }
   };
 
@@ -1748,14 +1795,6 @@ const VideoTravelToolPage: React.FC = () => {
     }
     // Otherwise show main list skeleton
     return <LoadingSkeleton type="grid" gridItemCount={6} />;
-  }
-
-  // If we have a hashShotId but shots have loaded and shot doesn't exist, redirect
-  if (hashShotId && shots && !shots.find(s => s.id === hashShotId)) {
-    // Shots have loaded but the hashShotId doesn't exist - redirect to main view
-    console.log(`[VideoTravelToolPage] Hash shot ${hashShotId} not found in loaded shots, redirecting`);
-    navigate('/tools/travel-between-images', { replace: true });
-    return null;
   }
 
   return (
@@ -2094,7 +2133,7 @@ const VideoTravelToolPage: React.FC = () => {
         isOpen={isCreateShotModalOpen}
         onClose={() => setIsCreateShotModalOpen(false)}
         onSubmit={handleModalSubmitCreateShot}
-        isLoading={createShotMutation.isPending || handleExternalImageDropMutation.isPending}
+        isLoading={isCreatingShot || createShotMutation.isPending || handleExternalImageDropMutation.isPending}
         defaultShotName={`Shot ${(shots?.length ?? 0) + 1}`}
         projectAspectRatio={projectAspectRatio}
         initialAspectRatio={null}

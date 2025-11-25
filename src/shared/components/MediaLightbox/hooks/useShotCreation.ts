@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { GenerationRow } from '@/types/shots';
 import { QuickCreateSuccess, ShotOption } from '../types';
 import { useCreateShotWithImage } from '@/shared/hooks/useShots';
+import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 
 export interface UseShotCreationProps {
   media: GenerationRow;
@@ -40,6 +41,7 @@ export const useShotCreation = ({
 
   // Handle quick create and add shot
   const handleQuickCreateAndAdd = useCallback(async () => {
+    console.warn('[ShotSettingsInherit] 🚀 handleQuickCreateAndAdd called from ImageGallery');
     console.log('[VisitShotDebug] handleQuickCreateAndAdd called', {
       hasSelectedProjectId: !!selectedProjectId,
       allShotsLength: allShots.length,
@@ -48,12 +50,15 @@ export const useShotCreation = ({
     
     if (!selectedProjectId) {
       console.error('[VisitShotDebug] No project selected');
+      console.warn('[ShotSettingsInherit] ❌ No project selected, aborting');
       return;
     }
     
     // Generate automatic shot name
     const shotCount = allShots.length;
     const newShotName = `Shot ${shotCount + 1}`;
+    
+    console.warn('[ShotSettingsInherit] 📝 Creating shot:', newShotName);
     
     setIsCreatingShot(true);
     try {
@@ -73,6 +78,15 @@ export const useShotCreation = ({
       
       console.log('[VisitShotDebug] Atomic shot creation result:', result);
       
+      // Apply standardized settings inheritance
+      if (result.shotId && selectedProjectId) {
+        await inheritSettingsForNewShot({
+          newShotId: result.shotId,
+          projectId: selectedProjectId,
+          shots: allShots as any[]
+        });
+      }
+      
       // Set success state with real shot ID
       setQuickCreateSuccess({
         isSuccessful: true,
@@ -91,7 +105,7 @@ export const useShotCreation = ({
     } finally {
       setIsCreatingShot(false);
     }
-  }, [selectedProjectId, allShots.length, media.id, createShotWithImageMutation]);
+  }, [selectedProjectId, allShots, media.id, createShotWithImageMutation]);
 
   // Handle quick create success navigation
   const handleQuickCreateSuccess = useCallback(() => {

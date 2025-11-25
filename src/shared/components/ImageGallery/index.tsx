@@ -193,7 +193,12 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   const simplifiedShotOptions = React.useMemo(() => 
     [...allShots]
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      .map(s => ({ id: s.id, name: s.name })), 
+      .map(s => ({ 
+        id: s.id, 
+        name: s.name,
+        settings: s.settings,
+        created_at: s.created_at 
+      })), 
     [allShots]
   );
   

@@ -88,7 +88,7 @@ export const useShotNavigation = (): ShotNavigationResult => {
     console.log('[ShotNavPerf] 🚀 Navigating to:', targetUrl);
     const navStart = Date.now();
     navigate(targetUrl, {
-      state: { fromShotClick: true },
+      state: { fromShotClick: true, shotData: shot },
       replace: opts.replace,
     });
     console.log('[ShotNavPerf] ✅ Navigation called in', Date.now() - navStart, 'ms');

@@ -16,6 +16,7 @@ import { useProject } from "@/shared/contexts/ProjectContext";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { nanoid } from 'nanoid';
 import { useGenerations, useDeleteGeneration, useUpdateGenerationLocation, useCreateGeneration, GenerationsPaginatedResponse } from "@/shared/hooks/useGenerations";
+import { inheritSettingsForNewShot } from '@/shared/lib/shotSettingsInheritance';
 
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { useQueryClient } from '@tanstack/react-query';
@@ -941,6 +942,15 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
         shouldSelectAfterCreation: false
       });
 
+      // Apply standardized settings inheritance
+      if (result.shot?.id) {
+        await inheritSettingsForNewShot({
+          newShotId: result.shot.id,
+          projectId: selectedProjectId,
+          shots: validShots
+        });
+      }
+
       // Invalidate and refetch shots to update the list
       await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
       await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
@@ -956,7 +966,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       toast.error("Failed to create shot");
       throw error; // Re-throw so the modal can handle the error state
     }
-  }, [selectedProjectId, createShotMutation, queryClient, setLastAffectedShotId]);
+  }, [selectedProjectId, createShotMutation, queryClient, setLastAffectedShotId, validShots]);
 
   // Unified handler for Collapsible open/close with smooth scroll on open
   // Only perform scroll-then-open when triggered from the sticky toggle

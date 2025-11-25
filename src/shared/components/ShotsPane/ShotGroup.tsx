@@ -16,9 +16,10 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 
 interface ShotGroupProps {
   shot: Shot;
+  highlighted?: boolean;
 }
 
-const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
+const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
   // COMMENTED OUT: Drag functionality temporarily disabled
   // const { isOver: isDndKitOver, setNodeRef } = useDroppable({
   //   id: shot.id,
@@ -214,7 +215,11 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot }) => {
     <div 
       ref={setNodeRef} 
       style={droppableStyle} 
-      className="shot-group p-3 border border-zinc-700 rounded-lg min-w-[200px] max-w-[300px] bg-zinc-800/90 shadow-lg flex flex-col space-y-2 transition-all duration-150 ease-in-out relative cursor-pointer hover:bg-zinc-700/50 hover:border-zinc-600"
+      className={`shot-group p-3 border rounded-lg min-w-[200px] max-w-[300px] shadow-lg flex flex-col space-y-2 transition-all duration-300 ease-in-out relative cursor-pointer ${
+        highlighted 
+          ? 'border-sky-400 bg-sky-900/20 hover:bg-sky-800/30 ring-2 ring-sky-400/50 ring-offset-2 ring-offset-zinc-900' 
+          : 'border-zinc-700 bg-zinc-800/90 hover:bg-zinc-700/50 hover:border-zinc-600'
+      }`}
       // COMMENTED OUT: Drag functionality temporarily disabled
       // onDragEnter={handleDragEnter}
       // onDragOver={handleDragOver}

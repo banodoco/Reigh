@@ -12,6 +12,7 @@ import { usePersistentToolState } from "@/shared/hooks/usePersistentToolState";
 import { useToolSettings } from "@/shared/hooks/useToolSettings";
 import { useUserUIState } from "@/shared/hooks/useUserUIState";
 import { ImageGenerationSettings } from "../../settings";
+import { VideoTravelSettings } from "@/tools/travel-between-images/settings";
 import { useListPublicResources, useCreateResource, useUpdateResource, useDeleteResource, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
 import { useListShots, useCreateShot } from "@/shared/hooks/useShots";
 import CreateShotModal from "@/shared/components/CreateShotModal";
@@ -772,6 +773,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   // Fetch public LoRAs from all users
   const { data: publicLorasData } = useListPublicResources('lora');
   const availableLoras: LoraModel[] = (Array.isArray(publicLorasData) ? publicLorasData.map(resource => resource.metadata) : []) || [];
+
+  // Fetch project-level settings for travel tool defaults
+  const { settings: travelProjectSettings } = useToolSettings<VideoTravelSettings>(
+    'travel-between-images',
+    { projectId: selectedProjectId, enabled: !!selectedProjectId }
+  );
+
+  const { settings: travelProjectUISettings } = useToolSettings<{
+    acceleratedMode?: boolean;
+    randomSeed?: boolean;
+  }>('travel-ui-state', { 
+    projectId: selectedProjectId, 
+    enabled: !!selectedProjectId 
+  });
 
   // LoRA management using the modularized hook with new generalized approach
   const loraManager = useLoraManager(availableLoras, {
@@ -2015,6 +2030,38 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       await queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
       await queryClient.refetchQueries({ queryKey: ['shots', selectedProjectId] });
       
+      // Apply settings inheritance logic for travel tool
+      if (result.shot.id) {
+        // Find latest shot to inherit from
+        let settingsSource: any = null;
+        if (shots && shots.length > 0) {
+           const sortedShots = [...shots].sort((a: any, b: any) => {
+             const dateA = new Date(a.created_at || 0).getTime();
+             const dateB = new Date(b.created_at || 0).getTime();
+             return dateB - dateA;
+           });
+           // Filter out the just-created shot if it's already in the list (though we just invalidated, refetch might be async)
+           const potentialSourceShots = sortedShots.filter(s => s.id !== result.shot.id);
+           const latestShot = potentialSourceShots[0];
+           
+           if (latestShot && (latestShot as any).settings?.['travel-between-images']) {
+             settingsSource = (latestShot as any).settings['travel-between-images'];
+             console.log('[ImageGenerationForm] Inheriting travel settings from latest shot:', latestShot.name);
+           }
+        }
+        
+        // Fallback to project settings
+        settingsSource = settingsSource || travelProjectSettings;
+        
+        if (settingsSource || travelProjectUISettings) {
+           const defaultsToApply = {
+             ...(settingsSource || {}),
+             _uiSettings: travelProjectUISettings || {}
+           };
+           sessionStorage.setItem(`apply-project-defaults-${result.shot.id}`, JSON.stringify(defaultsToApply));
+        }
+      }
+      
       // Switch to the newly created shot
       markAsInteracted();
       setAssociatedShotId(result.shot.id);
@@ -2023,7 +2070,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.error('Error creating shot:', error);
       toast.error("Failed to create shot");
     }
-  }, [selectedProjectId, createShotMutation, markAsInteracted, queryClient]);
+  }, [selectedProjectId, createShotMutation, markAsInteracted, queryClient, shots, travelProjectSettings, travelProjectUISettings]);
 
   // Optimize event handlers with useCallback to prevent recreating on each render
   const handleSliderChange = useCallback((setter: React.Dispatch<React.SetStateAction<number>>) => (value: number) => {

@@ -679,7 +679,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const generationActions = useGenerationActions({
     state,
     actions,
-    selectedShot: selectedShot!,
+    selectedShot: selectedShot || {} as any,
     projectId,
     batchVideoFrames,
     onShotImagesUpdate,
@@ -1208,14 +1208,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     loadPositions,
   });
 
-  // Early return check after all hooks are called (Rules of Hooks)
-  if (!selectedShot) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Shot not found</p>
-      </div>
-    );
-  }
+  // Early return check moved to end of component
+
 
   const handleReorderImagesInShot = useCallback((orderedShotGenerationIds: string[]) => {
     // DragDebug: handleReorderImagesInShot called
@@ -1498,6 +1492,26 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   }, [createShotMutation, projectId]);
   
 
+  // Calculate current settings for MotionControl
+  const currentMotionSettings = useMemo(() => {
+    const settings = {
+        textBeforePrompts,
+        textAfterPrompts,
+        basePrompt: batchVideoPrompt,
+        negativePrompt: steerableMotionSettings.negative_prompt,
+        enhancePrompt,
+        durationFrames: batchVideoFrames,
+        lastGeneratedVideoUrl: lastVideoGeneration || undefined,
+        selectedLoras: loraManager.selectedLoras.map(lora => ({
+            id: lora.id,
+            name: lora.name,
+            strength: lora.strength
+        }))
+    };
+    console.log('[PresetAutoPopulate] ShotEditor creating currentSettings:', settings);
+    return settings;
+  }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames, lastVideoGeneration, loraManager.selectedLoras]);
+
   // [ShotNavPerf] Log render completion time
   const renderEndTime = performance.now();
   const renderDuration = renderEndTime - renderStartTime;
@@ -1506,6 +1520,14 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     renderDuration: `${renderDuration.toFixed(2)}ms`,
     timestamp: Date.now()
   });
+
+  if (!selectedShot) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Shot not found</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col space-y-4 pb-4">
@@ -1705,24 +1727,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             selectedPhasePresetId={selectedPhasePresetId}
                             onPhasePresetSelect={onPhasePresetSelect || (() => {})}
                             onPhasePresetRemove={onPhasePresetRemove || (() => {})}
-                            currentSettings={useMemo(() => {
-                                const settings = {
-                                    textBeforePrompts,
-                                    textAfterPrompts,
-                                    basePrompt: batchVideoPrompt,
-                                    negativePrompt: steerableMotionSettings.negative_prompt,
-                                    enhancePrompt,
-                                    durationFrames: batchVideoFrames,
-                                    lastGeneratedVideoUrl: lastVideoGeneration || undefined,
-                                    selectedLoras: loraManager.selectedLoras.map(lora => ({
-                                        id: lora.id,
-                                        name: lora.name,
-                                        strength: lora.strength
-                                    }))
-                                };
-                                console.log('[PresetAutoPopulate] ShotEditor creating currentSettings:', settings);
-                                return settings;
-                            }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames, lastVideoGeneration, loraManager.selectedLoras])}
+                            currentSettings={currentMotionSettings}
                             advancedMode={advancedMode || false}
                             onAdvancedModeChange={onAdvancedModeChange || (() => {})}
                             phaseConfig={phaseConfig}

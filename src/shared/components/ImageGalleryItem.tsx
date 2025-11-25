@@ -34,6 +34,7 @@ import { useTaskType } from "@/shared/hooks/useTaskType";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
 import { deriveInputImages } from "./ImageGallery/utils";
+import { inheritSettingsForNewShot } from "@/shared/lib/shotSettingsInheritance";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -356,8 +357,22 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       
       console.log('[QuickCreate] Atomic operation successful:', result);
       
+      // Apply standardized settings inheritance
+      if (result.shotId && selectedProjectId) {
+        await inheritSettingsForNewShot({
+          newShotId: result.shotId,
+          projectId: selectedProjectId,
+          // Pass simplified shots - inheritance will use localStorage primarily
+          // DB fallback may be limited but that's acceptable here
+          shots: simplifiedShotOptions as any[] 
+        });
+      }
+      
       // Set the newly created shot as the last affected shot
       updateLastAffectedShotId(result.shotId);
+      
+      // Select the newly created shot in the dropdown
+      setSelectedShotIdLocal(result.shotId);
       
       // Set success state immediately and let the mutation's onSuccess handle the data refresh
       // The mutation should have triggered query invalidation, so the shot will be available soon

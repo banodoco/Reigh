@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { GlobalHeader } from '@/shared/components/GlobalHeader';
 import TasksPane from '@/shared/components/TasksPane/TasksPane';
@@ -102,9 +102,19 @@ const Layout: React.FC = () => {
     };
   }, []);
 
-  // Reset currentShotId when navigating to a new page
+  // Reset currentShotId when navigating AWAY from shot-related pages
+  // Don't clear when navigating TO travel-between-images (that's where shots are viewed)
+  const prevPathnameRef = useRef(location.pathname);
   useEffect(() => {
-    setCurrentShotId(null);
+    const isNavigatingToShotPage = location.pathname === '/tools/travel-between-images';
+    const wasOnShotPage = prevPathnameRef.current === '/tools/travel-between-images';
+    
+    // Only clear if we're navigating AWAY from the shot page, not TO it
+    if (!isNavigatingToShotPage && wasOnShotPage) {
+      setCurrentShotId(null);
+    }
+    
+    prevPathnameRef.current = location.pathname;
   }, [location.pathname, setCurrentShotId]);
 
   // Check for welcome bonus when user is authenticated
