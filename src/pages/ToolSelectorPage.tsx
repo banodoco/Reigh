@@ -181,6 +181,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const iconSize = isLg ? 'w-10 h-10' : isSm ? 'w-8 h-8' : 'w-6 h-6';
   const iconContainerSize = isLg ? 'w-20 h-20' : isSm ? 'w-16 h-16' : 'w-12 h-12';
   const titleSize = isLg ? 'text-3xl' : isSm ? 'text-2xl' : 'text-xl';
+  const titleSizeSquare = isLg ? 'text-2xl' : isSm ? 'text-xl' : 'text-lg';
   const descriptionSize = isSm ? 'text-base' : 'text-xs';
 
   const content = (
@@ -234,9 +235,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
             <div className={`${isSm ? 'px-1' : 'px-0'} w-full min-w-0`}>
               <h3 
                 ref={titleRef}
-                className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${forceTwoLines ? 'whitespace-pre-line' : ''}`}
+                className={`font-theme ${titleSizeSquare} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${(forceTwoLines || !isSm) ? 'whitespace-pre-line' : ''}`}
               >
-                {forceTwoLines ? item.name.replace(' ', '\n') : item.name}
+                {(forceTwoLines || !isSm) ? item.name.replace(' ', '\n') : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
