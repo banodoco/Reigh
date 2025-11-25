@@ -466,7 +466,7 @@ const JoinClipsPage: React.FC = () => {
       else if (joinSettings.settings.startingVideoUrl || joinSettings.settings.endingVideoUrl) {
         if (joinSettings.settings.startingVideoUrl) {
           initialClips.push({
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             url: joinSettings.settings.startingVideoUrl,
             posterUrl: joinSettings.settings.startingVideoPosterUrl,
             finalFrameUrl: joinSettings.settings.startingVideoFinalFrameUrl,
@@ -477,7 +477,7 @@ const JoinClipsPage: React.FC = () => {
         
         if (joinSettings.settings.endingVideoUrl) {
           initialClips.push({
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             url: joinSettings.settings.endingVideoUrl,
             posterUrl: joinSettings.settings.endingVideoPosterUrl,
             finalFrameUrl: joinSettings.settings.endingVideoFinalFrameUrl,
@@ -501,13 +501,13 @@ const JoinClipsPage: React.FC = () => {
       } else {
         // No saved clips - create 2 empty slots to start
         const emptyClip1 = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           url: '',
           loaded: false,
           playing: false
         };
         const emptyClip2 = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           url: '',
           loaded: false,
           playing: false
@@ -713,7 +713,7 @@ const JoinClipsPage: React.FC = () => {
   
   // Add new clip slot
   const handleAddClip = () => {
-    const newClipId = crypto.randomUUID();
+    const newClipId = generateUUID();
     setClips(prev => [...prev, {
       id: newClipId,
       url: '',

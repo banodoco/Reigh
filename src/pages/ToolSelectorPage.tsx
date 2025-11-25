@@ -17,6 +17,7 @@ const processTools = [
     id: 'image-generation',
     name: 'Generate Images',
     description: 'Create images using a variety of models and styles, with support from LLMs.',
+    descriptionMobile: 'Create images support from LLMs.',
     tool: toolsUIManifest.find(t => t.id === 'image-generation'),
     icon: Paintbrush,
     gradient: 'from-wes-vintage-gold via-wes-mustard to-wes-yellow',
@@ -26,6 +27,7 @@ const processTools = [
     id: 'travel-between-images',
     name: 'Travel Between Images',
     description: 'Transform static images into video sequences with controllable transitions.',
+    descriptionMobile: 'Turn images into video sequences.',
     tool: toolsUIManifest.find(t => t.id === 'travel-between-images'),
     icon: Video,
     gradient: 'from-wes-mint via-wes-sage to-wes-dusty-blue',
@@ -59,6 +61,7 @@ const assistantTools = [
     id: 'edit-images',
     name: 'Edit\nImages',
     description: 'Transform and enhance images.',
+    descriptionMobile: 'Refine + enhance',
     tool: toolsUIManifest.find(t => t.id === 'edit-images'),
     icon: Edit,
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
@@ -68,6 +71,7 @@ const assistantTools = [
     id: 'join-clips',
     name: 'Join Clips',
     description: 'Seamlessly connect video clips.',
+    descriptionMobile: 'Connect seamlesly',
     tool: toolsUIManifest.find(t => t.id === 'join-clips'),
     icon: Link2,
     gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',
@@ -77,6 +81,7 @@ const assistantTools = [
     id: 'character-animate',
     name: 'Animate Characters',
     description: 'Bring characters to life.',
+    descriptionMobile: 'Bring them to life',
     tool: toolsUIManifest.find(t => t.id === 'character-animate'),
     icon: Users,
     gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
@@ -86,6 +91,7 @@ const assistantTools = [
     id: 'moon-soon',
     name: 'More Soon',
     description: "We're adding more tools!",
+    descriptionMobile: 'Stay tuned',
     tool: null,
     icon: Sparkles,
     gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
@@ -184,7 +190,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
               {item.name}
             </h3>
             <p className={`font-theme ${descriptionSize} font-theme-body text-muted-foreground leading-relaxed pr-2`}>
-              {item.description}
+              {!isSm && item.descriptionMobile ? item.descriptionMobile : item.description}
             </p>
           </div>
         </div>
@@ -202,9 +208,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           </div>
 
           {/* Description - always show on mobile with adjusted styling */}
-          <div className={`${isSm ? 'mt-0.5' : 'mt-0'} px-2`}>
+          <div className={`${isSm ? 'mt-0.5' : 'mt-1'} px-2`}>
             <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
-              {item.description}
+              {!isSm && item.descriptionMobile ? item.descriptionMobile : item.description}
             </p>
           </div>
         </div>
@@ -335,9 +341,9 @@ const ToolSelectorPage: React.FC = () => {
 
   // Dynamic spacing based on content area - fixed padding to prevent right shift
   const containerPadding = isSm ? 'px-4' : 'px-2';
-  const containerSpacing = isLg ? 'pt-5 pb-2' : isSm ? 'pt-6 pb-1' : 'pt-3 pb-[0.333rem]';
-  const sectionGap = isLg ? 'gap-4' : isSm ? 'gap-3' : 'gap-2';
-  const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-5';
+  const containerSpacing = isLg ? 'pt-5 pb-2' : isSm ? 'pt-6 pb-1' : 'pt-2 pb-[0.333rem]';
+  const sectionGap = isLg ? 'gap-4' : isSm ? 'gap-3' : 'gap-1';
+  const itemGap = isLg ? 'gap-5' : isSm ? 'gap-6' : 'gap-3';
   const topMargin = isLg ? 'mt-0' : isSm ? 'mt-0' : 'mt-0';
   const bottomMargin = ''; // layoutDirection === 'column' ? 'mb-8' : '';
 
