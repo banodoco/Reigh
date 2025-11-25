@@ -677,7 +677,34 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // 2. Fallback: If no localStorage settings, try to use the project-level settings we just prepared
+      // 2. Fallback: If no localStorage settings, fetch the LATEST SHOT from the DB
+      // This ensures cross-device consistency (getting the last saved settings)
+      if (selectedProjectId && Object.keys(shotSettingsToInherit).length === 0) {
+        try {
+          const { data: latestShot } = await supabase
+            .from('shots')
+            .select('settings')
+            .eq('project_id', selectedProjectId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (latestShot?.settings) {
+            const shotSettings = latestShot.settings as any;
+            if (shotSettings['travel-between-images'] || shotSettings['travel-loras']) {
+              shotSettingsToInherit = {
+                'travel-between-images': shotSettings['travel-between-images'],
+                ...(shotSettings['travel-loras'] ? { 'travel-loras': shotSettings['travel-loras'] } : {})
+              };
+              console.log('[ProjectContext] 🧬 Inheriting shot settings from LATEST DB SHOT');
+            }
+          }
+        } catch (err) {
+          console.warn('[ProjectContext] Failed to fetch latest shot for inheritance:', err);
+        }
+      }
+
+      // 3. Fallback: If still no settings, try to use the project-level settings
       if (Object.keys(shotSettingsToInherit).length === 0 && (settingsToInherit as any)['travel-between-images']) {
          shotSettingsToInherit = {
            'travel-between-images': (settingsToInherit as any)['travel-between-images'],

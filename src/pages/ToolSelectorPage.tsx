@@ -8,11 +8,20 @@ import { useContentResponsive, useContentResponsiveDirection, useContentResponsi
 import React, { memo } from 'react';
 
 // Context to share overflow detection across tool cards
-const TitleOverflowContext = createContext<{
-  forceTwoLines: boolean;
-  reportOverflow: () => void;
+// Tracks both title and description overflow for consistent two-line display
+const CardOverflowContext = createContext<{
+  forceTwoLinesTitles: boolean;
+  forceTwoLinesDescriptions: boolean;
+  reportTitleOverflow: () => void;
+  reportDescriptionOverflow: () => void;
   resizeKey: number;
-}>({ forceTwoLines: false, reportOverflow: () => {}, resizeKey: 0 });
+}>({ 
+  forceTwoLinesTitles: false, 
+  forceTwoLinesDescriptions: false,
+  reportTitleOverflow: () => {}, 
+  reportDescriptionOverflow: () => {},
+  resizeKey: 0 
+});
 import { time, timeEnd } from '@/shared/lib/logger';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
@@ -112,33 +121,70 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const navigate = useNavigate();
   const { triggerRipple, triggerRippleAtCenter, rippleStyles, isRippleActive } = useClickRipple();
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const { forceTwoLines, reportOverflow, resizeKey } = useContext(TitleOverflowContext);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const { 
+    forceTwoLinesTitles, 
+    forceTwoLinesDescriptions, 
+    reportTitleOverflow, 
+    reportDescriptionOverflow, 
+    resizeKey 
+  } = useContext(CardOverflowContext);
   
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
   
-  // Detect if title is overflowing (text wrapping)
+  // Helper to check if an element would overflow on a single line
+  const checkElementOverflow = useCallback((el: HTMLElement | null, reportFn: () => void, isForced: boolean) => {
+    if (!el || isForced) return;
+    
+    // Temporarily force single line to measure true text width
+    const originalWhiteSpace = el.style.whiteSpace;
+    el.style.whiteSpace = 'nowrap';
+    
+    // Check if text overflows container
+    const overflows = el.scrollWidth > el.clientWidth;
+    
+    // Restore original style
+    el.style.whiteSpace = originalWhiteSpace;
+    
+    if (overflows) {
+      reportFn();
+    }
+  }, []);
+  
+  // Detect if title would overflow on a single line
   useEffect(() => {
-    if (!isSquare || !titleRef.current) return;
+    if (!isSquare || !titleRef.current || forceTwoLinesTitles) return;
     
-    const checkOverflow = () => {
-      const el = titleRef.current;
-      if (el && el.scrollHeight > el.clientHeight) {
-        reportOverflow();
-      }
-    };
+    const checkOverflow = () => checkElementOverflow(titleRef.current, reportTitleOverflow, forceTwoLinesTitles);
     
-    // Check on mount and resize
-    // Small delay to ensure DOM has updated after forceTwoLines reset
+    // Check after DOM has updated
     const timeoutId = setTimeout(checkOverflow, 50);
-    const observer = new ResizeObserver(checkOverflow);
+    const observer = new ResizeObserver(() => setTimeout(checkOverflow, 10));
     observer.observe(titleRef.current);
     
     return () => {
       clearTimeout(timeoutId);
       observer.disconnect();
     };
-  }, [isSquare, reportOverflow, item.name, resizeKey, forceTwoLines]);
+  }, [isSquare, reportTitleOverflow, item.name, resizeKey, forceTwoLinesTitles, checkElementOverflow]);
+  
+  // Detect if description would overflow on a single line
+  useEffect(() => {
+    if (!isSquare || !descriptionRef.current || forceTwoLinesDescriptions) return;
+    
+    const checkOverflow = () => checkElementOverflow(descriptionRef.current, reportDescriptionOverflow, forceTwoLinesDescriptions);
+    
+    // Check after DOM has updated
+    const timeoutId = setTimeout(checkOverflow, 50);
+    const observer = new ResizeObserver(() => setTimeout(checkOverflow, 10));
+    observer.observe(descriptionRef.current);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [isSquare, reportDescriptionOverflow, item.description, resizeKey, forceTwoLinesDescriptions, checkElementOverflow]);
 
   // Debug logging for tools
   useEffect(() => {
@@ -235,9 +281,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
             <div className={`${isSm ? 'px-1' : 'px-0'} w-full min-w-0`}>
               <h3 
                 ref={titleRef}
-                className={`font-theme ${titleSizeSquare} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${(forceTwoLines || !isSm) ? 'whitespace-pre-line' : ''}`}
+                className={`font-theme ${titleSizeSquare} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${(forceTwoLinesTitles || !isSm) ? 'whitespace-pre-line' : ''}`}
               >
-                {(forceTwoLines || !isSm) ? item.name.replace(' ', '\n') : item.name}
+                {(forceTwoLinesTitles || !isSm) ? item.name.replace(' ', '\n') : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
@@ -245,8 +291,11 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
 
           {/* Description - always show on mobile with adjusted styling */}
           <div className={`${isSm ? 'mt-0.5' : 'mt-1'} ${isSm ? 'px-1' : 'px-2'} overflow-hidden`}>
-            <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center break-words ${descriptionSize}`}>
-              {!isSm && item.descriptionMobile ? item.descriptionMobile : item.description}
+            <p 
+              ref={descriptionRef}
+              className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize} ${(forceTwoLinesDescriptions || !isSm) ? 'whitespace-pre-line' : ''}`}
+            >
+              {(forceTwoLinesDescriptions || !isSm) ? (item.descriptionMobile || item.description).replace(' ', '\n') : (item.descriptionMobile || item.description)}
             </p>
           </div>
         </div>
@@ -320,14 +369,20 @@ const ToolSelectorPage: React.FC = () => {
   const { isSm, isLg } = useContentResponsive();
   // Remove layoutDirection hook, use Tailwind classes instead
   
-  // State to force all assistant tool titles to two lines when any overflows
-  const [forceTwoLines, setForceTwoLines] = useState(false);
+  // State to force all assistant tool titles/descriptions to two lines when any overflows
+  const [forceTwoLinesTitles, setForceTwoLinesTitles] = useState(false);
+  const [forceTwoLinesDescriptions, setForceTwoLinesDescriptions] = useState(false);
   const [resizeKey, setResizeKey] = useState(0);
-  const reportOverflow = useCallback(() => {
-    setForceTwoLines(true);
+  
+  const reportTitleOverflow = useCallback(() => {
+    setForceTwoLinesTitles(true);
   }, []);
   
-  // Reset forceTwoLines on window resize so overflow can be re-checked
+  const reportDescriptionOverflow = useCallback(() => {
+    setForceTwoLinesDescriptions(true);
+  }, []);
+  
+  // Reset overflow states on window resize so they can be re-checked
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
     
@@ -335,7 +390,8 @@ const ToolSelectorPage: React.FC = () => {
       // Debounce: only reset after resize stops for 150ms
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        setForceTwoLines(false);
+        setForceTwoLinesTitles(false);
+        setForceTwoLinesDescriptions(false);
         setResizeKey(k => k + 1); // Force re-check of overflow
       }, 150);
     };
@@ -431,7 +487,7 @@ const ToolSelectorPage: React.FC = () => {
   }
 
   return (
-    <TitleOverflowContext.Provider value={{ forceTwoLines, reportOverflow }}>
+    <CardOverflowContext.Provider value={{ forceTwoLinesTitles, forceTwoLinesDescriptions, reportTitleOverflow, reportDescriptionOverflow, resizeKey }}>
       <PageFadeIn className="min-h-[70vh] relative">
         {/* Background elements removed to prevent inset-0 overlay issues */}
         
@@ -485,7 +541,7 @@ const ToolSelectorPage: React.FC = () => {
           </div>
         </div>
       </PageFadeIn>
-    </TitleOverflowContext.Provider>
+    </CardOverflowContext.Provider>
   );
 };
 
