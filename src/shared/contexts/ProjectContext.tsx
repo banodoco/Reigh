@@ -31,13 +31,14 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 // Dummy User ID is managed server-side and no longer needed here.
 
 // Helper function to create a default shot for a new project
-const createDefaultShot = async (projectId: string): Promise<void> => {
+const createDefaultShot = async (projectId: string, initialSettings?: any): Promise<void> => {
   try {
     const { error } = await supabase
       .from('shots')
       .insert({
         name: 'Default Shot',
         project_id: projectId,
+        settings: initialSettings || {},
       });
     
     if (error) {
@@ -644,8 +645,50 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
-      // Create default shot for the new project
-      await createDefaultShot(newProject.id);
+      // Prepare shot settings to inherit (priority: localStorage -> project settings)
+      let shotSettingsToInherit = {};
+      
+      // 1. Try to get most recent active shot settings from localStorage (most up-to-date)
+      if (selectedProjectId) {
+        try {
+           const storageKey = `last-active-shot-settings-${selectedProjectId}`;
+           const storedMain = localStorage.getItem(storageKey);
+           
+           if (storedMain) {
+             const mainSettings = JSON.parse(storedMain);
+             
+             // Also try to get LoRAs
+             const loraStorageKey = `last-active-lora-settings-${selectedProjectId}`;
+             const storedLoras = localStorage.getItem(loraStorageKey);
+             const loraSettings = storedLoras ? JSON.parse(storedLoras) : undefined;
+
+             shotSettingsToInherit = {
+               'travel-between-images': mainSettings,
+               ...(loraSettings ? { 'travel-loras': loraSettings } : {})
+             };
+             
+             console.log('[ProjectContext] 🧬 Inheriting shot settings from localStorage:', {
+               main: !!mainSettings,
+               loras: !!loraSettings
+             });
+           }
+        } catch (e) {
+          console.error('[ProjectContext] Failed to read localStorage for shot inheritance:', e);
+        }
+      }
+
+      // 2. Fallback: If no localStorage settings, try to use the project-level settings we just prepared
+      if (Object.keys(shotSettingsToInherit).length === 0 && (settingsToInherit as any)['travel-between-images']) {
+         shotSettingsToInherit = {
+           'travel-between-images': (settingsToInherit as any)['travel-between-images'],
+           // LoRAs might not be in project settings, but check anyway
+           ...((settingsToInherit as any)['travel-loras'] ? { 'travel-loras': (settingsToInherit as any)['travel-loras'] } : {})
+         };
+         console.log('[ProjectContext] 🧬 Inheriting shot settings from project defaults');
+      }
+
+      // Create default shot for the new project with inherited settings
+      await createDefaultShot(newProject.id, shotSettingsToInherit);
 
       const mappedProject = mapDbProjectToProject(newProject);
       setProjects(prevProjects => sortProjectsByCreatedAt([...prevProjects, mappedProject]));

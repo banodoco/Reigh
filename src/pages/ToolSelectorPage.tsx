@@ -1,11 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 import { AppEnv, type AppEnvValue } from '../types/env';
 import { Camera, Palette, Zap, Crown, Paintbrush, Video, Edit, Sparkles, Film, Maximize2, Wand2, Layers, Eye, Users, Link2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react';
 import { toolsUIManifest, type ToolUIDefinition } from '../tools';
 import { PageFadeIn, FadeInSection } from '@/shared/components/transitions';
 import { useContentResponsive, useContentResponsiveDirection, useContentResponsiveColumns } from '@/shared/hooks/useContentResponsive';
 import React, { memo } from 'react';
+
+// Context to share overflow detection across tool cards
+const TitleOverflowContext = createContext<{
+  forceTwoLines: boolean;
+  reportOverflow: () => void;
+}>({ forceTwoLines: false, reportOverflow: () => {} });
 import { time, timeEnd } from '@/shared/lib/logger';
 import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloader';
 import { useClickRipple } from '@/shared/hooks/useClickRipple';
@@ -59,7 +65,7 @@ const processTools = [
 const assistantTools = [
   {
     id: 'edit-images',
-    name: 'Edit\nImages',
+    name: 'Edit Images',
     description: 'Transform and enhance images.',
     descriptionMobile: 'Refine + enhance',
     tool: toolsUIManifest.find(t => t.id === 'edit-images'),
@@ -104,9 +110,30 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const [isWiggling, setIsWiggling] = useState(false);
   const navigate = useNavigate();
   const { triggerRipple, triggerRippleAtCenter, rippleStyles, isRippleActive } = useClickRipple();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const { forceTwoLines, reportOverflow } = useContext(TitleOverflowContext);
   
   // Use content-responsive breakpoints for dynamic sizing
   const { isSm, isLg } = useContentResponsive();
+  
+  // Detect if title is overflowing (text wrapping)
+  useEffect(() => {
+    if (!isSquare || !titleRef.current) return;
+    
+    const checkOverflow = () => {
+      const el = titleRef.current;
+      if (el && el.scrollHeight > el.clientHeight) {
+        reportOverflow();
+      }
+    };
+    
+    // Check on mount and resize
+    checkOverflow();
+    const observer = new ResizeObserver(checkOverflow);
+    observer.observe(titleRef.current);
+    
+    return () => observer.disconnect();
+  }, [isSquare, reportOverflow, item.name]);
 
   // Debug logging for tools
   useEffect(() => {
@@ -196,20 +223,20 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
         </div>
       ) : (
         /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className={`${isSm ? 'px-2 py-1' : 'px-1 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-col justify-center`}>
+        <div className={`${isSm ? 'px-1 py-1' : 'px-1 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-col justify-center`}>
           {/* Tool Header without icon */}
           <div className={`wes-symmetry ${isSm ? 'mb-0.5' : 'mb-0'} relative`}>
-            <div className="px-2">
-              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight whitespace-nowrap`}>
-                {item.id === 'character-animate' && !isSm ? 'Characters' : item.name}
+            <div className={`${isSm ? 'px-1' : 'px-0'} w-full min-w-0`}>
+              <h3 className={`font-theme ${titleSize} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${!isSm ? 'whitespace-pre-line' : ''}`}>
+                {!isSm ? item.name.replace(' ', '\n') : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
           </div>
 
           {/* Description - always show on mobile with adjusted styling */}
-          <div className={`${isSm ? 'mt-0.5' : 'mt-1'} px-2`}>
-            <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize}`}>
+          <div className={`${isSm ? 'mt-0.5' : 'mt-1'} ${isSm ? 'px-1' : 'px-2'} overflow-hidden`}>
+            <p className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center break-words ${descriptionSize}`}>
               {!isSm && item.descriptionMobile ? item.descriptionMobile : item.description}
             </p>
           </div>
