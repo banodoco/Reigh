@@ -5,6 +5,7 @@ import { Project } from '@/types/project'; // Added import
 import { UserPreferences } from '@/shared/settings/userPreferences';
 import { usePrefetchToolSettings } from '@/shared/hooks/usePrefetchToolSettings';
 import { useQueryClient } from '@tanstack/react-query';
+import { STORAGE_KEYS } from '@/tools/travel-between-images/storageKeys';
 
 // Type for updating projects
 interface ProjectUpdate {
@@ -651,14 +652,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       // 1. Try to get most recent active shot settings from localStorage (most up-to-date)
       if (selectedProjectId) {
         try {
-           const storageKey = `last-active-shot-settings-${selectedProjectId}`;
+           const storageKey = STORAGE_KEYS.LAST_ACTIVE_SHOT_SETTINGS(selectedProjectId);
            const storedMain = localStorage.getItem(storageKey);
            
            if (storedMain) {
              const mainSettings = JSON.parse(storedMain);
              
              // Also try to get LoRAs
-             const loraStorageKey = `last-active-lora-settings-${selectedProjectId}`;
+             const loraStorageKey = STORAGE_KEYS.LAST_ACTIVE_LORA_SETTINGS(selectedProjectId);
              const storedLoras = localStorage.getItem(loraStorageKey);
              const loraSettings = storedLoras ? JSON.parse(storedLoras) : undefined;
 

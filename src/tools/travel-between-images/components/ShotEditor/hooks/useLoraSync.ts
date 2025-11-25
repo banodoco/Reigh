@@ -3,6 +3,7 @@ import { LoraModel } from '@/shared/components/LoraSelectorModal';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useToolSettings } from '@/shared/hooks/useToolSettings';
 import { Shot } from "@/types/shots";
+import { STORAGE_KEYS } from '@/tools/travel-between-images/storageKeys';
 
 interface UseLoRaSyncProps {
   selectedShot: Shot | undefined;
@@ -219,7 +220,7 @@ export const useLoraSync = ({
       // Also save to localStorage for inheritance to new shots
       if (projectId) {
         try {
-          const storageKey = `last-active-lora-settings-${projectId}`;
+          const storageKey = STORAGE_KEYS.LAST_ACTIVE_LORA_SETTINGS(projectId);
           localStorage.setItem(storageKey, JSON.stringify({ loras: lorasToSave }));
           console.log('[ShotSettingsInherit] 💾 Saved active LoRAs to localStorage for inheritance', {
             shotId: selectedShot?.id?.substring(0, 8),

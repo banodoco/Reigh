@@ -281,9 +281,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
             <div className={`${isSm ? 'px-1' : 'px-0'} w-full min-w-0`}>
               <h3 
                 ref={titleRef}
-                className={`font-theme ${titleSizeSquare} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${(forceTwoLinesTitles || !isSm) ? 'whitespace-pre-line' : ''}`}
+                className={`font-theme ${titleSizeSquare} font-theme-heading text-primary mb-1 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight ${forceTwoLinesTitles ? 'whitespace-pre-line' : ''}`}
               >
-                {(forceTwoLinesTitles || !isSm) ? item.name.replace(' ', '\n') : item.name}
+                {forceTwoLinesTitles ? item.name.replace(' ', '\n') : item.name}
               </h3>
               <div className={`${isSm ? 'w-16' : 'w-12'} h-1 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-24' : 'group-hover:w-16'}` : ''} transition-all duration-700`}></div>
             </div>
@@ -293,9 +293,9 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           <div className={`${isSm ? 'mt-0.5' : 'mt-1'} ${isSm ? 'px-1' : 'px-2'} overflow-hidden`}>
             <p 
               ref={descriptionRef}
-              className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize} ${(forceTwoLinesDescriptions || !isSm) ? 'whitespace-pre-line' : ''}`}
+              className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize} ${forceTwoLinesDescriptions ? 'whitespace-pre-line' : ''}`}
             >
-              {(forceTwoLinesDescriptions || !isSm) ? (item.descriptionMobile || item.description).replace(' ', '\n') : (item.descriptionMobile || item.description)}
+              {forceTwoLinesDescriptions ? (item.descriptionMobile || item.description).replace(' ', '\n') : (item.descriptionMobile || item.description)}
             </p>
           </div>
         </div>

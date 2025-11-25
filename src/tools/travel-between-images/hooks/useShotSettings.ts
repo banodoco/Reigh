@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useToolSettings, updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import { VideoTravelSettings, DEFAULT_PHASE_CONFIG } from '../settings';
+import { STORAGE_KEYS } from '../storageKeys';
 import { deepEqual } from '@/shared/lib/deepEqual';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -90,7 +91,7 @@ export const useShotSettings = (
   // This allows new shots to inherit from the *currently edited* shot, not just the last created one
   useEffect(() => {
     if (shotId && projectId && status === 'ready' && settings) {
-        const storageKey = `last-active-shot-settings-${projectId}`;
+        const storageKey = STORAGE_KEYS.LAST_ACTIVE_SHOT_SETTINGS(projectId);
         try {
           localStorage.setItem(storageKey, JSON.stringify(settings));
           console.log('[ShotSettingsInherit] 💾 Saved active settings to localStorage for inheritance', { 
@@ -207,7 +208,7 @@ export const useShotSettings = (
 
     // Check for one-time initialization from session storage (for new shots created with inheritance)
     if (typeof window !== 'undefined') {
-      const storageKey = `apply-project-defaults-${shotId}`;
+      const storageKey = STORAGE_KEYS.APPLY_PROJECT_DEFAULTS(shotId);
       const storedDefaults = sessionStorage.getItem(storageKey);
       
       console.log('[ShotSettingsInherit] 🔍 useShotSettings checking sessionStorage for:', shotId.substring(0, 8));

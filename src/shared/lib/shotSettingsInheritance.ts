@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { STORAGE_KEYS } from '@/tools/travel-between-images/storageKeys';
 
 /**
  * Standardized settings inheritance for new shots
@@ -38,7 +39,7 @@ export async function getInheritedSettings(
 
   // 1. Try to get from localStorage (most recent active shot) - captures unsaved edits
   try {
-    const mainStorageKey = `last-active-shot-settings-${projectId}`;
+    const mainStorageKey = STORAGE_KEYS.LAST_ACTIVE_SHOT_SETTINGS(projectId);
     const stored = localStorage.getItem(mainStorageKey);
     if (stored) {
       mainSettings = JSON.parse(stored);
@@ -51,7 +52,7 @@ export async function getInheritedSettings(
       console.warn('[ShotSettingsInherit] ⚠️ No main settings in localStorage');
     }
     
-    const loraStorageKey = `last-active-lora-settings-${projectId}`;
+    const loraStorageKey = STORAGE_KEYS.LAST_ACTIVE_LORA_SETTINGS(projectId);
     const storedLoras = localStorage.getItem(loraStorageKey);
     if (storedLoras) {
       loraSettings = JSON.parse(storedLoras);
@@ -62,7 +63,7 @@ export async function getInheritedSettings(
       console.warn('[ShotSettingsInherit] ⚠️ No LoRAs in localStorage');
     }
     
-    const uiStorageKey = `last-active-ui-settings-${projectId}`;
+    const uiStorageKey = STORAGE_KEYS.LAST_ACTIVE_UI_SETTINGS(projectId);
     const storedUI = localStorage.getItem(uiStorageKey);
     if (storedUI) {
       uiSettings = JSON.parse(storedUI);
@@ -163,7 +164,7 @@ export async function applyInheritedSettings(
       ...(mainSettings || {}),
       _uiSettings: uiSettings || {}
     };
-    const storageKey = `apply-project-defaults-${newShotId}`;
+    const storageKey = STORAGE_KEYS.APPLY_PROJECT_DEFAULTS(newShotId);
     sessionStorage.setItem(storageKey, JSON.stringify(defaultsToApply));
     
     console.warn('[ShotSettingsInherit] 💾 SAVED TO SESSION STORAGE:', storageKey, {
