@@ -73,7 +73,6 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   container,
   onNavigateToShot,
 }) => {
-  
   const isMobile = useIsMobile();
   
   // Create the "Add Shot" header if needed
@@ -192,37 +191,38 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
           container={container}
         >
           {shots.map(shot => (
-            <SelectItem 
-              key={shot.id}
-              value={shot.id} 
-              className="text-xs group"
-            >
-              {/* On mobile, just show the name. On desktop with navigation, show arrow on hover */}
-              {!isMobile && onNavigateToShot ? (
-                <span className="flex items-center justify-between w-full">
-                  <span className="pointer-events-none">{shot.name}</span>
-                  {/* Jump arrow - appears on hover (desktop only) */}
-                  <span
-                    role="button"
-                    className="opacity-0 group-hover:opacity-100 group-data-[highlighted]:opacity-100 transition-opacity p-1 rounded-full bg-zinc-700 hover:bg-zinc-600 ml-2"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onNavigateToShot(shot);
-                    }}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    title={`Jump to ${shot.name}`}
-                  >
-                    <ArrowRight className="h-3 w-3 text-white" />
-                  </span>
-                </span>
-              ) : (
-                shot.name
+            <div key={shot.id} className="group relative flex items-center">
+              <SelectItem 
+                value={shot.id} 
+                className="text-xs flex-1 pr-8"
+                onPointerDown={(e) => {
+                  console.log('[ShotSelectorDebug] SelectItem onPointerDown:', shot.name);
+                }}
+                onClick={(e) => {
+                  console.log('[ShotSelectorDebug] SelectItem onClick:', shot.name);
+                }}
+              >
+                {shot.name}
+              </SelectItem>
+              {/* Jump arrow - appears on hover, visible on both dark and highlighted backgrounds, hidden on mobile */}
+              {onNavigateToShot && !isMobile && (
+                <button
+                  className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-zinc-800/90 hover:bg-zinc-700 border border-zinc-600/50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNavigateToShot(shot);
+                  }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  title={`Jump to ${shot.name}`}
+                >
+                  <ArrowRight className="h-3 w-3 text-white" />
+                </button>
               )}
-            </SelectItem>
+            </div>
           ))}
         </SelectContent>
       </Select>
@@ -231,4 +231,3 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
 };
 
 export default ShotSelector;
-export type { ShotOption, ShotSelectorProps };
