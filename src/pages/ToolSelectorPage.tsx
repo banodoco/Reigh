@@ -488,7 +488,7 @@ const ToolSelectorPage: React.FC = () => {
 
   return (
     <CardOverflowContext.Provider value={{ forceTwoLinesTitles, forceTwoLinesDescriptions, reportTitleOverflow, reportDescriptionOverflow, resizeKey }}>
-      <PageFadeIn className="min-h-[70vh] relative">
+      <PageFadeIn className="pb-4 relative">
         {/* Background elements removed to prevent inset-0 overlay issues */}
         
         {/* Reduced floating elements to prevent visual clutter */}
@@ -521,7 +521,7 @@ const ToolSelectorPage: React.FC = () => {
 
               {/* Assistant Tools Column */}
               <div className="w-full c-lg:w-1/2">
-                <div className={`grid ${itemGap} ${topMargin} grid-cols-2 sm:grid-cols-3 px-2 py-2`}>
+                <div className={`grid ${itemGap} ${topMargin} grid-cols-2 sm:grid-cols-3 px-2 pt-2`}>
                   {displayedAssistantTools.map((tool, index) => {
                     const isVisible = true; // Already filtered
                     

@@ -1803,19 +1803,31 @@ const VideoTravelToolPage: React.FC = () => {
         <>
           {/* Shot List Header - Constrained */}
           <div className="px-4 max-w-7xl mx-auto pt-6 pb-4">
-            <div className="flex items-center justify-between gap-4">
-              <h1 className="text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:gap-4">
+              {/* Title row with New Shot button */}
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl sm:text-3xl font-light tracking-tight text-foreground">Travel Between Images</h1>
+                <Button
+                  onClick={handleCreateNewShot}
+                  variant="default"
+                  size="sm"
+                  className="whitespace-nowrap"
+                >
+                  New Shot
+                </Button>
+              </div>
+              {/* Controls row */}
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
                 {/* Search and Sort - Only show in Shots view */}
                 {!showVideosView && (
                   <>
-                    <div className="relative w-40 sm:w-52 hidden sm:block">
+                    <div className="relative w-28 sm:w-52">
                       <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
                         <Search className="h-3.5 w-3.5" />
                       </div>
                       <Input
                         ref={searchInputRef}
-                        placeholder="Search shots..."
+                        placeholder="Search..."
                         value={shotSearchQuery}
                         onChange={(e) => setShotSearchQuery(e.target.value)}
                         className="h-8 text-xs pl-8"
@@ -1826,7 +1838,7 @@ const VideoTravelToolPage: React.FC = () => {
                       value={shotSortMode}
                       onValueChange={(value: 'ordered' | 'newest' | 'oldest') => setShotSortMode(value)}
                     >
-                      <SelectTrigger className="w-[110px] h-8 text-xs">
+                      <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
                         <SelectValue placeholder="Sort" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1841,12 +1853,12 @@ const VideoTravelToolPage: React.FC = () => {
                 {/* Search and Sort - Videos View */}
                 {showVideosView && (
                   <>
-                    <div className="relative w-40 sm:w-52 hidden sm:block">
+                    <div className="relative w-28 sm:w-52">
                       <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
                         <Search className="h-3.5 w-3.5" />
                       </div>
                       <Input
-                        placeholder="Search videos..."
+                        placeholder="Search..."
                         value={videoSearchTerm}
                         onChange={(e) => {
                           setVideoSearchTerm(e.target.value);
@@ -1863,7 +1875,7 @@ const VideoTravelToolPage: React.FC = () => {
                         setVideoPage(1);
                       }}
                     >
-                      <SelectTrigger className="w-[110px] h-8 text-xs">
+                      <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
                         <SelectValue placeholder="Sort" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1883,7 +1895,7 @@ const VideoTravelToolPage: React.FC = () => {
                         handleToggleVideosView(e);
                       }
                     }}
-                    className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                    className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
                       !showVideosView
                         ? 'bg-background shadow-sm'
                         : 'hover:bg-background/50'
@@ -1898,7 +1910,7 @@ const VideoTravelToolPage: React.FC = () => {
                         handleToggleVideosView(e);
                       }
                     }}
-                    className={`px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
+                    className={`px-3 sm:px-4 py-1.5 font-light rounded-full transition-all duration-200 whitespace-nowrap text-xs ${
                       showVideosView
                         ? 'bg-background shadow-sm'
                         : 'hover:bg-background/50'
@@ -1907,14 +1919,6 @@ const VideoTravelToolPage: React.FC = () => {
                     Videos
                   </button>
                 </div>
-                <Button
-                  onClick={handleCreateNewShot}
-                  variant="default"
-                  size="sm"
-                  className="whitespace-nowrap"
-                >
-                  New Shot
-                </Button>
               </div>
             </div>
           </div>

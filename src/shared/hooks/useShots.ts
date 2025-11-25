@@ -413,14 +413,16 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         const startTime = Date.now();
         
         // Query from generations table with shot_data filter (no join needed for previews)
+        // Order by timeline_frame (from shot_data JSONB) so that when we limit, we get the first N by position
         let query = supabase
           .from('generations')
           .select('id, location, thumbnail_url, type, created_at, starred, shot_data')
           .not(`shot_data->${shot.id}`, 'is', null) // GIN index filter
           .not('type', 'ilike', '%video%') // Exclude videos
-          .order('created_at', { ascending: false });
+          .order(`shot_data->${shot.id}`, { ascending: true, nullsFirst: false });
         
         // Only apply limit if specified (allows unlimited when needed)
+        // Now that we order by timeline_frame, limit gets the first N by position (correct behavior)
         if (maxImagesPerShot > 0) {
           query = query.limit(maxImagesPerShot);
         }
