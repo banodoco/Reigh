@@ -131,8 +131,8 @@ interface MediaLightboxProps {
   // Optimistic updates
   optimisticPositionedIds?: Set<string>;
   optimisticUnpositionedIds?: Set<string>;
-  onOptimisticPositioned?: (mediaId: string, shotId: string) => void;
-  onOptimisticUnpositioned?: (mediaId: string, shotId: string) => void;
+  onOptimisticPositioned?: (mediaId: string) => void;
+  onOptimisticUnpositioned?: (mediaId: string) => void;
   // Precomputed overrides from gallery source record
   positionedInSelectedShot?: boolean;
   associatedWithoutPositionInSelectedShot?: boolean;
@@ -488,11 +488,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { localStarred, setLocalStarred, toggleStarMutation, handleToggleStar } = starToggleHook;
 
   // Shot positioning hook
+  // Compute positionedInSelectedShot if not provided - check if media is in selected shot with position
+  const computedPositionedInSelectedShot = useMemo(() => {
+    if (typeof positionedInSelectedShot === 'boolean') {
+      return positionedInSelectedShot; // Use provided override
+    }
+    // Not provided - return undefined to let useShotPositioning compute it from media data
+    return undefined;
+  }, [positionedInSelectedShot]);
+  
   const shotPositioningHook = useShotPositioning({
     media,
-      selectedShotId,
+    selectedShotId,
     allShots,
-    positionedInSelectedShot,
+    positionedInSelectedShot: computedPositionedInSelectedShot,
     associatedWithoutPositionInSelectedShot,
     optimisticPositionedIds,
     optimisticUnpositionedIds,

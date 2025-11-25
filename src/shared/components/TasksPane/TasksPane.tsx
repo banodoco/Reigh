@@ -397,10 +397,14 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
   }, [selectedProjectId]);
 
   // Optimistic update handlers - use composite key mediaId:shotId
-  const handleOptimisticPositioned = useCallback((mediaId: string, shotId: string) => {
-    const key = `${mediaId}:${shotId}`;
-    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as positioned:', key);
-    setOptimisticPositionedIds(prev => new Set(prev).add(key));
+  const handleOptimisticPositioned = useCallback((mediaId: string, shotId?: string) => {
+    // Handle both old (simple) and new (composite) formats
+    const key = shotId ? `${mediaId}:${shotId}` : mediaId;
+    setOptimisticPositionedIds(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
     setOptimisticUnpositionedIds(prev => {
       const next = new Set(prev);
       next.delete(key);
@@ -408,10 +412,14 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     });
   }, []);
   
-  const handleOptimisticUnpositioned = useCallback((mediaId: string, shotId: string) => {
-    const key = `${mediaId}:${shotId}`;
-    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as unpositioned:', key);
-    setOptimisticUnpositionedIds(prev => new Set(prev).add(key));
+  const handleOptimisticUnpositioned = useCallback((mediaId: string, shotId?: string) => {
+    // Handle both old (simple) and new (composite) formats
+    const key = shotId ? `${mediaId}:${shotId}` : mediaId;
+    setOptimisticUnpositionedIds(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
     setOptimisticPositionedIds(prev => {
       const next = new Set(prev);
       next.delete(key);
@@ -826,7 +834,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         const handleNext = lightboxData.type === 'video' && Array.isArray(lightboxData.media) 
           ? () => {
               const currentIndex = lightboxData.videoIndex ?? 0;
-              if (currentIndex < lightboxData.media.length - 1) {
+              const mediaArray = lightboxData.media as GenerationRow[];
+              if (currentIndex < mediaArray.length - 1) {
                 setLightboxData({ ...lightboxData, videoIndex: currentIndex + 1 });
               }
             }

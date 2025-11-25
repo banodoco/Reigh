@@ -45,8 +45,8 @@ export interface ImageGalleryLightboxProps {
   // Optimistic updates
   optimisticPositionedIds?: Set<string>;
   optimisticUnpositionedIds?: Set<string>;
-  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
-  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
+  onOptimisticPositioned?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string) => void;
 
   // Task details
   isMobile: boolean;
@@ -308,18 +308,22 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return found;
   }, [filteredImages, activeLightboxMedia?.id]);
   
+  // Use lightboxSelectedShotId (the dropdown selection) instead of selectedShotIdLocal (the gallery filter)
+  // This ensures the override updates when the user changes the shot in the lightbox dropdown
+  const effectiveShotIdForOverride = lightboxSelectedShotId || (selectedShotIdLocal !== 'all' ? selectedShotIdLocal : undefined);
+  
   const positionedInSelectedShot = useMemo(() => {
-    if (!sourceRecord || !selectedShotIdLocal) {
+    if (!sourceRecord || !effectiveShotIdForOverride) {
       console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: early return undefined', {
         hasSourceRecord: !!sourceRecord,
-        selectedShotIdLocal,
+        effectiveShotIdForOverride,
         timestamp: Date.now()
       });
       return undefined;
     }
     
     let result: boolean;
-    if (sourceRecord.shot_id === selectedShotIdLocal) {
+    if (sourceRecord.shot_id === effectiveShotIdForOverride) {
       result = sourceRecord.position !== null && sourceRecord.position !== undefined;
       console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: direct shot_id match', {
         shot_id: sourceRecord.shot_id,
@@ -332,13 +336,14 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     
     const a = sourceRecord.all_shot_associations;
     if (Array.isArray(a)) {
-      const m = a.find(x => x.shot_id === selectedShotIdLocal);
+      const m = a.find(x => x.shot_id === effectiveShotIdForOverride);
       result = !!(m && m.position !== null && m.position !== undefined);
       console.log('[ShotNavDebug] [ImageGalleryLightbox] positionedInSelectedShot: all_shot_associations check', {
         associationsCount: a.length,
         foundMatch: !!m,
         matchPosition: m?.position,
         result,
+        effectiveShotIdForOverride,
         timestamp: Date.now()
       });
       return result;
@@ -348,20 +353,20 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       timestamp: Date.now()
     });
     return false;
-  }, [sourceRecord, selectedShotIdLocal]);
+  }, [sourceRecord, effectiveShotIdForOverride]);
   
   const associatedWithoutPositionInSelectedShot = useMemo(() => {
-    if (!sourceRecord || !selectedShotIdLocal) {
+    if (!sourceRecord || !effectiveShotIdForOverride) {
       console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: early return undefined', {
         hasSourceRecord: !!sourceRecord,
-        selectedShotIdLocal,
+        effectiveShotIdForOverride,
         timestamp: Date.now()
       });
       return undefined;
     }
     
     let result: boolean;
-    if (sourceRecord.shot_id === selectedShotIdLocal) {
+    if (sourceRecord.shot_id === effectiveShotIdForOverride) {
       result = sourceRecord.position === null || sourceRecord.position === undefined;
       console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: direct shot_id match', {
         shot_id: sourceRecord.shot_id,
@@ -374,13 +379,14 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     
     const a = sourceRecord.all_shot_associations;
     if (Array.isArray(a)) {
-      const m = a.find(x => x.shot_id === selectedShotIdLocal);
+      const m = a.find(x => x.shot_id === effectiveShotIdForOverride);
       result = !!(m && (m.position === null || m.position === undefined));
       console.log('[ShotNavDebug] [ImageGalleryLightbox] associatedWithoutPositionInSelectedShot: all_shot_associations check', {
         associationsCount: a.length,
         foundMatch: !!m,
         matchPosition: m?.position,
         result,
+        effectiveShotIdForOverride,
         timestamp: Date.now()
       });
       return result;
@@ -390,7 +396,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
       timestamp: Date.now()
     });
     return false;
-  }, [sourceRecord, selectedShotIdLocal]);
+  }, [sourceRecord, effectiveShotIdForOverride]);
 
   // Log what's being passed to MediaLightbox
   useEffect(() => {

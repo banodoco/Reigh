@@ -381,7 +381,8 @@ export const useImageGalleryActions = ({
     console.log('[ShotSelectorDebug] 🔄 handleShotChange called with:', shotId);
     setLastAffectedShotId(shotId);
     setSelectedShotIdLocal(shotId);
-  }, [setLastAffectedShotId, setSelectedShotIdLocal]);
+    setShowTickForImageId(null);
+  }, [setLastAffectedShotId, setSelectedShotIdLocal, setShowTickForImageId]);
 
   // Handle skeleton cleared callback - reset deletion count
   const handleSkeletonCleared = useCallback(() => {

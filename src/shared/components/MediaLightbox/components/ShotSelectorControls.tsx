@@ -95,7 +95,9 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleAddToShot}
+            onClick={() => {
+              handleAddToShot();
+            }}
             disabled={!selectedShotId}
             className={`h-8 px-3 text-white ${
               isAlreadyPositionedInSelectedShot || showTickForImageId === mediaId
