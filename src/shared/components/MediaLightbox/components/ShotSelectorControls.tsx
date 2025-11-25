@@ -41,6 +41,9 @@ export interface ShotSelectorControlsProps {
   // UI state
   setIsSelectOpen: (isOpen: boolean) => void;
   contentRef: React.RefObject<HTMLDivElement>;
+  
+  // Navigation
+  onNavigateToShot?: (shot: ShotOption) => void;
 }
 
 /**
@@ -67,6 +70,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   handleAddToShotWithoutPosition,
   setIsSelectOpen,
   contentRef,
+  onNavigateToShot,
 }) => {
   return (
     <>
@@ -83,6 +87,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
         quickCreateSuccess={quickCreateSuccess}
         onQuickCreateSuccess={handleQuickCreateSuccess}
         container={contentRef.current}
+        onNavigateToShot={onNavigateToShot}
       />
 
       <Tooltip>

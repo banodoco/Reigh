@@ -465,6 +465,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     allShots,
     onNavigateToShot,
     onClose,
+    onShotChange,
   });
   const {
     isCreatingShot,
@@ -537,6 +538,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       onShowTaskDetails();
     }
   };
+  
+  // Handle navigation to shot from the dropdown
+  const handleNavigateToShotFromSelector = React.useCallback((shot: { id: string; name: string }) => {
+    if (onNavigateToShot) {
+      // Build a minimal Shot object compatible with navigation
+      const minimalShot = {
+        id: shot.id,
+        name: shot.name,
+        images: [],
+        position: 0,
+      };
+      onNavigateToShot(minimalShot);
+    }
+  }, [onNavigateToShot]);
   
   // Replace in shot handler - swaps timeline position from parent to current image
   const handleReplaceInShot = React.useCallback(async (
@@ -1237,6 +1252,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       setIsSelectOpen={setIsSelectOpen}
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
+                      onNavigateToShot={handleNavigateToShotFromSelector}
                     />
                   </div>
 
@@ -1537,6 +1553,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       setIsSelectOpen={setIsSelectOpen}
                       contentRef={contentRef}
                       handleApplySettings={handleApplySettings}
+                      onNavigateToShot={handleNavigateToShotFromSelector}
                     />
 
                     {/* Navigation Arrows */}
@@ -1939,6 +1956,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     setIsSelectOpen={setIsSelectOpen}
                     contentRef={contentRef}
                     handleApplySettings={handleApplySettings}
+                    onNavigateToShot={handleNavigateToShotFromSelector}
                   />
 
                   {/* Navigation Arrows */}
@@ -1984,6 +2002,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onDelete={onDelete}
                       handleDelete={handleDelete}
                       isDeleting={isDeleting}
+                      onNavigateToShot={handleNavigateToShotFromSelector}
                     />
               </div>
                 )}

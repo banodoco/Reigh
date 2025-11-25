@@ -60,6 +60,9 @@ export interface WorkflowControlsProps {
   onDelete?: (id: string) => void;
   handleDelete: () => void;
   isDeleting?: string | null;
+  
+  // Navigation
+  onNavigateToShot?: (shot: ShotOption) => void;
 }
 
 /**
@@ -95,6 +98,7 @@ export const WorkflowControls: React.FC<WorkflowControlsProps> = ({
   onDelete,
   handleDelete,
   isDeleting,
+  onNavigateToShot,
 }) => {
   // Don't render if no workflow actions available, in inpaint mode, or video
   if ((! onAddToShot && !onDelete && !onApplySettings) || isVideo || isInpaintMode) {
@@ -120,6 +124,7 @@ export const WorkflowControls: React.FC<WorkflowControlsProps> = ({
               quickCreateSuccess={quickCreateSuccess}
               onQuickCreateSuccess={handleQuickCreateSuccess}
               container={contentRef.current}
+              onNavigateToShot={onNavigateToShot}
             />
 
             <Tooltip>

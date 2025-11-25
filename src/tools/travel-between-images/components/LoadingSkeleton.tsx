@@ -81,12 +81,15 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             <Skeleton className="h-8 w-24 rounded-md" />
           </div>
           {/* Controls row */}
-          <div className="flex items-center gap-2 sm:gap-3 justify-end">
-            {/* Search skeleton */}
-            <Skeleton className="h-8 w-28 sm:w-52 rounded-md" />
-            {/* Sort dropdown skeleton */}
-            <Skeleton className="h-8 w-[90px] sm:w-[110px] rounded-md" />
-            {/* Shots vs Videos Toggle skeleton */}
+          <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+            {/* Left side: Search and Sort */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Search skeleton */}
+              <Skeleton className="h-8 w-28 sm:w-52 rounded-md" />
+              {/* Sort dropdown skeleton */}
+              <Skeleton className="h-8 w-[90px] sm:w-[110px] rounded-md" />
+            </div>
+            {/* Right side: Shots vs Videos Toggle skeleton */}
             <Skeleton className="h-8 w-28 sm:w-32 rounded-full" />
           </div>
         </div>

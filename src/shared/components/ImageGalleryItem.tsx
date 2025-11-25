@@ -1069,6 +1069,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   side="top"
                   align="start"
                   sideOffset={4}
+                  onNavigateToShot={(shot) => navigateToShot(shot as any, { scrollToTop: true })}
               />
               )}
 

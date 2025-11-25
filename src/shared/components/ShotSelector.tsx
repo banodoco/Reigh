@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { PlusCircle, Check } from "lucide-react";
+import { PlusCircle, Check, ArrowRight } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { 
   Select,
@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 export interface ShotOption {
   id: string;
@@ -47,6 +48,9 @@ export interface ShotSelectorProps {
   // Event handlers
   onOpenChange?: (open: boolean) => void;
   container?: HTMLElement | null;
+  
+  // Navigation
+  onNavigateToShot?: (shot: ShotOption) => void;
 }
 
 export const ShotSelector: React.FC<ShotSelectorProps> = ({
@@ -67,7 +71,10 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   sideOffset = 4,
   onOpenChange,
   container,
+  onNavigateToShot,
 }) => {
+  
+  const isMobile = useIsMobile();
   
   // Create the "Add Shot" header if needed
   const addShotHeader = useMemo(() => {
@@ -125,12 +132,14 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
     );
   }, [showAddShot, onCreateShot, quickCreateSuccess, onQuickCreateSuccess, isCreatingShot]);
 
-  // Get the display name for the selected shot
-  const selectedShotName = useMemo(() => {
+  // Get the selected shot
+  const selectedShot = useMemo(() => {
     if (!value) return null;
-    const shot = shots.find(s => s.id === value);
-    return shot?.name || null;
+    return shots.find(s => s.id === value) || null;
   }, [value, shots]);
+
+  // Get the display name for the selected shot
+  const selectedShotName = selectedShot?.name || null;
 
   console.log('[ShotSelectorDebug] ShotSelector render:', {
     value,
@@ -140,64 +149,84 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
   });
 
   return (
-    <Select
-      value={value}
-      onValueChange={(newValue) => {
-        console.log('[ShotSelectorDebug] 🎯 Shot selected:', newValue);
-        onValueChange(newValue);
-      }}
-      onOpenChange={(open) => {
-        console.log('[ShotSelectorDebug] Dropdown open state changed:', open);
-        onOpenChange?.(open);
-      }}
-    >
-      <SelectTrigger
-        className={triggerClassName}
-        aria-label="Select target shot"
-        onMouseEnter={(e) => e.stopPropagation()}
-        onMouseLeave={(e) => e.stopPropagation()}
-        onPointerDown={(e) => {
-          console.log('[ShotSelectorDebug] SelectTrigger onPointerDown');
-          e.stopPropagation();
+    <div className={`flex items-center gap-1 ${className || ''}`}>
+      <Select
+        value={value}
+        onValueChange={(newValue) => {
+          console.log('[ShotSelectorDebug] 🎯 Shot selected:', newValue);
+          onValueChange(newValue);
         }}
-        onClick={(e) => {
-          console.log('[ShotSelectorDebug] SelectTrigger onClick');
+        onOpenChange={(open) => {
+          console.log('[ShotSelectorDebug] Dropdown open state changed:', open);
+          onOpenChange?.(open);
         }}
       >
-        <SelectValue placeholder={placeholder}>
-          {selectedShotName && selectedShotName.length > 10 
-            ? `${selectedShotName.substring(0, 10)}...` 
-            : selectedShotName || placeholder}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent 
-        header={addShotHeader}
-        className={`z-[9999] bg-zinc-900 border-zinc-700 text-white max-h-60 ${contentClassName || ''}`}
-        style={{ zIndex: 10000 }}
-        position="popper"
-        side={side}
-        sideOffset={sideOffset}
-        align={align}
-        collisionPadding={8}
-        container={container}
-      >
-        {shots.map(shot => (
-          <SelectItem 
-            key={shot.id} 
-            value={shot.id} 
-            className="text-xs"
-            onPointerDown={(e) => {
-              console.log('[ShotSelectorDebug] SelectItem onPointerDown:', shot.name);
-            }}
-            onClick={(e) => {
-              console.log('[ShotSelectorDebug] SelectItem onClick:', shot.name);
-            }}
-          >
-            {shot.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+        <SelectTrigger
+          className={triggerClassName}
+          aria-label="Select target shot"
+          onMouseEnter={(e) => e.stopPropagation()}
+          onMouseLeave={(e) => e.stopPropagation()}
+          onPointerDown={(e) => {
+            console.log('[ShotSelectorDebug] SelectTrigger onPointerDown');
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            console.log('[ShotSelectorDebug] SelectTrigger onClick');
+          }}
+        >
+          <SelectValue placeholder={placeholder}>
+            {selectedShotName && selectedShotName.length > 10 
+              ? `${selectedShotName.substring(0, 10)}...` 
+              : selectedShotName || placeholder}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent 
+          header={addShotHeader}
+          className={`z-[9999] bg-zinc-900 border-zinc-700 text-white max-h-60 ${contentClassName || ''}`}
+          style={{ zIndex: 10000 }}
+          position="popper"
+          side={side}
+          sideOffset={sideOffset}
+          align={align}
+          collisionPadding={8}
+          container={container}
+        >
+          {shots.map(shot => (
+            <SelectItem 
+              key={shot.id}
+              value={shot.id} 
+              className="text-xs group"
+            >
+              {/* On mobile, just show the name. On desktop with navigation, show arrow on hover */}
+              {!isMobile && onNavigateToShot ? (
+                <span className="flex items-center justify-between w-full">
+                  <span className="pointer-events-none">{shot.name}</span>
+                  {/* Jump arrow - appears on hover (desktop only) */}
+                  <span
+                    role="button"
+                    className="opacity-0 group-hover:opacity-100 group-data-[highlighted]:opacity-100 transition-opacity p-1 rounded-full bg-zinc-700 hover:bg-zinc-600 ml-2"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onNavigateToShot(shot);
+                    }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    title={`Jump to ${shot.name}`}
+                  >
+                    <ArrowRight className="h-3 w-3 text-white" />
+                  </span>
+                </span>
+              ) : (
+                shot.name
+              )}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 };
 

@@ -51,6 +51,9 @@ export interface WorkflowControlsBarProps {
   
   // Apply settings
   handleApplySettings: () => void;
+  
+  // Navigation
+  onNavigateToShot?: (shot: ShotOption) => void;
 }
 
 /**
@@ -83,6 +86,7 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
   setIsSelectOpen,
   contentRef,
   handleApplySettings,
+  onNavigateToShot,
 }) => {
   // Debug logging
   console.log('[ShotSelectorDebug] WorkflowControlsBar render check', {
@@ -134,6 +138,7 @@ export const WorkflowControlsBar: React.FC<WorkflowControlsBarProps> = ({
             handleAddToShotWithoutPosition={handleAddToShotWithoutPosition}
             setIsSelectOpen={setIsSelectOpen}
             contentRef={contentRef}
+            onNavigateToShot={onNavigateToShot}
           />
         )}
 

@@ -11,6 +11,7 @@ export interface UseShotCreationProps {
   allShots: ShotOption[];
   onNavigateToShot?: (shot: any) => void;
   onClose: () => void;
+  onShotChange?: (shotId: string) => void;
 }
 
 export interface UseShotCreationReturn {
@@ -29,6 +30,7 @@ export const useShotCreation = ({
   selectedProjectId,
   allShots,
   onNavigateToShot,
+  onShotChange,
 }: UseShotCreationProps): UseShotCreationReturn => {
   const [isCreatingShot, setIsCreatingShot] = useState(false);
   const [quickCreateSuccess, setQuickCreateSuccess] = useState<QuickCreateSuccess>({
@@ -87,6 +89,12 @@ export const useShotCreation = ({
         });
       }
       
+      // Update the selected shot ID (same as ImageGalleryItem does)
+      if (result.shotId && onShotChange) {
+        console.log('[VisitShotDebug] Updating selected shot ID to:', result.shotId);
+        onShotChange(result.shotId);
+      }
+      
       // Set success state with real shot ID
       setQuickCreateSuccess({
         isSuccessful: true,
@@ -105,7 +113,7 @@ export const useShotCreation = ({
     } finally {
       setIsCreatingShot(false);
     }
-  }, [selectedProjectId, allShots, media.id, createShotWithImageMutation]);
+  }, [selectedProjectId, allShots, media.id, createShotWithImageMutation, onShotChange]);
 
   // Handle quick create success navigation
   const handleQuickCreateSuccess = useCallback(() => {

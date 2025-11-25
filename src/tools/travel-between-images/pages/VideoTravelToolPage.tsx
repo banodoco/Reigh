@@ -1817,76 +1817,79 @@ const VideoTravelToolPage: React.FC = () => {
                 </Button>
               </div>
               {/* Controls row */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-                {/* Search and Sort - Only show in Shots view */}
-                {!showVideosView && (
-                  <>
-                    <div className="relative w-28 sm:w-52">
-                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                        <Search className="h-3.5 w-3.5" />
+              <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+                {/* Left side: Search and Sort */}
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Search and Sort - Only show in Shots view */}
+                  {!showVideosView && (
+                    <>
+                      <div className="relative w-28 sm:w-52">
+                        <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                          <Search className="h-3.5 w-3.5" />
+                        </div>
+                        <Input
+                          ref={searchInputRef}
+                          placeholder="Search..."
+                          value={shotSearchQuery}
+                          onChange={(e) => setShotSearchQuery(e.target.value)}
+                          className="h-8 text-xs pl-8"
+                        />
                       </div>
-                      <Input
-                        ref={searchInputRef}
-                        placeholder="Search..."
-                        value={shotSearchQuery}
-                        onChange={(e) => setShotSearchQuery(e.target.value)}
-                        className="h-8 text-xs pl-8"
-                      />
-                    </div>
 
-                    <Select
-                      value={shotSortMode}
-                      onValueChange={(value: 'ordered' | 'newest' | 'oldest') => setShotSortMode(value)}
-                    >
-                      <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
-                        <SelectValue placeholder="Sort" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ordered">Ordered</SelectItem>
-                        <SelectItem value="newest">Newest</SelectItem>
-                        <SelectItem value="oldest">Oldest</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
+                      <Select
+                        value={shotSortMode}
+                        onValueChange={(value: 'ordered' | 'newest' | 'oldest') => setShotSortMode(value)}
+                      >
+                        <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
+                          <SelectValue placeholder="Sort" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ordered">Ordered</SelectItem>
+                          <SelectItem value="newest">Newest</SelectItem>
+                          <SelectItem value="oldest">Oldest</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
 
-                {/* Search and Sort - Videos View */}
-                {showVideosView && (
-                  <>
-                    <div className="relative w-28 sm:w-52">
-                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-                        <Search className="h-3.5 w-3.5" />
+                  {/* Search and Sort - Videos View */}
+                  {showVideosView && (
+                    <>
+                      <div className="relative w-28 sm:w-52">
+                        <div className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                          <Search className="h-3.5 w-3.5" />
+                        </div>
+                        <Input
+                          placeholder="Search..."
+                          value={videoSearchTerm}
+                          onChange={(e) => {
+                            setVideoSearchTerm(e.target.value);
+                            setVideoPage(1);
+                          }}
+                          className="h-8 text-xs pl-8"
+                        />
                       </div>
-                      <Input
-                        placeholder="Search..."
-                        value={videoSearchTerm}
-                        onChange={(e) => {
-                          setVideoSearchTerm(e.target.value);
+
+                      <Select
+                        value={videoSortMode}
+                        onValueChange={(value: 'newest' | 'oldest') => {
+                          setVideoSortMode(value);
                           setVideoPage(1);
                         }}
-                        className="h-8 text-xs pl-8"
-                      />
-                    </div>
+                      >
+                        <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
+                          <SelectValue placeholder="Sort" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="newest">Newest</SelectItem>
+                          <SelectItem value="oldest">Oldest</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+                </div>
 
-                    <Select
-                      value={videoSortMode}
-                      onValueChange={(value: 'newest' | 'oldest') => {
-                        setVideoSortMode(value);
-                        setVideoPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="w-[90px] sm:w-[110px] h-8 text-xs">
-                        <SelectValue placeholder="Sort" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="newest">Newest</SelectItem>
-                        <SelectItem value="oldest">Oldest</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
-
-                {/* Shots vs Videos Toggle */}
+                {/* Right side: Shots vs Videos Toggle */}
                 <div className="inline-flex items-center bg-muted rounded-full p-1">
                   <button
                     type="button"
