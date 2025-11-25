@@ -285,7 +285,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </div>
               
             {/* Sign-in button below hero - Start -140px (UP) to simulate coming from bar */}                                                                
-            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6">
+            <div style={getFadeStyle(2.5, -140, false)} className="pt-2 pb-6 overflow-visible">
               {!session ? (
                 <div className="group">
                     <button

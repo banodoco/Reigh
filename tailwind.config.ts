@@ -683,7 +683,7 @@ export default {
 			},
 			boxShadow: {
 				'wes': '0 10px 40px -10px hsl(var(--primary) / 0.2), 0 4px 20px -4px hsl(var(--accent) / 0.1)',
-				'wes-hover': '0 20px 60px -10px hsl(var(--primary) / 0.3), 0 8px 30px -4px hsl(var(--accent) / 0.2)',
+				'wes-hover': '0 2px 8px hsl(var(--primary) / 0.12), 0 4px 24px hsl(var(--primary) / 0.08), 0 8px 48px hsl(var(--primary) / 0.04)',
 				'wes-vintage': '0 8px 32px -8px hsl(var(--wes-vintage-gold) / 0.3), inset 0 1px 0 hsl(var(--wes-cream) / 0.5)',
 				'wes-ornate': '0 0 0 1px hsl(var(--wes-vintage-gold) / 0.2), 0 2px 4px hsl(var(--primary) / 0.1), 0 8px 16px hsl(var(--primary) / 0.1)',
 				'wes-deep': '0 25px 50px -12px hsl(var(--primary) / 0.4), 0 0 0 1px hsl(var(--wes-vintage-gold) / 0.2)',
