@@ -40,6 +40,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   enhancedPrompts,
   defaultPrompt,
   defaultNegativePrompt,
+  onClearEnhancedPrompt,
 }) => {
   const [mobileSelectedIds, setMobileSelectedIds] = useState<string[]>([]);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);

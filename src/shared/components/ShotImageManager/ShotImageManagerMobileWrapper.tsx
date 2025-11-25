@@ -85,6 +85,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
         enhancedPrompts={props.enhancedPrompts}
         defaultPrompt={props.defaultPrompt}
         defaultNegativePrompt={props.defaultNegativePrompt}
+        onClearEnhancedPrompt={props.onClearEnhancedPrompt}
       />
       
       {lightbox.lightboxIndex !== null && lightbox.currentImages[lightbox.lightboxIndex] && (() => {

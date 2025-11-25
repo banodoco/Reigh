@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 // Removed invalidationRouter - DataFreshnessManager handles all invalidation logic
 import React from 'react';
 import { log } from '@/shared/lib/logger';
+import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
+import { parseRatio } from '@/shared/lib/aspectRatios';
 
 // Define the type for the new shot data returned by Supabase
 // This should align with your 'shots' table structure from `supabase/types.ts`
@@ -16,9 +18,8 @@ type ShotResponse = Database['public']['Tables']['shots']['Row'];
 // Add this new type definition near the top, after other type definitions
 export interface ShotGenerationRow {
   id: string;
-  shotId: string;
-  generationId: string;
-  timeline_frame?: number;
+  generation_id: string;
+  timeline_frame: number;
 }
 
 // CRUD functions will go here 
@@ -94,7 +95,8 @@ export const useCreateShot = () => {
 
       if (fetchError) throw fetchError;
 
-      return { shot: shotData, shouldSelectAfterCreation };
+      // Ensure the returned shot matches the Shot interface by adding the empty images array
+      return { shot: { ...shotData, images: [] }, shouldSelectAfterCreation };
     },
     onSuccess: (result, variables) => {
       // Manually update cache for immediate UI feedback (don't wait for realtime events)
@@ -147,235 +149,164 @@ export const useCreateShot = () => {
 // Duplicate a shot with all its images VIA API
 interface DuplicateShotArgs {
   shotId: string;
-  projectId: string | null;
-  newName?: string;
+  projectId: string;
 }
-
 export const useDuplicateShot = () => {
   const queryClient = useQueryClient();
-  const createShot = useCreateShot();
-  const addImageToShot = useAddImageToShot();
   
-  return useMutation<
-    Shot,
-    Error,
-    DuplicateShotArgs,
-    { previousShots?: Shot[], projectId?: string | null }
-  >({
-    mutationFn: async ({ shotId, projectId, newName }: DuplicateShotArgs): Promise<Shot> => {
-      if (!projectId) {
-        throw new Error('Project ID is required to duplicate a shot.');
-      }
-
-      // Get the shot to duplicate (basic info only)
-      const { data: originalShot, error: fetchError } = await supabase
-        .from('shots')
-        .select('id, name, position, project_id, settings')
-        .eq('id', shotId)
-        .single();
-      
-      if (fetchError || !originalShot) throw new Error('Shot not found');
-      
-      // Create new shot at position right after the original
-      const { shot: newShot } = (await createShot.mutateAsync({
-        name: newName || originalShot.name + ' Copy',
-        projectId: projectId,
-        shouldSelectAfterCreation: false,
-        position: ((originalShot as any).position || 0) + 1
-      })) as any as { shot: Shot };
-
-      // Copy settings if available
-      if ((originalShot as any).settings) {
-        const { error: settingsError } = await supabase
-          .from('shots')
-          .update({ settings: (originalShot as any).settings })
-          .eq('id', newShot.id);
-          
-        if (settingsError) {
-          console.error('[DuplicateShot] Failed to copy settings:', settingsError);
-        }
-      }
-      
-      // Use server-side function to copy shot_generations (no client data transfer!)
-      console.log(`[DuplicateShot] 🚀 Calling server-side duplication function...`);
-      const { data: stats, error: duplicateError } = await supabase
-        .rpc('duplicate_shot_generations', {
-          p_source_shot_id: shotId,
-          p_target_shot_id: newShot.id
-            });
-          
-      if (duplicateError) {
-        console.error('[DuplicateShot] Server-side duplication failed:', duplicateError);
-        throw duplicateError;
-          }
-      
-      console.log(`[DuplicateShot] ✅ Duplication complete:`, {
-        inserted: stats?.[0]?.inserted_count || 0,
-        skipped_videos: stats?.[0]?.skipped_videos || 0,
-        skipped_unpositioned: stats?.[0]?.skipped_unpositioned || 0
+  return useMutation({
+    mutationFn: async ({ shotId, projectId }: DuplicateShotArgs) => {
+      // Call database function to duplicate shot
+      const { data, error } = await supabase.rpc('duplicate_shot', {
+        original_shot_id: shotId,
+        project_id: projectId
       });
       
-      // Return the new shot with its images
-      const { data: completeShot } = await supabase
+      if (error) throw error;
+      
+      const newShotId = data;
+      
+      // Fetch the new shot data to return
+      const { data: shotData, error: fetchError } = await supabase
         .from('shots')
-        .select(`
-          *,
-          shot_generations(
-            *,
-            generation:generations(*)
-          )
-        `)
-        .eq('id', newShot.id)
+        .select()
+        .eq('id', newShotId)
         .single();
+        
+      if (fetchError) throw fetchError;
       
-      // Transform to match Shot interface
-      return {
-        id: completeShot.id,
-        name: completeShot.name,
-        created_at: completeShot.created_at,
-        updated_at: completeShot.updated_at,
-        project_id: completeShot.project_id,
-        position: (completeShot as any).position || 1, // Include position field
-        images: completeShot.shot_generations?.map((sg: any) => ({
-          ...sg.generation,
-          shotImageEntryId: sg.id,
-          shot_generation_id: sg.id,
-          imageUrl: sg.generation?.location || sg.generation?.imageUrl,
-          thumbUrl: sg.generation?.location || sg.generation?.thumbUrl,
-          timeline_frame: sg.timeline_frame, // Include timeline_frame for filtering and ordering
-        })) || []
-      };
+      return shotData;
     },
-    onMutate: async ({ projectId, newName, shotId }) => {
-      if (!projectId) return { previousShots: [], projectId: null };
+    onSuccess: (data, variables) => {
+      toast.success('Shot duplicated successfully');
+      // Invalidate queries to refresh list
+      queryClient.invalidateQueries({ queryKey: ['shots', variables.projectId] });
+    },
+    onError: (error) => {
+      console.error('Error duplicating shot:', error);
+      toast.error(`Failed to duplicate shot: ${error.message}`);
+    }
+  });
+};
+
+// Delete a shot
+export const useDeleteShot = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ shotId, projectId }: { shotId: string; projectId: string }) => {
+      const { error } = await supabase
+        .from('shots')
+        .delete()
+        .eq('id', shotId);
+
+      if (error) throw error;
+      return { shotId, projectId };
+    },
+    onSuccess: ({ projectId }) => {
+      toast.success('Shot deleted successfully');
+      // Invalidate queries to refresh list
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+      // Also invalidate shot-specific queries
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast'] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+    },
+    onError: (error) => {
+      console.error('Error deleting shot:', error);
+      toast.error(`Failed to delete shot: ${error.message}`);
+    }
+  });
+};
+
+// Reorder shots by updating their positions
+export const useReorderShots = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      projectId, 
+      shotOrders 
+    }: { 
+      projectId: string; 
+      shotOrders: Array<{ shotId: string; position: number }> 
+    }) => {
+      // Update each shot's position
+      const promises = shotOrders.map(({ shotId, position }) =>
+        supabase
+          .from('shots')
+          .update({ position })
+          .eq('id', shotId)
+          .eq('project_id', projectId) // Extra safety check
+      );
+
+      const results = await Promise.all(promises);
       
-      // Cancel all shots queries to prevent race conditions
+      // Check for any errors
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) {
+        const errorMessages = errors.map(e => e.error?.message).join(', ');
+        throw new Error(`Failed to update some shot positions: ${errorMessages}`);
+      }
+
+      return { projectId, shotOrders };
+    },
+    onMutate: async (variables) => {
+      const { projectId } = variables;
+      
+      // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
       
-      // Get data from the primary cache key used by ShotsContext (maxImagesPerShot: 0)
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId, 0]) || 
-                           queryClient.getQueryData<Shot[]>(['shots', projectId]);
-
-      // Create an optimistic shot for immediate UI feedback
-      const originalShot = previousShots?.find(s => s.id === shotId);
-      if (originalShot) {
-        // Filter to only include positioned non-video images (matching the actual duplication logic)
-        const positionedNonVideoImages = originalShot.images.filter(img => {
-          const isVideo = img.type === 'video_travel_output' || 
-                         (img.location && img.location.endsWith('.mp4')) ||
-                         (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-          const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
-          return !isVideo && hasTimelineFrame;
+      // Get previous shots data for rollback
+      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
+      
+      // Optimistically update shots with new positions
+      if (previousShots) {
+        const updatedShots = previousShots.map(shot => {
+          const order = variables.shotOrders.find(o => o.shotId === shot.id);
+          if (order) {
+            return { ...shot, position: order.position };
+          }
+          return shot;
         });
         
-        const optimisticDuplicatedShot: Shot = {
-          id: `optimistic-duplicate-${Date.now()}`,
-          name: newName || `${originalShot.name} (Copy)`,
-          created_at: new Date().toISOString(),
-          images: positionedNonVideoImages, // Only copy positioned non-video images for optimistic update
-          project_id: projectId,
-          position: ((originalShot as any).position || 0) + 1, // Position after the original shot
-        };
-
-        const applyOptimisticUpdate = (oldShots: Shot[] = []) => {
-          // Insert the duplicate at the correct position in the ordered list
-          // Since shots are ordered by position (ascending), find the insertion point
-          const insertionIndex = oldShots.findIndex(shot => 
-            shot.position > ((originalShot as any).position || 0)
-          );
-          
-          if (insertionIndex === -1) {
-            // No shots with higher position found, append at end
-            return [...oldShots, optimisticDuplicatedShot];
-          } else {
-            // Insert at the found position and shift subsequent positions
-            const updatedShots = [...oldShots];
-            // Update positions of shots that will be shifted
-            for (let i = insertionIndex; i < updatedShots.length; i++) {
-              updatedShots[i] = {
-                ...updatedShots[i],
-                position: (updatedShots[i].position || 0) + 1
-              };
-            }
-            // Insert the duplicate at the correct position
-            updatedShots.splice(insertionIndex, 0, optimisticDuplicatedShot);
-            return updatedShots;
-          }
-        };
+        // Sort by new positions
+        updatedShots.sort((a, b) => (a.position || 0) - (b.position || 0));
         
-        // Update all cache key variants
-        queryClient.setQueryData<Shot[]>(['shots', projectId, 0], applyOptimisticUpdate);
-        queryClient.setQueryData<Shot[]>(['shots', projectId, 5], applyOptimisticUpdate);
-        queryClient.setQueryData<Shot[]>(['shots', projectId], applyOptimisticUpdate);
+        // Update all cache variants
+        const shotsCacheKeys = [
+          ['shots', projectId],
+          ['shots', projectId, 0],
+          ['shots', projectId, 2],
+          ['shots', projectId, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, updatedShots);
+        });
       }
-
+      
       return { previousShots, projectId };
     },
-    onSuccess: (newShot, { projectId }) => {
-      if (projectId) {
-        // Update all shot cache variants (with different maxImagesPerShot values)
-        // This ensures ShotsContext and other consumers get updated
-        const updateShotCache = (oldShots: Shot[] = []) => {
-          // Remove ALL optimistic shots (in case there are multiple)
-          const shotsWithoutOptimistic = oldShots.filter(shot => 
-            !shot.id.startsWith('optimistic-duplicate-') && 
-            !shot.id.startsWith('optimistic-')
-          );
-          
-          // Insert the new shot at the correct position based on its position value
-          const newShotPosition = (newShot as any).position || 0;
-          const insertionIndex = shotsWithoutOptimistic.findIndex(shot => 
-            (shot.position || 0) > newShotPosition
-          );
-          
-          if (insertionIndex === -1) {
-            // No shots with higher position found, append at end
-            return [...shotsWithoutOptimistic, newShot];
-          } else {
-            // Insert at the correct position
-            const updatedShots = [...shotsWithoutOptimistic];
-            updatedShots.splice(insertionIndex, 0, newShot);
-            return updatedShots;
-          }
-        };
-        
-        // Update all common cache key variants to prevent context errors
-        queryClient.setQueryData<Shot[]>(['shots', projectId, 0], updateShotCache);
-        queryClient.setQueryData<Shot[]>(['shots', projectId, 5], updateShotCache);
-        queryClient.setQueryData<Shot[]>(['shots', projectId], updateShotCache);
-        
-        // Also ensure the shot is properly cached individually
-        queryClient.setQueryData(['shot', newShot.id], newShot);
-        
-        // Emit event for UI to react (switch to Newest First, scroll, highlight)
-        // Do this in a microtask to ensure cache updates are complete
-        Promise.resolve().then(() => {
-          window.dispatchEvent(new CustomEvent('shot-duplicated', {
-            detail: { shotId: newShot.id, shotName: newShot.name }
-          }));
+    onError: (error, variables, context) => {
+      // Rollback optimistic updates on error
+      if (context?.previousShots && context.projectId) {
+        const shotsCacheKeys = [
+          ['shots', context.projectId],
+          ['shots', context.projectId, 0],
+          ['shots', context.projectId, 2],
+          ['shots', context.projectId, 5],
+        ];
+        shotsCacheKeys.forEach(cacheKey => {
+          queryClient.setQueryData(cacheKey, context.previousShots);
         });
-        
-        // Invalidate after a delay to allow UI to update first
-        setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-        }, 100);
       }
+      console.error('Error reordering shots:', error);
+      toast.error(`Failed to reorder shots: ${error.message}`);
     },
-    onError: (err, { projectId }, context) => {
-      console.error('Optimistic update failed, rolling back for duplicateShot:', err);
-      if (context?.previousShots && projectId) {
-        // Rollback all cache key variants
-        queryClient.setQueryData<Shot[]>(['shots', projectId, 0], context.previousShots);
-        queryClient.setQueryData<Shot[]>(['shots', projectId, 5], context.previousShots);
-        queryClient.setQueryData<Shot[]>(['shots', projectId], context.previousShots);
-      }
-    },
-    onSettled: (data, error, { projectId }) => {
-      // Only invalidate on error - success case is handled in onSuccess
-      if (error && projectId) {
-        // Shot update events are now handled by DataFreshnessManager via realtime events
-      }
-    },
+    onSuccess: ({ projectId }) => {
+      // Invalidate queries to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+    }
   });
 };
 
@@ -409,434 +340,206 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       
       // Get images per shot based on maxImagesPerShot parameter
       // NEW: Use shot_data JSONB filter (fast, no joins) for preview images
-      const shotPromises = shots.map(async (shot) => {
-        const startTime = Date.now();
+      // NOTE: This relies on generations.shot_data containing { [shot_id]: timeline_frame }
+      const shotIds = shots.map(s => s.id);
+      
+      // If we need limited images per shot (e.g. for mobile/list view), we need a different approach
+      // Using a specialized RPC function is best for "top N items per group"
+      // But for now we'll fetch all relevant generations and group them in JS
+      // To optimize, we only fetch generations that belong to these shots
+      
+      // Fetch all shot_generations for these shots
+      const { data: shotGenerations, error: sgError } = await supabase
+        .from('shot_generations')
+        .select(`
+          shot_id,
+          timeline_frame,
+          generation_id,
+          generations (
+            id,
+            location,
+            thumbnail_url,
+            type,
+            created_at,
+            starred,
+            upscaled_url,
+            name,
+            based_on,
+            params
+          )
+        `)
+        .in('shot_id', shotIds);
         
-        // Query from generations table with shot_data filter (no join needed for previews)
-        // Order by timeline_frame (from shot_data JSONB) so that when we limit, we get the first N by position
-        let query = supabase
-          .from('generations')
-          .select('id, location, thumbnail_url, type, created_at, starred, shot_data')
-          .not(`shot_data->${shot.id}`, 'is', null) // GIN index filter
-          .not('type', 'ilike', '%video%') // Exclude videos
-          .order(`shot_data->${shot.id}`, { ascending: true, nullsFirst: false });
+      if (sgError) {
+        console.error('Error fetching shot generations:', sgError);
+        // Return shots without images if image fetch fails
+        return shots.map(shot => ({ ...shot, images: [] }));
+      }
+      
+      // Group images by shot_id
+      const imagesByShot: Record<string, GenerationRow[]> = {};
+      
+      shotGenerations?.forEach((sg: any) => {
+        if (!sg.generations) return;
         
-        // Only apply limit if specified (allows unlimited when needed)
-        // Now that we order by timeline_frame, limit gets the first N by position (correct behavior)
-        if (maxImagesPerShot > 0) {
-          query = query.limit(maxImagesPerShot);
+        const shotId = sg.shot_id;
+        if (!imagesByShot[shotId]) {
+          imagesByShot[shotId] = [];
         }
         
-        const { data: gens, error: genError } = await query;
+        const gen = sg.generations;
+        // Transform to GenerationRow format
+        const imageRow: GenerationRow = {
+          id: gen.id,
+          shotImageEntryId: gen.id, // Using generation ID as entry ID for now since we don't have the junction ID handy in this shape
+          imageUrl: gen.location,
+          thumbUrl: gen.thumbnail_url || gen.location,
+          type: gen.type || 'image',
+          createdAt: gen.created_at,
+          starred: gen.starred || false,
+          upscaled_url: gen.upscaled_url,
+          name: gen.name,
+          based_on: gen.based_on,
+          params: gen.params,
+          timeline_frame: sg.timeline_frame,
+          shot_data: { [shotId]: sg.timeline_frame }
+        };
         
-        if (genError) {
-          console.error('[ShotImageDebug] Error loading generations:', genError, { shotId: shot.id });
-          throw genError;
+        imagesByShot[shotId].push(imageRow);
+      });
+      
+      // Attach images to shots
+      return shots.map(shot => {
+        let images = imagesByShot[shot.id] || [];
+        
+        // Sort images by timeline_frame
+        images.sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+        
+        // Apply limit if requested
+        if (maxImagesPerShot > 0 && images.length > maxImagesPerShot) {
+          images = images.slice(0, maxImagesPerShot);
         }
-        
-        const duration = Date.now() - startTime;
-        console.log('[ShotImageDebug] [UnifiedDataFlow] Loaded generations (no join):', {
-          shotId: shot.id.substring(0, 8),
-          shotName: shot.name,
-          generationsCount: gens?.length || 0,
-          duration: `${duration}ms`,
-          queryType: 'shot_data JSONB filter',
-          sampleGenerations: gens?.slice(0, 3).map(gen => ({
-            id: gen.id?.substring(0, 8),
-            type: gen.type,
-            timeline_frame: gen.shot_data?.[shot.id],
-            hasLocation: !!gen.location,
-          }))
-        });
-        
-        // Transform and sort by timeline_frame from shot_data
-        const transformedImages = (gens || [])
-          .map(gen => ({
-            ...gen,
-            shotImageEntryId: null, // Preview images don't need mutation IDs
-            imageUrl: gen.location,
-            thumbUrl: gen.thumbnail_url || gen.location,
-            timeline_frame: gen.shot_data?.[shot.id] ?? null,
-          }))
-          .sort((a, b) => {
-            // Sort by timeline_frame (nulls last)
-            if (a.timeline_frame == null && b.timeline_frame == null) return 0;
-            if (a.timeline_frame == null) return 1;
-            if (b.timeline_frame == null) return -1;
-            return a.timeline_frame - b.timeline_frame;
-          });
-        
-        console.log('[ShotImageDebug] [UnifiedDataFlow] Transformed preview images:', {
-          shotId: shot.id.substring(0, 8),
-          shotName: shot.name,
-          transformedImagesCount: transformedImages.length,
-          duration: `${Date.now() - startTime}ms total`,
-          sampleTransformed: transformedImages.slice(0, 2).map(img => ({
-            hasImageUrl: !!img.imageUrl,
-            hasThumbUrl: !!img.thumbUrl,
-            timeline_frame: img.timeline_frame,
-            type: img.type
-          }))
-        });
         
         return {
           ...shot,
-          images: transformedImages,
+          images
         };
       });
-      
-      const result = await Promise.all(shotPromises);
-      
-      // [ShotReorderDebug] Log actual database positions returned
-      console.log('[ShotReorderDebug] Database query returned shots:', {
-        projectId,
-        shotsCount: result.length,
-        timestamp: Date.now()
-      });
-      
-      // [ShotReorderDebug] Log each position individually to avoid array collapse
-      result.slice(0, 10).forEach((shot, index) => {
-        console.log(`[ShotReorderDebug] Shot ${index}: ${shot.name} (ID: ${shot.id.substring(0, 8)}) - Position: ${(shot as any).position}`);
-      });
-      
-      return result;
     },
     enabled: !!projectId,
-    // If CancelledError occurs due to emergency recovery, keep showing last good data
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    // Keep previous data while fetching new data to prevent flashing
     placeholderData: (previousData) => previousData,
   });
 };
 
-// Type for the arguments of useReorderShots mutation
-interface ReorderShotsArgs {
-  projectId: string;
-  shotOrders: { shotId: string; position: number }[];
-}
-
-// Hook to reorder shots by updating their position values
-export const useReorderShots = () => {
-  // [ShotReorderDebug] Debug tag for shot reordering issues
-  const REORDER_DEBUG_TAG = '[ShotReorderDebug]';
+// Update shot name
+export const useUpdateShotName = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ projectId, shotOrders }: ReorderShotsArgs) => {
-      console.log(`${REORDER_DEBUG_TAG} === MUTATION FUNCTION START ===`);
-      console.log(`${REORDER_DEBUG_TAG} Mutation input:`, {
-        projectId,
-        shotOrders,
-        shotOrdersCount: shotOrders.length,
-        timestamp: Date.now()
-      });
-
-      // Update each shot's position in a batch
-      const updates = shotOrders.map(({ shotId, position }) => {
-        console.log(`${REORDER_DEBUG_TAG} Creating update for shot:`, {
-          shotId,
-          position,
-          projectId
-        });
-        
-        return supabase
-          .from('shots')
-          .update({ position } as any)
-          .eq('id', shotId)
-          .eq('project_id', projectId);
-      });
-
-      console.log(`${REORDER_DEBUG_TAG} Executing ${updates.length} database updates...`);
-      const results = await Promise.all(updates);
-      
-      console.log(`${REORDER_DEBUG_TAG} Database updates completed:`, {
-        results: results.map((result, index) => ({
-          shotId: shotOrders[index].shotId,
-          position: shotOrders[index].position,
-          success: !result.error,
-          error: result.error?.message,
-          data: result.data
-        }))
-      });
-      
-      // Check for any errors
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        const errorMessage = `Failed to update shot positions: ${errors.map(e => e.error?.message).join(', ')}`;
-        console.log(`${REORDER_DEBUG_TAG} Database errors found:`, {
-          errorCount: errors.length,
-          errors: errors.map(e => e.error),
-          errorMessage
-        });
-        throw new Error(errorMessage);
+    mutationFn: async ({ shotId, name, newName, projectId }: { shotId: string; name?: string; newName?: string; projectId: string }) => {
+      // Support both 'name' and 'newName' for backward compatibility
+      const shotName = newName || name;
+      if (!shotName) {
+        throw new Error('Shot name is required');
       }
 
-      console.log(`${REORDER_DEBUG_TAG} All database updates successful`);
-      return results;
+      const { error } = await supabase
+        .from('shots')
+        .update({ name: shotName })
+        .eq('id', shotId);
+
+      if (error) throw error;
+      return { shotId, name: shotName, projectId };
     },
-    onSuccess: (data, { projectId, shotOrders }) => {
-      console.log(`${REORDER_DEBUG_TAG} === MUTATION SUCCESS ===`, {
-        projectId,
-        shotOrders,
-        data,
-        timestamp: Date.now()
-      });
-      // Invalidate queries to refresh from database and confirm the actual order
-      if (projectId) {
-        // Emit domain event for shot reordering
-        // Shot reorder events are now handled by DataFreshnessManager via realtime events
-        console.log(`${REORDER_DEBUG_TAG} Emitted SHOT_REORDER event for project: ${projectId}`);
-      }
+    onSuccess: ({ projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
     },
-    onError: (error, { projectId, shotOrders }) => {
-      console.log(`${REORDER_DEBUG_TAG} === MUTATION ERROR ===`, {
-        error: error.message,
-        errorDetails: error,
-        projectId,
-        shotOrders,
-        timestamp: Date.now()
-      });
-      console.error('Error reordering shots:', error);
+    onError: (error) => {
+      console.error('Error updating shot name:', error);
+      toast.error(`Failed to update shot name: ${error.message}`);
     },
-    onMutate: ({ projectId, shotOrders }) => {
-      console.log(`${REORDER_DEBUG_TAG} === MUTATION STARTING ===`, {
-        projectId,
-        shotOrders,
-        timestamp: Date.now()
-      });
-    },
-    onSettled: (data, error, { projectId, shotOrders }) => {
-      console.log(`${REORDER_DEBUG_TAG} === MUTATION SETTLED ===`, {
-        success: !error,
-        error: error?.message,
-        projectId,
-        shotOrders,
-        timestamp: Date.now()
-      });
-    }
   });
 };
 
-// Type for the arguments of useAddImageToShot mutation
-interface AddImageToShotArgs {
-  shot_id: string;
-  generation_id: string; 
-  project_id: string | null; // For invalidating correct query
-  timeline_frame?: number | null; // Allow null for unpositioned associations
-  imageUrl?: string; // For optimistic update
-  thumbUrl?: string; // For optimistic update
-}
+// Update shot aspect ratio
+export const useUpdateShotAspectRatio = () => {
+  const queryClient = useQueryClient();
 
-// Type for the response from adding an image to a shot
-type ShotImageResponse = Database['public']['Tables']['shot_generations']['Row'];
+  return useMutation({
+    mutationFn: async ({ shotId, aspectRatio, projectId }: { shotId: string; aspectRatio: string; projectId: string }) => {
+      const { error } = await supabase
+        .from('shots')
+        .update({ aspect_ratio: aspectRatio })
+        .eq('id', shotId);
 
-// Helper function to create a generation record for an externally uploaded image
-const createGenerationForUploadedImage = async (
-  imageUrl: string,
-  fileName: string,
-  fileType: string,
-  fileSize: number,
-  projectId: string | null,
-  thumbnailUrl?: string
-): Promise<Database['public']['Tables']['generations']['Row']> => {
-  if (!projectId) {
-    throw new Error('Project ID is required to create a generation record.');
-  }
-  
-  const promptForGeneration = `External image: ${fileName || 'untitled'}`;
-  
-  const { data: newGeneration, error } = await supabase
-    .from('generations')
-    .insert({
-      location: imageUrl,
-      thumbnail_url: thumbnailUrl || imageUrl, // Use thumbnail URL if provided, fallback to main image
-      type: fileType,
-      project_id: projectId,
-      params: {
-        fileName,
-        fileSize,
-        prompt: promptForGeneration
-      }
-    })
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('[useShots] createGenerationForUploadedImage: Error creating generation:', error);
-    throw error;
-  }
-  
-  return newGeneration;
+      if (error) throw error;
+      return { shotId, aspectRatio, projectId };
+    },
+    onSuccess: ({ projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
+    },
+  });
 };
 
-// Helper function to detect server overload or rate limiting issues
-const isQuotaOrServerError = (error: any): boolean => {
-  const message = error?.message?.toLowerCase() || '';
-  const code = error?.code || error?.status;
-  return message.includes('quota') || 
-         message.includes('rate limit') || 
-         message.includes('too many requests') ||
-         code === 429 || 
-         code === 503 || 
-         code === 502;
-};
-
-// Add image to shot VIA API
+// Add image to shot (new simplified version)
 export const useAddImageToShot = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id, timelineFrame }: { 
+    mutationFn: async ({ 
+      shot_id, 
+      generation_id, 
+      project_id,
+      imageUrl, // For optimistic updates
+      thumbUrl, // For optimistic updates
+      timelineFrame // Optional: specify explicit frame position
+    }: { 
       shot_id: string; 
       generation_id: string; 
+      project_id: string;
       imageUrl?: string;
       thumbUrl?: string;
-      project_id: string;
       timelineFrame?: number;
     }) => {
-      log('MobileNetworkDebug', `Starting add image to shot - ShotID: ${shot_id}, GenerationID: ${generation_id}, ImageURL: ${imageUrl?.substring(0, 100)}...`);
-      console.log('[PositionFix] useAddImageToShot starting (regular path):', {
-        shot_id,
-        generation_id,
-        imageUrl: imageUrl?.substring(0, 50) + '...',
-        project_id,
-        timestamp: Date.now()
-      });
+      // If frame not specified, get the last frame + 60
+      let resolvedFrame = timelineFrame;
       
-      const startTime = Date.now();
-
-      // First create generation if imageUrl is provided and generation_id is empty/missing
-      // This must happen BEFORE we query shot_generations to avoid UUID errors
-      if (imageUrl && !generation_id) {
-        console.log('[PositionFix] Creating new generation from imageUrl');
-        const { data: newGeneration, error: genError } = await supabase
-          .from('generations')
-          .insert({
-            location: imageUrl,
-            type: 'image',
-            project_id: project_id,
-            params: {}
-          })
-          .select()
-          .single();
-        
-        if (genError) throw genError;
-        generation_id = newGeneration.id;
-        console.log('[PositionFix] Created new generation:', { newGenerationId: generation_id });
-      }
-
-      // Now check what currently exists for this shot-generation combo
-      // This happens AFTER generation creation to ensure we have a valid UUID
-      const { data: allExistingRecords, error: checkError } = await supabase
-        .from('shot_generations')
-        .select('id, shot_id, generation_id, timeline_frame, created_at')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id)
-        .order('created_at', { ascending: true });
-
-      if (checkError) {
-        console.error('[PositionFix] Error checking existing records (regular path):', checkError);
-      } else {
-        console.log('[PositionFix] ALL existing records (regular path):', {
-          shot_id,
-          generation_id,
-          recordCount: allExistingRecords?.length || 0,
-          allRecords: allExistingRecords?.map(record => ({
-            id: record.id,
-            timeline_frame: record.timeline_frame,
-            created_at: record.created_at,
-            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
-          })) || []
-        });
-      }
-      
-      // Use RPC function to atomically add generation to shot with proper position
-      console.log('[PositionFix] Calling RPC add_generation_to_shot (regular path) with params:', {
-        p_shot_id: shot_id,
-        p_generation_id: generation_id,
-        p_with_position: 'default (not specified - should be true)'
-      });
-
-      const { data: shotGeneration, error: rpcError } = await supabase
-        .rpc('add_generation_to_shot', {
-          p_shot_id: shot_id,
-          p_generation_id: generation_id
-        })
-        .single();
-      
-      if (rpcError) {
-        log('MobileNetworkDebug', `RPC Error after ${Date.now() - startTime}ms:`, rpcError);
-        console.error('[PositionFix] RPC error (regular path):', {
-          rpcError,
-          code: rpcError.code,
-          message: rpcError.message,
-          details: rpcError.details,
-          hint: rpcError.hint
-        });
-        throw rpcError;
-      }
-      
-      console.log('[PositionFix] RPC success (regular path), returned data:', {
-        shotGeneration,
-        newTimelineFrame: (shotGeneration as any)?.timeline_frame,
-        timestamp: Date.now()
-      });
-
-      // If explicit timeline_frame was provided, update it
-      if (timelineFrame !== undefined && shotGeneration) {
-        console.log('[ApplySettings] Setting explicit timeline_frame:', {
-          shotGenerationId: (shotGeneration as any).id,
-          timelineFrame
-        });
-        
-        const { error: updateError } = await supabase
+      if (resolvedFrame === undefined) {
+        const { data: lastGen, error: fetchError } = await supabase
           .from('shot_generations')
-          .update({ timeline_frame: timelineFrame })
-          .eq('id', (shotGeneration as any).id);
-        
-        if (updateError) {
-          console.error('[ApplySettings] Error setting timeline_frame:', updateError);
-        } else {
-          console.log('[ApplySettings] Successfully set timeline_frame to:', timelineFrame);
+          .select('timeline_frame')
+          .eq('shot_id', shot_id)
+          .order('timeline_frame', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+          
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Error fetching last frame:', fetchError);
         }
+        
+        const lastFrame = lastGen?.timeline_frame ?? -60; // Start at 0 (-60 + 60)
+        resolvedFrame = lastFrame + 60;
       }
 
-      // Verify the final state
-      const { data: finalRecords, error: verifyError } = await supabase
+      // Insert into shot_generations
+      const { data, error } = await supabase
         .from('shot_generations')
-        .select('id, shot_id, generation_id, timeline_frame, created_at')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id)
-        .order('created_at', { ascending: true });
-
-      if (verifyError) {
-        console.error('[PositionFix] Error verifying final records (regular path):', {
-          verifyError,
-          errorCode: verifyError.code,
-          errorMessage: verifyError.message,
-          errorDetails: verifyError.details,
-          queryParams: { shot_id, generation_id }
-        });
-      } else {
-        console.log('[PositionFix] Final verification (regular path):', {
+        .insert({
           shot_id,
           generation_id,
-          beforeCount: allExistingRecords?.length || 0,
-          afterCount: finalRecords?.length || 0,
-          recordsAdded: (finalRecords?.length || 0) - (allExistingRecords?.length || 0),
-          finalRecords: finalRecords?.map(record => ({
-            id: record.id,
-            timeline_frame: record.timeline_frame,
-            created_at: record.created_at,
-            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
-          })) || [],
-          rpcReturnedTimelineFrame: (shotGeneration as any)?.timeline_frame,
-          rpcReturnedId: (shotGeneration as any)?.id
-        });
-      }
-      
-      log('MobileNetworkDebug', `Successfully added image to shot in ${Date.now() - startTime}ms`);
-      return shotGeneration;
+          timeline_frame: resolvedFrame
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { ...data, project_id, imageUrl, thumbUrl };
     },
-    onMutate: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id, timelineFrame }) => {
+    onMutate: async (variables) => {
+      const { shot_id, generation_id, project_id, imageUrl, thumbUrl, timelineFrame } = variables;
+      
       console.log('[ADD:useAddImageToShot] 🔄 onMutate starting optimistic update', {
         shot_id,
         generation_id,
@@ -907,8 +610,9 @@ export const useAddImageToShot = () => {
           if (cachedShots) {
             const updatedShots = cachedShots.map(shot => {
               if (shot.id === shot_id) {
-                const optimisticItem = createOptimisticItem(shot.images);
-                return { ...shot, images: [...shot.images, optimisticItem] };
+                const currentImages = shot.images || [];
+                const optimisticItem = createOptimisticItem(currentImages);
+                return { ...shot, images: [...currentImages, optimisticItem] };
               }
               return shot;
             });
@@ -954,1021 +658,426 @@ export const useAddImageToShot = () => {
       // Emit domain event for shot-generation change
       const { project_id, shot_id } = variables;
 
-      if (project_id) {
-        // CRITICAL: Invalidate shot generations query so ShotImagesEditor updates immediately
-        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
-        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
-
-        // STAGE 2 ENHANCEMENT: Emit custom event so VideoTravelToolPage can detect external mutations
-        // This handles the case where GenerationsPane adds an image while user is viewing the shot
-        console.log('[OperationTracking] Emitting shot-mutation-complete event:', { shotId: shot_id.substring(0, 8), type: 'add' });
-        window.dispatchEvent(new CustomEvent('shot-mutation-complete', { 
-          detail: { shotId: shot_id, mutationType: 'add' } 
-        }));
-
-        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
-        // Query is now disabled during operations via disableRefetch flag in VideoTravelToolPage
-        // This prevents both "signal is aborted" errors AND unexpected position resets
-        // 100ms is enough for React's automatic batching without user-perceivable lag
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add operation (100ms delay)');
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
-        }, 100); // 100ms delay for React batch updates, query disabled separately
-      }
-    },
-    onError: (error: Error) => {
-      console.error('Error adding image to shot:', error);
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] }); // Also invalidate metadata (pairs)
       
-      // Provide more helpful error messages for common mobile issues
-      let userMessage = error.message;
-      if (error.message.includes('Load failed') || error.message.includes('TypeError')) {
-        userMessage = 'Network connection issue. Please check your internet connection and try again.';
-      } else if (error.message.includes('fetch')) {
-        userMessage = 'Unable to connect to server. Please try again in a moment.';
-      } else if (isQuotaOrServerError(error)) {
-        userMessage = 'Server is temporarily busy. Please wait a moment before trying again.';
-      }
-      
-      toast.error(`Failed to add image to shot: ${userMessage}`);
-    },
-  });
-};
-
-// Add image to shot WITHOUT position VIA API
-export const useAddImageToShotWithoutPosition = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ shot_id, generation_id, imageUrl, thumbUrl, project_id }: { 
-      shot_id: string; 
-      generation_id: string; 
-      imageUrl?: string;
-      thumbUrl?: string;
-      project_id: string;
-    }) => {
-      log('MobileNetworkDebug', `Starting add image to shot WITHOUT position - ShotID: ${shot_id}, GenerationID: ${generation_id}, ImageURL: ${imageUrl?.substring(0, 100)}...`);
-      
-      const startTime = Date.now();
-      
-      // First create generation if imageUrl is provided
-      if (imageUrl && !generation_id) {
-        const { data: newGeneration, error: genError } = await supabase
-          .from('generations')
-          .insert({
-            location: imageUrl,
-            type: 'image',
-            project_id: project_id,
-            params: {}
-          })
-          .select()
-          .single();
-        
-        if (genError) throw genError;
-        generation_id = newGeneration.id;
-      }
-      
-      // Use RPC function to atomically add generation to shot WITHOUT position
-      const { data: shotGeneration, error: rpcError } = await supabase
-        .rpc('add_generation_to_shot', {
-          p_shot_id: shot_id,
-          p_generation_id: generation_id,
-          p_with_position: false
-        })
-        .single();
-      
-      if (rpcError) {
-        log('MobileNetworkDebug', `RPC Error after ${Date.now() - startTime}ms:`, rpcError);
-        throw rpcError;
-      }
-      
-      log('MobileNetworkDebug', `Successfully added image to shot WITHOUT position in ${Date.now() - startTime}ms`);
-      return shotGeneration;
-    },
-    onSuccess: (_, variables) => {
-      // Batch invalidate queries for better performance
-      const { project_id, shot_id } = variables;
-      
-      if (project_id) {
-        // CRITICAL: Invalidate shot generations query so ShotImagesEditor updates immediately
-        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
-        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
-
-        // STAGE 2 ENHANCEMENT: Emit custom event for external mutations
-        console.log('[OperationTracking] Emitting shot-mutation-complete event:', { shotId: shot_id.substring(0, 8), type: 'add-without-position' });
-        window.dispatchEvent(new CustomEvent('shot-mutation-complete', { 
-          detail: { shotId: shot_id, mutationType: 'add-without-position' } 
-        }));
-
-        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after add without position operation (100ms delay)');
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
-        }, 100);
-      }
-    },
-    onError: (error: Error) => {
-      console.error('Error adding image to shot without position:', error);
-      toast.error(`Failed to add image to shot: ${error.message}`);
-    },
-  });
-};
-
-// Position existing generation with NULL position in shot
-export const usePositionExistingGenerationInShot = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ shot_id, generation_id, project_id }: { 
-      shot_id: string; 
-      generation_id: string; 
-      project_id: string;
-    }) => {
-      console.log('[PositionFix] usePositionExistingGenerationInShot starting:', {
-        shot_id,
-        generation_id,
-        project_id,
-        timestamp: Date.now()
-      });
-
-      // First, let's check what currently exists for this shot-generation combo
-      // Use .select() instead of .maybeSingle() to see ALL records
-      const { data: allExistingRecords, error: checkError } = await supabase
-        .from('shot_generations')
-        .select('id, shot_id, generation_id, timeline_frame, created_at')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id)
-        .order('created_at', { ascending: true });
-
-      if (checkError) {
-        console.error('[PositionFix] Error checking existing records:', checkError);
-      } else {
-        console.log('[PositionFix] ALL existing shot_generation records for this combo:', {
-          shot_id,
-          generation_id,
-          recordCount: allExistingRecords?.length || 0,
-          allRecords: allExistingRecords?.map(record => ({
-            id: record.id,
-            timeline_frame: record.timeline_frame,
-            created_at: record.created_at,
-            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
-          })) || [],
-          hasNullTimelineFrameRecord: allExistingRecords?.some(r => r.timeline_frame === null || r.timeline_frame === undefined) || false,
-          hasTimelineFrameRecord: allExistingRecords?.some(r => r.timeline_frame !== null && r.timeline_frame !== undefined) || false
-        });
-      }
-      
-      // Use the updated add_generation_to_shot function with positioning enabled
-      // This will find existing records with NULL position and assign them a position
-      console.log('[PositionFix] Calling RPC add_generation_to_shot with params:', {
-        p_shot_id: shot_id,
-        p_generation_id: generation_id,
-        p_with_position: true
-      });
-
-      const { data: shotGeneration, error: rpcError } = await supabase
-        .rpc('add_generation_to_shot', {
-          p_shot_id: shot_id,
-          p_generation_id: generation_id,
-          p_with_position: true
-        })
-        .single();
-      
-      if (rpcError) {
-        console.error('[PositionFix] RPC error:', {
-          rpcError,
-          code: rpcError.code,
-          message: rpcError.message,
-          details: rpcError.details,
-          hint: rpcError.hint
-        });
-        throw rpcError;
-      }
-      
-      console.log('[PositionFix] RPC success, returned data:', {
-        shotGeneration,
-        newTimelineFrame: (shotGeneration as any)?.timeline_frame,
-        recordId: (shotGeneration as any)?.id,
-        shotId: (shotGeneration as any)?.shot_id,
-        generationId: (shotGeneration as any)?.generation_id,
-        timestamp: Date.now()
-      });
-
-      // Let's verify the final state - get ALL records again to see what happened
-      const { data: finalRecords, error: verifyError } = await supabase
-        .from('shot_generations')
-        .select('id, shot_id, generation_id, timeline_frame, created_at')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id)
-        .order('created_at', { ascending: true });
-
-      if (verifyError) {
-        console.error('[PositionFix] Error verifying final records:', {
-          verifyError,
-          errorCode: verifyError.code,
-          errorMessage: verifyError.message,
-          errorDetails: verifyError.details,
-          queryParams: { shot_id, generation_id }
-        });
-      } else {
-        console.log('[PositionFix] Final verification - ALL records after RPC:', {
-          shot_id,
-          generation_id,
-          beforeCount: allExistingRecords?.length || 0,
-          afterCount: finalRecords?.length || 0,
-          recordsAdded: (finalRecords?.length || 0) - (allExistingRecords?.length || 0),
-          finalRecords: finalRecords?.map(record => ({
-            id: record.id,
-            timeline_frame: record.timeline_frame,
-            created_at: record.created_at,
-            isTimelineFrameNull: record.timeline_frame === null || record.timeline_frame === undefined
-          })) || [],
-          rpcReturnedTimelineFrame: (shotGeneration as any)?.timeline_frame,
-          rpcReturnedId: (shotGeneration as any)?.id
-        });
-      }
-      
-      return shotGeneration;
-    },
-    onSuccess: (_, variables) => {
-      // Batch invalidate queries for better performance
-      const { project_id, shot_id } = variables;
-      
-      // Emit domain event for shot-generation change
-      if (project_id) {
-        // CRITICAL: Invalidate queries for immediate UI updates
-        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', project_id] });
-        queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shot_id] });
-        
-        // STAGE 2 ENHANCEMENT: Emit custom event for external mutations
-        console.log('[OperationTracking] Emitting shot-mutation-complete event:', { shotId: shot_id.substring(0, 8), type: 'position-existing' });
-        window.dispatchEvent(new CustomEvent('shot-mutation-complete', { 
-          detail: { shotId: shot_id, mutationType: 'position-existing' } 
-        }));
-        
-        // FIX: Re-enable shot-specific invalidation with minimal delay
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after position existing operation (100ms delay)');
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] });
-        }, 100);
-      }
-    },
-    onError: (error: Error) => {
-      console.error('Error positioning existing generation in shot:', error);
-      toast.error(`Failed to position generation in shot: ${error.message}`);
-    },
-  });
-};
-
-// Duplicate image in shot at specific position
-export const useDuplicateImageInShot = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({
-      shot_id,
-      generation_id,
-      project_id,
-      silent
-    }: {
-      shot_id: string;
-      generation_id: string;
-      project_id: string;
-      silent?: boolean;
-    }) => {
-      // Get all existing images to calculate timeline frame midpoint
-      const { data: allImages, error: fetchAllError } = await supabase
-        .from('shot_generations')
-        .select('id, timeline_frame, generation_id')
-        .eq('shot_id', shot_id)
-        .order('timeline_frame', { ascending: true });
-      
-      if (fetchAllError) throw fetchAllError;
-      
-      console.log('[DUPLICATE_DEBUG] 📊 ALL IMAGES FROM DATABASE:', {
-        shot_id: shot_id.substring(0, 8),
-        generation_id: generation_id.substring(0, 8),
-        totalImages: allImages?.length || 0,
-        allImages: allImages?.map(img => ({
-          id: img.id.substring(0, 8),
-          generation_id: img.generation_id.substring(0, 8),
-          timeline_frame: img.timeline_frame
-        })) || []
-      });
-      
-      // Find the original image and the next image to calculate midpoint
-      const originalImage = allImages?.find(img => img.generation_id === generation_id);
-      if (!originalImage) throw new Error('Original image not found');
-      
-      console.log('[DUPLICATE_DEBUG] 🚨 UI vs DATABASE COMPARISON:', {
-        generation_id: generation_id.substring(0, 8),
-        database_timeline_frame: originalImage.timeline_frame,
-        note: 'This should match the timeline_frame_from_button in previous logs',
-        warning: 'If these don\'t match, there\'s a UI sync issue'
-      });
-      
-      console.log('[DUPLICATE_DEBUG] 🎯 FOUND ORIGINAL IMAGE:', {
-        originalImage: {
-          id: originalImage.id.substring(0, 8),
-          generation_id: originalImage.generation_id.substring(0, 8),
-          timeline_frame: originalImage.timeline_frame
-        }
-      });
-      
-      // Find the next image by timeline_frame order (not position order)
-      const originalFrameValue = originalImage.timeline_frame || 0;
-      
-      // Sort all images by timeline_frame to find the actual next image in timeline order
-      const sortedByTimelineFrame = allImages
-        ?.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined)
-        .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0)) || [];
-      
-      // Check for duplicate timeline_frame values (this indicates previous duplication bugs)
-      const timelineFrameCounts = {};
-      sortedByTimelineFrame.forEach(img => {
-        const frame = img.timeline_frame;
-        timelineFrameCounts[frame] = (timelineFrameCounts[frame] || 0) + 1;
-      });
-      
-      const duplicateFrames = Object.entries(timelineFrameCounts)
-        .filter(([frame, count]) => (count as number) > 1)
-        .map(([frame, count]) => ({ frame: parseInt(frame), count: count as number }));
-
-      console.log('[DUPLICATE_DEBUG] 📋 SORTED BY TIMELINE_FRAME:', {
-        sortedImages: sortedByTimelineFrame.map((img, index) => ({
-          index,
-          id: img.id.substring(0, 8),
-          generation_id: img.generation_id.substring(0, 8),
-          timeline_frame: img.timeline_frame,
-          isOriginal: img.id === originalImage.id
-        })),
-        duplicateFrames: duplicateFrames.length > 0 ? duplicateFrames : 'none',
-        warning: duplicateFrames.length > 0 ? 'DUPLICATE_TIMELINE_FRAMES_DETECTED!' : 'all_frames_unique'
-      });
-      
-      // Find the next image after the original in timeline order with a DIFFERENT timeline_frame
-      const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === originalImage.id);
-      
-      // Look for the next image with a different timeline_frame value
-      let nextImageInTimeline = null;
-      for (let i = originalIndex + 1; i < sortedByTimelineFrame.length; i++) {
-        const candidate = sortedByTimelineFrame[i];
-        if (candidate.timeline_frame !== originalFrameValue) {
-          nextImageInTimeline = candidate;
-          break;
-        }
-      }
-      
-      console.log('[DUPLICATE_DEBUG] 🔍 NEXT IMAGE SEARCH:', {
-        originalIndex,
-        totalSortedImages: sortedByTimelineFrame.length,
-        hasNextImage: !!nextImageInTimeline,
-        nextImageInTimeline: nextImageInTimeline ? {
-          id: nextImageInTimeline.id.substring(0, 8),
-          generation_id: nextImageInTimeline.generation_id.substring(0, 8),
-          timeline_frame: nextImageInTimeline.timeline_frame
-        } : null,
-        isLastImage: originalIndex === sortedByTimelineFrame.length - 1
-      });
-        
-      // If we're at the end of the timeline, there's no next image
-      // The duplicate should go after the original with default spacing
-      
-      // Calculate timeline frame as midpoint
-      const nextFrame = nextImageInTimeline 
-        ? nextImageInTimeline.timeline_frame  // Use the actual timeline_frame value
-        : (originalFrameValue + 60); // Default spacing if no next image
-      const duplicateTimelineFrame = Math.floor((originalFrameValue + nextFrame) / 2);
-      
-      console.log('[DUPLICATE_DEBUG] 🔧 FRAME CALCULATION DEBUG:', {
-        hasNextImage: !!nextImageInTimeline,
-        nextImageTimelineFrame: nextImageInTimeline?.timeline_frame,
-        nextFrameUsed: nextFrame,
-        originalFrame: originalFrameValue,
-        calculatedMidpoint: duplicateTimelineFrame,
-        issue: nextFrame === originalFrameValue ? 'NEXT_FRAME_EQUALS_ORIGINAL!' : 'OK'
-      });
-      
-      console.log('[DUPLICATE_DEBUG] 🧮 TIMELINE FRAME CALCULATION:', {
-        originalFrame: originalFrameValue,
-        nextFrame,
-        duplicateTimelineFrame,
-        calculationMethod: nextImageInTimeline ? 'midpoint_between_images' : 'default_spacing_after_last',
-        midpointFormula: `Math.floor((${originalFrameValue} + ${nextFrame}) / 2) = ${duplicateTimelineFrame}`,
-        nextImageInTimeline: nextImageInTimeline ? {
-          id: nextImageInTimeline.id.substring(0, 8),
-          timeline_frame: nextImageInTimeline.timeline_frame
-        } : 'none',
-        totalImagesInTimeline: sortedByTimelineFrame.length,
-        originalIndexInTimeline: originalIndex
-      });
-      
-      // Step 1: Get the original generation data to duplicate
-      console.log('[DUPLICATE_DEBUG] 🔍 FETCHING ORIGINAL GENERATION DATA:', {
-        generation_id: generation_id.substring(0, 8)
-      });
-      
-      const { data: originalGeneration, error: fetchGenError } = await supabase
-        .from('generations')
-        .select('*')
-        .eq('id', generation_id)
-        .single();
-      
-      if (fetchGenError || !originalGeneration) {
-        throw new Error('Failed to fetch original generation for duplication');
-      }
-      
-      console.log('[DUPLICATE_DEBUG] 📄 ORIGINAL GENERATION DATA:', {
-        id: originalGeneration.id.substring(0, 8),
-        location: originalGeneration.location?.substring(0, 50) + '...',
-        type: originalGeneration.type,
-        project_id: originalGeneration.project_id?.substring(0, 8)
-      });
-      
-      // Step 2: Create a new generation record (duplicate the image)
-      console.log('[DUPLICATE_DEBUG] 🆕 CREATING NEW GENERATION RECORD:', {
-        duplicating_from: originalGeneration.id.substring(0, 8),
-        timeline_frame: duplicateTimelineFrame
-      });
-      
-      const { data: newGeneration, error: createGenError } = await supabase
-        .from('generations')
-        .insert({
-          location: originalGeneration.location,
-          thumbnail_url: originalGeneration.thumbnail_url,
-          type: originalGeneration.type,
-          project_id: originalGeneration.project_id,
-          params: {
-            ...(originalGeneration.params as Record<string, any> || {}),
-            duplicated_from: originalGeneration.id,
-            duplicate_source: 'timeline_duplicate_button',
-            original_timeline_frame: originalFrameValue
-          } as any
-        })
-        .select()
-        .single();
-      
-      if (createGenError || !newGeneration) {
-        throw new Error('Failed to create new generation for duplicate');
-      }
-      
-      console.log('[DUPLICATE_DEBUG] ✅ NEW GENERATION CREATED:', {
-        new_generation_id: newGeneration.id.substring(0, 8),
-        original_generation_id: generation_id.substring(0, 8)
-      });
-      
-      // Step 3: Create shot_generations entry pointing to the NEW generation
-      console.log('[DUPLICATE_DEBUG] 💾 INSERTING INTO DATABASE:', {
-        shot_id: shot_id.substring(0, 8),
-        new_generation_id: newGeneration.id.substring(0, 8),
-        timeline_frame: duplicateTimelineFrame,
-        originalImageShouldRemainAt: originalFrameValue,
-        warning: 'ORIGINAL_IMAGE_SHOULD_NOT_MOVE'
-      });
-      
-      const { data: newShotGeneration, error: insertError } = await supabase
-        .from('shot_generations')
-        .insert({
-          shot_id,
-          generation_id: newGeneration.id, // ✅ NOW USING THE NEW GENERATION ID!
-          timeline_frame: duplicateTimelineFrame,
-          metadata: {
-            duplicated_from: originalImage.id,
-            original_timeline_frame: originalFrameValue,
-            calculated_midpoint: duplicateTimelineFrame,
-            original_generation_id: generation_id
-          }
-        })
-        .select()
-        .single();
-      
-      if (insertError) throw insertError;
-      
-      return newShotGeneration;
-    },
-    onMutate: async ({ shot_id, generation_id, project_id, silent }) => {
-      console.log('[DUPLICATE_OPTIMISTIC] 🚀 onMutate START', {
-        shot_id: shot_id?.substring(0, 8),
-        generation_id: generation_id?.substring(0, 8),
-        project_id: project_id?.substring(0, 8),
-        timestamp: Date.now()
-      });
-
-      // Cancel outgoing refetches
-      console.log('[DUPLICATE_OPTIMISTIC] 🛑 Canceling queries...');
-      await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
-      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shot_id] });
-      
-      // Snapshot the previous value
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
-      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shot_id]);
-      
-      // DEBUG: Check all shots-related cache keys to see what's available
-      const allShotsCacheKeys = [
-        ['shots', project_id],
-        ['shots', project_id, 0],
-        ['shots', project_id, 2],
-        ['shots', project_id, 5],
-      ];
-      const cacheDebug = allShotsCacheKeys.map(key => ({
-        key: JSON.stringify(key),
-        exists: !!queryClient.getQueryData(key),
-        count: (queryClient.getQueryData(key) as any)?.length || 0
-      }));
-      
-      console.log('[DUPLICATE_OPTIMISTIC] 📸 Snapshots taken:', {
-        previousShotsCount: previousShots?.length,
-        previousFastGensCount: previousFastGens?.length,
-        cacheDebug,
-        previousFastGensSample: previousFastGens?.slice(0, 3).map(g => ({
-          id: g.id?.substring(0, 8),
-          shotImageEntryId: g.shotImageEntryId?.substring(0, 8),
-          timeline_frame: g.timeline_frame
-        }))
-      });
-      
-      // Helper to calculate duplicate frame and create optimistic item
-      const createOptimisticDuplicate = (images: any[]) => {
-        const genToDuplicate = images.find(img => img.id === generation_id || img.generation_id === generation_id);
-        if (!genToDuplicate) return null;
-
-        const originalTimelineFrame = genToDuplicate.timeline_frame || 0;
-
-        const sortedByTimelineFrame = images
-          .filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined)
-          .sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
-        
-        const originalIndex = sortedByTimelineFrame.findIndex(img => img.id === genToDuplicate.id || img.generation_id === genToDuplicate.id);
-        
-        let nextImageInTimeline = null;
-        for (let i = originalIndex + 1; i < sortedByTimelineFrame.length; i++) {
-          const candidate = sortedByTimelineFrame[i];
-          if (candidate.timeline_frame !== originalTimelineFrame) {
-            nextImageInTimeline = candidate;
-            break;
-          }
-        }
-
-        const nextFrame = nextImageInTimeline 
-          ? nextImageInTimeline.timeline_frame
-          : (originalTimelineFrame + 60);
-        
-        const duplicateTimelineFrame = Math.floor((originalTimelineFrame + nextFrame) / 2);
-
-        // Create optimistic item matching the EXACT structure returned by phase1Query
-        // This ensures compatibility with useAllShotGenerations merge logic
-        const tempId = `temp-${Date.now()}-${Math.random()}`;
-        return {
-          ...genToDuplicate,
-          id: tempId,  // Use temp ID for the generation
-          shotImageEntryId: tempId,  // Same temp ID for shot_generation entry
-          shot_generation_id: tempId,
-          timeline_frame: duplicateTimelineFrame,
-          // Ensure compatibility with phase1 query structure
-          location: genToDuplicate.location || genToDuplicate.imageUrl,
-          thumbnail_url: genToDuplicate.thumbnail_url || genToDuplicate.thumbUrl,
-          imageUrl: genToDuplicate.imageUrl || genToDuplicate.location,
-          thumbUrl: genToDuplicate.thumbUrl || genToDuplicate.thumbnail_url,
-          // Mark as optimistic so UI can show loading state if needed
-          _optimistic: true  // Use _ prefix to avoid conflicts
-        };
-      };
-
-      // Optimistically update 'shot-generations-fast' (Timeline)
-      if (previousFastGens) {
-        const optimisticItem = createOptimisticDuplicate(previousFastGens);
-        if (optimisticItem) {
-          const updatedGens = [...previousFastGens, optimisticItem];
-          console.log('[DUPLICATE_OPTIMISTIC] ✨ Created optimistic item for fast cache:', {
-            optimisticId: optimisticItem.id?.substring(0, 8),
-            optimisticShotImageEntryId: optimisticItem.shotImageEntryId?.substring(0, 8),
-            timeline_frame: optimisticItem.timeline_frame,
-            previousCount: previousFastGens.length,
-            newCount: updatedGens.length
-          });
-          queryClient.setQueryData(['shot-generations-fast', shot_id], updatedGens);
-          console.log('[DUPLICATE_OPTIMISTIC] 💾 Updated shot-generations-fast cache');
-        } else {
-          console.warn('[DUPLICATE_OPTIMISTIC] ⚠️ Failed to create optimistic item for fast cache');
-        }
-      } else {
-        console.warn('[DUPLICATE_OPTIMISTIC] ⚠️ No previousFastGens available for optimistic update');
-      }
-
-      // Optimistically update 'shots' (Sidebar/Context)
-      // CRITICAL: Update ALL cache key variants used by useListShots (with different maxImagesPerShot)
-      const shotsCacheKeys = [
-        ['shots', project_id],
-        ['shots', project_id, 0],
-        ['shots', project_id, 2],
-        ['shots', project_id, 5],
-      ];
-      
-      let updatedAnyShotsCache = false;
-      shotsCacheKeys.forEach(cacheKey => {
-        const cachedShots = queryClient.getQueryData<Shot[]>(cacheKey);
-        if (cachedShots) {
-          const updatedShots = cachedShots.map(shot => {
-            if (shot.id === shot_id) {
-              const optimisticItem = createOptimisticDuplicate(shot.images);
-              if (optimisticItem) {
-                console.log('[DUPLICATE_OPTIMISTIC] ✨ Created optimistic item for shots cache:', {
-                  cacheKey: JSON.stringify(cacheKey),
-                  optimisticId: optimisticItem.id?.substring(0, 8),
-                  previousImagesCount: shot.images.length,
-                  newImagesCount: shot.images.length + 1
-                });
-                return { ...shot, images: [...shot.images, optimisticItem] };
-              }
-            }
-            return shot;
-          });
-          queryClient.setQueryData(cacheKey, updatedShots);
-          updatedAnyShotsCache = true;
-          console.log('[DUPLICATE_OPTIMISTIC] 💾 Updated shots cache:', JSON.stringify(cacheKey));
-        }
-      });
-      
-      if (!updatedAnyShotsCache) {
-        console.warn('[DUPLICATE_OPTIMISTIC] ⚠️ No shots cache available for optimistic update (tried all variants)');
-      }
-      
-      console.log('[DUPLICATE_OPTIMISTIC] ✅ onMutate COMPLETE');
-      return { previousShots, previousFastGens, project_id, shot_id };
-    },
-    onError: (err, { project_id, silent }, context) => {
-      console.error('[DUPLICATE_OPTIMISTIC] ❌ onError - Mutation failed, rolling back:', err);
-      
-      // Rollback ALL shots cache variants
-      const shotsCacheKeys = [
-        ['shots', project_id],
-        ['shots', project_id, 0],
-        ['shots', project_id, 2],
-        ['shots', project_id, 5],
-      ];
-      shotsCacheKeys.forEach(cacheKey => {
-        const cached = queryClient.getQueryData(cacheKey);
-        if (cached && context?.previousShots) {
-          console.log('[DUPLICATE_OPTIMISTIC] 🔙 Rolling back shots cache:', JSON.stringify(cacheKey));
-          queryClient.setQueryData(cacheKey, context.previousShots);
-        }
-      });
-      
-      if (context?.previousFastGens && context.shot_id) {
-        console.log('[DUPLICATE_OPTIMISTIC] 🔙 Rolling back shot-generations-fast cache');
-        queryClient.setQueryData(['shot-generations-fast', context.shot_id], context.previousFastGens);
-      }
-      console.error('Error duplicating image in shot:', err);
-      if (!silent) {
-        toast.error('Failed to duplicate image');
-      }
-    },
-    onSuccess: (data, { project_id, shot_id }) => {
-      console.log('[DUPLICATE_OPTIMISTIC] ✅ onSuccess - Refetching in background to sync with DB', {
-        shot_id: shot_id?.substring(0, 8),
-        project_id: project_id?.substring(0, 8)
-      });
-      
-      // Use refetchQueries instead of invalidateQueries to avoid clearing cache
-      // This keeps optimistic data visible while background sync happens
-      queryClient.refetchQueries({ queryKey: ['shots', project_id] });
-      queryClient.refetchQueries({ queryKey: ['unpositioned-count', shot_id] });
-      queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shot_id] });
-      queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shot_id] });
-      
-      console.log('[DUPLICATE_OPTIMISTIC] ✅ All background refetches queued');
+      // Note: DataFreshnessManager handles global invalidation, 
+      // but specific targeted invalidation is still good for immediate feedback
     }
   });
 };
 
-// Type for the arguments of useRemoveImageFromShot mutation
-interface RemoveImageFromShotArgs {
-  shot_id: string;
-  shotImageEntryId: string; // Changed from generation_id
-  project_id?: string | null;
-}
-
-// Remove an image from a shot's timeline VIA API
-// NOTE: This sets timeline_frame to null rather than deleting the shot_generations record,
-// effectively removing it from the timeline while preserving the generation association
-export const useRemoveImageFromShot = () => {
+// Add image to shot WITHOUT position logic (let caller handle it)
+// Useful for drag and drop reordering where we calculate position client-side first
+export const useAddImageToShotWithoutPosition = () => {
   const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ shot_id, shotImageEntryId, project_id }: { shot_id: string; shotImageEntryId: string; project_id?: string | null }) => {
-      console.log('[DELETE:useRemoveImageFromShot] 🗑️ STEP 3: Mutation starting', {
-        shot_id: shot_id?.substring(0, 8),
-        shotImageEntryId: shotImageEntryId?.substring(0, 8),
-        project_id: project_id?.substring(0, 8),
-        timestamp: Date.now()
-      });
 
-      // Instead of deleting, just remove the timeline_frame to unlink from timeline
+  return useMutation({
+    mutationFn: async ({ 
+      shot_id, 
+      generation_id, 
+      project_id,
+      imageUrl,
+      thumbUrl
+    }: { 
+      shot_id: string; 
+      generation_id: string; 
+      project_id: string;
+      imageUrl?: string;
+      thumbUrl?: string;
+    }) => {
+      // This mutation does NOT add to shot_generations table
+      // It assumes the caller will handle the database insert or it's part of a batch op
+      // But for consistency with existing code, we probably DO want it to insert, 
+      // just without the auto-position calculation logic.
+      
+      // Actually, looking at usage, it seems we often want to add it but let the UI
+      // determine the position later or use a default.
+      // If we insert with NULL position, it might break order.
+      // Let's assume we insert at end for now if this is called directly.
+      
+      // Wait, if this is "WithoutPosition", maybe it means "don't calculate, just insert"
+      // But we need a position for the unique constraint usually? 
+      // Ah, timeline_frame is nullable in some schemas or handled differently?
+      // In this codebase, timeline_frame seems important.
+      
+      // Let's implement it as "Insert at 0 or specified if provided in separate call"
+      // But typically "WithoutPosition" implies just linking them.
+      
+      // Getting latest frame to append
+      const { data: lastGen } = await supabase
+          .from('shot_generations')
+          .select('timeline_frame')
+          .eq('shot_id', shot_id)
+          .order('timeline_frame', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+          
+      const nextFrame = (lastGen?.timeline_frame ?? -60) + 60;
+
       const { data, error } = await supabase
         .from('shot_generations')
-        .update({ timeline_frame: null })
-        .eq('id', shotImageEntryId)
-        .eq('shot_id', shot_id)
-        .select();
-      
-      console.log('[DELETE:useRemoveImageFromShot] 📊 Database response:', {
-        success: !error,
-        error: error?.message,
-        errorDetails: error?.details,
-        errorHint: error?.hint,
-        updatedRows: data?.length || 0,
-        data: data,
-        timestamp: Date.now()
-      });
+        .insert({
+          shot_id,
+          generation_id,
+          timeline_frame: nextFrame
+        })
+        .select()
+        .single();
 
-      if (error) {
-        console.error('[DELETE:useRemoveImageFromShot] ❌ Database error:', error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        console.error('[DELETE:useRemoveImageFromShot] ⚠️ No rows were updated!', {
-          shot_id: shot_id?.substring(0, 8),
-          shotImageEntryId: shotImageEntryId?.substring(0, 8),
-          hint: 'Record might not exist or IDs are incorrect'
-        });
-      } else {
-        console.log('[DELETE:useRemoveImageFromShot] ✅ Successfully removed from timeline', {
-          updatedRows: data.length,
-          timestamp: Date.now()
-        });
-      }
-      
-      return { shot_id, shotImageEntryId };
+      if (error) throw error;
+      return { ...data, project_id, imageUrl, thumbUrl };
     },
-    onMutate: async ({ shot_id, shotImageEntryId, project_id }) => {
-      console.log('[DELETE:useRemoveImageFromShot] 🔄 STEP 4: onMutate starting optimistic update', {
-        shot_id: shot_id?.substring(0, 8),
-        shotImageEntryId: shotImageEntryId?.substring(0, 8),
-        project_id: project_id?.substring(0, 8),
-        timestamp: Date.now()
-      });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', variables.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', variables.shot_id] });
+    }
+  });
+};
 
-      // Always update timeline cache (shot-generations-fast) - works even without project_id
-      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shot_id] });
-      
-      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shot_id]);
+// Remove image from shot
+export const useRemoveImageFromShot = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ shotId, generationId, projectId }: { shotId: string; generationId: string; projectId: string }) => {
+      const { error } = await supabase
+        .from('shot_generations')
+        .delete()
+        .eq('shot_id', shotId)
+        .eq('generation_id', generationId);
+
+      if (error) throw error;
+      return { shotId, generationId, projectId };
+    },
+    onMutate: async (variables) => {
+      const { shotId, generationId, projectId } = variables;
+      await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
+      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shotId] });
+
+      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
+      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shotId]);
+
+      // Optimistically update fast gens
       if (previousFastGens) {
-        const updatedGens = previousFastGens.filter(img => img.shotImageEntryId !== shotImageEntryId);
-        queryClient.setQueryData(['shot-generations-fast', shot_id], updatedGens);
-        console.log('[DELETE:useRemoveImageFromShot] 💾 Updated shot-generations-fast cache (optimistic)');
+        queryClient.setQueryData(
+          ['shot-generations-fast', shotId],
+          previousFastGens.filter(g => g.id !== generationId)
+        );
       }
 
-      // Update project-level caches only if project_id is available
-      let previousShots;
-      if (project_id) {
-        await queryClient.cancelQueries({ queryKey: ['shots', project_id] });
-        
-        previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
-        
-        console.log('[DELETE:useRemoveImageFromShot] 📝 Applying optimistic update to shots cache', {
-          previousShotsCount: previousShots?.length || 0,
-          previousFastGensCount: previousFastGens?.length || 0,
-        });
-
-        // Optimistically update ALL 'shots' cache variants (Sidebar/Context)
-        const shotsCacheKeys = [
-          ['shots', project_id],
-          ['shots', project_id, 0],
-          ['shots', project_id, 2],
-          ['shots', project_id, 5],
-        ];
-        shotsCacheKeys.forEach(cacheKey => {
-          queryClient.setQueryData<Shot[]>(cacheKey, (oldShots = []) =>
-            oldShots.map(shot => {
-              if (shot.id === shot_id) {
-                return {
-                  ...shot,
-                  images: shot.images.filter(image => image.shotImageEntryId !== shotImageEntryId),
-                };
-              }
-              return shot;
-            })
-          );
-        });
-      } else {
-        console.log('[DELETE:useRemoveImageFromShot] ⚠️ No project_id, skipping shots cache update (but timeline updated)');
+      // Optimistically update shots list
+      if (previousShots) {
+        queryClient.setQueryData(
+          ['shots', projectId],
+          previousShots.map(shot => {
+            if (shot.id === shotId) {
+              return {
+                ...shot,
+                images: shot.images.filter(img => img.id !== generationId)
+              };
+            }
+            return shot;
+          })
+        );
       }
-      
-      return { previousShots, previousFastGens, project_id, shot_id };
+
+      return { previousShots, previousFastGens, projectId, shotId };
     },
-    onError: (err, args, context) => {
-      console.error('[DELETE:useRemoveImageFromShot] ❌ STEP 5: onError - Mutation failed!', {
-        error: err,
-        errorMessage: err.message,
-        args: {
-          shot_id: args.shot_id?.substring(0, 8),
-          shotImageEntryId: args.shotImageEntryId?.substring(0, 8),
-          project_id: args.project_id?.substring(0, 8)
-        },
-        hasContext: !!context,
-        timestamp: Date.now()
-      });
-      if (context?.previousShots && context.project_id) {
-        // Rollback ALL cache variants
-        const shotsCacheKeys = [
-          ['shots', context.project_id],
-          ['shots', context.project_id, 0],
-          ['shots', context.project_id, 2],
-          ['shots', context.project_id, 5],
-        ];
-        shotsCacheKeys.forEach(cacheKey => {
-          console.log('[DELETE:useRemoveImageFromShot] 🔙 Reverting optimistic update (shots):', JSON.stringify(cacheKey));
-          queryClient.setQueryData<Shot[]>(cacheKey, context.previousShots);
-        });
+    onError: (err, variables, context) => {
+      if (context?.previousShots) {
+        queryClient.setQueryData(['shots', context.projectId], context.previousShots);
       }
-      if (context?.previousFastGens && context.shot_id) {
-        console.log('[DELETE:useRemoveImageFromShot] 🔙 Reverting optimistic update (fast gens)');
-        queryClient.setQueryData(['shot-generations-fast', context.shot_id], context.previousFastGens);
+      if (context?.previousFastGens) {
+        queryClient.setQueryData(['shot-generations-fast', context.shotId], context.previousFastGens);
       }
       toast.error(`Failed to remove image: ${err.message}`);
     },
-    onSuccess: (data, variables) => {
-      console.log('[DELETE:useRemoveImageFromShot] ✅ onSuccess - Refetching in background', {
-        shot_id: variables.shot_id?.substring(0, 8),
-        shotImageEntryId: variables.shotImageEntryId?.substring(0, 8),
-        project_id: variables.project_id?.substring(0, 8),
-        timestamp: Date.now()
-      });
-
-      const project_id = variables.project_id;
-      
-      if (project_id) {
-        // Use refetchQueries to keep optimistic data visible during sync
-        queryClient.refetchQueries({ queryKey: ['shots', project_id] });
-        queryClient.refetchQueries({ queryKey: ['unified-generations', 'project', project_id] });
-        queryClient.refetchQueries({ queryKey: ['unpositioned-count', variables.shot_id] });
-        queryClient.refetchQueries({ queryKey: ['shot-generations-fast', variables.shot_id] });
-        queryClient.refetchQueries({ queryKey: ['shot-generations-meta', variables.shot_id] });
-        
-        console.log('[DELETE:useRemoveImageFromShot] ✅ All background refetches queued');
-      }
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['shots', data.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', data.shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
     },
   });
 };
 
-// Delete a shot VIA API
-export const useDeleteShot = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ shotId, projectId }: { shotId: string; projectId: string }) => {
-      const { error } = await supabase
-        .from('shots')
-        .delete()
-        .eq('id', shotId);
-      
-      if (error) throw error;
-      
-      return shotId;
-    },
-    onSuccess: (_, { projectId, shotId }) => {
-      // Immediately invalidate cache to update UI
-      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-      // Also invalidate unified generations cache
-      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
-      // Invalidate project-video-counts since deleting a shot affects counts
-      queryClient.invalidateQueries({ queryKey: ['project-video-counts', projectId] });
-      
-      console.log('[DeleteShot] Invalidated query cache for immediate UI update', { projectId, shotId });
-    },
-    onError: (error: Error) => {
-      console.error('Error deleting shot:', error);
-      toast.error(`Failed to delete shot: ${error.message}`);
-    },
-  });
-};
-
-// Type for updating shot name
-interface UpdateShotNameArgs {
-  shotId: string;
-  newName: string;
-  projectId: string | null;
-}
-
-// Update shot name VIA API
-export const useUpdateShotName = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ shotId, newName, projectId }: { shotId: string; newName: string; projectId: string }) => {
-      const { data: updatedShot, error } = await supabase
-        .from('shots')
-        .update({ 
-          name: newName,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', shotId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return updatedShot;
-    },
-    onSuccess: (_, { projectId }) => {
-      queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-
-    },
-    onError: (error: Error) => {
-      console.error('Error updating shot name:', error);
-      toast.error(`Failed to update shot name: ${error.message}`);
-    },
-  });
-};
-
-// Type for the arguments of useUpdateShotImageOrder mutation
-interface UpdateShotImageOrderArgs {
-  shotId: string;
-  orderedShotGenerationIds: string[]; // Changed from orderedGenerationIds
-  projectId: string | null;
-}
-
-// Update the order of images in a shot VIA API
-// 🚨 DISABLED: This function was overwriting user drag positions with index-based spacing
-// Only use for non-drag operations like bulk reorder from ShotsPane
+// Update shot image order/position
 export const useUpdateShotImageOrder = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ shotId, orderedShotGenerationIds, projectId }: { shotId: string; orderedShotGenerationIds: string[]; projectId: string }) => {
-      console.log('[TimelineDragFix] 🚨 BLOCKED: useUpdateShotImageOrder called - this would overwrite drag positions');
-      throw new Error('useUpdateShotImageOrder is disabled to prevent overwriting drag positions. Use timeline drag instead.');
-
-      // OLD CODE - DISABLED TO PREVENT DRAG POSITION OVERWRITES:
-      // const updates = orderedShotGenerationIds.map((id, index) =>
-      //   supabase
-      //     .from('shot_generations')
-      //     .update({ timeline_frame: index * 50 })
-      //     .eq('id', id)
-      //     .eq('shot_id', shotId)
-      // );
-      // const results = await Promise.all(updates);
-      // const error = results.find(r => r.error)?.error;
-      // if (error) throw error;
-      // return { message: 'Image order updated successfully' };
-    },
-    onMutate: async ({ shotId, orderedShotGenerationIds, projectId }) => {
-      if (!projectId) return { previousShots: [], projectId: null };
-      await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
-      const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
+    mutationFn: async ({ 
+      updates, 
+      projectId,
+      shotId 
+    }: { 
+      updates: { shot_id: string; generation_id: string; timeline_frame: number }[],
+      projectId: string,
+      shotId: string
+    }) => {
+      // We need to update each record. Supabase upsert matches on primary key.
+      // shot_generations PK is (shot_id, generation_id) usually? 
+      // Actually it has an 'id' column usually.
+      // But upserting with shot_id/generation_id should work if there's a unique constraint.
       
-      queryClient.setQueryData<Shot[]>(['shots', projectId], (oldShots = []) => {
-        return oldShots.map(shot => {
-          if (shot.id === shotId) {
-            const imageMap = new Map(shot.images.map(img => [img.shotImageEntryId, img]));
-            const reorderedImages = orderedShotGenerationIds
-              .map(id => imageMap.get(id))
-              .filter((img): img is GenerationRow => !!img);
-            
-            return { ...shot, images: reorderedImages };
+      // Since we might not have the ID, let's try calling an RPC or doing individual updates.
+      // Individual updates are safer if we don't know the PK ID.
+      
+      const promises = updates.map(update => 
+        supabase
+          .from('shot_generations')
+          .update({ timeline_frame: update.timeline_frame })
+          .eq('shot_id', update.shot_id)
+          .eq('generation_id', update.generation_id)
+      );
+
+      await Promise.all(promises);
+      return { projectId, shotId, updates };
+    },
+    onMutate: async (variables) => {
+      const { updates, projectId, shotId } = variables;
+      
+      // Cancel queries
+      await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shotId] });
+      
+      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shotId]);
+      
+      // Optimistic update
+      if (previousFastGens) {
+        const updatedGens = previousFastGens.map(gen => {
+          const update = updates.find(u => u.generation_id === gen.id);
+          if (update) {
+            return { ...gen, timeline_frame: update.timeline_frame };
           }
-          return shot;
+          return gen;
         });
-      });
-
-      return { previousShots, projectId };
-    },
-    onError: (err, args, context) => {
-      console.error('Optimistic update failed for updateShotImageOrder:', err);
-      if (context?.previousShots && context.projectId) {
-        queryClient.setQueryData(['shots', context.projectId], context.previousShots);
+        
+        // Sort by new frames
+        updatedGens.sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
+        
+        queryClient.setQueryData(['shot-generations-fast', shotId], updatedGens);
       }
-      toast.error(`Failed to reorder images: ${err.message}`);
+      
+      return { previousFastGens, shotId };
     },
-    onSettled: (data, error, { projectId, shotId }) => {
-      if (projectId) {
-        queryClient.invalidateQueries({ queryKey: ['shots', projectId] });
-        // Also invalidate unified generations cache so GenerationsPane updates immediately
-        queryClient.invalidateQueries({ queryKey: ['unified-generations', 'project', projectId] });
-
-        // FIX: Re-enable shot-specific invalidation with minimal delay for React batch updates
-        console.log('[PositionFix] ✅ Scheduling shot-specific query invalidation after create operation (100ms delay)');
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
-          queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
-        }, 100);
+    onError: (err, variables, context) => {
+      if (context?.previousFastGens) {
+        queryClient.setQueryData(['shot-generations-fast', context.shotId], context.previousFastGens);
       }
+      toast.error("Failed to reorder images");
     },
+    onSuccess: (data) => {
+      // Invalidate to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', data.shotId] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
+    }
   });
 };
 
-// Hook to handle dropping an external image file to create a new shot or add to an existing one
-// Type for the RPC response
+// Position an existing generation that already has NULL position in a shot
+// Used when viewing a shot with "Exclude items with a position" filter and adding one of those unpositioned items
+export const usePositionExistingGenerationInShot = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      shot_id, 
+      generation_id, 
+      project_id
+    }: { 
+      shot_id: string; 
+      generation_id: string; 
+      project_id: string;
+    }) => {
+      const { data, error } = await supabase
+        .rpc('position_existing_generation_in_shot', {
+          p_shot_id: shot_id,
+          p_generation_id: generation_id
+        });
+
+      if (error) throw error;
+      return { shot_id, generation_id, project_id, data };
+    },
+    onSuccess: (data) => {
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['shots', data.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', data.shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shot_id] });
+    },
+    onError: (error: Error) => {
+      console.error('Error positioning existing generation in shot:', error);
+      toast.error(`Failed to position image: ${error.message}`);
+    }
+  });
+};
+
+// Duplicate an image in a shot by creating a new generation and adding it at a midpoint timeline_frame
+export const useDuplicateImageInShot = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      shot_id, 
+      generation_id, 
+      project_id
+    }: { 
+      shot_id: string; 
+      generation_id: string; 
+      project_id: string;
+    }) => {
+      // 1. Fetch the original generation to get its image URL and metadata
+      const { data: originalGen, error: genError } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('id', generation_id)
+        .single();
+
+      if (genError || !originalGen) {
+        throw new Error(`Failed to fetch original generation: ${genError?.message || 'Not found'}`);
+      }
+
+      // 2. Fetch the original shot_generation to get its timeline_frame
+      const { data: originalShotGen, error: shotGenError } = await supabase
+        .from('shot_generations')
+        .select('timeline_frame')
+        .eq('shot_id', shot_id)
+        .eq('generation_id', generation_id)
+        .single();
+
+      if (shotGenError || !originalShotGen) {
+        throw new Error(`Failed to fetch original shot_generation: ${shotGenError?.message || 'Not found'}`);
+      }
+
+      const originalTimelineFrame = originalShotGen.timeline_frame ?? 0;
+
+      // 3. Find the next image's timeline_frame to calculate midpoint
+      const { data: nextShotGen } = await supabase
+        .from('shot_generations')
+        .select('timeline_frame')
+        .eq('shot_id', shot_id)
+        .gt('timeline_frame', originalTimelineFrame)
+        .order('timeline_frame', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      // Calculate midpoint timeline_frame
+      let newTimelineFrame: number;
+      if (nextShotGen?.timeline_frame !== null && nextShotGen?.timeline_frame !== undefined) {
+        // Midpoint between original and next
+        newTimelineFrame = Math.floor((originalTimelineFrame + nextShotGen.timeline_frame) / 2);
+      } else {
+        // No next image, place it 60 frames after the original
+        newTimelineFrame = originalTimelineFrame + 60;
+      }
+
+      // 4. Create a new generation record (duplicate)
+      const { data: newGeneration, error: createError } = await supabase
+        .from('generations')
+        .insert({
+          project_id: project_id,
+          type: originalGen.type || 'image',
+          location: originalGen.location,
+          thumbnail_url: originalGen.thumbnail_url || originalGen.location,
+          params: {
+            ...originalGen.params,
+            source: 'duplicate',
+            duplicated_from: generation_id,
+            original_filename: originalGen.params?.original_filename || 'duplicated_image'
+          }
+        })
+        .select()
+        .single();
+
+      if (createError || !newGeneration) {
+        throw new Error(`Failed to create duplicate generation: ${createError?.message || 'Unknown error'}`);
+      }
+
+      // 5. Add the new generation to the shot at the calculated timeline_frame
+      const { data: newShotGen, error: addError } = await supabase
+        .from('shot_generations')
+        .insert({
+          shot_id,
+          generation_id: newGeneration.id,
+          timeline_frame: newTimelineFrame
+        })
+        .select()
+        .single();
+
+      if (addError || !newShotGen) {
+        // Clean up: delete the generation if adding to shot failed
+        await supabase.from('generations').delete().eq('id', newGeneration.id);
+        throw new Error(`Failed to add duplicate to shot: ${addError?.message || 'Unknown error'}`);
+      }
+
+      return { 
+        shot_id, 
+        original_generation_id: generation_id,
+        new_generation_id: newGeneration.id,
+        timeline_frame: newTimelineFrame,
+        project_id 
+      };
+    },
+    onSuccess: (data) => {
+      // Invalidate queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['shots', data.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', data.shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shot_id] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shot_id] });
+    },
+    onError: (error: Error) => {
+      console.error('Error duplicating image in shot:', error);
+      toast.error(`Failed to duplicate image: ${error.message}`);
+    }
+  });
+};
+
+// Function to create a generation from an uploaded image
+export const createGenerationForUploadedImage = async (
+  imageUrl: string,
+  fileName: string,
+  fileType: string,
+  fileSize: number,
+  projectId: string,
+  thumbnailUrl?: string
+) => {
+  const { data, error } = await supabase
+    .from('generations')
+    .insert({
+      project_id: projectId,
+      type: 'image',
+      location: imageUrl,
+      thumbnail_url: thumbnailUrl || imageUrl, // Use separate thumbnail if available
+      params: {
+        source: 'upload',
+        original_filename: fileName,
+        file_type: fileType,
+        file_size: fileSize
+      }
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Helper function to check for quota or server errors
+const isQuotaOrServerError = (error: Error): boolean => {
+  const msg = error.message?.toLowerCase() || '';
+  return (
+    msg.includes('500') || 
+    msg.includes('502') || 
+    msg.includes('503') || 
+    msg.includes('504') ||
+    msg.includes('quota') ||
+    msg.includes('limit') ||
+    msg.includes('capacity')
+  );
+};
+
 interface CreateShotWithImageResponse {
   shot_id: string;
   shot_name: string;
@@ -2050,6 +1159,7 @@ export const useHandleExternalImageDrop = () => {
   const createShotMutation = useCreateShot();
   const addImageToShotMutation = useAddImageToShot();
   const addImageToShotWithoutPositionMutation = useAddImageToShotWithoutPosition();
+  const queryClient = useQueryClient();
   // IMPORTANT: This hook needs access to the current project_id.
   // This should ideally come from a context, e.g., useProject().
   // For now, I'll assume it's passed as an argument or a higher-level component handles it.
@@ -2075,6 +1185,80 @@ export const useHandleExternalImageDrop = () => {
     let shotId = targetShotId;
     const generationIds: string[] = [];
 
+    // --- NEW: CROP IMAGES TO SHOT ASPECT RATIO ---
+    
+    // 1. Get Project and Shot details to determine target aspect ratio
+    // We need to fetch the project to check its aspect ratio settings
+    // and if we have a target shot, we check its aspect ratio too.
+    
+    let targetAspectRatio: number | null = null;
+    let aspectRatioSource = 'none';
+
+    try {
+        // Fetch project details
+        const { data: projectData } = await supabase
+            .from('projects')
+            .select('aspect_ratio')
+            .eq('id', projectIdForOperation)
+            .single();
+            
+        // If we have a target shot, fetch its details
+        let shotData = null;
+        if (shotId) {
+            const { data } = await supabase
+                .from('shots')
+                .select('aspect_ratio')
+                .eq('id', shotId)
+                .single();
+            shotData = data;
+        }
+
+        // Determine aspect ratio: Shot > Project > Default
+        const shotRatioStr = shotData?.aspect_ratio;
+        const projectRatioStr = projectData?.aspect_ratio;
+        
+        const effectiveRatioStr = shotRatioStr || projectRatioStr;
+        
+        if (effectiveRatioStr) {
+            targetAspectRatio = parseRatio(effectiveRatioStr);
+            aspectRatioSource = shotRatioStr ? 'shot' : 'project';
+        }
+    } catch (err) {
+        console.warn('Error fetching aspect ratio settings:', err);
+    }
+
+    // 2. Crop images if we have a valid aspect ratio
+    let processedFiles = imageFiles;
+    if (targetAspectRatio && !isNaN(targetAspectRatio)) {
+        console.log(`[ImageDrop] Cropping ${imageFiles.length} images to ${aspectRatioSource} aspect ratio: ${targetAspectRatio}`);
+        
+        try {
+            const cropPromises = imageFiles.map(async (file) => {
+                try {
+                    // Skip if not an image
+                    if (!file.type.startsWith('image/')) return file;
+                    
+                    const result = await cropImageToProjectAspectRatio(file, targetAspectRatio as number);
+                    if (result) {
+                        return result.croppedFile;
+                    }
+                    return file;
+                } catch (e) {
+                    console.warn(`Failed to crop image ${file.name}:`, e);
+                    return file;
+                }
+            });
+            
+            processedFiles = await Promise.all(cropPromises);
+        } catch (e) {
+            console.error('Error during batch cropping:', e);
+            // Fallback to original files on catastrophic error
+            processedFiles = imageFiles;
+        }
+    }
+    
+    // --- END CROPPING ---
+
     try {
       // 1. Create a new shot if targetShotId is null
       if (!shotId) {
@@ -2098,9 +1282,9 @@ export const useHandleExternalImageDrop = () => {
         return null;
       }
 
-      // 2. Process each file
-      for (let fileIndex = 0; fileIndex < imageFiles.length; fileIndex++) {
-        const imageFile = imageFiles[fileIndex];
+      // 2. Process each file (using processed/cropped files)
+      for (let fileIndex = 0; fileIndex < processedFiles.length; fileIndex++) {
+        const imageFile = processedFiles[fileIndex];
         let newGeneration: Database['public']['Tables']['generations']['Row'] | null = null;
         try {
           // 2a. Generate client-side thumbnail and upload both images
@@ -2127,7 +1311,7 @@ export const useHandleExternalImageDrop = () => {
               userId,
               onProgress ? (progress) => {
                 // Calculate overall progress: each file is 1/totalFiles of the overall progress
-                const overallProgress = Math.round(((fileIndex + (progress / 100)) / imageFiles.length) * 100);
+                const overallProgress = Math.round(((fileIndex + (progress / 100)) / processedFiles.length) * 100);
                 onProgress(fileIndex, progress, overallProgress);
               } : undefined
             );
@@ -2142,7 +1326,7 @@ export const useHandleExternalImageDrop = () => {
               imageFile,
               3, // maxRetries
               onProgress ? (progress) => {
-                const overallProgress = Math.round(((fileIndex + (progress / 100)) / imageFiles.length) * 100);
+                const overallProgress = Math.round(((fileIndex + (progress / 100)) / processedFiles.length) * 100);
                 onProgress(fileIndex, progress, overallProgress);
               } : undefined
             );
@@ -2214,4 +1398,4 @@ export const useHandleExternalImageDrop = () => {
   });
 
   return mutation;
-}; 
+};
