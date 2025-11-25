@@ -21,8 +21,8 @@ export interface UseShotPositioningProps {
   onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onShowTick?: (imageId: string) => void;
   onShowSecondaryTick?: (imageId: string) => void;
-  onOptimisticPositioned?: (mediaId: string) => void;
-  onOptimisticUnpositioned?: (mediaId: string) => void;
+  onOptimisticPositioned?: (mediaId: string, shotId: string) => void;
+  onOptimisticUnpositioned?: (mediaId: string, shotId: string) => void;
 }
 
 export interface UseShotPositioningReturn {
@@ -58,13 +58,16 @@ export const useShotPositioning = ({
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotId || !media.id) return false;
 
+    // Composite key for optimistic check: mediaId:shotId
+    const optimisticKey = `${media.id}:${selectedShotId}`;
+    
     // Prefer override from gallery source
     if (typeof positionedInSelectedShot === 'boolean') {
-      return positionedInSelectedShot || !!optimisticPositionedIds?.has(media.id);
+      return positionedInSelectedShot || !!optimisticPositionedIds?.has(optimisticKey);
     }
     
-    // Check optimistic state first
-    if (optimisticPositionedIds?.has(media.id)) return true;
+    // Check optimistic state first (using composite key)
+    if (optimisticPositionedIds?.has(optimisticKey)) return true;
     
     // Check if this media is positioned in the selected shot
     // First check single shot association
@@ -88,13 +91,15 @@ export const useShotPositioning = ({
 
   // [ShotNavDebug] Log computed positioned state
   useEffect(() => {
+    const optimisticKey = `${media?.id}:${selectedShotId}`;
     console.log('[ShotNavDebug] [MediaLightbox] isAlreadyPositionedInSelectedShot computed', {
       mediaId: media?.id,
       selectedShotId,
       value: isAlreadyPositionedInSelectedShot,
       mediaShotId: (media as any)?.shot_id,
       mediaPosition: (media as any)?.position,
-      optimisticHas: optimisticPositionedIds?.has(media?.id || ''),
+      optimisticKey,
+      optimisticHas: optimisticPositionedIds?.has(optimisticKey),
       override: positionedInSelectedShot,
       timestamp: Date.now()
     });
@@ -146,9 +151,10 @@ export const useShotPositioning = ({
     console.log('[ShotNavDebug] [MediaLightbox] onAddToShot result', { success, timestamp: Date.now() });
     if (success) {
       onShowTick?.(media.id);
-      onOptimisticPositioned?.(media.id);
+      onOptimisticPositioned?.(media.id, selectedShotId);
       console.log('[ShotNavDebug] [MediaLightbox] Positioned optimistic + tick applied', {
         mediaId: media?.id,
+        shotId: selectedShotId,
         timestamp: Date.now()
       });
     }
@@ -158,13 +164,16 @@ export const useShotPositioning = ({
   const isAlreadyAssociatedWithoutPosition = useMemo(() => {
     if (!selectedShotId || !media.id) return false;
 
+    // Composite key for optimistic check: mediaId:shotId
+    const optimisticKey = `${media.id}:${selectedShotId}`;
+    
     // Prefer override from gallery source
     if (typeof associatedWithoutPositionInSelectedShot === 'boolean') {
-      return associatedWithoutPositionInSelectedShot || !!optimisticUnpositionedIds?.has(media.id);
+      return associatedWithoutPositionInSelectedShot || !!optimisticUnpositionedIds?.has(optimisticKey);
     }
     
-    // Check optimistic state first
-    if (optimisticUnpositionedIds?.has(media.id)) return true;
+    // Check optimistic state first (using composite key)
+    if (optimisticUnpositionedIds?.has(optimisticKey)) return true;
     
     // Check if this media is associated with the selected shot without position
     // First check single shot association
@@ -187,13 +196,15 @@ export const useShotPositioning = ({
 
   // [ShotNavDebug] Log computed unpositioned state
   useEffect(() => {
+    const optimisticKey = `${media?.id}:${selectedShotId}`;
     console.log('[ShotNavDebug] [MediaLightbox] isAlreadyAssociatedWithoutPosition computed', {
       mediaId: media?.id,
       selectedShotId,
       value: isAlreadyAssociatedWithoutPosition,
       mediaShotId: (media as any)?.shot_id,
       mediaPosition: (media as any)?.position,
-      optimisticHas: optimisticUnpositionedIds?.has(media?.id || ''),
+      optimisticKey,
+      optimisticHas: optimisticUnpositionedIds?.has(optimisticKey),
       override: associatedWithoutPositionInSelectedShot,
       timestamp: Date.now()
     });
@@ -245,9 +256,10 @@ export const useShotPositioning = ({
     console.log('[ShotNavDebug] [MediaLightbox] onAddToShotWithoutPosition result', { success, timestamp: Date.now() });
     if (success) {
       onShowSecondaryTick?.(media.id);
-      onOptimisticUnpositioned?.(media.id);
+      onOptimisticUnpositioned?.(media.id, selectedShotId);
       console.log('[ShotNavDebug] [MediaLightbox] Unpositioned optimistic + tick applied', {
         mediaId: media?.id,
+        shotId: selectedShotId,
         timestamp: Date.now()
       });
     }

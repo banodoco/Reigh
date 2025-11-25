@@ -43,8 +43,8 @@ export type ImageGalleryStateAction =
   | { type: 'SET_SELECTED_IMAGE_FOR_DETAILS'; payload: GenerationRow | null }
   | { type: 'SET_SHOW_TASK_DETAILS_MODAL'; payload: boolean }
   | { type: 'SET_PENDING_LIGHTBOX_TARGET'; payload: 'first' | 'last' | null }
-  | { type: 'MARK_OPTIMISTIC_UNPOSITIONED'; payload: string }
-  | { type: 'MARK_OPTIMISTIC_POSITIONED'; payload: string }
+  | { type: 'MARK_OPTIMISTIC_UNPOSITIONED'; payload: { mediaId: string; shotId: string } }
+  | { type: 'MARK_OPTIMISTIC_POSITIONED'; payload: { mediaId: string; shotId: string } }
   | { type: 'MARK_OPTIMISTIC_DELETED'; payload: string }
   | { type: 'REMOVE_OPTIMISTIC_DELETED'; payload: string }
   | { type: 'RECONCILE_OPTIMISTIC_STATE'; payload: Set<string> }
@@ -122,10 +122,13 @@ const imageGalleryStateReducer = (
       return { ...state, pendingLightboxTarget: action.payload };
       
     case 'MARK_OPTIMISTIC_UNPOSITIONED': {
+      // Store composite key: mediaId:shotId
+      const { mediaId, shotId } = action.payload;
+      const key = `${mediaId}:${shotId}`;
       const newUnpositioned = new Set(state.optimisticUnpositionedIds);
       const newPositioned = new Set(state.optimisticPositionedIds);
-      newUnpositioned.add(action.payload);
-      newPositioned.delete(action.payload);
+      newUnpositioned.add(key);
+      newPositioned.delete(key);
       return {
         ...state,
         optimisticUnpositionedIds: newUnpositioned,
@@ -134,10 +137,13 @@ const imageGalleryStateReducer = (
     }
     
     case 'MARK_OPTIMISTIC_POSITIONED': {
+      // Store composite key: mediaId:shotId
+      const { mediaId, shotId } = action.payload;
+      const key = `${mediaId}:${shotId}`;
       const newPositioned = new Set(state.optimisticPositionedIds);
       const newUnpositioned = new Set(state.optimisticUnpositionedIds);
-      newPositioned.add(action.payload);
-      newUnpositioned.delete(action.payload);
+      newPositioned.add(key);
+      newUnpositioned.delete(key);
       return {
         ...state,
         optimisticPositionedIds: newPositioned,
@@ -160,18 +166,21 @@ const imageGalleryStateReducer = (
     case 'RECONCILE_OPTIMISTIC_STATE': {
       const currentImageIds = action.payload;
       
-      // Clean up optimistic sets - remove IDs for images no longer in the list
+      // Clean up optimistic sets - remove entries for images no longer in the list
+      // Composite keys are in format mediaId:shotId
       const newUnpositioned = new Set<string>();
-      for (const id of state.optimisticUnpositionedIds) {
-        if (currentImageIds.has(id)) {
-          newUnpositioned.add(id);
+      for (const key of state.optimisticUnpositionedIds) {
+        const mediaId = key.split(':')[0];
+        if (currentImageIds.has(mediaId)) {
+          newUnpositioned.add(key);
         }
       }
       
       const newPositioned = new Set<string>();
-      for (const id of state.optimisticPositionedIds) {
-        if (currentImageIds.has(id)) {
-          newPositioned.add(id);
+      for (const key of state.optimisticPositionedIds) {
+        const mediaId = key.split(':')[0];
+        if (currentImageIds.has(mediaId)) {
+          newPositioned.add(key);
         }
       }
       
@@ -191,14 +200,7 @@ const imageGalleryStateReducer = (
     }
     
     case 'SET_SELECTED_SHOT_ID_LOCAL':
-      // Clear optimistic IDs when switching shots - the optimistic state is per-shot
-      // and should not persist when changing to a different shot
-      return { 
-        ...state, 
-        selectedShotIdLocal: action.payload,
-        optimisticPositionedIds: new Set(),
-        optimisticUnpositionedIds: new Set(),
-      };
+      return { ...state, selectedShotIdLocal: action.payload };
       
     case 'SET_SHOW_TICK_FOR_IMAGE_ID':
       return { ...state, showTickForImageId: action.payload };
@@ -270,8 +272,8 @@ export interface UseImageGalleryStateOptimizedReturn {
   setSelectedImageForDetails: (image: GenerationRow | null) => void;
   setShowTaskDetailsModal: (show: boolean) => void;
   setPendingLightboxTarget: (target: 'first' | 'last' | null) => void;
-  markOptimisticUnpositioned: (imageId: string) => void;
-  markOptimisticPositioned: (imageId: string) => void;
+  markOptimisticUnpositioned: (imageId: string, shotId: string) => void;
+  markOptimisticPositioned: (imageId: string, shotId: string) => void;
   markOptimisticDeleted: (imageId: string) => void;
   removeOptimisticDeleted: (imageId: string) => void;
   setSelectedShotIdLocal: (id: string) => void;
@@ -344,10 +346,10 @@ export const useImageGalleryStateOptimized = ({
       dispatch({ type: 'SET_SHOW_TASK_DETAILS_MODAL', payload: show }),
     setPendingLightboxTarget: (target: 'first' | 'last' | null) => 
       dispatch({ type: 'SET_PENDING_LIGHTBOX_TARGET', payload: target }),
-    markOptimisticUnpositioned: (imageId: string) => 
-      dispatch({ type: 'MARK_OPTIMISTIC_UNPOSITIONED', payload: imageId }),
-    markOptimisticPositioned: (imageId: string) => 
-      dispatch({ type: 'MARK_OPTIMISTIC_POSITIONED', payload: imageId }),
+    markOptimisticUnpositioned: (imageId: string, shotId: string) => 
+      dispatch({ type: 'MARK_OPTIMISTIC_UNPOSITIONED', payload: { mediaId: imageId, shotId } }),
+    markOptimisticPositioned: (imageId: string, shotId: string) => 
+      dispatch({ type: 'MARK_OPTIMISTIC_POSITIONED', payload: { mediaId: imageId, shotId } }),
     markOptimisticDeleted: (imageId: string) => 
       dispatch({ type: 'MARK_OPTIMISTIC_DELETED', payload: imageId }),
     removeOptimisticDeleted: (imageId: string) => 

@@ -131,8 +131,8 @@ interface MediaLightboxProps {
   // Optimistic updates
   optimisticPositionedIds?: Set<string>;
   optimisticUnpositionedIds?: Set<string>;
-  onOptimisticPositioned?: (mediaId: string) => void;
-  onOptimisticUnpositioned?: (mediaId: string) => void;
+  onOptimisticPositioned?: (mediaId: string, shotId: string) => void;
+  onOptimisticUnpositioned?: (mediaId: string, shotId: string) => void;
   // Precomputed overrides from gallery source record
   positionedInSelectedShot?: boolean;
   associatedWithoutPositionInSelectedShot?: boolean;

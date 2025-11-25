@@ -56,8 +56,8 @@ interface ImageGalleryItemProps {
   optimisticUnpositionedIds?: Set<string>;
   optimisticPositionedIds?: Set<string>;
   optimisticDeletedIds?: Set<string>;
-  onOptimisticUnpositioned?: (imageId: string) => void;
-  onOptimisticPositioned?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
+  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
   addingToShotImageId: string | null;
   setAddingToShotImageId: (id: string | null) => void;
   addingToShotWithoutPositionImageId?: string | null;
@@ -1155,7 +1155,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           if (success) {
                                               console.log(`[GenerationsPane] ✅ Success on attempt ${retryCount + 1} for image ${image.id}`);
                                               onShowTick(image.id!);
-                                              onOptimisticPositioned?.(image.id!);
+                                              onOptimisticPositioned?.(image.id!, selectedShotIdLocal);
                                               log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
                                           } else {
                                               console.log(`[GenerationsPane] ❌ Failed on attempt ${retryCount + 1} for image ${image.id}`);
@@ -1289,7 +1289,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                     if (success) {
                                                         console.log(`[GenerationsPane] ✅ Success without position on attempt ${retryCount + 1} for image ${image.id}`);
                                                         onShowSecondaryTick?.(image.id!);
-                                                        onOptimisticUnpositioned?.(image.id!);
+                                                        onOptimisticUnpositioned?.(image.id!, selectedShotIdLocal);
                                                     } else {
                                                         console.log(`[GenerationsPane] ❌ Failed without position on attempt ${retryCount + 1} for image ${image.id}`);
                                                     }

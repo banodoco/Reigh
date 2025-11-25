@@ -396,23 +396,25 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     }
   }, [selectedProjectId]);
 
-  // Optimistic update handlers
-  const handleOptimisticPositioned = useCallback((mediaId: string) => {
-    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as positioned:', mediaId.substring(0, 8));
-    setOptimisticPositionedIds(prev => new Set(prev).add(mediaId));
+  // Optimistic update handlers - use composite key mediaId:shotId
+  const handleOptimisticPositioned = useCallback((mediaId: string, shotId: string) => {
+    const key = `${mediaId}:${shotId}`;
+    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as positioned:', key);
+    setOptimisticPositionedIds(prev => new Set(prev).add(key));
     setOptimisticUnpositionedIds(prev => {
       const next = new Set(prev);
-      next.delete(mediaId);
+      next.delete(key);
       return next;
     });
   }, []);
   
-  const handleOptimisticUnpositioned = useCallback((mediaId: string) => {
-    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as unpositioned:', mediaId.substring(0, 8));
-    setOptimisticUnpositionedIds(prev => new Set(prev).add(mediaId));
+  const handleOptimisticUnpositioned = useCallback((mediaId: string, shotId: string) => {
+    const key = `${mediaId}:${shotId}`;
+    console.log('[TasksPane:AddToShot] ➕ Optimistically marking as unpositioned:', key);
+    setOptimisticUnpositionedIds(prev => new Set(prev).add(key));
     setOptimisticPositionedIds(prev => {
       const next = new Set(prev);
-      next.delete(mediaId);
+      next.delete(key);
       return next;
     });
   }, []);
@@ -437,8 +439,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       return false;
     }
     
-    // Optimistically update UI
-    handleOptimisticPositioned(generationId);
+    // Optimistically update UI with composite key
+    handleOptimisticPositioned(generationId, targetShotId);
     
     try {
       await addImageToShotMutation.mutateAsync({
@@ -453,10 +455,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       return true;
     } catch (error) {
       console.error('[TasksPane:AddToShot] ❌ Failed to add to shot:', error);
-      // Revert optimistic update on error
+      // Revert optimistic update on error (use composite key)
+      const key = `${generationId}:${targetShotId}`;
       setOptimisticPositionedIds(prev => {
         const next = new Set(prev);
-        next.delete(generationId);
+        next.delete(key);
         return next;
       });
       sonnerToast.error('Failed to add to shot');
@@ -484,8 +487,8 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       return false;
     }
     
-    // Optimistically update UI
-    handleOptimisticUnpositioned(generationId);
+    // Optimistically update UI with composite key
+    handleOptimisticUnpositioned(generationId, targetShotId);
     
     try {
       await addImageToShotWithoutPositionMutation.mutateAsync({
@@ -500,10 +503,11 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       return true;
     } catch (error) {
       console.error('[TasksPane:AddToShot] ❌ Failed to add to shot without position:', error);
-      // Revert optimistic update on error
+      // Revert optimistic update on error (use composite key)
+      const key = `${generationId}:${targetShotId}`;
       setOptimisticUnpositionedIds(prev => {
         const next = new Set(prev);
-        next.delete(generationId);
+        next.delete(key);
         return next;
       });
       sonnerToast.error('Failed to add to shot');
@@ -862,9 +866,6 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
             selectedShotId={lightboxSelectedShotId || currentShotId || lastAffectedShotId || undefined}
             onShotChange={(shotId) => {
               setLightboxSelectedShotId(shotId);
-              // Clear optimistic IDs when switching shots - they are per-shot state
-              setOptimisticPositionedIds(new Set());
-              setOptimisticUnpositionedIds(new Set());
             }}
             onAddToShot={handleAddToShot}
             onAddToShotWithoutPosition={handleAddToShotWithoutPosition}
