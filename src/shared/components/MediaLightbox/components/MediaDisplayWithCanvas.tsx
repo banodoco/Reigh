@@ -88,7 +88,9 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           : '55vw';
         return { maxWidth: adjustedMaxWidth, maxHeight: '98vh' };
       case 'mobile-stacked':
-        return { maxWidth: '95vw', maxHeight: '58vh' };
+        // Use 100% to fit within the container (which is 45dvh in InlineEditView)
+        // instead of fixed vh/vw which might overflow
+        return { maxWidth: '100%', maxHeight: '100%' };
       case 'regular-centered':
         return {}; // Use natural sizing with max-w-full max-h-full
       default:
@@ -147,11 +149,6 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
       ref={imageContainerRef} 
       className={`relative flex items-center justify-center ${containerClassName}`}
       style={{ touchAction: 'none' }}
-      onTouchMove={(e) => {
-        if (isInpaintMode) {
-          e.preventDefault();
-        }
-      }}
     >
       {isVideo ? (
         // Video Player

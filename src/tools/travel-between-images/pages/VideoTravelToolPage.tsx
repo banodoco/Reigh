@@ -2245,8 +2245,8 @@ const VideoTravelToolPage: React.FC = () => {
         </div>
       )}
       
-      {/* Back to Top Button - appears when scrolled down */}
-      {showBackToTop && (
+      {/* Back to Top Button - appears when scrolled down (only in shot list view) */}
+      {showBackToTop && !shouldShowShotEditor && (
         <Button
           variant="theme-soft"
           size="icon"

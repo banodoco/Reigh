@@ -505,6 +505,14 @@ export const useInpainting = ({
             inpaintCount: loadedInpaintStrokes.length,
             annotationCount: loadedAnnotationStrokes.length
           });
+          
+          // Redraw strokes immediately after hydration
+          // Use a timeout to ensure canvas is ready
+          setTimeout(() => {
+            if (redrawStrokesRef.current) {
+              redrawStrokesRef.current(loadedInpaintStrokes);
+            }
+          }, 50);
         } else {
           console.log('[Inpaint] ℹ️ No localStorage data on mode enter', { mediaId: media.id.substring(0, 8) });
         }
@@ -680,6 +688,18 @@ export const useInpainting = ({
         
         // Store new size for future comparisons
         prevCanvasSizeRef.current = { width: newWidth, height: newHeight };
+        
+        // Redraw all strokes after resizing/initializing
+        // This ensures strokes are visible immediately
+        if (inpaintStrokes.length > 0 || annotationStrokes.length > 0) {
+          // Use timeout to ensure canvas DOM updates have settled
+          setTimeout(() => {
+            const strokesToRedraw = [...inpaintStrokes, ...annotationStrokes];
+            if (redrawStrokesRef.current && strokesToRedraw.length > 0) {
+              redrawStrokesRef.current(strokesToRedraw);
+            }
+          }, 50);
+        }
         
     // Mark this media as initialized
     lastInitializedMediaRef.current = media.id;
@@ -1241,7 +1261,10 @@ export const useInpainting = ({
     if (!isDrawing) return;
     const preventTouchMove = (e: TouchEvent) => {
       // Only prevent if drawing to avoid breaking normal scroll elsewhere
-      e.preventDefault();
+      // Check if event is cancelable before attempting to preventDefault
+      if (e.cancelable) {
+        e.preventDefault();
+      }
     };
     document.addEventListener('touchmove', preventTouchMove, { passive: false });
     return () => {
