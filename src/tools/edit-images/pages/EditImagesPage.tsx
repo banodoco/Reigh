@@ -111,12 +111,12 @@ export default function EditImagesPage() {
           <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row bg-transparent">
             {/* Left Panel - Placeholder */}
             <div 
-              className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-t-2xl md:rounded-t-none md:rounded-l-xl overflow-hidden"
+              className="relative flex items-center justify-center bg-black w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl overflow-hidden"
             >
-             <div className="flex flex-col items-center justify-center space-y-2 md:space-y-6 p-4 md:p-8">
-                <div className="text-center space-y-1 md:space-y-2 max-w-md">
-                  <h1 className="text-xl md:text-3xl font-light tracking-tight text-white">Edit Images</h1>
-                  <p className="text-white/90 text-xs md:text-base hidden md:block">
+             <div className="bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 p-6 md:p-8 flex flex-col items-center justify-center space-y-4 md:space-y-6 max-w-md mx-4">
+                <div className="text-center space-y-1 md:space-y-2">
+                  <h1 className="text-xl md:text-3xl font-light tracking-tight">Edit Images</h1>
+                  <p className="text-muted-foreground text-xs md:text-base hidden md:block">
                     Select an image from the right or upload a new one to start editing.
                   </p>
                 </div>
@@ -129,7 +129,7 @@ export default function EditImagesPage() {
                     onChange={handleFileUpload}
                     disabled={isUploading}
                   />
-                  <Button variant="outline" size="lg" className="w-full gap-2 bg-black/50 text-white border-white/20 hover:bg-white/10" disabled={isUploading}>
+                  <Button variant="outline" size="lg" className="w-full gap-2" disabled={isUploading}>
                     <Upload className="w-4 h-4" />
                     {isUploading ? "Uploading..." : "Upload Image"}
                   </Button>
