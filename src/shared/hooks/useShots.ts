@@ -1172,9 +1172,10 @@ export const useHandleExternalImageDrop = () => {
         currentProjectQueryKey: string | null,
         currentShotCount: number,
         skipAutoPosition?: boolean, // NEW: Flag to skip auto-positioning for timeline uploads
+        positions?: number[], // NEW: Optional explicit positions for the images
         onProgress?: (fileIndex: number, fileProgress: number, overallProgress: number) => void // NEW: Progress callback
     }) => {
-    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition, onProgress } = variables;
+    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition, positions, onProgress } = variables;
     
     if (!currentProjectQueryKey) { // Should be actual projectId
         toast.error("Cannot add image(s): current project is not identified.");
@@ -1353,7 +1354,19 @@ export const useHandleExternalImageDrop = () => {
 
           // 2c. Add the generation to the shot (either new or existing)
           // Use different mutation based on skipAutoPosition flag
-          if (skipAutoPosition) {
+          const explicitPosition = positions && positions.length > fileIndex ? positions[fileIndex] : undefined;
+
+          if (explicitPosition !== undefined) {
+             // Use explicit position if provided
+             await addImageToShotMutation.mutateAsync({
+              shot_id: shotId,
+              generation_id: newGeneration.id as string,
+              project_id: projectIdForOperation,
+              imageUrl: newGeneration.location || undefined,
+              thumbUrl: thumbnailUrl || newGeneration.location || undefined,
+              timelineFrame: explicitPosition
+            });
+          } else if (skipAutoPosition) {
             // For timeline uploads: create without auto-positioning so caller can set position
             await addImageToShotWithoutPositionMutation.mutateAsync({
               shot_id: shotId,
