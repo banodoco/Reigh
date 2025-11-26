@@ -77,7 +77,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
         style={{
           left: `${startPercent}%`,
           width: `${endPercent - startPercent}%`,
-          transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
+          transition: 'none', // Prevent jitter when coordinate system changes
         }}
       />
 
@@ -88,7 +88,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
           style={{
             left: `${contextStartPercent}%`,
             width: `${endPercent - contextStartPercent}%`,
-            transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
+            transition: 'none', // Prevent jitter when coordinate system changes
           }}
         >
           <div className={`absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-light ${colorScheme.text} bg-white/80 px-2 py-0.5 rounded`}>
@@ -105,7 +105,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
           left: `${startPercent}%`,
           width: `${((startPercent + endPercent) / 2) - startPercent}%`,
           transform: 'translateY(-50%)',
-          transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
+          transition: 'none', // Prevent jitter when coordinate system changes
         }}
       />
 
@@ -116,7 +116,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
           left: `${(startPercent + endPercent) / 2}%`,
           width: `${endPercent - ((startPercent + endPercent) / 2)}%`,
           transform: 'translateY(-50%)',
-          transition: isDragging ? 'none' : 'left 0.2s ease-out, width 0.2s ease-out',
+          transition: 'none', // Prevent jitter when coordinate system changes
         }}
       />
 
@@ -129,7 +129,8 @@ const PairRegion: React.FC<PairRegionProps> = ({
               style={{
                 left: `${(startPercent + endPercent) / 2}%`,
                 transform: 'translate(-50%, -50%)',
-                transition: isDragging ? 'none' : 'left 0.2s ease-out',
+                // Only animate hover effects, NOT position (left) to prevent jitter
+                transition: 'background-color 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s ease-out, color 0.2s ease-out',
               }}
               onClick={(e) => {
                 e.stopPropagation();
