@@ -92,6 +92,7 @@ interface SortableClipProps {
   transitionPrompts: TransitionPrompt[];
   useIndividualPrompts: boolean;
   onRemoveClip: (clipId: string) => void;
+  onClearVideo: (clipId: string) => void;
   onVideoUpload: (e: React.ChangeEvent<HTMLInputElement>, clipId: string) => void;
   onDragOver: (e: React.DragEvent, clipId: string) => void;
   onDragEnter: (e: React.DragEvent, clipId: string) => void;
@@ -114,6 +115,7 @@ const SortableClip: React.FC<SortableClipProps> = ({
   transitionPrompts,
   useIndividualPrompts,
   onRemoveClip,
+  onClearVideo,
   onVideoUpload,
   onDragOver,
   onDragEnter,
@@ -165,11 +167,17 @@ const SortableClip: React.FC<SortableClipProps> = ({
               {isAddAnotherClip ? 'Add another clip' : `Clip #${index + 1}`}
             </div>
           </div>
-          {clips.length > 2 && !isAddAnotherClip && (
+          {clip.url && !isAddAnotherClip && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onRemoveClip(clip.id)}
+              onClick={() => {
+                if (clips.length > 2) {
+                  onRemoveClip(clip.id);
+                } else {
+                  onClearVideo(clip.id);
+                }
+              }}
               className="h-6 w-6 text-destructive hover:text-destructive"
             >
               <Trash2 className="h-3 w-3" />
@@ -495,9 +503,21 @@ const JoinClipsPage: React.FC = () => {
         }
       }
       
-      // If we have saved clips, use them
+      // If we have saved clips, use them (but ensure minimum of 2)
       if (initialClips.length > 0) {
-        setClips(initialClips);
+        // Ensure we always have at least 2 clips
+        if (initialClips.length < 2) {
+          const clipsToAdd = 2 - initialClips.length;
+          const emptyClips = Array.from({ length: clipsToAdd }, () => ({
+            id: generateUUID(),
+            url: '',
+            loaded: false,
+            playing: false
+          }));
+          setClips([...initialClips, ...emptyClips]);
+        } else {
+          setClips(initialClips);
+        }
       } else {
         // No saved clips - create 2 empty slots to start
         const emptyClip1 = {
@@ -555,9 +575,23 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [clips, transitionPrompts, settingsLoaded, joinSettings]);
   
-  // Auto-add empty slot when all slots are filled, and remove extra trailing empty slots
+  // Ensure minimum of 2 clips, auto-add empty slot when all slots are filled, and remove extra trailing empty slots
   useEffect(() => {
     if (clips.length === 0) return;
+    
+    // Ensure minimum of 2 clips
+    if (clips.length < 2) {
+      console.log('[JoinClips] Less than 2 clips, adding empty slots to reach minimum');
+      const clipsToAdd = 2 - clips.length;
+      const newClips = Array.from({ length: clipsToAdd }, () => ({
+        id: generateUUID(),
+        url: '',
+        loaded: false,
+        playing: false
+      }));
+      setClips(prev => [...prev, ...newClips]);
+      return; // Prevent running other logic in the same effect run
+    }
     
     // Find trailing empty slots (consecutive empty slots at the end)
     let lastNonEmptyIndex = -1;
@@ -585,9 +619,10 @@ const JoinClipsPage: React.FC = () => {
     }
     
     // If we have more than one trailing empty slot, remove extras (keeping only one)
+    // But ensure we always have at least 2 clips total
     if (trailingEmptyCount > 1) {
       console.log('[JoinClips] Multiple trailing empty slots detected, keeping only one');
-      const targetLength = lastNonEmptyIndex + 2; // Keep all non-empty + 1 empty
+      const targetLength = Math.max(2, lastNonEmptyIndex + 2); // Keep all non-empty + 1 empty, but minimum 2
       
       // Only update if we actually need to remove clips
       if (clips.length !== targetLength) {
@@ -722,9 +757,38 @@ const JoinClipsPage: React.FC = () => {
     }]);
   };
   
-  // Remove clip
+  // Remove clip (but ensure minimum of 2 clips)
   const handleRemoveClip = (clipId: string) => {
-    setClips(prev => prev.filter(c => c.id !== clipId));
+    setClips(prev => {
+      // Ensure we always have at least 2 clips
+      if (prev.length <= 2) {
+        return prev;
+      }
+      return prev.filter(c => c.id !== clipId);
+    });
+    // Remove any transition prompts associated with this clip
+    setTransitionPrompts(prev => prev.filter(p => p.id !== clipId));
+  };
+  
+  // Clear video content from a clip (keeps the slot)
+  const handleClearVideo = (clipId: string) => {
+    setClips(prev => prev.map(clip => 
+      clip.id === clipId
+        ? { ...clip, url: '', posterUrl: undefined, finalFrameUrl: undefined, file: undefined, loaded: false, playing: false }
+        : clip
+    ));
+    // Reset the file input so it can accept a new file
+    const fileInput = fileInputRefs.current[clipId];
+    if (fileInput) {
+      fileInput.value = '';
+    }
+    // Reset the video element
+    const videoElement = videoRefs.current[clipId];
+    if (videoElement) {
+      videoElement.pause();
+      videoElement.src = '';
+      videoElement.load();
+    }
     // Remove any transition prompts associated with this clip
     setTransitionPrompts(prev => prev.filter(p => p.id !== clipId));
   };
@@ -1057,6 +1121,7 @@ const JoinClipsPage: React.FC = () => {
                     transitionPrompts={transitionPrompts}
                     useIndividualPrompts={useIndividualPrompts}
                     onRemoveClip={handleRemoveClip}
+                    onClearVideo={handleClearVideo}
                     onVideoUpload={handleVideoUpload}
                     onDragOver={handleDragOver}
                     onDragEnter={handleDragEnter}
@@ -1101,7 +1166,11 @@ const JoinClipsPage: React.FC = () => {
             onGenerate={handleGenerate}
             isGenerating={generateJoinClipsMutation.isPending}
             generateSuccess={showSuccessState}
-            generateButtonText={`Generate (${clips.filter(c => c.url).length - 1} transition${clips.filter(c => c.url).length - 1 !== 1 ? 's' : ''})`}
+            generateButtonText={(() => {
+              const validClipsCount = clips.filter(c => c.url).length;
+              const transitionCount = Math.max(0, validClipsCount - 1);
+              return `Generate (${transitionCount} transition${transitionCount !== 1 ? 's' : ''})`;
+            })()}
             isGenerateDisabled={clips.filter(c => c.url).length < 2}
           />
         </div>
