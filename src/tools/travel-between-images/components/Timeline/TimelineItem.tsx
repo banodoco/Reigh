@@ -257,7 +257,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         left: `${leftPercent}%`,
         top: '50%',
         transform: `translate(-50%, -50%) ${isHovered || isDragging || isSelectedForMove ? 'scale(1.15)' : 'scale(1)'}`,
-        transition: isDragging ? 'none' : 'all 0.2s ease-out',
+        // Only transition transform/opacity/box-shadow, NOT position (left) - prevents visual jitter when coordinate system recalculates
+        transition: isDragging ? 'none' : 'transform 0.2s ease-out, opacity 0.2s ease-out, box-shadow 0.2s ease-out',
         opacity: isDragging ? 0.8 : 1,
         zIndex: isHovered || isDragging || isSelectedForMove ? 20 : 1,
         cursor: isSelectedForMove ? 'pointer' : 'move',
