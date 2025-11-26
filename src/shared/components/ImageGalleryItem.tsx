@@ -916,7 +916,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           paddingBottom: aspectRatioPadding,
           minHeight: minHeight 
         }} 
-        className="relative bg-gray-200"
+        className="relative bg-muted/50"
       >
           {isVideoContent ? (
             <GalleryVideoScrubber
@@ -1004,7 +1004,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                   imageLoading,
                   actualSrc
                 }),
-                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted/30 animate-pulse">
                   <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                 </div>
               )}

@@ -346,9 +346,9 @@ export const ImageGalleryGrid: React.FC<ImageGalleryGridProps> = ({
                         {/* Match ImageGalleryItem container: border, rounded, overflow-hidden */}
                         <div className="border rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 relative group bg-card">
                           <div className="relative w-full">
-                            <div style={{ paddingBottom: aspectRatioPadding }} className="relative bg-gray-200">
+                            <div style={{ paddingBottom: aspectRatioPadding }} className="relative bg-muted/50">
                               {/* Match exact skeleton design from ImageGalleryItem */}
-                              <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-200 animate-pulse">
+                              <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-muted/30 animate-pulse">
                                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-400"></div>
                               </div>
                             </div>
