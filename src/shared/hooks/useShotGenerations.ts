@@ -625,8 +625,11 @@ export const useTimelineShotGenerations = (
   const timelineData = React.useMemo(() => {
     if (!baseQuery.data) return undefined;
     
-    // Filter to only timeline generations (positioned + has metadata)
-    const filtered = baseQuery.data.filter(isTimelineGeneration);
+    // Filter to only timeline generations (positioned + has metadata) AND not videos
+    // Timeline should only display image frames
+    const filtered = baseQuery.data
+      .filter(isTimelineGeneration)
+      .filter(gen => !gen.type?.includes('video'));
     
     console.log('[useTimelineShotGenerations] Filtered timeline generations:', {
       shotId,
