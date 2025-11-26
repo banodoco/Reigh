@@ -352,6 +352,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
       const { data: shotGenerations, error: sgError } = await supabase
         .from('shot_generations')
         .select(`
+          id,
           shot_id,
           timeline_frame,
           generation_id,
@@ -391,7 +392,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         // Transform to GenerationRow format
         const imageRow: GenerationRow = {
           id: gen.id,
-          shotImageEntryId: gen.id, // Using generation ID as entry ID for now since we don't have the junction ID handy in this shape
+          shotImageEntryId: sg.id, // Use shot_generations row ID for unique key per shot-generation relationship
             imageUrl: gen.location,
             thumbUrl: gen.thumbnail_url || gen.location,
           type: gen.type || 'image',
@@ -743,22 +744,76 @@ export const useRemoveImageFromShot = () => {
 
   return useMutation({
     mutationFn: async ({ shotId, generationId, projectId }: { shotId: string; generationId: string; projectId: string }) => {
+      console.log('[DeleteDebug] 🎯 STEP 4: Mutation function called', {
+        shotId: shotId?.substring(0, 8),
+        generationId: generationId?.substring(0, 8),
+        projectId: projectId?.substring(0, 8),
+        shotIdType: typeof shotId,
+        generationIdType: typeof generationId,
+        projectIdType: typeof projectId,
+        shotIdUndefined: shotId === undefined,
+        generationIdUndefined: generationId === undefined,
+        projectIdUndefined: projectId === undefined
+      });
+
+      if (!shotId || !generationId || !projectId) {
+        console.error('[DeleteDebug] ❌ Missing required parameters', {
+          hasShotId: !!shotId,
+          hasGenerationId: !!generationId,
+          hasProjectId: !!projectId
+        });
+        throw new Error(`Missing required parameters: shotId=${shotId}, generationId=${generationId}, projectId=${projectId}`);
+      }
+
+      console.log('[DeleteDebug] 🗄️ STEP 5: Executing database delete', {
+        shotId: shotId.substring(0, 8),
+        generationId: generationId.substring(0, 8)
+      });
+
       const { error } = await supabase
         .from('shot_generations')
         .delete()
         .eq('shot_id', shotId)
         .eq('generation_id', generationId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[DeleteDebug] ❌ Database delete failed', {
+          error: error.message,
+          errorCode: error.code,
+          errorDetails: error.details,
+          shotId: shotId.substring(0, 8),
+          generationId: generationId.substring(0, 8)
+        });
+        throw error;
+      }
+
+      console.log('[DeleteDebug] ✅ STEP 6: Database delete successful', {
+        shotId: shotId.substring(0, 8),
+        generationId: generationId.substring(0, 8)
+      });
+
       return { shotId, generationId, projectId };
     },
     onMutate: async (variables) => {
+      console.log('[DeleteDebug] 🔄 STEP 3.5: onMutate called', {
+        variables: {
+          shotId: variables.shotId?.substring(0, 8),
+          generationId: variables.generationId?.substring(0, 8),
+          projectId: variables.projectId?.substring(0, 8)
+        }
+      });
+
       const { shotId, generationId, projectId } = variables;
       await queryClient.cancelQueries({ queryKey: ['shots', projectId] });
       await queryClient.cancelQueries({ queryKey: ['shot-generations-fast', shotId] });
 
       const previousShots = queryClient.getQueryData<Shot[]>(['shots', projectId]);
       const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['shot-generations-fast', shotId]);
+
+      console.log('[DeleteDebug] 📦 onMutate: Cache state', {
+        previousShotsCount: previousShots?.length ?? 0,
+        previousFastGensCount: previousFastGens?.length ?? 0
+      });
 
       // Optimistically update fast gens
       if (previousFastGens) {
@@ -787,6 +842,17 @@ export const useRemoveImageFromShot = () => {
       return { previousShots, previousFastGens, projectId, shotId };
     },
     onError: (err, variables, context) => {
+      console.error('[DeleteDebug] ❌ STEP ERROR: onError called', {
+        errorMessage: err.message,
+        errorStack: err.stack,
+        variables: {
+          shotId: variables.shotId?.substring(0, 8),
+          generationId: variables.generationId?.substring(0, 8),
+          projectId: variables.projectId?.substring(0, 8)
+        },
+        hasContext: !!context
+      });
+
       if (context?.previousShots) {
         queryClient.setQueryData(['shots', context.projectId], context.previousShots);
       }
@@ -796,6 +862,12 @@ export const useRemoveImageFromShot = () => {
       toast.error(`Failed to remove image: ${err.message}`);
     },
     onSuccess: (data) => {
+      console.log('[DeleteDebug] ✅ STEP 7: onSuccess called', {
+        shotId: data.shotId?.substring(0, 8),
+        generationId: data.generationId?.substring(0, 8),
+        projectId: data.projectId?.substring(0, 8)
+      });
+
       queryClient.invalidateQueries({ queryKey: ['shots', data.projectId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', data.shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
@@ -940,16 +1012,20 @@ export const useDuplicateImageInShot = () => {
       }
 
       // 2. Fetch the original shot_generation to get its timeline_frame
-      const { data: originalShotGen, error: shotGenError } = await supabase
+      // Use limit(1) instead of single() in case there are multiple entries
+      const { data: shotGenResults, error: shotGenError } = await supabase
         .from('shot_generations')
         .select('timeline_frame')
         .eq('shot_id', shot_id)
         .eq('generation_id', generation_id)
-        .single();
+        .order('timeline_frame', { ascending: true, nullsFirst: false })
+        .limit(1);
 
-      if (shotGenError || !originalShotGen) {
+      if (shotGenError || !shotGenResults || shotGenResults.length === 0) {
         throw new Error(`Failed to fetch original shot_generation: ${shotGenError?.message || 'Not found'}`);
       }
+      
+      const originalShotGen = shotGenResults[0];
 
       const originalTimelineFrame = originalShotGen.timeline_frame ?? 0;
 
