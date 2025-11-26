@@ -494,7 +494,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [zoomLevel, zoomCenter, dragState.isDragging]); // REMOVED fullMin/fullRange - don't scroll when positions change
+  }, [zoomLevel, zoomCenter]); // REMOVED dragState.isDragging - preventing scroll jump on drop
 
   // Unified drop hook (handles both file drops and generation drops)
   const {
