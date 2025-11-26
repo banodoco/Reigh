@@ -825,9 +825,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             if (dragState.isDragging && dragState.activeId) {
               const isDraggedItemInPair = startEntry?.[0] === dragState.activeId || endEntry?.[0] === dragState.activeId;
               if (isDraggedItemInPair) {
-                // Keep showing the pair region but maybe with reduced opacity or different styling if needed
-                // For now, let's NOT hide it completely to avoid the "naked" look during drag
-                // return null; 
+                return null; // Skip rendering context for dragged item
               }
             }
 
