@@ -56,10 +56,10 @@ export const VideoHoverPreview = React.memo<VideoHoverPreviewProps>(({
           }}
         >
           <div 
-            className="bg-background border border-border shadow-lg rounded-lg p-0 max-w-md min-w-80 relative pointer-events-auto group cursor-pointer"
+            className={`bg-background border border-border shadow-lg rounded-lg p-0 max-w-md min-w-80 relative pointer-events-auto group ${hoveredVideo?.location ? 'cursor-pointer' : ''}`}
             onMouseEnter={onPreviewEnter}
             onMouseLeave={onPreviewLeave}
-            onClick={onOpenDetailsFromHover}
+            onClick={hoveredVideo?.location ? onOpenDetailsFromHover : undefined}
           >
             {/* Arrow pointing to the button */}
             {hoverPosition.positioning === 'below' ? (
@@ -90,12 +90,14 @@ export const VideoHoverPreview = React.memo<VideoHoverPreviewProps>(({
                   isMobile={isMobile}
                 />
                 
-                {/* Click to view indicator - appears on hover */}
-                <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-zinc-900/90 via-zinc-800/60 to-transparent p-2 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="text-xs text-zinc-100 text-center font-medium drop-shadow-md">
-                    Click to view full task info
+                {/* Click to view indicator - appears on hover, but only when generation has output */}
+                {hoveredVideo?.location && (
+                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-zinc-900/90 via-zinc-800/60 to-transparent p-2 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="text-xs text-zinc-100 text-center font-medium drop-shadow-md">
+                      Click to view full task info
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-2 p-4">

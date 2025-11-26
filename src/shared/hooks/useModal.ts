@@ -23,10 +23,10 @@ export const useModal = (size: ModalSize = 'medium'): ModalStyling => {
   // Base classes that all modals need - removed z-index from classes since we apply it via inline style
   const baseClasses = 'bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 rounded-lg flex flex-col';
   
-  // Size-specific max widths
+  // Size-specific max widths and heights
   const sizeClasses = {
     small: 'sm:max-w-sm',
-    medium: 'sm:max-w-[425px]', 
+    medium: 'sm:max-w-[425px] max-h-[85vh]', 
     large: 'sm:max-w-2xl max-h-[90vh]',
     'extra-large': 'max-w-4xl max-h-[90vh]'
   }[size];

@@ -625,7 +625,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       ref={containerRef}
       className={cn('relative group', className)}
       onMouseEnter={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseEnter}
-      onMouseLeave={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseMove}
+      onMouseLeave={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseLeave}
       onMouseMove={isMobile || disableScrubbing || thumbnailMode ? undefined : handleMouseMove}
       {...rest}
     >

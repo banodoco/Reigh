@@ -7,11 +7,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { ProjectSelectorModal } from '@/shared/components/ProjectSelectorModal';
 import BatchSettingsForm from './BatchSettingsForm';
+import { MotionControl } from './MotionControl';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import ShotImagesEditor from './ShotImagesEditor';
 import type { GenerationRow } from '@/types/shots';
+import { PhaseConfig } from '../settings';
 
 interface SharedGenerationViewProps {
   shareData: {
@@ -52,8 +54,15 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   const params = task?.params || {};
   const orchestratorPayload = params.full_orchestrator_payload || {};
   const orchestratorDetails = params.orchestrator_details || {};
-  const generationMode = orchestratorPayload.generation_mode || orchestratorDetails.generation_mode || params.generation_mode || 'batch';
-  const frames = orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16;
+  const generationMode = orchestratorDetails.generation_mode || orchestratorPayload.generation_mode || params.generation_mode || 'batch';
+  
+  // Calculate total frames from segment_frames_expanded (sum of all segment durations)
+  const segmentFramesEarly = orchestratorDetails.segment_frames_expanded 
+    || orchestratorPayload.segment_frames_expanded 
+    || [];
+  const frames = segmentFramesEarly.length > 0 
+    ? segmentFramesEarly.reduce((sum: number, val: number) => sum + val, 0)
+    : (orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16);
 
   // Extract input images from task params
   const inputImages = useMemo(() => {
@@ -73,23 +82,30 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     const orchestratorDetails = p.orchestrator_details || {};
     
     console.log('[SharedGenDebug] Checking locations:', {
-      'orchestratorPayload.input_images': orchestratorPayload.input_images,
-      'orchestratorDetails.input_images': orchestratorDetails.input_images,
-      'p.input_images': p.input_images,
+      'orchestratorDetails.input_image_paths_resolved': orchestratorDetails.input_image_paths_resolved,
       'orchestratorPayload.input_image_paths_resolved': orchestratorPayload.input_image_paths_resolved,
       'p.input_image_paths_resolved': p.input_image_paths_resolved,
+      'p.input_images': p.input_images,
       'p.imageUrls': p.imageUrls,
     });
     
     // Try multiple possible locations for input images
-    if (Array.isArray(orchestratorPayload.input_images) && orchestratorPayload.input_images.length > 0) {
-      console.log('[SharedGenDebug] Found images in orchestratorPayload.input_images:', orchestratorPayload.input_images);
-      return orchestratorPayload.input_images.map(cleanUrl);
+    // Primary location: orchestrator_details.input_image_paths_resolved (current task structure)
+    if (Array.isArray(orchestratorDetails.input_image_paths_resolved) && orchestratorDetails.input_image_paths_resolved.length > 0) {
+      console.log('[SharedGenDebug] Found images in orchestratorDetails.input_image_paths_resolved:', orchestratorDetails.input_image_paths_resolved);
+      return orchestratorDetails.input_image_paths_resolved.map(cleanUrl);
     }
-    if (Array.isArray(orchestratorDetails.input_images) && orchestratorDetails.input_images.length > 0) {
-      console.log('[SharedGenDebug] Found images in orchestratorDetails.input_images:', orchestratorDetails.input_images);
-      return orchestratorDetails.input_images.map(cleanUrl);
+    // Legacy location: full_orchestrator_payload.input_image_paths_resolved
+    if (Array.isArray(orchestratorPayload.input_image_paths_resolved) && orchestratorPayload.input_image_paths_resolved.length > 0) {
+      console.log('[SharedGenDebug] Found images in orchestratorPayload.input_image_paths_resolved:', orchestratorPayload.input_image_paths_resolved);
+      return orchestratorPayload.input_image_paths_resolved.map(cleanUrl);
     }
+    // Direct params location
+    if (Array.isArray(p.input_image_paths_resolved) && p.input_image_paths_resolved.length > 0) {
+      console.log('[SharedGenDebug] Found images in p.input_image_paths_resolved:', p.input_image_paths_resolved);
+      return p.input_image_paths_resolved.map(cleanUrl);
+    }
+    // Alternative names
     if (Array.isArray(p.input_images) && p.input_images.length > 0) {
       console.log('[SharedGenDebug] Found images in p.input_images:', p.input_images);
       return p.input_images.map(cleanUrl);
@@ -97,14 +113,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     if (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
       console.log('[SharedGenDebug] Found images in p.imageUrls:', p.imageUrls);
       return p.imageUrls.map(cleanUrl);
-    }
-    if (Array.isArray(orchestratorPayload.input_image_paths_resolved)) {
-      console.log('[SharedGenDebug] Found images in orchestratorPayload.input_image_paths_resolved:', orchestratorPayload.input_image_paths_resolved);
-      return orchestratorPayload.input_image_paths_resolved.map(cleanUrl);
-    }
-    if (Array.isArray(p.input_image_paths_resolved)) {
-      console.log('[SharedGenDebug] Found images in p.input_image_paths_resolved:', p.input_image_paths_resolved);
-      return p.input_image_paths_resolved.map(cleanUrl);
     }
     
     console.warn('[SharedGenDebug] No input images found in any location!');
@@ -117,17 +125,24 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     const p = task?.params || {};
     const orchestratorPayload = p.full_orchestrator_payload || {};
     const orchestratorDetails = p.orchestrator_details || {};
-    const segmentFrames = orchestratorPayload.segment_frames_expanded 
-      || orchestratorDetails.segment_frames_expanded 
+    const segmentFrames = orchestratorDetails.segment_frames_expanded 
+      || orchestratorPayload.segment_frames_expanded 
       || p.segment_frames_expanded
       || [];
     
     // In timeline mode, first image is ALWAYS at frame 0
-    // segment_frames_expanded contains positions for images AFTER the first
-    // e.g., [45] means: image0=0, image1=45
-    const timelineFrames = generationMode === 'timeline' && segmentFrames.length > 0
-      ? [0, ...segmentFrames]  // Prepend 0 for first image
-      : [];
+    // segment_frames_expanded contains frame COUNTS per segment (e.g., [38, 38])
+    // We need to convert to cumulative positions (e.g., [0, 38, 76])
+    // For n images, we have n-1 segments
+    const timelineFrames: number[] = [];
+    if (generationMode === 'timeline' && segmentFrames.length > 0) {
+      let cumulativePosition = 0;
+      timelineFrames.push(0); // First image always at frame 0
+      for (const frameCount of segmentFrames) {
+        cumulativePosition += frameCount;
+        timelineFrames.push(cumulativePosition);
+      }
+    }
     
     console.log('[SharedGenDebug] Segment frames from task:', {
       rawSegmentFrames: segmentFrames,
@@ -319,21 +334,48 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     const orchestratorPayload = params.full_orchestrator_payload || {};
     const orchestratorDetails = params.orchestrator_details || {};
     
+    // Get frames from segment_frames_expanded if available (first value represents frames per segment)
+    const segmentFrames = orchestratorDetails.segment_frames_expanded || orchestratorPayload.segment_frames_expanded || [];
+    const framesValue = segmentFrames[0] || orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16;
+    
+    // Extract steps - could be in steps_per_phase for advanced mode
+    const phaseConfigData = orchestratorDetails.phase_config || orchestratorPayload.phase_config || params.phase_config || null;
+    const stepsPerPhase = phaseConfigData?.steps_per_phase;
+    const stepsValue = stepsPerPhase?.[0] || orchestratorPayload.steps || orchestratorDetails.steps || params.steps || 6;
+    
+    // Parse resolution
+    const resolutionStr = orchestratorDetails.parsed_resolution_wh || orchestratorPayload.parsed_resolution_wh || '';
+    let width = 512, height = 512;
+    if (resolutionStr && resolutionStr.includes('x')) {
+      const [w, h] = resolutionStr.split('x').map(Number);
+      if (!isNaN(w) && !isNaN(h)) {
+        width = w;
+        height = h;
+      }
+    }
+    
+    // Get negative prompts from expanded array
+    const negativePromptsExpanded = orchestratorDetails.negative_prompts_expanded || orchestratorPayload.negative_prompts_expanded || [];
+    const negativePrompt = negativePromptsExpanded[0] || orchestratorPayload.negative_prompt || orchestratorDetails.negative_prompt || params.negative_prompt || '';
+    
     return {
-      prompt: orchestratorPayload.prompt || orchestratorDetails.prompt || params.prompt || '',
-      frames: orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16,
+      prompt: orchestratorDetails.base_prompt || orchestratorPayload.base_prompt || params.prompt || '',
+      frames: framesValue,
       context_frames: orchestratorPayload.context_frames || orchestratorDetails.context_frames || params.context_frames || 0,
-      steps: orchestratorPayload.steps || orchestratorDetails.steps || params.steps || 8,
-      width: orchestratorPayload.width || orchestratorDetails.width || params.width || 512,
-      height: orchestratorPayload.height || orchestratorDetails.height || params.height || 512,
-      motion: orchestratorPayload.motion || orchestratorDetails.motion || params.motion || 127,
-      seed: orchestratorPayload.seed || orchestratorDetails.seed || params.seed || -1,
-      negative_prompt: orchestratorPayload.negative_prompt || orchestratorDetails.negative_prompt || params.negative_prompt || '',
-      advancedMode: orchestratorPayload.phase_config || orchestratorDetails.phase_config || params.phase_config ? true : false,
-      phaseConfig: orchestratorPayload.phase_config || orchestratorDetails.phase_config || params.phase_config || null,
-      generationMode: orchestratorPayload.generation_mode || orchestratorDetails.generation_mode || params.generation_mode || 'batch',
+      steps: stepsValue,
+      width,
+      height,
+      motion: orchestratorPayload.amount_of_motion || orchestratorDetails.amount_of_motion || params.amount_of_motion || 50,
+      seed: orchestratorDetails.seed_base || orchestratorPayload.seed_base || params.seed || -1,
+      negative_prompt: negativePrompt,
+      advancedMode: phaseConfigData ? true : false,
+      phaseConfig: phaseConfigData as PhaseConfig | null,
+      generationMode: orchestratorDetails.generation_mode || orchestratorPayload.generation_mode || params.generation_mode || 'batch',
       textBeforePrompts: orchestratorPayload.text_before_prompts || orchestratorDetails.text_before_prompts || params.text_before_prompts || '',
       textAfterPrompts: orchestratorPayload.text_after_prompts || orchestratorDetails.text_after_prompts || params.text_after_prompts || '',
+      enhancePrompt: orchestratorDetails.enhance_prompt || orchestratorPayload.enhance_prompt || params.enhance_prompt || false,
+      turboMode: params.turbo_mode || false,
+      motionMode: phaseConfigData ? 'advanced' as const : 'basic' as const,
     };
   }, [task]);
 
@@ -350,7 +392,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   });
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="container mx-auto px-4 pt-8 pb-24 sm:pb-28 max-w-6xl">
       <div className="space-y-6">
         {/* Output Video Display - FIRST */}
         <Card className="overflow-hidden">
@@ -451,85 +493,133 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
             <CardTitle className="text-base sm:text-lg font-light">Generation Settings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
-              <SectionHeader title="Settings" theme="orange" />
-            </div>
-            <div className="pointer-events-none opacity-75">
-              <BatchSettingsForm
-                batchVideoPrompt={taskSettings.prompt}
-                onBatchVideoPromptChange={() => {}} // No-op
-                batchVideoFrames={taskSettings.frames}
-                onBatchVideoFramesChange={() => {}} // No-op
-                batchVideoSteps={taskSettings.steps}
-                onBatchVideoStepsChange={() => {}} // No-op
-                dimensionSource="custom"
-                onDimensionSourceChange={() => {}} // No-op
-                customWidth={taskSettings.width}
-                onCustomWidthChange={() => {}} // No-op
-                customHeight={taskSettings.height}
-                onCustomHeightChange={() => {}} // No-op
-                steerableMotionSettings={{
-                  enabled: false,
-                  motion: taskSettings.motion
-                }}
-                onSteerableMotionSettingsChange={() => {}} // No-op
-                enhancePrompt={false}
-                onEnhancePromptChange={() => {}} // No-op
-                turboMode={false}
-                onTurboModeChange={() => {}} // No-op
-                amountOfMotion="low"
-                onAmountOfMotionChange={() => {}} // No-op
-                advancedMode={taskSettings.advancedMode}
-                onAdvancedModeChange={() => {}} // No-op
-                phaseConfig={taskSettings.phaseConfig}
-                onPhaseConfigChange={() => {}} // No-op
-                selectedPhasePresetId={null}
-                onPhasePresetSelect={() => {}} // No-op
-                onPhasePresetRemove={() => {}} // No-op
-                autoCreateIndividualPrompts={false}
-                onAutoCreateIndividualPromptsChange={() => {}} // No-op
-                projectId="shared-project"
-                shotId="shared-shot"
-                isCloudGenerationEnabled={true}
-              />
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left Column: Main Settings */}
+              <div className="lg:w-1/2 order-2 lg:order-1">
+                <div className="mb-4">
+                  <SectionHeader title="Settings" theme="orange" />
+                </div>
+                <div className="pointer-events-none opacity-75">
+                  <BatchSettingsForm
+                    batchVideoPrompt={taskSettings.prompt}
+                    onBatchVideoPromptChange={() => {}} // No-op
+                    batchVideoFrames={taskSettings.frames}
+                    onBatchVideoFramesChange={() => {}} // No-op
+                    batchVideoSteps={taskSettings.steps}
+                    onBatchVideoStepsChange={() => {}} // No-op
+                    dimensionSource="custom"
+                    onDimensionSourceChange={() => {}} // No-op
+                    customWidth={taskSettings.width}
+                    onCustomWidthChange={() => {}} // No-op
+                    customHeight={taskSettings.height}
+                    onCustomHeightChange={() => {}} // No-op
+                    steerableMotionSettings={{
+                      seed: taskSettings.seed,
+                      negative_prompt: taskSettings.negative_prompt,
+                      model_name: 'wan_2_2_i2v'
+                    }}
+                    onSteerableMotionSettingsChange={() => {}} // No-op
+                    enhancePrompt={taskSettings.enhancePrompt}
+                    onEnhancePromptChange={() => {}} // No-op
+                    turboMode={taskSettings.turboMode}
+                    onTurboModeChange={() => {}} // No-op
+                    amountOfMotion={taskSettings.motion}
+                    onAmountOfMotionChange={() => {}} // No-op
+                    advancedMode={taskSettings.advancedMode}
+                    onAdvancedModeChange={() => {}} // No-op
+                    phaseConfig={taskSettings.phaseConfig}
+                    onPhaseConfigChange={() => {}} // No-op
+                    selectedPhasePresetId={null}
+                    onPhasePresetSelect={() => {}} // No-op
+                    onPhasePresetRemove={() => {}} // No-op
+                    autoCreateIndividualPrompts={false}
+                    onAutoCreateIndividualPromptsChange={() => {}} // No-op
+                    projectId="shared-project"
+                    shotId="shared-shot"
+                    isCloudGenerationEnabled={true}
+                  />
+                </div>
+              </div>
+
+              {/* Right Column: Motion Control */}
+              <div className="lg:w-1/2 order-1 lg:order-2">
+                <div className="mb-4">
+                  <SectionHeader title="Motion" theme="purple" />
+                </div>
+                <div className="pointer-events-none opacity-75">
+                  <MotionControl
+                    motionMode={taskSettings.motionMode}
+                    onMotionModeChange={() => {}} // No-op
+                    amountOfMotion={taskSettings.motion}
+                    onAmountOfMotionChange={() => {}} // No-op
+                    selectedLoras={[]}
+                    availableLoras={[]}
+                    onAddLoraClick={() => {}} // No-op
+                    onRemoveLora={() => {}} // No-op
+                    onLoraStrengthChange={() => {}} // No-op
+                    selectedPhasePresetId={null}
+                    onPhasePresetSelect={() => {}} // No-op
+                    onPhasePresetRemove={() => {}} // No-op
+                    currentSettings={{
+                      basePrompt: taskSettings.prompt,
+                      negativePrompt: taskSettings.negative_prompt,
+                      enhancePrompt: taskSettings.enhancePrompt,
+                      durationFrames: taskSettings.frames,
+                    }}
+                    advancedMode={taskSettings.advancedMode}
+                    onAdvancedModeChange={() => {}} // No-op
+                    phaseConfig={taskSettings.phaseConfig || undefined}
+                    onPhaseConfigChange={() => {}} // No-op
+                    randomSeed={false}
+                    onRandomSeedChange={() => {}} // No-op
+                    turboMode={taskSettings.turboMode}
+                    settingsLoading={false}
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Floating CTA Button */}
-        <div className="fixed bottom-6 right-6 z-50">
-          <Button
-            size="lg"
-            onClick={handleCopyToAccount}
-            disabled={isCopying || copied}
-            className={`shadow-lg transition-all ${
-              copied 
-                ? 'bg-green-500 hover:bg-green-600' 
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-          >
-            {isCopying ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Copying...
-              </>
-            ) : copied ? (
-              <>
-                <Check className="mr-2 h-4 w-4" />
-                Copied!
-              </>
-            ) : isAuthenticated ? (
-              <>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy to My Account
-              </>
-            ) : (
-              <>
-                <LogIn className="mr-2 h-4 w-4" />
-                Sign In to Copy
-              </>
-            )}
-          </Button>
+      </div>
+
+      {/* Floating CTA Button - Fixed at bottom with safe area spacing */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+        <div className="container mx-auto max-w-6xl px-4 pb-4 sm:pb-6">
+          <div className="flex justify-end pointer-events-auto">
+            <Button
+              size="lg"
+              onClick={handleCopyToAccount}
+              disabled={isCopying || copied}
+              className={`shadow-xl transition-all ${
+                copied 
+                  ? 'bg-green-500 hover:bg-green-600' 
+                  : 'bg-primary hover:bg-primary/90'
+              }`}
+            >
+              {isCopying ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Copying...
+                </>
+              ) : copied ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Copied!
+                </>
+              ) : isAuthenticated ? (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy to My Account
+                </>
+              ) : (
+                <>
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Sign In to Copy
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

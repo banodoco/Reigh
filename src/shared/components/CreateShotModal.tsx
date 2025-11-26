@@ -138,7 +138,7 @@ const CreateShotModal: React.FC<CreateShotModalProps> = ({
           </DialogHeader>
         </div>
         
-        <div className={`flex-shrink-0 ${modal.isMobile ? 'px-4' : 'px-6'}`}>
+        <div className={`${modal.scrollClass} ${modal.isMobile ? 'px-4' : 'px-6'}`}>
           <div className="grid gap-3 py-3">
             <div className={`${modal.isMobile ? 'space-y-2' : 'grid grid-cols-4 items-center gap-4'}`}>
               <Label htmlFor="shot-name" className={modal.isMobile ? 'text-left' : 'text-right'}>

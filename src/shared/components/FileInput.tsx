@@ -2,7 +2,8 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
-import { X, UploadCloud, ImagePlus, VideoIcon, FileText, Loader2 } from "lucide-react";
+import { X, UploadCloud, ImagePlus, VideoIcon, FileText, Loader2, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/shared/components/ui/tooltip";
 import { toast } from "sonner";
 import { cropFilename } from "@/shared/lib/utils";
 
@@ -247,17 +248,41 @@ const FileInput: React.FC<FileInputProps> = ({
             {displayFiles.length > 0 && (
               <div className="space-y-2">
                 {!suppressSelectionSummary && (
-                  <div className="text-sm text-muted-foreground p-2 border rounded-md bg-background text-center">
-                      {displayFiles.length} file{displayFiles.length === 1 ? '' : 's'} selected
-                      {multiple && !disabled && (
-                        <span className="block text-xs mt-1 text-primary">
-                          <ImagePlus className="inline h-3 w-3 mr-1" />
-                          Click or drag to add more
-                        </span>
+                  <div className="text-sm text-muted-foreground p-2 border rounded-md bg-background flex items-center justify-between">
+                      <div className="flex-1 text-center">
+                        {displayFiles.length} file{displayFiles.length === 1 ? '' : 's'} selected
+                        {multiple && !disabled && (
+                          <span className="block text-xs mt-1 text-primary">
+                            <ImagePlus className="inline h-3 w-3 mr-1" />
+                            Click or drag to add more
+                          </span>
+                        )}
+                      </div>
+                      {!suppressRemoveAll && !disabled && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveAllFiles();
+                                }}
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive flex-shrink-0"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Remove all files</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                   </div>
                 )}
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-32 sm:max-h-24 overflow-y-auto">
                     {displayFiles.map((file, index) => (
                         <div key={index} className="relative group">
                             {file.type.startsWith('image/') && displayPreviewUrls[index] ? (
@@ -295,19 +320,6 @@ const FileInput: React.FC<FileInputProps> = ({
                         </div>
                     ))}
                 </div>
-                {!suppressRemoveAll && !disabled && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation(); 
-                            handleRemoveAllFiles();
-                        }}
-                        className="w-full"
-                    >
-                        Remove All Files
-                    </Button>
-                )}
               </div>
             )}
           </>
