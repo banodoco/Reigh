@@ -275,37 +275,75 @@ export const useTimelineDrag = ({
     const newPositions = new Map(framePositions);
     const originalPos = framePositions.get(dragState.activeId) ?? 0;
 
-    // Handle normal drag swapping
-    const swapTarget = [...framePositions.entries()].find(
+    // Check if another item is at the target position
+    const conflictingItem = [...framePositions.entries()].find(
       ([id, pos]) => id !== dragState.activeId && pos === finalPosition
     );
 
-    if (swapTarget) {
-      console.log('[FinalDropDebug] 🔄 SWAP DETECTED - Item would swap with:', {
+    if (conflictingItem) {
+      console.log('[FinalDropDebug] 🎯 POSITION CONFLICT DETECTED:', {
         itemId: dragState.activeId.substring(0, 8),
-        swapWithId: swapTarget[0].substring(0, 8),
-        swapWithPos: swapTarget[1],
-        newPos: finalPosition
+        conflictWithId: conflictingItem[0].substring(0, 8),
+        targetPos: finalPosition
       });
 
-      // Swap positions
-      newPositions.set(swapTarget[0], originalPos);
-      newPositions.set(dragState.activeId, finalPosition);
-    } else {
-      // Handle frame 0 reassignment
-      if (originalPos === 0 && finalPosition !== 0) {
-        const nearest = [...framePositions.entries()]
-          .filter(([id]) => id !== dragState.activeId)
-          .sort((a, b) => a[1] - b[1])[0];
-        if (nearest) {
-          console.log('[FinalDropDebug] 📍 FRAME 0 REASSIGNMENT - Moving frame 0 to:', {
-            itemId: dragState.activeId.substring(0, 8),
-            newFrame0Holder: nearest[0].substring(0, 8)
-          });
-          newPositions.set(nearest[0], 0);
-        }
+      if (finalPosition === 0) {
+        // Special case: dropping at position 0
+        // The dragged item takes position 0
+        // The existing item moves to the middle between 0 and the next item
+        const sortedItems = [...framePositions.entries()]
+          .filter(([id]) => id !== dragState.activeId && id !== conflictingItem[0])
+          .sort((a, b) => a[1] - b[1]);
+        
+        // Find the next item after position 0
+        const nextItem = sortedItems.find(([_, pos]) => pos > 0);
+        const nextItemPos = nextItem ? nextItem[1] : 50; // Default to 50 if no next item
+        
+        // Move the conflicting item to the midpoint
+        const midpoint = Math.floor(nextItemPos / 2);
+        
+        console.log('[FinalDropDebug] 📍 POSITION 0 INSERT:', {
+          draggedItem: dragState.activeId.substring(0, 8),
+          displacedItem: conflictingItem[0].substring(0, 8),
+          displacedNewPos: midpoint,
+          nextItemPos
+        });
+        
+        newPositions.set(conflictingItem[0], midpoint);
+        newPositions.set(dragState.activeId, 0);
+      } else {
+        // Normal case: dropping at an occupied position (not 0)
+        // Just move the dragged item to 1 frame higher than the target
+        const adjustedPosition = finalPosition + 1;
+        
+        console.log('[FinalDropDebug] 📍 INSERT (not swap):', {
+          draggedItem: dragState.activeId.substring(0, 8),
+          originalTarget: finalPosition,
+          adjustedPosition,
+          occupiedBy: conflictingItem[0].substring(0, 8)
+        });
+        
+        newPositions.set(dragState.activeId, adjustedPosition);
       }
+    } else {
+      // No conflict - just move to the target position
       newPositions.set(dragState.activeId, finalPosition);
+    }
+
+    // Handle frame 0 reassignment if we're leaving position 0
+    if (originalPos === 0 && finalPosition !== 0 && !conflictingItem) {
+      // We're moving away from position 0, and no one is taking it
+      // Find the nearest item to become the new position 0
+      const nearest = [...framePositions.entries()]
+        .filter(([id]) => id !== dragState.activeId)
+        .sort((a, b) => a[1] - b[1])[0];
+      if (nearest) {
+        console.log('[FinalDropDebug] 📍 FRAME 0 REASSIGNMENT:', {
+          itemId: dragState.activeId.substring(0, 8),
+          newFrame0Holder: nearest[0].substring(0, 8)
+        });
+        newPositions.set(nearest[0], 0);
+      }
     }
 
     // Apply fluid timeline behavior (new behavior)
