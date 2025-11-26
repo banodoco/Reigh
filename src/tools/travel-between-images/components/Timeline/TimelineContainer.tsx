@@ -250,6 +250,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // Track when a drag just ended to prevent scroll jumps
+  const dragJustEndedRef = useRef(false);
+  const dragEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // State for context visibility with delay
   const [showContext, setShowContext] = useState(false);
   const contextTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -351,6 +355,28 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleMouseUp,
     containerRef
   });
+  
+  // Track when drag ends to prevent scroll jumps from coordinate system changes
+  useEffect(() => {
+    if (!dragState.isDragging && dragState.activeId === null) {
+      // Drag just ended - set flag and clear after a delay
+      dragJustEndedRef.current = true;
+      
+      if (dragEndTimeoutRef.current) {
+        clearTimeout(dragEndTimeoutRef.current);
+      }
+      
+      dragEndTimeoutRef.current = setTimeout(() => {
+        dragJustEndedRef.current = false;
+      }, 500); // 500ms cooldown after drag ends
+    }
+    
+    return () => {
+      if (dragEndTimeoutRef.current) {
+        clearTimeout(dragEndTimeoutRef.current);
+      }
+    };
+  }, [dragState.isDragging, dragState.activeId]);
 
   // Zoom hook
   const {
@@ -461,14 +487,20 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Scroll timeline to center on zoom center when zooming
   // IMPORTANT: Only scroll when actually zooming, not when dropping items or changing positions
   useEffect(() => {
-    // Skip scroll adjustment if a drag is in progress or if not zoomed
-    if (dragState.isDragging || zoomLevel <= 1) {
+    // Skip scroll adjustment if:
+    // - A drag is in progress
+    // - A drag just ended (cooldown period to prevent coordinate system change scroll)
+    // - Not zoomed in
+    if (dragState.isDragging || dragJustEndedRef.current || zoomLevel <= 1) {
       return;
     }
     
     if (timelineRef.current && containerRef.current) {
       // Small delay to allow DOM to reflow after zoom change, then instantly scroll
       const timer = setTimeout(() => {
+        // Double-check the drag cooldown in case it changed during the timeout
+        if (dragJustEndedRef.current) return;
+        
         const scrollContainer = timelineRef.current;
         const timelineContainer = containerRef.current;
         
@@ -494,7 +526,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [zoomLevel, zoomCenter]); // REMOVED dragState.isDragging - preventing scroll jump on drop
+  }, [zoomLevel, zoomCenter]); // Dependencies don't include dragState to avoid re-running on drop
 
   // Unified drop hook (handles both file drops and generation drops)
   const {

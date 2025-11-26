@@ -74,8 +74,9 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
   return (
     <>
       {/* Fixed top controls - rendered outside the zoomed content */}
+      {/* Note: px-3 because the scroll container already has px-5, totaling px-8 to match bottom controls */}
       <div 
-        className="sticky top-2 left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8 mb-2"
+        className="sticky top-2 left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-3 mb-2"
       >
         {/* Left: Zoom controls */}
         <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
