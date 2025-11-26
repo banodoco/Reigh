@@ -320,9 +320,9 @@ export const useGenerationActions = ({
     }));
     
     removeImageFromShotMutation.mutate({
-      shot_id: selectedShot.id,
-      shotImageEntryId: shotImageEntryId, // Use the unique entry ID
-      project_id: projectId,
+      shotId: selectedShot.id,
+      generationId: shotImageEntryId, // Use the unique entry ID
+      projectId: projectId,
     });
   }, [selectedShot?.id, projectId, removeImageFromShotMutation]);
 
@@ -341,9 +341,9 @@ export const useGenerationActions = ({
     // Execute all timeline removals
     const removePromises = shotImageEntryIds.map(id => 
       removeImageFromShotMutation.mutateAsync({
-        shot_id: selectedShot.id,
-        shotImageEntryId: id,
-        project_id: projectId,
+        shotId: selectedShot.id,
+        generationId: id,
+        projectId: projectId,
       })
     );
 
