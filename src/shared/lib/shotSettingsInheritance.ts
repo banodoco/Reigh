@@ -46,7 +46,8 @@ export async function getInheritedSettings(
       console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from localStorage', {
         prompt: mainSettings.batchVideoPrompt?.substring(0, 20),
         motionMode: mainSettings.motionMode,
-        amountOfMotion: mainSettings.amountOfMotion
+        amountOfMotion: mainSettings.amountOfMotion,
+        generationMode: mainSettings.generationMode
       });
     } else {
       console.warn('[ShotSettingsInherit] ⚠️ No main settings in localStorage');
@@ -137,7 +138,8 @@ export async function getInheritedSettings(
   console.warn('[ShotSettingsInherit] 📋 Final inherited settings:', {
     hasMainSettings: !!mainSettings,
     hasLoraSettings: !!loraSettings,
-    hasUISettings: !!uiSettings
+    hasUISettings: !!uiSettings,
+    generationMode: mainSettings?.generationMode
   });
 
   return {
@@ -170,7 +172,8 @@ export async function applyInheritedSettings(
     console.warn('[ShotSettingsInherit] 💾 SAVED TO SESSION STORAGE:', storageKey, {
       length: JSON.stringify(defaultsToApply).length,
       motionMode: defaultsToApply.motionMode,
-      amountOfMotion: defaultsToApply.amountOfMotion
+      amountOfMotion: defaultsToApply.amountOfMotion,
+      generationMode: defaultsToApply.generationMode
     });
   } else {
     console.warn('[ShotSettingsInherit] ⚠️ No settings to save to sessionStorage');

@@ -835,63 +835,58 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           {/* Timeline items */}
           {(() => {
             // [TimelineVisibility] Log what items are about to be rendered
-            console.log(`[TimelineVisibility] 🎬 RENDERING ${images.length} timeline items:`, {
+            const itemsWithPositions = images.filter(img => {
+              const imgKey = img.shotImageEntryId ?? img.id;
+              return currentPositions.has(imgKey) || img.timeline_frame !== undefined;
+            });
+            const itemsWithoutPositions = images.filter(img => {
+              const imgKey = img.shotImageEntryId ?? img.id;
+              return !currentPositions.has(imgKey) && img.timeline_frame === undefined;
+            });
+            
+            if (itemsWithoutPositions.length > 0) {
+              console.log(`[TimelineVisibility] ⏳ SKIPPING ${itemsWithoutPositions.length} items without positions:`, {
+                shotId: shotId.substring(0, 8),
+                skippedIds: itemsWithoutPositions.map(img => (img.shotImageEntryId ?? img.id)?.substring(0, 8)),
+                renderingCount: itemsWithPositions.length,
+                timestamp: Date.now()
+              });
+            }
+            
+            console.log(`[TimelineVisibility] 🎬 RENDERING ${itemsWithPositions.length}/${images.length} timeline items:`, {
               shotId: shotId.substring(0, 8),
-              imagesCount: images.length,
               currentPositionsSize: currentPositions.size,
-              items: images.map((img, idx) => {
-                const imgKey = img.shotImageEntryId ?? img.id;
-                const pos = currentPositions.get(imgKey);
-                return {
-                  idx,
-                  id: imgKey?.substring(0, 8),
-                  hasPosition: pos !== undefined,
-                  position: pos ?? `fallback:${idx * 50}`,
-                  imageUrl: !!img.imageUrl
-                };
-              }),
-              missingPositions: images.filter(img => {
-                const imgKey = img.shotImageEntryId ?? img.id;
-                return !currentPositions.has(imgKey);
-              }).map(img => ({
-                id: (img.shotImageEntryId ?? img.id)?.substring(0, 8)
-              })),
               timestamp: Date.now()
             });
             return null;
           })()}
           {images.map((image, idx) => {
             const imageKey = image.shotImageEntryId ?? image.id;
-            // Prioritize timeline_frame from image data over generic fallback
-            // This ensures stable positioning during optimistic update -> DB sync transitions
-            // where framePositions map might not yet have the new key
-            const framePosition = currentPositions.get(imageKey) ?? image.timeline_frame ?? idx * 50;
+            
+            // KEY FIX: Get position from the positions map, with fallback to image.timeline_frame
+            // But do NOT use idx * 50 fallback - if we don't know the position, don't render
+            const positionFromMap = currentPositions.get(imageKey);
+            const positionFromImage = image.timeline_frame;
+            
+            // Use position from map first, then from image data
+            const framePosition = positionFromMap ?? positionFromImage;
+            
+            // CRITICAL: Skip rendering items without known positions
+            // This prevents the visible "wrong place" jumps during transitions
+            if (framePosition === undefined || framePosition === null) {
+              // Log skipped items at debug level
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[TimelineVisibility] ⏳ Skipping item without position:`, {
+                  imageKey: imageKey?.substring(0, 8),
+                  positionFromMap,
+                  positionFromImage,
+                  reason: 'Position unknown - waiting for database sync'
+                });
+              }
+              return null;
+            }
+            
             const isDragging = dragState.isDragging && dragState.activeId === imageKey;
-
-            // [Position0Debug] Track position lookup failures for item 50bbb119
-            if (imageKey?.startsWith('50bbb119')) {
-              console.log(`[Position0Debug] 🔍 Position lookup for item 50bbb119:`, {
-                shotImageEntryId: imageKey,
-                framePosition,
-                fromCurrentPositions: currentPositions.has(imageKey),
-                currentPositionsValue: currentPositions.get(imageKey),
-                fallbackCalculation: !currentPositions.has(imageKey) ? `${idx} * 50 = ${idx * 50}` : null,
-                currentPositionsSize: currentPositions.size,
-                allCurrentPositionsKeys: Array.from(currentPositions.keys()).map(k => k?.substring(0, 8))
-              });
-            }
-
-            // [Position0Debug] Only log position 0 items to reduce noise
-            if (framePosition === 0) {
-              console.log(`[Position0Debug] 🎬 POSITION 0 ITEM RENDERING:`, {
-                idx,
-                imageId: imageKey?.substring(0, 8),
-                framePosition,
-                coordinateSystem: { fullMin, fullMax, fullRange },
-                fromCurrentPositions: currentPositions.has(imageKey),
-                currentPositionsValue: currentPositions.get(imageKey)
-              });
-            }
 
             return (
               <TimelineItem

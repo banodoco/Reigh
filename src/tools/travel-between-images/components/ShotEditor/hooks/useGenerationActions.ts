@@ -460,16 +460,19 @@ export const useGenerationActions = ({
 
   /**
    * Handle dropping external image files onto the timeline
-   * This is now a clean orchestration function using extracted helpers
+   * 
+   * REFACTORED: Uses a simplified approach:
+   * 1. Calculate positions upfront
+   * 2. Upload with pre-calculated positions (single database round-trip)
+   * 3. Refresh data (positions already set correctly)
+   * 
+   * This eliminates the race conditions that caused shaky behavior.
    */
   const handleTimelineImageDrop = useCallback(async (files: File[], targetFrame?: number) => {
-    console.log('[AddImagesDebug] 🎯 handleTimelineImageDrop called:', {
+    console.log('[TimelineDrop] 🎯 Starting drop:', {
       filesCount: files.length,
       targetFrame,
-      targetFrameProvided: targetFrame !== undefined,
-      shotId: selectedShot?.id,
-      projectId,
-      batchVideoFrames
+      shotId: selectedShot?.id?.substring(0, 8)
     });
 
     if (!selectedShot?.id || !projectId) {
@@ -478,10 +481,15 @@ export const useGenerationActions = ({
     }
 
     try {
-      // Set uploading state
       actions.setUploadingImage(true);
       
-      // 1. Crop images to shot aspect ratio
+      // 1. Calculate target positions BEFORE upload
+      const calculatedTargetFrame = await calculateNextAvailableFrame(
+        selectedShot.id,
+        targetFrame
+      );
+      
+      // 2. Crop images to shot aspect ratio
       const processedFiles = await cropImagesToShotAspectRatio(
         files,
         selectedShot,
@@ -490,87 +498,77 @@ export const useGenerationActions = ({
         uploadSettings
       );
       
-      // 2. Upload images to shot
-      console.log('[AddImagesDebug] 📤 Uploading images to shot (WITHOUT auto-positioning)...');
+      // 3. Calculate positions for each file
+      const positions = processedFiles.map((_, index) => 
+        calculatedTargetFrame + (index * batchVideoFrames)
+      );
+      
+      console.log('[TimelineDrop] 📍 Pre-calculated positions:', {
+        startFrame: calculatedTargetFrame,
+        spacing: batchVideoFrames,
+        positions
+      });
+      
+      // 4. Upload with positions (single round trip to database)
       const result = await handleExternalImageDropMutation.mutateAsync({
         imageFiles: processedFiles,
         targetShotId: selectedShot.id,
         currentProjectQueryKey: projectId,
-        currentShotCount: 0, // Not needed when adding to existing shot
-        skipAutoPosition: true, // CRITICAL: Skip auto-positioning so we can set positions ourselves
+        currentShotCount: 0,
+        skipAutoPosition: false, // Let server use our calculated positions
+        positions: positions, // Pass pre-calculated positions
         onProgress: (fileIndex, fileProgress, overallProgress) => {
-          console.log(`[UploadProgress] File ${fileIndex + 1}/${processedFiles.length}: ${fileProgress}% (Overall: ${overallProgress}%)`);
+          console.log(`[TimelineDrop] Upload: ${fileIndex + 1}/${processedFiles.length} - ${overallProgress}%`);
         }
       });
 
-      console.log('[AddImagesDebug] 📥 Upload result:', {
-        hasResult: !!result,
-        generationIds: result?.generationIds,
-        generationIdsCount: result?.generationIds?.length
+      if (!result?.generationIds?.length) {
+        console.warn('[TimelineDrop] ⚠️ No generation IDs returned');
+        return;
+      }
+      
+      console.log('[TimelineDrop] ✅ Upload complete:', {
+        generationIds: result.generationIds.map(id => id.substring(0, 8)),
+        positionsUsed: positions
       });
-
-      // 3. Set pending positions for new images
-      if (result?.generationIds?.length > 0) {
-        console.log('[AddImagesDebug] 🎯 Setting pending positions, targetFrame:', {
-          provided: targetFrame,
-          willCalculate: targetFrame === undefined
-        });
-
-        // Calculate target frame if not provided
-        const calculatedTargetFrame = await calculateNextAvailableFrame(
-          selectedShot.id,
-          targetFrame
-        );
+      
+      // 5. If positions weren't set by the upload mutation, set them now
+      // This is a fallback for backwards compatibility
+      if (result.generationIds.length > 0) {
+        // Check if positions were already set by the upload
+        const needsPositionUpdate = await (async () => {
+          const { data } = await supabase
+            .from('shot_generations')
+            .select('id, timeline_frame')
+            .eq('shot_id', selectedShot.id)
+            .in('generation_id', result.generationIds)
+            .limit(1);
+          
+          return data?.[0]?.timeline_frame === null;
+        })();
         
-        console.log('[AddImagesDebug] 🎯 Final calculatedTargetFrame:', calculatedTargetFrame);
-
-        // Create position map for new images
-        const newPending = createPositionMap(
-          result.generationIds,
-                calculatedTargetFrame,
-          batchVideoFrames
-        );
-        
-        // Combine with existing pending positions
-        const combined = new Map([
-          ...Array.from(state.pendingFramePositions.entries()), 
-          ...Array.from(newPending.entries())
-        ]);
-        
-        console.log('[AddImagesDebug] 💾 Set pending positions:', {
-          newPendingCount: newPending.size,
-          existingPendingCount: state.pendingFramePositions.size,
-          combinedCount: combined.size,
-          combined: Array.from(combined.entries()).map(([id, pos]) => ({
-            id: id.substring(0, 8),
-            position: pos
-          }))
-        });
-        
-        actions.setPendingFramePositions(combined);
-        
-        // 4. Persist positions to database immediately
-        await persistTimelinePositions(
-          selectedShot.id,
-          result.generationIds,
-          calculatedTargetFrame,
-          batchVideoFrames
-        );
-      } else {
-        console.log('[AddImagesDebug] ⚠️ No generation IDs returned from upload, not setting positions');
+        if (needsPositionUpdate) {
+          console.log('[TimelineDrop] 🔄 Setting positions (fallback path)...');
+          await persistTimelinePositions(
+            selectedShot.id,
+            result.generationIds,
+            calculatedTargetFrame,
+            batchVideoFrames
+          );
+        }
       }
 
-      // 5. Refresh the shot data, which will trigger Timeline to update
-      console.log('[AddImagesDebug] 🔄 Calling onShotImagesUpdate to refresh...');
-      onShotImagesUpdate();
-      console.log('[AddImagesDebug] ✅ handleTimelineImageDrop complete');
+      // 6. Refresh the shot data
+      // Positions are already correct, this just syncs the UI
+      await onShotImagesUpdate();
+      
+      console.log('[TimelineDrop] ✅ Drop complete');
       
     } catch (error) {
-      console.error('[AddImagesDebug] ❌ Error adding images to timeline:', error);
-      // Let Timeline component handle the error display via re-throw
-      throw error; 
+      console.error('[TimelineDrop] ❌ Error:', error);
+      toast.error(`Failed to add images: ${(error as Error).message}`);
+      throw error;
     } finally {
-      // Clear uploading state
       actions.setUploadingImage(false);
     }
   }, [
@@ -582,8 +580,7 @@ export const useGenerationActions = ({
     batchVideoFrames, 
     actions, 
     handleExternalImageDropMutation, 
-    onShotImagesUpdate, 
-    state.pendingFramePositions
+    onShotImagesUpdate
   ]);
 
   /**
@@ -643,264 +640,100 @@ export const useGenerationActions = ({
 
   /**
    * Handle dropping external images onto batch mode grid
-   * Uploads files and inserts them at the specified position
+   * 
+   * REFACTORED: Simplified to match timeline drop approach
    */
   const handleBatchImageDrop = useCallback(async (
     files: File[],
     targetPosition?: number,
     framePosition?: number
   ) => {
-    console.log('[BatchDropPositionIssue] 🎯 handleBatchImageDrop ENTRY:', {
+    console.log('[BatchDrop] 🎯 Starting drop:', {
       filesCount: files.length,
-      targetPosition,
       framePosition,
-      shotId: selectedShot?.id,
-      projectId,
-      timestamp: Date.now()
+      shotId: selectedShot?.id?.substring(0, 8)
     });
 
     if (!selectedShot?.id || !projectId) {
-      console.log('[BatchDropPositionIssue] ❌ MISSING SHOT OR PROJECT:', { shotId: selectedShot?.id, projectId });
       toast.error("Cannot add images: No shot or project selected.");
       return;
     }
 
     try {
-      // Set uploading state
       actions.setUploadingImage(true);
-      console.log('[BatchDropPositionIssue] 📤 UPLOAD STARTING...');
       
-      // Crop images to shot aspect ratio before uploading
-      let processedFiles = files;
+      // 1. Calculate target frame position
+      const startFrame = framePosition ?? await calculateNextAvailableFrame(selectedShot.id, undefined);
       
-      // Prioritize shot aspect ratio over project aspect ratio
-      const currentProject = projects.find(p => p.id === projectId);
-      const aspectRatioStr = selectedShot?.aspect_ratio || currentProject?.aspectRatio || (currentProject as any)?.settings?.aspectRatio;
+      // 2. Crop images
+      const processedFiles = await cropImagesToShotAspectRatio(
+        files,
+        selectedShot,
+        projectId,
+        projects,
+        uploadSettings
+      );
       
-      if (aspectRatioStr && uploadSettings?.cropToProjectSize !== false) {
-        const targetAspectRatio = parseRatio(aspectRatioStr);
-        
-        if (!isNaN(targetAspectRatio)) {
-          const cropPromises = files.map(async (file) => {
-            try {
-              const result = await cropImageToProjectAspectRatio(file, targetAspectRatio);
-              if (result) {
-                return result.croppedFile;
-              }
-              return file;
-            } catch (error) {
-              console.error(`Failed to crop image ${file.name}:`, error);
-              return file;
-            }
-          });
-          
-          processedFiles = await Promise.all(cropPromises);
-          console.log('[BatchDropPositionIssue] ✂️ CROPS COMPLETED:', { processedCount: processedFiles.length });
-        }
-      }
+      // 3. Calculate positions for each file
+      const positions = processedFiles.map((_, index) => startFrame + index);
       
-      console.log('[BatchDropPositionIssue] 📤 CALLING UPLOAD MUTATION...');
+      console.log('[BatchDrop] 📍 Calculated positions:', {
+        startFrame,
+        count: processedFiles.length,
+        positions
+      });
+      
+      // 4. Upload with positions
       const result = await handleExternalImageDropMutation.mutateAsync({
         imageFiles: processedFiles,
         targetShotId: selectedShot.id,
         currentProjectQueryKey: projectId,
         currentShotCount: 0,
-        skipAutoPosition: true
+        skipAutoPosition: false,
+        positions: positions
       });
       
-      console.log('[BatchDropPositionIssue] ✅ MUTATION COMPLETED - GOT RESULT:', {
-        hasResult: !!result,
-        resultKeys: result ? Object.keys(result) : [],
-        timestamp: Date.now()
-      });
-      
-      console.log('[BatchDropPositionIssue] 📥 UPLOAD RESULT:', {
-        hasResult: !!result,
-        generationIds: result?.generationIds?.map(id => id.substring(0, 8)),
-        generationIdsCount: result?.generationIds?.length,
-        timestamp: Date.now()
-      });
-      
-      // Update frame positions for the newly uploaded images
-      if (result?.generationIds?.length > 0 && framePosition !== undefined) {
-        console.log('[BatchDropPositionIssue] 🎯 SETTING PENDING POSITIONS:', {
-          generationIds: result.generationIds.map(id => id.substring(0, 8)),
-          startFrame: framePosition,
-          count: result.generationIds.length,
-        });
-
-        const newPendingPositions = new Map<string, number>();
-        result.generationIds.forEach((id, i) => {
-          const newFrame = framePosition + i;
-          newPendingPositions.set(id, newFrame);
-          console.log('[BatchDropPositionIssue] 📍 PENDING POSITION:', {
-            generationId: id.substring(0, 8),
-            index: i,
-            frame: newFrame
-          });
-        });
-        
-        console.log('[BatchDropPositionIssue] 💾 CALLING setPendingFramePositions...');
-        actions.setPendingFramePositions(new Map([...state.pendingFramePositions, ...newPendingPositions]));
-        
-        // NOW: Directly update the database with these frame positions (like timeline does)
-        console.log('[BatchDropPositionIssue] 🔄 QUERYING FOR shot_generations RECORDS...');
-        try {
-          const { data: shotGenRecords, error: queryError } = await supabase
-            .from('shot_generations')
-            .select('id, generation_id, timeline_frame')
-            .eq('shot_id', selectedShot.id)
-            .in('generation_id', result.generationIds);
-          
-          console.log('[BatchDropPositionIssue] 📋 QUERY RESULT:', {
-            hasError: !!queryError,
-            recordCount: shotGenRecords?.length,
-            records: shotGenRecords?.map(r => ({
-              shotGenId: r.id.substring(0, 8),
-              generationId: r.generation_id.substring(0, 8),
-              currentFrame: (r as any).timeline_frame
-            }))
-          });
-          
-          if (queryError) {
-            console.error('[BatchDropPositionIssue] ❌ QUERY ERROR:', queryError);
-            throw queryError;
-          }
-          
-          if (!shotGenRecords || shotGenRecords.length === 0) {
-            console.warn('[BatchDropPositionIssue] ⚠️ NO RECORDS FOUND - RETRYING...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const { data: retryRecords, error: retryError } = await supabase
-              .from('shot_generations')
-              .select('id, generation_id, timeline_frame')
-              .eq('shot_id', selectedShot.id)
-              .in('generation_id', result.generationIds);
-            
-            console.log('[BatchDropPositionIssue] 🔄 RETRY QUERY:', {
-              hasError: !!retryError,
-              recordCount: retryRecords?.length
-            });
-            
-            if (retryError || !retryRecords || retryRecords.length === 0) {
-              console.error('[BatchDropPositionIssue] ❌ STILL NO RECORDS AFTER RETRY');
-              return;
-            }
-            
-            // Use retry records
-            console.log('[BatchDropPositionIssue] 📤 UPDATING RECORDS (RETRY PATH)...');
-            const updatePromises = result.generationIds.map(async (genId, index) => {
-              const shotGenRecord = retryRecords.find(r => r.generation_id === genId);
-              if (!shotGenRecord) {
-                console.warn('[BatchDropPositionIssue] ⚠️ NO RECORD FOR GENERATION:', genId.substring(0, 8));
-                return { success: false, genId };
-              }
-              
-              const frameValue = framePosition + index;
-              console.log('[BatchDropPositionIssue] 💾 UPDATING:', {
-                shotGenId: shotGenRecord.id.substring(0, 8),
-                generationId: genId.substring(0, 8),
-                frameValue
-              });
-              
-              const { error: updateError } = await supabase
-                .from('shot_generations')
-                .update({ timeline_frame: frameValue })
-                .eq('id', shotGenRecord.id);
-              
-              if (updateError) {
-                console.error('[BatchDropPositionIssue] ❌ UPDATE ERROR:', updateError);
-                return { success: false, genId, error: updateError };
-              }
-              
-              console.log('[BatchDropPositionIssue] ✅ UPDATED:', {
-                generationId: genId.substring(0, 8),
-                frameValue
-              });
-              
-              return { success: true, genId, frameValue };
-            });
-            
-            const updateResults = await Promise.all(updatePromises);
-            console.log('[BatchDropPositionIssue] 📊 UPDATE RESULTS (RETRY):', {
-              total: updateResults.length,
-              successful: updateResults.filter(r => r.success).length,
-              failed: updateResults.filter(r => !r.success).length
-            });
-            
-            return;
-          }
-          
-          // Update all records
-          console.log('[BatchDropPositionIssue] 📤 UPDATING RECORDS...');
-          const updatePromises = result.generationIds.map(async (genId, index) => {
-            const shotGenRecord = shotGenRecords.find(r => r.generation_id === genId);
-            if (!shotGenRecord) {
-              console.warn('[BatchDropPositionIssue] ⚠️ NO RECORD FOR GENERATION:', genId.substring(0, 8));
-              return { success: false, genId };
-            }
-            
-            const frameValue = framePosition + index;
-            console.log('[BatchDropPositionIssue] 💾 UPDATING:', {
-              shotGenId: shotGenRecord.id.substring(0, 8),
-              generationId: genId.substring(0, 8),
-              frameValue
-            });
-            
-            const { error: updateError } = await supabase
-              .from('shot_generations')
-              .update({ timeline_frame: frameValue })
-              .eq('id', shotGenRecord.id);
-            
-            if (updateError) {
-              console.error('[BatchDropPositionIssue] ❌ UPDATE ERROR:', updateError);
-              return { success: false, genId, error: updateError };
-            }
-            
-            console.log('[BatchDropPositionIssue] ✅ UPDATED:', {
-              generationId: genId.substring(0, 8),
-              frameValue
-            });
-            
-            return { success: true, genId, frameValue };
-          });
-          
-          const updateResults = await Promise.all(updatePromises);
-          console.log('[BatchDropPositionIssue] 📊 UPDATE RESULTS:', {
-            total: updateResults.length,
-            successful: updateResults.filter(r => r.success).length,
-            failed: updateResults.filter(r => !r.success).length,
-            details: updateResults.map(r => ({
-              generationId: r.genId.substring(0, 8),
-              success: r.success,
-              frameValue: r.frameValue
-            }))
-          });
-          
-        } catch (dbError) {
-          console.error('[BatchDropPositionIssue] ❌ DATABASE UPDATE ERROR:', dbError);
-        }
-      } else {
-        console.log('[BatchDropPositionIssue] ⚠️ SKIPPING PENDING POSITIONS:', {
-          hasGenerationIds: !!result?.generationIds?.length,
-          framePositionDefined: framePosition !== undefined,
-          framePosition
-        });
+      if (!result?.generationIds?.length) {
+        console.warn('[BatchDrop] ⚠️ No generation IDs returned');
+        return;
       }
       
-      console.log('[BatchDropPositionIssue] 🔄 CALLING onShotImagesUpdate...');
+      console.log('[BatchDrop] ✅ Upload complete:', {
+        generationIds: result.generationIds.map(id => id.substring(0, 8)),
+        positionsUsed: positions
+      });
+      
+      // 5. If positions weren't set by the upload, set them now (fallback)
+      const { data: checkData } = await supabase
+        .from('shot_generations')
+        .select('id, timeline_frame')
+        .eq('shot_id', selectedShot.id)
+        .in('generation_id', result.generationIds)
+        .limit(1);
+      
+      if (checkData?.[0]?.timeline_frame === null) {
+        console.log('[BatchDrop] 🔄 Setting positions (fallback)...');
+        await persistTimelinePositions(
+          selectedShot.id,
+          result.generationIds,
+          startFrame,
+          1 // Use 1 frame spacing for batch mode
+        );
+      }
+
+      // 6. Refresh shot data
       await onShotImagesUpdate();
       
-      console.log('[BatchDropPositionIssue] ✅ handleBatchImageDrop COMPLETE');
+      console.log('[BatchDrop] ✅ Drop complete');
+      
     } catch (error) {
-      console.error('[BatchDropPositionIssue] ❌ ERROR:', error);
+      console.error('[BatchDrop] ❌ Error:', error);
       toast.error(`Failed to add images: ${(error as Error).message}`);
       throw error;
     } finally {
       actions.setUploadingImage(false);
-      console.log('[BatchDropPositionIssue] 🏁 UPLOAD STATE CLEARED');
     }
-  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, onShotImagesUpdate, state.pendingFramePositions]);
+  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, onShotImagesUpdate]);
 
   /**
    * Handle dropping a generation from GenerationsPane onto batch mode grid

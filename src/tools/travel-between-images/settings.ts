@@ -114,7 +114,9 @@ export const videoTravelSettings = {
   id: 'travel-between-images',
   scope: ['shot'], // Video travel settings are per-shot
   defaults: {
-    // Content fields (don't inherit to new projects) - explicit empty defaults
+    // Content fields - explicit empty defaults
+    // Note: batchVideoPrompt, textBeforePrompts, textAfterPrompts DO inherit to new shots
+    // (via shotSettingsInheritance.ts), but start empty for new projects
     batchVideoPrompt: '',
     pairConfigs: [],
     shotImageIds: [],
@@ -123,12 +125,12 @@ export const videoTravelSettings = {
     textBeforePrompts: '',
     textAfterPrompts: '',
     
-    // Configuration fields (can inherit to new projects)
+    // Configuration fields - these inherit to both new shots and new projects
     videoControlMode: 'batch' as const,
     batchVideoFrames: 60,
     batchVideoSteps: 6,
     dimensionSource: 'firstImage' as const,
-    generationMode: 'batch' as const,
+    generationMode: 'timeline' as const,
     enhancePrompt: false,
     autoCreateIndividualPrompts: true,
     selectedModel: 'wan-2.1' as const,

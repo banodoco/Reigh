@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   motionMode: 'basic',  // Must be included to prevent reset during loading
   advancedMode: false,
   phaseConfig: undefined,
-  generationMode: 'batch',
+  generationMode: 'timeline',
   pairConfigs: [],
 };
 
@@ -96,7 +96,8 @@ export const useShotSettings = (
           localStorage.setItem(storageKey, JSON.stringify(settings));
           console.log('[ShotSettingsInherit] 💾 Saved active settings to localStorage for inheritance', { 
             shotId: shotId.substring(0, 8),
-            prompt: settings.batchVideoPrompt?.substring(0, 20)
+            prompt: settings.batchVideoPrompt?.substring(0, 20),
+            generationMode: settings.generationMode
           });
         } catch (e) {
           console.error('Failed to save settings to localStorage', e);
@@ -225,6 +226,7 @@ export const useShotSettings = (
           console.log('[ShotSettingsInherit] defaults.motionMode:', defaults.motionMode);
           console.log('[ShotSettingsInherit] defaults.amountOfMotion:', defaults.amountOfMotion);
           console.log('[ShotSettingsInherit] defaults.advancedMode:', defaults.advancedMode);
+          console.log('[ShotSettingsInherit] defaults.generationMode:', defaults.generationMode);
           console.log('[ShotSettingsInherit] defaults.phaseConfig:', defaults.phaseConfig ? 'HAS DATA' : 'NULL');
           console.log('[ShotSettingsInherit] defaults.steerableMotionSettings:', defaults.steerableMotionSettings);
           console.log('[ShotSettingsInherit] defaults.batchVideoPrompt:', defaults.batchVideoPrompt?.substring(0, 50) || '(empty)');
@@ -247,6 +249,7 @@ export const useShotSettings = (
           console.log('[ShotSettingsInherit] mergedSettings.motionMode:', mergedSettings.motionMode);
           console.log('[ShotSettingsInherit] mergedSettings.amountOfMotion:', mergedSettings.amountOfMotion);
           console.log('[ShotSettingsInherit] mergedSettings.advancedMode:', mergedSettings.advancedMode);
+          console.log('[ShotSettingsInherit] mergedSettings.generationMode:', mergedSettings.generationMode);
           console.log('[ShotSettingsInherit] mergedSettings.phaseConfig:', mergedSettings.phaseConfig ? 'HAS DATA' : 'NULL');
           console.log('[ShotSettingsInherit] mergedSettings.steerableMotionSettings:', mergedSettings.steerableMotionSettings);
           

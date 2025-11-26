@@ -70,9 +70,9 @@ async function fetchProjectGenerationModesFromDB(projectId: string): Promise<Map
     const toolSettings = (shot.settings as any)?.['travel-between-images'];
     const generationMode = toolSettings?.generationMode as 'batch' | 'timeline' | 'by-pair' | undefined;
     
-    // Default to batch if not set, and convert 'by-pair' to 'batch'
+    // Default to timeline if not set, and convert 'by-pair' to 'batch'
     const effectiveMode: 'batch' | 'timeline' = 
-      generationMode === 'timeline' ? 'timeline' : 'batch';
+      generationMode === 'batch' || generationMode === 'by-pair' ? 'batch' : 'timeline';
     
     modes.set(shot.id, effectiveMode);
   });

@@ -784,27 +784,6 @@ const VideoTravelToolPage: React.FC = () => {
     return loading;
   }, [shotsLoadingRaw, initializingFromHash]);
 
-  // Detect tablets/iPads - treat them like desktop for timeline mode
-  // iPads have screen width >= 768px, so they should get timeline mode option
-  const { isTabletOrLarger } = useDeviceDetection();
-  const shouldDefaultToBatch = isMobile && !isTabletOrLarger;
-  
-  // Get cached generation mode for instant loading (before settings fully load)
-  const cachedGenerationMode = getShotGenerationMode?.(selectedShot?.id || null, shouldDefaultToBatch);
-  
-  // Debug: Log cached generation mode usage
-  React.useEffect(() => {
-    if (selectedShot?.id && cachedGenerationMode) {
-      console.log('[GenerationModeCache] 🎯 Using cached generation mode:', {
-        shotId: selectedShot.id.substring(0, 8),
-        cachedMode: cachedGenerationMode,
-        shouldDefaultToBatch,
-        isMobile,
-        timestamp: Date.now()
-      });
-    }
-  }, [selectedShot?.id, cachedGenerationMode, shouldDefaultToBatch, isMobile]);
-  
   const {
     videoControlMode = 'batch',
     batchVideoPrompt = '',
@@ -819,7 +798,7 @@ const VideoTravelToolPage: React.FC = () => {
     phaseConfig,
     selectedPhasePresetId,
     pairConfigs = [],
-    generationMode = cachedGenerationMode || (shouldDefaultToBatch ? 'batch' : 'timeline'),
+    generationMode = 'timeline', // Default to 'timeline', inheritance will override if needed
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
     textBeforePrompts = '',
     textAfterPrompts = '',
