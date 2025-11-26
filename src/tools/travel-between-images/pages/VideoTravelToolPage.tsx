@@ -350,43 +350,45 @@ const VideoTravelToolPage: React.FC = () => {
   const updateShotNameMutation = useUpdateShotName();
 
   // Memoized callbacks to prevent infinite re-renders
+  // FIX: Use shotSettingsRef.current instead of shotSettings to prevent callback recreation
+  // when shotSettings object changes (which happens on every shot change)
   const noOpCallback = useCallback(() => {}, []);
   
   const handleVideoControlModeChange = useCallback((mode: 'individual' | 'batch') => {
-    shotSettings.updateField('videoControlMode', mode);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('videoControlMode', mode);
+  }, []);
 
   const handlePairConfigChange = useCallback((pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => {
-    const currentPairConfigs = shotSettings.settings?.pairConfigs || [];
+    const currentPairConfigs = shotSettingsRef.current.settings?.pairConfigs || [];
     const updated = currentPairConfigs.map(p => p.id === pairId ? { ...p, [field]: value } : p);
-    shotSettings.updateField('pairConfigs', updated);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('pairConfigs', updated);
+  }, []);
 
   const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    shotSettings.updateField('batchVideoPrompt', prompt);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('batchVideoPrompt', prompt);
+  }, []);
   
   const handleTextBeforePromptsChange = useCallback((text: string) => {
-    shotSettings.updateField('textBeforePrompts', text);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('textBeforePrompts', text);
+  }, []);
   
   const handleTextAfterPromptsChange = useCallback((text: string) => {
-    shotSettings.updateField('textAfterPrompts', text);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('textAfterPrompts', text);
+  }, []);
   
   const handleBlurSave = useCallback(() => {
     console.log('[PhaseConfigTrack] 🔵 Blur save triggered - saving immediately');
-    shotSettings.saveImmediate();
-  }, [shotSettings]);
+    shotSettingsRef.current.saveImmediate();
+  }, []);
 
   const handleBatchVideoFramesChange = useCallback((frames: number) => {
-    shotSettings.updateField('batchVideoFrames', frames);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('batchVideoFrames', frames);
+  }, []);
 
   const handleBatchVideoStepsChange = useCallback((steps: number) => {
     console.log('[BatchVideoSteps] User changing steps to:', steps);
-    shotSettings.updateField('batchVideoSteps', steps);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('batchVideoSteps', steps);
+  }, []);
 
   const handleDimensionSourceChange = useCallback((source: 'project' | 'firstImage' | 'custom') => {
     setDimensionSource(source);
@@ -401,97 +403,95 @@ const VideoTravelToolPage: React.FC = () => {
   }, []);
 
   const handleEnhancePromptChange = useCallback((enhance: boolean) => {
-    shotSettings.updateField('enhancePrompt', enhance);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('enhancePrompt', enhance);
+  }, []);
 
   const handleAutoCreateIndividualPromptsChange = useCallback((autoCreate: boolean) => {
-    shotSettings.updateField('autoCreateIndividualPrompts', autoCreate);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('autoCreateIndividualPrompts', autoCreate);
+  }, []);
 
   const handleTurboModeChange = useCallback((turbo: boolean) => {
     // When enabling turbo mode, automatically disable advanced mode
-    if (turbo && shotSettings.settings?.advancedMode) {
+    if (turbo && shotSettingsRef.current.settings?.advancedMode) {
       console.log('[TurboMode] Turbo mode enabled - auto-disabling advanced mode and clearing preset');
-      shotSettings.updateFields({
+      shotSettingsRef.current.updateFields({
         turboMode: turbo,
         advancedMode: false,
         selectedPhasePresetId: null  // Clear preset reference when disabling advanced mode
       });
     } else {
-      shotSettings.updateField('turboMode', turbo);
+      shotSettingsRef.current.updateField('turboMode', turbo);
     }
-  }, [shotSettings]);
+  }, []);
 
   const handleAmountOfMotionChange = useCallback((motion: number) => {
-    shotSettings.updateField('amountOfMotion', motion);
-  }, [shotSettings]);
+    shotSettingsRef.current.updateField('amountOfMotion', motion);
+  }, []);
 
   const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
     console.log('[MotionMode] User changing motion mode:', {
-      from: shotSettings.settings?.motionMode,
+      from: shotSettingsRef.current.settings?.motionMode,
       to: mode,
-      shotId: selectedShot?.id?.substring(0, 8),
       timestamp: Date.now()
     });
     
     // When switching to advanced mode, initialize phaseConfig if needed
     if (mode === 'advanced' || mode === 'presets') {
-      const currentPhaseConfig = shotSettings.settings?.phaseConfig;
+      const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
       if (!currentPhaseConfig) {
         console.log('[MotionMode] Initializing phaseConfig for advanced/presets mode');
-        shotSettings.updateFields({
+        shotSettingsRef.current.updateFields({
           motionMode: mode,
           advancedMode: true,
           phaseConfig: DEFAULT_PHASE_CONFIG
         });
       } else {
-        shotSettings.updateFields({
+        shotSettingsRef.current.updateFields({
           motionMode: mode,
           advancedMode: true
         });
       }
     } else {
       // Basic mode - disable advanced mode
-      shotSettings.updateFields({
+      shotSettingsRef.current.updateFields({
         motionMode: mode,
         advancedMode: false,
         selectedPhasePresetId: null  // Clear preset when going to basic mode
       });
     }
-  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
+  }, []);
 
   const handleAdvancedModeChange = useCallback((advanced: boolean) => {
     // Prevent enabling advanced mode when turbo mode is on
-    if (advanced && shotSettings.settings?.turboMode) {
+    if (advanced && shotSettingsRef.current.settings?.turboMode) {
       console.log('[PhaseConfigTrack] ⚠️ Cannot enable advanced mode while turbo mode is active');
       return;
     }
     
     console.log('[PhaseConfigTrack] 🎚️ User toggling advancedMode:', {
       to: advanced,
-      shotId: selectedShot?.id?.substring(0, 8),
       timestamp: Date.now()
     });
     
     // When turning on advanced mode, initialize phaseConfig if needed
-    const currentPhaseConfig = shotSettings.settings?.phaseConfig;
+    const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
     if (advanced && !currentPhaseConfig) {
       console.log('[PhaseConfigTrack] Initializing phaseConfig to DEFAULT_PHASE_CONFIG');
-      shotSettings.updateFields({
+      shotSettingsRef.current.updateFields({
         advancedMode: advanced,
         phaseConfig: DEFAULT_PHASE_CONFIG
       });
     } else if (!advanced) {
       // When turning OFF advanced mode, clear the preset reference
       console.log('[PhaseConfigTrack] Disabling advanced mode and clearing preset reference');
-      shotSettings.updateFields({
+      shotSettingsRef.current.updateFields({
         advancedMode: advanced,
         selectedPhasePresetId: null
       });
     } else {
-      shotSettings.updateField('advancedMode', advanced);
+      shotSettingsRef.current.updateField('advancedMode', advanced);
     }
-  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
+  }, []);
 
   const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
     // Auto-set model_switch_phase to 1 when num_phases is 2
@@ -500,7 +500,6 @@ const VideoTravelToolPage: React.FC = () => {
       : config;
     
     console.log('[PhaseConfigTrack] 📝 User changed phase config:', {
-      shotId: selectedShot?.id?.substring(0, 8),
       num_phases: adjustedConfig.num_phases,
       model_switch_phase: adjustedConfig.model_switch_phase,
       phases_array_length: adjustedConfig.phases?.length,
@@ -516,42 +515,44 @@ const VideoTravelToolPage: React.FC = () => {
       timestamp: Date.now()
     });
     
-    shotSettings.updateField('phaseConfig', adjustedConfig);
-  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
+    shotSettingsRef.current.updateField('phaseConfig', adjustedConfig);
+  }, []);
 
   const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig, presetMetadata?: any) => {
     console.log('[PhasePreset] User selected preset:', {
       presetId: presetId.substring(0, 8),
-      shotId: selectedShot?.id?.substring(0, 8),
       timestamp: Date.now()
     });
     
     // Update preset ID and phase config
-    shotSettings.updateFields({
+    shotSettingsRef.current.updateFields({
       selectedPhasePresetId: presetId,
       phaseConfig: config
     });
-  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
+  }, []);
 
   const handlePhasePresetRemove = useCallback(() => {
-    console.log('[PhasePreset] User removed preset:', {
-      shotId: selectedShot?.id?.substring(0, 8),
-      timestamp: Date.now()
-    });
+    console.log('[PhasePreset] User removed preset');
     
     // Clear preset ID but keep the current config
-    shotSettings.updateField('selectedPhasePresetId', null);
-  }, [shotSettings]); // Fix #2: Removed selectedShot?.id - only used for logging, not in logic
+    shotSettingsRef.current.updateField('selectedPhasePresetId', null);
+  }, []);
+
+  // Use refs to avoid recreating this callback when selectedShot or updateShotMode change
+  const selectedShotRef = useRef(selectedShot);
+  selectedShotRef.current = selectedShot;
+  const updateShotModeRef = useRef(updateShotMode);
+  updateShotModeRef.current = updateShotMode;
 
   const handleGenerationModeChange = useCallback((mode: 'batch' | 'timeline') => {
     // Optimistically update the cache for THIS shot immediately
-    if (selectedShot?.id) {
-      updateShotMode(selectedShot.id, mode);
+    if (selectedShotRef.current?.id) {
+      updateShotModeRef.current(selectedShotRef.current.id, mode);
     }
     
     // Update the actual settings (will save to DB asynchronously)
-    shotSettings.updateField('generationMode', mode);
-  }, [shotSettings, selectedShot?.id, updateShotMode]);
+    shotSettingsRef.current.updateField('generationMode', mode);
+  }, []);
   const [isCreateShotModalOpen, setIsCreateShotModalOpen] = useState(false);
   const [isCreatingShot, setIsCreatingShot] = useState(false);
   const queryClient = useQueryClient();
@@ -1281,8 +1282,7 @@ const VideoTravelToolPage: React.FC = () => {
   }, [turboMode, advancedMode, shotSettings.status]);
 
   // Memoize the selected shot update logic to prevent unnecessary re-renders
-  const selectedShotRef = useRef(selectedShot);
-  selectedShotRef.current = selectedShot;
+  // Note: selectedShotRef is already declared earlier in the component
   
   useEffect(() => {
     if (!selectedProjectId) {
@@ -1697,14 +1697,15 @@ const VideoTravelToolPage: React.FC = () => {
   // };
 
   const handleSteerableMotionSettingsChange = useCallback((settings: Partial<typeof steerableMotionSettings>) => {
-    // FIX: Use functional update to get current value, not stale closure
-    shotSettings.updateFields({
+    // FIX: Use ref to get current value and avoid callback recreation
+    const currentSettings = shotSettingsRef.current.settings?.steerableMotionSettings || {};
+    shotSettingsRef.current.updateFields({
       steerableMotionSettings: {
-        ...shotSettings.settings.steerableMotionSettings,
+        ...currentSettings,
         ...settings
       }
     });
-  }, [shotSettings]);
+  }, []);
 
   // Mode change handler removed - now hardcoded to use specific model
 

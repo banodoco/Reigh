@@ -470,14 +470,15 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
     queryKey: cacheKey,
     queryFn: () => {
       // Snapshot realtime state at fetch start for correlation
+      // 🎯 FIX: Use channel subscription state instead of internal socket API (which changed in newer Supabase versions)
       try {
-        const socket: any = (supabase as any)?.realtime?.socket;
         const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+        // Check if any channel is in 'joined' state (properly subscribed)
+        const hasSubscribedChannel = channels.some((c: any) => c.state === 'joined');
         console.log('[ReconnectionIssue][UnifiedGenerations] Fetch start realtime snapshot', {
-          connected: !!socket?.isConnected?.(),
-          connState: socket?.connectionState,
+          connected: hasSubscribedChannel,
           channelCount: channels?.length || 0,
-          topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
+          channelStates: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
           visibility: document.visibilityState,
           timestamp: Date.now(),
         });
@@ -526,13 +527,13 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   React.useEffect(() => {
     if (query.data && options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
       try {
-        const socket: any = (supabase as any)?.realtime?.socket;
+        // 🎯 FIX: Use channel subscription state instead of internal socket API
         const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+        const hasSubscribedChannel = channels.some((c: any) => c.state === 'joined');
         console.log('[ReconnectionIssue][UnifiedGenerations] Success realtime snapshot', {
-          connected: !!socket?.isConnected?.(),
-          connState: socket?.connectionState,
+          connected: hasSubscribedChannel,
           channelCount: channels?.length || 0,
-          topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
+          channelStates: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
           visibility: document.visibilityState,
           timestamp: Date.now(),
         });
@@ -577,13 +578,13 @@ export function useUnifiedGenerations(options: UseUnifiedGenerationsOptions) {
   React.useEffect(() => {
     if (query.error && options.enabled && options.projectId && (options.mode !== 'shot-specific' || options.shotId)) {
       try {
-        const socket: any = (supabase as any)?.realtime?.socket;
+        // 🎯 FIX: Use channel subscription state instead of internal socket API
         const channels = (supabase as any)?.getChannels ? (supabase as any).getChannels() : [];
+        const hasSubscribedChannel = channels.some((c: any) => c.state === 'joined');
         console.warn('[ReconnectionIssue][UnifiedGenerations] Error realtime snapshot', {
-          connected: !!socket?.isConnected?.(),
-          connState: socket?.connectionState,
+          connected: hasSubscribedChannel,
           channelCount: channels?.length || 0,
-          topics: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
+          channelStates: (channels || []).slice(0, 5).map((c: any) => ({ topic: c.topic, state: c.state })),
           visibility: document.visibilityState,
           timestamp: Date.now(),
         });

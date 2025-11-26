@@ -219,6 +219,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Only fallback if shots is undefined/null (loading), not if it's an empty array (loaded but missing)
   const selectedShot = foundShot || (shots === undefined ? lastValidShotRef.current : undefined);
   
+  // 🎯 PERF FIX: Create refs for values that are used in callbacks but shouldn't cause callback recreation
+  // This prevents the cascade of 22+ callback recreations on every shot/settings change
+  const selectedShotRef = useRef(selectedShot);
+  selectedShotRef.current = selectedShot;
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+  
   // Shot management hooks for external generation viewing
   const { mutateAsync: createShotMutation } = useCreateShot();
   const { mutateAsync: addToShotMutation } = useAddImageToShot();
@@ -1211,33 +1218,39 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // Early return check moved to end of component
 
 
+  // 🎯 PERF FIX: Use refs to avoid callback recreation on shot/project changes
+  const updateShotImageOrderMutationRef = useRef(updateShotImageOrderMutation);
+  updateShotImageOrderMutationRef.current = updateShotImageOrderMutation;
+  
   const handleReorderImagesInShot = useCallback((orderedShotGenerationIds: string[]) => {
     // DragDebug: handleReorderImagesInShot called
+    const shot = selectedShotRef.current;
+    const projId = projectIdRef.current;
     
-    if (!selectedShot || !projectId) {
+    if (!shot || !projId) {
       console.error('Cannot reorder images: No shot or project selected.');
       return;
     }
 
     console.log('[ShotEditor] Reordering images in shot', {
-      shotId: selectedShot.id,
-      projectId: projectId,
+      shotId: shot.id,
+      projectId: projId,
       orderedShotGenerationIds: orderedShotGenerationIds,
       timestamp: Date.now()
     });
 
     // Update the order on the server
-    updateShotImageOrderMutation.mutate({
-      shotId: selectedShot.id,
+    updateShotImageOrderMutationRef.current.mutate({
+      shotId: shot.id,
       orderedShotGenerationIds: orderedShotGenerationIds,
-      projectId: projectId
+      projectId: projId
     }, {
       onError: (error) => {
         console.error('[ShotEditor] Failed to reorder images:', error);
         // The mutation's onError will handle showing the error message and reverting optimistic updates
       }
     });
-  }, [selectedShot?.id, projectId, updateShotImageOrderMutation]);
+  }, []); // Empty deps - uses refs
 
   const handlePendingPositionApplied = useCallback((generationId: string) => {
     const newMap = new Map(state.pendingFramePositions);
@@ -1387,6 +1400,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     }
       }, [selectedShot, isMobile, updateGenerationsPaneSettings, setIsGenerationsPaneLocked]);
   
+  // 🎯 PERF FIX: Refs for stable callbacks
+  const updateGenerationLocationMutationRef = useRef(updateGenerationLocationMutation);
+  updateGenerationLocationMutationRef.current = updateGenerationLocationMutation;
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+  const onShotImagesUpdateRef = useRef(onShotImagesUpdate);
+  onShotImagesUpdateRef.current = onShotImagesUpdate;
+  const selectedShotIdRef = useRef(selectedShotId);
+  selectedShotIdRef.current = selectedShotId;
+  
   // [PERFORMANCE] Stable callbacks for ShotImagesEditor to prevent re-renders
   const handleImageSaved = useCallback(async (imageId: string, newImageUrl: string, createNew?: boolean) => {
     console.log('[ImageFlipDebug] [ShotEditor] onImageSaved called', {
@@ -1395,6 +1418,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       createNew,
       timestamp: Date.now()
     });
+    
+    const projId = projectIdRef.current;
+    const shotId = selectedShotIdRef.current;
     
     try {
       if (createNew) {
@@ -1410,11 +1436,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
       
       // Update both location and thumbnail_url in the database
-      await updateGenerationLocationMutation.mutateAsync({
+      await updateGenerationLocationMutationRef.current.mutateAsync({
         id: imageId,
         location: newImageUrl,
         thumbUrl: newImageUrl, // Also update thumbnail
-        projectId: projectId
+        projectId: projId
       });
       
       console.log('[ImageFlipDebug] [ShotEditor] Generation location updated successfully', {
@@ -1422,19 +1448,19 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
       
       // Invalidate queries to refresh the UI
-      await queryClient.invalidateQueries({ queryKey: ['shot-generations', selectedShotId] });
-      await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShotId] });
-      await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', selectedShotId] });
+      await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+      await queryClientRef.current.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
+      await queryClientRef.current.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       // IMPORTANT: Also invalidate two-phase cache keys
-      await queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', selectedShotId] });
-      await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', selectedShotId] });
+      await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
       
       console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {
         timestamp: Date.now()
       });
       
       // Call parent callback to update other related data
-      onShotImagesUpdate();
+      onShotImagesUpdateRef.current();
       
       console.log('[ImageFlipDebug] [ShotEditor] onImageSaved completed successfully', {
         timestamp: Date.now()
@@ -1450,7 +1476,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       });
       toast.error('Failed to save flipped image.');
     }
-  }, [updateGenerationLocationMutation, projectId, selectedShotId, queryClient, onShotImagesUpdate]);
+  }, []); // Empty deps - uses refs
 
   const handleSelectionChangeLocal = useCallback((hasSelection: boolean) => {
     // Track selection state - forward to parent for floating CTA control

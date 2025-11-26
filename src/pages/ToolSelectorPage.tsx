@@ -260,29 +260,22 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           </div>
         </div>
       ) : (
-        /* Square layout for Assistant tools - Responsive padding and sizing */
-        <div className={`${isSm ? 'px-1 py-1' : 'px-1 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-col justify-center`}>
-          {/* Tool Header without icon */}
-          <div className={`wes-symmetry ${isSm ? 'mb-0.5' : 'mb-0'} relative`}>
-            <div className={`${isSm ? 'px-1' : 'px-0'} w-full min-w-0`}>
-              <h3 
-                ref={titleRef}
-                className={`font-theme ${titleSizeSquare} font-theme-heading text-primary mb-2 ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage text-center leading-tight`}
-              >
-                {item.name}
-              </h3>
-              <div className={`${isSm ? 'w-12' : 'w-8'} h-0.5 bg-gradient-to-r from-${item.accent} to-wes-vintage-gold rounded-full mx-auto ${!isDisabled ? `${isSm ? 'group-hover:w-16' : 'group-hover:w-12'}` : ''} transition-all duration-700`}></div>
-            </div>
-          </div>
-
-          {/* Description - always show on mobile with adjusted styling */}
-          <div className={`${isSm ? 'mt-0.5' : 'mt-1'} ${isSm ? 'px-1' : 'px-2'} overflow-hidden`}>
-            <p 
-              ref={descriptionRef}
-              className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSizeSquare} ${forceTwoLinesDescriptions ? 'whitespace-pre-line' : ''}`}
-            >
-              {forceTwoLinesDescriptions ? (item.descriptionMobile || item.description).replace(' ', '\n') : (item.descriptionMobile || item.description)}
-            </p>
+        /* Square layout for Assistant tools - Title | Icon side by side */
+        <div className={`${isSm ? 'px-2 py-1' : 'px-1.5 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-row justify-center items-center gap-2 ${isLg ? 'gap-3' : ''}`}>
+          {/* Title */}
+          <h3 
+            ref={titleRef}
+            className={`font-theme ${titleSizeSquare} font-theme-heading text-primary ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage leading-tight text-right`}
+          >
+            {item.name}
+          </h3>
+          
+          {/* Vertical divider line */}
+          <div className={`w-0.5 ${isLg ? 'h-6' : isSm ? 'h-5' : 'h-4'} bg-gradient-to-b from-${item.accent} to-wes-vintage-gold rounded-full ${!isDisabled ? `${isLg ? 'group-hover:h-8' : isSm ? 'group-hover:h-7' : 'group-hover:h-6'}` : ''} transition-all duration-700 flex-shrink-0`}></div>
+          
+          {/* Mini icon badge */}
+          <div className={`${isLg ? 'w-8 h-8' : isSm ? 'w-6 h-6' : 'w-5 h-5'} bg-gradient-to-br ${item.gradient} rounded-lg flex items-center justify-center shadow-sm ${!isDisabled ? 'group-hover:scale-110 group-hover:shadow-md' : ''} transition-all duration-500 flex-shrink-0`}>
+            <item.icon className={`${isLg ? 'w-4 h-4' : isSm ? 'w-3 h-3' : 'w-2.5 h-2.5'} text-white drop-shadow-sm`} />
           </div>
         </div>
       )}
