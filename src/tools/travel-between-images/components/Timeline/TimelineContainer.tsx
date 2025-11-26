@@ -73,9 +73,6 @@ const TimelineSkeletonItem: React.FC<{
            <Loader2 className="h-6 w-6 text-primary/60 animate-spin" />
         </div>
       </div>
-       <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-[10px] font-mono text-muted-foreground whitespace-nowrap opacity-70">
-        Processing...
-      </div>
     </div>
   );
 };
@@ -186,24 +183,53 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   
   // Track pending drop frame for skeleton
   const [pendingDropFrame, setPendingDropFrame] = useState<number | null>(null);
+  
+  // Track internal generation drop processing state
+  const [isInternalDropProcessing, setIsInternalDropProcessing] = useState(false);
 
   // Clear pending frame when upload finishes
   useEffect(() => {
-    if (!isUploadingImage) {
+    // Only clear if we're not processing an internal drop
+    if (!isUploadingImage && !isInternalDropProcessing) {
       setPendingDropFrame(null);
     }
-  }, [isUploadingImage]);
+  }, [isUploadingImage, isInternalDropProcessing]);
 
   // Wrap onImageDrop to intercept targetFrame
   const handleImageDropInterceptor = React.useCallback(async (files: File[], targetFrame?: number) => {
     if (targetFrame !== undefined) {
-      console.log('[TimelineContainer] 🦴 Setting pending drop skeleton at frame:', targetFrame);
+      console.log('[TimelineContainer] 🦴 Setting pending drop skeleton at frame (file):', targetFrame);
       setPendingDropFrame(targetFrame);
     }
     if (onImageDrop) {
       await onImageDrop(files, targetFrame);
     }
   }, [onImageDrop]);
+
+  // Wrap onGenerationDrop to intercept targetFrame and track processing
+  const handleGenerationDropInterceptor = React.useCallback(async (
+    generationId: string, 
+    imageUrl: string, 
+    thumbUrl: string | undefined, 
+    targetFrame?: number
+  ) => {
+    if (targetFrame !== undefined) {
+      console.log('[TimelineContainer] 🦴 Setting pending drop skeleton at frame (gen):', targetFrame);
+      setPendingDropFrame(targetFrame);
+      setIsInternalDropProcessing(true);
+    }
+    
+    try {
+      if (onGenerationDrop) {
+        await onGenerationDrop(generationId, imageUrl, thumbUrl, targetFrame);
+      }
+    } finally {
+      setIsInternalDropProcessing(false);
+      // We don't strictly need to clear pendingDropFrame here because the effect will catch the state change
+      // But clearing it ensures it disappears even if the effect logic is complex
+      setPendingDropFrame(null); 
+    }
+  }, [onGenerationDrop]);
   
   // File input ref for Add Images button
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -479,7 +505,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleDragOver,
     handleDragLeave,
     handleDrop,
-  } = useUnifiedDrop({ onImageDrop: handleImageDropInterceptor, onGenerationDrop, fullMin, fullRange });
+  } = useUnifiedDrop({ 
+    onImageDrop: handleImageDropInterceptor, 
+    onGenerationDrop: handleGenerationDropInterceptor, 
+    fullMin, 
+    fullRange 
+  });
 
   // Effect to handle context visibility delay when not dragging
   useEffect(() => {
@@ -912,7 +943,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           })}
 
           {/* Skeleton for uploading item */}
-          {isUploadingImage && pendingDropFrame !== null && (
+          {(isUploadingImage || isInternalDropProcessing) && pendingDropFrame !== null && (
             <TimelineSkeletonItem
               framePosition={pendingDropFrame}
               fullMin={fullMin}
