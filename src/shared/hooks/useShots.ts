@@ -168,7 +168,7 @@ export const useDuplicateShot = () => {
       
       // Fetch the new shot data to return
       const { data: shotData, error: fetchError } = await supabase
-        .from('shots')
+          .from('shots')
         .select()
         .eq('id', newShotId)
         .single();
@@ -392,8 +392,8 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         const imageRow: GenerationRow = {
           id: gen.id,
           shotImageEntryId: gen.id, // Using generation ID as entry ID for now since we don't have the junction ID handy in this shape
-          imageUrl: gen.location,
-          thumbUrl: gen.thumbnail_url || gen.location,
+            imageUrl: gen.location,
+            thumbUrl: gen.thumbnail_url || gen.location,
           type: gen.type || 'image',
           createdAt: gen.created_at,
           starred: gen.starred || false,
@@ -446,7 +446,7 @@ export const useUpdateShotName = () => {
       }
 
       const { error } = await supabase
-        .from('shots')
+          .from('shots')
         .update({ name: shotName })
         .eq('id', shotId);
 
@@ -486,7 +486,7 @@ export const useUpdateShotAspectRatio = () => {
 // Add image to shot (new simplified version)
 export const useAddImageToShot = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: async ({ 
       shot_id, 
@@ -508,9 +508,9 @@ export const useAddImageToShot = () => {
       
       if (resolvedFrame === undefined) {
         const { data: lastGen, error: fetchError } = await supabase
-          .from('shot_generations')
+        .from('shot_generations')
           .select('timeline_frame')
-          .eq('shot_id', shot_id)
+        .eq('shot_id', shot_id)
           .order('timeline_frame', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -525,7 +525,7 @@ export const useAddImageToShot = () => {
 
       // Insert into shot_generations
       const { data, error } = await supabase
-        .from('shot_generations')
+          .from('shot_generations')
         .insert({
           shot_id,
           generation_id,
@@ -659,8 +659,8 @@ export const useAddImageToShot = () => {
       const { project_id, shot_id } = variables;
 
       // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
+        queryClient.invalidateQueries({ queryKey: ['shots', project_id] });
+          queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shot_id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shot_id] }); // Also invalidate metadata (pairs)
       
       // Note: DataFreshnessManager handles global invalidation, 
@@ -673,7 +673,7 @@ export const useAddImageToShot = () => {
 // Useful for drag and drop reordering where we calculate position client-side first
 export const useAddImageToShotWithoutPosition = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: async ({ 
       shot_id, 
@@ -719,14 +719,14 @@ export const useAddImageToShotWithoutPosition = () => {
 
       const { data, error } = await supabase
         .from('shot_generations')
-        .insert({
+          .insert({
           shot_id,
           generation_id,
           timeline_frame: nextFrame
-        })
-        .select()
-        .single();
-
+          })
+          .select()
+          .single();
+        
       if (error) throw error;
       return { ...data, project_id, imageUrl, thumbUrl };
     },
@@ -806,7 +806,7 @@ export const useRemoveImageFromShot = () => {
 // Update shot image order/position
 export const useUpdateShotImageOrder = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: async ({ 
       updates, 
@@ -827,7 +827,7 @@ export const useUpdateShotImageOrder = () => {
       
       const promises = updates.map(update => 
         supabase
-          .from('shot_generations')
+        .from('shot_generations')
           .update({ timeline_frame: update.timeline_frame })
           .eq('shot_id', update.shot_id)
           .eq('generation_id', update.generation_id)
@@ -883,8 +883,8 @@ export const usePositionExistingGenerationInShot = () => {
 
   return useMutation({
     mutationFn: async ({ 
-      shot_id, 
-      generation_id, 
+          shot_id,
+          generation_id,
       project_id
     }: { 
       shot_id: string; 
@@ -917,15 +917,15 @@ export const usePositionExistingGenerationInShot = () => {
 // Duplicate an image in a shot by creating a new generation and adding it at a midpoint timeline_frame
 export const useDuplicateImageInShot = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
-    mutationFn: async ({ 
-      shot_id, 
-      generation_id, 
+    mutationFn: async ({
+      shot_id,
+      generation_id,
       project_id
-    }: { 
-      shot_id: string; 
-      generation_id: string; 
+    }: {
+      shot_id: string;
+      generation_id: string;
       project_id: string;
     }) => {
       // 1. Fetch the original generation to get its image URL and metadata
@@ -990,7 +990,7 @@ export const useDuplicateImageInShot = () => {
         })
         .select()
         .single();
-
+      
       if (createError || !newGeneration) {
         throw new Error(`Failed to create duplicate generation: ${createError?.message || 'Unknown error'}`);
       }
@@ -1005,14 +1005,14 @@ export const useDuplicateImageInShot = () => {
         })
         .select()
         .single();
-
+      
       if (addError || !newShotGen) {
         // Clean up: delete the generation if adding to shot failed
         await supabase.from('generations').delete().eq('id', newGeneration.id);
         throw new Error(`Failed to add duplicate to shot: ${addError?.message || 'Unknown error'}`);
       }
 
-      return { 
+        return {
         shot_id, 
         original_generation_id: generation_id,
         new_generation_id: newGeneration.id,
@@ -1043,7 +1043,7 @@ export const createGenerationForUploadedImage = async (
   projectId: string,
   thumbnailUrl?: string
 ) => {
-  const { data, error } = await supabase
+      const { data, error } = await supabase
     .from('generations')
     .insert({
       project_id: projectId,
@@ -1057,10 +1057,10 @@ export const createGenerationForUploadedImage = async (
         file_size: fileSize
       }
     })
-    .select()
-    .single();
-
-  if (error) throw error;
+        .select()
+        .single();
+      
+      if (error) throw error;
   return data;
 };
 
@@ -1398,4 +1398,4 @@ export const useHandleExternalImageDrop = () => {
   });
 
   return mutation;
-};
+}; 

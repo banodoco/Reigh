@@ -901,19 +901,33 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [userId, isLoadingPreferences, fetchProjects, isLoadingProjects]); // Refetch when user changes or preferences finish loading
 
   const contextValue = useMemo(
-    () => ({ 
-      projects, 
-      selectedProjectId, 
-      setSelectedProjectId: handleSetSelectedProjectId, 
-      isLoadingProjects,
-      fetchProjects,
-      addNewProject, 
-      isCreatingProject,
-      updateProject,
-      isUpdatingProject,
-      deleteProject,
-      isDeletingProject
-    }),
+    () => {
+      // Ensure all required values are defined
+      const value = { 
+        projects: projects || [], 
+        selectedProjectId, 
+        setSelectedProjectId: handleSetSelectedProjectId, 
+        isLoadingProjects,
+        fetchProjects,
+        addNewProject, 
+        isCreatingProject,
+        updateProject,
+        isUpdatingProject,
+        deleteProject,
+        isDeletingProject
+      };
+      
+      // Defensive check - ensure context value is always valid
+      if (!value.setSelectedProjectId || !value.fetchProjects) {
+        console.error('[ProjectContext] Context value is missing required functions', {
+          hasSetSelectedProjectId: !!value.setSelectedProjectId,
+          hasFetchProjects: !!value.fetchProjects,
+          stack: new Error().stack
+        });
+      }
+      
+      return value;
+    },
     [
       projects,
       selectedProjectId,
@@ -936,6 +950,33 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [selectedProjectId, projects]);
 
+  // Ensure contextValue is always defined before rendering Provider
+  if (!contextValue || !contextValue.setSelectedProjectId || !contextValue.fetchProjects) {
+    console.error('[ProjectContext] Provider cannot render - contextValue is invalid', {
+      contextValue,
+      hasSetSelectedProjectId: !!contextValue?.setSelectedProjectId,
+      hasFetchProjects: !!contextValue?.fetchProjects
+    });
+    // Return a minimal provider to prevent the error, but this should never happen
+    return (
+      <ProjectContext.Provider value={contextValue || {
+        projects: [],
+        selectedProjectId: null,
+        setSelectedProjectId: () => {},
+        isLoadingProjects: true,
+        fetchProjects: async () => {},
+        addNewProject: async () => null,
+        isCreatingProject: false,
+        updateProject: async () => false,
+        isUpdatingProject: false,
+        deleteProject: async () => false,
+        isDeletingProject: false
+      }}>
+        {children}
+      </ProjectContext.Provider>
+    );
+  }
+
   return (
     <ProjectContext.Provider value={contextValue}>
       {children}
@@ -946,7 +987,15 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 export const useProject = () => {
   const context = useContext(ProjectContext);
   if (context === undefined) {
-    throw new Error('useProject must be used within a ProjectProvider');
+    // Provide more context in the error message for debugging
+    const errorMessage = 'useProject must be used within a ProjectProvider. ' +
+      'Make sure the component is rendered inside the ProjectProvider tree. ' +
+      'Check that the component is not being rendered outside of App.tsx or in an error boundary that is outside the provider.';
+    console.error('[ProjectContext]', errorMessage, {
+      stack: new Error().stack,
+      windowLocation: typeof window !== 'undefined' ? window.location.href : 'N/A'
+    });
+    throw new Error(errorMessage);
   }
   return context;
 }; 

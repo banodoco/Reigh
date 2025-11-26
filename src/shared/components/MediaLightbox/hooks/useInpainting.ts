@@ -120,6 +120,10 @@ export const useInpainting = ({
   const pendingRedrawRef = useRef<NodeJS.Timeout | null>(null);
   const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
+  // Track if we've initialized the canvas with existing strokes (prevents redrawing on every move)
+  const hasInitializedCanvasRef = useRef<boolean>(false);
+  const lastDrawnPointRef = useRef<{ x: number; y: number } | null>(null);
+  
   // Track when user tries to draw in text mode (for tooltip hint)
   const [showTextModeHint, setShowTextModeHint] = useState(false);
   const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -685,8 +689,6 @@ export const useInpainting = ({
   const handleResize = useCallback(() => {
     if (!isInpaintMode || isMediaTransitioningRef.current) return;
 
-    console.error('[InpaintResize] ⚠️ Window resized, recalculating canvas');
-
     if (displayCanvasRef.current && imageContainerRef.current) {
       const container = imageContainerRef.current;
       const img = container.querySelector('img');
@@ -889,23 +891,6 @@ export const useInpainting = ({
       lastRedrawTimeRef.current = now;
     }
     
-    console.error('[InpaintDraw] 🖌️ redrawStrokes called', {
-      strokeCount: strokes.length,
-      selectedId: selectedShapeId,
-      canvasExists: !!displayCanvasRef.current,
-      maskExists: !!maskCanvasRef.current,
-      immediate,
-      timestamp: Date.now()
-    });
-    console.log('[InpaintDraw] 🖌️ redrawStrokes called', {
-      strokeCount: strokes.length,
-      selectedId: selectedShapeId,
-      canvasExists: !!displayCanvasRef.current,
-      maskExists: !!maskCanvasRef.current,
-      immediate,
-      timestamp: Date.now()
-    });
-    
     const canvas = displayCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
     
@@ -926,10 +911,6 @@ export const useInpainting = ({
     maskCtx.imageSmoothingEnabled = false;
     
     // Clear both canvases
-    console.error('[InpaintDraw] 🧹 Clearing canvases', {
-      bufferSize: { width: canvas.width, height: canvas.height },
-      displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight }
-    });
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
     
@@ -944,29 +925,6 @@ export const useInpainting = ({
       const strokeBrushSize = stroke.brushSize || 20;
       const shapeType = stroke.shapeType || 'line';
       const isSelected = stroke.id === selectedShapeId;
-      
-      console.error('[InpaintDraw] ✏️ Drawing stroke', {
-        index,
-        id: stroke.id.substring(0, 8),
-        type: shapeType,
-        points: stroke.points.length,
-        isSelected,
-        isErasing: stroke.isErasing,
-        isFreeForm: stroke.isFreeForm,
-        firstPoint: stroke.points[0],
-        lastPoint: stroke.points[stroke.points.length - 1],
-        canvasBuffer: { width: canvas.width, height: canvas.height },
-        canvasDisplay: { width: canvas.offsetWidth, height: canvas.offsetHeight }
-      });
-      console.log('[InpaintDraw] ✏️ Drawing stroke', {
-        index,
-        id: stroke.id.substring(0, 8),
-        type: shapeType,
-        points: stroke.points.length,
-        isSelected,
-        isErasing: stroke.isErasing,
-        isFreeForm: stroke.isFreeForm
-      });
       
       // Set up context for display canvas
       ctx.globalCompositeOperation = stroke.isErasing ? 'destination-out' : 'lighten';
@@ -1055,27 +1013,6 @@ export const useInpainting = ({
     });
     
     console.log('[Inpaint] Redrawn strokes', { count: strokes.length, selectedId: selectedShapeId });
-    
-    // Debug: Check canvas visibility and scaling
-    if (canvas) {
-      const canvasStyle = window.getComputedStyle(canvas);
-      const bufferVsDisplay = canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight;
-      console.error('[InpaintDraw] 📊 Canvas style check', {
-        zIndex: canvasStyle.zIndex,
-        opacity: canvasStyle.opacity,
-        display: canvasStyle.display,
-        visibility: canvasStyle.visibility,
-        pointerEvents: canvasStyle.pointerEvents,
-        position: canvasStyle.position,
-        bufferSize: { width: canvas.width, height: canvas.height },
-        displaySize: { width: canvas.offsetWidth, height: canvas.offsetHeight },
-        MISMATCH: bufferVsDisplay ? '⚠️ BUFFER SIZE != DISPLAY SIZE!' : '✅ Sizes match',
-        scaleRatio: {
-          x: canvas.offsetWidth / canvas.width,
-          y: canvas.offsetHeight / canvas.height
-        }
-      });
-    }
   }, [selectedShapeId]);
   
   // Store latest redrawStrokes in ref to avoid stale closures in effects
@@ -1138,12 +1075,6 @@ export const useInpainting = ({
   // Handle mouse/touch drawing (canvas coordinate system)
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = displayCanvasRef.current;
-    console.error('[InpaintPointer] 🖱️ handlePointerDown', {
-      canvasBufferSize: canvas ? { width: canvas.width, height: canvas.height } : null,
-      canvasDisplaySize: canvas ? { width: canvas.offsetWidth, height: canvas.offsetHeight } : null,
-      pointerPosition: { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY },
-      clientPosition: { x: e.clientX, y: e.clientY }
-    });
     console.log('[MobilePaintDebug] 🔧 handlePointerDown called', {
       isInpaintMode,
       hasCanvas: !!displayCanvasRef.current,
@@ -1292,6 +1223,9 @@ export const useInpainting = ({
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     
     setIsDrawing(true);
+    // Reset canvas initialization flag for new stroke
+    hasInitializedCanvasRef.current = false;
+    lastDrawnPointRef.current = null;
     
     console.log('[MobilePaintDebug] ✅ Starting stroke', {
       x,
@@ -1421,8 +1355,6 @@ export const useInpainting = ({
     
     if (!isDrawing) return;
     
-    setCurrentStroke(prev => [...prev, { x, y }]);
-    
     // Draw current stroke on display canvas
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -1430,19 +1362,26 @@ export const useInpainting = ({
     // Disable image smoothing for crisp edges
     ctx.imageSmoothingEnabled = false;
     
+    // Initialize canvas with existing strokes only once at the start of drawing
+    if (!hasInitializedCanvasRef.current) {
+      redrawStrokes(brushStrokes);
+      hasInitializedCanvasRef.current = true;
+      lastDrawnPointRef.current = null;
+    }
+    
     // In annotation mode, redraw with the updated shape preview
     if (isAnnotateMode && annotationMode) {
-      console.log('[InpaintPointer] 🖌️ Drawing preview during pointer move', {
-        currentStrokeLength: currentStroke.length,
-        existingStrokesCount: brushStrokes.length
-      });
-      
-      // Redraw all saved strokes first
-      redrawStrokes(brushStrokes);
-      
-      // Then draw the current shape preview
+      // For rectangles, we need to redraw the preview each time
+      // But we can optimize by only clearing the preview area
       const startPoint = currentStroke[0];
       if (startPoint) {
+        // Save context state
+        ctx.save();
+        
+        // Redraw existing strokes (excluding current preview)
+        redrawStrokes(brushStrokes);
+        
+        // Draw the current shape preview
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
         ctx.lineWidth = 8;
@@ -1455,28 +1394,48 @@ export const useInpainting = ({
           const height = y - startPoint.y;
           ctx.strokeRect(startPoint.x, startPoint.y, width, height);
         }
+        
+        ctx.restore();
       }
+      
+      // Update stroke state
+      setCurrentStroke(prev => [...prev, { x, y }]);
     } else {
-      // Original line drawing for inpaint mode
-      // Redraw existing strokes to have a clean slate for the preview
-      redrawStrokes(brushStrokes);
-
-      // Draw the current stroke preview on top
+      // Optimized line drawing: only draw the incremental segment
+      const lastPoint = lastDrawnPointRef.current || (currentStroke.length > 0 ? currentStroke[currentStroke.length - 1] : null);
+      
+      ctx.save();
       ctx.globalCompositeOperation = isEraseMode ? 'destination-out' : 'source-over';
       ctx.strokeStyle = isEraseMode ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 0, 0, 0.4)';
       ctx.lineWidth = brushSize;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-
-      if (currentStroke.length > 0) {
+      
+      if (lastPoint) {
+        // Draw only the new segment from last point to current point
+        ctx.beginPath();
+        ctx.moveTo(lastPoint.x, lastPoint.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      } else if (currentStroke.length === 0) {
+        // First point - just set up for next segment
+        setCurrentStroke([{ x, y }]);
+        lastDrawnPointRef.current = { x, y };
+        ctx.restore();
+        return;
+      } else {
+        // Draw from first point to current (for the initial segment)
         ctx.beginPath();
         ctx.moveTo(currentStroke[0].x, currentStroke[0].y);
-        for (let i = 1; i < currentStroke.length; i++) {
-          ctx.lineTo(currentStroke[i].x, currentStroke[i].y);
-        }
-        ctx.lineTo(x, y); // Draw to the current cursor position
+        ctx.lineTo(x, y);
         ctx.stroke();
       }
+      
+      ctx.restore();
+      
+      // Update stroke state and last drawn point
+      setCurrentStroke(prev => [...prev, { x, y }]);
+      lastDrawnPointRef.current = { x, y };
     }
   }, [isInpaintMode, isDrawing, isEraseMode, currentStroke, brushSize, isAnnotateMode, annotationMode, brushStrokes, redrawStrokes, isDraggingShape, isDraggingControlPoint, dragOffset, dragMode, draggingCornerIndex, displayCanvasRef, maskCanvasRef, setBrushStrokes]);
 
@@ -1547,6 +1506,9 @@ export const useInpainting = ({
     }
     
     setIsDrawing(false);
+    // Reset canvas initialization flag when drawing ends
+    hasInitializedCanvasRef.current = false;
+    lastDrawnPointRef.current = null;
     
     if (currentStroke.length > 1) {
       const shapeType = isAnnotateMode && annotationMode ? annotationMode : 'line';
@@ -1583,21 +1545,6 @@ export const useInpainting = ({
       };
       
       const canvas = displayCanvasRef.current;
-      console.error('[InpointPointer] ✅ New stroke created', {
-        id: newStroke.id.substring(0, 8),
-        shapeType: newStroke.shapeType,
-        pointCount: newStroke.points.length,
-        canvasBufferSize: canvas ? { width: canvas.width, height: canvas.height } : null,
-        canvasDisplaySize: canvas ? { width: canvas.offsetWidth, height: canvas.offsetHeight } : null,
-        firstPoint: newStroke.points[0],
-        lastPoint: newStroke.points[newStroke.points.length - 1],
-        samplePoints: newStroke.points.slice(0, 3)
-      });
-      console.log('[InpaintPointer] ✅ New stroke created', {
-        id: newStroke.id.substring(0, 8),
-        shapeType: newStroke.shapeType,
-        pointCount: newStroke.points.length
-      });
       
       // Clear opposite mode's strokes when starting to draw (prevents cross-over)
       if (isAnnotateMode && inpaintStrokes.length > 0) {

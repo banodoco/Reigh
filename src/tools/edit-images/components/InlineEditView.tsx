@@ -191,7 +191,7 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
       <TooltipProvider delayDuration={500}>
          <div className="w-full flex flex-col bg-transparent">
              <div 
-               className="flex items-center justify-center relative bg-zinc-900/50 w-full shrink-0"
+               className="flex items-center justify-center relative bg-black w-full shrink-0"
                style={{ height: '45dvh', touchAction: 'pan-y' }}
              >
                <MediaDisplayWithCanvas
@@ -361,7 +361,7 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     <TooltipProvider delayDuration={500}>
        <div className="w-full h-full flex bg-transparent overflow-hidden">
           <div 
-            className="flex-1 flex items-center justify-center relative bg-zinc-900/50 rounded-l-xl overflow-hidden"
+            className="flex-1 flex items-center justify-center relative bg-black rounded-l-xl overflow-hidden"
             style={{ width: '60%', height: '100%' }}
           >
             <MediaDisplayWithCanvas

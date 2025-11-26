@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { Button } from '@/shared/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -150,7 +150,7 @@ export default function EditImagesPage() {
           </div>
         </div>
       ) : (
-        <div className="w-full h-full px-4 pt-4 overflow-hidden">
+        <div className="w-full h-full px-4 overflow-hidden">
           <div className={cn(
             "max-w-7xl mx-auto relative",
             isEditingOnMobile ? "flex flex-col min-h-full" : "h-full overflow-hidden"
