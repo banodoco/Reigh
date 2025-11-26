@@ -688,7 +688,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         {/* Timeline scrolling container */}
         <div
           ref={timelineRef}
-          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 ${
+            // Disable scrolling during drag to prevent browser auto-scroll behavior
+            dragState.isDragging ? 'overflow-x-hidden' : 'overflow-x-auto'
+          } ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
           style={{ 
