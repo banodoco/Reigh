@@ -1015,28 +1015,26 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           {images.map((image, idx) => {
             const imageKey = image.shotImageEntryId ?? image.id;
             
-            // KEY FIX: Get position from the positions map, with fallback to image.timeline_frame
-            // But do NOT use idx * 50 fallback - if we don't know the position, don't render
+            // KEY FIX: Get position from the positions map ONLY
+            // Do NOT fall back to image.timeline_frame as it may be stale or from wrong source
             const positionFromMap = currentPositions.get(imageKey);
-            const positionFromImage = image.timeline_frame;
             
-            // Use position from map first, then from image data
-            const framePosition = positionFromMap ?? positionFromImage;
-            
-            // CRITICAL: Skip rendering items without known positions
-            // This prevents the visible "wrong place" jumps during transitions
-            if (framePosition === undefined || framePosition === null) {
+            // CRITICAL: Skip rendering items without known positions in the map
+            // This prevents items from appearing at wrong positions
+            if (positionFromMap === undefined || positionFromMap === null) {
               // Log skipped items at debug level
               if (process.env.NODE_ENV === 'development') {
-                console.log(`[TimelineVisibility] ⏳ Skipping item without position:`, {
+                console.log(`[TimelineVisibility] ⏳ Skipping item not in positions map:`, {
                   imageKey: imageKey?.substring(0, 8),
                   positionFromMap,
-                  positionFromImage,
-                  reason: 'Position unknown - waiting for database sync'
+                  imageTimelineFrame: image.timeline_frame,
+                  reason: 'Item not in positions map - waiting for sync'
                 });
               }
               return null;
             }
+            
+            const framePosition = positionFromMap;
             
             const isDragging = dragState.isDragging && dragState.activeId === imageKey;
 
