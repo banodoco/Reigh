@@ -20,7 +20,65 @@ import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
+
+// Skeleton component for uploading images
+const TimelineSkeletonItem: React.FC<{
+  framePosition: number;
+  fullMin: number;
+  fullRange: number;
+  containerWidth: number;
+  projectAspectRatio?: string;
+}> = ({
+  framePosition,
+  fullMin,
+  fullRange,
+  containerWidth,
+  projectAspectRatio,
+}) => {
+  const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+  const pixelPosition = TIMELINE_PADDING_OFFSET + ((framePosition - fullMin) / fullRange) * effectiveWidth;
+  const leftPercent = (pixelPosition / containerWidth) * 100;
+
+  // Calculate aspect ratio
+  let aspectRatioStyle: React.CSSProperties = { aspectRatio: '1' };
+  if (projectAspectRatio) {
+    const [w, h] = projectAspectRatio.split(':').map(Number);
+    if (!isNaN(w) && !isNaN(h)) {
+      aspectRatioStyle = { aspectRatio: `${w / h}` };
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: `${leftPercent}%`,
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        transition: 'left 0.2s ease-out',
+        zIndex: 5,
+        pointerEvents: 'none',
+      }}
+    >
+       <div 
+        className="relative border-2 border-primary/20 rounded-lg overflow-hidden bg-muted/50"
+        style={{
+          width: '120px',
+          maxHeight: '120px',
+          ...aspectRatioStyle,
+        }}
+      >
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+           <Loader2 className="h-6 w-6 text-primary/60 animate-spin" />
+        </div>
+      </div>
+       <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-[10px] font-mono text-muted-foreground whitespace-nowrap opacity-70">
+        Processing...
+      </div>
+    </div>
+  );
+};
 
 // Import hooks
 import { useZoom } from './hooks/useZoom';
@@ -125,6 +183,27 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(50);
   const maxGap = 81;
+  
+  // Track pending drop frame for skeleton
+  const [pendingDropFrame, setPendingDropFrame] = useState<number | null>(null);
+
+  // Clear pending frame when upload finishes
+  useEffect(() => {
+    if (!isUploadingImage) {
+      setPendingDropFrame(null);
+    }
+  }, [isUploadingImage]);
+
+  // Wrap onImageDrop to intercept targetFrame
+  const handleImageDropInterceptor = React.useCallback(async (files: File[], targetFrame?: number) => {
+    if (targetFrame !== undefined) {
+      console.log('[TimelineContainer] 🦴 Setting pending drop skeleton at frame:', targetFrame);
+      setPendingDropFrame(targetFrame);
+    }
+    if (onImageDrop) {
+      await onImageDrop(files, targetFrame);
+    }
+  }, [onImageDrop]);
   
   // File input ref for Add Images button
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -400,7 +479,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     handleDragOver,
     handleDragLeave,
     handleDrop,
-  } = useUnifiedDrop({ onImageDrop, onGenerationDrop, fullMin, fullRange });
+  } = useUnifiedDrop({ onImageDrop: handleImageDropInterceptor, onGenerationDrop, fullMin, fullRange });
 
   // Effect to handle context visibility delay when not dragging
   useEffect(() => {
@@ -831,6 +910,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               />
             );
           })}
+
+          {/* Skeleton for uploading item */}
+          {isUploadingImage && pendingDropFrame !== null && (
+            <TimelineSkeletonItem
+              framePosition={pendingDropFrame}
+              fullMin={fullMin}
+              fullRange={fullRange}
+              containerWidth={containerWidth}
+              projectAspectRatio={projectAspectRatio}
+            />
+          )}
 
           {/* Timeline items */}
           {(() => {
