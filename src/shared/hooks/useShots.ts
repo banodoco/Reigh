@@ -1131,6 +1131,7 @@ export const useDuplicateImageInShot = () => {
         shot_id, 
         original_generation_id: generation_id,
         new_generation_id: newGeneration.id,
+        new_shot_generation_id: newShotGen.id, // The unique ID for the new shot_generation entry
         timeline_frame: newTimelineFrame,
         project_id 
       };

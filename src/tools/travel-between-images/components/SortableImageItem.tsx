@@ -1,22 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
 import { Trash2, Copy, Check, Pencil } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogOverlay,
-} from '@/shared/components/ui/alert-dialog';
-import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Label } from '@/shared/components/ui/label';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
@@ -35,8 +22,6 @@ interface SortableImageItemProps {
   isSelected: boolean;
   isDragDisabled?: boolean;
   timeline_frame?: number;
-  skipConfirmation: boolean;
-  onSkipConfirmationSave: () => void;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   /** When provided, image src will only be set once this is true */
@@ -57,8 +42,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   isSelected,
   isDragDisabled = false,
   timeline_frame,
-  skipConfirmation,
-  onSkipConfirmationSave,
   duplicatingImageId,
   duplicateSuccessImageId,
   shouldLoad = true,
@@ -122,9 +105,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     id: sortableId,
     disabled: isDragDisabled,
   });
-  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
-  const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(skipConfirmation);
-  const currentDialogSkipChoiceRef = useRef(skipConfirmation);
   const isMobile = useIsMobile();
 
   // Track touch position to detect scrolling vs tapping
@@ -166,21 +146,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    if (skipConfirmation) {
-      onDelete(image.shotImageEntryId);
-    } else {
-      setSkipConfirmationNextTimeVisual(false);
-      currentDialogSkipChoiceRef.current = false;
-      setIsConfirmDeleteDialogOpen(true);
-    }
-  };
-
-  const handleConfirmDelete = () => {
     onDelete(image.shotImageEntryId);
-    if (currentDialogSkipChoiceRef.current) {
-      onSkipConfirmationSave();
-    }
-    setIsConfirmDeleteDialogOpen(false);
   };
 
   const handleDuplicateClick = (e: React.MouseEvent) => {
@@ -398,48 +364,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
           </Button>
         </>
       )}
-      <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
-        <AlertDialogOverlay
-          onPointerDown={(e) => {
-            // Prevent underlying sortable interactions when clicking overlay
-            e.stopPropagation();
-          }}
-        />
-        <AlertDialogContent
-          onPointerDown={(e) => {
-            // Prevent underlying sortable item click / drag sensors when the dialog is open
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Image</AlertDialogTitle>
-            <AlertDialogDescription>
-              Do you want to permanently remove this image from the shot? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex items-center space-x-2 my-4">
-            <Checkbox
-              id="skip-confirm"
-              checked={skipConfirmationNextTimeVisual}
-              onCheckedChange={(checked) => {
-                const booleanValue = Boolean(checked);
-                setSkipConfirmationNextTimeVisual(booleanValue);
-                currentDialogSkipChoiceRef.current = booleanValue;
-              }}
-            />
-            <Label htmlFor="skip-confirm" className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-              Delete without confirmation in the future
-            </Label>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>Confirm Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
@@ -455,7 +379,6 @@ export const SortableImageItem = React.memo(
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isDragDisabled === nextProps.isDragDisabled &&
       prevProps.timeline_frame === nextProps.timeline_frame &&
-      prevProps.skipConfirmation === nextProps.skipConfirmation &&
       prevProps.duplicatingImageId === nextProps.duplicatingImageId &&
       prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
       prevProps.shouldLoad === nextProps.shouldLoad &&
@@ -477,7 +400,6 @@ export const SortableImageItem = React.memo(
         isSelected: prevProps.isSelected !== nextProps.isSelected,
         isDragDisabled: prevProps.isDragDisabled !== nextProps.isDragDisabled,
         timeline_frame: prevProps.timeline_frame !== nextProps.timeline_frame,
-        skipConfirmation: prevProps.skipConfirmation !== nextProps.skipConfirmation,
         duplicating: prevProps.duplicatingImageId !== nextProps.duplicatingImageId,
         success: prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId,
         shouldLoad: prevProps.shouldLoad !== nextProps.shouldLoad,

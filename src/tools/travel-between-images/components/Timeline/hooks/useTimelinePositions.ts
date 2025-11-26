@@ -203,10 +203,9 @@ export function useTimelinePositions({
       }))
     });
     
-    // Use transition for non-urgent database sync
-    startTransition(() => {
-      setPositions(newPositions);
-    });
+    // Sync positions immediately (not in transition) to prevent flicker
+    // when new items are added - the position must be available before render
+    setPositions(newPositions);
     
     // Notify parent if callback provided
     if (onPositionsChange) {

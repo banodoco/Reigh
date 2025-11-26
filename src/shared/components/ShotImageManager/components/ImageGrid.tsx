@@ -16,8 +16,6 @@ interface ImageGridProps {
   onDelete: (id: string) => void;
   onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   isMobile: boolean;
-  imageDeletionSettings: any;
-  updateImageDeletionSettings: (settings: any) => void;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   projectAspectRatio?: string;
@@ -44,8 +42,6 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   onDelete,
   onDuplicate,
   isMobile,
-  imageDeletionSettings,
-  updateImageDeletionSettings,
   duplicatingImageId,
   duplicateSuccessImageId,
   projectAspectRatio,
@@ -90,7 +86,10 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
       {images.map((image, index) => {
         const imageKey = ((image as any).shotImageEntryId ?? (image as any).id) as string;
         const desktopSelected = selectedIds.includes(imageKey);
-        const frameNumber = index * batchVideoFrames;
+        // Use actual timeline_frame for duplication (not calculated from index)
+        // The calculated frameNumber is only for display purposes
+        const displayFrameNumber = index * batchVideoFrames;
+        const actualTimelineFrame = (image as any).timeline_frame;
         const isLastImage = index === images.length - 1;
         
         console.log('[DataTrace] 🎨 Rendering image item:', {
@@ -116,11 +115,9 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
               }}
               onDelete={() => onDelete(image.shotImageEntryId ?? image.id)}
               onDuplicate={onDuplicate}
-              timeline_frame={frameNumber}
+              timeline_frame={actualTimelineFrame ?? displayFrameNumber}
               onDoubleClick={isMobile ? () => {} : () => onItemDoubleClick(index)}
               onInpaintClick={isMobile ? undefined : () => onInpaintClick(index)}
-              skipConfirmation={imageDeletionSettings.skipConfirmation}
-              onSkipConfirmationSave={() => updateImageDeletionSettings({ skipConfirmation: true })}
               duplicatingImageId={duplicatingImageId}
               duplicateSuccessImageId={duplicateSuccessImageId}
               shouldLoad={true}

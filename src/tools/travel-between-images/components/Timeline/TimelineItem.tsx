@@ -445,6 +445,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                       buttonClickedRef.current = false;
                     }, 100);
                   }}
+                  onTouchStart={(e) => {
+                    // Prevent touch events from bubbling to parent's double-tap handler
+                    e.stopPropagation();
+                  }}
+                  onTouchEnd={(e) => {
+                    // Prevent touch events from bubbling to parent's double-tap handler
+                    e.stopPropagation();
+                  }}
                   title="Edit image"
                 >
                   <Pencil className="h-3 w-3" />
@@ -461,7 +469,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -470,10 +477,17 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
+                }}
+                onTouchStart={(e) => {
+                  // Prevent touch events from bubbling to parent's double-tap handler
+                  e.stopPropagation();
+                }}
+                onTouchEnd={(e) => {
+                  // Prevent touch events from bubbling to parent's double-tap handler
+                  e.stopPropagation();
                 }}
                 disabled={duplicatingImageId === imageKey}
                 title="Duplicate image"
@@ -497,7 +511,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
@@ -506,10 +519,17 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                   buttonClickedRef.current = true;
                   e.preventDefault();
                   e.stopPropagation();
-                  // REMOVED: e.nativeEvent.stopImmediatePropagation() - can interfere with other event listeners
                   setTimeout(() => {
                     buttonClickedRef.current = false;
                   }, 100);
+                }}
+                onTouchStart={(e) => {
+                  // Prevent touch events from bubbling to parent's double-tap handler
+                  e.stopPropagation();
+                }}
+                onTouchEnd={(e) => {
+                  // Prevent touch events from bubbling to parent's double-tap handler
+                  e.stopPropagation();
                 }}
                 title="Remove from timeline"
               >

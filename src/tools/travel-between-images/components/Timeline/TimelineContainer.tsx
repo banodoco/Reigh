@@ -299,21 +299,98 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   });
 
   // Tap-to-move hook (for tablets only)
+  // Uses the same position conflict logic as desktop drag
   const handleTapToMoveAction = React.useCallback(async (imageId: string, targetFrame: number) => {
+    const originalPos = framePositions.get(imageId) ?? 0;
+    
     console.log('[TapToMove] Moving item:', {
       imageId: imageId.substring(0, 8),
       targetFrame,
-      currentFrame: framePositions.get(imageId)
+      originalPos
     });
     
-    // Create new positions map with the moved item at target position
-    const intermediatePositions = new Map(framePositions);
-    intermediatePositions.set(imageId, targetFrame);
+    // Don't move if target is same as current position
+    if (targetFrame === originalPos) {
+      console.log('[TapToMove] Target same as current position, skipping');
+      return;
+    }
     
-    // Apply fluid timeline logic to ensure proper spacing and no conflicts
-    // This is the same logic used by the drag system
+    const newPositions = new Map(framePositions);
+    
+    // Check if another item is at the target position (same logic as desktop drag)
+    const conflictingItem = [...framePositions.entries()].find(
+      ([id, pos]) => id !== imageId && pos === targetFrame
+    );
+    
+    if (conflictingItem) {
+      console.log('[TapToMove] 🎯 POSITION CONFLICT DETECTED:', {
+        itemId: imageId.substring(0, 8),
+        conflictWithId: conflictingItem[0].substring(0, 8),
+        targetPos: targetFrame
+      });
+      
+      if (targetFrame === 0) {
+        // Special case: moving to position 0
+        // The moved item takes position 0
+        // The existing item moves to the middle between 0 and the next item
+        const sortedItems = [...framePositions.entries()]
+          .filter(([id]) => id !== imageId && id !== conflictingItem[0])
+          .sort((a, b) => a[1] - b[1]);
+        
+        // Find the next item after position 0
+        const nextItem = sortedItems.find(([_, pos]) => pos > 0);
+        const nextItemPos = nextItem ? nextItem[1] : 50; // Default to 50 if no next item
+        
+        // Move the conflicting item to the midpoint
+        const midpoint = Math.floor(nextItemPos / 2);
+        
+        console.log('[TapToMove] 📍 POSITION 0 INSERT:', {
+          movedItem: imageId.substring(0, 8),
+          displacedItem: conflictingItem[0].substring(0, 8),
+          displacedNewPos: midpoint,
+          nextItemPos
+        });
+        
+        newPositions.set(conflictingItem[0], midpoint);
+        newPositions.set(imageId, 0);
+      } else {
+        // Normal case: moving to an occupied position (not 0)
+        // Just move the item to 1 frame higher than the target
+        const adjustedPosition = targetFrame + 1;
+        
+        console.log('[TapToMove] 📍 INSERT (not swap):', {
+          movedItem: imageId.substring(0, 8),
+          originalTarget: targetFrame,
+          adjustedPosition,
+          occupiedBy: conflictingItem[0].substring(0, 8)
+        });
+        
+        newPositions.set(imageId, adjustedPosition);
+      }
+    } else {
+      // No conflict - just move to the target position
+      newPositions.set(imageId, targetFrame);
+    }
+    
+    // Handle frame 0 reassignment if we're leaving position 0
+    if (originalPos === 0 && targetFrame !== 0 && !conflictingItem) {
+      // We're moving away from position 0, and no one is taking it
+      // Find the nearest item to become the new position 0
+      const nearest = [...framePositions.entries()]
+        .filter(([id]) => id !== imageId)
+        .sort((a, b) => a[1] - b[1])[0];
+      if (nearest) {
+        console.log('[TapToMove] 📍 FRAME 0 REASSIGNMENT:', {
+          itemId: imageId.substring(0, 8),
+          newFrame0Holder: nearest[0].substring(0, 8)
+        });
+        newPositions.set(nearest[0], 0);
+      }
+    }
+    
+    // Apply fluid timeline logic to ensure proper spacing
     const finalPositions = applyFluidTimeline(
-      intermediatePositions,
+      newPositions,
       imageId,
       targetFrame,
       undefined,
@@ -329,9 +406,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     });
     
     // Update positions via setFramePositions which handles database update
-    // NOTE: We do NOT call onImageReorder because it would trigger the disabled
-    // useUpdateShotImageOrder hook. setFramePositions already updates the database
-    // via updateTimelineFrame in the position management system.
     await setFramePositions(finalPositions);
     
     console.log('[TapToMove] Position update completed');
@@ -967,6 +1041,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 defaultPrompt={defaultPrompt}
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
+                hidePairLabel={!!tapToMove.selectedItemId}
                 autoCreateIndividualPrompts={autoCreateIndividualPrompts || false}
                 onClearEnhancedPrompt={onClearEnhancedPrompt}
               />

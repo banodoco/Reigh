@@ -31,6 +31,8 @@ interface PairRegionProps {
   showLabel: boolean;
   autoCreateIndividualPrompts?: boolean;
   onClearEnhancedPrompt?: (pairIndex: number) => void;
+  /** Hide the pair label (used during tap-to-move selection on tablets) */
+  hidePairLabel?: boolean;
 }
 
 const PairRegion: React.FC<PairRegionProps> = ({
@@ -55,6 +57,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
   showLabel,
   autoCreateIndividualPrompts,
   onClearEnhancedPrompt,
+  hidePairLabel = false,
 }) => {
   const pairColorSchemes = [
     { bg: 'bg-blue-50', border: 'border-blue-300', context: 'bg-blue-200/60', text: 'text-blue-700', line: 'bg-blue-400' },
@@ -120,8 +123,8 @@ const PairRegion: React.FC<PairRegionProps> = ({
         }}
       />
 
-      {/* Pair label - only show if there's enough space */}
-      {showLabel && (
+      {/* Pair label - only show if there's enough space and not hidden */}
+      {showLabel && !hidePairLabel && (
         <Tooltip>
           <TooltipTrigger asChild>
             <div

@@ -158,7 +158,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               className="h-8 w-8 bg-white/75 hover:bg-white/90"
               onClick={(e) => {
                 e.stopPropagation();
-                onDuplicate((image as any).shotImageEntryId ?? (image as any).id, (image as any).timeline_frame || index);
+                // Use ?? instead of || to handle timeline_frame=0 correctly
+                onDuplicate((image as any).shotImageEntryId ?? (image as any).id, (image as any).timeline_frame ?? index);
               }}
               onTouchEnd={(e) => {
                 e.stopPropagation();

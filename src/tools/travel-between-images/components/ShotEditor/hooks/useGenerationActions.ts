@@ -484,7 +484,18 @@ export const useGenerationActions = ({
       onSuccess: (result) => {
         console.log('[DUPLICATE] Duplicate mutation successful', result);
         
-        // REMOVED: Local state update - two-phase cache will refetch
+        // Add the new item to pending positions immediately to prevent flicker
+        // The new item will be in the positions map before the refetch completes
+        if (result.new_shot_generation_id && result.timeline_frame !== undefined) {
+          const newPendingPositions = new Map(state.pendingFramePositions);
+          newPendingPositions.set(result.new_shot_generation_id, result.timeline_frame);
+          actions.setPendingFramePositions(newPendingPositions);
+          
+          console.log('[DUPLICATE] Added to pending positions:', {
+            id: result.new_shot_generation_id.substring(0, 8),
+            frame: result.timeline_frame
+          });
+        }
         
         // Show success state
         actions.setDuplicateSuccessImageId(shotImageEntryId);

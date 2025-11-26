@@ -214,6 +214,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
   const titleSize = isLg ? 'text-3xl' : isSm ? 'text-2xl' : 'text-xl';
   const titleSizeSquare = isLg ? 'text-lg' : isSm ? 'text-base' : 'text-sm';
   const descriptionSize = isSm ? 'text-base' : 'text-xs';
+  const descriptionSizeSquare = isLg ? 'text-sm' : isSm ? 'text-xs' : 'text-[10px]';
 
   const content = (
     <div 
@@ -278,7 +279,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           <div className={`${isSm ? 'mt-0.5' : 'mt-1'} ${isSm ? 'px-1' : 'px-2'} overflow-hidden`}>
             <p 
               ref={descriptionRef}
-              className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSize} ${forceTwoLinesDescriptions ? 'whitespace-pre-line' : ''}`}
+              className={`font-theme font-theme-body text-muted-foreground leading-relaxed text-center ${descriptionSizeSquare} ${forceTwoLinesDescriptions ? 'whitespace-pre-line' : ''}`}
             >
               {forceTwoLinesDescriptions ? (item.descriptionMobile || item.description).replace(' ', '\n') : (item.descriptionMobile || item.description)}
             </p>
