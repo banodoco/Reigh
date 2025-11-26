@@ -13,7 +13,6 @@ interface PairRegionProps {
   actualFrames: number;
   visibleContextFrames: number;
   isDragging: boolean;
-  contextFrames: number;
   numPairs: number;
   startFrame: number;
   endFrame: number;
@@ -44,7 +43,6 @@ const PairRegion: React.FC<PairRegionProps> = ({
   actualFrames,
   visibleContextFrames,
   isDragging,
-  contextFrames,
   numPairs,
   startFrame,
   endFrame,

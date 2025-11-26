@@ -32,7 +32,6 @@ interface UseTimelineDragProps {
   setFramePositions: (positions: Map<string, number>) => void;
   images: GenerationRow[];
   onImageReorder: (orderedIds: string[]) => void;
-  contextFrames: number;
   fullMin: number;
   fullMax: number;
   fullRange: number;
@@ -45,7 +44,6 @@ export const useTimelineDrag = ({
   setFramePositions,
   images,
   onImageReorder,
-  contextFrames,
   fullMin,
   fullMax,
   fullRange,
@@ -168,7 +166,7 @@ export const useTimelineDrag = ({
       targetFrame,
       finalPosition,
       originalPos: framePositions.get(dragState.activeId) ?? 0,
-      contextFrames,
+      contextFrames: 0,
       coordinate_source: 'currentMousePosRef.current.x',
       timestamp: new Date().toISOString()
     });
@@ -253,7 +251,7 @@ export const useTimelineDrag = ({
       }))
     });
 
-    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames, undefined, fullMin, fullMax);
+    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, 0, undefined, fullMin, fullMax);
 
     console.log('[FluidTimelineDebug] ✅ FLUID TIMELINE RESULT - After fluid timeline:', {
       itemId: dragState.activeId.substring(0, 8),
@@ -284,7 +282,7 @@ export const useTimelineDrag = ({
     dragState.currentX,
     dragState.hasMovedPastThreshold,
     framePositions,
-    contextFrames,
+    0,
     calculateTargetFrame,
     calculateFinalPosition,
   ]);
@@ -396,7 +394,7 @@ export const useTimelineDrag = ({
       }))
     });
 
-    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, contextFrames, undefined, fullMin, fullMax);
+    const result = applyFluidTimeline(newPositions, dragState.activeId, finalPosition, 0, undefined, fullMin, fullMax);
 
     console.log('[FinalDropDebug] ✅ FINAL DROP RESULT - After fluid timeline:', {
       itemId: dragState.activeId.substring(0, 8),
@@ -426,7 +424,7 @@ export const useTimelineDrag = ({
     dragState.activeId,
     dragState.hasMovedPastThreshold,
     framePositions,
-    contextFrames,
+    0,
     calculateTargetFrame,
     calculateFinalPosition,
   ]);
@@ -480,8 +478,8 @@ export const useTimelineDrag = ({
       clientX: e.clientX,
       clientY: e.clientY,
       framePosition: framePositions.get(imageId) ?? 0,
-      contextFrames,
-      maxGap: calculateMaxGap(contextFrames),
+      contextFrames: 0,
+      maxGap: calculateMaxGap(0),
       framePositionsCount: framePositions.size,
       framePositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
         id: id.substring(0, 8),
@@ -582,8 +580,8 @@ export const useTimelineDrag = ({
       },
 
       // Context and Limits
-      contextFrames,
-      maxGap: calculateMaxGap(contextFrames),
+      contextFrames: 0,
+      maxGap: calculateMaxGap(0),
       fullMin,
       fullRange,
       containerWidth: 1000,
@@ -621,7 +619,7 @@ export const useTimelineDrag = ({
       id: imageId,
       framePos,
     });
-  }, [framePositions, dragState.isDragging, contextFrames]);
+  }, [framePositions, dragState.isDragging]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragState.isDragging) return;
@@ -728,8 +726,8 @@ export const useTimelineDrag = ({
         },
 
         // Context
-        contextFrames,
-        maxGap: calculateMaxGap(contextFrames),
+        contextFrames: 0,
+        maxGap: calculateMaxGap(0),
         fullMin,
         fullRange,
 
@@ -753,7 +751,7 @@ export const useTimelineDrag = ({
         diffFrames: finalPosition - dragState.originalFramePos,
       });
     }
-  }, [dragState.isDragging, dragState.activeId, dragState.originalFramePos, dragState.startX, dragState.currentX, calculateTargetFrame, calculateFinalPosition, contextFrames, fullMin, fullRange]);
+  }, [dragState.isDragging, dragState.activeId, dragState.originalFramePos, dragState.startX, dragState.currentX, calculateTargetFrame, calculateFinalPosition, fullMin, fullRange]);
 
   const handleMouseUp = useCallback((e: MouseEvent, containerRef: React.RefObject<HTMLDivElement>) => {
     console.log('[TimelineDragFix] 🎯 MOUSE UP CALLED:', {
@@ -911,8 +909,8 @@ export const useTimelineDrag = ({
         finalTargetFrame,
         finalPos,
         maxSingleMove: 50,
-        contextFrames,
-        maxGap: calculateMaxGap(contextFrames)
+        contextFrames: 0,
+        maxGap: calculateMaxGap(0)
       },
 
       // Position Analysis
@@ -937,8 +935,8 @@ export const useTimelineDrag = ({
 
       // Context and Limits
       limits: {
-        contextFrames,
-        maxGap: calculateMaxGap(contextFrames),
+        contextFrames: 0,
+        maxGap: calculateMaxGap(0),
         fullMin,
         fullRange,
         containerWidth: 1000
@@ -1146,7 +1144,7 @@ export const useTimelineDrag = ({
       // Change summary
       totalChanges: positionChanges.length,
       orderChanged,
-      violations: positionChanges.some(change => Math.abs(change.delta) > calculateMaxGap(contextFrames)) ? 'POTENTIAL_GAP_VIOLATION' : 'none',
+      violations: positionChanges.some(change => Math.abs(change.delta) > calculateMaxGap(0)) ? 'POTENTIAL_GAP_VIOLATION' : 'none',
       
       // Frame 0 handling details
       frame0Moved: positionChanges.some(change => change.oldPos === 0),
@@ -1155,7 +1153,7 @@ export const useTimelineDrag = ({
                    positionChanges.some(change => change.oldPos === 0) ? 'frame_0_reassignment' : 'no_change',
       
       // Metadata
-      contextFrames,
+      contextFrames: 0,
       totalImages: images.length,
       timestamp: new Date().toISOString(),
       
@@ -1212,8 +1210,7 @@ export const useTimelineDrag = ({
     setFramePositions,
     framePositions,
     containerRect,
-    calculateTargetFrame,
-    contextFrames
+    calculateTargetFrame
   ]);
 
   // Calculate current values for rendering

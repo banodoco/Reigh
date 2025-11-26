@@ -46,8 +46,6 @@ interface ShotImagesEditorProps {
   onImageReorder: (orderedIds: string[]) => void;
   /** Image saved callback (e.g. after in-place edit) */
   onImageSaved: (imageId: string, newImageUrl: string, createNew?: boolean) => Promise<void>;
-  /** Context frames change */
-  onContextFramesChange: (context: number) => void;
   /** Timeline frame positions change */
   onFramePositionsChange: (newPositions: Map<string, number>) => void;
   /** Callback when external images are dropped on the timeline */
@@ -137,7 +135,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   batchVideoFrames,
   onImageReorder,
   onImageSaved,
-  onContextFramesChange,
   onFramePositionsChange,
   onImageDrop,
   onGenerationDrop,
@@ -286,7 +283,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     onGenerationModeChange?: any;
     onImageReorder?: any;
     onImageSaved?: any;
-    onContextFramesChange?: any;
     onFramePositionsChange?: any;
     onImageDrop?: any;
     onGenerationDrop?: any;
@@ -313,7 +309,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       onGenerationModeChange,
       onImageReorder,
       onImageSaved,
-      onContextFramesChange,
       onFramePositionsChange,
       onImageDrop,
       onGenerationDrop,
@@ -855,7 +850,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 frameSpacing={batchVideoFrames}
                 onImageReorder={onImageReorder}
                 onImageSaved={onImageSaved}
-                onContextFramesChange={onContextFramesChange}
                 onFramePositionsChange={onFramePositionsChange}
                 onImageDrop={onImageDrop}
                 onGenerationDrop={onGenerationDrop}

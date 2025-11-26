@@ -20,7 +20,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Upload } from 'lucide-react';
 
 // Skeleton component for uploading images
 const TimelineSkeletonItem: React.FC<{
@@ -687,11 +687,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     <div className="w-full overflow-x-hidden relative">
       {/* Timeline wrapper with fixed overlays */}
       <div className="relative">
-        {/* Fixed top controls overlay - Zoom and Structure controls (not in read-only) */}
-        {!readOnly && shotId && projectId && onStructureVideoChange && structureVideoPath && (
+        {/* Fixed top controls overlay - Zoom and Structure controls */}
+        {/* Show when: there's a structure video OR when showing the uploader (no video, not readOnly) */}
+        {shotId && projectId && onStructureVideoChange && (structureVideoPath || !readOnly) && (
         <div
-          className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
-          style={{ top: '55px' }}
+          className="absolute left-0 z-30 flex items-center justify-between pointer-events-none px-8"
+          style={{ 
+            width: "100%", 
+            maxWidth: "100vw", 
+            top: zoomLevel > 1 ? '0.98875rem' : '1rem' // Move up slightly when zoomed to avoid scrollbar overlap
+          }}
         >
           {/* Zoom controls */}
           <div className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
@@ -738,69 +743,107 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             </Button>
           </div>
           
-          {/* Structure controls */}
-          <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
-            {/* Structure type selector */}
-            <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
-              onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
-            }}>
-              <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
-                <SelectValue>
-                  {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="flow">
-                  <span className="text-xs">Optical flow</span>
-                </SelectItem>
-                <SelectItem value="canny">
-                  <span className="text-xs">Canny</span>
-                </SelectItem>
-                <SelectItem value="depth">
-                  <span className="text-xs">Depth</span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Right side: Structure controls OR Upload button */}
+          {structureVideoPath ? (
+            <div className={`flex items-center gap-1.5 pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+              {/* Structure type selector */}
+              <Select value={structureVideoType} onValueChange={(type: 'flow' | 'canny' | 'depth') => {
+                onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, structureVideoMotionStrength, type);
+              }}>
+                <SelectTrigger className="h-6 w-[90px] text-[9px] px-2 py-0 border-muted-foreground/30 text-left [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                  <SelectValue>
+                    {structureVideoType === 'flow' ? 'Optical flow' : structureVideoType === 'canny' ? 'Canny' : 'Depth'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="flow">
+                    <span className="text-xs">Optical flow</span>
+                  </SelectItem>
+                  <SelectItem value="canny">
+                    <span className="text-xs">Canny</span>
+                  </SelectItem>
+                  <SelectItem value="depth">
+                    <span className="text-xs">Depth</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
-            {/* Strength compact display */}
-            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-xs">
-              <span className="text-muted-foreground">Strength:</span>
-              <span className={`font-medium ${
-                structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
-                structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
-                'text-foreground'
-              }`}>
-                {structureVideoMotionStrength.toFixed(1)}x
-              </span>
+              {/* Strength compact display */}
+              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded text-xs">
+                <span className="text-muted-foreground">Strength:</span>
+                <span className={`font-medium ${
+                  structureVideoMotionStrength < 0.5 ? 'text-amber-500' :
+                  structureVideoMotionStrength > 1.5 ? 'text-blue-500' :
+                  'text-foreground'
+                }`}>
+                  {structureVideoMotionStrength.toFixed(1)}x
+                </span>
+              </div>
+
+              {/* Strength slider (compact) */}
+              <div className="w-16">
+                <Slider
+                  value={[structureVideoMotionStrength]}
+                  onValueChange={([value]) => {
+                    onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
+                  }}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  className="h-4"
+                />
+              </div>
             </div>
-
-            {/* Strength slider (compact) */}
-            <div className="w-16">
-              <Slider
-                value={[structureVideoMotionStrength]}
-                onValueChange={([value]) => {
-                  onStructureVideoChange(structureVideoPath, structureVideoMetadata, structureVideoTreatment, value, structureVideoType);
+          ) : (
+            /* Upload Guidance Video button - shown when no video exists */
+            <div className={`pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const { extractVideoMetadata, uploadVideoToStorage } = await import('@/shared/lib/videoUploader');
+                    const metadata = await extractVideoMetadata(file);
+                    const videoUrl = await uploadVideoToStorage(file, projectId!, shotId);
+                    onStructureVideoChange(videoUrl, metadata, structureVideoTreatment, structureVideoMotionStrength, structureVideoType);
+                    e.target.value = '';
+                  } catch (error) {
+                    console.error('Error uploading video:', error);
+                  }
                 }}
-                min={0}
-                max={2}
-                step={0.1}
-                className="h-4"
+                className="hidden"
+                id="guidance-video-upload-top"
               />
+              <Label htmlFor="guidance-video-upload-top" className="m-0 cursor-pointer">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs px-3 sm:px-2 lg:px-3"
+                  asChild
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span className="sm:hidden lg:inline">Upload Guidance Video</span>
+                  </span>
+                </Button>
+              </Label>
             </div>
-          </div>
+          )}
         </div>
         )}
 
         {/* Timeline scrolling container */}
         <div
           ref={timelineRef}
-          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
           style={{ 
             minHeight: "240px", 
             paddingTop: structureVideoPath ? "4rem" : "1rem",  // Show padding if structure video exists (metadata can be null during extraction)
-            paddingBottom: "4.5rem" 
+            paddingBottom: "7.5rem" 
           }}
           onDragEnter={handleDragEnter}
           onDragOver={(e) => handleDragOver(e, containerRef)}
@@ -866,7 +909,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         <div
           ref={containerRef}
           id="timeline-container"
-          className={`relative h-36 mb-10`}
+          className={`relative h-36 mb-2`}
           onDoubleClick={(e) => {
             // Don't zoom if double-clicking on an item or button
             const target = e.target as HTMLElement;
@@ -1003,7 +1046,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 actualFrames={actualFrames}
                 visibleContextFrames={visibleContextFrames}
                 isDragging={dragState.isDragging}
-                contextFrames={0}
                 numPairs={numPairs}
                 startFrame={pair.startFrame}
                 endFrame={pair.endFrame}
@@ -1157,8 +1199,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
 
         {/* Fixed bottom controls overlay */}
         <div
-          className="sticky left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8"
-          style={{ bottom: '90px' }}
+          className="absolute bottom-4 left-0 z-30 flex items-center justify-between pointer-events-none px-8"
+          style={{ 
+            width: "100%", 
+            maxWidth: "100vw",
+            bottom: zoomLevel > 1 ? '1.6rem' : '1rem' // Lift controls when zoomed to avoid scrollbar overlap
+          }}
         >
           {readOnly ? (
             // Read-only mode: Just zoom controls
@@ -1209,7 +1255,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             <>
               {/* Bottom-left: Gap control and Reset button */}
               <div 
-                className={`flex items-center gap-2 w-fit pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
+                className={`flex items-center gap-2 w-fit pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}
               >
                 {/* Gap to reset */}
                 <div className="flex items-center gap-1.5">
