@@ -790,6 +790,23 @@ export const getTimelineDimensions = (framePositions: Map<string, number>) => {
   const fullMin = Math.min(0, staticMin);
   const fullRange = Math.max(fullMax - fullMin, 1); // Ensure minimum range of 1 to avoid division by zero
 
+  // DEBUG: Detect outlier positions that might cause timeline to extend unexpectedly
+  const sortedPositions = [...positions].sort((a, b) => a - b);
+  const median = sortedPositions[Math.floor(sortedPositions.length / 2)];
+  const outliers = positions.filter(p => Math.abs(p - median) > 200); // More than 200 frames from median
+  
+  if (outliers.length > 0) {
+    console.warn('[TimelineOutlier] ⚠️ OUTLIER POSITIONS DETECTED:', {
+      outliers,
+      median,
+      allPositions: sortedPositions,
+      fullRange,
+      itemsWithOutliers: [...framePositions.entries()]
+        .filter(([_, pos]) => outliers.includes(pos))
+        .map(([id, pos]) => ({ id: id.substring(0, 8), position: pos }))
+    });
+  }
+
   // DEBUG: Log coordinate system calculation for position 0 visibility debugging
   if (positions.includes(0)) {
     console.log('[NoPaddingFix] 🎯 Timeline dimensions calculated with NO PADDING:', {

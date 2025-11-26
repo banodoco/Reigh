@@ -127,13 +127,19 @@ export const useTimelineDrag = ({
     // Calculate frame position, allowing expansion beyond current timeline bounds
     const calculatedFrame = Math.max(0, pixelToFrame(targetRelativePos, effectiveWidth, fullMin, fullRange));
     
-    // If dragging beyond right edge, extend the timeline
+    // If dragging beyond right edge, extend the timeline (with reasonable limits)
     if (targetRelativePos > effectiveWidth) {
       // Calculate how far beyond the right edge we are
       const overshoot = targetRelativePos - effectiveWidth;
       const overshootFrames = (overshoot / effectiveWidth) * fullRange;
+      
+      // Cap the expansion to a reasonable amount (max 81 frames = 5s beyond current max)
+      // This prevents accidentally creating items way off the timeline
+      const maxExpansion = 81; // Same as max gap
+      const cappedOvershoot = Math.min(overshootFrames, maxExpansion);
+      
       // Round to whole frame numbers to avoid decimal distance displays
-      return Math.round(calculatedFrame + overshootFrames);
+      return Math.round(calculatedFrame + cappedOvershoot);
     }
     
     return calculatedFrame;
