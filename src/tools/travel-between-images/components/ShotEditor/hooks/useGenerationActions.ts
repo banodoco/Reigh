@@ -281,7 +281,7 @@ export const useGenerationActions = ({
   }, [selectedShot?.id, projectId, actions, deleteGenerationMutation, onShotImagesUpdate]);
 
   const handleDeleteImageFromShot = useCallback(async (shotImageEntryId: string) => {
-    console.log('[DELETE:useGenerationActions] 🗑️ STEP 2: handleDeleteImageFromShot called', {
+    console.log('[DeleteDebug] 🗑️ STEP 1: handleDeleteImageFromShot called', {
       shotImageEntryId: shotImageEntryId?.substring(0, 8),
       shotId: selectedShot?.id?.substring(0, 8),
       projectId: projectId?.substring(0, 8),
@@ -291,7 +291,7 @@ export const useGenerationActions = ({
     });
 
     if (!selectedShot || !projectId) {
-      console.error('[DELETE:useGenerationActions] ❌ Missing shot or project', {
+      console.error('[DeleteDebug] ❌ Missing shot or project', {
         hasSelectedShot: !!selectedShot,
         hasProjectId: !!projectId
       });
@@ -301,17 +301,46 @@ export const useGenerationActions = ({
 
     // Guard: Prevent deleting optimistic items (mutations in progress)
     if (shotImageEntryId.startsWith('temp-')) {
-      console.warn('[DELETE:useGenerationActions] ⚠️ Attempted to delete optimistic item, ignoring', {
+      console.warn('[DeleteDebug] ⚠️ Attempted to delete optimistic item, ignoring', {
         shotImageEntryId
       });
       toast.warning("Please wait for the previous operation to complete.");
       return;
     }
 
-    console.log('[DELETE:useGenerationActions] ✅ Calling removeImageFromShotMutation with:', {
-      shot_id: selectedShot.id.substring(0, 8),
+    // Find the actual generation ID from the image data
+    const imageToDelete = orderedShotImages.find(img => 
+      (img.shotImageEntryId ?? img.id) === shotImageEntryId
+    );
+    
+    const actualGenerationId = imageToDelete?.id;
+    
+    console.log('[DeleteDebug] 🔍 STEP 2: Looking up generation ID', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
-      project_id: projectId.substring(0, 8),
+      foundImage: !!imageToDelete,
+      actualGenerationId: actualGenerationId?.substring(0, 8),
+      imageId: imageToDelete?.id?.substring(0, 8),
+      imageShotImageEntryId: imageToDelete?.shotImageEntryId?.substring(0, 8),
+      totalImages: orderedShotImages.length
+    });
+
+    if (!actualGenerationId) {
+      console.error('[DeleteDebug] ❌ Could not find generation ID for shotImageEntryId', {
+        shotImageEntryId: shotImageEntryId.substring(0, 8),
+        availableIds: orderedShotImages.map(img => ({
+          id: img.id?.substring(0, 8),
+          shotImageEntryId: (img.shotImageEntryId ?? img.id)?.substring(0, 8)
+        }))
+      });
+      toast.error("Cannot remove image: Image not found.");
+      return;
+    }
+
+    console.log('[DeleteDebug] 📤 STEP 3: Calling removeImageFromShotMutation', {
+      shotId: selectedShot.id.substring(0, 8),
+      generationId: actualGenerationId.substring(0, 8),
+      projectId: projectId.substring(0, 8),
+      shotImageEntryId: shotImageEntryId.substring(0, 8)
     });
 
     // Emit event to lock timeline positions during mutation + refetch
@@ -321,10 +350,10 @@ export const useGenerationActions = ({
     
     removeImageFromShotMutation.mutate({
       shotId: selectedShot.id,
-      generationId: shotImageEntryId, // Use the unique entry ID
+      generationId: actualGenerationId,
       projectId: projectId,
     });
-  }, [selectedShot?.id, projectId, removeImageFromShotMutation]);
+  }, [selectedShot?.id, projectId, removeImageFromShotMutation, orderedShotImages]);
 
   const handleBatchDeleteImages = useCallback(async (shotImageEntryIds: string[]) => {
     if (!selectedShot || !projectId || shotImageEntryIds.length === 0) {
@@ -432,8 +461,9 @@ export const useGenerationActions = ({
     duplicateImageInShotMutation.mutate({
       shot_id: selectedShot.id,
       generation_id: generationId,
-      // Position will be computed from timeline_frame - no parameter needed
       project_id: projectId,
+      shot_generation_id: shotImageEntryId, // Use the unique shot_generation ID for precise lookup
+      timeline_frame: timeline_frame, // Pass the timeline_frame directly to avoid query
     }, {
       onSuccess: (result) => {
         console.log('[DUPLICATE] Duplicate mutation successful', result);

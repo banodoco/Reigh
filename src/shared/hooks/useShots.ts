@@ -994,11 +994,15 @@ export const useDuplicateImageInShot = () => {
     mutationFn: async ({
       shot_id,
       generation_id,
-      project_id
+      project_id,
+      shot_generation_id,
+      timeline_frame
     }: {
       shot_id: string;
       generation_id: string;
       project_id: string;
+      shot_generation_id?: string; // Optional: if provided, used for precise lookup
+      timeline_frame?: number; // Optional: if provided, used directly instead of querying
     }) => {
       // 1. Fetch the original generation to get its image URL and metadata
       const { data: originalGen, error: genError } = await supabase
@@ -1011,23 +1015,39 @@ export const useDuplicateImageInShot = () => {
         throw new Error(`Failed to fetch original generation: ${genError?.message || 'Not found'}`);
       }
 
-      // 2. Fetch the original shot_generation to get its timeline_frame
-      // Use limit(1) instead of single() in case there are multiple entries
-      const { data: shotGenResults, error: shotGenError } = await supabase
-        .from('shot_generations')
-        .select('timeline_frame')
-        .eq('shot_id', shot_id)
-        .eq('generation_id', generation_id)
-        .order('timeline_frame', { ascending: true, nullsFirst: false })
-        .limit(1);
-
-      if (shotGenError || !shotGenResults || shotGenResults.length === 0) {
-        throw new Error(`Failed to fetch original shot_generation: ${shotGenError?.message || 'Not found'}`);
-      }
+      // 2. Get the original timeline_frame
+      let originalTimelineFrame: number;
       
-      const originalShotGen = shotGenResults[0];
+      if (timeline_frame !== undefined) {
+        // Use provided timeline_frame directly (most efficient)
+        originalTimelineFrame = timeline_frame;
+      } else if (shot_generation_id) {
+        // Query by shot_generation_id (unique, guaranteed single result)
+        const { data: shotGen, error: shotGenError } = await supabase
+          .from('shot_generations')
+          .select('timeline_frame')
+          .eq('id', shot_generation_id)
+          .single();
 
-      const originalTimelineFrame = originalShotGen.timeline_frame ?? 0;
+        if (shotGenError || !shotGen) {
+          throw new Error(`Failed to fetch shot_generation: ${shotGenError?.message || 'Not found'}`);
+        }
+        originalTimelineFrame = shotGen.timeline_frame ?? 0;
+      } else {
+        // Fallback: query by generation_id (may have multiple, take first)
+        const { data: shotGenResults, error: shotGenError } = await supabase
+          .from('shot_generations')
+          .select('timeline_frame')
+          .eq('shot_id', shot_id)
+          .eq('generation_id', generation_id)
+          .order('timeline_frame', { ascending: true, nullsFirst: false })
+          .limit(1);
+
+        if (shotGenError || !shotGenResults || shotGenResults.length === 0) {
+          throw new Error(`Failed to fetch original shot_generation: ${shotGenError?.message || 'Not found'}`);
+        }
+        originalTimelineFrame = shotGenResults[0].timeline_frame ?? 0;
+      }
 
       // 3. Find the next image's timeline_frame to calculate midpoint
       const { data: nextShotGen } = await supabase
