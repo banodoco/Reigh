@@ -72,11 +72,10 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
   };
 
   return (
-    <div className="relative w-full">
-      {/* Fixed controls bar at top - sticky to stay in place when scrolling */}
+    <>
+      {/* Fixed top controls - rendered outside the zoomed content */}
       <div 
-        className="sticky left-0 z-20 flex items-center justify-between gap-2 pointer-events-none px-8 py-2"
-        style={{ top: 0 }}
+        className="sticky top-2 left-0 right-0 z-30 flex items-center justify-between pointer-events-none px-8 mb-2"
       >
         {/* Left: Zoom controls */}
         <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
@@ -125,7 +124,7 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
           </Button>
         </div>
 
-        {/* Right: Upload button - styled to match Add Images button */}
+        {/* Right: Upload button */}
         <div className={`pointer-events-auto ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
           <input
             ref={fileInputRef}
@@ -153,9 +152,9 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
         </div>
       </div>
 
-      {/* Placeholder strip */}
+      {/* Placeholder strip - this zooms with content */}
       <div 
-        className="relative h-28 mb-0"
+        className="relative h-20 mb-0"
         style={{
           width: zoomLevel > 1 ? `${zoomLevel * 100}%` : '100%',
           minWidth: '100%',
@@ -164,10 +163,18 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
           overflow: 'visible',
         }}
       >
-        {/* Center message */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-          <Video className="h-10 w-10 text-muted-foreground/30" />
-          <span className="text-xs text-muted-foreground">
+        {/* Center message - fixed position, doesn't zoom */}
+        <div 
+          className="flex flex-col items-center justify-center gap-2 pointer-events-none"
+          style={{
+            position: 'sticky',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'fit-content',
+          }}
+        >
+          <Video className="h-8 w-8 text-muted-foreground/30" />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
             {isUploading ? `Uploading... ${uploadProgress}%` : 'Add guidance video to control motion'}
           </span>
           {isUploading && (
@@ -180,6 +187,6 @@ export const GuidanceVideoUploader: React.FC<GuidanceVideoUploaderProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 };
