@@ -271,7 +271,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           </h3>
           
           {/* Vertical divider line */}
-          <div className={`w-0.5 ${isLg ? 'h-6' : isSm ? 'h-5' : 'h-4'} bg-gradient-to-b from-${item.accent} to-wes-vintage-gold rounded-full ${!isDisabled ? `${isLg ? 'group-hover:h-8' : isSm ? 'group-hover:h-7' : 'group-hover:h-6'}` : ''} transition-all duration-700 flex-shrink-0`}></div>
+          <div className={`w-0.5 ${isLg ? 'h-6' : isSm ? 'h-5' : 'h-4'} bg-gradient-to-b from-${item.accent} to-wes-vintage-gold rounded-full ${!isDisabled ? `${isLg ? 'group-hover:h-7' : isSm ? 'group-hover:h-6' : 'group-hover:h-5'}` : ''} transition-all duration-700 flex-shrink-0`}></div>
           
           {/* Mini icon badge */}
           <div className={`${isLg ? 'w-8 h-8' : isSm ? 'w-6 h-6' : 'w-5 h-5'} bg-gradient-to-br ${item.gradient} rounded-lg flex items-center justify-center shadow-sm ${!isDisabled ? 'group-hover:scale-110 group-hover:shadow-md' : ''} transition-all duration-500 flex-shrink-0`}>

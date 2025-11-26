@@ -110,14 +110,26 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       if (fetchError) throw fetchError;
 
       // Convert database data to ShotGeneration format and set state
-      const shotGenerationsData = (data || []).map(sg => ({
-        id: sg.id,
-        shot_id: sg.shot_id,
-        generation_id: sg.generation_id,
-        timeline_frame: sg.timeline_frame,
-        metadata: sg.metadata as PositionMetadata,
-        generation: sg.generation as any // Type assertion for upscaled_url
-      }));
+      // CRITICAL: Filter out videos at the source level to prevent them from appearing anywhere
+      const shotGenerationsData = (data || [])
+        .filter(sg => {
+          const gen = sg.generation as any;
+          if (!gen) return false;
+          
+          // Filter out videos - same logic used throughout the codebase
+          const isVideo = gen.type === 'video' ||
+                         gen.type === 'video_travel_output' ||
+                         (gen.location && gen.location.endsWith('.mp4'));
+          return !isVideo;
+        })
+        .map(sg => ({
+          id: sg.id,
+          shot_id: sg.shot_id,
+          generation_id: sg.generation_id,
+          timeline_frame: sg.timeline_frame,
+          metadata: sg.metadata as PositionMetadata,
+          generation: sg.generation as any // Type assertion for upscaled_url
+        }));
 
       setShotGenerations(shotGenerationsData as ShotGeneration[]);
 

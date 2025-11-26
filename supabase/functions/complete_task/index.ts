@@ -769,7 +769,11 @@ serve(async (req) => {
 
       // CRITICAL: Sub-tasks (segments) now create child generations, so we DO NOT skip them anymore.
       // The createGenerationFromTask function handles the parent/child logic.
-      const isSubTask = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
+      // Check multiple locations for orchestrator reference (travel-between-images nests it in orchestrator_details)
+      const isSubTask = taskData.params?.orchestrator_task_id_ref || 
+        taskData.params?.orchestrator_task_id ||
+        taskData.params?.orchestrator_details?.orchestrator_task_id ||
+        taskData.params?.originalParams?.orchestrator_details?.orchestrator_task_id;
       if (isSubTask) {
         console.log(`[GenMigration] Task ${taskIdString} is a sub-task of orchestrator ${isSubTask} - proceeding to create child generation`);
       }
@@ -1013,8 +1017,12 @@ serve(async (req) => {
           .single();
 
         // Skip cost calculation for sub-tasks - parent orchestrator will be billed instead
-        if (taskForCostCheck?.params?.orchestrator_task_id_ref) {
-          console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a sub-task of orchestrator ${taskForCostCheck.params.orchestrator_task_id_ref}, skipping cost calculation`);
+        // Check multiple locations for orchestrator reference (travel-between-images nests it in orchestrator_details)
+        const subTaskOrchestratorRef = taskForCostCheck?.params?.orchestrator_task_id_ref ||
+          taskForCostCheck?.params?.orchestrator_details?.orchestrator_task_id ||
+          taskForCostCheck?.params?.originalParams?.orchestrator_details?.orchestrator_task_id;
+        if (subTaskOrchestratorRef) {
+          console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a sub-task of orchestrator ${subTaskOrchestratorRef}, skipping cost calculation`);
         } else {
           console.log(`[COMPLETE-TASK-DEBUG] Triggering cost calculation for task ${taskIdString}...`);
           const costCalcResp = await fetch(`${supabaseUrl}/functions/v1/calculate-task-cost`, {
@@ -1394,7 +1402,11 @@ async function createGenerationFromTask(
     }
 
     // Check if this is a sub-task (segment)
-    const orchestratorTaskId = taskData.params?.orchestrator_task_id_ref || taskData.params?.orchestrator_task_id;
+    // Check multiple locations for orchestrator reference (travel-between-images nests it in orchestrator_details)
+    const orchestratorTaskId = taskData.params?.orchestrator_task_id_ref || 
+      taskData.params?.orchestrator_task_id ||
+      taskData.params?.orchestrator_details?.orchestrator_task_id ||
+      taskData.params?.originalParams?.orchestrator_details?.orchestrator_task_id;
     let parentGenerationId: string | null = null;
     let isChild = false;
     let childOrder: number | null = null;
@@ -1403,7 +1415,8 @@ async function createGenerationFromTask(
       console.log(`[GenMigration] Task ${taskId} is a sub-task of orchestrator ${orchestratorTaskId}`);
 
       // Get or create the parent generation (Lazy Parent Creation)
-      const parentGen = await getOrCreateParentGeneration(supabase, orchestratorTaskId, taskData.project_id);
+      // Pass segment task params as fallback for shot_id extraction (in case orchestrator task query fails)
+      const parentGen = await getOrCreateParentGeneration(supabase, orchestratorTaskId, taskData.project_id, taskData.params);
       if (parentGen) {
         parentGenerationId = parentGen.id;
         isChild = true;
@@ -1690,8 +1703,9 @@ async function createGenerationFromTask(
 /**
  * Get existing parent generation or create a placeholder
  * This implements the "Lazy Parent Creation" pattern
+ * @param segmentParams - Optional params from segment task, used as fallback for shot_id if orchestrator query fails
  */
-async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: string, projectId: string): Promise<any> {
+async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: string, projectId: string, segmentParams?: any): Promise<any> {
   try {
     // 1. Try to find existing generation for this orchestrator task
     const existing = await findExistingGeneration(supabase, orchestratorTaskId);
@@ -1707,16 +1721,28 @@ async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: st
     // For now, create a minimal placeholder.
 
     // Try to fetch orchestrator task to get better metadata
-    const { data: orchTask } = await supabase
-      .from('tasks')
-      .select('task_type, params')
-      .eq('id', orchestratorTaskId)
-      .single();
+    // Note: This may fail if orchestratorTaskId is not a UUID (e.g., "sm_travel_orchestrator_...")
+    let orchTask: { task_type?: string; params?: any } | null = null;
+    try {
+      const { data } = await supabase
+        .from('tasks')
+        .select('task_type, params')
+        .eq('id', orchestratorTaskId)
+        .single();
+      orchTask = data;
+    } catch (orchQueryError) {
+      console.log(`[GenMigration] Could not fetch orchestrator task ${orchestratorTaskId} (may not be a UUID), using segment params as fallback`);
+    }
 
     const generationType = 'video'; // Orchestrators usually produce video (travel, etc)
     // If we could look up task_type -> content_type that would be better, but 'video' is safe for now for travel.
 
     const newId = crypto.randomUUID();
+    
+    // Use orchestrator task params if available, otherwise fall back to segment params
+    // This ensures we have useful params for the parent generation even if orchestrator query failed
+    const placeholderParams = orchTask?.params || segmentParams || {};
+    
     const placeholderRecord = {
       id: newId,
       tasks: [orchestratorTaskId],
@@ -1726,7 +1752,7 @@ async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: st
       // Mark as placeholder? We don't have a specific flag, but location is null.
       location: null,
       created_at: new Date().toISOString(),
-      params: orchTask?.params || {}
+      params: placeholderParams
     };
 
     const { data: newParent, error } = await supabase
@@ -1746,9 +1772,12 @@ async function getOrCreateParentGeneration(supabase: any, orchestratorTaskId: st
     console.log(`[GenMigration] Created placeholder parent ${newId}`);
 
     // Link parent to shot if orchestrator has shot_id
-    if (orchTask) {
-      const { shotId, addInPosition } = extractShotAndPosition(orchTask.params);
+    // Try orchestrator task params first, fall back to segment params
+    const paramsForShotExtraction = orchTask?.params || segmentParams;
+    if (paramsForShotExtraction) {
+      const { shotId, addInPosition } = extractShotAndPosition(paramsForShotExtraction);
       if (shotId) {
+        console.log(`[GenMigration] Linking parent generation ${newId} to shot ${shotId}`);
         await linkGenerationToShot(supabase, shotId, newId, addInPosition);
       }
     }

@@ -331,7 +331,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
   }, [video.id, thumbnailLoaded, thumbnailError, hasThumbnail, isInitiallyCached, inPreloaderCache, inBrowserCache]);
 
   // Hook for video element integration
-  useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader, isMobile);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useVideoElementIntegration(video, index, shouldLoad, shouldPreload, videoLoader, isMobile, containerRef);
 
   // ===============================================================================
   // VIDEO TRANSITION STATE - Smooth transition from thumbnail to video
@@ -1028,7 +1029,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
 
             {/* Only render video when it's time to load */}
             {shouldLoad && (
-              <div className="relative w-full h-full">
+              <div ref={containerRef} className="relative w-full h-full">
                 {/* HoverScrubVideo with loading optimization integration */}
                 <HoverScrubVideo
                   key={`video-${video.id}`}

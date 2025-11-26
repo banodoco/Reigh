@@ -4,8 +4,10 @@ import { GenerationRow } from '@/types/shots';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
+import { Switch } from '@/shared/components/ui/switch';
 import { Slider } from '@/shared/components/ui/slider';
 import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +22,7 @@ import MediaLightbox from '@/shared/components/MediaLightbox';
 import { useLoraManager, type LoraModel } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { getDisplayUrl } from '@/shared/lib/utils';
+import { useIsMobile } from '@/shared/hooks/use-mobile';
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -34,6 +37,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 }) => {
     const { toast } = useToast();
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+    const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
+    const isMobile = useIsMobile();
 
     // Fetch child generations for this parent
     const { data, isLoading, refetch } = useGenerations(
@@ -170,6 +175,21 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         enabled: !!parentGenerationId,
     });
 
+    // Transform parent generation for VideoItem
+    const parentVideoRow = React.useMemo(() => {
+        if (!parentGeneration) return null;
+        return {
+            ...parentGeneration,
+            location: parentGeneration.location,
+            imageUrl: parentGeneration.location, // Fallback for poster
+            thumbUrl: parentGeneration.thumbnail_url || parentGeneration.location,
+            params: parentGeneration.params,
+            created_at: parentGeneration.created_at,
+            createdAt: parentGeneration.created_at,
+            type: 'video', // Force type
+        } as GenerationRow;
+    }, [parentGeneration]);
+
     // Fetch available LoRAs
     const publicLorasResult = useListPublicResources('lora');
     const availableLoras = ((publicLorasResult.data || []) as any[]).map((resource: any) => resource.metadata || {}) as LoraModel[];
@@ -189,7 +209,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         setKeepBridgingImages(joinClipsSettings.defaults.keepBridgingImages);
         setJoinPrompt('');
         setJoinNegativePrompt('');
-        loraManager.clearLoras();
+        loraManager.setSelectedLoras([]);
         toast({
             title: "Settings restored",
             description: "Join clips settings have been reset to defaults.",
@@ -290,7 +310,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
             {/* Content */}
             {/* Parent Generation Video (Final Output) */}
-            {parentGeneration?.location && (
+            {parentVideoRow && parentVideoRow.location && (
                 <div className="max-w-7xl mx-auto px-4 pt-5 pb-0">
                     <Card className="overflow-hidden border-primary/20 shadow-sm">
                         <div className="p-4 border-b bg-muted/30">
@@ -299,15 +319,29 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 Final Video
                             </h2>
                         </div>
-                        <div className="bg-black w-full flex items-center justify-center min-h-[300px] max-h-[60vh] relative group">
-                            <video
-                                src={getDisplayUrl(parentGeneration.location)}
-                                controls
-                                loop
-                                playsInline
-                                className="w-full h-full object-contain max-h-[60vh]"
-                                poster={parentGeneration.thumbnail_url ? getDisplayUrl(parentGeneration.thumbnail_url) : undefined}
-                            />
+                        <div className="bg-black w-full flex items-center justify-center relative group p-1">
+                            <div className="w-full max-w-3xl mx-auto">
+                                <VideoItem
+                                    video={parentVideoRow}
+                                    index={-1}
+                                    originalIndex={-1}
+                                    isFirstVideo={false}
+                                    shouldPreload="metadata"
+                                    isMobile={isMobile}
+                                    projectId={projectId}
+                                    onLightboxOpen={() => setIsParentLightboxOpen(true)}
+                                    onMobileTap={() => setIsParentLightboxOpen(true)}
+                                    onDelete={() => { }}
+                                    deletingVideoId={null}
+                                    onHoverStart={() => { }}
+                                    onHoverEnd={() => { }}
+                                    onMobileModalOpen={() => { }}
+                                    selectedVideoForDetails={null}
+                                    showTaskDetailsModal={false}
+                                    onApplySettingsFromTask={() => { }}
+                                    hideActions={false}
+                                />
+                            </div>
                         </div>
                     </Card>
                 </div>
@@ -393,7 +427,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 </div>
             )}
 
-            {/* Lightbox */}
+            {/* Lightbox for Segments */}
             {lightboxIndex !== null && sortedChildren[lightboxIndex] && (
                 <MediaLightbox
                     media={sortedChildren[lightboxIndex]}
@@ -404,6 +438,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     hasNext={sortedChildren.length > 1}
                     hasPrevious={sortedChildren.length > 1}
                     shotId={undefined} // Context is specific to this view
+                />
+            )}
+
+            {/* Lightbox for Parent Video */}
+            {isParentLightboxOpen && parentVideoRow && (
+                <MediaLightbox
+                    media={parentVideoRow}
+                    onClose={() => setIsParentLightboxOpen(false)}
+                    showNavigation={false}
+                    hasNext={false}
+                    hasPrevious={false}
+                    shotId={undefined}
                 />
             )}
         </div>
@@ -640,6 +686,26 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                                 value={params.negative_prompt || ''}
                                 onChange={(e) => handleChange('negative_prompt', e.target.value)}
                                 className="h-16 text-xs resize-none"
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs font-medium">Enhance Prompt</Label>
+                            <Switch
+                                checked={params.enhancePrompt || false}
+                                onCheckedChange={(checked) => handleChange('enhancePrompt', checked)}
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium">Motion Amount (0-100)</Label>
+                            <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={params.amountOfMotion || ''}
+                                onChange={(e) => handleChange('amountOfMotion', parseInt(e.target.value) || 0)}
+                                className="h-9 text-xs"
                             />
                         </div>
                     </CollapsibleContent>

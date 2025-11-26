@@ -67,6 +67,18 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * When true, toggle play/pause on click (helpful on mobile where hover is absent)
    */
   playOnClick?: boolean;
+  /**
+   * Callback for video load error
+   */
+  onVideoError?: React.ReactEventHandler<HTMLVideoElement>;
+  /**
+   * Callback for video load start
+   */
+  onLoadStart?: React.ReactEventHandler<HTMLVideoElement>;
+  /**
+   * Callback for video loaded data
+   */
+  onLoadedData?: React.ReactEventHandler<HTMLVideoElement>;
 }
 
 /**
@@ -91,6 +103,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   autoplayOnHover = false,
   posterOnlyUntilClick = false,
   playOnClick = false,
+  onVideoError,
+  onLoadStart,
+  onLoadedData,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -671,7 +686,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
           }
 
         }}
-        onLoadStart={() => {
+        onLoadStart={(e) => {
           if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
             console.log('[MobileVideoAutoplay] onLoadStart called', {
               isMobile,
@@ -679,8 +694,9 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
               timestamp: Date.now()
             });
           }
+          onLoadStart?.(e);
         }}
-        onLoadedData={() => {
+        onLoadedData={(e) => {
           if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
             console.log('[MobileVideoAutoplay] onLoadedData called', {
               isMobile,
@@ -689,6 +705,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
               timestamp: Date.now()
             });
           }
+          onLoadedData?.(e);
         }}
         onCanPlay={() => {
           if (process.env.NODE_ENV === 'development' && !thumbnailMode) {
@@ -721,6 +738,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
               timestamp: Date.now()
             });
           }
+          onVideoError?.(e);
         }}
         onSuspend={() => {
           if (process.env.NODE_ENV === 'development' && !thumbnailMode) {

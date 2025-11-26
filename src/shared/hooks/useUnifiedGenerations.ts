@@ -235,21 +235,9 @@ async function fetchShotSpecificGenerations({
     timestamp: Date.now()
   });
 
-  // Sort by timeline_frame (positioned first), then by created_at
-  // Since we can't efficiently sort JSONB values at DB level, do it client-side
-  items.sort((a, b) => {
-    // Positioned items come first (timeline_frame !== null)
-    if (a.position !== null && b.position === null) return -1;
-    if (a.position === null && b.position !== null) return 1;
-    
-    // Both positioned - sort by timeline_frame
-    if (a.position !== null && b.position !== null) {
-      return a.position - b.position;
-    }
-    
-    // Both unpositioned - sort by created_at (newest first)
-    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-  });
+  // 🎯 REVERTED: Position-based sorting removed to restore strict chronological order
+  // The database query already applies .order('created_at', { ascending: false })
+  // items.sort((a, b) => { ... });
   
   // Store original count before client-side filtering
   const originalItemsCount = items.length;

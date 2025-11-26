@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, RefObject } from 'react';
 import { GenerationRow } from '@/types/shots';
 import { useVideoLoader } from './useVideoLoader';
 
@@ -12,7 +12,8 @@ export const useVideoElementIntegration = (
   shouldLoad: boolean,
   shouldPreload: string,
   videoLoader: ReturnType<typeof useVideoLoader>,
-  isMobile: boolean
+  isMobile: boolean,
+  containerRef?: RefObject<HTMLDivElement>
 ) => {
   const { 
     setVideoMetadataLoaded, 
@@ -34,16 +35,26 @@ export const useVideoElementIntegration = (
     }
     
     const timeoutId = setTimeout(() => {
-      const container = document.querySelector(`[data-video-id="${video.id}"]`);
-      const videoElement = container?.querySelector('video') as HTMLVideoElement | null;
+      let videoElement: HTMLVideoElement | null = null;
+      let container: Element | null = null;
+
+      if (containerRef?.current) {
+        container = containerRef.current;
+        videoElement = container.querySelector('video');
+      } else {
+        // Fallback to ID selector if ref not provided (legacy)
+        container = document.querySelector(`[data-video-id="${video.id}"]`);
+        videoElement = container?.querySelector('video') as HTMLVideoElement | null;
+      }
       
       if (process.env.NODE_ENV === 'development') {
         console.log(`🎬 [VideoLifecycle] Video ${index + 1} - VIDEO_ELEMENT_SEARCH:`, {
           videoId: video.id,
           phase: 'VIDEO_ELEMENT_SEARCH',
+          usedRef: !!containerRef?.current,
           containerFound: !!container,
           videoElementFound: !!videoElement,
-          containerSelector: `[data-video-id="${video.id}"]`,
+          containerSelector: containerRef?.current ? 'ref' : `[data-video-id="${video.id}"]`,
           videoSrc: videoElement?.src || 'NO_SRC',
           shouldPreload: shouldPreload,
           videoReadyState: videoElement?.readyState || 'NO_ELEMENT',

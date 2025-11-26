@@ -44,21 +44,31 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
   // Convert GenerationRow[] to ShotGeneration[] format for backward compatibility
   // NOTE: Include both positioned and unpositioned items
   // For unpositioned items, use a sentinel value (-1) instead of null to match type
-  const shotGenerations: ShotGeneration[] = generations.map(gen => ({
-    id: gen.shotImageEntryId || (gen as any).shot_generation_id || '',
-    shot_id: shotId || '',
-    generation_id: gen.id,
-    timeline_frame: gen.timeline_frame ?? -1, // Use -1 as sentinel for unpositioned
-    metadata: (gen as any).metadata as PositionMetadata | undefined,
-    generation: {
-      id: gen.id,
-      location: gen.imageUrl || gen.location || undefined,
-      type: gen.type || undefined,
-      created_at: gen.createdAt || new Date().toISOString(),
-      upscaled_url: gen.upscaled_url || undefined,
-      starred: gen.starred ?? undefined,
-    }
-  }));
+  // CRITICAL: Filter out videos at the source level
+  const shotGenerations: ShotGeneration[] = generations
+    .filter(gen => {
+      // Filter out videos - same logic used throughout the codebase
+      const isVideo = gen.type === 'video' ||
+                     gen.type === 'video_travel_output' ||
+                     (gen.location && gen.location.endsWith('.mp4')) ||
+                     (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
+      return !isVideo;
+    })
+    .map(gen => ({
+      id: gen.shotImageEntryId || (gen as any).shot_generation_id || '',
+      shot_id: shotId || '',
+      generation_id: gen.id,
+      timeline_frame: gen.timeline_frame ?? -1, // Use -1 as sentinel for unpositioned
+      metadata: (gen as any).metadata as PositionMetadata | undefined,
+      generation: {
+        id: gen.id,
+        location: gen.imageUrl || gen.location || undefined,
+        type: gen.type || undefined,
+        created_at: gen.createdAt || new Date().toISOString(),
+        upscaled_url: gen.upscaled_url || undefined,
+        starred: gen.starred ?? undefined,
+      }
+    }));
   
   console.log('[TimelinePositionUtils] Converted shotGenerations:', {
     shotId: shotId?.substring(0, 8),

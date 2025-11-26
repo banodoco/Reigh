@@ -315,6 +315,16 @@ const Timeline: React.FC<TimelineProps> = ({
         .map(sg => transformForTimeline(sg as any as RawShotGeneration))
         .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     }
+    
+    // CRITICAL: Filter out videos - they should never appear on timeline
+    // This uses the same detection logic as ShotEditor and ShotsPane
+    result = result.filter(img => {
+      const isVideo = img.type === 'video' ||
+                     img.type === 'video_travel_output' ||
+                     (img.location && img.location.endsWith('.mp4')) ||
+                     (img.imageUrl && img.imageUrl.endsWith('.mp4'));
+      return !isVideo;
+    });
 
     // [TimelineVisibility] Log images array changes
     console.log(`[TimelineVisibility] 📸 IMAGES ARRAY COMPUTED:`, {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil, Share2, Copy, Loader2, CornerDownLeft } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
-import GalleryVideoScrubber from './ImageGallery/components/GalleryVideoScrubber';
+import HoverScrubVideo from './HoverScrubVideo';
 import { 
   Tooltip, 
   TooltipContent, 
@@ -919,7 +919,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         className="relative bg-muted/50"
       >
           {isVideoContent ? (
-            <GalleryVideoScrubber
+            <HoverScrubVideo
               src={videoUrl || actualSrc || ''}
               poster={displayUrl || undefined}
               preload={shouldLoad ? "auto" : "none"}
@@ -927,11 +927,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               videoClassName="object-cover cursor-pointer w-full h-full"
               muted
               loop
-              playsInline
               onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
               onTouchStart={isMobile && !enableSingleClick ? handleTouchStart : undefined}
               onTouchEnd={isMobile && !enableSingleClick ? handleInteraction : undefined}
-              // Pass video loading handlers if GalleryVideoScrubber supports them, or if it spreads props to video
               onVideoError={handleImageError}
               onLoadStart={() => setImageLoading(true)}
               onLoadedData={handleImageLoad}

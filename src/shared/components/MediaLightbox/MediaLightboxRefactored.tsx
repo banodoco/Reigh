@@ -1347,7 +1347,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         
                         {/* Info | Edit Toggle and Close Button */}
                         <div className="flex items-center gap-3">
-                          {showImageEditTools && !readOnly && (
+                          {showImageEditTools && !readOnly && !isVideo && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                               <button
                                 className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
@@ -1645,7 +1645,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         
                         {/* Info | Edit Toggle and Close Button */}
                         <div className="flex items-center gap-3">
-                          {showImageEditTools && !readOnly && (
+                          {showImageEditTools && !readOnly && !isVideo && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                               <button
                                 className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
