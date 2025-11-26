@@ -821,13 +821,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             const sortedDynamicPositions = [...currentPositions.entries()].sort((a, b) => a[1] - b[1]);
             const [startEntry, endEntry] = [sortedDynamicPositions[index], sortedDynamicPositions[index + 1]];
 
-            // Hide context for pairs involving the dragged item
-            if (dragState.isDragging && dragState.activeId) {
-              const isDraggedItemInPair = startEntry?.[0] === dragState.activeId || endEntry?.[0] === dragState.activeId;
-              if (isDraggedItemInPair) {
-                return null; // Skip rendering context for dragged item
-              }
-            }
+            // Don't hide pairs during drag - let them stretch and follow the dragged item
+            // This provides better visual feedback about where the item is moving
+            // (Previously we hid pairs involving the dragged item, but this caused too many
+            // markers to disappear, especially when dragging items in the middle)
 
             // Hide context with delay for non-dragged pairs when not dragging
             // REMOVED: This was causing pairs to disappear ("naked images") for 100ms after drop
