@@ -451,11 +451,26 @@ export const useGenerationActions = ({
 
     // REMOVED: Optimistic duplicate insertion - two-phase loading is fast enough
 
-    // Position is now computed from timeline_frame, so we don't need to calculate it
-    // The useDuplicateImageInShot hook will calculate the timeline_frame midpoint
+    // Calculate the next image's frame from UI data (more reliable than database query)
+    // Sort images by their timeline_frame and find the one after the current
+    const sortedImages = [...orderedShotImages]
+      .filter(img => (img as any).timeline_frame !== undefined && (img as any).timeline_frame !== null)
+      .sort((a, b) => ((a as any).timeline_frame ?? 0) - ((b as any).timeline_frame ?? 0));
+    
+    const currentIndex = sortedImages.findIndex(img => 
+      (img.shotImageEntryId ?? img.id) === shotImageEntryId
+    );
+    
+    const nextImage = currentIndex >= 0 && currentIndex < sortedImages.length - 1 
+      ? sortedImages[currentIndex + 1] 
+      : null;
+    const nextTimelineFrame = nextImage ? (nextImage as any).timeline_frame : undefined;
     
     console.log('[DUPLICATE] Calling duplicateImageInShotMutation', {
-      originalTimelineFrame: (originalImage as any).timeline_frame
+      originalTimelineFrame: timeline_frame,
+      nextTimelineFrame,
+      currentIndex,
+      totalSortedImages: sortedImages.length
     });
 
     duplicateImageInShotMutation.mutate({
@@ -464,6 +479,7 @@ export const useGenerationActions = ({
       project_id: projectId,
       shot_generation_id: shotImageEntryId, // Use the unique shot_generation ID for precise lookup
       timeline_frame: timeline_frame, // Pass the timeline_frame directly to avoid query
+      next_timeline_frame: nextTimelineFrame, // Pass the next frame from UI for accurate midpoint
     }, {
       onSuccess: (result) => {
         console.log('[DUPLICATE] Duplicate mutation successful', result);

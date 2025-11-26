@@ -996,13 +996,15 @@ export const useDuplicateImageInShot = () => {
       generation_id,
       project_id,
       shot_generation_id,
-      timeline_frame
+      timeline_frame,
+      next_timeline_frame
     }: {
       shot_id: string;
       generation_id: string;
       project_id: string;
       shot_generation_id?: string; // Optional: if provided, used for precise lookup
       timeline_frame?: number; // Optional: if provided, used directly instead of querying
+      next_timeline_frame?: number; // Optional: if provided, used for midpoint calculation instead of querying
     }) => {
       // 1. Fetch the original generation to get its image URL and metadata
       const { data: originalGen, error: genError } = await supabase
@@ -1049,24 +1051,41 @@ export const useDuplicateImageInShot = () => {
         originalTimelineFrame = shotGenResults[0].timeline_frame ?? 0;
       }
 
-      // 3. Find the next image's timeline_frame to calculate midpoint
-      const { data: nextShotGen } = await supabase
-        .from('shot_generations')
-        .select('timeline_frame')
-        .eq('shot_id', shot_id)
-        .gt('timeline_frame', originalTimelineFrame)
-        .order('timeline_frame', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      // Calculate midpoint timeline_frame
+      // 3. Calculate midpoint timeline_frame for the duplicate
       let newTimelineFrame: number;
-      if (nextShotGen?.timeline_frame !== null && nextShotGen?.timeline_frame !== undefined) {
-        // Midpoint between original and next
-        newTimelineFrame = Math.floor((originalTimelineFrame + nextShotGen.timeline_frame) / 2);
+      
+      if (next_timeline_frame !== undefined) {
+        // Use provided next_timeline_frame from UI (most accurate, avoids stale DB data)
+        newTimelineFrame = Math.floor((originalTimelineFrame + next_timeline_frame) / 2);
+        console.log('[DUPLICATE] Using UI-provided next_timeline_frame for midpoint:', {
+          originalTimelineFrame,
+          next_timeline_frame,
+          newTimelineFrame
+        });
       } else {
-        // No next image, place it 60 frames after the original
-        newTimelineFrame = originalTimelineFrame + 60;
+        // Fallback: Query database for next image's timeline_frame
+        const { data: nextShotGen } = await supabase
+          .from('shot_generations')
+          .select('timeline_frame')
+          .eq('shot_id', shot_id)
+          .gt('timeline_frame', originalTimelineFrame)
+          .order('timeline_frame', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (nextShotGen?.timeline_frame !== null && nextShotGen?.timeline_frame !== undefined) {
+          // Midpoint between original and next
+          newTimelineFrame = Math.floor((originalTimelineFrame + nextShotGen.timeline_frame) / 2);
+        } else {
+          // No next image, place it 60 frames after the original
+          newTimelineFrame = originalTimelineFrame + 60;
+        }
+        
+        console.log('[DUPLICATE] Using DB-queried next frame for midpoint:', {
+          originalTimelineFrame,
+          dbNextFrame: nextShotGen?.timeline_frame,
+          newTimelineFrame
+        });
       }
 
       // 4. Create a new generation record (duplicate)
