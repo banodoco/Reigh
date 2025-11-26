@@ -825,14 +825,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             if (dragState.isDragging && dragState.activeId) {
               const isDraggedItemInPair = startEntry?.[0] === dragState.activeId || endEntry?.[0] === dragState.activeId;
               if (isDraggedItemInPair) {
-                return null; // Skip rendering context for dragged item
+                // Keep showing the pair region but maybe with reduced opacity or different styling if needed
+                // For now, let's NOT hide it completely to avoid the "naked" look during drag
+                // return null; 
               }
             }
 
             // Hide context with delay for non-dragged pairs when not dragging
-            if (!dragState.isDragging && !showContext) {
-              return null; // Skip rendering until delay period is over
-            }
+            // REMOVED: This was causing pairs to disappear ("naked images") for 100ms after drop
+            // if (!dragState.isDragging && !showContext) {
+            //   return null; 
+            // }
 
             // Calculate pixel positions with padding adjustment
             const getPixel = (entry: [string, number] | undefined): number => {
