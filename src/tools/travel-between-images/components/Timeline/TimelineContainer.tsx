@@ -458,8 +458,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // This was conflicting with useZoom's center preservation and causing jitters/drift.
   // useZoom now handles logical center preservation, and the effect below handles scroll sync.
 
-  // Scroll timeline to center on zoom center when zooming OR when timeline dimensions change
-  // IMPORTANT: Don't adjust scroll during drag operations to prevent view jumping
+  // Scroll timeline to center on zoom center when zooming
+  // IMPORTANT: Only scroll when actually zooming, not when dropping items or changing positions
   useEffect(() => {
     // Skip scroll adjustment if a drag is in progress or if not zoomed
     if (dragState.isDragging || zoomLevel <= 1) {
@@ -467,7 +467,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     }
     
     if (timelineRef.current && containerRef.current) {
-      // Small delay to allow DOM to reflow after zoom/data change, then instantly scroll
+      // Small delay to allow DOM to reflow after zoom change, then instantly scroll
       const timer = setTimeout(() => {
         const scrollContainer = timelineRef.current;
         const timelineContainer = containerRef.current;
@@ -494,7 +494,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [zoomLevel, zoomCenter, dragState.isDragging, fullMin, fullRange]); // Added fullMin/fullRange dependencies
+  }, [zoomLevel, zoomCenter, dragState.isDragging]); // REMOVED fullMin/fullRange - don't scroll when positions change
 
   // Unified drop hook (handles both file drops and generation drops)
   const {
@@ -688,10 +688,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         {/* Timeline scrolling container */}
         <div
           ref={timelineRef}
-          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 ${
-            // Disable scrolling during drag to prevent browser auto-scroll behavior
-            dragState.isDragging ? 'overflow-x-hidden' : 'overflow-x-auto'
-          } ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
+          className={`timeline-scroll relative bg-muted/20 border rounded-lg px-5 overflow-x-auto ${readOnly ? 'mb-2' : 'mb-10'} ${zoomLevel <= 1 ? 'no-scrollbar' : ''} ${
             isFileOver ? 'ring-2 ring-primary bg-primary/5' : ''
           }`}
           style={{ 
