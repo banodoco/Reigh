@@ -71,6 +71,8 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
   const [loadedImages, setLoadedImages] = React.useState<Set<string>>(new Set());
   // Track touch interactions to prevent hover interfering with tap
   const [touchedRef, setTouchedRef] = React.useState<string | null>(null);
+  // Track touch start position to distinguish taps from scrolls/drags
+  const touchStartPos = React.useRef<{ x: number; y: number; refId: string } | null>(null);
   
   const handleImageLoad = React.useCallback((refId: string) => {
     setLoadedImages(prev => new Set(prev).add(refId));
@@ -161,19 +163,58 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
                     : "border-gray-300 hover:border-purple-300"
                 )}
                 onClick={() => !isGenerating && onSelectReference(ref.id)}
+                onTouchStart={(e) => {
+                  setTouchedRef(ref.id);
+                  // Store initial touch position to detect scrolls vs taps
+                  const touch = e.touches[0];
+                  if (touch) {
+                    touchStartPos.current = {
+                      x: touch.clientX,
+                      y: touch.clientY,
+                      refId: ref.id
+                    };
+                  }
+                }}
+                onTouchMove={(e) => {
+                  // If touch moved significantly, it's a scroll/drag, not a tap
+                  if (touchStartPos.current && touchStartPos.current.refId === ref.id) {
+                    const touch = e.touches[0];
+                    if (touch) {
+                      const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
+                      const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
+                      // If moved more than 10px, clear the touch start (prevent selection)
+                      if (deltaX > 10 || deltaY > 10) {
+                        touchStartPos.current = null;
+                      }
+                    }
+                  }
+                }}
                 onTouchEnd={(e) => {
                   // Handle touch to ensure single-tap selection works
                   if (!isGenerating) {
                     // Don't select if tapping the delete button
-                    const target = e.target as HTMLElement;
-                    if (!target.closest('button')) {
-                      onSelectReference(ref.id);
+                    const target = e.changedTouches[0];
+                    if (target && touchStartPos.current && touchStartPos.current.refId === ref.id) {
+                      // Check if this was a tap (minimal movement) vs a scroll/drag
+                      const deltaX = Math.abs(target.clientX - touchStartPos.current.x);
+                      const deltaY = Math.abs(target.clientY - touchStartPos.current.y);
+                      const isTap = deltaX <= 10 && deltaY <= 10;
+                      
+                      if (isTap) {
+                        const htmlTarget = e.target as HTMLElement;
+                        if (!htmlTarget.closest('button')) {
+                          onSelectReference(ref.id);
+                        }
+                      }
                     }
                   }
                   setTouchedRef(null);
+                  touchStartPos.current = null;
                 }}
-                onTouchStart={() => setTouchedRef(ref.id)}
-                onTouchCancel={() => setTouchedRef(null)}
+                onTouchCancel={() => {
+                  setTouchedRef(null);
+                  touchStartPos.current = null;
+                }}
                 title={ref.name.split('\n')[0]}
               >
                 {imageUrl ? (

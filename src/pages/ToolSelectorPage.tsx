@@ -95,7 +95,7 @@ const assistantTools = [
   },
   {
     id: 'character-animate',
-    name: 'Animate Characters',
+    name: 'Characters',
     description: 'Bring characters to life.',
     descriptionMobile: 'Breathe life',
     tool: toolsUIManifest.find(t => t.id === 'character-animate'),
