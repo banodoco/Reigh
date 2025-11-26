@@ -111,7 +111,7 @@ export default function EditImagesPage() {
           <div className="max-w-7xl mx-auto h-full flex flex-col md:flex-row bg-transparent">
             {/* Left Panel - Placeholder */}
             <div 
-              className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-b-xl md:rounded-b-none md:rounded-l-xl overflow-hidden"
+              className="relative flex items-center justify-center bg-zinc-900/50 w-full h-[20%] md:w-[60%] md:h-full md:flex-1 rounded-t-2xl md:rounded-t-none md:rounded-l-xl overflow-hidden"
             >
              <div className="flex flex-col items-center justify-center space-y-2 md:space-y-6 p-4 md:p-8">
                 <div className="text-center space-y-1 md:space-y-2 max-w-md">
@@ -140,7 +140,7 @@ export default function EditImagesPage() {
           {/* Right Panel - Selection UI */}
           <div 
             className={cn(
-              "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[80%] md:w-[40%] md:h-full rounded-t-xl md:rounded-none md:rounded-r-xl"
+              "bg-background border-t md:border-t-0 md:border-l border-border overflow-hidden relative z-[60] flex flex-col w-full h-[80%] md:w-[40%] md:h-full rounded-b-2xl md:rounded-none md:rounded-r-xl"
             )}
           >
              <ImageSelectionModal 

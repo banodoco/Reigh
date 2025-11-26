@@ -900,7 +900,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onClick={!isMobile && enableSingleClick ? (e) => {
+        onClick={enableSingleClick || !isMobile ? (e) => {
           if (onImageClick) {
             e.stopPropagation();
             onImageClick(image);
@@ -929,8 +929,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               loop
               playsInline
               onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-              onTouchStart={isMobile ? handleTouchStart : undefined}
-              onTouchEnd={isMobile ? handleInteraction : undefined}
+              onTouchStart={isMobile && !enableSingleClick ? handleTouchStart : undefined}
+              onTouchEnd={isMobile && !enableSingleClick ? handleInteraction : undefined}
               // Pass video loading handlers if GalleryVideoScrubber supports them, or if it spreads props to video
               onVideoError={handleImageError}
               onLoadStart={() => setImageLoading(true)}
@@ -972,8 +972,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     progressiveEnabled && isFullLoaded && "opacity-100"
                   )}
                   onDoubleClick={isMobile ? undefined : () => onOpenLightbox(image)}
-                  onTouchStart={isMobile ? handleTouchStart : undefined}
-                  onTouchEnd={isMobile ? handleInteraction : undefined}
+                  onTouchStart={isMobile && !enableSingleClick ? handleTouchStart : undefined}
+                  onTouchEnd={isMobile && !enableSingleClick ? handleInteraction : undefined}
                   draggable={false}
                   style={{ cursor: 'pointer' }}
                 />

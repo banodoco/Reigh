@@ -190,10 +190,10 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
     return (
       <TooltipProvider delayDuration={500}>
          <div className="w-full flex flex-col bg-transparent">
-             <div 
-               className="flex items-center justify-center relative bg-black w-full shrink-0"
-               style={{ height: '45dvh', touchAction: 'pan-y' }}
-             >
+            <div 
+              className="flex items-center justify-center relative bg-black w-full shrink-0 rounded-t-2xl overflow-hidden"
+              style={{ height: '45dvh', touchAction: 'pan-y' }}
+            >
                <MediaDisplayWithCanvas
                  effectiveImageUrl={effectiveImageUrl}
                  thumbUrl={media.thumbUrl}
@@ -290,12 +290,12 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
                  />
              </div>
 
-             <div 
-               className={cn(
-                 "bg-background border-t border-border relative z-[60] w-full rounded-t-xl pb-8"
-               )}
-               style={{ minHeight: '55dvh' }}
-             >
+            <div 
+              className={cn(
+                "bg-background border-t border-border relative z-[60] w-full rounded-b-2xl pb-8"
+              )}
+              style={{ minHeight: '55dvh' }}
+            >
                {isSpecialEditMode ? (
                  <EditModePanel
                    sourceGenerationData={sourceGenerationData}
