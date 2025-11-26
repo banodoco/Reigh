@@ -843,9 +843,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
               const [id, framePos] = entry;
 
               // Skip DOM-based positioning for dragged items
-              if (dragState.isDragging && id === dragState.activeId) {
-                return 0; // Return 0 since this won't be used anyway
-              }
+              // REMOVED: Now that we show pairs during drag, we need the actual pixel position, not 0
+              // if (dragState.isDragging && id === dragState.activeId) {
+              //   return 0; 
+              // }
 
               // Use the same coordinate system as TimelineItem and TimelineRuler
               // This ensures pair regions align perfectly with images
