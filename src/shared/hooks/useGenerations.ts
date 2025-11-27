@@ -41,7 +41,9 @@ export async function fetchGenerations(
   let countQuery = supabase
     .from('generations')
     .select('*', { count: 'exact', head: true })
-    .eq('project_id', projectId);
+    .eq('project_id', projectId)
+    // Only include generations with valid output URLs
+    .not('location', 'is', null);
 
   // Apply server-side filters to count query
 
@@ -139,7 +141,9 @@ export async function fetchGenerations(
       parent_generation_id,
       child_order
     `)
-    .eq('project_id', projectId);
+    .eq('project_id', projectId)
+    // Only include generations with valid output URLs
+    .not('location', 'is', null);
 
   // Apply same filters to data query
 

@@ -88,6 +88,61 @@ export default function HomePage() {
 
   // Auth Session Management
   useEffect(() => {
+    // [iPadAuthFix] Explicitly check for OAuth tokens in URL hash on mount
+    // This ensures reliable authentication on iPad Safari where detectSessionInUrl may not work consistently
+    const handleHashTokens = async () => {
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        console.log('[AuthDebug] OAuth tokens detected in URL hash, processing...');
+        try {
+          // Parse the hash fragment to extract tokens
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          
+          console.log('[AuthDebug] Parsed tokens - access_token exists:', !!accessToken, 'refresh_token exists:', !!refreshToken);
+          
+          if (accessToken && refreshToken) {
+            // Mark OAuth as in progress BEFORE setting session
+            // This ensures the auth change handler will navigate to /tools
+            try { localStorage.setItem('oauthInProgress', 'true'); } catch {}
+            
+            // Explicitly set the session using the tokens from the URL
+            // This is more reliable than relying on detectSessionInUrl on iPad Safari
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (error) {
+              console.error('[AuthDebug] Error setting session from hash tokens:', error);
+              // Clear the flag if session setting failed
+              try { localStorage.removeItem('oauthInProgress'); } catch {}
+            } else if (data.session) {
+              console.log('[AuthDebug] Successfully set session from hash tokens');
+              setSession(data.session);
+            }
+          } else {
+            // Fallback: try getSession in case detectSessionInUrl already worked
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+              console.error('[AuthDebug] Error getting session:', error);
+            } else if (data.session) {
+              console.log('[AuthDebug] Session already exists from detectSessionInUrl');
+              setSession(data.session);
+            }
+          }
+          
+          // Clean the hash from URL to prevent confusion
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        } catch (err) {
+          console.error('[AuthDebug] Failed to process hash tokens:', err);
+        }
+      }
+    };
+    
+    handleHashTokens();
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('[AuthDebug] Initial session check:', !!session?.user?.id);
       setSession(session);

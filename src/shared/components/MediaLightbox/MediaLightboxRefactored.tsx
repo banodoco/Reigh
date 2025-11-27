@@ -226,6 +226,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Track where pointer/click started to prevent accidental modal closure on drag
   const pointerDownTargetRef = useRef<EventTarget | null>(null);
+  
+  // Track double-tap on mobile/iPad
+  const lastTapTimeRef = useRef<number>(0);
+  const lastTapTargetRef = useRef<EventTarget | null>(null);
+  const DOUBLE_TAP_DELAY = 300; // ms
 
   // Basic hooks
   const isMobile = useIsMobile();
@@ -812,6 +817,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               
               if (isInteractive) {
                 return; // Allow propagation for interactive elements
+              }
+              
+              // Detect double-tap to close on mobile/iPad (only on overlay background)
+              if (!isInpaintMode && e.target === e.currentTarget) {
+                const currentTime = Date.now();
+                const timeSinceLastTap = currentTime - lastTapTimeRef.current;
+                
+                // Check if this is a double-tap (within DOUBLE_TAP_DELAY and same target)
+                if (timeSinceLastTap < DOUBLE_TAP_DELAY && lastTapTargetRef.current === e.currentTarget) {
+                  console.log('[MediaLightbox] 📱 Double-tap detected on overlay, closing...');
+                  onClose();
+                  lastTapTimeRef.current = 0; // Reset
+                  lastTapTargetRef.current = null;
+                } else {
+                  // First tap - record it
+                  lastTapTimeRef.current = currentTime;
+                  lastTapTargetRef.current = e.currentTarget;
+                }
               }
               
               // Block touch end events from bubbling through dialog content

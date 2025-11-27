@@ -1014,7 +1014,8 @@ const VideoTravelToolPage: React.FC = () => {
       excludePositioned: videoExcludePositioned,
       starredOnly: videoStarredOnly,
       searchTerm: videoSearchTerm,
-      sort: videoSortMode
+      sort: videoSortMode,
+      includeChildren: false // Only show parent generations, not derived/child generations
     }
   );
 
