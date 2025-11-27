@@ -230,6 +230,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // Track double-tap on mobile/iPad
   const lastTapTimeRef = useRef<number>(0);
   const lastTapTargetRef = useRef<EventTarget | null>(null);
+  const touchStartTargetRef = useRef<EventTarget | null>(null); // Track where touch started
+  const touchStartedOnOverlayRef = useRef<boolean>(false); // Track if touch started on overlay background
   const DOUBLE_TAP_DELAY = 300; // ms
 
   // Basic hooks
@@ -750,6 +752,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
             }}
             onTouchStart={(e) => {
+              // Track where touch started for double-tap detection
+              touchStartTargetRef.current = e.target;
+              
+              // Check if touch started directly on overlay (for double-tap to close)
+              // e.target is the element that was touched, e.currentTarget is the overlay
+              const touchedDirectlyOnOverlay = e.target === e.currentTarget;
+              touchStartedOnOverlayRef.current = touchedDirectlyOnOverlay;
+              
+              console.log('[TouchDebug] 👆 Touch started on OVERLAY:', {
+                directlyOnOverlay: touchedDirectlyOnOverlay,
+                targetTagName: (e.target as HTMLElement).tagName,
+                targetClassName: (e.target as HTMLElement).className?.substring?.(0, 50),
+                isInpaintMode,
+                timestamp: Date.now()
+              });
+              
               // Allow touch events on canvas when in inpaint mode
               const target = e.target as HTMLElement;
               if (isInpaintMode && target.tagName === 'CANVAS') {
@@ -820,9 +838,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               }
               
               // Detect double-tap to close on mobile/iPad (only on overlay background)
-              if (!isInpaintMode && e.target === e.currentTarget) {
+              // Use touchStartedOnOverlayRef which was set in onTouchStart for more reliable detection
+              const touchEndedOnOverlay = e.target === e.currentTarget;
+              const validOverlayTap = touchStartedOnOverlayRef.current && touchEndedOnOverlay;
+              
+              console.log('[TouchDebug] 👆 Touch ended on OVERLAY:', {
+                touchStartedOnOverlay: touchStartedOnOverlayRef.current,
+                touchEndedOnOverlay,
+                validOverlayTap,
+                isInpaintMode,
+                timestamp: Date.now()
+              });
+              
+              if (!isInpaintMode && validOverlayTap) {
                 const currentTime = Date.now();
                 const timeSinceLastTap = currentTime - lastTapTimeRef.current;
+                
+                console.log('[TouchDebug] ⏱️ Double-tap check:', {
+                  timeSinceLastTap,
+                  threshold: DOUBLE_TAP_DELAY,
+                  isWithinThreshold: timeSinceLastTap < DOUBLE_TAP_DELAY,
+                  lastTapTargetMatches: lastTapTargetRef.current === e.currentTarget
+                });
                 
                 // Check if this is a double-tap (within DOUBLE_TAP_DELAY and same target)
                 if (timeSinceLastTap < DOUBLE_TAP_DELAY && lastTapTargetRef.current === e.currentTarget) {
@@ -832,15 +869,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   lastTapTargetRef.current = null;
                 } else {
                   // First tap - record it
+                  console.log('[TouchDebug] 📝 First tap recorded, waiting for second tap...');
                   lastTapTimeRef.current = currentTime;
                   lastTapTargetRef.current = e.currentTarget;
                 }
               }
               
+              // Reset touch tracking
+              touchStartTargetRef.current = null;
+              touchStartedOnOverlayRef.current = false;
+              
               // Block touch end events from bubbling through dialog content
               if (isMobile) e.stopPropagation();
             }}
             onTouchCancel={(e) => {
+              // Reset touch tracking on cancel
+              touchStartTargetRef.current = null;
+              touchStartedOnOverlayRef.current = false;
+              
               // Check if a higher z-index dialog is open - if so, don't block events
               const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
               const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
@@ -863,6 +909,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               // Ensure the overlay captures all pointer events
               pointerEvents: 'all',
               touchAction: 'none',
+              // CRITICAL: cursor:pointer is required for iOS to register touch events!
+              // See: https://github.com/facebook/react/issues/7635
+              cursor: 'pointer',
               // Make sure overlay is above everything else
               zIndex: 10000,
               // Ensure full coverage

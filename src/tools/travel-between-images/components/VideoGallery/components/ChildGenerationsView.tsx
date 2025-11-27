@@ -283,8 +283,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     return (
         <div className="w-full min-h-screen">
             {/* Header */}
-            <div className="sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 pt-4 pb-0">
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
+                <div className="max-w-7xl mx-auto px-4 pt-4 pb-3">
                     <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
@@ -465,6 +465,7 @@ interface SegmentCardProps {
 
 const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onUpdate }) => {
     const { toast } = useToast();
+    const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -610,25 +611,25 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
         <Card className="overflow-hidden flex flex-col">
             {/* Video Preview */}
             <div className="relative aspect-video bg-black group">
-                <VideoItem
-                    video={child}
-                    index={index}
-                    originalIndex={index}
-                    shouldPreload="metadata"
-                    isMobile={false}
-                    projectId={projectId}
-                    onLightboxOpen={onLightboxOpen}
-                    onMobileTap={() => { }}
-                    onDelete={() => { }}
-                    deletingVideoId={null}
-                    onHoverStart={() => { }}
-                    onHoverEnd={() => { }}
-                    onMobileModalOpen={() => { }}
-                    selectedVideoForDetails={null}
-                    showTaskDetailsModal={false}
-                    onApplySettingsFromTask={() => { }}
-                    hideActions={true}
-                />
+                    <VideoItem
+                        video={child}
+                        index={index}
+                        originalIndex={index}
+                        shouldPreload="metadata"
+                        isMobile={isMobile}
+                        projectId={projectId}
+                        onLightboxOpen={onLightboxOpen}
+                        onMobileTap={onLightboxOpen}
+                        onDelete={() => { }}
+                        deletingVideoId={null}
+                        onHoverStart={() => { }}
+                        onHoverEnd={() => { }}
+                        onMobileModalOpen={() => { }}
+                        selectedVideoForDetails={null}
+                        showTaskDetailsModal={false}
+                        onApplySettingsFromTask={() => { }}
+                        hideActions={true}
+                    />
             </div>
 
             {/* Settings Form */}
