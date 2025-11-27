@@ -15,6 +15,7 @@ import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoadin
 import { cn } from '@/shared/lib/utils';
 import { isImageCached, setImageCacheStatus } from '@/shared/lib/imageCacheManager';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { isVideoGeneration, isPositioned } from '@/shared/lib/typeGuards';
 
 interface VideoShotDisplayProps {
   shot: Shot;
@@ -84,7 +85,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   };
 
   const handleImageError = () => {
-    console.error(`[ShotImageDebug] Image failed to load:`, { displayUrl, index, shotImageEntryId: image.shotImageEntryId });
+    console.error(`[ShotImageDebug] Image failed to load:`, { displayUrl, index, id: image.id });
     setImageLoadError(true);
   };
 
@@ -92,7 +93,7 @@ const ShotImage: React.FC<ShotImageProps> = ({ image, index, onSelectShot, shotN
   if (!displayUrl) {
     console.warn(`[ShotImageDebug] No valid URL found for image:`, { 
       image: {
-        shotImageEntryId: image.shotImageEntryId,
+        id: image.id, // shot_generations.id
         imageUrl: image.imageUrl,
         thumbUrl: image.thumbUrl, 
         location: image.location,
@@ -365,22 +366,10 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
   };
 
   // Match ShotEditor/ShotsPane: show only positioned, non-video images sorted by timeline_frame
+  // Uses canonical filters from typeGuards
   const positionedImages = (shot.images || [])
-    .filter(img => {
-      const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
-      return hasTimelineFrame;
-    })
-    .filter(img => {
-      const isVideo = img.type === 'video' || img.type === 'video_travel_output' ||
-        ((img as any).location && (img as any).location.endsWith('.mp4')) ||
-        ((img as any).imageUrl && (img as any).imageUrl.endsWith('.mp4'));
-      return !isVideo;
-    })
-    .sort((a, b) => {
-      const frameA = (a as any).timeline_frame || 0;
-      const frameB = (b as any).timeline_frame || 0;
-      return frameA - frameB;
-    });
+    .filter(img => isPositioned(img) && !isVideoGeneration(img))
+    .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
 
   const imagesToShow: GenerationRow[] = positionedImages.slice(0, 5);
   
@@ -506,7 +495,7 @@ const VideoShotDisplay: React.FC<VideoShotDisplayProps> = ({ shot, onSelectShot,
             <>
               {imagesToShow.map((image, index) => (
                 <ShotImage
-                  key={image.shotImageEntryId || `img-${index}`}
+                  key={image.id || `img-${index}`} // image.id is shot_generations.id
                   image={image}
                   index={index}
                   onSelectShot={onSelectShot}

@@ -15,6 +15,27 @@ export const useZoom = ({ fullMin, fullMax, fullRange, containerRef }: UseZoomPr
   
   // Track previous coordinate system to detect changes
   const prevCoordinateSystemRef = useRef({ fullMin, fullMax, fullRange });
+  
+  // [ZoomDebug] Log zoom state changes
+  const mountCountRef = useRef(0);
+  useEffect(() => {
+    mountCountRef.current++;
+    console.log('[ZoomDebug] 🔍 useZoom MOUNTED/REMOUNTED:', {
+      mountCount: mountCountRef.current,
+      zoomLevel,
+      zoomCenter,
+      fullMin,
+      fullMax,
+      fullRange,
+      timestamp: Date.now()
+    });
+    return () => {
+      console.log('[ZoomDebug] 🔍 useZoom UNMOUNTING:', {
+        mountCount: mountCountRef.current,
+        timestamp: Date.now()
+      });
+    };
+  }, []); // Only on mount/unmount
 
   // Calculate zoom viewport
   const getZoomViewport = useCallback(() => {

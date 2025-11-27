@@ -30,10 +30,9 @@ export const useStarToggle = ({ media, starred, shotId }: UseStarToggleProps): U
   const initialStarred = useMemo(() => {
     // Prefer explicit prop, fall back to media.starred if available
     console.log('[StarPersist] 📥 Calculating initialStarred from props', {
-      mediaId: media.id,
+      mediaId: media.id, // shot_generations.id
       shotId,
-      shotImageEntryId: (media as any).shotImageEntryId,
-      shot_generation_id: (media as any).shot_generation_id,
+      generation_id: (media as any).generation_id,
       starredProp: starred,
       mediaStarred: (media as any).starred,
       hasStarredProp: typeof starred === 'boolean',
@@ -110,10 +109,9 @@ export const useStarToggle = ({ media, starred, shotId }: UseStarToggleProps): U
   const handleToggleStar = () => {
     const newStarred = !localStarred;
     console.log('[StarPersist] 🖱️ Star button clicked in UI', {
-      mediaId: media.id,
+      mediaId: media.id, // shot_generations.id
       shotId,
-      shotImageEntryId: (media as any).shotImageEntryId,
-      shot_generation_id: (media as any).shot_generation_id,
+      generation_id: (media as any).generation_id,
       oldLocalStarred: localStarred,
       newStarred,
       willMutateWithId: media.id,

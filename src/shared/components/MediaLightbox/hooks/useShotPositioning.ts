@@ -21,8 +21,8 @@ export interface UseShotPositioningProps {
   onAddToShotWithoutPosition?: (generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
   onShowTick?: (imageId: string) => void;
   onShowSecondaryTick?: (imageId: string) => void;
-  onOptimisticPositioned?: (mediaId: string, shotId?: string) => void;
-  onOptimisticUnpositioned?: (mediaId: string, shotId?: string) => void;
+  onOptimisticPositioned?: (mediaId: string, shotId: string) => void;
+  onOptimisticUnpositioned?: (mediaId: string, shotId: string) => void;
 }
 
 export interface UseShotPositioningReturn {
@@ -167,13 +167,25 @@ export const useShotPositioning = ({
       return;
     }
     
+    // FIX: Use fallback chain for image URL since data structure varies
+    // The media object may have 'url', 'location', or 'imageUrl' depending on source
+    const imageUrl = (media as any).url || media.location || media.imageUrl;
+    const thumbUrl = (media as any).thumbnail_url || media.thumbUrl || imageUrl;
+    
     console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShot', {
       mediaId: media?.id,
-      imageUrl: (media?.imageUrl || '').slice(0, 120),
-      thumbUrl: (media?.thumbUrl || '').slice(0, 120),
+      imageUrl: (imageUrl || '').slice(0, 120),
+      thumbUrl: (thumbUrl || '').slice(0, 120),
+      originalFields: {
+        hasUrl: !!(media as any).url,
+        hasLocation: !!media.location,
+        hasImageUrl: !!media.imageUrl,
+        hasThumbnailUrl: !!(media as any).thumbnail_url,
+        hasThumbUrl: !!media.thumbUrl
+      },
       timestamp: Date.now()
     });
-    const success = await onAddToShot(media.id, media.imageUrl, media.thumbUrl);
+    const success = await onAddToShot(media.id, imageUrl, thumbUrl);
     console.log('[ShotNavDebug] [MediaLightbox] onAddToShot result', { success, timestamp: Date.now() });
     if (success) {
       onShowTick?.(media.id);
@@ -273,13 +285,17 @@ export const useShotPositioning = ({
       return;
     }
     
+    // FIX: Use fallback chain for image URL since data structure varies
+    const imageUrl = (media as any).url || media.location || media.imageUrl;
+    const thumbUrl = (media as any).thumbnail_url || media.thumbUrl || imageUrl;
+    
     console.log('[ShotNavDebug] [MediaLightbox] Calling onAddToShotWithoutPosition', {
       mediaId: media?.id,
-      imageUrl: (media?.imageUrl || '').slice(0, 120),
-      thumbUrl: (media?.thumbUrl || '').slice(0, 120),
+      imageUrl: (imageUrl || '').slice(0, 120),
+      thumbUrl: (thumbUrl || '').slice(0, 120),
       timestamp: Date.now()
     });
-    const success = await onAddToShotWithoutPosition(media.id, media.imageUrl, media.thumbUrl);
+    const success = await onAddToShotWithoutPosition(media.id, imageUrl, thumbUrl);
     console.log('[ShotNavDebug] [MediaLightbox] onAddToShotWithoutPosition result', { success, timestamp: Date.now() });
     if (success) {
       onShowSecondaryTick?.(media.id);

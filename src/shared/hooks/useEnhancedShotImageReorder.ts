@@ -73,7 +73,8 @@ export const useEnhancedShotImageReorder = (
     try {
       // Get current images and their timeline_frame values
       const currentImages = getImagesForMode('batch');
-      const currentOrder = currentImages.map(img => img.shotImageEntryId || img.id);
+      // img.id is shot_generations.id - unique per entry
+      const currentOrder = currentImages.map(img => img.id);
       
       console.log('[DataTrace] 🔍 Analyzing reorder:', {
         currentOrder: currentOrder.map(id => id?.substring(0, 8)),
@@ -131,7 +132,8 @@ export const useEnhancedShotImageReorder = (
         
         // Build the new order array for neighbor calculation
         const newOrderItems = orderedShotImageEntryIds.map(id => {
-          const img = currentImages.find(i => (i.shotImageEntryId || i.id) === id);
+          // img.id is shot_generations.id - unique per entry
+          const img = currentImages.find(i => i.id === id);
           return {
             id,
             timeline_frame: img?.timeline_frame ?? null
@@ -176,8 +178,8 @@ export const useEnhancedShotImageReorder = (
       console.log('[BatchModeReorderFlow] [DATA_STRUCTURE] 📊 Current data structure analysis:', {
         currentImages: currentImages.map((img, index) => ({
           index,
-          shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
-          generationId: img.id?.substring(0, 8),
+          id: img.id?.substring(0, 8), // shot_generations.id
+          generationId: img.generation_id?.substring(0, 8),
           timeline_frame: img.timeline_frame
         })),
         shotGenerations: shotGenerations.map(sg => ({
@@ -211,16 +213,17 @@ export const useEnhancedShotImageReorder = (
       const changes: Array<{
         oldPos: number;
         newPos: number;
-        shotImageEntryId: string;
+        id: string; // shot_generations.id
         generationId: string;
         currentTimelineFrame: number;
         targetTimelineFrame: number;
       }> = [];
 
       // For each item in the desired order, check if its position changed
+      // orderedShotImageEntryIds contains shot_generations.id values (unique per entry)
       for (let newPos = 0; newPos < orderedShotImageEntryIds.length; newPos++) {
-        const shotImageEntryId = orderedShotImageEntryIds[newPos];
-        const oldPos = currentOrder.indexOf(shotImageEntryId);
+        const id = orderedShotImageEntryIds[newPos]; // shot_generations.id
+        const oldPos = currentOrder.indexOf(id);
         
         if (oldPos !== -1 && oldPos !== newPos) {
           // This item moved - find its current and target timeline_frame values
@@ -230,7 +233,7 @@ export const useEnhancedShotImageReorder = (
           // Safety check: Ensure both images exist AND have id field (handles race conditions from just-added images)
           if (!currentImg || !targetImg || !currentImg.id || !targetImg.id) {
             console.error('[useEnhancedShotImageReorder] Skipping change - missing image data or id:', {
-              shotImageEntryId: shotImageEntryId.substring(0, 8),
+              id: id.substring(0, 8), // shot_generations.id
               oldPos,
               newPos,
               hasCurrentImg: !!currentImg,
@@ -240,13 +243,13 @@ export const useEnhancedShotImageReorder = (
               currentImagesLength: currentImages.length,
               orderedIdsLength: orderedShotImageEntryIds.length,
               currentImgData: currentImg ? {
-                shotImageEntryId: currentImg.shotImageEntryId?.substring(0, 8),
-                id: currentImg.id?.substring(0, 8) || 'MISSING',
+                id: currentImg.id?.substring(0, 8) || 'MISSING', // shot_generations.id
+                generation_id: currentImg.generation_id?.substring(0, 8),
                 timeline_frame: currentImg.timeline_frame
               } : 'null',
               targetImgData: targetImg ? {
-                shotImageEntryId: targetImg.shotImageEntryId?.substring(0, 8),
-                id: targetImg.id?.substring(0, 8) || 'MISSING',
+                id: targetImg.id?.substring(0, 8) || 'MISSING', // shot_generations.id
+                generation_id: targetImg.generation_id?.substring(0, 8),
                 timeline_frame: targetImg.timeline_frame
               } : 'null'
             });
@@ -261,8 +264,8 @@ export const useEnhancedShotImageReorder = (
             changes.push({
               oldPos,
               newPos,
-              shotImageEntryId,
-              generationId: currentImg.id,
+              id, // shot_generations.id
+              generationId: currentImg.generation_id || currentImg.id,
               currentTimelineFrame: currentShotGen.timeline_frame || 0,
               targetTimelineFrame: targetShotGen.timeline_frame || 0
             });
@@ -273,7 +276,7 @@ export const useEnhancedShotImageReorder = (
       console.log('[BatchModeReorderFlow] [CHANGES_DETECTED] 📋 Timeline-frame-based changes detected:', {
         changesCount: changes.length,
         changes: changes.map(c => ({
-          shotImageEntryId: c.shotImageEntryId.substring(0, 8),
+          id: c.id.substring(0, 8), // shot_generations.id
           generationId: c.generationId.substring(0, 8),
           oldPos: c.oldPos,
           newPos: c.newPos,
@@ -294,7 +297,8 @@ export const useEnhancedShotImageReorder = (
       console.log('[BatchModeReorderFlow] [SEQUENTIAL_SWAPS] 🔄 Building sequential swap sequence...');
       
       // Create working arrays with shot_generation IDs (the unique identifiers we need for swaps)
-      const currentOrderIds = currentImages.map(img => img.shotImageEntryId);
+      // img.id is shot_generations.id - unique per entry
+      const currentOrderIds = currentImages.map(img => img.id);
       const desiredOrderIds = [...orderedShotImageEntryIds]; // Copy to avoid mutation
       
       console.log('[BatchModeReorderFlow] [ORDER_COMPARISON] 📋 Comparing orders:', {
@@ -359,26 +363,27 @@ export const useEnhancedShotImageReorder = (
   }, [shotId, getImagesForMode, shotGenerations, exchangePositionsNoReload, loadPositions]);
 
   // Handle item deletion
-  const handleDelete = useCallback(async (shotImageEntryId: string) => {
+  // id parameter is shot_generations.id (unique per entry)
+  const handleDelete = useCallback(async (id: string) => {
     if (!shotId) {
       throw new Error('No shot ID provided for deletion');
     }
-
+    
     try {
       // Find the shot generation record by its ID
-      const targetItem = shotGenerations.find(sg => sg.id === shotImageEntryId);
+      const targetItem = shotGenerations.find(sg => sg.id === id);
       if (!targetItem) {
         throw new Error('Item not found for deletion');
       }
 
       console.log('[PositionSystemDebug] 🗑️ Deleting individual duplicate item:', {
-        shotImageEntryId: shotImageEntryId.substring(0, 8),
+        id: id.substring(0, 8), // shot_generations.id
         generationId: targetItem.generation_id.substring(0, 8),
         timeline_frame: targetItem.timeline_frame
       });
 
-      // Pass the shot_generations.id (shotImageEntryId) to delete only this specific record
-      await deleteItem(shotImageEntryId);
+      // Pass the shot_generations.id to delete only this specific record
+      await deleteItem(id);
       
     } catch (error) {
       console.error('[useEnhancedShotImageReorder] Delete error:', error);

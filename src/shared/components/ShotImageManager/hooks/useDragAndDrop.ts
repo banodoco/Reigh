@@ -64,12 +64,13 @@ export function useDragAndDrop({
       imagesCount: images.length,
     });
     
-    const draggedItem = images.find(img => (img.shotImageEntryId ?? img.id) === draggedItemId);
+    // img.id is shot_generations.id - unique per entry
+    const draggedItem = images.find(img => img.id === draggedItemId);
     
     console.log('[BatchModeReorderFlow] [DRAG_START] 🚀 Batch mode drag initiated:', {
       draggedItemId: draggedItemId.substring(0, 8),
-      draggedGenerationId: draggedItem?.id?.substring(0, 8),
-      currentPosition: images.findIndex(img => (img.shotImageEntryId ?? img.id) === draggedItemId),
+      draggedGenerationId: draggedItem?.generation_id?.substring(0, 8),
+      currentPosition: images.findIndex(img => img.id === draggedItemId),
       totalItems: images.length,
       timeline_frame: draggedItem?.timeline_frame,
       selectedIds: selectedIds.length,
@@ -123,11 +124,11 @@ export function useDragAndDrop({
       return;
     }
     
-    // Safety check: Ensure all images have shotImageEntryId (Phase 2 complete)
-    const hasMissingIds = images.some(img => !img.shotImageEntryId);
+    // Safety check: Ensure all images have id
+    const hasMissingIds = images.some(img => !img.id);
     if (hasMissingIds) {
-      const missingCount = images.filter(img => !img.shotImageEntryId).length;
-      console.warn('[DesktopReorder] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Cannot reorder yet.', {
+      const missingCount = images.filter(img => !img.id).length;
+      console.warn('[DesktopReorder] ⚠️  Some images missing id. Cannot reorder yet.', {
         totalImages: images.length,
         missingIds: missingCount
       });
@@ -146,8 +147,9 @@ export function useDragAndDrop({
     const activeIsSelected = selectedIds.includes(active.id as string);
     
     if (!activeIsSelected || selectedIds.length <= 1) {
-      const oldIndex = images.findIndex((img) => (img.shotImageEntryId ?? img.id) === active.id);
-      const newIndex = images.findIndex((img) => (img.shotImageEntryId ?? img.id) === over.id);
+      // img.id is shot_generations.id - unique per entry
+      const oldIndex = images.findIndex((img) => img.id === active.id);
+      const newIndex = images.findIndex((img) => img.id === over.id);
       
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
         const newOrder = arrayMove(images, oldIndex, newIndex);
@@ -156,9 +158,10 @@ export function useDragAndDrop({
         setIsOptimisticUpdate(true);
         setOptimisticOrder(newOrder);
         
-        const orderedShotImageEntryIds = newOrder.map((img) => img.shotImageEntryId ?? img.id);
+        // img.id is shot_generations.id - unique per entry
+        const orderedIds = newOrder.map((img) => img.id);
         console.log('[DataTrace] 🎯 Drag complete - calling onImageReorder:', {
-          idsCount: orderedShotImageEntryIds.length,
+          idsCount: orderedIds.length,
           ids: orderedShotImageEntryIds.map(id => id?.substring(0, 8)),
         });
         onImageReorder(orderedShotImageEntryIds);
@@ -171,8 +174,9 @@ export function useDragAndDrop({
     // Multi-drag logic
     console.log('[DragDebug:ShotImageManager] Multi-drag reorder', { selectedCount: selectedIds.length });
     
-    const overIndex = images.findIndex((img) => (img.shotImageEntryId ?? img.id) === over.id);
-    const activeIndex = images.findIndex((img) => (img.shotImageEntryId ?? img.id) === active.id);
+    // img.id is shot_generations.id - unique per entry
+    const overIndex = images.findIndex((img) => img.id === over.id);
+    const activeIndex = images.findIndex((img) => img.id === active.id);
     
     const newItems = calculateMultiDragOrder(
       images,
@@ -183,8 +187,9 @@ export function useDragAndDrop({
       over.id as string
     );
     
-    const currentOrder = images.map(img => img.shotImageEntryId ?? img.id).join(',');
-    const newOrder = newItems.map(img => img.shotImageEntryId ?? img.id).join(',');
+    // img.id is shot_generations.id - unique per entry
+    const currentOrder = images.map(img => img.id).join(',');
+    const newOrder = newItems.map(img => img.id).join(',');
     
     if (currentOrder === newOrder) {
       console.log('[DragDebug:ShotImageManager] Multi-drag resulted in no change - skipping update');
@@ -200,7 +205,7 @@ export function useDragAndDrop({
     setOptimisticOrder(newItems);
     
     console.log('[DragDebug:ShotImageManager] Calling onImageReorder for multi-drag');
-    const reorderedIds = newItems.map((img) => img.shotImageEntryId ?? img.id);
+    const reorderedIds = newItems.map((img) => img.id);
     console.log('[DataTrace] 🎯 Multi-drag complete - calling onImageReorder:', {
       idsCount: reorderedIds.length,
       ids: reorderedIds.map(id => id?.substring(0, 8)),
@@ -210,7 +215,8 @@ export function useDragAndDrop({
     setLastSelectedIndex(null);
   }, [selectedIds, images, onImageReorder, setSelectedIds, setLastSelectedIndex, setOptimisticOrder, setIsOptimisticUpdate, setReconciliationId]);
   
-  const activeImage = activeId ? images.find((img) => (img.shotImageEntryId ?? img.id) === activeId) : null;
+  // img.id is shot_generations.id - unique per entry
+  const activeImage = activeId ? images.find((img) => img.id === activeId) : null;
   
   return {
     activeId,

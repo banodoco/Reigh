@@ -223,20 +223,22 @@ export const useGenerationActions = ({
         });
 
         const finalImage: GenerationRow = {
-          ...(newGeneration as Omit<GenerationRow, 'id' | 'shotImageEntryId'>),
-          // Preserve the optimistic shotImageEntryId so React key stays stable
-          shotImageEntryId: optimisticImage.shotImageEntryId,
-          id: newGeneration.id,
+          ...(newGeneration as Omit<GenerationRow, 'id' | 'generation_id'>),
+          // Preserve the optimistic id (shot_generations.id) so React key stays stable
+          id: optimisticImage.id,
+          generation_id: newGeneration.id, // actual generation ID
+          // Deprecated (backwards compat)
+          shotImageEntryId: optimisticImage.id,
           isOptimistic: false,
           imageUrl: finalImageUrl, // Ensure final URL is used
           thumbUrl: thumbnailUrl, // Use the generated thumbnail URL
         };
         
-        return { optimisticId: optimisticImage.shotImageEntryId, finalImage, success: true };
+        return { optimisticId: optimisticImage.id, finalImage, success: true };
       } catch (error: any) {
         console.error(`[ShotEditor] Error uploading one image: ${file.name}`, error);
         toast.error(`Failed to upload ${file.name}: ${error.message}`);
-        return { optimisticId: optimisticImage.shotImageEntryId, success: false };
+        return { optimisticId: optimisticImage.id, success: false };
       }
     });
 
@@ -308,19 +310,19 @@ export const useGenerationActions = ({
       return;
     }
 
-    // Find the actual generation ID from the image data
-    const imageToDelete = orderedShotImages.find(img => 
-      (img.shotImageEntryId ?? img.id) === shotImageEntryId
-    );
+    // Find the image by its id (shot_generations.id)
+    // shotImageEntryId param IS the id (same value now)
+    const imageToDelete = orderedShotImages.find(img => img.id === shotImageEntryId);
     
-    const actualGenerationId = imageToDelete?.id;
+    // The actual generation ID is now stored in generation_id
+    const actualGenerationId = imageToDelete?.generation_id;
     
     console.log('[DeleteDebug] 🔍 STEP 2: Looking up generation ID', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
       foundImage: !!imageToDelete,
       actualGenerationId: actualGenerationId?.substring(0, 8),
-      imageId: imageToDelete?.id?.substring(0, 8),
-      imageShotImageEntryId: imageToDelete?.shotImageEntryId?.substring(0, 8),
+      imageId: imageToDelete?.id?.substring(0, 8), // shot_generations.id
+      generation_id: imageToDelete?.generation_id?.substring(0, 8),
       totalImages: orderedShotImages.length
     });
 
@@ -328,8 +330,8 @@ export const useGenerationActions = ({
       console.error('[DeleteDebug] ❌ Could not find generation ID for shotImageEntryId', {
         shotImageEntryId: shotImageEntryId.substring(0, 8),
         availableIds: orderedShotImages.map(img => ({
-          id: img.id?.substring(0, 8),
-          shotImageEntryId: (img.shotImageEntryId ?? img.id)?.substring(0, 8)
+          id: img.id?.substring(0, 8), // shot_generations.id
+          generation_id: img.generation_id?.substring(0, 8)
         }))
       });
       toast.error("Cannot remove image: Image not found.");
@@ -338,9 +340,8 @@ export const useGenerationActions = ({
 
     console.log('[DeleteDebug] 📤 STEP 3: Calling removeImageFromShotMutation', {
       shotId: selectedShot.id.substring(0, 8),
-      generationId: actualGenerationId.substring(0, 8),
-      projectId: projectId.substring(0, 8),
-      shotImageEntryId: shotImageEntryId.substring(0, 8)
+      shotGenerationId: shotImageEntryId.substring(0, 8), // This is the shot_generations.id
+      projectId: projectId.substring(0, 8)
     });
 
     // Emit event to lock timeline positions during mutation + refetch
@@ -348,9 +349,11 @@ export const useGenerationActions = ({
       detail: { shotId: selectedShot.id, type: 'delete' }
     }));
     
+    // CRITICAL: Pass shotGenerationId (shot_generations.id), NOT generationId (generations.id)
+    // This ensures only this specific entry is deleted, not all duplicates of the same generation
     removeImageFromShotMutation.mutate({
       shotId: selectedShot.id,
-      generationId: actualGenerationId,
+      shotGenerationId: shotImageEntryId, // The unique shot_generations.id
       projectId: projectId,
     });
   }, [selectedShot?.id, projectId, removeImageFromShotMutation, orderedShotImages]);
@@ -406,14 +409,18 @@ export const useGenerationActions = ({
       return;
     }
 
-    const originalImage = orderedShotImages.find(img => (img.shotImageEntryId ?? img.id) === shotImageEntryId);
+    // shotImageEntryId param is the shot_generations.id which matches img.id
+    const originalImage = orderedShotImages.find(img => img.id === shotImageEntryId);
     if (!originalImage) {
       toast.error("Original image not found for duplication.");
       return;
     }
     
+    // Get the actual generation_id (generations.id, not shot_generations.id)
+    // originalImage.id is now shot_generations.id, we need generation_id
+    const generationId = (originalImage as any).generation_id || originalImage.id;
+    
     // Additional guard: Check if the generation ID is also temporary
-    const generationId = originalImage.id;
     if (generationId.startsWith('temp-')) {
       console.warn('[DUPLICATE:useGenerationActions] ⚠️ Generation ID is temporary, ignoring', {
         generationId
@@ -424,7 +431,8 @@ export const useGenerationActions = ({
     
     console.log('[DUPLICATE_DEBUG] 📍 FOUND ORIGINAL IMAGE:', {
       shotImageEntryId: shotImageEntryId.substring(0, 8),
-      generationId: generationId.substring(0, 8),
+      shotGenerationsId: originalImage.id?.substring(0, 8),
+      generationId: generationId?.substring(0, 8),
       timeline_frame_from_button: timeline_frame,
       timeline_frame_from_image: (originalImage as any).timeline_frame,
       imageUrl: originalImage.imageUrl?.substring(0, 50) + '...',
@@ -457,9 +465,8 @@ export const useGenerationActions = ({
       .filter(img => (img as any).timeline_frame !== undefined && (img as any).timeline_frame !== null)
       .sort((a, b) => ((a as any).timeline_frame ?? 0) - ((b as any).timeline_frame ?? 0));
     
-    const currentIndex = sortedImages.findIndex(img => 
-      (img.shotImageEntryId ?? img.id) === shotImageEntryId
-    );
+    // Find by id (shot_generations.id)
+    const currentIndex = sortedImages.findIndex(img => img.id === shotImageEntryId);
     
     const nextImage = currentIndex >= 0 && currentIndex < sortedImages.length - 1 
       ? sortedImages[currentIndex + 1] 
@@ -616,8 +623,10 @@ export const useGenerationActions = ({
       }
 
       // 6. Refresh the shot data
-      // Positions are already correct, this just syncs the UI
-      await onShotImagesUpdate();
+      // REMOVED: Don't force refetch here. useAddImageToShot now handles cache updates correctly.
+      // Calling refetch here causes a race condition where stale data from the server
+      // overwrites the correct optimistic data in the cache, causing the image to disappear.
+      // await onShotImagesUpdate();
       
       console.log('[TimelineDrop] ✅ Drop complete');
       
@@ -654,8 +663,9 @@ export const useGenerationActions = ({
       generationId: generationId?.substring(0, 8),
       targetFrame,
       targetFrameProvided: targetFrame !== undefined,
-      shotId: selectedShot?.id,
-      projectId
+      shotId: selectedShot?.id?.substring(0, 8),
+      projectId: projectId?.substring(0, 8),
+      note: 'This should CREATE A NEW shot_generations record, not move an existing one'
     });
 
     if (!selectedShot?.id || !projectId) {
@@ -682,11 +692,8 @@ export const useGenerationActions = ({
         project_id: projectId
       });
       
-      console.log('[GenerationDrop] ✅ Generation added successfully, refreshing shot data...');
-      
-      // Refresh shot data
-      await onShotImagesUpdate();
-      
+      // Note: Don't call onShotImagesUpdate() here - the mutation's onSuccess 
+      // already invalidates the cache, and calling refresh causes double-refresh flicker
       console.log('[GenerationDrop] ✅ handleTimelineGenerationDrop complete');
     } catch (error) {
       console.error('[GenerationDrop] ❌ Error adding generation to timeline:', error);
@@ -779,7 +786,8 @@ export const useGenerationActions = ({
       }
 
       // 6. Refresh shot data
-      await onShotImagesUpdate();
+      // REMOVED: Don't force refetch here. See handleTimelineImageDrop for details.
+      // await onShotImagesUpdate();
       
       console.log('[BatchDrop] ✅ Drop complete');
       
@@ -835,11 +843,8 @@ export const useGenerationActions = ({
         timelineFrame: framePosition ?? targetPosition, // Prefer framePosition, fall back to targetPosition
       });
       
-      console.log('[BatchDrop] ✅ Generation added successfully, refreshing shot data...');
-      
-      // Refresh shot data
-      await onShotImagesUpdate();
-      
+      // Note: Don't call onShotImagesUpdate() here - the mutation's onSuccess 
+      // already invalidates the cache, and calling refresh causes double-refresh flicker
       console.log('[BatchDrop] ✅ handleBatchGenerationDrop complete');
     } catch (error) {
       console.error('[BatchDrop] ❌ Error adding generation to batch:', error);

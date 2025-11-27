@@ -8,6 +8,7 @@ import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
 import { PhaseConfig } from '../../../settings';
+import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
 
 export interface GenerateVideoParams {
   // Core IDs
@@ -211,19 +212,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
 
     // Filter and process exactly like simpleFilteredImages does
     // IMPORTANT: Now prioritizes upscaled_url when available
+    // Uses canonical isVideoShotGenerations from typeGuards
     const freshImages = (freshShotGenerations || [])
-      .filter(sg => {
-        // Has valid timeline frame
-        const hasTimelineFrame = sg.timeline_frame !== null && sg.timeline_frame !== undefined;
-        if (!hasTimelineFrame) return false;
-        
-        // Not a video
-        const gen = sg.generations as any;
-        const isVideo = gen?.type === 'video' ||
-                       gen?.type === 'video_travel_output' ||
-                       (gen?.location && gen.location.endsWith('.mp4'));
-        return !isVideo;
-      })
+      .filter(sg => sg.timeline_frame != null && !isVideoShotGenerations(sg as ShotGenerationsLike))
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
       .map(sg => {
         const gen = sg.generations as any;
@@ -307,17 +298,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         // Build sorted positions from timeline_frame data
         // CRITICAL: Filter out videos to match absoluteImageUrls filtering
         // MUST match the UI filtering logic exactly (only filter videos, NOT timeline_frame)
-        const filteredShotGenerations = shotGenerationsData.filter(sg => {
-          // Must have a generation
-          if (!sg.generations) return false;
-          
-          // Not a video - must match the filtering logic used for absoluteImageUrls above AND the UI
-          const gen = sg.generations as any;
-          const isVideo = gen?.type === 'video' ||
-                         gen?.type === 'video_travel_output' ||
-                         (gen?.location && gen.location.endsWith('.mp4'));
-          return !isVideo;
-        });
+        // Uses canonical isVideoShotGenerations from typeGuards
+        const filteredShotGenerations = shotGenerationsData.filter(sg => 
+          sg.generations && !isVideoShotGenerations(sg as ShotGenerationsLike)
+        );
 
         console.log('[BasePromptsDebug] After filtering out videos:', filteredShotGenerations.length);
         console.log('[BasePromptsDebug] Filtered records:', filteredShotGenerations.map((sg, i) => ({
@@ -519,14 +503,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         console.log('[BasePromptsDebug] Total records from DB:', shotGenerationsData.length);
         
         // Filter to get only images (same logic as timeline mode)
-        const filteredShotGenerations = shotGenerationsData.filter(sg => {
-          if (!sg.generations) return false;
-          const gen = sg.generations as any;
-          const isVideo = gen?.type === 'video' ||
-                         gen?.type === 'video_travel_output' ||
-                         (gen?.location && gen.location.endsWith('.mp4'));
-          return !isVideo;
-        });
+        // Uses canonical isVideoShotGenerations from typeGuards
+        const filteredShotGenerations = shotGenerationsData.filter(sg => 
+          sg.generations && !isVideoShotGenerations(sg as ShotGenerationsLike)
+        );
         
         console.log('[BasePromptsDebug] After filtering out videos:', filteredShotGenerations.length);
         console.log('[BasePromptsDebug] Filtered records:', filteredShotGenerations.map((sg, i) => ({

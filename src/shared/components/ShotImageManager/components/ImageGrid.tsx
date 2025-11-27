@@ -59,7 +59,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
 }) => {
   console.log('[DataTrace] 🖼️  ImageGrid rendering:', {
     imagesCount: images.length,
-    imageIds: images.map(img => ((img as any).shotImageEntryId ?? (img as any).id)?.substring(0, 8)),
+    imageIds: images.map(img => img.id?.substring(0, 8)), // shot_generations.id
   });
   
   console.log('[PairIndicatorDebug] ImageGrid render:', {
@@ -84,7 +84,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
       }}
     >
       {images.map((image, index) => {
-        const imageKey = ((image as any).shotImageEntryId ?? (image as any).id) as string;
+        // imageKey is shot_generations.id - unique per entry
+        const imageKey = image.id as string;
         const desktopSelected = selectedIds.includes(imageKey);
         // Use actual timeline_frame for duplication (not calculated from index)
         // The calculated frameNumber is only for display purposes
@@ -113,7 +114,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
               onClick={isMobile ? undefined : (e) => {
                 onItemClick(imageKey, e);
               }}
-              onDelete={() => onDelete(image.shotImageEntryId ?? image.id)}
+              onDelete={() => onDelete(image.id)}
               onDuplicate={onDuplicate}
               timeline_frame={actualTimelineFrame ?? displayFrameNumber}
               onDoubleClick={isMobile ? () => {} : () => onItemDoubleClick(index)}
@@ -141,13 +142,13 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                       startFrame: index * batchVideoFrames,
                       endFrame: (index + 1) * batchVideoFrames,
                       startImage: startImage ? {
-                        id: (startImage as any).shotImageEntryId,
+                        id: startImage.id, // shot_generations.id
                         url: startImage.imageUrl || startImage.location,
                         thumbUrl: startImage.thumbUrl,
                         position: index + 1
                       } : null,
                       endImage: endImage ? {
-                        id: (endImage as any).shotImageEntryId,
+                        id: endImage.id, // shot_generations.id
                         url: endImage.imageUrl || endImage.location,
                         thumbUrl: endImage.thumbUrl,
                         position: index + 2

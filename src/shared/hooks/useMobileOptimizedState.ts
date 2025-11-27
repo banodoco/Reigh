@@ -208,8 +208,9 @@ export const useMobileOptimizedOptimisticState = <T>(
       }
       
       // Compare states to see if they match
-      const optimisticIds = optimisticState.map((item: any) => item.id || item.shotImageEntryId).join(',');
-      const serverIds = serverState.map((item: any) => item.id || item.shotImageEntryId).join(',');
+      // item.id is shot_generations.id - unique per entry
+      const optimisticIds = optimisticState.map((item: any) => item.id).join(',');
+      const serverIds = serverState.map((item: any) => item.id).join(',');
       
       if (optimisticIds === serverIds) {
         console.log('[MobileOptimizedOptimistic] Server caught up with optimistic state');

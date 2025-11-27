@@ -138,8 +138,9 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   React.useEffect(() => {
     if (isOptimisticUpdate && images && images.length > 0) {
       // Check if server state matches optimistic state
-      const optimisticIds = optimisticOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id).join(',');
-      const serverIds = images.map(img => (img as any).shotImageEntryId ?? (img as any).id).join(',');
+      // img.id is shot_generations.id - unique per entry
+      const optimisticIds = optimisticOrder.map(img => img.id).join(',');
+      const serverIds = images.map(img => img.id).join(',');
       
       if (optimisticIds === serverIds) {
         setIsOptimisticUpdate(false);
@@ -237,9 +238,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
 
     try {
       // Get the selected images and their current indices
+      // img.id is shot_generations.id - unique per entry
       const selectedItems = mobileSelectedIds.map(id => {
-        const image = currentImages.find(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
-        const index = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
+        const image = currentImages.find(img => img.id === id);
+        const index = currentImages.findIndex(img => img.id === id);
         return { id, image, currentIndex: index };
       }).filter(item => item.image && item.currentIndex !== -1);
 
@@ -247,11 +249,11 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
         return;
       }
 
-      // Safety check: Ensure all images have shotImageEntryId (Phase 2 complete)
-      const hasMissingIds = currentImages.some(img => !(img as any).shotImageEntryId);
+      // Safety check: Ensure all images have id
+      const hasMissingIds = currentImages.some(img => !img.id);
       if (hasMissingIds) {
-        const missingCount = currentImages.filter(img => !(img as any).shotImageEntryId).length;
-        console.warn('[MobileReorder] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Cannot reorder yet.', {
+        const missingCount = currentImages.filter(img => !img.id).length;
+        console.warn('[MobileReorder] ⚠️  Some images missing id. Cannot reorder yet.', {
           totalImages: currentImages.length,
           missingIds: missingCount
         });
@@ -280,7 +282,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       });
 
       // Create ordered IDs array for the unified system (safe now - checked above)
-      const orderedIds = newOrder.map(img => (img as any).shotImageEntryId);
+      const orderedIds = newOrder.map(img => img.id);
 
       // 1. Apply optimistic update immediately for instant visual feedback
       setReconciliationId(prev => prev + 1);
@@ -309,10 +311,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Batch delete handler
   const performBatchDelete = useCallback(async (idsToDelete: string[]) => {
     // Filter out IDs that don't correspond to actual shotImageEntryIds
-    // This handles Phase 1 loading where shotImageEntryId might be null
+    // Filter to valid IDs only
     const validIds = idsToDelete.filter(id => {
-      const img = currentImages.find(i => ((i as any).shotImageEntryId ?? (i as any).id) === id);
-      return img && (img as any).shotImageEntryId;
+      const img = currentImages.find(i => i.id === id);
+      return img && img.id;
     });
     
     if (validIds.length < idsToDelete.length) {
@@ -352,7 +354,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     if (mobileSelectedIds.length === 0) return false;
     
     const selectedIndices = mobileSelectedIds
-      .map(id => currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id))
+      .map(id => currentImages.findIndex(img => img.id === id))
       .filter(idx => idx !== -1)
       .sort((a, b) => a - b);
     
@@ -393,7 +395,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     <>
       <div className={cn("grid gap-3", mobileGridColsClass)}>
         {currentImages.map((image, index) => {
-          const imageKey = (image as any).shotImageEntryId ?? (image as any).id;
+          // imageKey is shot_generations.id - unique per entry
+          const imageKey = image.id;
           const isSelected = mobileSelectedIds.includes(imageKey as string);
           const isLastItem = index === currentImages.length - 1;
           
@@ -442,13 +445,13 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                           startFrame: (index - 1) * batchVideoFrames,
                           endFrame: index * batchVideoFrames,
                           startImage: prevStartImage ? {
-                            id: (prevStartImage as any).shotImageEntryId,
+                            id: prevStartImage.id, // shot_generations.id
                             url: prevStartImage.imageUrl || prevStartImage.location,
                             thumbUrl: prevStartImage.thumbUrl,
                             position: index
                           } : null,
                           endImage: prevEndImage ? {
-                            id: (prevEndImage as any).shotImageEntryId,
+                            id: prevEndImage.id, // shot_generations.id
                             url: prevEndImage.imageUrl || prevEndImage.location,
                             thumbUrl: prevEndImage.thumbUrl,
                             position: index + 1
@@ -469,7 +472,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   isSelected={isSelected}
                   index={index}
                   onMobileTap={() => handleMobileTap(imageKey as string, index)}
-                  onDelete={(image as any).shotImageEntryId ? () => handleIndividualDelete((image as any).shotImageEntryId) : undefined}
+                  onDelete={image.id ? () => handleIndividualDelete(image.id) : undefined}
                   onDuplicate={onImageDuplicate}
                   onOpenLightbox={onOpenLightbox ? () => onOpenLightbox(index) : undefined}
                   onInpaintClick={onInpaintClick ? () => onInpaintClick(index) : undefined}
@@ -536,13 +539,13 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                           startFrame: index * batchVideoFrames,
                           endFrame: (index + 1) * batchVideoFrames,
                           startImage: startImage ? {
-                            id: (startImage as any).shotImageEntryId,
+                            id: startImage.id, // shot_generations.id
                             url: startImage.imageUrl || startImage.location,
                             thumbUrl: startImage.thumbUrl,
                             position: index + 1
                           } : null,
                           endImage: endImage ? {
-                            id: (endImage as any).shotImageEntryId,
+                            id: endImage.id, // shot_generations.id
                             url: endImage.imageUrl || endImage.location,
                             thumbUrl: endImage.thumbUrl,
                             position: index + 2

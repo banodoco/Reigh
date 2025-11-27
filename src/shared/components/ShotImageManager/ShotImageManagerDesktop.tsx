@@ -94,7 +94,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
         onDragEnd={dragAndDrop.handleDragEnd}
       >
         <SortableContext
-          items={lightbox.currentImages.map((img: any) => img.shotImageEntryId ?? img.id)}
+          items={lightbox.currentImages.map((img: any) => img.id)}
           strategy={rectSortingStrategy}
         >
           <ImageGrid
@@ -233,25 +233,24 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
                   lightboxIndex: lightbox.lightboxIndex,
                   mediaIdFromCallback: mediaId?.substring(0, 8),
                   currentImage: {
-                    id: currentImage.id?.substring(0, 8),
-                    shotImageEntryId: currentImage.shotImageEntryId?.substring(0, 8),
-                    generation_id: (currentImage as any).generation_id?.substring(0, 8),
+                    id: currentImage.id?.substring(0, 8), // shot_generations.id
+                    generation_id: currentImage.generation_id?.substring(0, 8),
                     type: currentImage.type,
                     hasImageUrl: !!currentImage.imageUrl,
                     timeline_frame: (currentImage as any).timeline_frame
                   },
-                  willCallWith: currentImage.shotImageEntryId?.substring(0, 8),
+                  willCallWith: currentImage.id?.substring(0, 8), // shot_generations.id
                   timestamp: Date.now()
                 });
-                // Use shotImageEntryId for deletion to target the specific shot_generations entry
-                if (!currentImage.shotImageEntryId) {
-                  console.error('[DELETE:ShotImageManager] ❌ Missing shotImageEntryId!', {
+                // Use id (shot_generations.id) for deletion to target the specific entry
+                if (!currentImage.id) {
+                  console.error('[DELETE:ShotImageManager] ❌ Missing id!', {
                     currentImage,
                     allKeys: Object.keys(currentImage)
                   });
                   return;
                 }
-                props.onImageDelete(currentImage.shotImageEntryId);
+                props.onImageDelete(currentImage.id);
               } : undefined}
               onImageSaved={props.onImageSaved ? async (newImageUrl: string, createNew?: boolean) =>
                 await props.onImageSaved!(lightbox.currentImages[lightbox.lightboxIndex].id, newImageUrl, createNew) : undefined}

@@ -51,6 +51,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Label } from "@/shared/components/ui/label";
 import { Image, Upload } from "lucide-react";
 import { transformForTimeline, type RawShotGeneration } from "@/shared/lib/generationTransformers";
+import { isVideoGeneration } from "@/shared/lib/typeGuards";
 import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { deriveInputImages } from "@/shared/components/ImageGallery/utils";
@@ -209,6 +210,25 @@ const Timeline: React.FC<TimelineProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot
 }) => {
+  // [ZoomDebug] Track Timeline mounts to detect unwanted remounts
+  const timelineMountRef = React.useRef(0);
+  React.useEffect(() => {
+    timelineMountRef.current++;
+    console.log('[ZoomDebug] 🟢 Timeline MOUNTED:', {
+      mountCount: timelineMountRef.current,
+      shotId: shotId?.substring(0, 8),
+      propImagesCount: propImages?.length || 0,
+      timestamp: Date.now()
+    });
+    return () => {
+      console.log('[ZoomDebug] 🟢 Timeline UNMOUNTING:', {
+        mountCount: timelineMountRef.current,
+        shotId: shotId?.substring(0, 8),
+        timestamp: Date.now()
+      });
+    };
+  }, []);
+
   // [ShotNavPerf] Track Timeline component renders and image count - ONLY ON CHANGE
   const timelineRenderCount = React.useRef(0);
   timelineRenderCount.current += 1;
@@ -317,14 +337,8 @@ const Timeline: React.FC<TimelineProps> = ({
     }
     
     // CRITICAL: Filter out videos - they should never appear on timeline
-    // This uses the same detection logic as ShotEditor and ShotsPane
-    result = result.filter(img => {
-      const isVideo = img.type === 'video' ||
-                     img.type === 'video_travel_output' ||
-                     (img.location && img.location.endsWith('.mp4')) ||
-                     (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-      return !isVideo;
-    });
+    // Uses canonical isVideoGeneration from typeGuards
+    result = result.filter(img => !isVideoGeneration(img));
 
     // [TimelineVisibility] Log images array changes
     console.log(`[TimelineVisibility] 📸 IMAGES ARRAY COMPUTED:`, {
@@ -333,7 +347,8 @@ const Timeline: React.FC<TimelineProps> = ({
       totalImages: result.length,
       shotGenerationsCount: shotGenerations.length,
       images: result.map(img => ({
-        id: (img.shotImageEntryId ?? img.id)?.substring(0, 8),
+        id: img.id?.substring(0, 8), // shot_generations.id
+        generation_id: img.generation_id?.substring(0, 8),
         timeline_frame: img.timeline_frame,
         hasImageUrl: !!img.imageUrl
       })),
@@ -347,12 +362,14 @@ const Timeline: React.FC<TimelineProps> = ({
       totalImages: result.length,
       dataSource: propImages ? 'propImages' : 'shotGenerations',
       position0Images: position0Images.map(img => ({
-        id: img.shotImageEntryId?.substring(0, 8) || img.id?.substring(0, 8),
+        id: img.id?.substring(0, 8), // shot_generations.id
+        generation_id: img.generation_id?.substring(0, 8),
         timeline_frame: img.timeline_frame,
         hasImageUrl: !!img.imageUrl
       })),
       allImages: result.map(img => ({
-        id: img.shotImageEntryId?.substring(0, 8) || img.id?.substring(0, 8),
+        id: img.id?.substring(0, 8), // shot_generations.id
+        generation_id: img.generation_id?.substring(0, 8),
         timeline_frame: img.timeline_frame,
         hasImageUrl: !!img.imageUrl
       })).sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0)),
@@ -526,8 +543,9 @@ const Timeline: React.FC<TimelineProps> = ({
   const { isTabletOrLarger } = useDeviceDetection();
 
   // Fetch task ID mapping from unified cache
+  // Uses generation_id (the actual generation record) not id (shot_generations entry)
   const { data: taskMapping } = useTaskFromUnifiedCache(
-    currentLightboxImage?.id || null
+    currentLightboxImage?.generation_id || null
   );
 
   // Extract taskId and convert from Json to string
@@ -621,7 +639,8 @@ const Timeline: React.FC<TimelineProps> = ({
     // Then set the positions with the specified gap
     const newPositions = new Map<string, number>();
     images.forEach((image, index) => {
-      newPositions.set(image.shotImageEntryId, index * gap);
+      // Use id (shot_generations.id) for position mapping - unique per entry
+      newPositions.set(image.id, index * gap);
     });
 
     await setFramePositions(newPositions);
@@ -871,10 +890,11 @@ const Timeline: React.FC<TimelineProps> = ({
             onDelete={!readOnly ? (mediaId: string) => {
               console.log('[Timeline] Delete from lightbox', {
                 mediaId,
-                shotImageEntryId: currentLightboxImage.shotImageEntryId
+                id: currentLightboxImage.id, // shot_generations.id - unique per entry
+                generation_id: currentLightboxImage.generation_id
               });
-              // Use shotImageEntryId for deletion to target the specific shot_generations entry
-              onImageDelete(currentLightboxImage.shotImageEntryId);
+              // Use id (shot_generations.id) for deletion to target the specific entry
+              onImageDelete(currentLightboxImage.id);
             } : undefined}
             onImageSaved={async (newUrl: string, createNew?: boolean) => {
               console.log('[ImageFlipDebug] [Timeline] MediaLightbox onImageSaved called', {

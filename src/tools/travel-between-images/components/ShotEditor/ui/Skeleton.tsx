@@ -3,6 +3,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { CardHeader, CardTitle, CardContent } from '@/shared/components/ui/card';
 import { GenerationRow } from '@/types/shots';
 import { Image } from 'lucide-react';
+import { isVideoGeneration } from '@/shared/lib/typeGuards';
 
 interface ImageManagerSkeletonProps {
   isMobile: boolean;
@@ -24,13 +25,9 @@ export const ImageManagerSkeleton: React.FC<ImageManagerSkeletonProps> = ({
     let unpositionedFiltered = 0;
     
     // Single pass through the array for efficiency
+    // Uses canonical isVideoGeneration from typeGuards
     shotImages.forEach(img => {
-      const isVideo = img.type === 'video' ||
-                     img.type === 'video_travel_output' ||
-                     (img.location && img.location.endsWith('.mp4')) ||
-                     (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-      
-      if (isVideo) {
+      if (isVideoGeneration(img)) {
         videosFiltered++;
       } else {
         const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;

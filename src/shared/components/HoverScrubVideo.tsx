@@ -114,6 +114,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   const isHoveringRef = useRef(false);
   // Track whether a play was explicitly initiated by the user
   const userInitiatedPlayRef = useRef(false);
+  // Track the last mouse X position for re-calculating scrubber when metadata loads
+  const lastMouseXRef = useRef<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [duration, setDuration] = useState(0);
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
@@ -210,8 +212,14 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
+    // Store the mouse X position even if duration is 0, so we can calculate scrubber when metadata loads
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      lastMouseXRef.current = e.clientX - rect.left;
+    }
+
     if (duration === 0) {
-      console.log('[SegmentCardPopulation] Duration is 0, skipping scrubbing');
+      console.log('[SegmentCardPopulation] Duration is 0, skipping scrubbing (mouse position stored for later)');
       return;
     }
     
@@ -223,6 +231,10 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
 
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
+    
+    // Store the mouse X position for re-calculating when metadata loads
+    lastMouseXRef.current = mouseX;
+    
     const progress = Math.max(0, Math.min(1, mouseX / rect.width));
     const targetTime = progress * duration;
 
@@ -326,6 +338,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     }
     
     isHoveringRef.current = false;
+    lastMouseXRef.current = null; // Clear stored mouse position
     setScrubberPosition(null); // Hide scrubber
     setScrubberVisible(true); // Reset visibility for next hover
     if (mouseMoveTimeoutRef.current) {
@@ -354,6 +367,8 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         videoPaused: videoRef.current.paused,
         videoReadyState: videoRef.current.readyState,
         disableScrubbing,
+        isHovering: isHoveringRef.current,
+        lastMouseX: lastMouseXRef.current,
         timestamp: Date.now()
       });
       
@@ -368,8 +383,34 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
 
-      setDuration(videoRef.current.duration);
-      console.log('[SegmentCardPopulation] Duration set to:', videoRef.current.duration);
+      const newDuration = videoRef.current.duration;
+      setDuration(newDuration);
+      console.log('[SegmentCardPopulation] Duration set to:', newDuration);
+      
+      // FIX: Recalculate scrubber position if user was hovering while metadata was loading
+      // This fixes the issue where the scrubber doesn't appear on first hover of the first video
+      if (!isMobile && !disableScrubbing && !thumbnailMode && isHoveringRef.current && lastMouseXRef.current !== null && containerRef.current && newDuration > 0) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const progress = Math.max(0, Math.min(1, lastMouseXRef.current / rect.width));
+        const targetTime = progress * newDuration;
+        
+        console.log('[ScrubberFix] Recalculating scrubber after metadata loaded while hovering', {
+          src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
+          progress,
+          targetTime,
+          newDuration,
+          timestamp: Date.now()
+        });
+        
+        setScrubberPosition(progress * 100);
+        setScrubberVisible(true);
+        
+        // Also seek to the position
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = targetTime;
+        }
+      }
       
       // Ensure video is paused first to prevent autoplay
       if (!videoRef.current.paused) {

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
+import { isVideoAny } from '@/shared/lib/typeGuards';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
@@ -255,9 +256,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return null;
   }
 
-  // Derived values
-  // FIX: Check media.url for .mp4 extension since that's the actual field name
-  const isVideo = media.type === 'video' || media.type === 'video_travel_output' || (media as any).url?.endsWith('.mp4') || media.location?.endsWith('.mp4');
+  // Derived values - uses canonical isVideoAny from typeGuards
+  const isVideo = isVideoAny(media as any);
   
   // ========================================
   // ALL HOOKS - Business logic extracted

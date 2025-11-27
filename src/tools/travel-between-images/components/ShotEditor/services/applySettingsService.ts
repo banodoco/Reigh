@@ -860,8 +860,9 @@ export const applyFramePositionsToExistingImages = async (
   try {
     // Update timeline_frame for each image
     const updates = simpleFilteredImages.map(async (img, index) => {
-      if (!img.shotImageEntryId) {
-        console.warn('[ApplySettings] ⚠️  Skipping image without shotImageEntryId:', index);
+      // img.id is the shot_generations.id
+      if (!img.id) {
+        console.warn('[ApplySettings] ⚠️  Skipping image without id:', index);
         return null;
       }
       
@@ -872,7 +873,7 @@ export const applyFramePositionsToExistingImages = async (
       
       console.log('[ApplySettings] 🎯 Updating timeline_frame:', {
         index,
-        shotImageEntryId: img.shotImageEntryId.substring(0, 8),
+        id: img.id.substring(0, 8), // shot_generations.id
         oldTimelineFrame: img.timeline_frame,
         newTimelineFrame,
         source: index < cumulativePositions.length ? 'cumulative position' : 'extrapolated'
@@ -881,14 +882,14 @@ export const applyFramePositionsToExistingImages = async (
       const { error } = await supabase
         .from('shot_generations')
         .update({ timeline_frame: newTimelineFrame })
-        .eq('id', img.shotImageEntryId);
+        .eq('id', img.id); // img.id is shot_generations.id
       
       if (error) {
         console.error('[ApplySettings] ❌ Failed to update timeline_frame:', error);
         return null;
       }
       
-      return { shotImageEntryId: img.shotImageEntryId, newTimelineFrame };
+      return { id: img.id, newTimelineFrame };
     });
     
     const results = await Promise.all(updates);
@@ -946,8 +947,8 @@ export const replaceImagesIfRequested = async (
   });
   
   try {
-    // Remove existing non-video images (only those with shotImageEntryId)
-    const imagesToDelete = simpleFilteredImages.filter(img => !!img.shotImageEntryId);
+    // Remove existing non-video images (only those with id)
+    const imagesToDelete = simpleFilteredImages.filter(img => !!img.id);
     console.log('[ApplySettings] 🗑️  Removing existing images:', {
       count: imagesToDelete.length,
       totalImages: simpleFilteredImages.length,
@@ -960,7 +961,7 @@ export const replaceImagesIfRequested = async (
     
     const deletions = imagesToDelete.map(img => removeImageFromShotMutation.mutateAsync({
       shot_id: selectedShot.id,
-      shotImageEntryId: img.shotImageEntryId!, // Safe now - filtered above
+      shotImageEntryId: img.id!, // img.id is shot_generations.id - Safe now, filtered above
       project_id: projectId,
     }));
     

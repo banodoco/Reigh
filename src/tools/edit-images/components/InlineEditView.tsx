@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { GenerationRow } from '@/types/shots';
+import { isVideoAny } from '@/shared/lib/typeGuards';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
@@ -50,7 +51,8 @@ export function InlineEditView({ media, onClose, onImageSaved, onNavigateToGener
 
   if (!media) return null;
 
-  const isVideo = media.type === 'video' || media.type === 'video_travel_output' || (media as any).url?.endsWith('.mp4') || media.location?.endsWith('.mp4');
+  // Uses canonical isVideoAny from typeGuards
+  const isVideo = isVideoAny(media as any);
   
   const upscaleHook = useUpscale({ media, selectedProjectId, isVideo });
   const { 

@@ -63,7 +63,8 @@ export const transformUnifiedGenerationsData = (items: any[]): GenerationRow[] =
     type: item.isVideo ? 'video_travel_output' : 'single_image',
     created_at: item.createdAt,
     metadata: item.metadata,
-    shotImageEntryId: item.shotImageEntryId,
+    // Deprecated (backwards compat) - use item.id instead
+    shotImageEntryId: item.id,
     position: item.position,
     name: item.name, // Include variant name
     starred: item.starred ?? false, // 🌟 Preserve starred state from cache

@@ -177,6 +177,25 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   autoCreateIndividualPrompts,
   hasNoImages = false
 }) => {
+  // [ZoomDebug] Track component mounts to detect unwanted remounts
+  const mountCountRef = useRef(0);
+  useEffect(() => {
+    mountCountRef.current++;
+    console.log('[ZoomDebug] 🔴 TimelineContainer MOUNTED:', {
+      mountCount: mountCountRef.current,
+      shotId: shotId?.substring(0, 8),
+      imageCount: images.length,
+      timestamp: Date.now()
+    });
+    return () => {
+      console.log('[ZoomDebug] 🔴 TimelineContainer UNMOUNTING:', {
+        mountCount: mountCountRef.current,
+        shotId: shotId?.substring(0, 8),
+        timestamp: Date.now()
+      });
+    };
+  }, []);
+  
   // Local state for reset gap
   const [resetGap, setResetGap] = useState<number>(50);
   const maxGap = 81;
@@ -184,9 +203,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Track pending drop frame for skeleton
   const [pendingDropFrame, setPendingDropFrame] = useState<number | null>(null);
   
+  // Track pending duplicate frame for skeleton
+  const [pendingDuplicateFrame, setPendingDuplicateFrame] = useState<number | null>(null);
+  
   // Track internal generation drop processing state
   const [isInternalDropProcessing, setIsInternalDropProcessing] = useState(false);
-
+  
   // Clear pending frame when upload finishes
   useEffect(() => {
     // Only clear if we're not processing an internal drop
@@ -194,6 +216,26 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       setPendingDropFrame(null);
     }
   }, [isUploadingImage, isInternalDropProcessing]);
+  
+  // Clear pending duplicate frame when the new item appears
+  useEffect(() => {
+    if (pendingDuplicateFrame !== null) {
+      const hasImageAtFrame = images.some(img => img.timeline_frame === pendingDuplicateFrame);
+      if (hasImageAtFrame) {
+        setPendingDuplicateFrame(null);
+      }
+    }
+  }, [images, pendingDuplicateFrame]);
+
+  // Safety timeout for pending duplicate frame
+  useEffect(() => {
+    if (pendingDuplicateFrame !== null) {
+      const timer = setTimeout(() => {
+        setPendingDuplicateFrame(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingDuplicateFrame]);
 
   // Wrap onImageDrop to intercept targetFrame
   const handleImageDropInterceptor = React.useCallback(async (files: File[], targetFrame?: number) => {
@@ -231,6 +273,43 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     }
   }, [onGenerationDrop]);
   
+  // Wrap onImageDuplicate to show skeleton at the target frame
+  const handleDuplicateInterceptor = React.useCallback((imageId: string, timeline_frame: number) => {
+    // Calculate where the duplicate will appear (midpoint between this frame and next)
+    // Find the next image's frame
+    const sortedImages = [...images]
+      .filter(img => img.timeline_frame !== undefined && img.timeline_frame !== null)
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
+    
+    const currentIndex = sortedImages.findIndex(img => img.timeline_frame === timeline_frame);
+    const nextImage = currentIndex >= 0 && currentIndex < sortedImages.length - 1 
+      ? sortedImages[currentIndex + 1] 
+      : null;
+    
+    // Calculate the target frame for the duplicate
+    // Default gap of 30 frames when duplicating the last/only image
+    const DEFAULT_DUPLICATE_GAP = 30;
+    let duplicateTargetFrame: number;
+    if (nextImage && nextImage.timeline_frame !== undefined) {
+      // Midpoint between current and next
+      duplicateTargetFrame = Math.floor((timeline_frame + nextImage.timeline_frame) / 2);
+    } else {
+      // Last/only image - put duplicate DEFAULT_DUPLICATE_GAP frames after it
+      duplicateTargetFrame = timeline_frame + DEFAULT_DUPLICATE_GAP;
+    }
+    
+    console.log('[PendingDebug] 🦴 Setting pending duplicate skeleton at frame:', {
+      duplicateTargetFrame,
+      currentFullMax: fullMax,
+      willExpandTimeline: duplicateTargetFrame > fullMax,
+      timestamp: Date.now()
+    });
+    setPendingDuplicateFrame(duplicateTargetFrame);
+    
+    // Call the actual duplicate handler
+    onImageDuplicate(imageId, timeline_frame);
+  }, [images, onImageDuplicate]);
+  
   // File input ref for Add Images button
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -267,7 +346,24 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const enableTapToMove = isTablet && !readOnly;
 
   // Calculate coordinate system using proper timeline dimensions
-  const { fullMin, fullMax, fullRange } = getTimelineDimensions(framePositions);
+  // Include pending frames (drop, duplicate) so the ruler updates immediately
+  const { fullMin, fullMax, fullRange } = getTimelineDimensions(
+    framePositions,
+    [pendingDropFrame, pendingDuplicateFrame]
+  );
+  
+  // [PendingDebug] Log when pending frames affect timeline dimensions
+  if (pendingDropFrame !== null || pendingDuplicateFrame !== null) {
+    console.log('[PendingDebug] 📏 Timeline dimensions with pending frames:', {
+      pendingDropFrame,
+      pendingDuplicateFrame,
+      fullMin,
+      fullMax,
+      fullRange,
+      framePositionsCount: framePositions.size,
+      timestamp: Date.now()
+    });
+  }
 
   // Get actual container dimensions for calculations
   const containerRect = containerRef.current?.getBoundingClientRect() || null;
@@ -848,7 +944,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           onDragEnter={handleDragEnter}
           onDragOver={(e) => handleDragOver(e, containerRef)}
           onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
+          onDrop={(e) => handleDrop(e, containerRef)}
         >
         {/* Structure video strip (show if exists) or uploader (only if not readOnly) */}
         {shotId && projectId && onStructureVideoChange && (
@@ -1022,7 +1118,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             const generationStartPercent = (generationStartPixel / containerWidth) * 100;
 
             // CRITICAL: Get the first image in this pair to read its metadata
-            const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
+            // startEntry[0] is the shot_generations.id which matches img.id
+            const startImage = images.find(img => img.id === startEntry?.[0]);
             
             // Read pair prompts from props first, then fallback to metadata
             // Props take precedence when passed (used during batch generation setup)
@@ -1050,9 +1147,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 startFrame={pair.startFrame}
                 endFrame={pair.endFrame}
                 onPairClick={onPairClick ? (pairIndex, pairData) => {
-                  // Get the images for this pair
-                  const startImage = images.find(img => img.shotImageEntryId === startEntry?.[0]);
-                  const endImage = images.find(img => img.shotImageEntryId === endEntry?.[0]);
+                  // Get the images for this pair (by shot_generations.id)
+                  const startImage = images.find(img => img.id === startEntry?.[0]);
+                  const endImage = images.find(img => img.id === endEntry?.[0]);
                   
                   // Calculate actual position numbers (1-based)
                   const startPosition = index + 1; // First image in pair
@@ -1062,14 +1159,14 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                   onPairClick(pairIndex, {
                     ...pairData,
                     startImage: startImage ? {
-                      id: startImage.shotImageEntryId,
+                      id: startImage.id, // shot_generations.id
                       url: startImage.imageUrl || startImage.thumbUrl,
                       thumbUrl: startImage.thumbUrl,
                       timeline_frame: (startImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
                       position: startPosition
                     } : null,
                     endImage: endImage ? {
-                      id: endImage.shotImageEntryId,
+                      id: endImage.id, // shot_generations.id
                       url: endImage.imageUrl || endImage.thumbUrl,
                       thumbUrl: endImage.thumbUrl,
                       timeline_frame: (endImage as GenerationRow & { timeline_frame?: number }).timeline_frame ?? 0,
@@ -1090,10 +1187,69 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             );
           })}
 
+          {/* Single item vertical marker - ensures visual consistency when there's only one item */}
+          {images.length === 1 && currentPositions.size > 0 && (() => {
+            const entry = [...currentPositions.entries()][0];
+            if (!entry) return null;
+            
+            const [id, framePos] = entry;
+            // Use same calculation as getPixel
+            const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+            const pixelPos = TIMELINE_PADDING_OFFSET + ((framePos - fullMin) / fullRange) * effectiveWidth;
+            const leftPercent = (pixelPos / containerWidth) * 100;
+            
+            // Use blue-300 to match the border of the first pair (PairRegion color scheme 0)
+            return (
+              <div
+                className="absolute top-0 bottom-0 w-[2px] bg-blue-300 pointer-events-none z-5"
+                style={{
+                  left: `${leftPercent}%`,
+                  transform: 'translateX(-50%)',
+                }}
+              />
+            );
+          })()}
+
+          {/* Pending item vertical marker - shows immediately when drop/duplicate starts */}
+          {(pendingDropFrame !== null || pendingDuplicateFrame !== null) && (() => {
+            const pendingFrame = pendingDropFrame ?? pendingDuplicateFrame;
+            if (pendingFrame === null) return null;
+            
+            const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
+            const pixelPos = TIMELINE_PADDING_OFFSET + ((pendingFrame - fullMin) / fullRange) * effectiveWidth;
+            const leftPercent = (pixelPos / containerWidth) * 100;
+            
+            // Use a lighter/dashed style to indicate it's pending
+            // Color matches the next pair color based on current item count
+            const pairColors = ['bg-blue-300', 'bg-emerald-300', 'bg-purple-300', 'bg-orange-300', 'bg-rose-300', 'bg-teal-300'];
+            const colorIndex = images.length % pairColors.length;
+            
+            return (
+              <div
+                className={`absolute top-0 bottom-0 w-[2px] ${pairColors[colorIndex]} pointer-events-none z-5 opacity-60`}
+                style={{
+                  left: `${leftPercent}%`,
+                  transform: 'translateX(-50%)',
+                }}
+              />
+            );
+          })()}
+
           {/* Skeleton for uploading item */}
           {(isUploadingImage || isInternalDropProcessing) && pendingDropFrame !== null && (
             <TimelineSkeletonItem
               framePosition={pendingDropFrame}
+              fullMin={fullMin}
+              fullRange={fullRange}
+              containerWidth={containerWidth}
+              projectAspectRatio={projectAspectRatio}
+            />
+          )}
+          
+          {/* Skeleton for duplicating item */}
+          {pendingDuplicateFrame !== null && (
+            <TimelineSkeletonItem
+              framePosition={pendingDuplicateFrame}
               fullMin={fullMin}
               fullRange={fullRange}
               containerWidth={containerWidth}
@@ -1105,18 +1261,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
           {(() => {
             // [TimelineVisibility] Log what items are about to be rendered
             const itemsWithPositions = images.filter(img => {
-              const imgKey = img.shotImageEntryId ?? img.id;
-              return currentPositions.has(imgKey) || img.timeline_frame !== undefined;
+              // img.id is shot_generations.id - unique per entry
+              return currentPositions.has(img.id) || img.timeline_frame !== undefined;
             });
             const itemsWithoutPositions = images.filter(img => {
-              const imgKey = img.shotImageEntryId ?? img.id;
-              return !currentPositions.has(imgKey) && img.timeline_frame === undefined;
+              return !currentPositions.has(img.id) && img.timeline_frame === undefined;
             });
             
             if (itemsWithoutPositions.length > 0) {
               console.log(`[TimelineVisibility] ⏳ SKIPPING ${itemsWithoutPositions.length} items without positions:`, {
                 shotId: shotId.substring(0, 8),
-                skippedIds: itemsWithoutPositions.map(img => (img.shotImageEntryId ?? img.id)?.substring(0, 8)),
+                skippedIds: itemsWithoutPositions.map(img => img.id?.substring(0, 8)),
                 renderingCount: itemsWithPositions.length,
                 timestamp: Date.now()
               });
@@ -1130,7 +1285,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             return null;
           })()}
           {images.map((image, idx) => {
-            const imageKey = image.shotImageEntryId ?? image.id;
+            // imageKey is shot_generations.id - unique per entry
+            const imageKey = image.id;
             
             // KEY FIX: Get position from the positions map ONLY
             // Do NOT fall back to image.timeline_frame as it may be stale or from wrong source
@@ -1183,7 +1339,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 maxAllowedGap={maxAllowedGap}
                 originalFramePos={framePositions.get(imageKey) ?? 0}
                 onDelete={onImageDelete}
-                onDuplicate={onImageDuplicate}
+                onDuplicate={handleDuplicateInterceptor}
                 onInpaintClick={handleInpaintClick ? () => handleInpaintClick(idx) : undefined}
                 duplicatingImageId={duplicatingImageId}
                 duplicateSuccessImageId={duplicateSuccessImageId}

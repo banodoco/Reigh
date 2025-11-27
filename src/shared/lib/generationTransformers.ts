@@ -308,14 +308,20 @@ export function transformForTimeline(
   
   if (!genData) {
     return {
-      id: shotGen.generation_id,
+      // PRIMARY IDs: id = shot_generations.id (unique per entry), generation_id = actual generation
+      id: shotGen.id,
+      generation_id: shotGen.generation_id,
+      // Deprecated (backwards compat)
       shotImageEntryId: shotGen.id,
       timeline_frame: shotGen.timeline_frame ?? undefined,
     };
   }
   
   return {
-    id: shotGen.generation_id,
+    // PRIMARY IDs: id = shot_generations.id (unique per entry), generation_id = actual generation
+    id: shotGen.id,
+    generation_id: shotGen.generation_id,
+    // Deprecated (backwards compat)
     shotImageEntryId: shotGen.id,
     imageUrl: genData.location,
     thumbUrl: genData.location,
@@ -343,7 +349,9 @@ export function transformForUnifiedGenerations(
   
   if (!genData) {
     return {
-      id: shotGen.generation_id,
+      // PRIMARY IDs
+      id: shotGen.id, // shot_generations.id (unique per entry)
+      generation_id: shotGen.generation_id,
       url: '',
       thumbUrl: '',
       prompt: 'No prompt',
@@ -351,6 +359,7 @@ export function transformForUnifiedGenerations(
       createdAt: shotGen.created_at || new Date().toISOString(),
       isVideo: false,
       starred: false,
+      // Deprecated (backwards compat)
       shotImageEntryId: shotGen.id,
       position: normalizePosition(shotGen.timeline_frame),
       taskId: null,
@@ -369,6 +378,10 @@ export function transformForUnifiedGenerations(
   
   return {
     ...baseTransform,
+    // PRIMARY IDs
+    id: shotGen.id, // shot_generations.id (unique per entry)
+    generation_id: shotGen.generation_id,
+    // Deprecated (backwards compat)
     shotImageEntryId: shotGen.id,
     position: normalizePosition(shotGen.timeline_frame),
     taskId,

@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { GenerationRow } from '@/types/shots';
 import type { ShotGeneration, PositionMetadata } from './useEnhancedShotPositions';
+import { isVideoGeneration } from '@/shared/lib/typeGuards';
 
 // Re-export types for convenience
 export type { ShotGeneration, PositionMetadata };
@@ -44,20 +45,14 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
   // Convert GenerationRow[] to ShotGeneration[] format for backward compatibility
   // NOTE: Include both positioned and unpositioned items
   // For unpositioned items, use a sentinel value (-1) instead of null to match type
-  // CRITICAL: Filter out videos at the source level
+  // CRITICAL: Filter out videos at the source level using canonical function
   const shotGenerations: ShotGeneration[] = generations
-    .filter(gen => {
-      // Filter out videos - same logic used throughout the codebase
-      const isVideo = gen.type === 'video' ||
-                     gen.type === 'video_travel_output' ||
-                     (gen.location && gen.location.endsWith('.mp4')) ||
-                     (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
-      return !isVideo;
-    })
+    .filter(gen => !isVideoGeneration(gen))
     .map(gen => ({
-      id: gen.shotImageEntryId || (gen as any).shot_generation_id || '',
+      // gen.id is shot_generations.id, gen.generation_id is the actual generation
+      id: gen.id || '',
       shot_id: shotId || '',
-      generation_id: gen.id,
+      generation_id: gen.generation_id || gen.id,
       timeline_frame: gen.timeline_frame ?? -1, // Use -1 as sentinel for unpositioned
       metadata: (gen as any).metadata as PositionMetadata | undefined,
       generation: {
@@ -141,7 +136,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
 
       // Invalidate all related caches to trigger refetch
       await queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
-      await queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      await queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       await queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
       await queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
       
@@ -372,7 +367,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     await Promise.all(updatePromises);
 
     console.log('[DataTrace] ✅ All distribution updates complete, refetching in background');
-    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
     queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });
@@ -432,7 +427,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     }
 
     // Refetch instead of invalidate to preserve data
-    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
     queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });
@@ -527,7 +522,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
       console.log('[TimelinePositionUtils] All swaps complete, refetching in background');
       
       // Use refetchQueries instead of invalidate to preserve data during sync
-      queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
       queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
       if (projectId) {
         queryClient.refetchQueries({ queryKey: ['shots', projectId] });
@@ -579,7 +574,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
 
     // Refetch instead of invalidate to preserve data
     console.log('[TimelinePositionUtils] All absolute updates complete, refetching in background');
-    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
     queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });
@@ -693,7 +688,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     console.log('[PairPromptFlow] 🔄 Refetching query caches in background...');
 
     // Refetch instead of invalidate
-    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
     queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });
@@ -739,7 +734,7 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
     }
 
     console.log('[PairPromptFlow] ✅ Enhanced prompt cleared, refetching caches...');
-    queryClient.refetchQueries({ queryKey: ['shot-generations-fast', shotId] });
+    queryClient.refetchQueries({ queryKey: ['all-shot-generations', shotId] });
     queryClient.refetchQueries({ queryKey: ['shot-generations-meta', shotId] });
     if (projectId) {
       queryClient.refetchQueries({ queryKey: ['shots', projectId] });

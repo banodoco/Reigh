@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { GenerationRow } from '@/types/shots';
 import { transformForTimeline, type RawShotGeneration } from '@/shared/lib/generationTransformers';
 import { timelineDebugger } from '@/tools/travel-between-images/components/Timeline/utils/timeline-debug';
+import { isVideoGeneration, isVideoShotGeneration, isPositioned, type ShotGenerationLike } from '@/shared/lib/typeGuards';
 
 
 export interface ShotGeneration {
@@ -111,17 +112,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
       // Convert database data to ShotGeneration format and set state
       // CRITICAL: Filter out videos at the source level to prevent them from appearing anywhere
+      // Uses canonical isVideoShotGeneration from typeGuards
       const shotGenerationsData = (data || [])
-        .filter(sg => {
-          const gen = sg.generation as any;
-          if (!gen) return false;
-          
-          // Filter out videos - same logic used throughout the codebase
-          const isVideo = gen.type === 'video' ||
-                         gen.type === 'video_travel_output' ||
-                         (gen.location && gen.location.endsWith('.mp4'));
-          return !isVideo;
-        })
+        .filter(sg => sg.generation && !isVideoShotGeneration(sg as ShotGenerationLike))
         .map(sg => ({
           id: sg.id,
           shot_id: sg.shot_id,
@@ -167,12 +160,14 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         const isUnifiedGenerationsShot = queryKey[0] === 'unified-generations' && queryKey[1] === 'shot' && queryKey[2] === shotId;
         const isShotsProject = queryKey[0] === 'shots' && queryKey.includes(shotId);
         const isShotGenerations = queryKey[0] === 'shot-generations' && queryKey[1] === shotId;
+        const isAllShotGenerations = queryKey[0] === 'all-shot-generations' && queryKey[1] === shotId;
 
         // Block shot-related invalidations during drag operations
         const shouldReload = (
           (isUnifiedGenerationsShot && !isDragInProgress && !isPersistingPositions) ||
           (isShotsProject && !isDragInProgress && !isPersistingPositions) ||
           (isShotGenerations && !isDragInProgress && !isPersistingPositions) || // 🚀 Listen for shot-generations invalidations (e.g., upscale completion)
+          (isAllShotGenerations && !isDragInProgress && !isPersistingPositions) || // 🚀 Listen for all-shot-generations (single query approach)
           (queryKey[0] === 'unpositioned-count' && queryKey[1] === shotId)
         );
 
@@ -234,18 +229,11 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
 
   // Get images sorted by mode (excludes videos like original system)
   const getImagesForMode = useCallback((mode: 'batch' | 'timeline'): GenerationRow[] => {
+    // Transform to GenerationRow, then filter videos using canonical function
     const images = shotGenerations
       .filter(sg => sg.generation)
       .map(sg => transformForTimeline(sg as any as RawShotGeneration))
-      .filter(img => {
-        // EXACT same video detection as original ShotEditor/ShotsPane logic
-        const isVideo = img.type === 'video' ||
-                       img.type === 'video_travel_output' ||
-                       (img.location && img.location.endsWith('.mp4')) ||
-                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-        
-        return !isVideo; // Exclude videos, just like original system
-      });
+      .filter(img => !isVideoGeneration(img));
 
     if (mode === 'timeline') {
       // CRITICAL FIX: For timeline mode, only include items with valid timeline_frame
@@ -256,8 +244,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         // [MagicEditTaskDebug] Log filtering decisions for magic edit generations
         if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
           console.log('[MagicEditTaskDebug] Timeline mode filtering magic edit generation:', {
-            id: img.id?.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
+            id: img.id?.substring(0, 8), // shot_generations.id
+            generation_id: img.generation_id?.substring(0, 8),
             timeline_frame: img.timeline_frame,
             hasTimelineFrame,
             willAppearOnTimeline: hasTimelineFrame,
@@ -283,8 +271,8 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         // [MagicEditTaskDebug] Log filtering decisions for magic edit generations in batch mode
         if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
           console.log('[MagicEditTaskDebug] Batch mode filtering magic edit generation:', {
-            id: img.id?.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
+            id: img.id?.substring(0, 8), // shot_generations.id
+            generation_id: img.generation_id?.substring(0, 8),
             timeline_frame: img.timeline_frame,
             hasTimelineFrame,
             willAppearInBatch: hasTimelineFrame,
@@ -367,7 +355,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
       // IMPORTANT: Also invalidate two-phase cache keys
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
     } catch (err) {
       console.error('[clearEnhancedPromptsForGenerations] Error:', err);
@@ -380,15 +368,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!timelineFrame) return [];
     
     // Sort all generations by timeline_frame, filtering out videos
+    // Uses canonical isVideoShotGeneration from typeGuards
     const sorted = [...shotGenerations]
-      .filter(sg => {
-        if (sg.timeline_frame == null) return false;
-        // Filter out videos - check generation type
-        const isVideo = sg.generation.type === 'video' ||
-                       sg.generation.type === 'video_travel_output' ||
-                       (sg.generation.location && sg.generation.location.endsWith('.mp4'));
-        return !isVideo;
-      })
+      .filter(sg => sg.timeline_frame != null && !isVideoShotGeneration(sg))
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     
     // Find the index of the item with this timeline_frame
@@ -417,13 +399,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     if (!timelineFrame) return null;
     
     const sorted = [...shotGenerations]
-      .filter(sg => {
-        if (sg.timeline_frame == null) return false;
-        const isVideo = sg.generation.type === 'video' ||
-                       sg.generation.type === 'video_travel_output' ||
-                       (sg.generation.location && sg.generation.location.endsWith('.mp4'));
-        return !isVideo;
-      })
+      .filter(sg => sg.timeline_frame != null && !isVideoShotGeneration(sg))
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     
     const index = sorted.findIndex(sg => sg.timeline_frame === timelineFrame);
@@ -777,14 +753,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     const oldTimelineFrame = movedItem?.timeline_frame;
 
     // Get the current order of items (excluding videos)
+    // Uses canonical isVideoShotGeneration from typeGuards
     const oldOrderedItems = shotGenerations
-      .filter(sg => {
-        if (!sg.generation) return false;
-        const isVideo = sg.generation.type === 'video' ||
-                       sg.generation.type === 'video_travel_output' ||
-                       (sg.generation.location && sg.generation.location.endsWith('.mp4'));
-        return !isVideo && sg.timeline_frame !== null && sg.timeline_frame !== undefined;
-      })
+      .filter(sg => sg.generation && !isVideoShotGeneration(sg) && sg.timeline_frame != null)
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     
     const oldIndex = oldOrderedItems.findIndex(sg => sg.id === shotGenerationId);
@@ -825,15 +796,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       let newIndex = -1; // Declare outside for use later
       
       if (updatedGenerations) {
-        // Filter out videos
-        const nonVideoGens = updatedGenerations.filter(sg => {
-          const gen = (sg as any).generation;
-          if (!gen) return false; // Skip if no generation data
-          const isVideo = gen.type === 'video' || 
-                         gen.type === 'video_travel_output' ||
-                         (gen.location && gen.location.endsWith('.mp4'));
-          return !isVideo;
-        });
+        // Filter out videos using canonical function
+        const nonVideoGens = updatedGenerations.filter(sg => 
+          sg.generation && !isVideoShotGeneration(sg as ShotGenerationLike)
+        );
         
         newIndex = nonVideoGens.findIndex(sg => sg.id === shotGenerationId);
         
@@ -868,14 +834,9 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
         // Get the item before the moved item at NEW position
         let newPrevious: string | null = null;
         if (updatedGenerations && newIndex > 0) {
-          const nonVideoGens = updatedGenerations.filter(sg => {
-            const gen = (sg as any).generation;
-            if (!gen) return false; // Skip if no generation data
-            const isVideo = gen.type === 'video' || 
-                           gen.type === 'video_travel_output' ||
-                           (gen.location && gen.location.endsWith('.mp4'));
-            return !isVideo;
-          });
+          const nonVideoGens = updatedGenerations.filter(sg => 
+            sg.generation && !isVideoShotGeneration(sg as ShotGenerationLike)
+          );
           newPrevious = nonVideoGens[newIndex - 1]?.id || null;
           if (newPrevious && newPrevious !== oldPrevious) {
             itemsToClear.push(newPrevious);
@@ -1120,7 +1081,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
       // IMPORTANT: Also invalidate two-phase cache keys
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
       
       console.log('[PairPrompts] ✅ Cache invalidated, all components will see the updated pair prompt');
@@ -1133,20 +1094,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
   // Get pair prompts in Timeline component format as a reactive value
   const pairPrompts = useMemo((): Record<number, { prompt: string; negativePrompt: string }> => {
     // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
-    const filteredGenerations = shotGenerations.filter(sg => {
-      // Must have a generation
-      if (!sg.generation) return false;
-      
-      // CRITICAL: Must have a timeline_frame (positioned on timeline)
-      // This excludes old/unpositioned images from being considered
-      if (sg.timeline_frame == null) return false;
-      
-      // Filter out videos
-      const isVideo = sg.generation.type === 'video' ||
-                     sg.generation.type === 'video_travel_output' ||
-                     (sg.generation.location && sg.generation.location.endsWith('.mp4'));
-      return !isVideo;
-    });
+    // Uses canonical isVideoShotGeneration from typeGuards
+    const filteredGenerations = shotGenerations.filter(sg => 
+      sg.generation && sg.timeline_frame != null && !isVideoShotGeneration(sg)
+    );
 
     // 🎯 PERFORMANCE: Early return if no generations to process
     if (filteredGenerations.length === 0) {
@@ -1215,16 +1166,10 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     
     // CRITICAL: Filter out videos AND unpositioned images to match the timeline display
     // This ensures pair prompt indexes match the visual pairs in the UI
-    const filteredGenerations = (freshShotGens || []).filter(sg => {
-      // Must have a generation
-      if (!sg.generation) return false;
-      
-      // Filter out videos
-      const isVideo = sg.generation.type === 'video' ||
-                     sg.generation.type === 'video_travel_output' ||
-                     (sg.generation.location && sg.generation.location.endsWith('.mp4'));
-      return !isVideo;
-    });
+    // Uses canonical isVideoShotGeneration from typeGuards
+    const filteredGenerations = (freshShotGens || []).filter(sg => 
+      sg.generation && !isVideoShotGeneration(sg)
+    );
 
     console.log(`[PairPrompts-SAVE] 📊 Filtered shotGenerations:`, {
       totalGenerations: freshShotGens?.length || 0,
@@ -1381,7 +1326,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
       // IMPORTANT: Also invalidate two-phase cache keys
-      queryClient.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
     } catch (err) {
       console.error('[PromptClearLog] ❌ CLEAR ALL - Error clearing enhanced prompts:', err);

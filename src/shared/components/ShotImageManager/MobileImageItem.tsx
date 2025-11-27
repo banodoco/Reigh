@@ -89,8 +89,9 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
     }
   };
 
-  const isDuplicating = duplicatingImageId === ((image as any).shotImageEntryId ?? (image as any).id);
-  const showSuccessIcon = duplicateSuccessImageId === ((image as any).shotImageEntryId ?? (image as any).id);
+  // image.id is shot_generations.id - unique per entry
+  const isDuplicating = duplicatingImageId === image.id;
+  const showSuccessIcon = duplicateSuccessImageId === image.id;
 
   return (
     <>
@@ -158,8 +159,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
               className="h-8 w-8 bg-white/75 hover:bg-white/90"
               onClick={(e) => {
                 e.stopPropagation();
-                // Use ?? instead of || to handle timeline_frame=0 correctly
-                onDuplicate((image as any).shotImageEntryId ?? (image as any).id, (image as any).timeline_frame ?? index);
+                // Use id (shot_generations.id) for duplication
+                onDuplicate(image.id, (image as any).timeline_frame ?? index);
               }}
               onTouchEnd={(e) => {
                 e.stopPropagation();

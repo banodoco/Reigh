@@ -45,8 +45,8 @@ export interface ImageGalleryLightboxProps {
   // Optimistic updates
   optimisticPositionedIds?: Set<string>;
   optimisticUnpositionedIds?: Set<string>;
-  onOptimisticPositioned?: (imageId: string) => void;
-  onOptimisticUnpositioned?: (imageId: string) => void;
+  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
 
   // Task details
   isMobile: boolean;

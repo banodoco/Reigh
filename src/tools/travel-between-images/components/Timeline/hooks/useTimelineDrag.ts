@@ -67,6 +67,15 @@ export const useTimelineDrag = ({
     hasMovedPastThreshold: false,
   });
 
+  // New: Track dropping state to freeze positions during sync
+  const [dropState, setDropState] = useState<{
+    isDropping: boolean;
+    frozenPositions: Map<string, number> | null;
+  }>({
+    isDropping: false,
+    frozenPositions: null
+  });
+
   const dragRefsRef = useRef<DragRefs>({
     lastMouseUpTime: 0,
     isBlocked: false,
@@ -154,7 +163,26 @@ export const useTimelineDrag = ({
 
   // Calculate positions during drag for preview
   const calculateDragPreview = useCallback((): Map<string, number> => {
+    // [InternalDragDebug] Log every call to understand the flow
+    console.log('[InternalDragDebug] 🔄 calculateDragPreview called:', {
+      isDropping: dropState.isDropping,
+      hasFrozenPositions: !!dropState.frozenPositions,
+      isDragging: dragState.isDragging,
+      activeId: dragState.activeId?.substring(0, 8),
+      hasMousePos: !!currentMousePosRef.current,
+      hasMovedPastThreshold: dragState.hasMovedPastThreshold,
+      framePositionsCount: framePositions.size,
+      timestamp: Date.now()
+    });
+
+    // 1. If dropping, return the frozen positions to prevent flicker
+    if (dropState.isDropping && dropState.frozenPositions) {
+        console.log('[InternalDragDebug] ❄️ Returning FROZEN positions:', dropState.frozenPositions.size);
+        return dropState.frozenPositions;
+    }
+
     if (!dragState.isDragging || !dragState.activeId || !currentMousePosRef.current || !dragState.hasMovedPastThreshold) {
+      console.log('[InternalDragDebug] 📍 Returning framePositions (not dragging or no movement)');
       return framePositions;
     }
 
@@ -967,127 +995,68 @@ export const useTimelineDrag = ({
 
     // Apply final positions immediately to avoid any momentary fallback to database positions
     (async () => {
-      console.log('[TimelineDragFix] 🚀 SETFRAMEPOSITIONS CALL IMMINENT - About to call setFramePositions:', {
+      console.log('[InternalDragDebug] 🚀 INTERNAL DRAG - About to call setFramePositions:', {
         itemId: dragState.activeId.substring(0, 8),
         positionsCount: finalPositions.size,
-        positionsToApply: Array.from(finalPositions.entries()).map(([id, pos]) => ({
+        finalPositions: Array.from(finalPositions.entries()).map(([id, pos]) => ({
           id: id.substring(0, 8),
           pos
         })),
-        originalPositions: Array.from(framePositions.entries()).map(([id, pos]) => ({
-          id: id.substring(0, 8),
-          pos
-        })),
-        positionChanges: Array.from(finalPositions.entries())
-          .filter(([id, newPos]) => (framePositions.get(id) ?? 0) !== newPos)
-          .map(([id, newPos]) => ({
-            id: id.substring(0, 8),
-            oldPos: framePositions.get(id) ?? 0,
-            newPos,
-            delta: newPos - (framePositions.get(id) ?? 0)
-          })),
-        timestamp: new Date().toISOString(),
-        setFramePositionsFunction: typeof setFramePositions
+        timestamp: new Date().toISOString()
       });
+
+      // FREEZE POSITIONS: Enter "dropping" state immediately
+      setDropState({
+        isDropping: true,
+        frozenPositions: finalPositions
+      });
+      console.log('[InternalDragDebug] ❄️ Frozen positions set');
 
       try {
         await setFramePositions(finalPositions);
-
-        console.log('[TimelineDragFix] ✅ SETFRAMEPOSITIONS CALL COMPLETED SUCCESSFULLY:', {
+        
+        console.log('[InternalDragDebug] ✅ setFramePositions completed successfully:', {
           itemId: dragState.activeId.substring(0, 8),
-          finalPositionsCount: finalPositions.size,
+          finalPos,
           timestamp: new Date().toISOString()
         });
 
-        console.log('[TimelineDragFix] ✅ POSITIONS APPLIED - SKIPPING image order update during drag:', {
-          itemId: dragState.activeId.substring(0, 8),
-          finalPos,
-          timestamp: new Date().toISOString(),
-          reason: 'Timeline drag already set timeline_frame values - order update would overwrite them'
-        });
-
-        // 🎯 DRAG TRACKING: Log every drag completion
-        console.log(`[TimelineDragFlow] [DRAG_COMPLETE] ✅ Session: ${dragState.dragSessionId || 'unknown'} | Item ${dragState.activeId.substring(0, 8)} drag completed: ${dragState.originalFramePos} → ${finalPos}`);
-        (window as any).__CURRENT_DRAG_SESSION__ = null;
-        
-        // 🎯 DEBUG: Log all position changes to identify wrong item movements
-        const allChanges = Array.from(finalPositions.entries())
-          .filter(([id, newPos]) => (framePositions.get(id) ?? 0) !== newPos)
-          .map(([id, newPos]) => ({
-            id: id.substring(0, 8),
-            oldPos: framePositions.get(id) ?? 0,
-            newPos,
-            isDraggedItem: id === dragState.activeId
-          }));
-        
-        if (allChanges.length > 1) {
-          console.log(`[TimelineDragFlow] [MULTI_ITEM_MOVE] ⚠️ Session: ${dragState.dragSessionId || 'unknown'} | Multiple items moving in single drag:`, allChanges);
-          
-          // 🚨 CONFLICT DETECTION: Check for duplicate final positions
-          const finalPositionCounts = new Map<number, string[]>();
-          for (const change of allChanges) {
-            if (!finalPositionCounts.has(change.newPos)) {
-              finalPositionCounts.set(change.newPos, []);
-            }
-            finalPositionCounts.get(change.newPos)!.push(change.id);
-          }
-          
-          const finalConflicts = Array.from(finalPositionCounts.entries())
-            .filter(([pos, ids]) => ids.length > 1);
-            
-          if (finalConflicts.length > 0) {
-            console.error(`[TimelineDragFlow] [FINAL_CONFLICTS] 💥 Multiple items ended up at same positions after drag:`, 
-              finalConflicts.map(([pos, ids]) => `Frame ${pos}: [${ids.join(', ')}]`));
-          }
-        }
-        
-        console.log('[DragLifecycle] 🎉 DRAG COMPLETE - All updates finished:', {
-          itemId: dragState.activeId.substring(0, 8),
-          finalPos,
-          positionsUpdated: finalPositions.size,
-          timestamp: new Date().toISOString()
-        });
-        
-        log('TimelineDragDebug', 'drag_complete', {
-          id: dragState.activeId,
-          finalPos,
-          orderUpdated: true
-        });
       } catch (error) {
-        console.error('[TimelineMoveFlow] ❌ ERROR APPLYING POSITIONS:', {
-          itemId: dragState.activeId.substring(0, 8),
-          error: error instanceof Error ? error.message : error,
-          finalPos,
-          stackTrace: error instanceof Error ? error.stack : undefined
-        });
-        console.error('[TimelineDragDebug] Error applying drag results:', error);
+        console.error('[InternalDragDebug] ❌ ERROR APPLYING POSITIONS:', error);
+      } finally {
+         // Release the freeze after a delay to ensure data has propagated
+         setTimeout(() => {
+             setDropState({ isDropping: false, frozenPositions: null });
+             console.log('[InternalDragDebug] ❄️ Unfreezing positions after 500ms');
+         }, 500);
       }
     })();
 
     // Generate comprehensive drag summary with unique tag [TimelineItemMoveSummary]
     const mode = 'normal';
     
+    // image.id is shot_generations.id - unique per entry
     const originalOrder = [...images]
       .sort((a, b) => {
-        const fa = framePositions.get(a.shotImageEntryId) ?? 0;
-        const fb = framePositions.get(b.shotImageEntryId) ?? 0;
+        const fa = framePositions.get(a.id) ?? 0;
+        const fb = framePositions.get(b.id) ?? 0;
         return fa - fb;
       })
-      .map(img => img.shotImageEntryId);
+      .map(img => img.id);
 
     const finalOrder = [...images]
       .sort((a, b) => {
-        const fa = finalPositions.get(a.shotImageEntryId) ?? 0;
-        const fb = finalPositions.get(b.shotImageEntryId) ?? 0;
+        const fa = finalPositions.get(a.id) ?? 0;
+        const fb = finalPositions.get(b.id) ?? 0;
         return fa - fb;
       })
-      .map(img => img.shotImageEntryId);
+      .map(img => img.id);
 
     // Create detailed before/after position maps for comprehensive logging
     const positionsBefore = [...framePositions.entries()]
       .sort(([, a], [, b]) => a - b)
       .map(([id, pos]) => {
-        const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+        const imageIndex = images.findIndex(img => img.id === id);
         return {
           id: id.slice(-8),
           imageIdx: imageIndex,
@@ -1098,7 +1067,7 @@ export const useTimelineDrag = ({
     const positionsAfter = [...finalPositions.entries()]
       .sort(([, a], [, b]) => a - b)
       .map(([id, pos]) => {
-        const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+        const imageIndex = images.findIndex(img => img.id === id);
         return {
           id: id.slice(-8),
           imageIdx: imageIndex,
@@ -1113,7 +1082,7 @@ export const useTimelineDrag = ({
       })
       .map(([id, newPos]) => {
         const oldPos = framePositions.get(id) ?? 0;
-        const imageIndex = images.findIndex(img => img.shotImageEntryId === id);
+        const imageIndex = images.findIndex(img => img.id === id);
         return {
           id: id.slice(-8), // last 8 chars for brevity
           imageIdx: imageIndex,
@@ -1132,7 +1101,7 @@ export const useTimelineDrag = ({
       // Top-level move details
       moveType: 'drag',
       draggedImageId: dragState.activeId?.slice(-8),
-      draggedImageIndex: images.findIndex(img => img.shotImageEntryId === dragState.activeId),
+      draggedImageIndex: images.findIndex(img => img.id === dragState.activeId),
       draggedImageMove: `${dragState.originalFramePos} → ${finalPos} (${dragDirection > 0 ? '+' : ''}${dragDirection})`,
       
       // Attempt details

@@ -79,19 +79,21 @@ const ShotsPage: React.FC = () => {
     }
   };
 
-  const handleDeleteImage = (shotImageEntryId: string) => {
+  // id parameter is shot_generations.id (unique per entry)
+  const handleDeleteImage = (id: string) => {
     if (!selectedShot || !selectedProjectId) {
       toast.error('Cannot delete image: Shot or Project ID is missing.');
       return;
     }
 
     const originalImages = selectedShot.images || [];
-    const updatedImages = originalImages.filter(img => img.shotImageEntryId !== shotImageEntryId);
+    // img.id is shot_generations.id - unique per entry
+    const updatedImages = originalImages.filter(img => img.id !== id);
     setManagedImages(updatedImages); // Optimistic update
 
     removeImageFromShotMutation.mutate({
       shot_id: selectedShot.id,
-      shotImageEntryId: shotImageEntryId,
+      shotImageEntryId: id, // API still expects this parameter name
       project_id: selectedProjectId,
     }, {
       onSuccess: () => {
@@ -112,7 +114,8 @@ const ShotsPage: React.FC = () => {
     }
 
     const originalImages = selectedShot.images || [];
-    const imageMap = new Map(originalImages.map(img => [img.shotImageEntryId, img]));
+    // img.id is shot_generations.id - unique per entry
+    const imageMap = new Map(originalImages.map(img => [img.id, img]));
     const reorderedImages = orderedShotGenerationIds
       .map(id => imageMap.get(id))
       .filter((img): img is GenerationRow => !!img);

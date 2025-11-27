@@ -81,9 +81,10 @@ export function useMobileGestures({
     
     try {
       // Get the selected images and their current indices
+      // img.id is shot_generations.id - unique per entry
       const selectedItems = mobileSelectedIds.map(id => {
-        const image = currentImages.find(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
-        const index = currentImages.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === id);
+        const image = currentImages.find(img => img.id === id);
+        const index = currentImages.findIndex(img => img.id === id);
         return { id, image, currentIndex: index };
       }).filter(item => item.image && item.currentIndex !== -1);
       
@@ -109,10 +110,11 @@ export function useMobileGestures({
       });
       
       // Create ordered IDs array for the unified system
-      const orderedIds = newOrder.map(img => (img as any).shotImageEntryId ?? (img as any).id);
+      // img.id is shot_generations.id - unique per entry
+      const orderedIds = newOrder.map(img => img.id);
       
       console.log('[MobileReorder] 🎯 Calling unified reorder system:', {
-        originalOrder: currentImages.map(img => ((img as any).shotImageEntryId ?? (img as any).id).substring(0, 8)),
+        originalOrder: currentImages.map(img => img.id.substring(0, 8)),
         newOrder: orderedIds.map(id => id.substring(0, 8)),
         movedItems: selectedItems.map(item => item.id.substring(0, 8)),
         targetIndex

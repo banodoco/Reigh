@@ -60,6 +60,13 @@ const shotEditorReducer = (state: ShotEditorState, action: ShotEditorAction): Sh
       return { ...state, isSettingsModalOpen: action.payload };
     case 'SET_MODE_READY':
       if (action.payload === state.isModeReady) return state;
+      // [ZoomDebug] Track when isModeReady changes - this causes Timeline remounts!
+      console.log('[ZoomDebug] ⚡ SET_MODE_READY changing:', {
+        from: state.isModeReady,
+        to: action.payload,
+        stack: new Error().stack?.split('\n').slice(2, 6).join('\n'),
+        timestamp: Date.now()
+      });
       return { ...state, isModeReady: action.payload };
     case 'SET_SETTINGS_ERROR':
       if (action.payload === state.settingsError) return state;

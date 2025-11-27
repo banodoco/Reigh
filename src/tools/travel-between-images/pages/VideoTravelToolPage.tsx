@@ -1675,15 +1675,22 @@ const VideoTravelToolPage: React.FC = () => {
     }
   };
 
-  const handleShotImagesUpdate = useCallback(() => {
+  const handleShotImagesUpdate = useCallback(async () => {
     if (selectedProjectId && selectedShot?.id) {
-      // Invalidate and refetch the shots query to get updated data
-      queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] });
+      // Invalidate both the main shots list (context) AND the detailed generations for this shot
+      // This ensures all views (Timeline, ShotList, etc.) get fresh data
+      const promises = [
+        queryClient.invalidateQueries({ queryKey: ['shots', selectedProjectId] }),
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', selectedShot.id] })
+      ];
       
       // STAGE 2: Signal that a shot operation occurred
       // This prevents the shot-specific query from refetching immediately
       // Gives timeline time to complete position updates without interference
       signalShotOperation();
+      
+      // Return promise so callers can await the refresh (prevents flicker)
+      await Promise.all(promises);
     }
   }, [selectedProjectId, selectedShot?.id, queryClient, signalShotOperation]);
   

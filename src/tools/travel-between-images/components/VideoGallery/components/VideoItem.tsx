@@ -43,7 +43,6 @@ interface VideoItemProps {
   video: GenerationRow;
   index: number;
   originalIndex: number;
-  isFirstVideo: boolean;
   shouldPreload: string;
   isMobile: boolean;
   projectAspectRatio?: string;
@@ -69,7 +68,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
   video,
   index,
   originalIndex,
-  isFirstVideo,
   shouldPreload,
   isMobile,
   projectAspectRatio,
@@ -288,19 +286,12 @@ export const VideoItem = React.memo<VideoItemProps>(({
     }
   };
 
-  // DEBUG: Track re-renders to verify memo is working
-  if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-    console.log('[HoverIssue] 🔄 VideoItem re-render (first item):', {
-      videoId: video.id?.substring(0, 8),
-      timestamp: Date.now()
-    });
-  }
 
   // ===============================================================================
   // HOOKS - Use extracted hooks for cleaner separation of concerns
   // ===============================================================================
 
-  const videoLoader = useVideoLoader(video, index, isFirstVideo, shouldPreload);
+  const videoLoader = useVideoLoader(video, index, shouldPreload);
   const thumbnailLoader = useThumbnailLoader(video);
 
   // Destructure for easier access
@@ -951,19 +942,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
         ) : (
           // DESKTOP OR PRIORITY VIDEO MODE: Use actual video element
           <>
-            {(() => {
-              if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                console.log('[MobileGalleryDebug] RENDERING DESKTOP MODE - Will use <video> element', {
-                  videoId: video.id?.substring(0, 8),
-                  isMobile,
-                  shouldLoad,
-                  hasThumbnail: !!video.thumbUrl,
-                  reason: 'shouldUsePosterOnMobile is false',
-                  timestamp: Date.now()
-                });
-              }
-              return null;
-            })()}
             {/* Thumbnail - shows immediately if available, stays visible until video fully transitions */}
             {hasThumbnail && !thumbnailError && (
               <img
@@ -1290,24 +1268,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
                   onLightboxOpen(originalIndex);
                 }
               }}
-              onMouseEnter={(e) => {
-                if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                  console.log('[HoverIssue] 👆 Hover START on first item Info button:', {
-                    videoId: video.id?.substring(0, 8),
-                    timestamp: Date.now()
-                  });
-                }
-                onHoverStart(video, e);
-              }}
-              onMouseLeave={() => {
-                if (process.env.NODE_ENV === 'development' && isFirstVideo) {
-                  console.log('[HoverIssue] 👇 Hover END on first item Info button:', {
-                    videoId: video.id?.substring(0, 8),
-                    timestamp: Date.now()
-                  });
-                }
-                onHoverEnd();
-              }}
+              onMouseEnter={(e) => onHoverStart(video, e)}
+              onMouseLeave={onHoverEnd}
               className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
             >
               <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -1423,7 +1385,6 @@ export const VideoItem = React.memo<VideoItemProps>(({
     (prevProps.video as any).name === (nextProps.video as any).name && // Check variant name changes
     prevProps.index === nextProps.index &&
     prevProps.originalIndex === nextProps.originalIndex &&
-    prevProps.isFirstVideo === nextProps.isFirstVideo &&
     prevProps.shouldPreload === nextProps.shouldPreload &&
     prevProps.isMobile === nextProps.isMobile &&
     prevProps.projectAspectRatio === nextProps.projectAspectRatio &&

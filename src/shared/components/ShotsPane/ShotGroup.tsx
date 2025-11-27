@@ -13,6 +13,7 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
+import { isVideoGeneration } from '@/shared/lib/typeGuards';
 
 interface ShotGroupProps {
   shot: Shot;
@@ -46,15 +47,8 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
   // const [isFileOver, setIsFileOver] = useState(false);
   const [isFileOver] = useState(false);
 
-  const isGenerationVideo = (gen: GenerationRow): boolean => {
-    return gen.type === 'video' ||
-           gen.type === 'video_travel_output' ||
-           (gen.location && gen.location.endsWith('.mp4')) ||
-           (gen.imageUrl && gen.imageUrl.endsWith('.mp4'));
-  };
-
   const IMAGES_PER_ROW = 4;
-  const allImages = (shot.images || []).filter(img => !isGenerationVideo(img));
+  const allImages = (shot.images || []).filter(img => !isVideoGeneration(img));
   const hasMultipleRows = allImages.length > IMAGES_PER_ROW;
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -274,11 +268,11 @@ const ShotGroup: React.FC<ShotGroupProps> = ({ shot, highlighted = false }) => {
             >
               {allImages.map((image, index) => (
                 <img
-                  key={image.shotImageEntryId || `image-${index}`}
+                  key={image.id || `image-${index}`} // image.id is shot_generations.id (unique per entry)
                   src={getDisplayUrl(image.thumbUrl || image.imageUrl)} // Keep thumbnail-only for small cells
                   alt={`Shot image ${index + 1}`}
                   className="w-12 h-12 object-cover rounded border border-zinc-700 bg-zinc-600 shadow"
-                  title={`Image ID: ${image.id} (Entry: ${image.shotImageEntryId})`}
+                  title={`Entry ID: ${image.id} (Gen: ${image.generation_id || 'N/A'})`}
                 />
               ))}
             </div>

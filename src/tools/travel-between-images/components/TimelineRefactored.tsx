@@ -167,7 +167,10 @@ const Timeline: React.FC<TimelineProps> = ({
     const imagesWithPositions = shotGenerations
       .filter(sg => sg.generation)
       .map(sg => ({
-        id: sg.generation_id,
+        // PRIMARY IDs: id = shot_generations.id (unique), generation_id = actual generation
+        id: sg.id,
+        generation_id: sg.generation_id,
+        // Deprecated (backwards compat)
         shotImageEntryId: sg.id,
         imageUrl: sg.generation?.location,
         thumbUrl: sg.generation?.location,
@@ -291,7 +294,8 @@ const Timeline: React.FC<TimelineProps> = ({
     // Create new positions: 0, gap, gap*2, gap*3, etc.
     const newPositions = new Map<string, number>();
     images.forEach((image, index) => {
-      newPositions.set(image.shotImageEntryId, index * gap);
+      // Use id (shot_generations.id) - unique per entry
+      newPositions.set(image.id, index * gap);
     });
 
     timelineDebugger.logPositionUpdate('New positions calculated', {

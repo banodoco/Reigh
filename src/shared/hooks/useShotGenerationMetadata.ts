@@ -189,12 +189,14 @@ export function useShotGenerationMetadata({
           shotId: shotId.substring(0, 8),
           queryKeys: [
             ['unified-generations', 'shot', shotId],
-            ['shot-generations', shotId]
+            ['shot-generations', shotId],
+            ['all-shot-generations', shotId]
           ],
           timestamp: Date.now()
         });
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       }
 
       console.log('[MagicEditPromptPersist] ✅ DB UPDATE SUCCESS:', {

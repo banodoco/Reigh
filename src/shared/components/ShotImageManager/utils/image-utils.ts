@@ -73,7 +73,8 @@ export const getImageRange = (
   
   for (let i = minIndex; i <= maxIndex; i++) {
     if (currentImages[i]) {
-      rangeIds.push(currentImages[i].shotImageEntryId ?? currentImages[i].id);
+      // img.id is shot_generations.id - unique per entry
+      rangeIds.push(currentImages[i].id);
     }
   }
   

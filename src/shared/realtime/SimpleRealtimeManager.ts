@@ -168,7 +168,12 @@ export class SimpleRealtimeManager {
         .on('postgres_changes', 
           { event: 'UPDATE', schema: 'public', table: 'generations', filter: `project_id=eq.${projectId}` }, 
           (payload: any) => {
-            console.log('[SimpleRealtime] 📨 Generation updated (upscale/etc):', payload);
+            console.log('[AddFlicker] 2️⃣a REALTIME: generations UPDATE received from Supabase:', {
+              generationId: payload?.new?.id?.substring(0, 8),
+              hasNew: !!payload?.new,
+              hasOld: !!payload?.old,
+              timestamp: Date.now()
+            });
             this.handleGenerationUpdate(payload);
           }
         );
@@ -352,6 +357,7 @@ export class SimpleRealtimeManager {
       ['task-status-counts'],
       ['unified-generations'],
       ['shot-generations'], // 🚀 Invalidate shot-specific generation queries (e.g., for upscale in Timeline)
+      ['all-shot-generations'], // 🚀 Single query approach
       ['generations'], // 🚀 Invalidate all generation queries (including useGenerations)
       ['tasks', 'paginated', this.projectId].filter(Boolean)
     ]);
@@ -429,6 +435,7 @@ export class SimpleRealtimeManager {
     const queryKeys = Array.from(affectedShotIds).flatMap(shotId => [
       ['unified-generations', 'shot', shotId],
       ['shot-generations', shotId],
+      ['all-shot-generations', shotId],
       ['unpositioned-count', shotId]
     ]);
     
@@ -464,7 +471,8 @@ export class SimpleRealtimeManager {
     const queryKeys = [
       ['unified-generations'],
       ['generations'],
-      ['shot-generations']
+      ['shot-generations'],
+      ['all-shot-generations']
     ];
     
     dataFreshnessManager.onRealtimeEvent('generation-update', queryKeys);
@@ -534,6 +542,8 @@ export class SimpleRealtimeManager {
   }
 
   private handleGenerationUpdate(payload: any) {
+    console.log('[AddFlicker] 2️⃣ handleGenerationUpdate called - checking if shot sync only');
+    
     const newRecord = payload?.new;
     const oldRecord = payload?.old;
     const generationId = newRecord?.id;
@@ -544,20 +554,39 @@ export class SimpleRealtimeManager {
     const thumbnailUrl = newRecord?.thumbnail_url;
     const oldThumbnailUrl = oldRecord?.thumbnail_url;
     
-    // Check what changed
+    // Check what changed - IMPORTANT: Only consider it a "real" change if BOTH old and new 
+    // have values AND they differ. Supabase realtime's `old` record may not include all columns,
+    // so comparing against undefined would incorrectly flag unchanged fields as "changed".
     const upscaleCompleted = !oldUpscaledUrl && upscaledUrl;
-    const locationChanged = location !== oldLocation;
-    const thumbnailChanged = thumbnailUrl !== oldThumbnailUrl;
+    // Only true if both have values and they differ
+    const locationActuallyChanged = !!(oldLocation && location && location !== oldLocation);
+    const thumbnailActuallyChanged = !!(oldThumbnailUrl && thumbnailUrl && thumbnailUrl !== oldThumbnailUrl);
     
-    console.log('[SimpleRealtime] 🎯 Generation update analysis:', {
+    // CRITICAL: Check if this is just a shot sync update (from sync_shot_to_generation trigger)
+    // These updates only change shot_id, timeline_frame, or shot_data - not actual generation content
+    // We should NOT invalidate all-shot-generations for these because:
+    // 1. The shot_generations INSERT already handles this via handleShotGenerationChange
+    // 2. Invalidating here causes flicker when adding images to shots
+    const shotIdChanged = newRecord?.shot_id !== oldRecord?.shot_id;
+    const timelineFrameChanged = newRecord?.timeline_frame !== oldRecord?.timeline_frame;
+    const shotDataChanged = JSON.stringify(newRecord?.shot_data) !== JSON.stringify(oldRecord?.shot_data);
+    
+    // If no actual content changed (upscale, location, thumbnail), this is just a shot sync update
+    const hasActualContentChange = upscaleCompleted || locationActuallyChanged || thumbnailActuallyChanged;
+    const isOnlyShotSyncUpdate = !hasActualContentChange;
+    
+    console.log('[AddFlicker] 2️⃣ Generation update analysis:', {
       generationId: generationId?.substring(0, 8),
       upscaleCompleted,
-      locationChanged,
-      thumbnailChanged,
-      upscaledUrl: upscaledUrl ? 'present' : 'none',
-      oldUpscaledUrl: oldUpscaledUrl ? 'present' : 'none',
-      location: location ? location.substring(0, 50) + '...' : 'none',
-      oldLocation: oldLocation ? oldLocation.substring(0, 50) + '...' : 'none'
+      locationActuallyChanged,
+      thumbnailActuallyChanged,
+      hasActualContentChange,
+      isOnlyShotSyncUpdate,
+      // Debug: show actual values
+      hasOldLocation: !!oldLocation,
+      hasNewLocation: !!location,
+      hasOldThumbnail: !!oldThumbnailUrl,
+      hasNewThumbnail: !!thumbnailUrl,
     });
     
     if (!generationId) {
@@ -565,9 +594,16 @@ export class SimpleRealtimeManager {
       return;
     }
     
+    // Skip invalidation for shot sync updates - these are handled by shot_generations INSERT
+    // and invalidating here causes flicker
+    if (isOnlyShotSyncUpdate) {
+      console.log('[AddFlicker] 2️⃣ ⏭️ SKIPPING generation update - only shot sync fields changed:', generationId.substring(0, 8));
+      return;
+    }
+    
     // Invalidate queries to pick up any generation changes (location, upscaled_url, thumbnail, etc.)
     console.log('[SimpleRealtime:Batching] 📦 Batching generation update:', generationId.substring(0, 8));
-    this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted, locationChanged, thumbnailChanged });
+    this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted, locationChanged: locationActuallyChanged, thumbnailChanged: thumbnailActuallyChanged });
   }
 
   private updateGlobalSnapshot(channelState: string, lastEventAt?: number) {

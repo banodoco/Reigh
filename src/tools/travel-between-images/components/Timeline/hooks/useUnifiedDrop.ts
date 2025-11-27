@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { pixelToFrame } from "../utils/timeline-utils";
+import { TIMELINE_PADDING_OFFSET } from "../constants";
 
 export type DragType = 'file' | 'generation' | 'none';
 
@@ -99,8 +100,10 @@ export const useUnifiedDrop = ({
     
     if (dragType !== 'none' && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const relativeX = e.clientX - rect.left;
-      const targetFrame = Math.max(0, pixelToFrame(relativeX, rect.width, fullMin, fullRange));
+      // Account for timeline padding offset - same calculation as useTimelineDrag
+      const relativeX = e.clientX - rect.left - TIMELINE_PADDING_OFFSET;
+      const effectiveWidth = rect.width - (TIMELINE_PADDING_OFFSET * 2);
+      const targetFrame = Math.max(0, pixelToFrame(relativeX, effectiveWidth, fullMin, fullRange));
       setDropTargetFrame(targetFrame);
       
       if (dragType === 'file' && onImageDrop) {
@@ -136,12 +139,29 @@ export const useUnifiedDrop = ({
     setDropTargetFrame(null);
   }, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>, containerRef?: React.RefObject<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     
     const dragType = getDragType(e);
-    const targetFrame = dropTargetFrame;
+    
+    // Calculate target frame directly from drop coordinates (not stale state)
+    // This fixes the "jumping to wrong location" bug caused by stale dropTargetFrame state
+    let targetFrame: number | null = dropTargetFrame;
+    if (containerRef?.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const relativeX = e.clientX - rect.left - TIMELINE_PADDING_OFFSET;
+      const effectiveWidth = rect.width - (TIMELINE_PADDING_OFFSET * 2);
+      targetFrame = Math.max(0, pixelToFrame(relativeX, effectiveWidth, fullMin, fullRange));
+      console.log('[BatchDropPositionIssue] 📍 Calculated frame from drop coords:', {
+        clientX: e.clientX,
+        relativeX,
+        effectiveWidth,
+        targetFrame,
+        staleStateFrame: dropTargetFrame,
+        timestamp: Date.now()
+      });
+    }
     
     console.log('[BatchDropPositionIssue] 💥 DROP EVENT:', {
       dragType,
@@ -237,7 +257,7 @@ export const useUnifiedDrop = ({
     } else {
       console.log('[BatchDropPositionIssue] ⚠️ DROP - No handler matched dragType:', dragType);
     }
-  }, [getDragType, onImageDrop, onGenerationDrop, dropTargetFrame]);
+  }, [getDragType, onImageDrop, onGenerationDrop, dropTargetFrame, fullMin, fullRange]);
 
   // Determine current drag type for consumers
   const currentDragType: DragType = isFileOver ? 'file' : isGenerationOver ? 'generation' : 'none';

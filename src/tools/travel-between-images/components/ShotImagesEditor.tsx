@@ -18,6 +18,7 @@ import { BatchGuidanceVideo } from './BatchGuidanceVideo';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Video } from 'lucide-react';
+import { isVideoGeneration, isPositioned, isVideoAny } from '@/shared/lib/typeGuards';
 
 interface ShotImagesEditorProps {
   /** Controls whether internal UI should render the skeleton */
@@ -60,12 +61,12 @@ interface ShotImagesEditorProps {
   pendingPositions: Map<string, number>;
   /** Callback when pending position is applied */
   onPendingPositionApplied: (generationId: string) => void;
-  /** Image deletion callback */
-  onImageDelete: (shotImageEntryId: string) => void;
-  /** Batch image deletion callback */
-  onBatchImageDelete?: (shotImageEntryIds: string[]) => void;
-  /** Image duplication callback */
-  onImageDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
+  /** Image deletion callback - id is shot_generations.id (unique per entry) */
+  onImageDelete: (id: string) => void;
+  /** Batch image deletion callback - ids are shot_generations.id values */
+  onBatchImageDelete?: (ids: string[]) => void;
+  /** Image duplication callback - id is shot_generations.id */
+  onImageDuplicate?: (id: string, timeline_frame: number) => void;
   /** Number of columns for batch mode grid */
   columns: 2 | 3 | 4 | 6;
   /** Skeleton component to show while loading */
@@ -176,6 +177,26 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onAddToShotWithoutPosition,
   onCreateShot,
 }) => {
+  // [ZoomDebug] Track ShotImagesEditor mounts to detect unwanted remounts
+  const shotImagesEditorMountRef = React.useRef(0);
+  React.useEffect(() => {
+    shotImagesEditorMountRef.current++;
+    console.log('[ZoomDebug] 🟡 ShotImagesEditor MOUNTED:', {
+      mountCount: shotImagesEditorMountRef.current,
+      selectedShotId: selectedShotId?.substring(0, 8),
+      isModeReady,
+      preloadedImagesCount: preloadedImages?.length || 0,
+      timestamp: Date.now()
+    });
+    return () => {
+      console.log('[ZoomDebug] 🟡 ShotImagesEditor UNMOUNTING:', {
+        mountCount: shotImagesEditorMountRef.current,
+        selectedShotId: selectedShotId?.substring(0, 8),
+        timestamp: Date.now()
+      });
+    };
+  }, []);
+
   // [RenderProfile] DETAILED PROFILING: Track what props are changing to cause re-renders
   const renderCount = React.useRef(0);
   renderCount.current += 1;
@@ -415,10 +436,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     initializeTimelineFrames: utilsData.initializeTimelineFrames,
     // Provide filtering function for mode-specific views
     getImagesForMode: (mode: 'batch' | 'timeline') => {
-      // BOTH modes show only positioned images (timeline_frame != null)
-      const positioned = preloadedImages.filter(img => 
-        img.timeline_frame != null && img.timeline_frame !== -1
-      );
+      // BOTH modes show only positioned non-video images
+      // Uses canonical filters from typeGuards
+      const positioned = preloadedImages
+        .filter(img => isPositioned(img) && !isVideoGeneration(img))
+        .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
       console.log('[TimelinePositionUtils] getImagesForMode:', {
         mode,
         total: preloadedImages.length,
@@ -467,7 +489,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     dataSource: preloadedImages ? 'two-phase (from ShotEditor)' : 'legacy (useEnhancedShotPositions)',
     imageCount: shotGenerations.length,
     withMetadata: shotGenerations.filter((img: any) => img.metadata).length,
-    withShotGenId: shotGenerations.filter((img: any) => img.shotImageEntryId || img.id).length,
+    withId: shotGenerations.filter((img: any) => img.id).length, // id is shot_generations.id
     positioned: shotGenerations.filter((img: any) => img.timeline_frame != null && img.timeline_frame !== -1).length,
     unpositioned: shotGenerations.filter((img: any) => img.timeline_frame == null || img.timeline_frame === -1).length,
     hookDataShotGensCount: hookData.shotGenerations.length,
@@ -552,6 +574,17 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const memoizedShotGenerations = React.useMemo(() => {
     return shotGenerations;
   }, [shotGenerations]);
+
+  // Track if we've ever had data to prevent unmounting Timeline during refetches
+  // This prevents zoom reset when data is being refetched
+  const hasEverHadDataRef = React.useRef(false);
+  if (memoizedShotGenerations.length > 0) {
+    hasEverHadDataRef.current = true;
+  }
+  // Reset when shot changes
+  React.useEffect(() => {
+    hasEverHadDataRef.current = memoizedShotGenerations.length > 0;
+  }, [selectedShotId]);
 
   // Note: Pair prompts cleanup is handled automatically by the database
   // when shot_generations are deleted, since prompts are stored in their metadata
@@ -804,8 +837,20 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       </CardHeader>
 
       {/* Content - Show skeleton if not ready, otherwise show actual content */}
+      {/* IMPORTANT: Don't unmount Timeline during refetches - use hasEverHadDataRef to prevent zoom reset */}
       <CardContent>
-        {!isModeReady || (positionsLoading && !memoizedShotGenerations.length) ? (
+        {(() => {
+          const showSkeleton = !isModeReady || (positionsLoading && !memoizedShotGenerations.length && !hasEverHadDataRef.current);
+          console.log('[ZoomDebug] 🔵 ShotImagesEditor skeleton condition:', {
+            showSkeleton,
+            isModeReady,
+            positionsLoading,
+            shotGensLength: memoizedShotGenerations.length,
+            hasEverHadData: hasEverHadDataRef.current,
+            timestamp: Date.now()
+          });
+          return showSkeleton;
+        })() ? (
           <div className="p-1">
             {/* Show section headers even in skeleton mode for batch mode */}
             {effectiveGenerationMode === "batch" && (
@@ -887,8 +932,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   console.log('[ClearEnhancedPrompt-Timeline] Total shotGenerations:', shotGenerations.length);
                   if (shotGenerations.length > 0) {
                     console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0] keys:', Object.keys(shotGenerations[0]));
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].shotImageEntryId:', (shotGenerations[0] as any).shotImageEntryId);
-                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].id:', shotGenerations[0].id);
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].id:', shotGenerations[0].id); // shot_generations.id
+                    console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation_id:', shotGenerations[0].generation_id);
                     console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].type:', shotGenerations[0].type);
                     console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].location:', shotGenerations[0].location);
                     console.log('[ClearEnhancedPrompt-Timeline] Sample generation [0].generation?.type:', shotGenerations[0].generation?.type);
@@ -897,26 +942,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   try {
                     // Convert pairIndex to generation ID using the same logic as pair prompts
                     // Filter out videos to match the timeline display
+                    // Uses isVideoAny which handles both flattened and nested data structures
                     const filteredGenerations = shotGenerations.filter((sg, idx) => {
-                      // Check if type is on sg directly or nested in sg.generation
-                      const type = sg.type || sg.generation?.type;
-                      const location = sg.location || sg.generation?.location;
+                      const video = isVideoAny(sg);
                       
                       if (idx === 0) {
-                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] type:', type);
-                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] location:', location);
+                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] isVideo:', video);
+                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] returning:', !video);
                       }
                       
-                      const isVideo = type === 'video' ||
-                                     type === 'video_travel_output' ||
-                                     (location && location.endsWith('.mp4'));
-                      
-                      if (idx === 0) {
-                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] isVideo:', isVideo);
-                        console.log('[ClearEnhancedPrompt-Timeline] Filter [0] returning:', !isVideo);
-                      }
-                      
-                      return !isVideo;
+                      return !video;
                     });
                     console.log('[ClearEnhancedPrompt-Timeline] Filtered generations count:', filteredGenerations.length);
 
@@ -932,16 +967,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     }
 
                     console.log('[ClearEnhancedPrompt-Timeline] 🎯 Found generation at pairIndex:', pairIndex);
-                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.shotImageEntryId:', (firstItem as any).shotImageEntryId);
-                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.id:', firstItem.id);
+                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.id:', firstItem.id); // shot_generations.id
+                    console.log('[ClearEnhancedPrompt-Timeline] firstItem.generation_id:', firstItem.generation_id);
                     console.log('[ClearEnhancedPrompt-Timeline] firstItem.hasMetadata:', !!firstItem.metadata);
                     console.log('[ClearEnhancedPrompt-Timeline] firstItem.hasEnhancedPrompt:', !!firstItem.metadata?.enhanced_prompt);
                     
-                    const usingShotImageEntryId = !!(firstItem as any).shotImageEntryId;
-                    console.log('[ClearEnhancedPrompt-Timeline] Using shotImageEntryId:', usingShotImageEntryId);
-                    
-                    const idToUse = usingShotImageEntryId ? (firstItem as any).shotImageEntryId : firstItem.id;
-                    console.log('[ClearEnhancedPrompt-Timeline] 📞 Calling clearEnhancedPrompt with:', idToUse);
+                    // firstItem.id IS the shot_generations.id (unique per entry)
+                    const idToUse = firstItem.id;
+                    console.log('[ClearEnhancedPrompt-Timeline] 📞 Calling clearEnhancedPrompt with id:', idToUse);
                     
                     await clearEnhancedPrompt(idToUse);
                   } catch (error) {
@@ -1091,24 +1124,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       console.log('[ClearEnhancedPrompt-Batch] 🔵 Starting clear for pair index:', pairIndex);
                       console.log('[ClearEnhancedPrompt-Batch] Total shotGenerations:', shotGenerations.length);
                       console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].id:', shotGenerations[0]?.id);
+                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].id:', shotGenerations[0]?.id); // shot_generations.id
                       console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].generation_id:', shotGenerations[0]?.generation_id);
-                      console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].shotImageEntryId:', (shotGenerations[0] as any)?.shotImageEntryId);
                       console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].type:', shotGenerations[0]?.type);
                       console.log('[ClearEnhancedPrompt-Batch] Sample generation [0].generation?.type:', shotGenerations[0]?.generation?.type);
                       
                       // Convert pairIndex to generation ID using the same logic as pair prompts
                       // Filter out videos to match the display
-                      // Handle both direct properties and nested generation properties
-                      const filteredGenerations = shotGenerations.filter(sg => {
-                        // Check if type is on sg directly or nested in sg.generation
-                        const type = sg.type || sg.generation?.type;
-                        const location = sg.location || sg.generation?.location;
-                        
-                        const isVideo = type === 'video' ||
-                                       type === 'video_travel_output' ||
-                                       (location && location.endsWith('.mp4'));
-                        return !isVideo;
-                      });
+                      // Uses isVideoAny which handles both flattened and nested data structures
+                      const filteredGenerations = shotGenerations.filter(sg => !isVideoAny(sg));
 
                       console.log('[ClearEnhancedPrompt-Batch] Filtered generations count:', filteredGenerations.length);
 
@@ -1133,20 +1157,18 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.id:', firstItem.id);
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.id (short):', firstItem.id?.substring(0, 8));
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.generation_id:', firstItem.generation_id);
+                      console.log('[ClearEnhancedPrompt-Batch] firstItem.id (short):', firstItem.id?.substring(0, 8)); // shot_generations.id
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.generation_id (short):', firstItem.generation_id?.substring(0, 8));
-                      console.log('[ClearEnhancedPrompt-Batch] firstItem.shotImageEntryId:', (firstItem as any).shotImageEntryId);
-                      console.log('[ClearEnhancedPrompt-Batch] firstItem.shotImageEntryId (short):', (firstItem as any).shotImageEntryId?.substring(0, 8));
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.hasMetadata:', !!firstItem.metadata);
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.hasEnhancedPrompt:', !!firstItem.metadata?.enhanced_prompt);
                       console.log('[ClearEnhancedPrompt-Batch] firstItem.enhancedPromptPreview:', firstItem.metadata?.enhanced_prompt?.substring(0, 50));
                       
                       // The clearEnhancedPrompt function expects shot_generation.id
-                      // CRITICAL: shotImageEntryId is the actual shot_generation.id, NOT firstItem.id!
-                      const shotGenerationId = (firstItem as any).shotImageEntryId || firstItem.id;
+                      // CRITICAL: firstItem.id IS the shot_generation.id (unique per entry)
+                      const shotGenerationId = firstItem.id;
                       
                       console.log('[ClearEnhancedPrompt-Batch] 📞 Calling clearEnhancedPrompt with shot_generation.id:', shotGenerationId);
                       console.log('[ClearEnhancedPrompt-Batch] shot_generation.id (short):', shotGenerationId?.substring(0, 8));
-                      console.log('[ClearEnhancedPrompt-Batch] Using shotImageEntryId:', !!((firstItem as any).shotImageEntryId));
                       await clearEnhancedPrompt(shotGenerationId);
                       console.log('[ClearEnhancedPrompt-Batch] ✅ clearEnhancedPrompt completed');
                     } catch (error) {
@@ -1250,11 +1272,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         readOnly={readOnly}
         pairPrompt={(() => {
           // CRITICAL: Read prompt from the exact shot_generation being displayed
-          // Look up by shotImageEntryId (which is the shot_generation.id)
+          // Look up by id (which is the shot_generation.id)
           if (!pairPromptModalData.pairData?.startImage?.id) {
             return "";
           }
-          const shotGen = shotGenerations.find(sg => sg.shotImageEntryId === pairPromptModalData.pairData.startImage.id);
+          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
           const prompt = shotGen?.metadata?.pair_prompt || "";
           
           // Only log when modal is actually open
@@ -1268,9 +1290,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
             // Show ALL available IDs
             const allIds = shotGenerations.map((sg, i) => ({
               index: i,
-              id: sg.id?.substring(0, 8),
-              shotImageEntryId: sg.shotImageEntryId?.substring(0, 8),
-              shot_generation_id: sg.shot_generation_id?.substring(0, 8),
+              id: sg.id?.substring(0, 8), // shot_generations.id
+              generation_id: sg.generation_id?.substring(0, 8),
               hasMetadata: !!sg.metadata,
               hasPairPrompt: !!sg.metadata?.pair_prompt,
             }));
@@ -1280,9 +1301,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         })()}
         pairNegativePrompt={(() => {
           // CRITICAL: Read negative prompt from the exact shot_generation being displayed
-          // Look up by shotImageEntryId (which is the shot_generation.id)
+          // Look up by id (which is the shot_generation.id)
           if (!pairPromptModalData.pairData?.startImage?.id) return "";
-          const shotGen = shotGenerations.find(sg => sg.shotImageEntryId === pairPromptModalData.pairData.startImage.id);
+          const shotGen = shotGenerations.find(sg => sg.id === pairPromptModalData.pairData.startImage.id);
           return shotGen?.metadata?.pair_negative_prompt || "";
         })()}
         defaultPrompt={defaultPrompt}
@@ -1318,14 +1339,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 startFrame: startImage.timeline_frame!,
                 endFrame: endImage.timeline_frame!,
                 startImage: {
-                  id: startImage.shotImageEntryId || startImage.id, // Use shot_generation.id
+                  id: startImage.id, // shot_generations.id
                   url: startLocation,
                   thumbUrl: startLocation,
                   timeline_frame: startImage.timeline_frame!,
                   position: prevIndex + 1,
                 },
                 endImage: {
-                  id: endImage.shotImageEntryId || endImage.id, // Use shot_generation.id
+                  id: endImage.id, // shot_generations.id
                   url: endLocation,
                   thumbUrl: endLocation,
                   timeline_frame: endImage.timeline_frame!,
@@ -1366,14 +1387,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 startFrame: startImage.timeline_frame!,
                 endFrame: endImage.timeline_frame!,
                 startImage: {
-                  id: startImage.shotImageEntryId || startImage.id, // Use shot_generation.id
+                  id: startImage.id, // shot_generations.id
                   url: startLocation,
                   thumbUrl: startLocation,
                   timeline_frame: startImage.timeline_frame!,
                   position: nextIndex + 1,
                 },
                 endImage: {
-                  id: endImage.shotImageEntryId || endImage.id, // Use shot_generation.id
+                  id: endImage.id, // shot_generations.id
                   url: endLocation,
                   thumbUrl: endLocation,
                   timeline_frame: endImage.timeline_frame!,

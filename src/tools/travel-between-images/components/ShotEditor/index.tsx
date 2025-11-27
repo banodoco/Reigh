@@ -38,6 +38,7 @@ import { useStructureVideo } from './hooks/useStructureVideo';
 import { Header } from './ui/Header';
 import { ImageManagerSkeleton } from './ui/Skeleton';
 import { filterAndSortShotImages, getNonVideoImages, getVideoOutputs } from './utils/generation-utils';
+import { isVideoGeneration, isPositioned, sortByTimelineFrame } from '@/shared/lib/typeGuards';
 import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import { useAddImageToShot, useRemoveImageFromShot } from '@/shared/hooks/useShots';
 import { useUpdateGenerationLocation } from '@/shared/hooks/useGenerations';
@@ -336,21 +337,34 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     queryFn: async () => {
       if (!selectedShotId) return null;
       
+      // Query through shot_generations join table since shot_data column doesn't exist on generations
       const { data, error } = await supabase
-        .from('generations')
-        .select('id, location, type, created_at')
-        .not(`shot_data->${selectedShotId}`, 'is', null)
-        .like('type', '%video%')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .from('shot_generations')
+        .select(`
+          generation:generations!inner (
+            id,
+            location,
+            type,
+            created_at
+          )
+        `)
+        .eq('shot_id', selectedShotId);
       
       if (error) {
         console.log('[PresetAutoPopulate] No last video found for shot:', error);
         return null;
       }
       
-      return data?.location || null;
+      // Filter to video types and sort by created_at in JS
+      const videos = (data || [])
+        .filter(sg => (sg.generation as any)?.type?.includes('video'))
+        .sort((a, b) => {
+          const dateA = new Date((a.generation as any)?.created_at || 0).getTime();
+          const dateB = new Date((b.generation as any)?.created_at || 0).getTime();
+          return dateB - dateA; // Descending
+        });
+      
+      return videos[0] ? (videos[0].generation as any)?.location : null;
     },
     enabled: !!selectedShotId,
     staleTime: 30000, // Cache for 30 seconds
@@ -392,7 +406,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     // This prevents the timeline from disappearing or showing incomplete data during duplications/updates
     const isRefetching = fullImagesQueryResult.isFetching || fullImagesQueryResult.isLoading;
     
-    console.log('[DUPLICATE_UI] 🔍 ShotEditor data flow:', {
+    console.log('[AddFlicker] 7️⃣ ShotEditor orderedShotImages computing:', {
       resultCount: result.length,
       cachedCount: lastValidImagesRef.current.length,
       isRefetching,
@@ -400,7 +414,13 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       fullImagesCount: fullShotImages.length,
       contextImagesCount: contextImages.length,
       queryStatus: fullImagesQueryResult.status,
-      queryFetchStatus: fullImagesQueryResult.fetchStatus
+      queryFetchStatus: fullImagesQueryResult.fetchStatus,
+      hasOptimistic: result.some((r: any) => r._optimistic),
+      lastItems: result.slice(-2).map(r => ({
+        id: r.id?.substring(0, 8),
+        _optimistic: (r as any)._optimistic
+      })),
+      timestamp: Date.now()
     });
     
     if (result.length > 0 && !isRefetching) {
@@ -761,25 +781,36 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // CRITICAL FIX: Reset mode readiness when shot changes ONLY if we don't have context images yet
   // If we have context images, stay ready and let settings refetch in the background
   // This prevents the unmount/remount cascade that was canceling image loads
+  // 
+  // [ZoomDebug] IMPORTANT: Only trigger on shot ID change, NOT on contextImages.length change!
+  // contextImages can temporarily become empty during cache updates, which was causing
+  // isModeReady to flip false->true and unmount/remount the Timeline (resetting zoom).
+  const prevShotIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (selectedShot?.id) {
+    const shotId = selectedShot?.id;
+    const shotIdChanged = shotId !== prevShotIdRef.current;
+    
+    if (shotId && shotIdChanged) {
+      prevShotIdRef.current = shotId;
       const hasContextImages = contextImages.length > 0;
       if (hasContextImages) {
         // We have images - stay ready, let settings update in background
         console.log('[ShotNavPerf] 🚀 Shot changed but keeping ready state - we have context images', {
-          shotId: selectedShot.id.substring(0, 8),
+          shotId: shotId.substring(0, 8),
           contextImagesCount: contextImages.length
         });
         actions.setModeReady(true);
       } else {
         // No images yet - reset to loading state
         console.log('[ShotNavPerf] ⏳ Shot changed - resetting to loading state', {
-          shotId: selectedShot.id.substring(0, 8)
+          shotId: shotId.substring(0, 8)
         });
         actions.setModeReady(false);
       }
     }
-  }, [selectedShot?.id, contextImages.length, actions]);
+    // Note: We intentionally DON'T include contextImages.length in deps
+    // to prevent mode flipping when cache updates temporarily clear images
+  }, [selectedShot?.id, actions]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Handle generation mode setup and readiness - AGGRESSIVE OPTIMIZATION for faster ready state
   const readinessState = React.useMemo(() => ({
@@ -1047,8 +1078,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         // [MagicEditTaskDebug] Log magic edit generations to see their timeline_frame values
         if (img.type === 'image_edit' || (img as any).params?.tool_type === 'magic-edit') {
           console.log('[MagicEditTaskDebug] Magic edit generation filtering:', {
-            id: img.id.substring(0, 8),
-            shotImageEntryId: img.shotImageEntryId?.substring(0, 8),
+            id: img.id.substring(0, 8), // shot_generations.id
+            generation_id: img.generation_id?.substring(0, 8),
             timeline_frame: (img as any).timeline_frame,
             hasTimelineFrame,
             willBeIncludedInTimeline: hasTimelineFrame,
@@ -1059,19 +1090,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         
         return hasTimelineFrame;
       })
-      .filter(img => {
-        // EXACT same video detection as ShotsPane's ShotGroup component
-        const isVideo = img.type === 'video' ||
-                       img.type === 'video_travel_output' ||
-                       (img.location && img.location.endsWith('.mp4')) ||
-                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-        return !isVideo; // Exclude videos, just like ShotsPane
-      })
-      .sort((a, b) => {
-        const frameA = (a as any).timeline_frame ?? 0;
-        const frameB = (b as any).timeline_frame ?? 0;
-        return frameA - frameB;
-      });
+      // Use canonical isVideoGeneration from typeGuards
+      .filter(img => !isVideoGeneration(img))
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0));
     
     // OPTIMIZED: Only log filtering results when they change significantly
     const filteringKey = `${selectedShotId}-${sourceImages.length}-${filtered.length}`;
@@ -1094,17 +1115,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const unpositionedImagesCount = useMemo(() => {
     const sourceImages = orderedShotImages || [];
     return sourceImages
-      .filter(img => {
-        const hasTimelineFrame = (img as any).timeline_frame !== null && (img as any).timeline_frame !== undefined;
-        return !hasTimelineFrame;
-      })
-      .filter(img => {
-        const isVideo = img.type === 'video' ||
-                       img.type === 'video_travel_output' ||
-                       (img.location && img.location.endsWith('.mp4')) ||
-                       (img.imageUrl && img.imageUrl.endsWith('.mp4'));
-        return !isVideo;
-      }).length;
+      .filter(img => !isPositioned(img))
+      .filter(img => !isVideoGeneration(img))
+      .length;
   }, [orderedShotImages]);
 
   // Auto-disable turbo mode when there are more than 2 images
@@ -1452,7 +1465,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       await queryClientRef.current.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       await queryClientRef.current.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       // IMPORTANT: Also invalidate two-phase cache keys
-      await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations-fast', shotId] });
+      await queryClientRef.current.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
       await queryClientRef.current.invalidateQueries({ queryKey: ['shot-generations-meta', shotId] });
       
       console.log('[ImageFlipDebug] [ShotEditor] Queries invalidated', {

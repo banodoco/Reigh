@@ -1,5 +1,6 @@
 import { useReducer, useEffect, useMemo, useRef } from 'react';
 import { GeneratedImageWithMetadata } from '../index';
+import { hasVideoExtension } from '@/shared/lib/typeGuards';
 
 // Consolidated filters state interface
 export interface ImageGalleryFiltersState {
@@ -358,10 +359,10 @@ export const useImageGalleryFiltersOptimized = ({
     }
 
     // 2. Apply mediaTypeFilter (only in client pagination mode)
+    // Uses canonical hasVideoExtension from typeGuards
     if (!isServerPagination && filtersState.mediaTypeFilter !== 'all') {
       currentFiltered = currentFiltered.filter(image => {
-        const urlIsVideo = image.url && (image.url.toLowerCase().endsWith('.webm') || image.url.toLowerCase().endsWith('.mp4') || image.url.toLowerCase().endsWith('.mov'));
-        const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : urlIsVideo;
+        const isActuallyVideo = typeof image.isVideo === 'boolean' ? image.isVideo : hasVideoExtension(image.url);
         
         if (filtersState.mediaTypeFilter === 'image') {
           return !isActuallyVideo;

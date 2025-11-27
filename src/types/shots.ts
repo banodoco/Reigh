@@ -26,9 +26,25 @@ export interface GenerationMetadata {
 /**
  * Base type for all generation data
  * Used throughout the app for galleries, lightboxes, and general image display
+ * 
+ * IMPORTANT ID FIELDS:
+ * - `id` is the shot_generations.id (unique per entry in a shot)
+ * - `generation_id` is the generations.id (the actual generation record)
+ * 
+ * When the same generation appears twice in a shot:
+ * - Both have the SAME `generation_id`
+ * - Each has a DIFFERENT `id` (their shot_generations entry IDs)
+ * 
+ * For operations:
+ * - Use `id` for delete, reorder, position updates (targets the shot entry)
+ * - Use `generation_id` for fetching generation data, lineage tracking
+ * 
+ * @deprecated shotImageEntryId - Use `id` instead (same value)
+ * @deprecated shot_generation_id - Use `id` instead (same value)
  */
 export interface GenerationRow {
-  id: string; // Assuming generation_id is a string, adjust if it's a number or other type
+  id: string; // shot_generations.id - unique per entry in shot
+  generation_id?: string; // generations.id - the actual generation record
   // Add other relevant properties from your generations table
   imageUrl?: string; // May specifically be for image previews
   thumbUrl?: string;
@@ -37,7 +53,10 @@ export interface GenerationRow {
   createdAt?: string;
   metadata?: GenerationMetadata; // Typed metadata field
   isOptimistic?: boolean;
-  shotImageEntryId?: string; // ID from the shot_images table linking shot to generation
+  /** @deprecated Use `id` instead - this is the same value */
+  shotImageEntryId?: string; // Deprecated: ID from the shot_generations table
+  /** @deprecated Use `id` instead - this is the same value */
+  shot_generation_id?: string; // Deprecated: alias for shotImageEntryId
   name?: string; // Optional variant name
   timeline_frame?: number; // Position in timeline (from shot_generations table)
   starred?: boolean; // Whether this generation is starred

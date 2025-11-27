@@ -415,6 +415,20 @@ export const applyFluidTimeline = (
     return shrinkOversizedGaps(result, excludeId);
   }
 
+  // SIMPLIFIED: Don't shift other items during drag
+  // The complex shifting logic was causing items to disappear and markers to jump
+  // Instead, just enforce gap constraints on the final result
+  console.log('[FluidTimelineCore] 🛑 SHIFTING DISABLED - Complex shifting caused instability');
+  console.log('[FluidTimelineCore] 📍 Dragged item position:', {
+    draggedId: draggedId.substring(0, 8),
+    targetFrame: limitedTargetFrame,
+    violations: violations.length
+  });
+  
+  // Just apply gap constraints without shifting other items
+  return shrinkOversizedGaps(result, excludeId);
+
+  /* DISABLED: Complex shifting logic that was causing issues
   // Apply shifting to handle violations (both gap violations and boundary collisions)
   const shiftDirection = movementAmount > 0 ? 1 : -1;
 
@@ -648,6 +662,7 @@ export const applyFluidTimeline = (
   });
 
   return result;
+  END DISABLED BLOCK */
 };
 
 // Convert pixel position to frame number
@@ -772,19 +787,40 @@ export const findClosestValidPosition = (
 };
 
 // Calculate timeline dimensions
-export const getTimelineDimensions = (framePositions: Map<string, number>) => {
+// MINIMUM_TIMELINE_MAX ensures the timeline always shows at least this many frames
+// This provides space for duplicating the only item in a shot
+const MINIMUM_TIMELINE_MAX = 30;
+
+export const getTimelineDimensions = (
+  framePositions: Map<string, number>,
+  pendingFrames?: (number | null)[] // Optional pending frames (drop, duplicate) to include in range calculation
+) => {
   const positions = Array.from(framePositions.values());
   
-  // Handle empty positions case
-  if (positions.length === 0) {
-    return { fullMin: 0, fullMax: 0, fullRange: 1 }; // Minimal range for empty case
+  // Include valid pending frames in the calculation
+  const validPendingFrames = (pendingFrames || []).filter((f): f is number => f !== null && f !== undefined);
+  const allPositions = [...positions, ...validPendingFrames];
+  
+  // [PendingDebug] Log when pending frames are included
+  if (validPendingFrames.length > 0) {
+    console.log('[PendingDebug] 📐 getTimelineDimensions including pending frames:', {
+      positions: positions.slice(0, 5), // First 5 positions
+      validPendingFrames,
+      allPositionsCount: allPositions.length
+    });
   }
   
-  const staticMax = Math.max(...positions, 0);
-  const staticMin = Math.min(...positions, 0);
+  // Handle empty positions case
+  if (allPositions.length === 0) {
+    return { fullMin: 0, fullMax: MINIMUM_TIMELINE_MAX, fullRange: MINIMUM_TIMELINE_MAX }; // Show minimum range for empty case
+  }
+  
+  const staticMax = Math.max(...allPositions, 0);
+  const staticMin = Math.min(...allPositions, 0);
 
-  // NO RIGHT-SIDE PADDING - timeline ends exactly at the last image position
-  const fullMax = staticMax;
+  // Ensure timeline shows at least MINIMUM_TIMELINE_MAX frames
+  // This provides visual space when there's only one item at position 0
+  const fullMax = Math.max(staticMax, MINIMUM_TIMELINE_MAX);
   
   // NO LEFT-SIDE PADDING - timeline starts exactly at the first image position (or 0)
   const fullMin = Math.min(0, staticMin);

@@ -53,10 +53,13 @@ const TimelineRuler: React.FC<TimelineRulerProps> = ({
     }
     
     // Always include end
-    if (markerCount > 1) {
+    if (markerCount > 1 && fullMax > fullMin) {
       markers.push(fullMax);
     }
   }
+
+  // [RulerDebug] Log ruler markers
+  // console.log('[RulerDebug] Markers:', { fullMin, fullMax, fullRange, count: markers.length, markers });
 
   return (
     <div

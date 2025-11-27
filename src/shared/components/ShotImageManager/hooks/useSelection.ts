@@ -104,7 +104,8 @@ export function useSelection({
     }
     
     // Find the current image index
-    const currentIndex = images.findIndex(img => ((img as any).shotImageEntryId ?? (img as any).id) === imageKey);
+    // img.id is shot_generations.id - unique per entry
+    const currentIndex = images.findIndex(img => img.id === imageKey);
     
     // Desktop behavior
     if (event.metaKey || event.ctrlKey) {

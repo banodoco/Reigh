@@ -66,20 +66,20 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
       requestedIndex: index,
       totalImages: images.length,
       isValidIndex: index >= 0 && index < images.length,
-      imageId: images[index]?.shotImageEntryId?.substring(0, 8)
+      imageId: images[index]?.id?.substring(0, 8) // shot_generations.id
     });
     
     if (index >= 0 && index < images.length) {
       console.log('[DoubleTapFlow] ✅ LIGHTBOX OPENING:', {
         shotId: shotId.substring(0, 8),
         index,
-        imageId: images[index]?.shotImageEntryId?.substring(0, 8)
+        imageId: images[index]?.id?.substring(0, 8) // shot_generations.id
       });
       
       timelineDebugger.logEvent('Lightbox opened', {
         shotId,
         imageIndex: index,
-        imageId: images[index]?.shotImageEntryId?.substring(0, 8),
+        imageId: images[index]?.id?.substring(0, 8), // shot_generations.id
         totalImages: images.length
       });
       setLightboxIndex(index);
@@ -96,7 +96,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
       timelineDebugger.logEvent('Lightbox opened with inpaint mode', {
         shotId,
         imageIndex: index,
-        imageId: images[index]?.shotImageEntryId?.substring(0, 8),
+        imageId: images[index]?.id?.substring(0, 8), // shot_generations.id
         totalImages: images.length
       });
       setAutoEnterInpaint(true);

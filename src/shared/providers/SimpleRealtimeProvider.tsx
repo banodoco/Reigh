@@ -151,6 +151,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
           completedShotIds.forEach((shotId) => {
             queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
             queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] }); // 🚀 For useEnhancedShotPositions (Timeline)
+            queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] }); // 🚀 For useAllShotGenerations (single query)
           });
         } else {
           // Only if we have completed tasks but no shot IDs, invalidate project-level
@@ -160,6 +161,9 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
           // Also invalidate all shot-generations (e.g., for upscale tasks that don't have shotId in metadata)
           queryClient.invalidateQueries({
             predicate: (query) => query.queryKey[0] === 'shot-generations'
+          });
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'all-shot-generations'
           });
         }
       }
@@ -240,15 +244,37 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
         timestamp: Date.now()
       });
 
+      // Check if any payloads are INSERT events (which are handled by optimistic updates)
+      // We skip all-shot-generations invalidation for pure INSERT batches to prevent flicker
+      // Also checking for 'insert' just in case case-sensitivity varies
+      const eventTypes = payloads?.map((p: any) => p.eventType) || [];
+      const hasOnlyInserts = payloads?.length > 0 && payloads?.every((p: any) => p.eventType === 'INSERT' || p.eventType === 'insert');
+      
+      console.log('[AddFlicker] 4️⃣ REALTIME shot-generation-change-batch received:', {
+        payloadCount: payloads?.length,
+        eventTypes,
+        hasOnlyInserts,
+        affectedShotIds: affectedShotIds?.map((id: string) => id.substring(0, 8)),
+        timestamp: Date.now()
+      });
+      
       // Invalidate queries for all affected shots in batch
       // This prevents multiple invalidations during rapid timeline drag operations
       if (affectedShotIds && affectedShotIds.length > 0) {
-        console.log('[SimpleRealtimeProvider:Batching] 🎯 Batch invalidating', affectedShotIds.length, 'shots:', 
-          affectedShotIds.map((id: string) => id.substring(0, 8)).join(', '));
-        
         affectedShotIds.forEach((shotId: string) => {
+          console.log('[AddFlicker] 4️⃣ Invalidating for shot:', shotId.substring(0, 8), {
+            willInvalidateAllShotGens: !hasOnlyInserts,
+            reason: hasOnlyInserts ? 'SKIPPED - INSERT handled by optimistic' : 'INVALIDATING'
+          });
+          
           queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
           queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+          // Skip all-shot-generations for INSERT-only batches - optimistic updates handle these
+          // This prevents the flicker when adding images via GenerationsPane
+          if (!hasOnlyInserts) {
+            console.log('[AddFlicker] 4️⃣ ❌ INVALIDATING all-shot-generations!', shotId.substring(0, 8));
+            queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
+          }
           queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shotId] });
         });
       }
@@ -258,7 +284,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
     const handleShotGenerationChange = (event: CustomEvent) => {
       const { shotId, isPositioned, eventType } = event.detail;
       
-      console.log('[SimpleRealtimeProvider] 🎯 Shot generation change received (legacy - should be batched):', {
+      console.log('[AddFlicker] ⚠️ LEGACY shot-generation-change received (should be batched):', {
         shotId: shotId?.substring(0, 8),
         isPositioned,
         eventType,
@@ -267,27 +293,37 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       
       // Simplified invalidation for legacy events
       if (shotId) {
-        console.log('[SimpleRealtimeProvider] 🎯 Targeted shot invalidation for positioned image:', { shotId: shotId.substring(0, 8) });
+        console.log('[AddFlicker] ⚠️ LEGACY ❌ INVALIDATING all-shot-generations!', shotId.substring(0, 8));
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
         queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
         queryClient.invalidateQueries({ queryKey: ['unpositioned-count', shotId] });
       }
     };
 
     // NEW: Handle batched generation updates (upscale, location changes, etc.)
     const handleGenerationUpdateBatch = (event: CustomEvent) => {
-      const { count } = event.detail;
-      console.log('[SimpleRealtimeProvider:Batching] 📦 Batched generation updates received:', {
+      const { count, payloads } = event.detail;
+      console.log('[AddFlicker] 5️⃣ REALTIME generation-update-batch received:', {
         count,
+        payloads: payloads?.map((p: any) => ({
+          generationId: p.generationId?.substring(0, 8),
+          upscaleCompleted: p.upscaleCompleted,
+          locationChanged: p.locationChanged,
+          thumbnailChanged: p.thumbnailChanged
+        })),
         timestamp: Date.now()
       });
 
+      console.log('[AddFlicker] 5️⃣ ❌ INVALIDATING all-shot-generations (broad)!');
+      
       // Invalidate generation queries to show new URLs/locations
       queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
       queryClient.invalidateQueries({ queryKey: ['generations'] });
       queryClient.invalidateQueries({ queryKey: ['generation'] }); // For single generation queries (e.g. parent generation in ChildGenerationsView)
       // Also invalidate shot-generations as they contain generation data
       queryClient.invalidateQueries({ queryKey: ['shot-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] });
       // Invalidate shots as they might contain generation data (thumbnails etc)
       queryClient.invalidateQueries({ queryKey: ['shots'] });
     };

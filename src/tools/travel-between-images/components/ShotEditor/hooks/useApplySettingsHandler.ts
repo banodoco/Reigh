@@ -92,9 +92,9 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
     // Get latest values from ref (no stale closures!)
     const ctx = contextRef.current;
     
-    // ⚠️ SAFETY CHECK: Ensure Phase 2 data is loaded before mutations
-    // Phase 2 provides shotImageEntryId needed for mutations
-    const hasMissingIds = ctx.simpleFilteredImages.some(img => !img.shotImageEntryId);
+    // ⚠️ SAFETY CHECK: Ensure data is loaded before mutations
+    // We need id (shot_generations.id) for mutations
+    const hasMissingIds = ctx.simpleFilteredImages.some(img => !img.id);
     if (hasMissingIds && replaceImages) {
       console.warn('[ApplySettings] ⚠️  Some images missing shotImageEntryId (Phase 2 incomplete). Waiting for metadata...');
       const { toast } = await import('sonner');
@@ -219,6 +219,7 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
           
           console.log('[ApplySettings] - About to invalidate shot-generations query...');
           queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
+          queryClient.invalidateQueries({ queryKey: ['all-shot-generations', ctx.selectedShot?.id] });
           console.log('[ApplySettings] - shot-generations invalidated');
           
           console.log('[ApplySettings] - Both queries invalidated successfully');
@@ -339,6 +340,7 @@ export function useApplySettingsHandler(context: ApplySettingsContext) {
       console.log('[ApplySettings] Step 7: Force reload...');
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', ctx.selectedShot?.id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations', ctx.selectedShot?.id] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', ctx.selectedShot?.id] });
       await new Promise(resolve => setTimeout(resolve, 200));
       await ctx.loadPositions({ silent: true });
       

@@ -12,8 +12,9 @@ import { framesToSeconds } from './Timeline/utils/time-utils';
 
 interface SortableImageItemProps {
   image: GenerationRow;
-  onDelete: (shotImageEntryId: string) => void;
-  onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
+  // id parameter is shot_generations.id (unique per entry)
+  onDelete: (id: string) => void;
+  onDuplicate?: (id: string, timeline_frame: number) => void;
   onDoubleClick: () => void;
   onMobileTap?: () => void;
   onClick: (event: React.MouseEvent) => void;
@@ -100,7 +101,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     return { aspectRatio: '1' };
   };
 
-  const sortableId = (image.shotImageEntryId as any) || (image.id as any);
+  // image.id is shot_generations.id - unique per entry
+  const sortableId = image.id;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: sortableId,
     disabled: isDragDisabled,
@@ -146,7 +148,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    onDelete(image.shotImageEntryId);
+    // Use id (shot_generations.id)
+    onDelete(image.id);
   };
 
   const handleDuplicateClick = (e: React.MouseEvent) => {
@@ -154,7 +157,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
     if (onDuplicate && timeline_frame !== undefined) {
-      onDuplicate(image.shotImageEntryId, timeline_frame);
+      // Use id (shot_generations.id)
+      onDuplicate(image.id, timeline_frame);
     }
   };
 
@@ -171,7 +175,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   );
 
   console.log('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-    imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+    imageId: (image.id || '').substring(0, 8), // shot_generations.id
     isSelected,
     isDragDisabled,
     isMobile,
@@ -193,7 +197,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
       style={style}
       className={finalClassName}
       data-selected={isSelected}
-      data-image-id={((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8)}
+      data-image-id={(image.id || '').substring(0, 8)} // shot_generations.id
       {...(!isDragDisabled ? attributes : {})}
       onClick={(e) => {
         // Check if the click originated from a button or its children
@@ -201,7 +205,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         const isButtonClick = target.closest('button') !== null;
         
         console.log('[SelectionDebug:SortableImageItem] onClick triggered', {
-          imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+          imageId: (image.id || '').substring(0, 8), // shot_generations.id
           isSelected,
           hasOnClickHandler: !!onClick,
           eventTarget: target?.tagName || 'unknown',
@@ -229,7 +233,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
             return;
           }
           console.log('[SelectionDebug:SortableImageItem] DOM INSPECTION POST-RENDER', {
-            imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
+            imageId: (image.id || '').substring(0, 8), // shot_generations.id
             isSelected,
             isButtonClick,
             actualDOMClasses: element.className,
@@ -331,12 +335,12 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
                 e.stopPropagation();
                 e.nativeEvent.stopImmediatePropagation();
               }}
-              disabled={duplicatingImageId === image.shotImageEntryId}
+              disabled={duplicatingImageId === image.id}
               title="Duplicate image"
             >
-              {duplicatingImageId === image.shotImageEntryId ? (
+              {duplicatingImageId === image.id ? (
                 <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
-              ) : duplicateSuccessImageId === image.shotImageEntryId ? (
+              ) : duplicateSuccessImageId === image.id ? (
                 <Check className="h-3.5 w-3.5" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
@@ -374,8 +378,9 @@ export const SortableImageItem = React.memo(
   SortableImageItemComponent,
   (prevProps, nextProps) => {
     // Log deep render trace for debugging (can be removed once optimized)
+    // image.id is shot_generations.id - unique per entry
     const shouldSkipRender = 
-      prevProps.image.shotImageEntryId === nextProps.image.shotImageEntryId &&
+      prevProps.image.id === nextProps.image.id &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isDragDisabled === nextProps.isDragDisabled &&
       prevProps.timeline_frame === nextProps.timeline_frame &&
@@ -388,7 +393,7 @@ export const SortableImageItem = React.memo(
       prevProps.image.imageUrl === nextProps.imageUrl;
 
     console.warn('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-      imageId: nextProps.image.shotImageEntryId?.substring(0, 8),
+      imageId: nextProps.image.id?.substring(0, 8), // shot_generations.id
       isSelected: nextProps.isSelected,
       isDragDisabled: nextProps.isDragDisabled,
       isMobile: false,
@@ -396,7 +401,7 @@ export const SortableImageItem = React.memo(
       hasOnDoubleClick: !!nextProps.onDoubleClick,
       shouldSkipRender,
       propsChanged: {
-        id: prevProps.image.shotImageEntryId !== nextProps.image.shotImageEntryId,
+        id: prevProps.image.id !== nextProps.image.id,
         isSelected: prevProps.isSelected !== nextProps.isSelected,
         isDragDisabled: prevProps.isDragDisabled !== nextProps.isDragDisabled,
         timeline_frame: prevProps.timeline_frame !== nextProps.timeline_frame,

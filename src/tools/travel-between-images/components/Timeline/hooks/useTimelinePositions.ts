@@ -158,17 +158,11 @@ export function useTimelinePositions({
       console.log('[TimelinePositions] ⏳ Skipping sync - update in progress');
       return;
     }
-    
-    // Don't sync if we have pending updates
-    if (pendingUpdatesRef.current.size > 0) {
-      console.log('[TimelinePositions] 📝 Skipping sync - pending updates exist:', 
-        pendingUpdatesRef.current.size);
-      return;
-    }
-    
+
     // Build image key map for efficient lookup
+    // image.id is now shot_generations.id - unique per entry
     const imageKeyMap = new Map(
-      images.map(img => [img.id, img.shotImageEntryId ?? img.id])
+      images.map(img => [img.id, img.id])
     );
     
     // Calculate new positions from database
@@ -186,6 +180,58 @@ export function useTimelinePositions({
         }
       }
     });
+
+    // MERGE LOGIC: Combine server data with local pending updates
+    // Instead of skipping the entire sync, we merge:
+    // 1. Server data (truth for non-pending items and verified items)
+    // 2. Local pending data (truth for unverified pending items)
+    if (pendingUpdatesRef.current.size > 0) {
+       const now = Date.now();
+       const toDelete = new Set<string>();
+
+       for (const [id, pending] of pendingUpdatesRef.current.entries()) {
+           const serverPos = newPositions.get(id);
+           
+           // 1. Success case: Server matches our pending update
+           // Use relaxed comparison for safety (sometimes floats vs ints)
+           if (serverPos !== undefined && Math.abs(serverPos - pending.newPosition) < 0.01) {
+               toDelete.add(id);
+               // Server is correct, keep newPositions as-is for this item
+               continue;
+           }
+
+           // 2. Timeout case: Pending update is too old (> 10s)
+           if (now - pending.timestamp > 10000) {
+               console.warn('[TimelinePositions] ⏰ Pending update timed out, accepting server state:', id);
+               toDelete.add(id);
+               // Accept server data (already in newPositions)
+               continue;
+           }
+           
+           // 3. Stale case: Server still has old position (or null)
+           // OVERRIDE the server data with our local optimistic state
+           // This protects the dragged item(s) from jumping back
+           if (pending.operation === 'remove') {
+               newPositions.delete(id);
+           } else {
+               newPositions.set(id, pending.newPosition);
+           }
+           console.log('[TimelinePositions] 🛡️ Protected pending item from stale sync:', {
+             id: id.substring(0, 8),
+             serverPos,
+             localPos: pending.newPosition
+           });
+       }
+       
+       // Clear verified/timed-out updates
+       if (toDelete.size > 0) {
+         console.log('[TimelinePositions] ✅ Verified/Cleared pending updates:', Array.from(toDelete).map(id => id.substring(0, 8)));
+         toDelete.forEach(id => pendingUpdatesRef.current.delete(id));
+       }
+       
+       // NOTE: We no longer skip the sync entirely!
+       // We merged local pending data into newPositions, so we can safely continue
+    }
     
     // Check if positions actually changed
     const syncKey = JSON.stringify([...newPositions.entries()].sort());
@@ -387,11 +433,10 @@ export function useTimelinePositions({
       
       for (const change of changes) {
         // Find the shot_generation record for this item
+        // change.id is shot_generations.id which matches sg.id directly
         const shotGen = shotGenerations.find(sg => {
-          const imageKey = images.find(img => 
-            (img.shotImageEntryId ?? img.id) === change.id
-          )?.id;
-          return sg.generation_id === imageKey || sg.id === change.id;
+          // Direct match on shot_generations.id
+          return sg.id === change.id;
         });
         
         if (shotGen) {
@@ -453,14 +498,18 @@ export function useTimelinePositions({
         }
       }
       
-      // Success! Clear pending updates
-      clearPendingUpdates(changes.map(c => c.id));
+      // Success!
+      // NOTE: We do NOT clear pending updates here anymore.
+      // We leave them in pendingUpdatesRef until syncFromDatabase verifies that
+      // the server data has actually caught up. This prevents "flash of stale content".
+      // clearPendingUpdates(changes.map(c => c.id));
       
       console.log(`[TimelinePositions] ✅ Operation ${operationId} completed successfully`);
       
       // Invalidate cache after a short delay to allow UI to settle
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['shot-generations', shotId] });
+        queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] });
         queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
       }, 100);
       

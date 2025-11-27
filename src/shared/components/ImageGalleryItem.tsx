@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Trash2, Info, Settings, CheckCircle, AlertTriangle, Download, PlusCircle, Check, Star, Eye, Link, Plus, Pencil, Share2, Copy, Loader2, CornerDownLeft } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import HoverScrubVideo from './HoverScrubVideo';
+import { hasVideoExtension } from '@/shared/lib/typeGuards';
 import { 
   Tooltip, 
   TooltipContent, 
@@ -56,8 +57,8 @@ interface ImageGalleryItemProps {
   optimisticUnpositionedIds?: Set<string>;
   optimisticPositionedIds?: Set<string>;
   optimisticDeletedIds?: Set<string>;
-  onOptimisticUnpositioned?: (imageId: string) => void;
-  onOptimisticPositioned?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
+  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
   addingToShotImageId: string | null;
   setAddingToShotImageId: (id: string | null) => void;
   addingToShotWithoutPositionImageId?: string | null;
@@ -586,31 +587,20 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
 
   // Determine if it's a video ONLY if the display URL points to a video file
   // Thumbnails for videos are images (png/jpg) and must be treated as images here
-  const urlIsVideo = Boolean(
-    actualDisplayUrl && (
-      actualDisplayUrl.toLowerCase().endsWith('.webm') ||
-      actualDisplayUrl.toLowerCase().endsWith('.mp4') ||
-      actualDisplayUrl.toLowerCase().endsWith('.mov')
-    )
-  );
+  // Uses canonical hasVideoExtension from typeGuards
+  const urlIsVideo = hasVideoExtension(actualDisplayUrl);
   // If the display URL is not a video file, force image rendering even if image.isVideo is true
   const isActuallyVideo = urlIsVideo;
   // Content type: whether this item represents a video generation at all
   const isVideoContent = useMemo(() => {
     if (typeof image.isVideo === 'boolean') return image.isVideo;
-    const url = image.url || '';
-    const lower = url.toLowerCase();
-    return lower.endsWith('.webm') || lower.endsWith('.mp4') || lower.endsWith('.mov');
+    return hasVideoExtension(image.url);
   }, [image.isVideo, image.url]);
 
   // Check if we have a real image thumbnail (not a video file)
   const hasThumbnailImage = useMemo(() => {
-    const thumb = image.thumbUrl || '';
-    if (!thumb) return false;
-    const lower = thumb.toLowerCase();
-    // Treat as image only if not a video extension
-    const isVideoExt = lower.endsWith('.webm') || lower.endsWith('.mp4') || lower.endsWith('.mov');
-    return !isVideoExt;
+    if (!image.thumbUrl) return false;
+    return !hasVideoExtension(image.thumbUrl);
   }, [image.thumbUrl]);
 
   const videoUrl = useMemo(() => (isVideoContent ? (image.url || null) : null), [isVideoContent, image.url]);
@@ -623,8 +613,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isAlreadyPositionedInSelectedShot = useMemo(() => {
     if (!selectedShotIdLocal || !image.id) return false;
     
-    // Check optimistic state first
-    if (optimisticPositionedIds?.has(image.id)) return true;
+    // Check optimistic state first (uses composite key: mediaId:shotId)
+    if (optimisticPositionedIds?.has(`${image.id}:${selectedShotIdLocal}`)) return true;
     
     // Optimized: Check single shot first (most common case)
     if (image.shot_id === selectedShotIdLocal) {
@@ -648,8 +638,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const isAlreadyAssociatedWithoutPosition = useMemo(() => {
     if (!selectedShotIdLocal || !image.id) return false;
     
-    // Check optimistic state first
-    if (optimisticUnpositionedIds?.has(image.id)) return true;
+    // Check optimistic state first (uses composite key: mediaId:shotId)
+    if (optimisticUnpositionedIds?.has(`${image.id}:${selectedShotIdLocal}`)) return true;
     
     // Optimized: Check single shot first (most common case)
     if (image.shot_id === selectedShotIdLocal) {
@@ -900,7 +890,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onClick={enableSingleClick || !isMobile ? (e) => {
+        onClick={enableSingleClick ? (e) => {
+          // Only handle single-click when explicitly enabled (e.g., selection mode)
+          // Normal behavior: desktop uses double-click, mobile uses touch events
           if (onImageClick) {
             e.stopPropagation();
             onImageClick(image);
@@ -1153,7 +1145,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                           if (success) {
                                               console.log(`[GenerationsPane] ✅ Success on attempt ${retryCount + 1} for image ${image.id}`);
                                               onShowTick(image.id!);
-                                              onOptimisticPositioned?.(image.id!);
+                                              onOptimisticPositioned?.(image.id!, selectedShotIdLocal);
                                               log('MobileAddToShot', `Success on attempt ${retryCount + 1} for image ${image.id}`);
                                           } else {
                                               console.log(`[GenerationsPane] ❌ Failed on attempt ${retryCount + 1} for image ${image.id}`);
@@ -1287,7 +1279,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                                                     if (success) {
                                                         console.log(`[GenerationsPane] ✅ Success without position on attempt ${retryCount + 1} for image ${image.id}`);
                                                         onShowSecondaryTick?.(image.id!);
-                                                        onOptimisticUnpositioned?.(image.id!);
+                                                        onOptimisticUnpositioned?.(image.id!, selectedShotIdLocal);
                                                     } else {
                                                         console.log(`[GenerationsPane] ❌ Failed without position on attempt ${retryCount + 1} for image ${image.id}`);
                                                     }

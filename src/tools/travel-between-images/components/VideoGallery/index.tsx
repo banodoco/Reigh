@@ -958,8 +958,6 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
               {displaySortedVideoOutputs.map((video, index) => {
                 const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
-                const isFirstVideo = index === 0;
-                const shouldPreload = isFirstVideo ? 'metadata' : 'none';
 
                 return (
                   <VideoItem
@@ -967,8 +965,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     video={video}
                     index={index}
                     originalIndex={originalIndex}
-                    isFirstVideo={isFirstVideo}
-                    shouldPreload={shouldPreload}
+                    // Simplified: all videos use 'metadata' preload - let browser manage concurrent requests
+                    shouldPreload="metadata"
                     isMobile={isTouchLikeDevice}
                     projectAspectRatio={projectAspectRatio}
                     projectId={projectId}

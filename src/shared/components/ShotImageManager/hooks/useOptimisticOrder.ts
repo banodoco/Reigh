@@ -48,8 +48,9 @@ export function useOptimisticOrder({ images }: UseOptimisticOrderProps) {
         }
         
         // Check if parent props now match our optimistic order
-        const currentOrder = optimisticOrder.map(img => img.shotImageEntryId ?? img.id).join(',');
-        const parentOrder = images.map(img => img.shotImageEntryId ?? img.id).join(',');
+        // img.id is shot_generations.id - unique per entry
+        const currentOrder = optimisticOrder.map(img => img.id).join(',');
+        const parentOrder = images.map(img => img.id).join(',');
         
         if (currentOrder === parentOrder) {
           console.log('[DragDebug:ShotImageManager] Parent caught up with optimistic order - ending optimistic mode');

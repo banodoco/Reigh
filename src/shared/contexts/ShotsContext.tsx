@@ -56,7 +56,7 @@ export const ShotsProvider: React.FC<ShotsProviderProps> = ({ children }) => {
           shotName: shot.name,
           imagesCount: shot.images?.length || 0,
           sampleImages: shot.images?.slice(0, 2).map(img => ({
-            shotImageEntryId: img.shotImageEntryId,
+            id: img.id, // shot_generations.id
             hasImageUrl: !!img.imageUrl,
             hasThumbUrl: !!img.thumbUrl,
             hasLocation: !!img.location,

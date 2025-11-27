@@ -42,6 +42,8 @@ interface TimelineItemProps {
   // Tap-to-move state (for tablets)
   isSelectedForMove?: boolean;
   onTapToMove?: () => void;
+  // Just-dropped effect - shows temporary hover state
+  isJustDropped?: boolean;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -72,6 +74,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   readOnly = false,
   isSelectedForMove = false,
   onTapToMove,
+  isJustDropped = false,
 }) => {
   // [ShotNavPerf] Log when TimelineItem mounts/updates
   React.useEffect(() => {
@@ -86,11 +89,29 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   // Track hover state
   const [isHovered, setIsHovered] = useState(false);
   
+  // Track "just dropped" visual effect - auto-clears after animation
+  const [showDropEffect, setShowDropEffect] = useState(false);
+  
+  React.useEffect(() => {
+    if (isJustDropped) {
+      setShowDropEffect(true);
+      // Clear the effect after 800ms (enough time for visual feedback)
+      const timer = setTimeout(() => {
+        setShowDropEffect(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isJustDropped]);
+  
+  // Combined "elevated" state: actual hover OR just-dropped effect (unless actually hovering takes over)
+  const isElevated = isHovered || showDropEffect || isDragging || isSelectedForMove;
+  
   // Track if we just clicked a button to prevent drag from starting
   const buttonClickedRef = useRef(false);
   
-  // Use imageKey for Phase 1 compatibility (shotImageEntryId may be null)
-  const imageKey = image.shotImageEntryId ?? image.id;
+  // imageKey is the shot_generations.id - unique per entry in the shot
+  // (Previously used shotImageEntryId fallback, but now id IS the shot entry ID)
+  const imageKey = image.id;
 
   // ===== MOBILE TAP HANDLING =====
   // Use generalized double-tap hook for iPad/mobile interaction
@@ -196,7 +217,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
     if (onDelete) {
-      onDelete(image.shotImageEntryId);
+      // Use id (shot_generations.id) - unique per entry
+      onDelete(image.id);
     }
   };
 
@@ -206,13 +228,14 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     e.nativeEvent.stopImmediatePropagation();
     if (onDuplicate) {
       console.log('[DUPLICATE_DEBUG] 🖱️ TIMELINE ITEM - DUPLICATE CLICK:', {
-        shotImageEntryId: image.shotImageEntryId.substring(0, 8),
+        id: image.id.substring(0, 8), // shot_generations.id
+        generation_id: image.generation_id?.substring(0, 8),
         framePosition_from_timeline: framePosition,
         timeline_frame_from_image: (image as any).timeline_frame,
-        image_id: image.id.substring(0, 8),
         mismatch: framePosition !== (image as any).timeline_frame ? 'POSITION_MISMATCH!' : 'positions_match'
       });
-      onDuplicate(image.shotImageEntryId, framePosition);
+      // Use id (shot_generations.id) - unique per entry
+      onDuplicate(image.id, framePosition);
     }
   };
   // Calculate position as pixel offset with padding adjustment
@@ -256,17 +279,17 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         position: 'absolute',
         left: `${leftPercent}%`,
         top: '50%',
-        transform: `translate(-50%, -50%) ${isHovered || isDragging || isSelectedForMove ? 'scale(1.15)' : 'scale(1)'}`,
+        transform: `translate(-50%, -50%) ${isElevated ? 'scale(1.15)' : 'scale(1)'}`,
         // Only transition transform/opacity/box-shadow, NOT position (left) - prevents visual jitter when coordinate system recalculates
         transition: isDragging ? 'none' : 'transform 0.2s ease-out, opacity 0.2s ease-out, box-shadow 0.2s ease-out',
         opacity: isDragging ? 0.8 : 1,
-        zIndex: isHovered || isDragging || isSelectedForMove ? 20 : 1,
+        zIndex: isElevated ? 20 : 1,
         cursor: isSelectedForMove ? 'pointer' : 'move',
         boxShadow: isSelectedForMove 
           ? '0 0 0 3px rgba(59, 130, 246, 0.5), 0 8px 25px rgba(59, 130, 246, 0.3)' 
-          : (isHovered || isDragging ? '0 8px 25px rgba(0, 0, 0, 0.15)' : 'none'),
+          : (isElevated ? '0 8px 25px rgba(0, 0, 0, 0.15)' : 'none'),
         // Prevent clicks from reaching items underneath when not hovered
-        pointerEvents: isHovered || isDragging ? 'auto' : 'auto',
+        pointerEvents: isElevated ? 'auto' : 'auto',
       }}
       onMouseDown={(e) => {
         // [NonDraggableDebug] Log that we reached the TimelineItem onMouseDown handler
@@ -359,7 +382,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             width: '120px', // Fixed width for consistent button positioning
             maxHeight: '120px', // Prevent tall portrait images from overflowing
             // Height controlled by aspectRatio for proper display
-            transform: isHovered || isDragging ? 'scale(1.05)' : 'scale(1)',
+            transform: isElevated ? 'scale(1.05)' : 'scale(1)',
             transition: isDragging ? 'none' : 'all 0.2s ease-out',
             ...aspectRatioStyle, // Apply aspect ratio to control height
           }}

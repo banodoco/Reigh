@@ -8,6 +8,7 @@ import { Shot } from "@/types/shots";
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
 import { parseRatio } from '@/shared/lib/aspectRatios';
 import { supabase } from "@/integrations/supabase/client";
+import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
 
 // ============================================================================
 // Types
@@ -164,18 +165,10 @@ export const calculateNextAvailableFrame = async (
     return 0;
   }
 
-  // Filter out videos (standardized approach)
-  const filteredShotGenerations = shotGenerationsData.filter(sg => {
-    // Must have a generation
-    if (!sg.generations) return false;
-    
-    // Not a video
-    const gen = sg.generations as any;
-    const isVideo = gen?.type === 'video' ||
-                   gen?.type === 'video_travel_output' ||
-                   (gen?.location && gen.location.endsWith('.mp4'));
-    return !isVideo;
-  });
+  // Filter out videos using canonical function from typeGuards
+  const filteredShotGenerations = shotGenerationsData.filter(sg => 
+    sg.generations && !isVideoShotGenerations(sg as ShotGenerationsLike)
+  );
 
   console.log('[AddImagesDebug] 🔍 After filtering videos:', {
     originalCount: shotGenerationsData.length,
