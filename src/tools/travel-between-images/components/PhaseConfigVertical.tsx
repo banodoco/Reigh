@@ -322,7 +322,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
                   <Slider
                     id={`steps_${phaseIdx}`}
                     min={1}
-                    max={20}
+                    max={15}
                     step={1}
                     value={[phaseConfig.steps_per_phase[phaseIdx]]}
                     onValueChange={(value) => {
