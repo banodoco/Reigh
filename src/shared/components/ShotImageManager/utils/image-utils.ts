@@ -1,62 +1,32 @@
 import { GenerationRow } from '@/types/shots';
+import { 
+  calculateFrameForIndex, 
+  extractExistingFrames 
+} from '@/shared/utils/timelinePositionCalculator';
 
 /**
  * Calculate frame position for inserting at a given index
- * The frame position should be the midpoint between surrounding images
+ * The frame position should be the midpoint between surrounding images,
+ * with collision detection to ensure uniqueness.
+ * 
+ * NOTE: This calculates timeline_frame (the frame number for video export),
+ * NOT the grid index position. The grid index comes from BatchDropZone.
+ * 
+ * IMPORTANT: currentImages are GenerationRow objects where:
+ * - .id = shot_generations.id (unique per shot entry)
+ * - .generation_id = generations.id (the actual generation)
+ * - .timeline_frame = frame number for video positioning
  */
 export const getFramePositionForIndex = (
   index: number,
   currentImages: GenerationRow[],
   batchVideoFrames: number
 ): number | undefined => {
-  console.log('[BatchDropPositionIssue] 📊 getFramePositionForIndex called:', {
-    index,
-    currentImagesLength: currentImages.length,
-    batchVideoFrames,
-    timestamp: Date.now()
-  });
-
-  if (currentImages.length === 0) {
-    console.log('[BatchDropPositionIssue] 🆕 NO IMAGES - RETURNING 0');
-    return 0;
-  }
+  // Extract existing frames from current images (filters out videos and null frames)
+  const existingFrames = extractExistingFrames(currentImages);
   
-  if (index === 0) {
-    const firstImage = currentImages[0];
-    const firstFrame = firstImage.timeline_frame ?? 0;
-    const result = Math.max(0, Math.floor(firstFrame / 2));
-    console.log('[BatchDropPositionIssue] 🔝 INSERTING AT START:', {
-      firstFrame,
-      result
-    });
-    return result;
-  }
-  
-  if (index >= currentImages.length) {
-    const lastImage = currentImages[currentImages.length - 1];
-    const lastFrame = lastImage.timeline_frame ?? (currentImages.length - 1) * batchVideoFrames;
-    const result = lastFrame + batchVideoFrames;
-    console.log('[BatchDropPositionIssue] 🔚 INSERTING AT END:', {
-      lastFrame,
-      result
-    });
-    return result;
-  }
-  
-  const prevImage = currentImages[index - 1];
-  const nextImage = currentImages[index];
-  const prevFrame = prevImage.timeline_frame ?? (index - 1) * batchVideoFrames;
-  const nextFrame = nextImage.timeline_frame ?? index * batchVideoFrames;
-  const result = Math.floor((prevFrame + nextFrame) / 2);
-  
-  console.log('[BatchDropPositionIssue] 🔄 INSERTING BETWEEN:', {
-    index,
-    prevFrame,
-    nextFrame,
-    midpoint: result
-  });
-  
-  return result;
+  // Use unified calculator with collision detection
+  return calculateFrameForIndex(index, existingFrames, batchVideoFrames);
 };
 
 /**

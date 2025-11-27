@@ -113,16 +113,43 @@ export const cropImagesToShotAspectRatio = async (
  * Calculate the next available frame position for new images
  * Queries the database to find the max position and adds spacing
  */
+/**
+ * Helper to ensure a frame is unique among existing frames
+ */
+const ensureUniqueFrame = (
+  targetFrame: number,
+  existingFrames: number[]
+): number => {
+  let frame = Math.max(0, Math.round(targetFrame));
+  
+  // If no collision, return as-is
+  if (!existingFrames.includes(frame)) {
+    return frame;
+  }
+  
+  // Find nearest available position
+  let offset = 1;
+  while (offset < 1000) {
+    const higher = frame + offset;
+    if (!existingFrames.includes(higher)) {
+      console.log('[UniqueFrame] 🔄 Collision resolved:', {
+        original: targetFrame,
+        resolved: higher,
+        offset
+      });
+      return higher;
+    }
+    offset += 1;
+  }
+  
+  // Fallback
+  return existingFrames.length > 0 ? Math.max(...existingFrames) + 60 : 0;
+};
+
 export const calculateNextAvailableFrame = async (
   shotId: string,
   targetFrame: number | undefined
 ): Promise<number> => {
-  // If target frame already provided, use it
-  if (targetFrame !== undefined) {
-    console.log('[AddImagesDebug] 🎯 Using provided targetFrame:', targetFrame);
-    return targetFrame;
-  }
-
   console.log('[AddImagesDebug] 🔍 Querying database for existing positions...');
   
   // Query shot_generations directly from database to get current positions
@@ -157,12 +184,12 @@ export const calculateNextAvailableFrame = async (
   if (error) {
     console.error('[AddImagesDebug] ❌ Error fetching shot generations for position calculation:', error);
     // Default to 0 if query fails
-    return 0;
+    return targetFrame !== undefined ? targetFrame : 0;
   }
 
   if (!shotGenerationsData) {
     console.log('[AddImagesDebug] 🆕 No shot generations data, starting at 0');
-    return 0;
+    return targetFrame !== undefined ? targetFrame : 0;
   }
 
   // Filter out videos using canonical function from typeGuards
@@ -178,7 +205,7 @@ export const calculateNextAvailableFrame = async (
 
   // Get positions only from items with valid timeline_frame
   const existingPositions = filteredShotGenerations
-    .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined)
+    .filter(sg => sg.timeline_frame !== null && sg.timeline_frame !== undefined && sg.timeline_frame !== -1)
     .map(sg => sg.timeline_frame!);
   
   console.log('[AddImagesDebug] 📍 Valid timeline_frame positions:', {
@@ -186,6 +213,17 @@ export const calculateNextAvailableFrame = async (
     positions: existingPositions,
     sorted: [...existingPositions].sort((a, b) => a - b)
   });
+
+  // If target frame provided, ensure it's unique
+  if (targetFrame !== undefined) {
+    const uniqueFrame = ensureUniqueFrame(targetFrame, existingPositions);
+    console.log('[AddImagesDebug] 🎯 Using provided targetFrame (with collision check):', {
+      original: targetFrame,
+      resolved: uniqueFrame,
+      hadCollision: targetFrame !== uniqueFrame
+    });
+    return uniqueFrame;
+  }
 
   if (existingPositions.length > 0) {
     const maxPosition = Math.max(...existingPositions);

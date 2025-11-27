@@ -84,6 +84,7 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
   const projectUISettingsQuery = useToolSettings<{
     acceleratedMode?: boolean;
     randomSeed?: boolean;
+    shotSortMode?: 'ordered' | 'newest' | 'oldest';
   }>('travel-ui-state', { 
     projectId: projectId || null, 
     enabled: !!projectId 
@@ -124,6 +125,7 @@ const useVideoTravelData = (selectedShotId?: string, projectId?: string) => {
 
     // Project UI settings data
     projectUISettings: projectUISettingsQuery.settings,
+    updateProjectUISettings: projectUISettingsQuery.update,
 
     // Current shot's LoRA settings (for inheriting to new shots)
     shotLoraSettings: shotLoraSettingsQuery.settings,
@@ -256,6 +258,7 @@ const VideoTravelToolPage: React.FC = () => {
     projectSettingsLoading,
     projectSettingsUpdating,
     projectUISettings,
+    updateProjectUISettings,
     shotLoraSettings
   } = useVideoTravelData(selectedShot?.id, selectedProjectId);
   console.log('[ShotNavPerf] ✅ useVideoTravelData returned in', Date.now() - videoTravelDataStart, 'ms');
@@ -832,8 +835,11 @@ const VideoTravelToolPage: React.FC = () => {
   const [shotSearchQuery, setShotSearchQuery] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
-  // Sort mode for shots
-  const [shotSortMode, setShotSortMode] = useState<'ordered' | 'newest' | 'oldest'>('ordered');
+  // Sort mode for shots - persisted per project
+  const shotSortMode = projectUISettings?.shotSortMode ?? 'ordered';
+  const setShotSortMode = useCallback((mode: 'ordered' | 'newest' | 'oldest') => {
+    updateProjectUISettings?.('project', { shotSortMode: mode });
+  }, [updateProjectUISettings]);
   
   // Video gallery filter state
   const [videoPage, setVideoPage] = useState<number>(1);

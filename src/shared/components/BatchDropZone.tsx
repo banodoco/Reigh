@@ -1,7 +1,8 @@
 import React, { useRef, useCallback, useState } from "react";
-import { useUnifiedDrop } from "@/tools/travel-between-images/components/Timeline/hooks/useUnifiedDrop";
-import { calculateGridDropPosition } from "@/tools/travel-between-images/components/Timeline/utils/grid-position-utils";
-import DropSlotIndicator from "./DropSlotIndicator";
+import { toast } from "sonner";
+
+export type DragType = 'file' | 'generation' | 'none';
+
 
 interface BatchDropZoneProps {
   children: React.ReactNode;
@@ -16,9 +17,86 @@ interface BatchDropZoneProps {
 }
 
 /**
+ * Calculate grid drop position from mouse coordinates
+ * Returns the index where the item should be inserted
+ */
+function calculateDropIndex(
+  e: React.DragEvent,
+  containerRef: React.RefObject<HTMLDivElement>,
+  columns: number,
+  itemCount: number
+): number | null {
+  if (!containerRef.current) return null;
+  
+  // Find actual grid items to get accurate positioning
+  const items = containerRef.current.querySelectorAll('[data-sortable-item]');
+  
+  if (items.length === 0) return 0;
+  
+  const firstItemRect = items[0].getBoundingClientRect();
+  const containerRect = containerRef.current.getBoundingClientRect();
+  
+  // Calculate the offset of the grid from the container
+  const gridOffsetX = firstItemRect.left - containerRect.left;
+  const gridOffsetY = firstItemRect.top - containerRect.top;
+  
+  // Get item dimensions
+  const itemWidth = firstItemRect.width;
+  const itemHeight = firstItemRect.height;
+  
+  // Calculate gap by looking at second item if available
+  let gap = 12; // default
+  if (items.length > 1) {
+    const secondItemRect = items[1].getBoundingClientRect();
+    // Check if on same row
+    if (Math.abs(firstItemRect.top - secondItemRect.top) < 10) {
+      gap = secondItemRect.left - firstItemRect.right;
+    } else {
+      gap = secondItemRect.top - firstItemRect.bottom;
+    }
+  }
+  
+  // Calculate mouse position relative to grid start
+  const relativeX = e.clientX - containerRect.left - gridOffsetX;
+  const relativeY = e.clientY - containerRect.top - gridOffsetY;
+  
+  // Calculate column and row using round for nearest vertical gap
+  const totalItemWidth = itemWidth + gap;
+  const totalItemHeight = itemHeight + gap;
+  
+  const column = Math.max(0, Math.min(Math.round(relativeX / totalItemWidth), columns));
+  const row = Math.max(0, Math.floor(relativeY / totalItemHeight));
+  
+  // Calculate target index
+  let targetIndex = row * columns + column;
+  
+  // Clamp to valid range (can insert at end, which is itemCount)
+  return Math.max(0, Math.min(targetIndex, itemCount));
+}
+
+/**
+ * Detect the type of item being dragged
+ */
+function getDragType(e: React.DragEvent): DragType {
+  const types = Array.from(e.dataTransfer.types);
+  
+  // Check for generation data first (more specific)
+  if (types.includes('application/x-generation')) {
+    return 'generation';
+  }
+  
+  // Check for files
+  if (types.includes('Files')) {
+    return 'file';
+  }
+  
+  return 'none';
+}
+
+/**
  * Drop zone wrapper for batch mode grid layouts
  * Handles both file drops and generation drops with visual feedback
- * Reuses the unified drop logic from Timeline
+ * Calculates position at DROP TIME to avoid stale state issues
  */
 const BatchDropZone: React.FC<BatchDropZoneProps> = ({
   children,
@@ -31,194 +109,178 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
   getFramePositionForIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [dragType, setDragType] = useState<DragType>('none');
 
-  // Wrapper functions that convert grid index to position parameter
-  const handleImageDropWithPosition = useCallback(
-    async (files: File[], _targetFrame?: number) => {
-      if (!onImageDrop) return;
-      
-      // Use the dropTargetIndex captured during drag over
-      const targetPosition = dropTargetIndex ?? undefined;
-      
-      // Calculate frame position based on surrounding images
-      const framePosition = dropTargetIndex !== null && getFramePositionForIndex 
-        ? getFramePositionForIndex(dropTargetIndex) 
-        : undefined;
-      
-      console.log('[BatchDropPositionIssue] 📍 handleImageDropWithPosition called:', {
-        filesCount: files.length,
-        targetPosition,
-        framePosition,
-        dropTargetIndex,
-        hasFrameCalculator: !!getFramePositionForIndex,
-        timestamp: Date.now()
-      });
-      
-      await onImageDrop(files, targetPosition, framePosition);
-    },
-    [onImageDrop, dropTargetIndex, getFramePositionForIndex]
-  );
+  // Handle drag enter
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (disabled) return;
+    
+    const type = getDragType(e);
+    if ((type === 'file' && onImageDrop) || (type === 'generation' && onGenerationDrop)) {
+      setDragType(type);
+    }
+  }, [disabled, onImageDrop, onGenerationDrop]);
 
-  const handleGenerationDropWithPosition = useCallback(
-    async (generationId: string, imageUrl: string, thumbUrl: string | undefined, _targetFrame?: number) => {
-      if (!onGenerationDrop) return;
-      
-      // Use the dropTargetIndex captured during drag over
-      const targetPosition = dropTargetIndex ?? undefined;
-      
-      // Calculate frame position based on surrounding images
-      const framePosition = dropTargetIndex !== null && getFramePositionForIndex 
-        ? getFramePositionForIndex(dropTargetIndex) 
-        : undefined;
-      
-      console.log('[BatchDropPositionIssue] 🖼️ handleGenerationDropWithPosition called:', {
-        generationId: generationId?.substring(0, 8),
-        targetPosition,
-        framePosition,
-        dropTargetIndex,
-        hasFrameCalculator: !!getFramePositionForIndex,
-        timestamp: Date.now()
-      });
-      
-      await onGenerationDrop(generationId, imageUrl, thumbUrl, targetPosition, framePosition);
-    },
-    [onGenerationDrop, dropTargetIndex, getFramePositionForIndex]
-  );
+  // Handle drag over - update indicator position
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  // Custom drag over handler that calculates grid position
-  const handleDragOverCustom = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
+    if (disabled) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
 
-      if (disabled || !containerRef.current) {
-        setDropTargetIndex(null);
-        return;
-      }
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const targetIndex = calculateGridDropPosition(
-        e.clientX,
-        e.clientY,
-        rect,
-        columns,
-        itemCount
-      );
-
+    const type = getDragType(e);
+    if ((type === 'file' && onImageDrop) || (type === 'generation' && onGenerationDrop)) {
+      const targetIndex = calculateDropIndex(e, containerRef, columns, itemCount);
       setDropTargetIndex(targetIndex);
+      setDragType(type);
       e.dataTransfer.dropEffect = 'copy';
-    },
-    [columns, itemCount, disabled]
-  );
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  }, [columns, itemCount, disabled, onImageDrop, onGenerationDrop]);
 
-  const handleDragLeaveCustom = useCallback(() => {
+  // Handle drag leave
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Only clear state if we're actually leaving the container
+    if (e.currentTarget.contains(e.relatedTarget as Node)) {
+      return;
+    }
+    
     setDropTargetIndex(null);
+    setDragType('none');
   }, []);
 
-  const handleDropCustom = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    // Let the unified drop hook handle the actual drop
-    // but reset our visual state
+  // Handle drop - CALCULATE POSITION AT DROP TIME, not from state
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (disabled) return;
+    
+    const type = getDragType(e);
+    
+    // CRITICAL: Calculate position at drop time, not from stale state
+    const targetPosition = calculateDropIndex(e, containerRef, columns, itemCount);
+    
+    // Calculate frame position based on surrounding images
+    const framePosition = targetPosition !== null && getFramePositionForIndex 
+      ? getFramePositionForIndex(targetPosition) 
+      : undefined;
+    
+    // Clear visual state
     setDropTargetIndex(null);
-  }, []);
+    setDragType('none');
+    
+    // Handle file drops
+    if (type === 'file' && onImageDrop) {
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
+      
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      const validFiles = files.filter(file => {
+        if (validImageTypes.includes(file.type)) {
+          return true;
+        }
+        toast.error(`Invalid file type for ${file.name}. Only JPEG, PNG, and WebP are supported.`);
+        return false;
+      });
 
-  // Use unified drop hook for detection and handling
-  const {
-    isFileOver,
-    dragType,
-    handleDragEnter,
-    handleDrop,
-  } = useUnifiedDrop({
-    onImageDrop: handleImageDropWithPosition,
-    onGenerationDrop: handleGenerationDropWithPosition,
-    fullMin: 0,
-    fullRange: itemCount || 1, // Dummy values since we're not using frame-based positioning
-  });
+      if (validFiles.length === 0) return;
+
+      try {
+        await onImageDrop(validFiles, targetPosition ?? undefined, framePosition);
+      } catch (error) {
+        console.error('[BatchDropZone] File drop error:', error);
+        toast.error(`Failed to add images: ${(error as Error).message}`);
+      }
+    }
+    
+    // Handle generation drops
+    else if (type === 'generation' && onGenerationDrop) {
+      try {
+        const dataString = e.dataTransfer.getData('application/x-generation');
+        if (!dataString) return;
+        
+        const data = JSON.parse(dataString);
+        await onGenerationDrop(data.generationId, data.imageUrl, data.thumbUrl, targetPosition ?? undefined, framePosition);
+      } catch (error) {
+        console.error('[BatchDropZone] Generation drop error:', error);
+        toast.error(`Failed to add generation: ${(error as Error).message}`);
+      }
+    }
+  }, [columns, itemCount, disabled, onImageDrop, onGenerationDrop, getFramePositionForIndex]);
 
   if (disabled) {
     return <>{children}</>;
   }
 
-  // Calculate actual item dimensions from grid
-  const getItemDimensions = useCallback(() => {
-    if (!gridRef.current) return { width: 200, height: 200, gap: 12 };
-    
-    const gridElement = gridRef.current;
-    const firstItem = gridElement.querySelector('[data-sortable-item]') as HTMLElement;
-    
-    if (firstItem) {
-      const rect = firstItem.getBoundingClientRect();
-      const style = window.getComputedStyle(gridElement);
-      const gap = parseInt(style.gap) || 12;
-      
-      return {
-        width: rect.width,
-        height: rect.height,
-        gap
-      };
-    }
-    
-    // Fallback dimensions
-    return { width: 200, height: 200, gap: 12 };
-  }, []);
+  const isOver = dragType !== 'none';
 
   return (
     <div
       ref={containerRef}
       className={`relative ${className}`}
       onDragEnter={handleDragEnter}
-      onDragOver={handleDragOverCustom}
-      onDragLeave={handleDragLeaveCustom}
-      onDrop={(e) => {
-        handleDropCustom(e);
-        handleDrop(e);
-      }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      {/* Clone children to inject grid ref and indicator */}
+      {/* Render children with drop indicator */}
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          // Clone the DndContext and pass through to find the grid
-          const clonedChild = React.cloneElement(child as React.ReactElement<any>, {
-            children: React.Children.map((child as React.ReactElement<any>).props.children, (grandChild: React.ReactNode) => {
-              // Find the SortableContext
-              if (React.isValidElement(grandChild)) {
-                return React.cloneElement(grandChild as React.ReactElement<any>, {
-                  children: React.Children.map((grandChild as React.ReactElement<any>).props.children, (ggChild: React.ReactNode) => {
-                    // Find the actual grid div
-                    if (React.isValidElement(ggChild) && (ggChild as any).type === 'div') {
-                      return React.cloneElement(ggChild as React.ReactElement<any>, {
-                        ref: gridRef
-                      });
-                    }
-                    return ggChild;
-                  })
-                });
-              }
-              return grandChild;
-            })
-          });
-          
           return (
             <>
-              {clonedChild}
+              {child}
               {/* Insertion line indicator - shows between images */}
-              {isFileOver && dropTargetIndex !== null && (() => {
-                const dims = getItemDimensions();
+              {isOver && dropTargetIndex !== null && (() => {
+                const containerElement = containerRef.current;
+                if (!containerElement) return null;
+                
+                // Get all sortable items directly from container
+                const items = containerElement.querySelectorAll('[data-sortable-item]');
+                if (items.length === 0) return null;
+                
+                const containerRect = containerElement.getBoundingClientRect();
+                const firstItemRect = items[0].getBoundingClientRect();
+                const itemHeight = firstItemRect.height;
+                
+                // Calculate grid offset
+                const gridOffsetX = firstItemRect.left - containerRect.left;
+                const gridOffsetY = firstItemRect.top - containerRect.top;
+                
+                // Calculate gap
+                let gap = 12;
+                if (items.length > 1) {
+                  const secondItemRect = items[1].getBoundingClientRect();
+                  if (Math.abs(firstItemRect.top - secondItemRect.top) < 10) {
+                    gap = secondItemRect.left - firstItemRect.right;
+                  }
+                }
+                
+                const itemWidth = firstItemRect.width;
                 const row = Math.floor(dropTargetIndex / columns);
                 const col = dropTargetIndex % columns;
                 
-                // Calculate position for insertion line
-                // Show line on the left edge of where the new item will be inserted
-                const leftPosition = col * ((dims.width + dims.gap));
-                const topPosition = row * (dims.height + dims.gap);
+                // Calculate position for insertion line relative to grid
+                const leftPosition = col * (itemWidth + gap);
+                const topPosition = row * (itemHeight + gap);
                 
-                // Adjust to be in the middle of the gap
-                const finalLeft = leftPosition - (dims.gap / 2) - 2; // 2px is half of indicator width
-                
-                // Don't show indicator outside the grid on the left
-                if (col === 0 && finalLeft < 0) {
-                  // Adjust for first column if needed
+                // Adjust to be in the middle of the gap (or at left edge for col 0)
+                let finalLeft: number;
+                if (col === 0) {
+                  finalLeft = gridOffsetX - 2; // At left edge of first item
+                } else {
+                  finalLeft = gridOffsetX + leftPosition - (gap / 2) - 2;
                 }
 
                 return (
@@ -226,9 +288,9 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
                     className="absolute pointer-events-none"
                     style={{
                       left: `${finalLeft}px`,
-                      top: `${topPosition}px`,
+                      top: `${gridOffsetY + topPosition}px`,
                       width: '4px',
-                      height: `${dims.height}px`,
+                      height: `${itemHeight}px`,
                       zIndex: 100,
                     }}
                   >
@@ -256,4 +318,3 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
 };
 
 export default BatchDropZone;
-

@@ -232,7 +232,9 @@ export const useAllShotGenerations = (
       // Otherwise retry up to 2 times
       return failureCount < 2;
     },
-    placeholderData: (previousData) => previousData,
+    // NOTE: Removed placeholderData: (previousData) => previousData
+    // This was causing cross-shot data leakage - when navigating to a new shot,
+    // the previous shot's images would briefly appear as "placeholder" data
     queryFn: async ({ signal }) => {
       const startTime = Date.now();
       console.log('[AddFlicker] 6️⃣ QUERY FETCH START - all-shot-generations refetching!', { 

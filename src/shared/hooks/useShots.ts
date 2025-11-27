@@ -321,8 +321,6 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         return [];
       }
       
-
-        
       // Just get shots simple query - order by position (which defaults to chronological)
       const { data: shots, error: shotsError } = await supabase
         .from('shots')
@@ -338,98 +336,91 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         return [];
       }
       
-      // Get images per shot based on maxImagesPerShot parameter
-      // NEW: Use shot_data JSONB filter (fast, no joins) for preview images
-      // NOTE: This relies on generations.shot_data containing { [shot_id]: timeline_frame }
-      const shotIds = shots.map(s => s.id);
+      // Fetch images for each shot individually, batched to avoid overwhelming the database
+      // This avoids hitting Supabase's 1000 row limit and allows per-shot limiting at DB level
+      const BATCH_SIZE = 10; // Process 10 shots at a time to avoid connection limits
+      const imagesPerShot: { shotId: string; images: GenerationRow[] }[] = [];
       
-      // If we need limited images per shot (e.g. for mobile/list view), we need a different approach
-      // Using a specialized RPC function is best for "top N items per group"
-      // But for now we'll fetch all relevant generations and group them in JS
-      // To optimize, we only fetch generations that belong to these shots
-      
-      // Fetch all shot_generations for these shots
-      const { data: shotGenerations, error: sgError } = await supabase
-        .from('shot_generations')
-        .select(`
-          id,
-          shot_id,
-          timeline_frame,
-          generation_id,
-          generations (
-            id,
-            location,
-            thumbnail_url,
-            type,
-            created_at,
-            starred,
-            upscaled_url,
-            name,
-            based_on,
-            params
-          )
-        `)
-        .in('shot_id', shotIds);
-        
-      if (sgError) {
-        console.error('Error fetching shot generations:', sgError);
-        // Return shots without images if image fetch fails
-        return shots.map(shot => ({ ...shot, images: [] }));
+      // Process shots in batches
+      for (let i = 0; i < shots.length; i += BATCH_SIZE) {
+        const batch = shots.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (shot) => {
+          // Build query for this shot's images
+          let query = supabase
+            .from('shot_generations')
+            .select(`
+              id,
+              shot_id,
+              timeline_frame,
+              generation_id,
+              generations (
+                id,
+                location,
+                thumbnail_url,
+                type,
+                created_at,
+                starred,
+                upscaled_url,
+                name,
+                based_on,
+                params
+              )
+            `)
+            .eq('shot_id', shot.id)
+            .order('timeline_frame', { ascending: true, nullsFirst: false });
+          
+          // Apply limit at database level if specified (more efficient than fetching all and slicing)
+          if (maxImagesPerShot > 0) {
+            query = query.limit(maxImagesPerShot);
+          }
+          
+          const { data: shotGenerations, error: sgError } = await query;
+          
+          if (sgError) {
+            console.error(`Error fetching generations for shot ${shot.id}:`, sgError);
+            return { shotId: shot.id, images: [] };
+          }
+          
+          // Transform to GenerationRow format
+          const images: GenerationRow[] = (shotGenerations || [])
+            .filter((sg: any) => sg.generations)
+            .map((sg: any) => {
+              const gen = sg.generations;
+              return {
+                id: sg.id, // shot_generations.id - unique per entry in shot
+                generation_id: gen.id, // generations.id - the actual generation
+                shotImageEntryId: sg.id, // Deprecated (kept for backwards compat)
+                imageUrl: gen.location,
+                thumbUrl: gen.thumbnail_url || gen.location,
+                type: gen.type || 'image',
+                createdAt: gen.created_at,
+                starred: gen.starred || false,
+                upscaled_url: gen.upscaled_url,
+                name: gen.name,
+                based_on: gen.based_on,
+                params: gen.params,
+                timeline_frame: sg.timeline_frame,
+              } as GenerationRow;
+            });
+          
+          return { shotId: shot.id, images };
+          })
+        );
+        imagesPerShot.push(...batchResults);
       }
       
-      // Group images by shot_id
+      // Build lookup map
       const imagesByShot: Record<string, GenerationRow[]> = {};
-      
-      shotGenerations?.forEach((sg: any) => {
-        if (!sg.generations) return;
-        
-        const shotId = sg.shot_id;
-        if (!imagesByShot[shotId]) {
-          imagesByShot[shotId] = [];
-        }
-        
-        const gen = sg.generations;
-        // Transform to GenerationRow format
-        // PRIMARY IDs: id = shot_generations.id (unique per entry), generation_id = generations.id
-        const imageRow: GenerationRow = {
-          id: sg.id, // shot_generations.id - unique per entry in shot
-          generation_id: gen.id, // generations.id - the actual generation
-          // Deprecated (kept for backwards compat)
-          shotImageEntryId: sg.id,
-          // Data fields
-          imageUrl: gen.location,
-          thumbUrl: gen.thumbnail_url || gen.location,
-          type: gen.type || 'image',
-          createdAt: gen.created_at,
-          starred: gen.starred || false,
-          upscaled_url: gen.upscaled_url,
-          name: gen.name,
-          based_on: gen.based_on,
-          params: gen.params,
-          timeline_frame: sg.timeline_frame,
-          shot_data: { [shotId]: sg.timeline_frame }
-        };
-        
-        imagesByShot[shotId].push(imageRow);
+      imagesPerShot.forEach(({ shotId, images }) => {
+        imagesByShot[shotId] = images;
       });
       
       // Attach images to shots
-      return shots.map(shot => {
-        let images = imagesByShot[shot.id] || [];
-        
-        // Sort images by timeline_frame
-        images.sort((a, b) => (a.timeline_frame || 0) - (b.timeline_frame || 0));
-        
-        // Apply limit if requested
-        if (maxImagesPerShot > 0 && images.length > maxImagesPerShot) {
-          images = images.slice(0, maxImagesPerShot);
-        }
-        
-        return {
-          ...shot,
-          images
-        };
-      });
+      return shots.map(shot => ({
+        ...shot,
+        images: imagesByShot[shot.id] || []
+      }));
     },
     enabled: !!projectId,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -499,7 +490,8 @@ export const useAddImageToShot = () => {
       project_id,
       imageUrl, // For optimistic updates
       thumbUrl, // For optimistic updates
-      timelineFrame // Optional: specify explicit frame position
+      timelineFrame, // Optional: specify explicit frame position
+      skipOptimistic // NEW: Flag to skip optimistic updates
     }: { 
       shot_id: string; 
       generation_id: string; 
@@ -507,25 +499,43 @@ export const useAddImageToShot = () => {
       imageUrl?: string;
       thumbUrl?: string;
       timelineFrame?: number;
+      skipOptimistic?: boolean;
     }) => {
-      // If frame not specified, get the last frame + 60
-      let resolvedFrame = timelineFrame;
-      
-      if (resolvedFrame === undefined) {
-        const { data: lastGen, error: fetchError } = await supabase
+      // Get all existing frames for collision detection
+      const { data: existingGens, error: fetchError } = await supabase
         .from('shot_generations')
-          .select('timeline_frame')
+        .select('timeline_frame')
         .eq('shot_id', shot_id)
-          .order('timeline_frame', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-          
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          console.error('Error fetching last frame:', fetchError);
-        }
+        .not('timeline_frame', 'is', null);
         
-        const lastFrame = lastGen?.timeline_frame ?? -60; // Start at 0 (-60 + 60)
-        resolvedFrame = lastFrame + 60;
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching existing frames:', fetchError);
+      }
+      
+      const existingFrames = (existingGens || [])
+        .map(g => g.timeline_frame)
+        .filter((f): f is number => f != null && f !== -1);
+      
+      // Calculate frame with collision detection
+      let resolvedFrame: number;
+      
+      if (timelineFrame !== undefined) {
+        // Explicit frame provided - ensure it's unique
+        resolvedFrame = timelineFrame;
+        while (existingFrames.includes(resolvedFrame)) {
+          resolvedFrame += 1;
+        }
+        if (resolvedFrame !== timelineFrame) {
+          console.log('[UniqueFrame] 🔄 Adjusted provided frame:', {
+            original: timelineFrame,
+            resolved: resolvedFrame,
+            reason: 'collision'
+          });
+        }
+      } else {
+        // No frame specified - append at end
+        const maxFrame = existingFrames.length > 0 ? Math.max(...existingFrames) : -60;
+        resolvedFrame = maxFrame + 60;
       }
 
       // Insert into shot_generations
@@ -593,7 +603,7 @@ export const useAddImageToShot = () => {
       return { ...data, project_id, imageUrl, thumbUrl };
     },
     onMutate: async (variables) => {
-      const { shot_id, generation_id, project_id, imageUrl, thumbUrl, timelineFrame } = variables;
+      const { shot_id, generation_id, project_id, imageUrl, thumbUrl, timelineFrame, skipOptimistic } = variables;
       
       console.log('[PATH_COMPARE] ⚡ MUTATION onMutate START - addImageToShotMutation:', {
         shot_id: shot_id?.substring(0, 8),
@@ -601,7 +611,8 @@ export const useAddImageToShot = () => {
         imageUrl: imageUrl ? imageUrl.substring(0, 80) : '❌ MISSING',
         thumbUrl: thumbUrl ? thumbUrl.substring(0, 80) : '❌ MISSING',
         timelineFrame: timelineFrame !== undefined ? timelineFrame : '❌ UNDEFINED (will calculate)',
-        willCreateOptimistic: !!(imageUrl || thumbUrl),
+        willCreateOptimistic: !!(imageUrl || thumbUrl) && !skipOptimistic,
+        skipOptimistic,
         timestamp: Date.now()
       });
 
@@ -613,19 +624,29 @@ export const useAddImageToShot = () => {
       const previousShots = queryClient.getQueryData<Shot[]>(['shots', project_id]);
       const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', shot_id]);
 
-      // Only perform optimistic update if we have image URL to show
+      // Only perform optimistic update if we have image URL to show AND not skipped
       let tempId: string | undefined;
       
-      if (imageUrl || thumbUrl) {
+      if ((imageUrl || thumbUrl) && !skipOptimistic) {
         tempId = `temp-${Date.now()}-${Math.random()}`;
         
         const createOptimisticItem = (currentImages: any[]) => {
-          let resolvedFrame = timelineFrame;
-          if (resolvedFrame === undefined) {
-            // If no frame provided, guess the next position (append)
-            const positionedImages = currentImages.filter(img => img.timeline_frame !== null && img.timeline_frame !== undefined);
-            const maxFrame = positionedImages.length > 0 
-              ? Math.max(...positionedImages.map(g => g.timeline_frame || 0)) 
+          // Get existing frames for collision detection
+          const existingFrames = currentImages
+            .filter(img => img.timeline_frame != null && img.timeline_frame !== -1)
+            .map(img => img.timeline_frame as number);
+          
+          let resolvedFrame: number;
+          if (timelineFrame !== undefined) {
+            // Explicit frame provided - ensure it's unique
+            resolvedFrame = timelineFrame;
+            while (existingFrames.includes(resolvedFrame)) {
+              resolvedFrame += 1;
+            }
+          } else {
+            // No frame provided - append at end
+            const maxFrame = existingFrames.length > 0 
+              ? Math.max(...existingFrames) 
               : -60; // Start at 0 ( -60 + 60 )
             resolvedFrame = maxFrame + 60;
           }
@@ -876,26 +897,35 @@ export const useAddImageToShotWithoutPosition = () => {
       // Let's implement it as "Insert at 0 or specified if provided in separate call"
       // But typically "WithoutPosition" implies just linking them.
       
-      // Getting latest frame to append
-      const { data: lastGen } = await supabase
-          .from('shot_generations')
-          .select('timeline_frame')
-          .eq('shot_id', shot_id)
-          .order('timeline_frame', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-          
-      const nextFrame = (lastGen?.timeline_frame ?? -60) + 60;
+      // Get all existing frames for collision detection
+      const { data: existingGens } = await supabase
+        .from('shot_generations')
+        .select('timeline_frame')
+        .eq('shot_id', shot_id)
+        .not('timeline_frame', 'is', null);
+      
+      const existingFrames = (existingGens || [])
+        .map(g => g.timeline_frame)
+        .filter((f): f is number => f != null && f !== -1);
+      
+      // Calculate next frame with collision detection
+      const maxFrame = existingFrames.length > 0 ? Math.max(...existingFrames) : -60;
+      let nextFrame = maxFrame + 60;
+      
+      // Ensure unique (shouldn't be needed for append, but safety check)
+      while (existingFrames.includes(nextFrame)) {
+        nextFrame += 1;
+      }
 
       const { data, error } = await supabase
         .from('shot_generations')
-          .insert({
+        .insert({
           shot_id,
           generation_id,
           timeline_frame: nextFrame
-          })
-          .select()
-          .single();
+        })
+        .select()
+        .single();
         
       if (error) throw error;
       return { ...data, project_id, imageUrl, thumbUrl };
@@ -1210,16 +1240,27 @@ export const useDuplicateImageInShot = () => {
         originalTimelineFrame = shotGenResults[0].timeline_frame ?? 0;
       }
 
-      // 2. Calculate midpoint timeline_frame for the duplicate
-      let newTimelineFrame: number;
+      // 2. Get all existing frames for collision detection
+      const { data: existingGens } = await supabase
+        .from('shot_generations')
+        .select('timeline_frame')
+        .eq('shot_id', shot_id)
+        .not('timeline_frame', 'is', null);
+      
+      const existingFrames = (existingGens || [])
+        .map(g => g.timeline_frame)
+        .filter((f): f is number => f != null && f !== -1);
+      
+      // 3. Calculate midpoint timeline_frame for the duplicate
+      let targetTimelineFrame: number;
       
       if (next_timeline_frame !== undefined) {
         // Use provided next_timeline_frame from UI (most accurate, avoids stale DB data)
-        newTimelineFrame = Math.floor((originalTimelineFrame + next_timeline_frame) / 2);
+        targetTimelineFrame = Math.floor((originalTimelineFrame + next_timeline_frame) / 2);
         console.log('[DUPLICATE] Using UI-provided next_timeline_frame for midpoint:', {
           originalTimelineFrame,
           next_timeline_frame,
-          newTimelineFrame
+          targetTimelineFrame
         });
       } else {
         // Fallback: Query database for next image's timeline_frame
@@ -1234,20 +1275,55 @@ export const useDuplicateImageInShot = () => {
 
         if (nextShotGen?.timeline_frame !== null && nextShotGen?.timeline_frame !== undefined) {
           // Midpoint between original and next
-          newTimelineFrame = Math.floor((originalTimelineFrame + nextShotGen.timeline_frame) / 2);
+          targetTimelineFrame = Math.floor((originalTimelineFrame + nextShotGen.timeline_frame) / 2);
         } else {
           // No next image, place it 30 frames after the original (consistent with UI skeleton)
-          newTimelineFrame = originalTimelineFrame + 30;
+          targetTimelineFrame = originalTimelineFrame + 30;
         }
         
         console.log('[DUPLICATE] Using DB-queried next frame for midpoint:', {
           originalTimelineFrame,
           dbNextFrame: nextShotGen?.timeline_frame,
-          newTimelineFrame
+          targetTimelineFrame
         });
       }
+      
+      // 4. Ensure the calculated frame is unique (collision detection)
+      let newTimelineFrame = Math.max(0, Math.round(targetTimelineFrame));
+      
+      // If collision, find nearest available position
+      if (existingFrames.includes(newTimelineFrame)) {
+        let offset = 1;
+        while (offset < 1000) {
+          // Try higher first
+          const higher = newTimelineFrame + offset;
+          if (!existingFrames.includes(higher)) {
+            console.log('[DUPLICATE] 🔄 Collision resolved:', {
+              original: targetTimelineFrame,
+              resolved: higher,
+              direction: 'higher',
+              offset
+            });
+            newTimelineFrame = higher;
+            break;
+          }
+          // Then try lower (but not below 0)
+          const lower = newTimelineFrame - offset;
+          if (lower >= 0 && !existingFrames.includes(lower)) {
+            console.log('[DUPLICATE] 🔄 Collision resolved:', {
+              original: targetTimelineFrame,
+              resolved: lower,
+              direction: 'lower',
+              offset
+            });
+            newTimelineFrame = lower;
+            break;
+          }
+          offset += 1;
+        }
+      }
 
-      // 3. Create a new shot_generations entry pointing to the SAME generation
+      // 5. Create a new shot_generations entry pointing to the SAME generation
       // This is more efficient - we're just adding another timeline position for the same image
       const { data: newShotGen, error: addError } = await supabase
         .from('shot_generations')
@@ -1431,8 +1507,9 @@ export const useHandleExternalImageDrop = () => {
         skipAutoPosition?: boolean, // NEW: Flag to skip auto-positioning for timeline uploads
         positions?: number[], // NEW: Optional explicit positions for the images
         onProgress?: (fileIndex: number, fileProgress: number, overallProgress: number) => void // NEW: Progress callback
+        skipOptimistic?: boolean // NEW: Flag to skip individual optimistic updates (handled by batch)
     }) => {
-    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition, positions, onProgress } = variables;
+    const { imageFiles, targetShotId, currentProjectQueryKey, currentShotCount, skipAutoPosition, positions, onProgress, skipOptimistic } = variables;
     
     if (!currentProjectQueryKey) { // Should be actual projectId
         toast.error("Cannot add image(s): current project is not identified.");
@@ -1621,7 +1698,8 @@ export const useHandleExternalImageDrop = () => {
               project_id: projectIdForOperation,
               imageUrl: newGeneration.location || undefined,
               thumbUrl: thumbnailUrl || newGeneration.location || undefined,
-              timelineFrame: explicitPosition
+              timelineFrame: explicitPosition,
+              skipOptimistic // Pass the flag
             });
           } else if (skipAutoPosition) {
             // For timeline uploads: create without auto-positioning so caller can set position
@@ -1640,6 +1718,7 @@ export const useHandleExternalImageDrop = () => {
               project_id: projectIdForOperation,
               imageUrl: newGeneration.location || undefined,
               thumbUrl: thumbnailUrl || newGeneration.location || undefined,
+              skipOptimistic // Pass the flag
             });
           }
           generationIds.push(newGeneration.id as string);

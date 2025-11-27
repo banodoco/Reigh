@@ -707,7 +707,8 @@ export const useGenerationActions = ({
   /**
    * Handle dropping external images onto batch mode grid
    * 
-   * REFACTORED: Simplified to match timeline drop approach
+   * Shows optimistic skeleton immediately using local file preview URLs,
+   * then uploads and replaces with real data.
    */
   const handleBatchImageDrop = useCallback(async (
     files: File[],
@@ -725,13 +726,83 @@ export const useGenerationActions = ({
       return;
     }
 
+    // Track optimistic items for cleanup
+    const optimisticIds: string[] = [];
+    const localUrls: string[] = [];
+
     try {
       actions.setUploadingImage(true);
       
-      // 1. Calculate target frame position
+      // 1. Calculate target frame positions with collision detection
+      // First get the start frame (already collision-checked by calculateNextAvailableFrame)
       const startFrame = framePosition ?? await calculateNextAvailableFrame(selectedShot.id, undefined);
       
-      // 2. Crop images
+      // For multiple files, we need to ensure each position is unique
+      // Get existing frames from cache for quick collision detection
+      const existingGens = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', selectedShot.id]) || [];
+      const existingFrames = existingGens
+        .filter(g => g.timeline_frame != null && g.timeline_frame !== -1)
+        .map(g => g.timeline_frame as number);
+      
+      // Calculate unique positions for each file
+      const positions: number[] = [];
+      const allUsedFrames = [...existingFrames];
+      for (let i = 0; i < files.length; i++) {
+        let targetFrame = startFrame + i;
+        // Ensure this frame is unique (not in existing or already assigned)
+        while (allUsedFrames.includes(targetFrame)) {
+          targetFrame += 1;
+        }
+        positions.push(targetFrame);
+        allUsedFrames.push(targetFrame);
+      }
+      
+      console.log('[BatchDrop] 📍 Calculated unique positions:', {
+        startFrame,
+        filesCount: files.length,
+        positions,
+        existingCount: existingFrames.length
+      });
+      
+      // 2. Create optimistic entries immediately using local file URLs
+      const previousFastGens = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', selectedShot.id]) || [];
+      
+      const optimisticItems = files.map((file, index) => {
+        const localUrl = URL.createObjectURL(file);
+        localUrls.push(localUrl);
+        const tempId = `temp-upload-${Date.now()}-${index}-${Math.random()}`;
+        optimisticIds.push(tempId);
+        
+        return {
+          id: tempId,
+          generation_id: tempId,
+          shotImageEntryId: tempId,
+          shot_generation_id: tempId,
+          location: localUrl,
+          thumbnail_url: localUrl,
+          imageUrl: localUrl,
+          thumbUrl: localUrl,
+          timeline_frame: positions[index],
+          type: 'image' as const,
+          created_at: new Date().toISOString(),
+          starred: false,
+          upscaled_url: null,
+          name: file.name,
+          based_on: null,
+          params: {},
+          shot_data: { [selectedShot.id]: positions[index] },
+          _optimistic: true,
+          _uploading: true // Extra flag to show upload indicator
+        };
+      });
+      
+      // Add optimistic items to cache
+      queryClient.setQueryData(
+        ['all-shot-generations', selectedShot.id], 
+        [...previousFastGens, ...optimisticItems]
+      );
+      
+      // 3. Crop images
       const processedFiles = await cropImagesToShotAspectRatio(
         files,
         selectedShot,
@@ -740,34 +811,23 @@ export const useGenerationActions = ({
         uploadSettings
       );
       
-      // 3. Calculate positions for each file
-      const positions = processedFiles.map((_, index) => startFrame + index);
-      
-      console.log('[BatchDrop] 📍 Calculated positions:', {
-        startFrame,
-        count: processedFiles.length,
-        positions
-      });
-      
       // 4. Upload with positions
+      // Pass skipOptimistic: true so we don't create DUPLICATE optimistic items
+      // Our manual ones will persist until the real items come back from the server (after cache invalidation)
       const result = await handleExternalImageDropMutation.mutateAsync({
         imageFiles: processedFiles,
         targetShotId: selectedShot.id,
         currentProjectQueryKey: projectId,
         currentShotCount: 0,
         skipAutoPosition: false,
-        positions: positions
+        positions: positions,
+        skipOptimistic: true
       });
       
       if (!result?.generationIds?.length) {
         console.warn('[BatchDrop] ⚠️ No generation IDs returned');
         return;
       }
-      
-      console.log('[BatchDrop] ✅ Upload complete:', {
-        generationIds: result.generationIds.map(id => id.substring(0, 8)),
-        positionsUsed: positions
-      });
       
       // 5. If positions weren't set by the upload, set them now (fallback)
       const { data: checkData } = await supabase
@@ -786,21 +846,28 @@ export const useGenerationActions = ({
           1 // Use 1 frame spacing for batch mode
         );
       }
-
-      // 6. Refresh shot data
-      // REMOVED: Don't force refetch here. See handleTimelineImageDrop for details.
-      // await onShotImagesUpdate();
       
       console.log('[BatchDrop] ✅ Drop complete');
       
     } catch (error) {
       console.error('[BatchDrop] ❌ Error:', error);
       toast.error(`Failed to add images: ${(error as Error).message}`);
+      
+      // Remove optimistic items on error
+      const currentCache = queryClient.getQueryData<GenerationRow[]>(['all-shot-generations', selectedShot.id]) || [];
+      queryClient.setQueryData(
+        ['all-shot-generations', selectedShot.id],
+        currentCache.filter(item => !optimisticIds.includes(item.id))
+      );
+      
       throw error;
     } finally {
       actions.setUploadingImage(false);
+      
+      // Clean up local URLs to prevent memory leaks
+      localUrls.forEach(url => URL.revokeObjectURL(url));
     }
-  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, onShotImagesUpdate]);
+  }, [selectedShot?.id, selectedShot?.aspect_ratio, projectId, projects, uploadSettings, actions, handleExternalImageDropMutation, queryClient]);
 
   /**
    * Handle dropping a generation from GenerationsPane onto batch mode grid
@@ -813,14 +880,6 @@ export const useGenerationActions = ({
     targetPosition?: number,
     framePosition?: number
   ) => {
-    console.log('[BatchDrop] 🎯 handleBatchGenerationDrop called:', {
-      generationId: generationId?.substring(0, 8),
-      targetPosition,
-      framePosition,
-      shotId: selectedShot?.id,
-      projectId
-    });
-
     if (!selectedShot?.id || !projectId) {
       toast.error("Cannot add generation: No shot or project selected.");
       return;
@@ -832,28 +891,23 @@ export const useGenerationActions = ({
     }
 
     try {
-      console.log('[BatchDrop] 📤 Adding generation to shot (batch mode)...');
+      // Use framePosition (calculated timeline_frame) or fall back to targetPosition
+      const timelineFrame = framePosition ?? targetPosition;
       
-      // Add the generation to the shot at the specified position
       await addImageToShotMutation.mutateAsync({
         generation_id: generationId,
         shot_id: selectedShot.id,
         imageUrl: imageUrl,
         thumbUrl: thumbUrl,
         project_id: projectId,
-        // Use the calculated frame position for insertion
-        timelineFrame: framePosition ?? targetPosition, // Prefer framePosition, fall back to targetPosition
+        timelineFrame: timelineFrame,
       });
-      
-      // Note: Don't call onShotImagesUpdate() here - the mutation's onSuccess 
-      // already invalidates the cache, and calling refresh causes double-refresh flicker
-      console.log('[BatchDrop] ✅ handleBatchGenerationDrop complete');
     } catch (error) {
-      console.error('[BatchDrop] ❌ Error adding generation to batch:', error);
+      console.error('[BatchDrop] Error adding generation:', error);
       toast.error(`Failed to add generation: ${(error as Error).message}`);
       throw error;
     }
-  }, [selectedShot?.id, selectedShot?.name, projectId, addImageToShotMutation, onShotImagesUpdate]);
+  }, [selectedShot?.id, projectId, addImageToShotMutation]);
 
   // 🎯 FIX #3: Memoize the return object to prevent callback instability in parent components
   // Without this, every render creates a new object, causing ShotImagesEditor to rerender

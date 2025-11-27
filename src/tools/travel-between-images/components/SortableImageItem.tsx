@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
+import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Trash2, Copy, Check, Pencil } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
@@ -63,6 +64,9 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
 
   // Use progressive src if available, otherwise fallback to display URL
   const displayImageUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(image.thumbUrl || image.imageUrl);
+  
+  // Track image loading state for skeleton display
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Calculate aspect ratio for consistent sizing with skeletons
   const getAspectRatioStyle = () => {
@@ -257,6 +261,11 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
       }}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
+      {/* Skeleton placeholder while image loads */}
+      {!imageLoaded && shouldLoad && (
+        <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
+      )}
+      
       {/* Progressive image display */}
       <img
         ref={progressiveRef}
@@ -266,19 +275,24 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
           "w-full h-full object-cover transition-all duration-200",
           // Progressive loading visual states
           progressiveEnabled && isThumbShowing && "opacity-95",
-          progressiveEnabled && isFullLoaded && "opacity-100"
+          progressiveEnabled && isFullLoaded && "opacity-100",
+          // Hide image until loaded to show skeleton
+          !imageLoaded && "opacity-0"
         )}
         onTouchStart={isMobile ? handleTouchStart : undefined}
         onTouchEnd={isMobile ? handleTouchEnd : undefined}
         loading="lazy"
         draggable={false}
         {...(!isDragDisabled ? listeners : {})}
+        onLoad={() => setImageLoaded(true)}
         onError={(e) => {
           // Fallback to original URL if display URL fails
           const target = e.target as HTMLImageElement;
           if (target.src !== (image.thumbUrl || image.imageUrl)) {
             target.src = image.thumbUrl || image.imageUrl;
           }
+          // Still mark as loaded to hide skeleton
+          setImageLoaded(true);
         }}
       />
       

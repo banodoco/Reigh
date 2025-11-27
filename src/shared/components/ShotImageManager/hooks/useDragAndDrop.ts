@@ -162,9 +162,9 @@ export function useDragAndDrop({
         const orderedIds = newOrder.map((img) => img.id);
         console.log('[DataTrace] 🎯 Drag complete - calling onImageReorder:', {
           idsCount: orderedIds.length,
-          ids: orderedShotImageEntryIds.map(id => id?.substring(0, 8)),
+          ids: orderedIds.map(id => id?.substring(0, 8)),
         });
-        onImageReorder(orderedShotImageEntryIds);
+        onImageReorder(orderedIds);
       }
       setSelectedIds([]);
       setLastSelectedIndex(null);
