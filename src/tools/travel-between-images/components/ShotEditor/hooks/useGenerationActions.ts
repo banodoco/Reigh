@@ -374,7 +374,7 @@ export const useGenerationActions = ({
     const removePromises = shotImageEntryIds.map(id => 
       removeImageFromShotMutation.mutateAsync({
         shotId: selectedShot.id,
-        generationId: id,
+        shotGenerationId: id,
         projectId: projectId,
       })
     );

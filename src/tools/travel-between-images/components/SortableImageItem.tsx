@@ -1,10 +1,22 @@
-import React, { useRef, useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Trash2, Copy, Check, Pencil } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogOverlay,
+} from '@/shared/components/ui/alert-dialog';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Label } from '@/shared/components/ui/label';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
@@ -13,9 +25,8 @@ import { framesToSeconds } from './Timeline/utils/time-utils';
 
 interface SortableImageItemProps {
   image: GenerationRow;
-  // id parameter is shot_generations.id (unique per entry)
-  onDelete: (id: string) => void;
-  onDuplicate?: (id: string, timeline_frame: number) => void;
+  onDelete: (shotImageEntryId: string) => void;
+  onDuplicate?: (shotImageEntryId: string, timeline_frame: number) => void;
   onDoubleClick: () => void;
   onMobileTap?: () => void;
   onClick: (event: React.MouseEvent) => void;
@@ -24,6 +35,8 @@ interface SortableImageItemProps {
   isSelected: boolean;
   isDragDisabled?: boolean;
   timeline_frame?: number;
+  skipConfirmation: boolean;
+  onSkipConfirmationSave: () => void;
   duplicatingImageId?: string | null;
   duplicateSuccessImageId?: string | null;
   /** When provided, image src will only be set once this is true */
@@ -44,6 +57,8 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   isSelected,
   isDragDisabled = false,
   timeline_frame,
+  skipConfirmation,
+  onSkipConfirmationSave,
   duplicatingImageId,
   duplicateSuccessImageId,
   shouldLoad = true,
@@ -64,9 +79,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
 
   // Use progressive src if available, otherwise fallback to display URL
   const displayImageUrl = progressiveEnabled && progressiveSrc ? progressiveSrc : getDisplayUrl(image.thumbUrl || image.imageUrl);
-  
-  // Track image loading state for skeleton display
-  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Calculate aspect ratio for consistent sizing with skeletons
   const getAspectRatioStyle = () => {
@@ -105,12 +117,14 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     return { aspectRatio: '1' };
   };
 
-  // image.id is shot_generations.id - unique per entry
-  const sortableId = image.id;
+  const sortableId = (image.shotImageEntryId as any) || (image.id as any);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: sortableId,
     disabled: isDragDisabled,
   });
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
+  const [skipConfirmationNextTimeVisual, setSkipConfirmationNextTimeVisual] = useState(skipConfirmation);
+  const currentDialogSkipChoiceRef = useRef(skipConfirmation);
   const isMobile = useIsMobile();
 
   // Track touch position to detect scrolling vs tapping
@@ -152,8 +166,21 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    // Use id (shot_generations.id)
-    onDelete(image.id);
+    if (skipConfirmation) {
+      onDelete(image.shotImageEntryId);
+    } else {
+      setSkipConfirmationNextTimeVisual(false);
+      currentDialogSkipChoiceRef.current = false;
+      setIsConfirmDeleteDialogOpen(true);
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete(image.shotImageEntryId);
+    if (currentDialogSkipChoiceRef.current) {
+      onSkipConfirmationSave();
+    }
+    setIsConfirmDeleteDialogOpen(false);
   };
 
   const handleDuplicateClick = (e: React.MouseEvent) => {
@@ -161,8 +188,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
     if (onDuplicate && timeline_frame !== undefined) {
-      // Use id (shot_generations.id)
-      onDuplicate(image.id, timeline_frame);
+      onDuplicate(image.shotImageEntryId, timeline_frame);
     }
   };
 
@@ -179,7 +205,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   );
 
   console.log('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-    imageId: (image.id || '').substring(0, 8), // shot_generations.id
+    imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
     isSelected,
     isDragDisabled,
     isMobile,
@@ -201,7 +227,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
       style={style}
       className={finalClassName}
       data-selected={isSelected}
-      data-image-id={(image.id || '').substring(0, 8)} // shot_generations.id
+      data-image-id={((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8)}
       {...(!isDragDisabled ? attributes : {})}
       onClick={(e) => {
         // Check if the click originated from a button or its children
@@ -209,7 +235,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
         const isButtonClick = target.closest('button') !== null;
         
         console.log('[SelectionDebug:SortableImageItem] onClick triggered', {
-          imageId: (image.id || '').substring(0, 8), // shot_generations.id
+          imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
           isSelected,
           hasOnClickHandler: !!onClick,
           eventTarget: target?.tagName || 'unknown',
@@ -237,7 +263,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
             return;
           }
           console.log('[SelectionDebug:SortableImageItem] DOM INSPECTION POST-RENDER', {
-            imageId: (image.id || '').substring(0, 8), // shot_generations.id
+            imageId: ((image.shotImageEntryId as any) || (image.id as any) || '').toString().substring(0, 8),
             isSelected,
             isButtonClick,
             actualDOMClasses: element.className,
@@ -261,11 +287,6 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
       }}
       onDoubleClick={isMobile ? undefined : onDoubleClick}
     >
-      {/* Skeleton placeholder while image loads */}
-      {!imageLoaded && shouldLoad && (
-        <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
-      )}
-      
       {/* Progressive image display */}
       <img
         ref={progressiveRef}
@@ -275,24 +296,19 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
           "w-full h-full object-cover transition-all duration-200",
           // Progressive loading visual states
           progressiveEnabled && isThumbShowing && "opacity-95",
-          progressiveEnabled && isFullLoaded && "opacity-100",
-          // Hide image until loaded to show skeleton
-          !imageLoaded && "opacity-0"
+          progressiveEnabled && isFullLoaded && "opacity-100"
         )}
         onTouchStart={isMobile ? handleTouchStart : undefined}
         onTouchEnd={isMobile ? handleTouchEnd : undefined}
         loading="lazy"
         draggable={false}
         {...(!isDragDisabled ? listeners : {})}
-        onLoad={() => setImageLoaded(true)}
         onError={(e) => {
           // Fallback to original URL if display URL fails
           const target = e.target as HTMLImageElement;
           if (target.src !== (image.thumbUrl || image.imageUrl)) {
             target.src = image.thumbUrl || image.imageUrl;
           }
-          // Still mark as loaded to hide skeleton
-          setImageLoaded(true);
         }}
       />
       
@@ -349,12 +365,12 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
                 e.stopPropagation();
                 e.nativeEvent.stopImmediatePropagation();
               }}
-              disabled={duplicatingImageId === image.id}
+              disabled={duplicatingImageId === image.shotImageEntryId}
               title="Duplicate image"
             >
-              {duplicatingImageId === image.id ? (
+              {duplicatingImageId === image.shotImageEntryId ? (
                 <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
-              ) : duplicateSuccessImageId === image.id ? (
+              ) : duplicateSuccessImageId === image.shotImageEntryId ? (
                 <Check className="h-3.5 w-3.5" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
@@ -382,6 +398,48 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
           </Button>
         </>
       )}
+      <AlertDialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
+        <AlertDialogOverlay
+          onPointerDown={(e) => {
+            // Prevent underlying sortable interactions when clicking overlay
+            e.stopPropagation();
+          }}
+        />
+        <AlertDialogContent
+          onPointerDown={(e) => {
+            // Prevent underlying sortable item click / drag sensors when the dialog is open
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Image</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do you want to permanently remove this image from the shot? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-center space-x-2 my-4">
+            <Checkbox
+              id="skip-confirm"
+              checked={skipConfirmationNextTimeVisual}
+              onCheckedChange={(checked) => {
+                const booleanValue = Boolean(checked);
+                setSkipConfirmationNextTimeVisual(booleanValue);
+                currentDialogSkipChoiceRef.current = booleanValue;
+              }}
+            />
+            <Label htmlFor="skip-confirm" className="text-sm font-light leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Delete without confirmation in the future
+            </Label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>Confirm Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -392,12 +450,12 @@ export const SortableImageItem = React.memo(
   SortableImageItemComponent,
   (prevProps, nextProps) => {
     // Log deep render trace for debugging (can be removed once optimized)
-    // image.id is shot_generations.id - unique per entry
     const shouldSkipRender = 
-      prevProps.image.id === nextProps.image.id &&
+      prevProps.image.shotImageEntryId === nextProps.image.shotImageEntryId &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.isDragDisabled === nextProps.isDragDisabled &&
       prevProps.timeline_frame === nextProps.timeline_frame &&
+      prevProps.skipConfirmation === nextProps.skipConfirmation &&
       prevProps.duplicatingImageId === nextProps.duplicatingImageId &&
       prevProps.duplicateSuccessImageId === nextProps.duplicateSuccessImageId &&
       prevProps.shouldLoad === nextProps.shouldLoad &&
@@ -407,7 +465,7 @@ export const SortableImageItem = React.memo(
       prevProps.image.imageUrl === nextProps.imageUrl;
 
     console.warn('[SelectionDebug:SortableImageItem] DEEP RENDER TRACE', {
-      imageId: nextProps.image.id?.substring(0, 8), // shot_generations.id
+      imageId: nextProps.image.shotImageEntryId?.substring(0, 8),
       isSelected: nextProps.isSelected,
       isDragDisabled: nextProps.isDragDisabled,
       isMobile: false,
@@ -415,10 +473,11 @@ export const SortableImageItem = React.memo(
       hasOnDoubleClick: !!nextProps.onDoubleClick,
       shouldSkipRender,
       propsChanged: {
-        id: prevProps.image.id !== nextProps.image.id,
+        id: prevProps.image.shotImageEntryId !== nextProps.image.shotImageEntryId,
         isSelected: prevProps.isSelected !== nextProps.isSelected,
         isDragDisabled: prevProps.isDragDisabled !== nextProps.isDragDisabled,
         timeline_frame: prevProps.timeline_frame !== nextProps.timeline_frame,
+        skipConfirmation: prevProps.skipConfirmation !== nextProps.skipConfirmation,
         duplicating: prevProps.duplicatingImageId !== nextProps.duplicatingImageId,
         success: prevProps.duplicateSuccessImageId !== nextProps.duplicateSuccessImageId,
         shouldLoad: prevProps.shouldLoad !== nextProps.shouldLoad,

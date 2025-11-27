@@ -6,6 +6,8 @@ import { DEFAULT_BATCH_VIDEO_FRAMES } from '../constants';
 import { AddImagesCard } from './AddImagesCard';
 import { PairPromptIndicator } from './PairPromptIndicator';
 
+const FPS = 16;
+
 interface ImageGridProps {
   images: GenerationRow[];
   selectedIds: string[];
@@ -88,8 +90,9 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         const imageKey = image.id as string;
         const desktopSelected = selectedIds.includes(imageKey);
         // Use actual timeline_frame for duplication (not calculated from index)
-        // The calculated frameNumber is only for display purposes
-        const displayFrameNumber = index * batchVideoFrames;
+        // For batch view display: show index × duration per pair in seconds
+        const durationPerPairSeconds = batchVideoFrames / FPS;
+        const displayTimeSeconds = index * durationPerPairSeconds;
         const actualTimelineFrame = (image as any).timeline_frame;
         const isLastImage = index === images.length - 1;
         
@@ -116,7 +119,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
               }}
               onDelete={() => onDelete(image.id)}
               onDuplicate={onDuplicate}
-              timeline_frame={actualTimelineFrame ?? displayFrameNumber}
+              timeline_frame={actualTimelineFrame}
+              displayTimeSeconds={displayTimeSeconds}
               onDoubleClick={isMobile ? () => {} : () => onItemDoubleClick(index)}
               onInpaintClick={isMobile ? undefined : () => onInpaintClick(index)}
               duplicatingImageId={duplicatingImageId}
