@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { GenerationRow } from '@/types/shots';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -19,10 +19,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { JoinClipsSettingsForm } from '@/tools/join-clips/components/JoinClipsSettingsForm';
 import { joinClipsSettings } from '@/tools/join-clips/settings';
 import MediaLightbox from '@/shared/components/MediaLightbox';
-import { useLoraManager, type LoraModel } from '@/shared/hooks/useLoraManager';
+import { useLoraManager, type LoraModel, type ActiveLora } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
+import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -39,6 +41,46 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
     const isMobile = useIsMobile();
+    
+    // Drag detection for parent video to prevent accidental opens on touch devices
+    const parentTouchStartPos = React.useRef<{ x: number; y: number } | null>(null);
+    const parentWasDragging = React.useRef(false);
+    const DRAG_THRESHOLD = 10;
+    
+    const handleParentTouchStart = useCallback((e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        parentTouchStartPos.current = { x: touch.clientX, y: touch.clientY };
+        parentWasDragging.current = false;
+    }, []);
+    
+    const handleParentTouchMove = useCallback((e: React.TouchEvent) => {
+        if (!parentTouchStartPos.current) return;
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - parentTouchStartPos.current.x);
+        const deltaY = Math.abs(touch.clientY - parentTouchStartPos.current.y);
+        if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
+            parentWasDragging.current = true;
+        }
+    }, []);
+    
+    const handleParentTouchEnd = useCallback(() => {
+        setTimeout(() => {
+            parentTouchStartPos.current = null;
+            parentWasDragging.current = false;
+        }, 100);
+    }, []);
+    
+    const handleParentLightboxOpenSafe = useCallback(() => {
+        if (!parentWasDragging.current) {
+            setIsParentLightboxOpen(true);
+        }
+    }, []);
+    
+    // Fetch available LoRAs for the motion control
+    const publicLorasQuery = useListPublicResources('lora', true);
+    const availableLoras: LoraModel[] = React.useMemo(() => {
+        return ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {});
+    }, [publicLorasQuery.data]);
 
     // Fetch child generations for this parent
     const { data, isLoading, refetch } = useGenerations(
@@ -190,11 +232,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         } as GenerationRow;
     }, [parentGeneration]);
 
-    // Fetch available LoRAs
-    const publicLorasResult = useListPublicResources('lora');
-    const availableLoras = ((publicLorasResult.data || []) as any[]).map((resource: any) => resource.metadata || {}) as LoraModel[];
-
-    // Initialize LoRA manager
+    // Initialize LoRA manager (uses availableLoras from publicLorasQuery above)
     const loraManager = useLoraManager(availableLoras, {
         projectId: projectId || undefined,
         persistenceScope: 'project',
@@ -319,7 +357,12 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 Final Video
                             </h2>
                         </div>
-                        <div className="bg-black w-full flex items-center justify-center relative group p-1">
+                        <div 
+                            className="bg-black w-full flex items-center justify-center relative group p-1"
+                            onTouchStart={handleParentTouchStart}
+                            onTouchMove={handleParentTouchMove}
+                            onTouchEnd={handleParentTouchEnd}
+                        >
                             <div className="w-full max-w-3xl mx-auto">
                                 <VideoItem
                                     video={parentVideoRow}
@@ -328,8 +371,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     shouldPreload="metadata"
                                     isMobile={isMobile}
                                     projectId={projectId}
-                                    onLightboxOpen={() => setIsParentLightboxOpen(true)}
-                                    onMobileTap={() => setIsParentLightboxOpen(true)}
+                                    onLightboxOpen={handleParentLightboxOpenSafe}
+                                    onMobileTap={handleParentLightboxOpenSafe}
                                     onDelete={() => { }}
                                     deletingVideoId={null}
                                     onHoverStart={() => { }}
@@ -351,8 +394,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     <h2 className="text-2xl font-light tracking-tight mb-6">Segments</h2>
                     
                     {isLoading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {[1, 2, 3, 4].map((i) => (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[1, 2, 3].map((i) => (
                                 <Card key={i}>
                                     <CardContent className="p-4 space-y-3">
                                         <Skeleton className="w-full aspect-video rounded-lg" />
@@ -367,7 +410,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             <p className="text-muted-foreground">No segments found for this generation.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {sortedChildren.map((child, index) => (
                                 <SegmentCard
                                     key={child.id}
@@ -376,6 +419,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     projectId={projectId}
                                     onLightboxOpen={() => setLightboxIndex(index)}
                                     onUpdate={refetch}
+                                    availableLoras={availableLoras}
                                 />
                             ))}
                         </div>
@@ -461,15 +505,161 @@ interface SegmentCardProps {
     projectId: string | null;
     onLightboxOpen: () => void;
     onUpdate: () => void;
+    availableLoras: LoraModel[];
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onUpdate }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onUpdate, availableLoras }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
+    
+    // Drag detection to prevent accidental opens on touch devices
+    const touchStartPos = React.useRef<{ x: number; y: number } | null>(null);
+    const wasDragging = React.useRef(false);
+    const DRAG_THRESHOLD = 10; // pixels of movement to consider it a drag
+    
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+        wasDragging.current = false;
+    }, []);
+    
+    const handleTouchMove = useCallback((e: React.TouchEvent) => {
+        if (!touchStartPos.current) return;
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
+        const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
+        if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
+            wasDragging.current = true;
+        }
+    }, []);
+    
+    const handleTouchEnd = useCallback(() => {
+        // Reset after a small delay to allow click handlers to check wasDragging
+        setTimeout(() => {
+            touchStartPos.current = null;
+            wasDragging.current = false;
+        }, 100);
+    }, []);
+    
+    const handleLightboxOpenSafe = useCallback(() => {
+        // Only open lightbox if we weren't dragging
+        if (!wasDragging.current) {
+            onLightboxOpen();
+        }
+    }, [onLightboxOpen]);
+    
+    // Motion control state - derived from params
+    const [motionMode, setMotionMode] = useState<'basic' | 'presets' | 'advanced'>(() => {
+        const orchestrator = params.orchestrator_details || {};
+        if (orchestrator.advanced_mode || params.advanced_mode) return 'advanced';
+        return 'basic';
+    });
+    const [advancedMode, setAdvancedMode] = useState(() => {
+        const orchestrator = params.orchestrator_details || {};
+        return orchestrator.advanced_mode || params.advanced_mode || false;
+    });
+    const [amountOfMotion, setAmountOfMotion] = useState(() => {
+        const orchestrator = params.orchestrator_details || {};
+        const rawValue = params.amount_of_motion ?? orchestrator.amount_of_motion ?? 0.5;
+        return Math.round(rawValue * 100);
+    });
+    const [phaseConfig, setPhaseConfig] = useState<PhaseConfig | undefined>(() => {
+        // Try to extract phase config from params
+        const orchestrator = params.orchestrator_details || {};
+        if (orchestrator.phase_config) return orchestrator.phase_config;
+        if (params.phase_config) return params.phase_config;
+        return undefined;
+    });
+    const [selectedPhasePresetId, setSelectedPhasePresetId] = useState<string | null>(null);
+    const [randomSeed, setRandomSeed] = useState(true);
+    
+    // LoRA state - derived from params.additional_loras
+    const [selectedLoras, setSelectedLoras] = useState<ActiveLora[]>(() => {
+        const lorasObj = params.additional_loras || params.orchestrator_details?.additional_loras || {};
+        return Object.entries(lorasObj).map(([url, strength]) => {
+            const filename = url.split('/').pop()?.replace('.safetensors', '') || url;
+            return {
+                id: url,
+                name: filename,
+                path: url,
+                strength: typeof strength === 'number' ? strength : 1.0,
+            };
+        });
+    });
+    
+    // Handlers for motion control
+    const handleMotionModeChange = useCallback((mode: 'basic' | 'presets' | 'advanced') => {
+        setMotionMode(mode);
+        setIsDirty(true);
+        if (mode === 'advanced' || mode === 'presets') {
+            setAdvancedMode(true);
+            if (!phaseConfig) {
+                setPhaseConfig(DEFAULT_PHASE_CONFIG);
+            }
+        } else {
+            setAdvancedMode(false);
+        }
+    }, [phaseConfig]);
+    
+    const handleAmountOfMotionChange = useCallback((value: number) => {
+        setAmountOfMotion(value);
+        setIsDirty(true);
+    }, []);
+    
+    const handleAdvancedModeChange = useCallback((value: boolean) => {
+        setAdvancedMode(value);
+        setIsDirty(true);
+    }, []);
+    
+    const handlePhaseConfigChange = useCallback((config: PhaseConfig) => {
+        setPhaseConfig(config);
+        setIsDirty(true);
+    }, []);
+    
+    const handlePhasePresetSelect = useCallback((presetId: string, config: PhaseConfig) => {
+        setSelectedPhasePresetId(presetId);
+        setPhaseConfig(config);
+        setIsDirty(true);
+    }, []);
+    
+    const handlePhasePresetRemove = useCallback(() => {
+        setSelectedPhasePresetId(null);
+        setIsDirty(true);
+    }, []);
+    
+    const handleRandomSeedChange = useCallback((value: boolean) => {
+        setRandomSeed(value);
+        setIsDirty(true);
+    }, []);
+    
+    // LoRA handlers
+    const handleAddLoraClick = useCallback(() => {
+        setIsLoraModalOpen(true);
+    }, []);
+    
+    const handleRemoveLora = useCallback((loraId: string) => {
+        setSelectedLoras(prev => prev.filter(l => l.id !== loraId));
+        setIsDirty(true);
+    }, []);
+    
+    const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
+        setSelectedLoras(prev => prev.map(l => l.id === loraId ? { ...l, strength } : l));
+        setIsDirty(true);
+    }, []);
+    
+    // Current settings for MotionControl
+    const currentMotionSettings = useMemo(() => ({
+        basePrompt: params.base_prompt || params.prompt || '',
+        negativePrompt: params.negative_prompt || '',
+        enhancePrompt: params.enhancePrompt || params.orchestrator_details?.enhance_prompt || false,
+        durationFrames: params.num_frames || 61,
+        selectedLoras: selectedLoras.map(l => ({ id: l.id, name: l.name, strength: l.strength })),
+    }), [params, selectedLoras]);
 
     // Update local state when child prop changes
     useEffect(() => {
@@ -610,7 +800,12 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
     return (
         <Card className="overflow-hidden flex flex-col">
             {/* Video Preview */}
-            <div className="relative aspect-video bg-black group">
+            <div 
+                className="relative aspect-video bg-black group"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
                     <VideoItem
                         video={child}
                         index={index}
@@ -618,8 +813,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                         shouldPreload="metadata"
                         isMobile={isMobile}
                         projectId={projectId}
-                        onLightboxOpen={onLightboxOpen}
-                        onMobileTap={onLightboxOpen}
+                        onLightboxOpen={handleLightboxOpenSafe}
+                        onMobileTap={handleLightboxOpenSafe}
                         onDelete={() => { }}
                         deletingVideoId={null}
                         onHoverStart={() => { }}
@@ -678,43 +873,76 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                             {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </Button>
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-3 pt-3">
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Negative Prompt</Label>
-                            <Textarea
-                                value={params.negative_prompt || ''}
-                                onChange={(e) => handleChange('negative_prompt', e.target.value)}
-                                className="h-16 text-xs resize-none"
-                            />
+                    <CollapsibleContent className="space-y-4 pt-3">
+                        {/* Generation Settings Section */}
+                        <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Generation Settings</Label>
+                            
+                            {/* Negative Prompt */}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium">Negative Prompt</Label>
+                                <Textarea
+                                    value={params.negative_prompt || ''}
+                                    onChange={(e) => handleChange('negative_prompt', e.target.value)}
+                                    className="h-16 text-xs resize-none"
+                                    placeholder="Things to avoid..."
+                                />
+                            </div>
+
+                            {/* Model & Resolution Info (read-only) */}
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground">Model</span>
+                                    <span className="font-medium truncate" title={params.model_name || 'Default'}>
+                                        {(params.model_name || 'wan_2_2_i2v').replace('wan_2_2_', '').replace(/_/g, ' ')}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-muted-foreground">Resolution</span>
+                                    <span className="font-medium">
+                                        {params.parsed_resolution_wh || params.orchestrator_details?.parsed_resolution_wh || 'Auto'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Seed Info */}
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Seed</span>
+                                <span className="font-mono font-medium">
+                                    {params.seed_to_use || params.orchestrator_details?.seed_base || 'Random'}
+                                </span>
+                            </div>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <Label className="text-xs font-medium">Enhance Prompt</Label>
-                            <Switch
-                                checked={params.enhancePrompt || false}
-                                onCheckedChange={(checked) => handleChange('enhancePrompt', checked)}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-medium">Motion Amount (0-100)</Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={params.amountOfMotion || ''}
-                                onChange={(e) => handleChange('amountOfMotion', parseInt(e.target.value) || 0)}
-                                className="h-9 text-xs"
-                            />
-                        </div>
+                        {/* Motion Control - Same component as main page */}
+                        <MotionControl
+                            motionMode={motionMode}
+                            onMotionModeChange={handleMotionModeChange}
+                            amountOfMotion={amountOfMotion}
+                            onAmountOfMotionChange={handleAmountOfMotionChange}
+                            selectedLoras={selectedLoras}
+                            availableLoras={availableLoras}
+                            onAddLoraClick={handleAddLoraClick}
+                            onRemoveLora={handleRemoveLora}
+                            onLoraStrengthChange={handleLoraStrengthChange}
+                            selectedPhasePresetId={selectedPhasePresetId}
+                            onPhasePresetSelect={handlePhasePresetSelect}
+                            onPhasePresetRemove={handlePhasePresetRemove}
+                            currentSettings={currentMotionSettings}
+                            advancedMode={advancedMode}
+                            onAdvancedModeChange={handleAdvancedModeChange}
+                            phaseConfig={phaseConfig}
+                            onPhaseConfigChange={handlePhaseConfigChange}
+                            randomSeed={randomSeed}
+                            onRandomSeedChange={handleRandomSeedChange}
+                        />
                     </CollapsibleContent>
                 </Collapsible>
 
-                {/* Regenerate Video Button */}
+                {/* Regenerate Video Button - TODO: Implement regenerate functionality
                 <Button
                     size="sm"
                     onClick={() => {
-                        // TODO: Implement regenerate video functionality
                         toast({
                             title: "Regenerate Video",
                             description: "This feature is coming soon!",
@@ -725,6 +953,7 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                     <Film className="w-3 h-3" />
                     Regenerate Video
                 </Button>
+                */}
             </CardContent>
         </Card>
     );

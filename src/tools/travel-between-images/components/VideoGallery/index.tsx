@@ -734,18 +734,76 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
       setLightboxIndex
     )(), [lightboxIndex, displaySortedVideoOutputs]);
 
-  // Base lightbox navigation (without derived mode)
+  // Helper to check if a video has a valid output URL
+  const hasOutputUrl = useCallback((video: GenerationRow): boolean => {
+    return !!(video.location || (video as any).url || video.imageUrl);
+  }, []);
+
+  // Base lightbox navigation (without derived mode) - skips items without output URLs
   const baseGoNext = useCallback(() => {
-    if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex + 1) % displaySortedVideoOutputs.length);
+    if (lightboxIndex === null) return;
+    
+    const length = displaySortedVideoOutputs.length;
+    if (length === 0) return;
+    
+    // Find the next item with an output URL
+    for (let i = 1; i <= length; i++) {
+      const nextIndex = (lightboxIndex + i) % length;
+      if (hasOutputUrl(displaySortedVideoOutputs[nextIndex])) {
+        setLightboxIndex(nextIndex);
+        return;
+      }
     }
-  }, [lightboxIndex, displaySortedVideoOutputs.length]);
+    // No valid items found, stay at current
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
 
   const baseGoPrev = useCallback(() => {
-    if (lightboxIndex !== null) {
-      setLightboxIndex((lightboxIndex - 1 + displaySortedVideoOutputs.length) % displaySortedVideoOutputs.length);
+    if (lightboxIndex === null) return;
+    
+    const length = displaySortedVideoOutputs.length;
+    if (length === 0) return;
+    
+    // Find the previous item with an output URL
+    for (let i = 1; i <= length; i++) {
+      const prevIndex = (lightboxIndex - i + length) % length;
+      if (hasOutputUrl(displaySortedVideoOutputs[prevIndex])) {
+        setLightboxIndex(prevIndex);
+        return;
+      }
     }
-  }, [lightboxIndex, displaySortedVideoOutputs.length]);
+    // No valid items found, stay at current
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
+
+  // Check if there are valid items (with output URLs) in each direction
+  const hasValidNext = useMemo(() => {
+    if (lightboxIndex === null) return false;
+    const length = displaySortedVideoOutputs.length;
+    if (length <= 1) return false;
+    
+    // Check if any item other than the current one has a valid output URL
+    for (let i = 1; i < length; i++) {
+      const nextIndex = (lightboxIndex + i) % length;
+      if (hasOutputUrl(displaySortedVideoOutputs[nextIndex])) {
+        return true;
+      }
+    }
+    return false;
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
+
+  const hasValidPrevious = useMemo(() => {
+    if (lightboxIndex === null) return false;
+    const length = displaySortedVideoOutputs.length;
+    if (length <= 1) return false;
+    
+    // Check if any item other than the current one has a valid output URL
+    for (let i = 1; i < length; i++) {
+      const prevIndex = (lightboxIndex - i + length) % length;
+      if (hasOutputUrl(displaySortedVideoOutputs[prevIndex])) {
+        return true;
+      }
+    }
+    return false;
+  }, [lightboxIndex, displaySortedVideoOutputs, hasOutputUrl]);
 
   // Add derived navigation mode support (navigates only through "Based on this" items when active)
   const { wrappedGoNext: handleNext, wrappedGoPrev: handlePrevious, hasNext: derivedHasNext, hasPrevious: derivedHasPrevious } = useDerivedNavigation({
@@ -1024,8 +1082,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           showNavigation={true}
           showImageEditTools={false}
           showDownload={true}
-          hasNext={derivedHasNext}
-          hasPrevious={derivedHasPrevious}
+          hasNext={derivedHasNext && hasValidNext}
+          hasPrevious={derivedHasPrevious && hasValidPrevious}
           starred={(displaySortedVideoOutputs[lightboxIndex] as { starred?: boolean }).starred ?? false}
           shotId={shotId || undefined}
           showTaskDetails={true}
