@@ -550,7 +550,7 @@ const GenerationsPaneComponent: React.FC = () => {
                         shotsAvailable: shotsData?.map(s => ({ id: s.id, name: s.name })),
                         timestamp: Date.now()
                       });
-                      return handleAddToShot(generationId, imageUrl);
+                      return handleAddToShot(generationId, imageUrl, thumbUrl);
                     }}
                     onAddToLastShotWithoutPosition={(generationId, imageUrl, thumbUrl) => {
                       console.log('[GenerationsPane] ImageGallery onAddToLastShotWithoutPosition called', {
@@ -563,7 +563,7 @@ const GenerationsPaneComponent: React.FC = () => {
                         shotsAvailable: shotsData?.map(s => ({ id: s.id, name: s.name })),
                         timestamp: Date.now()
                       });
-                      return handleAddToShotWithoutPosition(generationId, imageUrl);
+                      return handleAddToShotWithoutPosition(generationId, imageUrl, thumbUrl);
                     }}
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}

@@ -595,12 +595,12 @@ export const useAddImageToShot = () => {
     onMutate: async (variables) => {
       const { shot_id, generation_id, project_id, imageUrl, thumbUrl, timelineFrame } = variables;
       
-      console.log('[AddFlicker] 1️⃣ onMutate START', {
+      console.log('[PATH_COMPARE] ⚡ MUTATION onMutate START - addImageToShotMutation:', {
         shot_id: shot_id?.substring(0, 8),
         generation_id: generation_id?.substring(0, 8),
-        imageUrl: imageUrl ? imageUrl.substring(0, 80) : 'MISSING',
-        thumbUrl: thumbUrl ? thumbUrl.substring(0, 80) : 'MISSING',
-        timelineFrame,
+        imageUrl: imageUrl ? imageUrl.substring(0, 80) : '❌ MISSING',
+        thumbUrl: thumbUrl ? thumbUrl.substring(0, 80) : '❌ MISSING',
+        timelineFrame: timelineFrame !== undefined ? timelineFrame : '❌ UNDEFINED (will calculate)',
         willCreateOptimistic: !!(imageUrl || thumbUrl),
         timestamp: Date.now()
       });
@@ -682,6 +682,9 @@ export const useAddImageToShot = () => {
             hasOptimistic: verifyCache?.some((g: any) => g._optimistic),
             timestamp: Date.now()
           });
+
+          // NOTE: Skeleton event is now emitted BEFORE mutation in useGenerationsPageLogic
+          // This ensures the skeleton appears immediately, not after onMutate runs
         } else {
           console.log('[AddFlicker] 1️⃣ onMutate - ⚠️ NO CACHE to update!', {
             shot_id: shot_id?.substring(0, 8),
@@ -807,10 +810,17 @@ export const useAddImageToShot = () => {
           });
         };
 
+        console.log('[PATH_COMPARE] ⚡ onSuccess - REPLACING temp ID with real ID:', {
+          tempId: context?.tempId?.substring(0, 12),
+          realId: data.id?.substring(0, 8),
+          timeline_frame: data.timeline_frame,
+          timestamp: Date.now()
+        });
+        
         queryClient.setQueryData(['all-shot-generations', shot_id], updateCache);
         
         const afterUpdate = queryClient.getQueryData<any[]>(['all-shot-generations', shot_id]);
-        console.log('[AddFlicker] 3️⃣ onSuccess - AFTER replacing optimistic:', {
+        console.log('[PATH_COMPARE] ⚡ onSuccess - AFTER cache update:', {
           shot_id: shot_id?.substring(0, 8),
           cacheCount: afterUpdate?.length,
           hasOptimistic: afterUpdate?.some((g: any) => g._optimistic),

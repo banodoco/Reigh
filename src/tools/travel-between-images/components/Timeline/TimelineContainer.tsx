@@ -206,6 +206,93 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   // Track pending duplicate frame for skeleton
   const [pendingDuplicateFrame, setPendingDuplicateFrame] = useState<number | null>(null);
   
+  // Track pending external add frame (from GenerationsPane)
+  const [pendingExternalAddFrame, setPendingExternalAddFrame] = useState<number | null>(null);
+  
+  // Listen for global pending add events (from GenerationsPane)
+  useEffect(() => {
+    console.log('[PATH_COMPARE] 🎧 TimelineContainer setting up event listener for shot:', shotId?.substring(0, 8));
+    
+    const handlePendingAdd = (event: CustomEvent) => {
+      const { frame, shotId: targetShotId } = event.detail;
+      
+      console.log('[PATH_COMPARE] 🔵 TimelineContainer received timeline:pending-add event:', {
+        frame,
+        targetShotId: targetShotId?.substring(0, 8),
+        currentShotId: shotId?.substring(0, 8),
+        matches: targetShotId === shotId || !targetShotId
+      });
+      
+      // Only handle if this is for the current shot
+      if (targetShotId && targetShotId !== shotId) {
+        console.log('[PATH_COMPARE] 🔵 Ignoring - different shot');
+        return;
+      }
+      
+      console.log('[PATH_COMPARE] 🔵 Setting pendingExternalAddFrame:', frame);
+      setPendingExternalAddFrame(frame);
+    };
+    
+    window.addEventListener('timeline:pending-add', handlePendingAdd as EventListener);
+    return () => {
+      console.log('[PATH_COMPARE] 🎧 TimelineContainer removing event listener for shot:', shotId?.substring(0, 8));
+      window.removeEventListener('timeline:pending-add', handlePendingAdd as EventListener);
+    };
+  }, [shotId]);
+
+  // Track images array changes
+  const prevImagesRef = React.useRef<typeof images>([]);
+  useEffect(() => {
+    const prevImages = prevImagesRef.current;
+    if (prevImages.length !== images.length) {
+      console.log('[PATH_COMPARE] 📊 Images array changed:', {
+        prevCount: prevImages.length,
+        newCount: images.length,
+        diff: images.length - prevImages.length,
+        // Find what was added or removed
+        added: images.filter(img => !prevImages.find(p => p.id === img.id)).map(img => ({
+          id: img.id?.substring(0, 8),
+          frame: img.timeline_frame,
+          _optimistic: (img as any)._optimistic
+        })),
+        removed: prevImages.filter(img => !images.find(p => p.id === img.id)).map(img => ({
+          id: img.id?.substring(0, 8),
+          frame: img.timeline_frame,
+          _optimistic: (img as any)._optimistic
+        })),
+        timestamp: Date.now()
+      });
+    }
+    prevImagesRef.current = images;
+  }, [images]);
+
+  // Clear pending external add frame when the new item appears
+  useEffect(() => {
+    if (pendingExternalAddFrame !== null) {
+      const imageAtFrame = images.find(img => img.timeline_frame === pendingExternalAddFrame);
+      if (imageAtFrame) {
+        console.log('[PATH_COMPARE] 🔵 ✨ New item appeared at pending external frame, clearing skeleton:', {
+          pendingExternalAddFrame,
+          imageId: imageAtFrame.id?.substring(0, 8),
+          _optimistic: (imageAtFrame as any)._optimistic,
+          timestamp: Date.now()
+        });
+        // Add a small delay to ensure smooth transition
+        setTimeout(() => setPendingExternalAddFrame(null), 100);
+      }
+    }
+  }, [images, pendingExternalAddFrame]);
+
+  // Safety timeout for pending external add frame
+  useEffect(() => {
+    if (pendingExternalAddFrame !== null) {
+      const timer = setTimeout(() => {
+        setPendingExternalAddFrame(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingExternalAddFrame]);
+  
   // Track internal generation drop processing state
   const [isInternalDropProcessing, setIsInternalDropProcessing] = useState(false);
   
@@ -255,8 +342,16 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
     thumbUrl: string | undefined, 
     targetFrame?: number
   ) => {
+    console.log('[PATH_COMPARE] 🟢 DRAG PATH INTERCEPTOR - before mutation:', {
+      generationId: generationId?.substring(0, 8),
+      imageUrl: imageUrl?.substring(0, 60),
+      thumbUrl: thumbUrl?.substring(0, 60),
+      targetFrame,
+      timestamp: Date.now()
+    });
+    
     if (targetFrame !== undefined) {
-      console.log('[TimelineContainer] 🦴 Setting pending drop skeleton at frame (gen):', targetFrame);
+      console.log('[PATH_COMPARE] 🟢 DRAG PATH - Setting pendingDropFrame BEFORE mutation:', targetFrame);
       setPendingDropFrame(targetFrame);
       setIsInternalDropProcessing(true);
     }
@@ -266,6 +361,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         await onGenerationDrop(generationId, imageUrl, thumbUrl, targetFrame);
       }
     } finally {
+      console.log('[PATH_COMPARE] 🟢 DRAG PATH INTERCEPTOR - after mutation, clearing skeleton');
       setIsInternalDropProcessing(false);
       // We don't strictly need to clear pendingDropFrame here because the effect will catch the state change
       // But clearing it ensures it disappears even if the effect logic is complex
@@ -346,17 +442,18 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const enableTapToMove = isTablet && !readOnly;
 
   // Calculate coordinate system using proper timeline dimensions
-  // Include pending frames (drop, duplicate) so the ruler updates immediately
+  // Include pending frames (drop, duplicate, external add) so the ruler updates immediately
   const { fullMin, fullMax, fullRange } = getTimelineDimensions(
     framePositions,
-    [pendingDropFrame, pendingDuplicateFrame]
+    [pendingDropFrame, pendingDuplicateFrame, pendingExternalAddFrame]
   );
   
   // [PendingDebug] Log when pending frames affect timeline dimensions
-  if (pendingDropFrame !== null || pendingDuplicateFrame !== null) {
+  if (pendingDropFrame !== null || pendingDuplicateFrame !== null || pendingExternalAddFrame !== null) {
     console.log('[PendingDebug] 📏 Timeline dimensions with pending frames:', {
       pendingDropFrame,
       pendingDuplicateFrame,
+      pendingExternalAddFrame,
       fullMin,
       fullMax,
       fullRange,
@@ -1210,9 +1307,9 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             );
           })()}
 
-          {/* Pending item vertical marker - shows immediately when drop/duplicate starts */}
-          {(pendingDropFrame !== null || pendingDuplicateFrame !== null) && (() => {
-            const pendingFrame = pendingDropFrame ?? pendingDuplicateFrame;
+          {/* Pending item vertical marker - shows immediately when drop/duplicate/add starts */}
+          {(pendingDropFrame !== null || pendingDuplicateFrame !== null || pendingExternalAddFrame !== null) && (() => {
+            const pendingFrame = pendingDropFrame ?? pendingDuplicateFrame ?? pendingExternalAddFrame;
             if (pendingFrame === null) return null;
             
             const effectiveWidth = containerWidth - (TIMELINE_PADDING_OFFSET * 2);
@@ -1257,6 +1354,17 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             />
           )}
 
+          {/* Skeleton for external add (GenerationsPane) */}
+          {pendingExternalAddFrame !== null && (
+            <TimelineSkeletonItem
+              framePosition={pendingExternalAddFrame}
+              fullMin={fullMin}
+              fullRange={fullRange}
+              containerWidth={containerWidth}
+              projectAspectRatio={projectAspectRatio}
+            />
+          )}
+
           {/* Timeline items */}
           {(() => {
             // [TimelineVisibility] Log what items are about to be rendered
@@ -1288,26 +1396,27 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             // imageKey is shot_generations.id - unique per entry
             const imageKey = image.id;
             
-            // KEY FIX: Get position from the positions map ONLY
-            // Do NOT fall back to image.timeline_frame as it may be stale or from wrong source
+            // KEY FIX: Get position from the positions map, but fall back to image.timeline_frame
+            // for newly added items whose ID just changed (temp -> real)
             const positionFromMap = currentPositions.get(imageKey);
             
-            // CRITICAL: Skip rendering items without known positions in the map
-            // This prevents items from appearing at wrong positions
-            if (positionFromMap === undefined || positionFromMap === null) {
+            // Use position from map if available, otherwise fall back to image.timeline_frame
+            // This prevents flicker when temp ID is replaced with real ID in onSuccess
+            const framePosition = positionFromMap ?? image.timeline_frame;
+            
+            // Only skip if we truly have no position information at all
+            if (framePosition === undefined || framePosition === null) {
               // Log skipped items at debug level
               if (process.env.NODE_ENV === 'development') {
-                console.log(`[TimelineVisibility] ⏳ Skipping item not in positions map:`, {
+                console.log(`[TimelineVisibility] ⏳ Skipping item with no position:`, {
                   imageKey: imageKey?.substring(0, 8),
                   positionFromMap,
                   imageTimelineFrame: image.timeline_frame,
-                  reason: 'Item not in positions map - waiting for sync'
+                  reason: 'No position available from map or image'
                 });
               }
               return null;
             }
-            
-            const framePosition = positionFromMap;
             
             const isDragging = dragState.isDragging && dragState.activeId === imageKey;
 

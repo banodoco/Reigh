@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useContext } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useGenerations, useDeleteGeneration, useToggleGenerationStar } from '@/shared/hooks/useGenerations';
 import { useListShots, useAddImageToShot, useAddImageToShotWithoutPosition, usePositionExistingGenerationInShot } from '@/shared/hooks/useShots';
@@ -24,6 +25,7 @@ export function useGenerationsPageLogic({
   toolType,
   enableDataLoading = true
 }: UseGenerationsPageLogicOptions = {}) {
+  const queryClient = useQueryClient();
   const { selectedProjectId } = useProject();
   
   // Gate all data loading based on project availability and enableDataLoading flag
@@ -285,18 +287,19 @@ export function useGenerationsPageLogic({
     toggleStarMutation.mutate({ id, starred });
   };
 
-  const handleAddToShot = async (generationId: string, imageUrl?: string): Promise<boolean> => {
+  const handleAddToShot = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     // Fast path: minimal validation and direct execution
     const targetShotId = currentShotId || lastAffectedShotId;
     
-    console.log('[PositionFix] handleAddToShot called:', {
-      generationId,
-      imageUrl: imageUrl?.substring(0, 50) + '...',
-      currentShotId,
-      lastAffectedShotId,
-      targetShotId,
-      selectedProjectId,
-      selectedShotFilter,
+    console.log('[PATH_COMPARE] 🔵 BUTTON PATH START - handleAddToShot:', {
+      generationId: generationId?.substring(0, 8),
+      imageUrl: imageUrl?.substring(0, 60),
+      thumbUrl: thumbUrl?.substring(0, 60),
+      currentShotId: currentShotId?.substring(0, 8),
+      lastAffectedShotId: lastAffectedShotId?.substring(0, 8),
+      targetShotId: targetShotId?.substring(0, 8),
+      selectedProjectId: selectedProjectId?.substring(0, 8),
+      selectedShotFilter: selectedShotFilter?.substring(0, 8),
       excludePositioned,
       timestamp: Date.now()
     });
@@ -345,18 +348,58 @@ export function useGenerationsPageLogic({
           timestamp: Date.now()
         });
       } else {
-        console.log('[PositionFix] Using regular addImageToShotMutation with params:', {
-          shot_id: targetShotId,
-          generation_id: generationId,
-          imageUrl: imageUrl,
-          project_id: selectedProjectId,
+        // Calculate the target frame BEFORE calling mutation (same as drag path)
+        // This lets us show the skeleton immediately
+        const currentCache = queryClient.getQueryData<any[]>(['all-shot-generations', targetShotId]) || [];
+        const positionedImages = currentCache.filter((img: any) => img.timeline_frame !== null && img.timeline_frame !== undefined);
+        const maxFrame = positionedImages.length > 0 
+          ? Math.max(...positionedImages.map((g: any) => g.timeline_frame || 0)) 
+          : -60;
+        const calculatedFrame = maxFrame + 60;
+        
+        console.log('[PATH_COMPARE] 🔵 BUTTON PATH - calculated frame BEFORE mutation:', {
+          calculatedFrame,
+          maxFrame,
+          positionedImagesCount: positionedImages.length,
+          timestamp: Date.now()
         });
         
-        // Use the regular add function
+        // Emit skeleton event BEFORE mutation (same timing as drag path)
+        if (typeof window !== 'undefined') {
+          const event = new CustomEvent('timeline:pending-add', {
+            detail: { 
+              frame: calculatedFrame,
+              shotId: targetShotId
+            }
+          });
+          console.log('[PATH_COMPARE] 🔵 BUTTON PATH - emitting skeleton event BEFORE mutation:', {
+            frame: calculatedFrame,
+            shotId: targetShotId?.substring(0, 8),
+            eventType: event.type,
+            eventDetail: event.detail,
+            timestamp: Date.now()
+          });
+          window.dispatchEvent(event);
+          console.log('[PATH_COMPARE] 🔵 BUTTON PATH - event dispatched');
+        }
+        
+        console.log('[PATH_COMPARE] 🔵 BUTTON PATH - calling addImageToShotMutation.mutateAsync:', {
+          shot_id: targetShotId?.substring(0, 8),
+          generation_id: generationId?.substring(0, 8),
+          imageUrl: imageUrl?.substring(0, 60),
+          thumbUrl: thumbUrl?.substring(0, 60),
+          project_id: selectedProjectId?.substring(0, 8),
+          timelineFrame: calculatedFrame,
+          timestamp: Date.now()
+        });
+        
+        // Use the regular add function - now with pre-calculated frame!
         const result = await addImageToShotMutation.mutateAsync({
           shot_id: targetShotId,
           generation_id: generationId,
           imageUrl: imageUrl,
+          thumbUrl: thumbUrl,
+          timelineFrame: calculatedFrame, // Pass the pre-calculated frame
           project_id: selectedProjectId,
         });
         
@@ -382,7 +425,7 @@ export function useGenerationsPageLogic({
     }
   };
 
-  const handleAddToShotWithoutPosition = async (generationId: string, imageUrl?: string): Promise<boolean> => {
+  const handleAddToShotWithoutPosition = async (generationId: string, imageUrl?: string, thumbUrl?: string): Promise<boolean> => {
     // Fast path: minimal validation and direct execution
     const targetShotId = currentShotId || lastAffectedShotId;
     
@@ -399,6 +442,7 @@ export function useGenerationsPageLogic({
         shot_id: targetShotId,
         generation_id: generationId,
         imageUrl: imageUrl,
+        thumbUrl: thumbUrl,
         project_id: selectedProjectId,
       });
       return true;

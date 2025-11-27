@@ -659,13 +659,15 @@ export const useGenerationActions = ({
     thumbUrl: string | undefined, 
     targetFrame?: number
   ) => {
-    console.log('[GenerationDrop] 🎯 handleTimelineGenerationDrop called:', {
+    console.log('[PATH_COMPARE] 🟢 DRAG PATH START - handleTimelineGenerationDrop:', {
       generationId: generationId?.substring(0, 8),
+      imageUrl: imageUrl?.substring(0, 60),
+      thumbUrl: thumbUrl?.substring(0, 60),
       targetFrame,
       targetFrameProvided: targetFrame !== undefined,
       shotId: selectedShot?.id?.substring(0, 8),
       projectId: projectId?.substring(0, 8),
-      note: 'This should CREATE A NEW shot_generations record, not move an existing one'
+      timestamp: Date.now()
     });
 
     if (!selectedShot?.id || !projectId) {
@@ -679,7 +681,7 @@ export const useGenerationActions = ({
     }
 
     try {
-      console.log('[GenerationDrop] 📤 Adding generation to shot...');
+      console.log('[PATH_COMPARE] 🟢 DRAG PATH - calling addImageToShotMutation.mutateAsync');
       
       // Add the generation to the shot using the existing mutation
       // The addImageToShot API will handle creating the shot_image_entry

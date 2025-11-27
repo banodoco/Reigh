@@ -159,25 +159,34 @@ export function useTimelinePositions({
       return;
     }
 
-    // Build image key map for efficient lookup
-    // image.id is now shot_generations.id - unique per entry
-    const imageKeyMap = new Map(
-      images.map(img => [img.id, img.id])
-    );
-    
-    // Calculate new positions from database
+    // Calculate new positions from database AND optimistic images
     const newPositions = new Map<string, number>();
     
+    // 1. First, add positions from shotGenerations (database source)
+    // shotGenerations uses sg.id as the key (shot_generations.id)
     shotGenerations.forEach(sg => {
       if (sg.timeline_frame !== null && sg.timeline_frame !== undefined) {
-        // Try to find matching image key
-        const imageKey = imageKeyMap.get(sg.generation_id);
-        if (imageKey) {
-          newPositions.set(imageKey, sg.timeline_frame);
-        } else {
-          // Fallback to shot generation ID
-          newPositions.set(sg.id, sg.timeline_frame);
-        }
+        newPositions.set(sg.id, sg.timeline_frame);
+      }
+    });
+    
+    // 2. Then, add positions from images that aren't in shotGenerations yet
+    // This handles optimistic items that have timeline_frame but haven't synced to DB
+    // image.id is shot_generations.id (or temp-xxx for optimistic items)
+    images.forEach(img => {
+      // Skip if already in positions (from shotGenerations)
+      if (newPositions.has(img.id)) {
+        return;
+      }
+      
+      // Add optimistic items that have a timeline_frame
+      if (img.timeline_frame !== null && img.timeline_frame !== undefined) {
+        console.log('[TimelinePositions] 🆕 Adding optimistic item to positions:', {
+          id: img.id?.substring(0, 8),
+          timeline_frame: img.timeline_frame,
+          isOptimistic: !!(img as any)._optimistic
+        });
+        newPositions.set(img.id, img.timeline_frame);
       }
     });
 
