@@ -24,6 +24,7 @@ import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import type { LoraModel } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
+import { Card } from '@/shared/components/ui/card';
 import { extractVideoPosterFrame, extractVideoFinalFrame } from '@/shared/utils/videoPosterExtractor';
 import { useJoinClipsSettings } from '../hooks/useJoinClipsSettings';
 import { generateUUID } from '@/shared/lib/taskCreation';
@@ -1137,7 +1138,7 @@ const JoinClipsPage: React.FC = () => {
         )}
 
         {/* Global Settings using JoinClipsSettingsForm */}
-        <div className="pt-6 border-t">
+        <Card className="p-6 sm:p-8 shadow-sm border">
           <JoinClipsSettingsForm
             gapFrames={gapFrameCount}
             setGapFrames={(val) => joinSettings.updateField('gapFrameCount', val)}
@@ -1173,7 +1174,7 @@ const JoinClipsPage: React.FC = () => {
             })()}
             isGenerateDisabled={clips.filter(c => c.url).length < 2}
           />
-        </div>
+        </Card>
 
         {/* Results Gallery */}
         {(() => {

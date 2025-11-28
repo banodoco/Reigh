@@ -328,11 +328,38 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       queryClient.invalidateQueries({ queryKey: ['shots'] });
     };
 
+    // NEW: Handle batched generation inserts (new child generations/segments)
+    const handleGenerationInsertBatch = (event: CustomEvent) => {
+      const { count, payloads, childGenerations, parentGenerations } = event.detail;
+      console.log('[SimpleRealtime] 🆕 REALTIME generation-insert-batch received:', {
+        count,
+        childGenerations,
+        parentGenerations,
+        payloads: payloads?.slice(0, 3).map((p: any) => ({
+          generationId: p.generationId?.substring(0, 8),
+          isChild: p.isChild,
+          parentGenerationId: p.parentGenerationId?.substring(0, 8),
+          hasLocation: p.hasLocation
+        })),
+        timestamp: Date.now()
+      });
+
+      // Invalidate generation queries to show new generations
+      // This is especially important for ChildGenerationsView which queries by parentGenerationId
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generation'] }); // For single generation queries
+      // Also invalidate shot-generations as they may contain generation data
+      queryClient.invalidateQueries({ queryKey: ['shot-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] });
+    };
+
     // Listen for BATCHED events (new, efficient)
     window.addEventListener('realtime:task-update-batch', handleTaskUpdateBatch as EventListener);
     window.addEventListener('realtime:task-new-batch', handleNewTaskBatch as EventListener);
     window.addEventListener('realtime:shot-generation-change-batch', handleShotGenerationChangeBatch as EventListener);
     window.addEventListener('realtime:generation-update-batch', handleGenerationUpdateBatch as EventListener);
+    window.addEventListener('realtime:generation-insert-batch', handleGenerationInsertBatch as EventListener);
     
     // Keep legacy event listeners for backward compatibility
     window.addEventListener('realtime:task-update', handleTaskUpdate as EventListener);
@@ -345,6 +372,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       window.removeEventListener('realtime:task-new-batch', handleNewTaskBatch as EventListener);
       window.removeEventListener('realtime:shot-generation-change-batch', handleShotGenerationChangeBatch as EventListener);
       window.removeEventListener('realtime:generation-update-batch', handleGenerationUpdateBatch as EventListener);
+      window.removeEventListener('realtime:generation-insert-batch', handleGenerationInsertBatch as EventListener);
       
       // Remove legacy event listeners
       window.removeEventListener('realtime:task-update', handleTaskUpdate as EventListener);
