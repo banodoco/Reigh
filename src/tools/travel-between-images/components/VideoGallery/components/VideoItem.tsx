@@ -62,6 +62,8 @@ interface VideoItemProps {
   onViewSegments?: (video: GenerationRow) => void;
   projectId?: string | null;
   hideActions?: boolean;
+  /** Custom tooltip text for the delete button */
+  deleteTooltip?: string;
 }
 
 export const VideoItem = React.memo<VideoItemProps>(({
@@ -86,7 +88,8 @@ export const VideoItem = React.memo<VideoItemProps>(({
   onShareCreated,
   onViewSegments,
   projectId,
-  hideActions = false
+  hideActions = false,
+  deleteTooltip
 }) => {
   // Get task mapping for this video to enable Apply Settings button
   const { data: taskMapping } = useTaskFromUnifiedCache(video.id || '');
@@ -1352,26 +1355,34 @@ export const VideoItem = React.memo<VideoItemProps>(({
                 </Tooltip>
               </TooltipProvider>
             )}
-            <Button
-              variant="destructive"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
-                  videoId: video.id,
-                  deletingVideoId,
-                  isDisabled: deletingVideoId === video.id,
-                  timestamp: Date.now()
-                });
-                onDelete(video.id);
-                console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
-              }}
-              disabled={deletingVideoId === video.id}
-              className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
-              title="Delete video"
-            >
-              <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('[MobileButtonDebug] [DeleteButton] Button clicked:', {
+                        videoId: video.id,
+                        deletingVideoId,
+                        isDisabled: deletingVideoId === video.id,
+                        timestamp: Date.now()
+                      });
+                      onDelete(video.id);
+                      console.log('[MobileButtonDebug] [DeleteButton] onDelete called');
+                    }}
+                    disabled={deletingVideoId === video.id}
+                    className="h-6 w-6 sm:h-7 sm:w-7 p-0 rounded-full"
+                  >
+                    <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>{deleteTooltip || 'Delete video'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         )}
       </div>
@@ -1422,6 +1433,7 @@ export const VideoItem = React.memo<VideoItemProps>(({
     prevProps.onHoverStart === nextProps.onHoverStart &&
     prevProps.onHoverEnd === nextProps.onHoverEnd &&
     prevProps.onMobileModalOpen === nextProps.onMobileModalOpen &&
-    prevProps.onApplySettingsFromTask === nextProps.onApplySettingsFromTask
+    prevProps.onApplySettingsFromTask === nextProps.onApplySettingsFromTask &&
+    prevProps.deleteTooltip === nextProps.deleteTooltip
   );
 });

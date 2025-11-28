@@ -1060,6 +1060,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
                     onViewSegments={(video) => {
                       navigate(`/tools/travel-between-images/segments/${video.id}`);
                     }}
+                    deleteTooltip="Delete video permanently"
                   />
                 );
               })}

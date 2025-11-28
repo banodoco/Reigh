@@ -176,21 +176,6 @@ export class SimpleRealtimeManager {
             });
             this.handleGenerationUpdate(payload);
           }
-        )
-        // Listen to generations INSERT for new child generations (segments)
-        // Child generations are not linked to shot_generations, so they need their own listener
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'generations', filter: `project_id=eq.${projectId}` }, 
-          (payload: any) => {
-            console.log('[SimpleRealtime] 📨 New generation inserted:', {
-              generationId: payload?.new?.id?.substring(0, 8),
-              isChild: payload?.new?.is_child,
-              parentId: payload?.new?.parent_generation_id?.substring(0, 8),
-              hasLocation: !!payload?.new?.location,
-              timestamp: Date.now()
-            });
-            this.handleGenerationInsert(payload);
-          }
         );
 
       // Subscribe with status callback
@@ -346,8 +331,6 @@ export class SimpleRealtimeManager {
         this.dispatchBatchedShotGenerationChanges(payloads);
       } else if (eventType === 'generation-update') {
         this.dispatchBatchedGenerationUpdates(payloads);
-      } else if (eventType === 'generation-insert') {
-        this.dispatchBatchedGenerationInserts(payloads);
       }
     });
 
@@ -506,50 +489,6 @@ export class SimpleRealtimeManager {
     }
   }
 
-  /**
-   * Dispatch batched generation insert events (new child generations/segments)
-   * This is specifically for child generations that are not linked to shot_generations
-   */
-  private dispatchBatchedGenerationInserts(payloads: any[]) {
-    // Update global snapshot with latest event time
-    this.updateGlobalSnapshot('joined', Date.now());
-
-    // Count child vs parent generations
-    const childGenerations = payloads.filter((p: any) => p.isChild);
-    const parentGenerations = payloads.filter((p: any) => !p.isChild);
-
-    console.log('[SimpleRealtime:Batching] 📨 Dispatching batched generation inserts:', {
-      count: payloads.length,
-      childGenerations: childGenerations.length,
-      parentGenerations: parentGenerations.length,
-      timestamp: Date.now()
-    });
-
-    // Invalidate all generation-related queries to pick up new generations
-    // This is especially important for ChildGenerationsView which queries by parentGenerationId
-    const queryKeys = [
-      ['unified-generations'],
-      ['generations'],
-      ['shot-generations'],
-      ['all-shot-generations']
-    ];
-    
-    dataFreshnessManager.onRealtimeEvent('generation-insert', queryKeys);
-
-    // Emit single consolidated event with all payloads
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('realtime:generation-insert-batch', {
-        detail: {
-          payloads,
-          count: payloads.length,
-          childGenerations: childGenerations.length,
-          parentGenerations: parentGenerations.length,
-          timestamp: Date.now()
-        }
-      }));
-    }
-  }
-
   private handleTaskUpdate(payload: any) {
     // Batch this event instead of dispatching immediately
     this.batchEvent('task-update', payload);
@@ -567,16 +506,14 @@ export class SimpleRealtimeManager {
     const timelineFrame = newRecord?.timeline_frame;
     const oldTimelineFrame = oldRecord?.timeline_frame;
     
-    // Check if this involves a positioned image (timeline_frame is NOT NULL)
+    // Only invalidate if this involves a positioned image (timeline_frame is NOT NULL)
     const isNowPositioned = timelineFrame !== null && timelineFrame !== undefined;
     const wasPositioned = oldTimelineFrame !== null && oldTimelineFrame !== undefined;
     const positionChanged = eventType === 'UPDATE' && timelineFrame !== oldTimelineFrame;
     
-    // For INSERT: ALWAYS invalidate (VideoOutputsGallery needs to show new generations even if unpositioned)
-    // For UPDATE: only care if position changed (added, removed, or moved)
-    // NOTE: Previously we only invalidated INSERT if positioned, which caused parent generations 
-    // (created without URL/position) to not appear in VideoOutputsGallery until manual refresh
-    const shouldInvalidate = eventType === 'INSERT' || (isNowPositioned || wasPositioned || positionChanged);
+    // For INSERT: only care if it's positioned
+    // For UPDATE: care if position changed (added, removed, or moved)
+    const shouldInvalidate = eventType === 'INSERT' ? isNowPositioned : (isNowPositioned || wasPositioned || positionChanged);
     
     console.log('[SimpleRealtime] 🎯 Shot generation change analysis:', {
       eventType,
@@ -586,8 +523,7 @@ export class SimpleRealtimeManager {
       isNowPositioned,
       wasPositioned,
       positionChanged,
-      shouldInvalidate,
-      reason: eventType === 'INSERT' ? 'INSERT always invalidates' : 'position change check'
+      shouldInvalidate
     });
     
     if (!shouldInvalidate) {
@@ -668,41 +604,6 @@ export class SimpleRealtimeManager {
     // Invalidate queries to pick up any generation changes (location, upscaled_url, thumbnail, etc.)
     console.log('[SimpleRealtime:Batching] 📦 Batching generation update:', generationId.substring(0, 8));
     this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted, locationChanged: locationActuallyChanged, thumbnailChanged: thumbnailActuallyChanged });
-  }
-
-  /**
-   * Handle new generation inserts (especially child generations/segments)
-   * Child generations are not linked to shot_generations, so they need their own handler
-   */
-  private handleGenerationInsert(payload: any) {
-    const newRecord = payload?.new;
-    const generationId = newRecord?.id;
-    const isChild = newRecord?.is_child;
-    const parentGenerationId = newRecord?.parent_generation_id;
-    const hasLocation = !!newRecord?.location;
-    
-    console.log('[SimpleRealtime] 🆕 Generation insert analysis:', {
-      generationId: generationId?.substring(0, 8),
-      isChild,
-      parentGenerationId: parentGenerationId?.substring(0, 8),
-      hasLocation,
-      timestamp: Date.now()
-    });
-    
-    if (!generationId) {
-      console.warn('[SimpleRealtime] ⚠️  Generation insert missing id, cannot invalidate');
-      return;
-    }
-    
-    // Batch this event to consolidate multiple segment completions
-    console.log('[SimpleRealtime:Batching] 📦 Batching generation insert:', generationId.substring(0, 8));
-    this.batchEvent('generation-insert', { 
-      ...payload, 
-      generationId, 
-      isChild, 
-      parentGenerationId,
-      hasLocation 
-    });
   }
 
   private updateGlobalSnapshot(channelState: string, lastEventAt?: number) {

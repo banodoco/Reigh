@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useGenerations } from '@/shared/hooks/useGenerations';
 import { GenerationRow } from '@/types/shots';
 import { Skeleton } from '@/shared/components/ui/skeleton';
+import { Separator } from '@/shared/components/ui/separator';
 import { VideoItem } from './VideoItem';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -282,16 +283,19 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     });
 
     // Transform parent generation for VideoItem
+    // Use updated_at for timestamp since that reflects when the final video was generated
     const parentVideoRow = React.useMemo(() => {
         if (!parentGeneration) return null;
+        // Use updated_at if available (when final video was generated), otherwise fall back to created_at
+        const timestampToShow = parentGeneration.updated_at || parentGeneration.created_at;
         return {
             ...parentGeneration,
             location: parentGeneration.location,
             imageUrl: parentGeneration.location, // Fallback for poster
             thumbUrl: parentGeneration.thumbnail_url || parentGeneration.location,
             params: parentGeneration.params,
-            created_at: parentGeneration.created_at,
-            createdAt: parentGeneration.created_at,
+            created_at: timestampToShow, // Show when final video was generated, not when parent was created
+            createdAt: timestampToShow,
             type: 'video', // Force type
         } as GenerationRow;
     }, [parentGeneration]);
@@ -303,6 +307,39 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         enableProjectPersistence: true,
         persistenceKey: 'join-clips-segments',
     });
+
+    // Handler to clear only the output URL from the parent generation (not delete the generation itself)
+    const handleClearParentOutput = useCallback(async () => {
+        if (!parentGenerationId) return;
+        
+        try {
+            const { error } = await supabase
+                .from('generations')
+                .update({ 
+                    location: null,
+                    thumbnail_url: null 
+                })
+                .eq('id', parentGenerationId);
+            
+            if (error) throw error;
+            
+            toast({
+                title: "Output cleared",
+                description: "Final video output has been removed. You can regenerate it.",
+            });
+            
+            // Invalidate queries to refresh the UI
+            queryClient.invalidateQueries({ queryKey: ['generation', parentGenerationId] });
+            queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+        } catch (error) {
+            console.error('[ChildGenerationsView] Error clearing parent output:', error);
+            toast({
+                title: "Error",
+                description: "Failed to clear the output",
+                variant: "destructive",
+            });
+        }
+    }, [parentGenerationId, queryClient, toast]);
 
     const handleRestoreDefaults = () => {
         setJoinContextFrames(joinClipsSettings.defaults.contextFrameCount);
@@ -414,17 +451,16 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             {/* Parent Generation Video (Final Output) */}
             {parentVideoRow && parentVideoRow.location && (
                 <div className="max-w-7xl mx-auto px-4 pt-5 pb-0">
-                    <Card className="overflow-hidden border-primary/20 shadow-sm">
-                        <div className="p-4 border-b bg-muted/30">
-                            <h2 className="text-lg font-medium flex items-center gap-2">
-                                <Film className="w-5 h-5 text-primary" />
+                    <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
+                        <div className="flex flex-col space-y-2 sm:space-y-3">
+                            <h2 className="text-base sm:text-lg font-light flex items-center gap-2">
                                 Final Video
                             </h2>
+                            <Separator className="my-2" />
                         </div>
-                        <div 
-                            className="bg-black w-full flex items-center justify-center relative group p-1"
-                        >
-                            <div className="w-full max-w-3xl mx-auto">
+                        
+                        <div className="flex justify-center mt-4">
+                            <div className="w-full max-w-2xl">
                                 <VideoItem
                                     video={parentVideoRow}
                                     index={-1}
@@ -434,7 +470,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     projectId={projectId}
                                     onLightboxOpen={() => setIsParentLightboxOpen(true)}
                                     onMobileTap={handleMobileTap}
-                                    onDelete={() => { }}
+                                    onDelete={handleClearParentOutput}
                                     deletingVideoId={null}
                                     onHoverStart={() => { }}
                                     onHoverEnd={() => { }}
@@ -443,16 +479,17 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     showTaskDetailsModal={false}
                                     onApplySettingsFromTask={() => { }}
                                     hideActions={false}
+                                    deleteTooltip="Clear output (keeps segments, allows re-joining)"
                                 />
                             </div>
                         </div>
-                    </Card>
+                    </div>
                 </div>
             )}
 
             <div className="max-w-7xl mx-auto px-4 pt-5 pb-6">
-                <Card className="p-6 sm:p-8 shadow-sm border">
-                    <h2 className="text-2xl font-light tracking-tight mb-6">Segments</h2>
+                <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
+                    <h2 className="text-lg sm:text-xl font-light tracking-tight text-foreground mb-6">Segments</h2>
                     
                     {isLoading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -486,17 +523,17 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             ))}
                         </div>
                     )}
-                </Card>
+                </div>
             </div>
 
             {/* Join Clips Section */}
             {sortedChildren.length >= 2 && sortedChildren.some(c => c.location) && (
                 <div className="max-w-7xl mx-auto px-4 pb-4">
-                    <Card className="p-6 sm:p-8 shadow-sm border">
+                    <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm">
                         <JoinClipsSettingsForm 
                             headerContent={
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-2xl font-light tracking-tight">Join Segments</h2>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg sm:text-xl font-light tracking-tight text-foreground">Join Segments</h2>
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -528,7 +565,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             generateSuccess={joinClipsSuccess}
                             generateButtonText={`Generate Joined Video (${sortedChildren.length} Segments)`}
                         />
-                    </Card>
+                    </div>
                 </div>
             )}
 
