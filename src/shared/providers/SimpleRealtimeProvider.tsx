@@ -162,7 +162,11 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
             queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] }); // 🚀 For useAllShotGenerations (single query)
           });
         } else {
-          // No shot IDs found - also invalidate all shot-related queries as fallback
+          // No shot IDs found - invalidate all shot-related queries as fallback
+          // 🔧 FIX: Also invalidate unified-generations shot queries so VideoGallery updates
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'shot'
+          });
           queryClient.invalidateQueries({
             predicate: (query) => query.queryKey[0] === 'shot-generations'
           });

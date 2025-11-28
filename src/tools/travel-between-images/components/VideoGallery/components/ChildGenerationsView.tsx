@@ -10,7 +10,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
 import { Slider } from '@/shared/components/ui/slider';
-import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, Save, Film, Loader2, Check, Layers, RotateCcw, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
@@ -208,53 +208,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         });
     }, [children]);
 
-    const handleLightboxClose = () => setLightboxIndex(null);
-    const handleLightboxNext = () => setLightboxIndex((prev) => (prev !== null ? (prev + 1) % sortedChildren.length : null));
-    const handleLightboxPrev = () => setLightboxIndex((prev) => (prev !== null ? (prev - 1 + sortedChildren.length) % sortedChildren.length : null));
-
-    // ===============================================================================
-    // TASK DATA HOOKS - For lightbox task details
-    // ===============================================================================
-    
-    // Get task data for segment lightbox
-    const segmentLightboxVideoId = lightboxIndex !== null && sortedChildren[lightboxIndex] ? sortedChildren[lightboxIndex].id : null;
-    const { data: segmentTaskMapping, isLoading: isLoadingSegmentMapping } = useTaskFromUnifiedCache(segmentLightboxVideoId || '');
-    const segmentTaskId = typeof segmentTaskMapping?.taskId === 'string' ? segmentTaskMapping.taskId : '';
-    const { data: segmentTask, isLoading: isLoadingSegmentTask, error: segmentTaskError } = useGetTask(segmentTaskId);
-    const segmentInputImages: string[] = useMemo(() => deriveInputImages(segmentTask), [segmentTask]);
-    
-    // Debug: Log task data fetching for segments
-    React.useEffect(() => {
-        if (lightboxIndex !== null && segmentTask) {
-            console.log('[ChildViewTaskDebug] ===== SEGMENT TASK DETAILS =====');
-            console.log('[ChildViewTaskDebug] segmentTaskId:', segmentTaskId);
-            console.log('[ChildViewTaskDebug] segmentTask.task_type:', segmentTask.task_type);
-            console.log('[ChildViewTaskDebug] segmentTask.params?.prompt:', segmentTask.params?.prompt?.substring?.(0, 100));
-            console.log('[ChildViewTaskDebug] segmentTask.params?.base_prompt:', segmentTask.params?.base_prompt?.substring?.(0, 100));
-            console.log('[ChildViewTaskDebug] segmentTask.params?.segment_index:', segmentTask.params?.segment_index);
-            console.log('[ChildViewTaskDebug] segmentTask.params?.orchestrator_task_id:', segmentTask.params?.orchestrator_task_id);
-            console.log('[ChildViewTaskDebug] Full segmentTask.params keys:', Object.keys(segmentTask.params || {}));
-        }
-    }, [lightboxIndex, segmentTaskId, segmentTask]);
-    
-    // Get task data for parent lightbox
-    const { data: parentTaskMapping, isLoading: isLoadingParentMapping } = useTaskFromUnifiedCache(isParentLightboxOpen ? parentGenerationId : '');
-    const parentTaskId = typeof parentTaskMapping?.taskId === 'string' ? parentTaskMapping.taskId : '';
-    const { data: parentTask, isLoading: isLoadingParentTask, error: parentTaskError } = useGetTask(parentTaskId);
-    const parentInputImages: string[] = useMemo(() => deriveInputImages(parentTask), [parentTask]);
-    
-    // Debug: Log task data fetching for parent
-    React.useEffect(() => {
-        if (isParentLightboxOpen && parentTask) {
-            console.log('[ChildViewTaskDebug] ===== PARENT TASK DETAILS =====');
-            console.log('[ChildViewTaskDebug] parentTaskId:', parentTaskId);
-            console.log('[ChildViewTaskDebug] parentTask.task_type:', parentTask.task_type);
-            console.log('[ChildViewTaskDebug] parentTask.params?.prompt:', parentTask.params?.prompt?.substring?.(0, 100));
-            console.log('[ChildViewTaskDebug] parentTask.params?.base_prompt:', parentTask.params?.base_prompt?.substring?.(0, 100));
-            console.log('[ChildViewTaskDebug] Full parentTask.params keys:', Object.keys(parentTask.params || {}));
-        }
-    }, [isParentLightboxOpen, parentTaskId, parentTask]);
-
     // Join Clips State
     const [isJoiningClips, setIsJoiningClips] = useState(false);
     const [joinClipsSuccess, setJoinClipsSuccess] = useState(false);
@@ -283,6 +236,185 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         },
         enabled: !!parentGenerationId,
     });
+
+    // Extract expected segment count and data from parent's orchestrator_details
+    const expectedSegmentData = React.useMemo(() => {
+        if (!parentGeneration?.params) {
+            console.log('[ExpectedSegmentData] No parent params');
+            return null;
+        }
+        
+        const params = parentGeneration.params as any;
+        const orchestratorDetails = params.orchestrator_details;
+        
+        if (!orchestratorDetails) {
+            console.log('[ExpectedSegmentData] No orchestrator_details in params');
+            return null;
+        }
+        
+        const segmentCount = orchestratorDetails.num_new_segments_to_generate 
+            || orchestratorDetails.segment_frames_expanded?.length 
+            || 0;
+        
+        console.log('[ExpectedSegmentData] Extracted data', {
+            num_new_segments_to_generate: orchestratorDetails.num_new_segments_to_generate,
+            segment_frames_expanded_length: orchestratorDetails.segment_frames_expanded?.length,
+            computedCount: segmentCount,
+            timestamp: Date.now()
+        });
+        
+        return {
+            count: segmentCount,
+            frames: orchestratorDetails.segment_frames_expanded || [],
+            prompts: orchestratorDetails.enhanced_prompts_expanded || orchestratorDetails.base_prompts_expanded || [],
+            inputImages: orchestratorDetails.input_image_paths_resolved || [],
+        };
+    }, [parentGeneration?.params]);
+
+    // Type for segment slots - either a real child or a placeholder
+    type SegmentSlot = 
+        | { type: 'child'; child: GenerationRow; index: number }
+        | { type: 'placeholder'; index: number; expectedFrames?: number; expectedPrompt?: string; startImage?: string; endImage?: string };
+
+    // Create merged array with placeholders for missing segments
+    const segmentSlots = React.useMemo((): SegmentSlot[] => {
+        console.log('[SegmentSlots] Computing segment slots', {
+            hasExpectedData: !!expectedSegmentData,
+            expectedCount: expectedSegmentData?.count,
+            actualChildrenCount: sortedChildren.length,
+            childOrders: sortedChildren.map(c => (c as any).child_order),
+            timestamp: Date.now()
+        });
+        
+        if (!expectedSegmentData || expectedSegmentData.count === 0) {
+            // No expected data, just show what we have
+            console.log('[SegmentSlots] No expected data, showing all children as-is');
+            return sortedChildren.map((child, index) => ({
+                type: 'child' as const,
+                child,
+                index: (child as any).child_order ?? index,
+            }));
+        }
+
+        // Create slots for all expected segments
+        const slots: SegmentSlot[] = [];
+        const childrenByOrder = new Map<number, GenerationRow>();
+        
+        // Check if children have valid, unique child_order values
+        const childOrders = sortedChildren.map(c => (c as any).child_order);
+        const hasValidOrders = childOrders.every((order, idx) => 
+            typeof order === 'number' && 
+            order >= 0 && 
+            order < expectedSegmentData.count &&
+            childOrders.indexOf(order) === idx // unique
+        );
+        
+        console.log('[SegmentSlots] Child order analysis', {
+            childOrders,
+            hasValidOrders
+        });
+        
+        if (hasValidOrders) {
+            // Map children by their child_order
+            sortedChildren.forEach(child => {
+                const order = (child as any).child_order;
+                console.log('[SegmentSlots] Mapping child by child_order', {
+                    childId: child.id?.substring(0, 8),
+                    child_order: order
+                });
+                childrenByOrder.set(order, child);
+            });
+        } else {
+            // Fall back to using array index (sorted by child_order already)
+            console.log('[SegmentSlots] Falling back to array index mapping');
+            sortedChildren.forEach((child, index) => {
+                console.log('[SegmentSlots] Mapping child by index', {
+                    childId: child.id?.substring(0, 8),
+                    index
+                });
+                childrenByOrder.set(index, child);
+            });
+        }
+
+        // Fill in slots
+        for (let i = 0; i < expectedSegmentData.count; i++) {
+            const child = childrenByOrder.get(i);
+            if (child) {
+                console.log('[SegmentSlots] Slot', i, '= child', child.id?.substring(0, 8));
+                slots.push({ type: 'child', child, index: i });
+            } else {
+                console.log('[SegmentSlots] Slot', i, '= placeholder');
+                slots.push({
+                    type: 'placeholder',
+                    index: i,
+                    expectedFrames: expectedSegmentData.frames[i],
+                    expectedPrompt: expectedSegmentData.prompts[i],
+                    startImage: expectedSegmentData.inputImages[i],
+                    endImage: expectedSegmentData.inputImages[i + 1],
+                });
+            }
+        }
+
+        console.log('[SegmentSlots] Final slots', {
+            totalSlots: slots.length,
+            childSlots: slots.filter(s => s.type === 'child').length,
+            placeholderSlots: slots.filter(s => s.type === 'placeholder').length
+        });
+
+        return slots;
+    }, [sortedChildren, expectedSegmentData]);
+
+    // Count completed vs total segments
+    const segmentProgress = React.useMemo(() => {
+        const completed = segmentSlots.filter(s => s.type === 'child').length;
+        const total = segmentSlots.length;
+        return { completed, total };
+    }, [segmentSlots]);
+
+    // Lightbox handlers (must be after segmentSlots is defined)
+    const handleLightboxClose = () => setLightboxIndex(null);
+    
+    // Get only the child slots for navigation (skip placeholders)
+    const childSlotIndices = React.useMemo(() => 
+        segmentSlots
+            .map((slot, idx) => slot.type === 'child' ? idx : null)
+            .filter((idx): idx is number => idx !== null),
+        [segmentSlots]
+    );
+    
+    const handleLightboxNext = () => setLightboxIndex((prev) => {
+        if (prev === null || childSlotIndices.length === 0) return null;
+        const currentPosInChildSlots = childSlotIndices.indexOf(prev);
+        const nextPos = (currentPosInChildSlots + 1) % childSlotIndices.length;
+        return childSlotIndices[nextPos];
+    });
+    
+    const handleLightboxPrev = () => setLightboxIndex((prev) => {
+        if (prev === null || childSlotIndices.length === 0) return null;
+        const currentPosInChildSlots = childSlotIndices.indexOf(prev);
+        const prevPos = (currentPosInChildSlots - 1 + childSlotIndices.length) % childSlotIndices.length;
+        return childSlotIndices[prevPos];
+    });
+    
+    // Get current slot for lightbox (must be after segmentSlots is defined)
+    const currentSlot = lightboxIndex !== null ? segmentSlots[lightboxIndex] : null;
+    const segmentLightboxVideoId = currentSlot?.type === 'child' ? currentSlot.child.id : null;
+
+    // ===============================================================================
+    // TASK DATA HOOKS - For lightbox task details
+    // ===============================================================================
+    
+    // Get task data for segment lightbox
+    const { data: segmentTaskMapping } = useTaskFromUnifiedCache(segmentLightboxVideoId || '');
+    const segmentTaskId = typeof segmentTaskMapping?.taskId === 'string' ? segmentTaskMapping.taskId : '';
+    const { data: segmentTask, isLoading: isLoadingSegmentTask, error: segmentTaskError } = useGetTask(segmentTaskId);
+    const segmentInputImages: string[] = useMemo(() => deriveInputImages(segmentTask), [segmentTask]);
+    
+    // Get task data for parent lightbox
+    const { data: parentTaskMapping } = useTaskFromUnifiedCache(isParentLightboxOpen ? parentGenerationId : '');
+    const parentTaskId = typeof parentTaskMapping?.taskId === 'string' ? parentTaskMapping.taskId : '';
+    const { data: parentTask, isLoading: isLoadingParentTask, error: parentTaskError } = useGetTask(parentTaskId);
+    const parentInputImages: string[] = useMemo(() => deriveInputImages(parentTask), [parentTask]);
 
     // Transform parent generation for VideoItem
     // Use updated_at for timestamp since that reflects when the final video was generated
@@ -452,8 +584,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 Edit and refine individual segments
                             </p>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                            {sortedChildren.length} {sortedChildren.length === 1 ? 'segment' : 'segments'}
+                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            {segmentProgress.completed === segmentProgress.total ? (
+                                <span className="flex items-center gap-1.5">
+                                    <Check className="w-4 h-4 text-green-500" />
+                                    {segmentProgress.total} {segmentProgress.total === 1 ? 'segment' : 'segments'}
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1.5">
+                                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                    {segmentProgress.completed}/{segmentProgress.total} segments
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -515,23 +657,34 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                 </Card>
                             ))}
                         </div>
-                    ) : sortedChildren.length === 0 ? (
+                    ) : segmentSlots.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 border rounded-lg bg-muted/10">
                             <p className="text-muted-foreground">No segments found for this generation.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {sortedChildren.map((child, index) => (
-                                <SegmentCard
-                                    key={child.id}
-                                    child={child}
-                                    index={index}
-                                    projectId={projectId}
-                                    onLightboxOpen={() => setLightboxIndex(index)}
-                                    onMobileTap={handleMobileTap}
-                                    onUpdate={refetch}
-                                    availableLoras={availableLoras}
-                                />
+                            {segmentSlots.map((slot) => (
+                                slot.type === 'child' ? (
+                                    <SegmentCard
+                                        key={slot.child.id}
+                                        child={slot.child}
+                                        index={slot.index}
+                                        projectId={projectId}
+                                        onLightboxOpen={() => setLightboxIndex(slot.index)}
+                                        onMobileTap={handleMobileTap}
+                                        onUpdate={refetch}
+                                        availableLoras={availableLoras}
+                                    />
+                                ) : (
+                                    <SegmentPlaceholder
+                                        key={`placeholder-${slot.index}`}
+                                        index={slot.index}
+                                        expectedFrames={slot.expectedFrames}
+                                        expectedPrompt={slot.expectedPrompt}
+                                        startImage={slot.startImage}
+                                        endImage={slot.endImage}
+                                    />
+                                )
                             ))}
                         </div>
                     )}
@@ -575,7 +728,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             onGenerate={handleConfirmJoin}
                             isGenerating={isJoiningClips}
                             generateSuccess={joinClipsSuccess}
-                            generateButtonText={`Generate Joined Video (${sortedChildren.length} Segments)`}
+                            generateButtonText={`Generate Joined Video (${segmentProgress.completed} Segments)`}
                         />
                     </div>
                 </div>
@@ -583,33 +736,35 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
             {/* Lightbox for Segments */}
             {(() => {
-                const shouldRenderSegmentLightbox = lightboxIndex !== null && sortedChildren[lightboxIndex];
+                const lightboxSlot = lightboxIndex !== null ? segmentSlots[lightboxIndex] : null;
+                const shouldRenderSegmentLightbox = lightboxSlot?.type === 'child';
                 console.log('[MobileTapFlow:ChildView] Segment Lightbox render check', { 
                     lightboxIndex,
                     shouldRenderSegmentLightbox,
-                    sortedChildrenLength: sortedChildren.length,
-                    hasChildAtIndex: lightboxIndex !== null ? !!sortedChildren[lightboxIndex] : 'N/A',
+                    segmentSlotsLength: segmentSlots.length,
+                    slotType: lightboxSlot?.type,
                     timestamp: Date.now()
                 });
-                if (!shouldRenderSegmentLightbox) return null;
+                if (!shouldRenderSegmentLightbox || !lightboxSlot) return null;
                 
+                const childMedia = lightboxSlot.child;
                 console.log('[MobileTapFlow:ChildView] ✅ RENDERING MediaLightbox for segment', { 
                     index: lightboxIndex, 
-                    childId: sortedChildren[lightboxIndex]?.id,
+                    childId: childMedia?.id,
                     timestamp: Date.now()
                 });
                 return (
                     <MediaLightbox
-                        media={sortedChildren[lightboxIndex]}
+                        media={childMedia}
                         onClose={handleLightboxClose}
                         onNext={handleLightboxNext}
                         onPrevious={handleLightboxPrev}
                         showNavigation={true}
                         showImageEditTools={false}
                         showDownload={true}
-                        hasNext={sortedChildren.length > 1}
-                        hasPrevious={sortedChildren.length > 1}
-                        starred={(sortedChildren[lightboxIndex] as { starred?: boolean }).starred ?? false}
+                        hasNext={childSlotIndices.length > 1}
+                        hasPrevious={childSlotIndices.length > 1}
+                        starred={(childMedia as { starred?: boolean }).starred ?? false}
                         shotId={undefined}
                         showTaskDetails={true}
                         taskDetailsData={{
@@ -1085,6 +1240,85 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                     Regenerate Video
                 </Button>
                 */}
+            </CardContent>
+        </Card>
+    );
+};
+
+// Placeholder component for pending/missing segments
+interface SegmentPlaceholderProps {
+    index: number;
+    expectedFrames?: number;
+    expectedPrompt?: string;
+    startImage?: string;
+    endImage?: string;
+}
+
+const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
+    index,
+    expectedFrames,
+    expectedPrompt,
+    startImage,
+    endImage,
+}) => {
+    return (
+        <Card className="overflow-hidden flex flex-col opacity-70 border-dashed">
+            {/* Placeholder Video Area */}
+            <div className="relative aspect-video bg-muted/30 flex items-center justify-center">
+                {/* Show start/end images if available */}
+                {(startImage || endImage) ? (
+                    <div className="absolute inset-0 flex">
+                        {startImage && (
+                            <div className="flex-1 relative overflow-hidden">
+                                <img 
+                                    src={startImage} 
+                                    alt={`Start frame for segment ${index + 1}`}
+                                    className="absolute inset-0 w-full h-full object-cover opacity-40 blur-[1px]"
+                                />
+                            </div>
+                        )}
+                        {endImage && (
+                            <div className="flex-1 relative overflow-hidden border-l border-dashed border-border/50">
+                                <img 
+                                    src={endImage} 
+                                    alt={`End frame for segment ${index + 1}`}
+                                    className="absolute inset-0 w-full h-full object-cover opacity-40 blur-[1px]"
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : null}
+                
+                {/* Loading indicator overlay */}
+                <div className="relative z-10 flex flex-col items-center gap-2 text-muted-foreground">
+                    <div className="relative">
+                        <Clock className="w-8 h-8 opacity-50" />
+                        <Loader2 className="w-4 h-4 animate-spin absolute -top-1 -right-1 text-primary" />
+                    </div>
+                    <span className="text-xs font-medium">Segment {index + 1}</span>
+                    <span className="text-xs opacity-70">Pending...</span>
+                </div>
+            </div>
+
+            {/* Placeholder Content */}
+            <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
+                <div className="space-y-2 flex-1">
+                    <Label className="text-xs font-medium text-muted-foreground">Expected Prompt</Label>
+                    <div className="text-xs text-muted-foreground/70 line-clamp-3 italic">
+                        {expectedPrompt ? (
+                            expectedPrompt.length > 150 ? expectedPrompt.substring(0, 150) + '...' : expectedPrompt
+                        ) : (
+                            'Waiting for generation...'
+                        )}
+                    </div>
+                </div>
+
+                {expectedFrames && (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Expected Frames</span>
+                        <span className="font-medium">{expectedFrames}</span>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
