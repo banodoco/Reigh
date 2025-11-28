@@ -5,7 +5,8 @@ import { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/shared/components/ui/tooltip';
 import { Button } from '@/shared/components/ui/button';
 
-// Re-export the LoraModel type for convenience
+// Re-export types
+export type { ActiveLora } from '@/shared/components/ActiveLoRAsDisplay';
 export type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 export interface UseLoraManagerOptions {

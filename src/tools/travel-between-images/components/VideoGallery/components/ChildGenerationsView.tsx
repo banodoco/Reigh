@@ -25,6 +25,16 @@ import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
+import { createMobileTapHandler, deriveInputImages } from '../utils/gallery-utils';
+import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
+import { useGetTask } from '@/shared/hooks/useTasks';
+
+// TypeScript declaration for global mobile video preload map
+declare global {
+  interface Window {
+    mobileVideoPreloadMap?: Map<number, () => void>;
+  }
+}
 
 interface ChildGenerationsViewProps {
     parentGenerationId: string;
@@ -42,8 +52,53 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
     const isMobile = useIsMobile();
     
+    // Refs for mobile double-tap detection
+    const lastTouchTimeRef = React.useRef<number>(0);
+    const doubleTapTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Mobile tap handler
+    const handleMobileTap = useMemo(() => {
+        console.log('[MobileTapFlow:ChildView] Creating handleMobileTap via useMemo');
+        return createMobileTapHandler(
+            lastTouchTimeRef,
+            doubleTapTimeoutRef,
+            (index) => {
+                console.log('[MobileTapFlow:ChildView] ✅ LIGHTBOX OPEN callback invoked', { 
+                    index,
+                    isParentIndex: index === -1,
+                    currentLightboxIndex: lightboxIndex,
+                    currentIsParentLightboxOpen: isParentLightboxOpen,
+                    timestamp: Date.now()
+                });
+                if (index === -1) {
+                    console.log('[MobileTapFlow:ChildView] Setting isParentLightboxOpen = true');
+                    setIsParentLightboxOpen(true);
+                } else {
+                    console.log('[MobileTapFlow:ChildView] Setting lightboxIndex =', index);
+                    setLightboxIndex(index);
+                }
+                console.log('[MobileTapFlow:ChildView] State setters called', { 
+                    index,
+                    timestamp: Date.now()
+                });
+            },
+            (index) => {
+                console.log('[MobileTapFlow:ChildView] Preload callback invoked', { 
+                    index,
+                    hasPreloadMap: !!window.mobileVideoPreloadMap,
+                    preloadMapHasIndex: window.mobileVideoPreloadMap?.has(index),
+                    timestamp: Date.now()
+                });
+                // First tap action: Preload video
+                if (window.mobileVideoPreloadMap && window.mobileVideoPreloadMap.has(index)) {
+                    window.mobileVideoPreloadMap.get(index)?.();
+                }
+            }
+        );
+    }, [lightboxIndex, isParentLightboxOpen]);
+    
     // Fetch available LoRAs for the motion control
-    const publicLorasQuery = useListPublicResources('lora', true);
+    const publicLorasQuery = useListPublicResources('lora');
     const availableLoras: LoraModel[] = React.useMemo(() => {
         return ((publicLorasQuery.data || []) as any[]).map(resource => resource.metadata || {});
     }, [publicLorasQuery.data]);
@@ -153,6 +208,23 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const handleLightboxClose = () => setLightboxIndex(null);
     const handleLightboxNext = () => setLightboxIndex((prev) => (prev !== null ? (prev + 1) % sortedChildren.length : null));
     const handleLightboxPrev = () => setLightboxIndex((prev) => (prev !== null ? (prev - 1 + sortedChildren.length) % sortedChildren.length : null));
+
+    // ===============================================================================
+    // TASK DATA HOOKS - For lightbox task details
+    // ===============================================================================
+    
+    // Get task data for segment lightbox
+    const segmentLightboxVideoId = lightboxIndex !== null && sortedChildren[lightboxIndex] ? sortedChildren[lightboxIndex].id : null;
+    const { data: segmentTaskMapping } = useTaskFromUnifiedCache(segmentLightboxVideoId || '');
+    const segmentTaskId = typeof segmentTaskMapping?.taskId === 'string' ? segmentTaskMapping.taskId : '';
+    const { data: segmentTask, isLoading: isLoadingSegmentTask, error: segmentTaskError } = useGetTask(segmentTaskId);
+    const segmentInputImages: string[] = useMemo(() => deriveInputImages(segmentTask), [segmentTask]);
+    
+    // Get task data for parent lightbox
+    const { data: parentTaskMapping } = useTaskFromUnifiedCache(isParentLightboxOpen ? parentGenerationId : '');
+    const parentTaskId = typeof parentTaskMapping?.taskId === 'string' ? parentTaskMapping.taskId : '';
+    const { data: parentTask, isLoading: isLoadingParentTask, error: parentTaskError } = useGetTask(parentTaskId);
+    const parentInputImages: string[] = useMemo(() => deriveInputImages(parentTask), [parentTask]);
 
     // Join Clips State
     const [isJoiningClips, setIsJoiningClips] = useState(false);
@@ -335,7 +407,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     isMobile={isMobile}
                                     projectId={projectId}
                                     onLightboxOpen={() => setIsParentLightboxOpen(true)}
-                                    onMobileTap={() => setIsParentLightboxOpen(true)}
+                                    onMobileTap={handleMobileTap}
                                     onDelete={() => { }}
                                     deletingVideoId={null}
                                     onHoverStart={() => { }}
@@ -381,6 +453,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     index={index}
                                     projectId={projectId}
                                     onLightboxOpen={() => setLightboxIndex(index)}
+                                    onMobileTap={handleMobileTap}
                                     onUpdate={refetch}
                                     availableLoras={availableLoras}
                                 />
@@ -434,30 +507,88 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
             )}
 
             {/* Lightbox for Segments */}
-            {lightboxIndex !== null && sortedChildren[lightboxIndex] && (
-                <MediaLightbox
-                    media={sortedChildren[lightboxIndex]}
-                    onClose={handleLightboxClose}
-                    onNext={handleLightboxNext}
-                    onPrevious={handleLightboxPrev}
-                    showNavigation={true}
-                    hasNext={sortedChildren.length > 1}
-                    hasPrevious={sortedChildren.length > 1}
-                    shotId={undefined} // Context is specific to this view
-                />
-            )}
+            {(() => {
+                const shouldRenderSegmentLightbox = lightboxIndex !== null && sortedChildren[lightboxIndex];
+                console.log('[MobileTapFlow:ChildView] Segment Lightbox render check', { 
+                    lightboxIndex,
+                    shouldRenderSegmentLightbox,
+                    sortedChildrenLength: sortedChildren.length,
+                    hasChildAtIndex: lightboxIndex !== null ? !!sortedChildren[lightboxIndex] : 'N/A',
+                    timestamp: Date.now()
+                });
+                if (!shouldRenderSegmentLightbox) return null;
+                
+                console.log('[MobileTapFlow:ChildView] ✅ RENDERING MediaLightbox for segment', { 
+                    index: lightboxIndex, 
+                    childId: sortedChildren[lightboxIndex]?.id,
+                    timestamp: Date.now()
+                });
+                return (
+                    <MediaLightbox
+                        media={sortedChildren[lightboxIndex]}
+                        onClose={handleLightboxClose}
+                        onNext={handleLightboxNext}
+                        onPrevious={handleLightboxPrev}
+                        showNavigation={true}
+                        showImageEditTools={false}
+                        showDownload={true}
+                        hasNext={sortedChildren.length > 1}
+                        hasPrevious={sortedChildren.length > 1}
+                        starred={(sortedChildren[lightboxIndex] as { starred?: boolean }).starred ?? false}
+                        shotId={undefined}
+                        showTaskDetails={true}
+                        taskDetailsData={{
+                            task: segmentTask,
+                            isLoading: isLoadingSegmentTask,
+                            error: segmentTaskError,
+                            inputImages: segmentInputImages,
+                            taskId: segmentTaskId || null,
+                            onApplySettingsFromTask: () => {}, // Not applicable in this context
+                            onClose: handleLightboxClose
+                        }}
+                    />
+                );
+            })()}
 
             {/* Lightbox for Parent Video */}
-            {isParentLightboxOpen && parentVideoRow && (
-                <MediaLightbox
-                    media={parentVideoRow}
-                    onClose={() => setIsParentLightboxOpen(false)}
-                    showNavigation={false}
-                    hasNext={false}
-                    hasPrevious={false}
-                    shotId={undefined}
-                />
-            )}
+            {(() => {
+                const shouldRenderParentLightbox = isParentLightboxOpen && parentVideoRow;
+                console.log('[MobileTapFlow:ChildView] Parent Lightbox render check', { 
+                    isParentLightboxOpen,
+                    hasParentVideoRow: !!parentVideoRow,
+                    shouldRenderParentLightbox,
+                    timestamp: Date.now()
+                });
+                if (!shouldRenderParentLightbox) return null;
+                
+                console.log('[MobileTapFlow:ChildView] ✅ RENDERING MediaLightbox for parent', {
+                    parentId: parentVideoRow?.id,
+                    timestamp: Date.now()
+                });
+                return (
+                    <MediaLightbox
+                        media={parentVideoRow}
+                        onClose={() => setIsParentLightboxOpen(false)}
+                        showNavigation={false}
+                        showImageEditTools={false}
+                        showDownload={true}
+                        hasNext={false}
+                        hasPrevious={false}
+                        starred={(parentVideoRow as { starred?: boolean }).starred ?? false}
+                        shotId={undefined}
+                        showTaskDetails={true}
+                        taskDetailsData={{
+                            task: parentTask,
+                            isLoading: isLoadingParentTask,
+                            error: parentTaskError,
+                            inputImages: parentInputImages,
+                            taskId: parentTaskId || null,
+                            onApplySettingsFromTask: () => {}, // Not applicable in this context
+                            onClose: () => setIsParentLightboxOpen(false)
+                        }}
+                    />
+                );
+            })()}
         </div>
     );
 };
@@ -467,11 +598,12 @@ interface SegmentCardProps {
     index: number;
     projectId: string | null;
     onLightboxOpen: () => void;
+    onMobileTap: (index: number) => void;
     onUpdate: () => void;
     availableLoras: LoraModel[];
 }
 
-const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onUpdate, availableLoras }) => {
+const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLightboxOpen, onMobileTap, onUpdate, availableLoras }) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [params, setParams] = useState<any>(child.params || {});
@@ -737,8 +869,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                         shouldPreload="metadata"
                         isMobile={isMobile}
                         projectId={projectId}
-                        onLightboxOpen={onLightboxOpen}
-                        onMobileTap={onLightboxOpen}
+                        onLightboxOpen={() => onLightboxOpen()}
+                        onMobileTap={onMobileTap}
                         onDelete={() => { }}
                         deletingVideoId={null}
                         onHoverStart={() => { }}

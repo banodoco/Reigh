@@ -895,33 +895,55 @@ export const VideoItem = React.memo<VideoItemProps>(({
               // Don't interfere with touches inside action buttons
               const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
               const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
-              if (isInsideButton) return;
-              e.preventDefault();
-              e.stopPropagation();
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[AutoplayDebugger:GALLERY] 📱 Poster clicked, opening lightbox', {
+              if (isInsideButton) {
+                console.log('[MobileTapFlow:VideoItem] onClick - SKIPPED (inside button)', {
                   videoId: video.id?.substring(0, 8),
                   originalIndex,
                   timestamp: Date.now()
                 });
+                return;
               }
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[MobileTapFlow:VideoItem] onClick - calling onMobileTap', {
+                videoId: video.id?.substring(0, 8),
+                originalIndex,
+                onMobileTapType: typeof onMobileTap,
+                timestamp: Date.now()
+              });
               onMobileTap(originalIndex);
+              console.log('[MobileTapFlow:VideoItem] onClick - onMobileTap RETURNED', {
+                videoId: video.id?.substring(0, 8),
+                originalIndex,
+                timestamp: Date.now()
+              });
             }}
             onTouchEnd={isMobile ? (e) => {
               // Don't interfere with touches inside action buttons
               const path = (e as any).nativeEvent?.composedPath?.() as HTMLElement[] | undefined;
               const isInsideButton = path ? path.some((el) => (el as HTMLElement)?.tagName === 'BUTTON' || (el as HTMLElement)?.closest?.('button')) : !!(e.target as HTMLElement).closest('button');
-              if (isInsideButton) return;
-              e.preventDefault();
-              e.stopPropagation();
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[AutoplayDebugger:GALLERY] 📱 Poster touched, opening lightbox', {
+              if (isInsideButton) {
+                console.log('[MobileTapFlow:VideoItem] onTouchEnd - SKIPPED (inside button)', {
                   videoId: video.id?.substring(0, 8),
                   originalIndex,
                   timestamp: Date.now()
                 });
+                return;
               }
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[MobileTapFlow:VideoItem] onTouchEnd - calling onMobileTap', {
+                videoId: video.id?.substring(0, 8),
+                originalIndex,
+                onMobileTapType: typeof onMobileTap,
+                timestamp: Date.now()
+              });
               onMobileTap(originalIndex);
+              console.log('[MobileTapFlow:VideoItem] onTouchEnd - onMobileTap RETURNED', {
+                videoId: video.id?.substring(0, 8),
+                originalIndex,
+                timestamp: Date.now()
+              });
             } : undefined}
           >
             {posterImageSrc ? (

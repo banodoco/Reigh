@@ -13,18 +13,33 @@ export const createMobileTapHandler = (
     const currentTime = Date.now();
     const timeSinceLastTap = currentTime - lastTouchTimeRef.current;
     
+    console.log('[MobileTapFlow] createMobileTapHandler INVOKED', {
+      originalIndex,
+      currentTime,
+      lastTouchTime: lastTouchTimeRef.current,
+      timeSinceLastTap,
+      isDoubleTap: timeSinceLastTap < 300 && timeSinceLastTap > 0,
+      hasOnFirstTapPreload: !!onFirstTapPreload,
+      onLightboxOpenType: typeof onLightboxOpen,
+      timestamp: Date.now()
+    });
+    
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       // This is a double-tap, clear any pending timeout and open lightbox
       if (doubleTapTimeoutRef.current) {
         clearTimeout(doubleTapTimeoutRef.current);
         doubleTapTimeoutRef.current = null;
       }
-      console.log('[MobilePreload] Double-tap detected - opening lightbox', {
+      console.log('[MobileTapFlow] ✅ DOUBLE-TAP detected - calling onLightboxOpen', {
         originalIndex,
         timeSinceLastTap,
         timestamp: Date.now()
       });
       onLightboxOpen(originalIndex);
+      console.log('[MobileTapFlow] ✅ onLightboxOpen RETURNED', {
+        originalIndex,
+        timestamp: Date.now()
+      });
     } else {
       // This is a single tap, start preloading the video for faster lightbox experience
       if (doubleTapTimeoutRef.current) {
@@ -33,17 +48,23 @@ export const createMobileTapHandler = (
       
       // NEW: Start preloading video immediately on first tap
       if (onFirstTapPreload) {
-        console.log('[MobilePreload] First tap detected - starting video preload', {
+        console.log('[MobileTapFlow] First tap detected - starting video preload', {
           originalIndex,
           timeSinceLastTap,
           timestamp: Date.now()
         });
         onFirstTapPreload(originalIndex);
+      } else {
+        console.log('[MobileTapFlow] First tap detected - NO preload callback', {
+          originalIndex,
+          timeSinceLastTap,
+          timestamp: Date.now()
+        });
       }
       
       doubleTapTimeoutRef.current = setTimeout(() => {
         // Single tap timeout - video preloading continues in background
-        console.log('[MobilePreload] Single tap timeout - video continues preloading', {
+        console.log('[MobileTapFlow] Single tap timeout - video continues preloading', {
           originalIndex,
           timestamp: Date.now()
         });

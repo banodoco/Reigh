@@ -707,8 +707,24 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
 
   // Mobile double-tap handler with preloading - memoized for stable reference
   const handleMobileTap = useCallback(
-    createMobileTapHandler(lastTouchTimeRef, doubleTapTimeoutRef, setLightboxIndex, handleMobilePreload),
-    [handleMobilePreload]
+    createMobileTapHandler(
+      lastTouchTimeRef, 
+      doubleTapTimeoutRef, 
+      (index) => {
+        console.log('[MobileTapFlow:VideoGallery] ✅ LIGHTBOX OPEN callback invoked', { 
+          index,
+          currentLightboxIndex: lightboxIndex,
+          timestamp: Date.now()
+        });
+        setLightboxIndex(index);
+        console.log('[MobileTapFlow:VideoGallery] setLightboxIndex called', { 
+          index,
+          timestamp: Date.now()
+        });
+      }, 
+      handleMobilePreload
+    ),
+    [handleMobilePreload, lightboxIndex]
   );
 
   // Handle opening details from hover - memoized for stable reference
