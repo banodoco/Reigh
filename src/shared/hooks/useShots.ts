@@ -1355,10 +1355,12 @@ export const useDuplicateImageInShot = () => {
       };
     },
     onSuccess: (data) => {
-      // Don't invalidate all-shot-generations - realtime will handle it
+      // Invalidate all relevant caches to ensure UI updates immediately
       queryClient.invalidateQueries({ queryKey: ['shots', data.project_id] });
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shot_id] });
       queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', data.shot_id] });
+      // CRITICAL: Also invalidate all-shot-generations - this is what ShotEditor uses!
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations', data.shot_id] });
     },
     onError: (error: Error) => {
       console.error('Error duplicating image in shot:', error);

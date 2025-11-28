@@ -1141,7 +1141,7 @@ serve(async (req) => {
                   .from("tasks")
                   .update({
                     status: "Complete",
-                    output_location: `All ${foundSegments} segments completed successfully`,
+                    output_location: publicUrl, // Use the final segment's video URL as the orchestrator's output
                     generation_processed_at: new Date().toISOString()
                   })
                   .eq("id", orchestratorTaskId)
@@ -1151,6 +1151,37 @@ serve(async (req) => {
                   console.error(`[OrchestratorComplete] Failed to mark orchestrator ${orchestratorTaskId} as Complete:`, updateOrchError);
                 } else {
                   console.log(`[OrchestratorComplete] Successfully marked orchestrator ${orchestratorTaskId} as Complete`);
+                  
+                  // Update parent_generation_id if present
+                  // ONLY for join_clips_segment - the final segment IS the combined video
+                  // For travel_segment, the travel_stitch task produces the final video and handles this update
+                  if (taskType === 'join_clips_segment') {
+                    const parentGenId = orchestratorTask.params?.orchestrator_details?.parent_generation_id || 
+                                        orchestratorTask.params?.parent_generation_id;
+                    
+                    if (parentGenId) {
+                      console.log(`[OrchestratorComplete] Updating parent generation ${parentGenId} with final video URL`);
+                      
+                      try {
+                        const { error: updateGenError } = await supabaseAdmin
+                          .from('generations')
+                          .update({
+                            location: publicUrl,
+                            thumbnail_url: thumbnailUrl,
+                            type: 'video'
+                          })
+                          .eq('id', parentGenId);
+                        
+                        if (updateGenError) {
+                          console.error(`[OrchestratorComplete] Failed to update parent generation ${parentGenId}:`, updateGenError);
+                        } else {
+                          console.log(`[OrchestratorComplete] Successfully updated parent generation ${parentGenId} with final video`);
+                        }
+                      } catch (genUpdateErr) {
+                        console.error(`[OrchestratorComplete] Exception updating parent generation:`, genUpdateErr);
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -1680,12 +1711,13 @@ async function createGenerationFromTask(
           if (orchDetails && !isNaN(childOrder)) {
             console.log(`[GenMigration] Extracting specific params for child segment ${childOrder}`);
 
-            // SPECIAL CASE: For travel orchestrators with only 2 images, the first segment IS the final output
+            // SPECIAL CASE: For travel orchestrators with only 1 segment, the segment IS the final output
+            // This covers both 1-image i2v and 2-image travel (no travel_stitch needed)
             // Update the parent generation immediately with this segment's output
             if (childOrder === 0) {
-              const inputImages = orchDetails.input_image_paths_resolved || taskData.params?.originalParams?.image_urls;
-              if (inputImages && Array.isArray(inputImages) && inputImages.length === 2) {
-                console.log(`[Travel2Images] Detected segment 0 of 2-image orchestrator - updating parent generation ${parentGenerationId}`);
+              const numSegments = orchDetails.num_new_segments_to_generate;
+              if (numSegments === 1) {
+                console.log(`[TravelSingleSegment] Detected segment 0 of single-segment orchestrator - updating parent generation ${parentGenerationId}`);
                 
                 // Update parent generation with this segment's output
                 // We use publicUrl and thumbnailUrl from the current segment task execution
@@ -1699,9 +1731,9 @@ async function createGenerationFromTask(
                   .eq('id', parentGenerationId);
                   
                 if (updateParentError) {
-                  console.error(`[Travel2Images] Error updating parent generation:`, updateParentError);
+                  console.error(`[TravelSingleSegment] Error updating parent generation:`, updateParentError);
                 } else {
-                  console.log(`[Travel2Images] Successfully updated parent generation with segment output`);
+                  console.log(`[TravelSingleSegment] Successfully updated parent generation with segment output`);
                   
                   // Also mark the orchestrator task as generation_created=true to be safe
                   await supabase
@@ -1754,9 +1786,10 @@ async function createGenerationFromTask(
           }
         }
       }
-    } else if ((taskData.task_type === 'travel_stitch' || taskData.task_type === 'join_clips_orchestrator') && (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)) {
-      // SPECIAL CASE: travel_stitch or join_clips_orchestrator IS the final output of the orchestrator.
+    } else if (taskData.task_type === 'travel_stitch' && (taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id)) {
+      // SPECIAL CASE: travel_stitch IS the final output of the travel orchestrator.
       // Instead of creating a child generation, we should UPDATE the parent generation with the final URL.
+      // NOTE: join_clips_orchestrator is handled in the segment completion logic (OrchestratorComplete) above.
       const parentGenId = taskData.params?.orchestrator_details?.parent_generation_id || taskData.params?.parent_generation_id;
       console.log(`[GenMigration] ${taskData.task_type} task ${taskId} completing - updating parent generation ${parentGenId}`);
 
