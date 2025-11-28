@@ -215,12 +215,36 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
   // Check if we should show Advanced Phase Settings and LoRAs in right column
   const showPhaseContentInRightColumn = isVideoTravelTask && phaseConfig?.phases;
 
+  // Check if this is a segment task (child generation)
+  const isSegmentTask = task?.params?.segment_index !== undefined;
+  const segmentIndex = task?.params?.segment_index;
+  const isFirstSegment = task?.params?.is_first_segment;
+  const isLastSegment = task?.params?.is_last_segment;
+
   return (
     <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full' : variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : 'w-[360px]'} ${showPhaseContentInRightColumn ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : 'space-y-3'}`}>
       {/* Main Content Column */}
       <div className={showPhaseContentInRightColumn ? 'space-y-3 min-w-0' : 'contents'}>
+      
+      {/* Segment Indicator - Show for segment tasks */}
+      {isSegmentTask && (
+        <div className="space-y-1 pb-3 border-b border-muted-foreground/20">
+          <div className="flex items-center gap-2">
+            <span className={`${config.textSize} font-medium text-primary`}>
+              Segment {segmentIndex + 1}
+            </span>
+            {isFirstSegment && (
+              <span className={`${config.textSize} text-muted-foreground`}>(First)</span>
+            )}
+            {isLastSegment && (
+              <span className={`${config.textSize} text-muted-foreground`}>(Last)</span>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Variant Name Section - Only for Video Travel tasks in modal or panel variant */}
-      {isVideoTravelTask && (variant === 'modal' || variant === 'panel') && (generationName !== undefined || onGenerationNameChange) && (
+      {isVideoTravelTask && !isSegmentTask && (variant === 'modal' || variant === 'panel') && (generationName !== undefined || onGenerationNameChange) && (
         <div className="space-y-1 pb-3 border-b border-muted-foreground/20">
           <p className={`${config.textSize} font-medium text-muted-foreground`}>Variant Name</p>
           {isEditingGenerationName ? (
@@ -845,11 +869,16 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
         <div className="space-y-3">
           {/* Prompt */}
           {(() => {
-            const prompt = orchestratorDetails?.base_prompts_expanded?.[0] || 
-                          orchestratorPayload?.base_prompts_expanded?.[0] || 
-                          orchestratorDetails?.base_prompt ||
-                          orchestratorPayload?.base_prompt ||
-                          task?.params?.prompt;
+            // For segment tasks, prioritize segment-specific base_prompt over orchestrator_details
+            // Segment tasks have their own base_prompt directly in params
+            const isSegmentTask = task?.params?.segment_index !== undefined;
+            const prompt = isSegmentTask 
+              ? (task?.params?.base_prompt || task?.params?.prompt)
+              : (orchestratorDetails?.base_prompts_expanded?.[0] || 
+                 orchestratorPayload?.base_prompts_expanded?.[0] || 
+                 orchestratorDetails?.base_prompt ||
+                 orchestratorPayload?.base_prompt ||
+                 task?.params?.prompt);
             const enhancePrompt = orchestratorDetails?.enhance_prompt || 
                                  orchestratorPayload?.enhance_prompt || 
                                  task?.params?.enhance_prompt;
@@ -890,7 +919,11 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           
           {/* Negative Prompt */}
           {(() => {
-            const negativePrompt = orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt;
+            // For segment tasks, prioritize segment-specific negative_prompt
+            const isSegmentTask = task?.params?.segment_index !== undefined;
+            const negativePrompt = isSegmentTask
+              ? task?.params?.negative_prompt
+              : (orchestratorDetails?.negative_prompts_expanded?.[0] || orchestratorPayload?.negative_prompts_expanded?.[0] || task?.params?.negative_prompt);
             if (negativePrompt && negativePrompt !== 'N/A') {
               const shouldTruncate = negativePrompt.length > config.negativePromptLength;
               const displayText = showFullNegativePrompt || !shouldTruncate ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...';
@@ -973,9 +1006,13 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
             <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{orchestratorDetails?.parsed_resolution_wh || task?.params?.parsed_resolution_wh || 'N/A'}</p>
           </div>
           <div className="space-y-1">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Frames / Segment</p>
+            <p className={`${config.textSize} font-medium text-muted-foreground`}>
+              {task?.params?.segment_index !== undefined ? 'Frames' : 'Frames / Segment'}
+            </p>
             <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>
-              {orchestratorDetails?.segment_frames_expanded?.[0] || orchestratorPayload?.segment_frames_expanded?.[0] || task?.params?.segment_frames_expanded || 'N/A'}
+              {task?.params?.segment_index !== undefined
+                ? (task?.params?.segment_frames_target || 'N/A')
+                : (orchestratorDetails?.segment_frames_expanded?.[0] || orchestratorPayload?.segment_frames_expanded?.[0] || task?.params?.segment_frames_expanded || 'N/A')}
             </p>
           </div>
           <div className="space-y-1">

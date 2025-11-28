@@ -215,16 +215,42 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     
     // Get task data for segment lightbox
     const segmentLightboxVideoId = lightboxIndex !== null && sortedChildren[lightboxIndex] ? sortedChildren[lightboxIndex].id : null;
-    const { data: segmentTaskMapping } = useTaskFromUnifiedCache(segmentLightboxVideoId || '');
+    const { data: segmentTaskMapping, isLoading: isLoadingSegmentMapping } = useTaskFromUnifiedCache(segmentLightboxVideoId || '');
     const segmentTaskId = typeof segmentTaskMapping?.taskId === 'string' ? segmentTaskMapping.taskId : '';
     const { data: segmentTask, isLoading: isLoadingSegmentTask, error: segmentTaskError } = useGetTask(segmentTaskId);
     const segmentInputImages: string[] = useMemo(() => deriveInputImages(segmentTask), [segmentTask]);
     
+    // Debug: Log task data fetching for segments
+    React.useEffect(() => {
+        if (lightboxIndex !== null && segmentTask) {
+            console.log('[ChildViewTaskDebug] ===== SEGMENT TASK DETAILS =====');
+            console.log('[ChildViewTaskDebug] segmentTaskId:', segmentTaskId);
+            console.log('[ChildViewTaskDebug] segmentTask.task_type:', segmentTask.task_type);
+            console.log('[ChildViewTaskDebug] segmentTask.params?.prompt:', segmentTask.params?.prompt?.substring?.(0, 100));
+            console.log('[ChildViewTaskDebug] segmentTask.params?.base_prompt:', segmentTask.params?.base_prompt?.substring?.(0, 100));
+            console.log('[ChildViewTaskDebug] segmentTask.params?.segment_index:', segmentTask.params?.segment_index);
+            console.log('[ChildViewTaskDebug] segmentTask.params?.orchestrator_task_id:', segmentTask.params?.orchestrator_task_id);
+            console.log('[ChildViewTaskDebug] Full segmentTask.params keys:', Object.keys(segmentTask.params || {}));
+        }
+    }, [lightboxIndex, segmentTaskId, segmentTask]);
+    
     // Get task data for parent lightbox
-    const { data: parentTaskMapping } = useTaskFromUnifiedCache(isParentLightboxOpen ? parentGenerationId : '');
+    const { data: parentTaskMapping, isLoading: isLoadingParentMapping } = useTaskFromUnifiedCache(isParentLightboxOpen ? parentGenerationId : '');
     const parentTaskId = typeof parentTaskMapping?.taskId === 'string' ? parentTaskMapping.taskId : '';
     const { data: parentTask, isLoading: isLoadingParentTask, error: parentTaskError } = useGetTask(parentTaskId);
     const parentInputImages: string[] = useMemo(() => deriveInputImages(parentTask), [parentTask]);
+    
+    // Debug: Log task data fetching for parent
+    React.useEffect(() => {
+        if (isParentLightboxOpen && parentTask) {
+            console.log('[ChildViewTaskDebug] ===== PARENT TASK DETAILS =====');
+            console.log('[ChildViewTaskDebug] parentTaskId:', parentTaskId);
+            console.log('[ChildViewTaskDebug] parentTask.task_type:', parentTask.task_type);
+            console.log('[ChildViewTaskDebug] parentTask.params?.prompt:', parentTask.params?.prompt?.substring?.(0, 100));
+            console.log('[ChildViewTaskDebug] parentTask.params?.base_prompt:', parentTask.params?.base_prompt?.substring?.(0, 100));
+            console.log('[ChildViewTaskDebug] Full parentTask.params keys:', Object.keys(parentTask.params || {}));
+        }
+    }, [isParentLightboxOpen, parentTaskId, parentTask]);
 
     // Join Clips State
     const [isJoiningClips, setIsJoiningClips] = useState(false);

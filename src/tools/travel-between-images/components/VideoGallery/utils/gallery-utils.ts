@@ -79,6 +79,8 @@ export const createMobileTapHandler = (
 /**
  * Derive input images from task params
  * Strips any surrounding quotes from URLs that may have been improperly stored
+ * For segment tasks (child generations), returns empty array since they don't have
+ * their own input images - they inherit from the parent orchestrator
  */
 export const deriveInputImages = (task: any): string[] => {
   const cleanUrl = (url: string): string => {
@@ -88,11 +90,22 @@ export const deriveInputImages = (task: any): string[] => {
   };
   
   const p = task?.params || {};
+  
+  // For segment tasks, don't show the parent's input images
+  // Segments are generated from the video flow, not from input images
+  if (p.segment_index !== undefined) {
+    return [];
+  }
+  
   if (Array.isArray(p.input_images) && p.input_images.length > 0) {
     return p.input_images.map(cleanUrl);
   }
   if (p.full_orchestrator_payload && Array.isArray(p.full_orchestrator_payload.input_image_paths_resolved)) {
     return p.full_orchestrator_payload.input_image_paths_resolved.map(cleanUrl);
+  }
+  // Check orchestrator_details for input images (parent/orchestrator tasks store data here)
+  if (p.orchestrator_details && Array.isArray(p.orchestrator_details.input_image_paths_resolved)) {
+    return p.orchestrator_details.input_image_paths_resolved.map(cleanUrl);
   }
   if (Array.isArray(p.input_image_paths_resolved)) {
     return p.input_image_paths_resolved.map(cleanUrl);
