@@ -41,9 +41,13 @@ export async function fetchGenerations(
   let countQuery = supabase
     .from('generations')
     .select('*', { count: 'exact', head: true })
-    .eq('project_id', projectId)
-    // Only include generations with valid output URLs
-    .not('location', 'is', null);
+    .eq('project_id', projectId);
+  
+  // Only include generations with valid output URLs - UNLESS fetching children of a specific parent
+  // (children may still be processing and need to show as placeholders)
+  if (!filters?.parentGenerationId) {
+    countQuery = countQuery.not('location', 'is', null);
+  }
 
   // Apply server-side filters to count query
 
@@ -141,19 +145,20 @@ export async function fetchGenerations(
       parent_generation_id,
       child_order
     `)
-    .eq('project_id', projectId)
-    // Only include generations with valid output URLs
-    .not('location', 'is', null);
+    .eq('project_id', projectId);
 
-  // Apply same filters to data query
-
-  // Parent/Child filtering
+  // Parent/Child filtering - apply BEFORE location filter since parentGenerationId affects whether we filter by location
   if (filters?.parentGenerationId) {
     dataQuery = dataQuery.eq('parent_generation_id', filters.parentGenerationId);
     // Order children by child_order
     dataQuery = dataQuery.order('child_order', { ascending: true });
-  } else if (!filters?.includeChildren) {
-    dataQuery = dataQuery.eq('is_child', false);
+    // Don't filter by location - we want to see ALL children including ones still processing
+  } else {
+    // Only include generations with valid output URLs (when NOT fetching specific parent's children)
+    dataQuery = dataQuery.not('location', 'is', null);
+    if (!filters?.includeChildren) {
+      dataQuery = dataQuery.eq('is_child', false);
+    }
   }
 
 

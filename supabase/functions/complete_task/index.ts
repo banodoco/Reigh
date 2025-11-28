@@ -11,6 +11,258 @@ import { authenticateRequest, verifyTaskOwnership, getTaskUserId } from "../_sha
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const Deno: any;
 
+// ===== REQUEST PARSING TYPES & FUNCTIONS =====
+
+/**
+ * Upload mode for complete-task requests
+ */
+type UploadMode = 'base64' | 'presigned' | 'reference';
+
+/**
+ * Parsed request data from complete-task endpoint
+ */
+interface ParsedRequest {
+  taskId: string;
+  mode: UploadMode;
+  filename: string;
+  // MODE 1 (base64) specific
+  fileData?: Uint8Array;
+  fileContentType?: string;
+  thumbnailData?: Uint8Array;
+  thumbnailFilename?: string;
+  thumbnailContentType?: string;
+  // MODE 3/4 (storage path) specific
+  storagePath?: string;
+  thumbnailStoragePath?: string;
+  // For MODE 3 validation (set during parsing)
+  storagePathTaskId?: string; // The task_id extracted from storage_path
+  requiresOrchestratorCheck?: boolean; // True if path task_id != request task_id
+}
+
+/**
+ * Result of request parsing - either success with data or error with response
+ */
+type ParseResult = 
+  | { success: true; data: ParsedRequest }
+  | { success: false; response: Response };
+
+/**
+ * Parse and validate the incoming request
+ * Does structural validation only - security checks (orchestrator validation) happen later
+ */
+async function parseCompleteTaskRequest(req: Request): Promise<ParseResult> {
+  const contentType = req.headers.get("content-type") || "";
+  
+  // Multipart not supported
+  if (contentType.includes("multipart/form-data")) {
+    return {
+      success: false,
+      response: new Response(
+        "Multipart upload (MODE 2) is not supported. Use MODE 1 (base64 JSON) or MODE 3 (pre-signed URL).",
+        { status: 400 }
+      )
+    };
+  }
+
+  // Parse JSON body
+  let body: any;
+  try {
+    body = await req.json();
+  } catch (e) {
+    return {
+      success: false,
+      response: new Response("Invalid JSON body", { status: 400 })
+    };
+  }
+
+  const {
+    task_id,
+    file_data,
+    filename,
+    first_frame_data,
+    first_frame_filename,
+    storage_path,
+    thumbnail_storage_path
+  } = body;
+
+  console.log(`[RequestParser] Received request with task_id: ${task_id}`);
+  console.log(`[RequestParser] Body keys: ${Object.keys(body).join(', ')}`);
+
+  // Determine mode and validate accordingly
+  if (storage_path) {
+    // MODE 3 or MODE 4: Pre-uploaded or referenced file
+    if (!task_id) {
+      return {
+        success: false,
+        response: new Response("task_id required", { status: 400 })
+      };
+    }
+
+    const pathParts = storage_path.split('/');
+    const isMode3Format = pathParts.length >= 4 && pathParts[1] === 'tasks';
+    const mode: UploadMode = isMode3Format ? 'presigned' : 'reference';
+
+    console.log(`[RequestParser] ${mode === 'presigned' ? 'MODE 3' : 'MODE 4'}: storage_path=${storage_path}`);
+
+    // Basic path validation for MODE 4
+    if (mode === 'reference' && pathParts.length < 2) {
+      return {
+        success: false,
+        response: new Response("Invalid storage_path format. Must be at least userId/filename", { status: 400 })
+      };
+    }
+
+    // For MODE 3, check if path task_id matches request task_id
+    let requiresOrchestratorCheck = false;
+    let storagePathTaskId: string | undefined;
+    
+    if (mode === 'presigned') {
+      storagePathTaskId = pathParts[2];
+      if (storagePathTaskId !== task_id) {
+        console.log(`[RequestParser] Path task_id (${storagePathTaskId}) != request task_id (${task_id}) - will require orchestrator check`);
+        requiresOrchestratorCheck = true;
+      }
+
+      // Validate thumbnail path format if provided
+      if (thumbnail_storage_path) {
+        const thumbParts = thumbnail_storage_path.split('/');
+        if (thumbParts.length < 4 || thumbParts[1] !== 'tasks') {
+          return {
+            success: false,
+            response: new Response("Invalid thumbnail_storage_path format.", { status: 400 })
+          };
+        }
+        const thumbTaskId = thumbParts[2];
+        if (thumbTaskId !== task_id) {
+          // Will also need orchestrator check for thumbnail
+          requiresOrchestratorCheck = true;
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        taskId: String(task_id),
+        mode,
+        filename: pathParts[pathParts.length - 1],
+        storagePath: storage_path,
+        thumbnailStoragePath: thumbnail_storage_path,
+        storagePathTaskId,
+        requiresOrchestratorCheck
+      }
+    };
+
+  } else {
+    // MODE 1: Legacy base64 upload
+    console.log(`[RequestParser] MODE 1: base64 upload`);
+
+    if (!task_id || !file_data || !filename) {
+      return {
+        success: false,
+        response: new Response(
+          "task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)",
+          { status: 400 }
+        )
+      };
+    }
+
+    // Validate thumbnail parameters consistency
+    if (first_frame_data && !first_frame_filename) {
+      return {
+        success: false,
+        response: new Response("first_frame_filename required when first_frame_data is provided", { status: 400 })
+      };
+    }
+    if (first_frame_filename && !first_frame_data) {
+      return {
+        success: false,
+        response: new Response("first_frame_data required when first_frame_filename is provided", { status: 400 })
+      };
+    }
+
+    // Decode base64 file data
+    let fileBuffer: Uint8Array;
+    try {
+      console.log(`[RequestParser] Decoding base64 file data (length: ${file_data.length} chars)`);
+      fileBuffer = Uint8Array.from(atob(file_data), (c) => c.charCodeAt(0));
+      console.log(`[RequestParser] Decoded file buffer size: ${fileBuffer.length} bytes`);
+    } catch (e) {
+      console.error("[RequestParser] Base64 decode error:", e);
+      return {
+        success: false,
+        response: new Response("Invalid base64 file_data", { status: 400 })
+      };
+    }
+
+    // Decode thumbnail if provided
+    let thumbnailBuffer: Uint8Array | undefined;
+    let thumbnailFilename: string | undefined;
+    if (first_frame_data && first_frame_filename) {
+      try {
+        console.log(`[RequestParser] Decoding base64 thumbnail data`);
+        thumbnailBuffer = Uint8Array.from(atob(first_frame_data), (c) => c.charCodeAt(0));
+        thumbnailFilename = first_frame_filename;
+        console.log(`[RequestParser] Decoded thumbnail buffer size: ${thumbnailBuffer.length} bytes`);
+      } catch (e) {
+        console.error("[RequestParser] Thumbnail base64 decode error:", e);
+        // Continue without thumbnail - non-fatal
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        taskId: String(task_id),
+        mode: 'base64',
+        filename,
+        fileData: fileBuffer,
+        fileContentType: getContentType(filename),
+        thumbnailData: thumbnailBuffer,
+        thumbnailFilename,
+        thumbnailContentType: thumbnailFilename ? getContentType(thumbnailFilename) : undefined
+      }
+    };
+  }
+}
+
+/**
+ * Validate that a storage path is allowed for the given task
+ * Called after Supabase client is available for orchestrator check
+ */
+async function validateStoragePathSecurity(
+  supabase: any,
+  taskId: string,
+  storagePath: string,
+  storagePathTaskId: string | undefined
+): Promise<{ allowed: boolean; error?: string }> {
+  // If path task_id matches request task_id, it's allowed
+  if (!storagePathTaskId || storagePathTaskId === taskId) {
+    return { allowed: true };
+  }
+
+  // Check if this is an orchestrator task (allowed to reference other task outputs)
+  const { data: task, error } = await supabase
+    .from('tasks')
+    .select('task_type')
+    .eq('id', taskId)
+    .single();
+
+  if (error) {
+    console.error(`[SecurityCheck] Error fetching task for validation: ${error.message}`);
+    return { allowed: false, error: "storage_path does not match task_id. Files must be uploaded for the correct task." };
+  }
+
+  const isOrchestrator = task?.task_type?.includes('orchestrator');
+  if (isOrchestrator) {
+    console.log(`[SecurityCheck] ✅ Orchestrator task ${taskId} referencing task ${storagePathTaskId} output - allowed`);
+    return { allowed: true };
+  }
+
+  console.error(`[SecurityCheck] ❌ Non-orchestrator task attempting to reference different task's output`);
+  return { allowed: false, error: "storage_path does not match task_id. Files must be uploaded for the correct task." };
+}
+
 /**
  * Edge function: complete-task
  * 
@@ -70,243 +322,50 @@ declare const Deno: any;
  */
 serve(async (req) => {
   if (req.method !== "POST") {
-    return new Response("Method not allowed", {
-      status: 405
-    });
+    return new Response("Method not allowed", { status: 405 });
   }
 
-  // Determine content type to choose processing mode
-  const contentType = req.headers.get("content-type") || "";
-  const isMultipart = contentType.includes("multipart/form-data");
-
-  let task_id: string | undefined;
-  let filename: string | undefined;
-  let fileUploadBody: Blob | Uint8Array | undefined;
-  let first_frame_filename: string | undefined;
-  let firstFrameUploadBody: Blob | Uint8Array | undefined;
-  let fileContentType: string | undefined;
-  let firstFrameContentType: string | undefined;
-  let storagePathProvided: string | undefined; // MODE 3: pre-uploaded file
-  let thumbnailPathProvided: string | undefined;
-
-  if (isMultipart) {
-    // MODE 2: Multipart upload - NOT SUPPORTED
-    return new Response("Multipart upload (MODE 2) is not supported. Use MODE 1 (base64 JSON) or MODE 3 (pre-signed URL).", {
-      status: 400
-    });
-  } else {
-    // JSON mode: could be MODE 1 (base64) or MODE 3 (pre-signed URL)
-    let body;
-    try {
-      body = await req.json();
-    } catch (e) {
-      return new Response("Invalid JSON body", {
-        status: 400
-      });
-    }
-
-    const {
-      task_id: bodyTaskId,
-      file_data,
-      filename: bodyFilename,
-      first_frame_data,
-      first_frame_filename: bodyFirstFrameFilename,
-      storage_path,  // MODE 3
-      thumbnail_storage_path  // MODE 3
-    } = body;
-
-    console.log(`[COMPLETE-TASK-DEBUG] Received JSON request with task_id: ${bodyTaskId}`);
-    console.log(`[COMPLETE-TASK-DEBUG] Body keys: ${Object.keys(body)}`);
-
-    task_id = bodyTaskId;
-
-    // Check if storage_path is provided (MODE 3: strict validation or MODE 4: relaxed)
-    if (storage_path) {
-      if (!task_id) {
-        return new Response("task_id required", { status: 400 });
-      }
-
-      const pathParts = storage_path.split('/');
-      const isMode3Format = pathParts.length >= 4 && pathParts[1] === 'tasks';
-
-      if (isMode3Format) {
-        // MODE 3: Pre-signed URL upload with strict validation
-        console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Pre-signed URL - file already uploaded to: ${storage_path}`);
-
-        // SECURITY: Validate that storage_path contains the correct task_id
-        // Expected format: userId/tasks/{task_id}/filename or userId/tasks/{task_id}/thumbnails/filename
-        const pathTaskId = pathParts[2];
-        if (pathTaskId !== task_id) {
-          console.log(`[COMPLETE-TASK-DEBUG] storage_path task_id (${pathTaskId}) doesn't match request task_id (${task_id}) - checking if orchestrator task`);
-
-          // EXCEPTION: Allow orchestrator tasks to reference other task outputs
-          // Security is already enforced by:
-          // 1. Task ownership verification (caller must own the task being completed)
-          // 2. File existence check (file must exist in storage)
-          // 3. Storage RLS policies (cross-user access already protected)
-          const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-          const supabaseUrl = Deno.env.get("SUPABASE_URL");
-          if (!serviceKey || !supabaseUrl) {
-            console.error("Missing required environment variables");
-            return new Response("Server configuration error", { status: 500 });
-          }
-          const tempClient = createClient(supabaseUrl, serviceKey);
-
-          const { data: currentTask, error: taskFetchError } = await tempClient
-            .from('tasks')
-            .select('task_type')
-            .eq('id', task_id)
-            .single();
-
-          if (taskFetchError) {
-            console.error(`[COMPLETE-TASK-DEBUG] Error fetching task for validation: ${taskFetchError.message}`);
-            return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
-          }
-
-          // Check if this is an orchestrator task
-          const isOrchestrator = currentTask?.task_type?.includes('orchestrator');
-
-          if (isOrchestrator) {
-            console.log(`[COMPLETE-TASK-DEBUG] ✅ Orchestrator task ${task_id} referencing task ${pathTaskId} output - allowing (will verify file exists)`);
-            // Allow orchestrator tasks to reference other task outputs
-            // File existence will be verified in MODE 4 validation section
-          } else {
-            console.error(`[COMPLETE-TASK-DEBUG] ❌ Security violation: Non-orchestrator task attempting to reference different task's output`);
-            return new Response("storage_path does not match task_id. Files must be uploaded for the correct task.", { status: 403 });
-          }
-        } else {
-          console.log(`[COMPLETE-TASK-DEBUG] MODE 3: Validated storage_path contains correct task_id: ${pathTaskId}`);
-        }
-
-        // Validate thumbnail path if provided
-        if (thumbnail_storage_path) {
-          const thumbParts = thumbnail_storage_path.split('/');
-          if (thumbParts.length < 4 || thumbParts[1] !== 'tasks') {
-            return new Response("Invalid thumbnail_storage_path format.", { status: 400 });
-          }
-          const thumbTaskId = thumbParts[2];
-          if (thumbTaskId !== task_id) {
-            // Allow orchestrator tasks to reference child task thumbnails
-            // Need to fetch task type to check if it's an orchestrator
-            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-            const supabaseUrl = Deno.env.get("SUPABASE_URL");
-            if (!serviceKey || !supabaseUrl) {
-              console.error("Missing required environment variables");
-              return new Response("Server configuration error", { status: 500 });
-            }
-            const tempClient = createClient(supabaseUrl, serviceKey);
-
-            const { data: taskForThumb, error: taskFetchError } = await tempClient
-              .from('tasks')
-              .select('task_type')
-              .eq('id', task_id)
-              .single();
-
-            if (taskFetchError) {
-              console.error(`[COMPLETE-TASK-DEBUG] Error fetching task for thumbnail validation: ${taskFetchError.message}`);
-              return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
-            }
-
-            const isOrchestrator = taskForThumb?.task_type?.includes('orchestrator');
-            if (isOrchestrator) {
-              console.log(`[COMPLETE-TASK-DEBUG] ✅ Orchestrator task ${task_id} referencing thumbnail from task ${thumbTaskId} - allowing`);
-            } else {
-              console.error(`[COMPLETE-TASK-DEBUG] Security violation: thumbnail task_id (${thumbTaskId}) doesn't match request task_id (${task_id})`);
-              return new Response("thumbnail_storage_path does not match task_id.", { status: 403 });
-            }
-          }
-        }
-      } else {
-        // MODE 4: Reference existing storage path (relaxed validation for orchestrator completion)
-        // Used when orchestrator task needs to reference a file uploaded by its child task
-        console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Reference existing storage path (orchestrator completion): ${storage_path}`);
-
-        // Basic validation: ensure path has at least userId/filename structure
-        if (pathParts.length < 2) {
-          return new Response("Invalid storage_path format. Must be at least userId/filename", { status: 400 });
-        }
-
-        // File verification will happen after supabaseAdmin client is created
-        console.log(`[COMPLETE-TASK-DEBUG] MODE 4: Will verify file exists after client initialization`);
-      }
-
-      storagePathProvided = storage_path;
-      thumbnailPathProvided = thumbnail_storage_path;
-
-      // Extract filename from storage path
-      filename = pathParts[pathParts.length - 1];
-
-      // Skip to authorization - no file upload needed
-    } else {
-      // MODE 1: Legacy base64 upload
-      console.log(`[COMPLETE-TASK-DEBUG] MODE 1: Processing JSON request with base64 data`);
-
-      if (!bodyTaskId || !file_data || !bodyFilename) {
-        return new Response("task_id, file_data (base64), and filename required (or use storage_path for pre-uploaded files)", {
-          status: 400
-        });
-      }
-
-      // Validate thumbnail parameters if provided
-      if (first_frame_data && !bodyFirstFrameFilename) {
-        return new Response("first_frame_filename required when first_frame_data is provided", {
-          status: 400
-        });
-      }
-      if (bodyFirstFrameFilename && !first_frame_data) {
-        return new Response("first_frame_data required when first_frame_filename is provided", {
-          status: 400
-        });
-      }
-
-      task_id = bodyTaskId;
-      filename = bodyFilename;
-
-      // Decode base64 file data
-      try {
-        console.log(`[COMPLETE-TASK-DEBUG] Decoding base64 file data (length: ${file_data.length} chars)`);
-        const fileBuffer = Uint8Array.from(atob(file_data), (c) => c.charCodeAt(0));
-        fileUploadBody = fileBuffer;
-        fileContentType = getContentType(filename);
-        console.log(`[COMPLETE-TASK-DEBUG] Decoded file buffer size: ${fileBuffer.length} bytes`);
-      } catch (e) {
-        console.error("[COMPLETE-TASK-DEBUG] Base64 decode error:", e);
-        return new Response("Invalid base64 file_data", { status: 400 });
-      }
-
-      // Decode thumbnail if provided
-      if (first_frame_data && bodyFirstFrameFilename) {
-        try {
-          console.log(`[COMPLETE-TASK-DEBUG] Decoding base64 thumbnail data`);
-          const thumbBuffer = Uint8Array.from(atob(first_frame_data), (c) => c.charCodeAt(0));
-          first_frame_filename = bodyFirstFrameFilename;
-          firstFrameUploadBody = thumbBuffer;
-          firstFrameContentType = getContentType(first_frame_filename);
-          console.log(`[COMPLETE-TASK-DEBUG] Decoded thumbnail buffer size: ${thumbBuffer.length} bytes`);
-        } catch (e) {
-          console.error("[COMPLETE-TASK-DEBUG] Thumbnail base64 decode error:", e);
-          // Continue without thumbnail
-        }
-      }
-    }
+  // 1) Parse and validate request
+  const parseResult = await parseCompleteTaskRequest(req);
+  if (!parseResult.success) {
+    return parseResult.response;
   }
+  const parsedRequest = parseResult.data;
+  const taskIdString = parsedRequest.taskId;
 
-  // Convert task_id to string early to avoid UUID casting issues
-  const taskIdString = String(task_id);
-  console.log(`[COMPLETE-TASK-DEBUG] Converted task_id to string: ${taskIdString}`);
+  // Extract values for backward compatibility with existing code
+  const filename = parsedRequest.filename;
+  const fileUploadBody = parsedRequest.fileData;
+  const fileContentType = parsedRequest.fileContentType;
+  const first_frame_filename = parsedRequest.thumbnailFilename;
+  const firstFrameUploadBody = parsedRequest.thumbnailData;
+  const firstFrameContentType = parsedRequest.thumbnailContentType;
+  const storagePathProvided = parsedRequest.storagePath;
+  const thumbnailPathProvided = parsedRequest.thumbnailStoragePath;
 
-  // Get environment variables
+  console.log(`[COMPLETE-TASK] Processing task ${taskIdString} (mode: ${parsedRequest.mode})`);
+
+  // 2) Get environment variables and create Supabase client
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   if (!serviceKey || !supabaseUrl) {
     console.error("Missing required environment variables");
-    return new Response("Server configuration error", {
-      status: 500
-    });
+    return new Response("Server configuration error", { status: 500 });
   }
-
-  // Create admin client for database operations
   const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+
+  // 3) Security check: Validate storage path for orchestrator references (MODE 3 with mismatched task_id)
+  if (parsedRequest.requiresOrchestratorCheck && parsedRequest.storagePath) {
+    const securityResult = await validateStoragePathSecurity(
+      supabaseAdmin,
+      taskIdString,
+      parsedRequest.storagePath,
+      parsedRequest.storagePathTaskId
+    );
+    if (!securityResult.allowed) {
+      return new Response(securityResult.error || "Access denied", { status: 403 });
+    }
+  }
 
   // Authenticate request using shared utility
   const auth = await authenticateRequest(req, supabaseAdmin, "[COMPLETE-TASK-DEBUG]");
@@ -472,17 +531,11 @@ serve(async (req) => {
           console.log(`[ThumbnailGenDebug] Processing image for thumbnail generation with ImageScript`);
 
           // Decode with ImageScript (Deno-native, no DOM/canvas APIs)
-          let sourceBytes: Uint8Array;
-          if (fileUploadBody instanceof Uint8Array) {
-            sourceBytes = fileUploadBody;
-            console.log(`[ThumbnailGenDebug] Using Uint8Array source, size: ${sourceBytes.length} bytes`);
-          } else if (typeof (fileUploadBody as any).arrayBuffer === 'function') {
-            const ab = await (fileUploadBody as Blob).arrayBuffer();
-            sourceBytes = new Uint8Array(ab);
-            console.log(`[ThumbnailGenDebug] Converted Blob to Uint8Array, size: ${sourceBytes.length} bytes`);
-          } else {
-            throw new Error('Unsupported upload body type for thumbnail generation');
+          if (!fileUploadBody) {
+            throw new Error('No file data available for thumbnail generation');
           }
+          const sourceBytes = fileUploadBody;
+          console.log(`[ThumbnailGenDebug] Using file data, size: ${sourceBytes.length} bytes`);
 
           const image = await ImageScript.decode(sourceBytes);
           const originalWidth = image.width;

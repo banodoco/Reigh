@@ -7,8 +7,126 @@ import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } fro
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
 import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../state/types';
-import { PhaseConfig } from '../../../settings';
+import { PhaseConfig, PhaseLoraConfig } from '../../../settings';
 import { isVideoShotGenerations, type ShotGenerationsLike } from '@/shared/lib/typeGuards';
+
+// ============================================================================
+// PHASE CONFIG HELPERS FOR BASIC MODE
+// ============================================================================
+
+/**
+ * Motion LoRA URL - applied based on Amount of Motion slider
+ */
+const MOTION_LORA_URL = 'https://huggingface.co/peteromallet/random_junk/resolve/main/14b-i2v.safetensors';
+
+/**
+ * Build phase config for basic mode based on structure video presence, motion amount, and user LoRAs.
+ * This allows the backend to use a unified phase-based system for all generation modes.
+ * 
+ * @param hasStructureVideo - Whether a structure video is being used (determines VACE vs I2V)
+ * @param amountOfMotion - 0-100 motion slider value
+ * @param userLoras - User-selected LoRAs to add to every phase
+ * @returns Object with model name and phase config
+ */
+function buildBasicModePhaseConfig(
+  hasStructureVideo: boolean,
+  amountOfMotion: number,
+  userLoras: Array<{ path: string; strength: number }>
+): { model: string; phaseConfig: PhaseConfig } {
+  
+  // Build additional LoRAs array (motion + user-selected)
+  const additionalLoras: PhaseLoraConfig[] = [];
+  
+  // Add motion LoRA if motion > 0
+  if (amountOfMotion > 0) {
+    additionalLoras.push({
+      url: MOTION_LORA_URL,
+      multiplier: (amountOfMotion / 100).toFixed(2)
+    });
+  }
+  
+  // Add all user-selected LoRAs
+  userLoras.forEach(lora => {
+    if (lora.path) {
+      additionalLoras.push({
+        url: lora.path,
+        multiplier: lora.strength.toFixed(2)
+      });
+    }
+  });
+
+  if (hasStructureVideo) {
+    // WITH structure video - 3 phases, VACE model
+    return {
+      model: 'wan_2_2_vace_lightning_baseline_2_2_2',
+      phaseConfig: {
+        num_phases: 3,
+        steps_per_phase: [2, 2, 2],
+        flow_shift: 5.0,
+        sample_solver: "euler",
+        model_switch_phase: 2,
+        phases: [
+          {
+            phase: 1,
+            guidance_scale: 3.0,
+            loras: [
+              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" },
+              ...additionalLoras
+            ]
+          },
+          {
+            phase: 2,
+            guidance_scale: 1.0,
+            loras: [
+              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" },
+              ...additionalLoras
+            ]
+          },
+          {
+            phase: 3,
+            guidance_scale: 1.0,
+            loras: [
+              { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" },
+              ...additionalLoras
+            ]
+          }
+        ]
+      }
+    };
+  } else {
+    // WITHOUT structure video - 2 phases, I2V model
+    return {
+      model: 'wan_2_2_i2v_lightning_baseline_2_2_2',
+      phaseConfig: {
+        num_phases: 2,
+        steps_per_phase: [3, 3],
+        flow_shift: 5.0,
+        sample_solver: "euler",
+        model_switch_phase: 1,
+        phases: [
+          {
+            phase: 1,
+            guidance_scale: 3.0,
+            loras: [
+              { url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors", multiplier: "1.2" },
+              ...additionalLoras
+            ]
+          },
+          {
+            phase: 2,
+            guidance_scale: 1.0,
+            loras: [
+              { url: "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors", multiplier: "1.0" },
+              ...additionalLoras
+            ]
+          }
+        ]
+      }
+    };
+  }
+}
+
+// ============================================================================
 
 export interface GenerateVideoParams {
   // Core IDs
@@ -621,71 +739,97 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     }
   }
 
-  // Determine model name based on structure video presence
-  let actualModelName = getModelName();
-  let modelType = 'i2v';
+  // ============================================================================
+  // MODEL AND PHASE CONFIG DETERMINATION
+  // ============================================================================
+  // 
+  // We now use phase configs for BOTH basic and advanced mode, unifying the backend.
+  // - Basic mode: Phase config is computed based on structure video presence + motion + user LoRAs
+  // - Advanced mode: User's phase config is used (with LoRA swapping for VACE if needed)
   
-  // If there is a structure video, use VACE model
-  if (structureVideoPath) {
-    if (actualModelName.includes('baseline_3_3')) {
-      actualModelName = 'wan_2_2_vace_lightning_baseline_3_3';
-    } else {
-      actualModelName = 'wan_2_2_vace_lightning_baseline_2_2_2';
-    }
-    modelType = 'vace';
-    console.log('[Generation] Structure video present - using VACE model:', actualModelName);
-  } else {
-    // No structure video - use I2V model
-    if (actualModelName.includes('baseline_3_3')) {
-      actualModelName = 'wan_2_2_i2v_lightning_baseline_3_3';
-    } else {
-      actualModelName = 'wan_2_2_i2v_lightning_baseline_2_2_2';
-    }
-    modelType = 'i2v';
-    console.log('[Generation] No structure video - using I2V model:', actualModelName);
-  }
+  let actualModelName: string;
+  let effectivePhaseConfig: PhaseConfig;
+  let modelType: 'i2v' | 'vace';
   
-  // Swap LoRAs in phase config based on structure video presence
-  // I2V models use Seko V1 LoRAs, VACE models use Seko V2.0 LoRAs
-  let adjustedPhaseConfig = phaseConfig;
-  if (advancedMode && phaseConfig && structureVideoPath) {
-    // Structure video present - swap I2V LoRAs to VACE LoRAs
-    console.log('[Generation] Structure video present - swapping I2V LoRAs to VACE LoRAs');
-    adjustedPhaseConfig = {
-      ...phaseConfig,
-      phases: phaseConfig.phases.map(phase => ({
-        ...phase,
-        loras: phase.loras.map(lora => {
-          // Swap I2V Seko V1 to VACE Seko V2.0
-          if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors')) {
-            return {
-              ...lora,
-              url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/high_noise_model.safetensors'
-            };
-          }
-          if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors')) {
-            return {
-              ...lora,
-              url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/low_noise_model.safetensors'
-            };
-          }
-          // Keep other LoRAs unchanged
-          return lora;
-        })
-      }))
-    };
+  // Convert user LoRAs to the format needed for phase config
+  const userLorasForPhaseConfig = (selectedLoras || []).map(l => ({
+    path: l.path,
+    strength: parseFloat(l.strength?.toString() ?? '0') || 0.0
+  }));
+  
+  if (advancedMode && phaseConfig) {
+    // ADVANCED MODE: Use user's phase config
+    let adjustedPhaseConfig = phaseConfig;
     
-    console.log('[Generation] LoRA swap complete:', {
-      originalLoraUrls: phaseConfig.phases.map(p => p.loras.map(l => l.url.split('/').pop())),
-      adjustedLoraUrls: adjustedPhaseConfig.phases.map(p => p.loras.map(l => l.url.split('/').pop()))
+    // Determine model based on structure video
+    if (structureVideoPath) {
+      actualModelName = phaseConfig.num_phases === 2 
+        ? 'wan_2_2_vace_lightning_baseline_3_3' 
+        : 'wan_2_2_vace_lightning_baseline_2_2_2';
+      modelType = 'vace';
+      
+      // Swap I2V LoRAs to VACE LoRAs if needed
+      console.log('[Generation] Advanced mode + Structure video - swapping I2V LoRAs to VACE LoRAs');
+      adjustedPhaseConfig = {
+        ...phaseConfig,
+        phases: phaseConfig.phases.map(phase => ({
+          ...phase,
+          loras: phase.loras.map(lora => {
+            // Swap I2V Seko V1 to VACE Seko V2.0
+            if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors')) {
+              return { ...lora, url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/high_noise_model.safetensors' };
+            }
+            if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors')) {
+              return { ...lora, url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/low_noise_model.safetensors' };
+            }
+            return lora;
+          })
+        }))
+      };
+    } else {
+      actualModelName = phaseConfig.num_phases === 2 
+        ? 'wan_2_2_i2v_lightning_baseline_3_3' 
+        : 'wan_2_2_i2v_lightning_baseline_2_2_2';
+      modelType = 'i2v';
+    }
+    
+    effectivePhaseConfig = adjustedPhaseConfig;
+    console.log('[Generation] Advanced Mode - using user phase config:', {
+      model: actualModelName,
+      modelType,
+      numPhases: effectivePhaseConfig.num_phases,
+      stepsPerPhase: effectivePhaseConfig.steps_per_phase
+    });
+    
+  } else {
+    // BASIC MODE: Build phase config automatically
+    const basicConfig = buildBasicModePhaseConfig(
+      !!structureVideoPath,
+      amountOfMotion,
+      userLorasForPhaseConfig
+    );
+    
+    actualModelName = basicConfig.model;
+    effectivePhaseConfig = basicConfig.phaseConfig;
+    modelType = structureVideoPath ? 'vace' : 'i2v';
+    
+    console.log('[Generation] Basic Mode - built phase config:', {
+      model: actualModelName,
+      modelType,
+      hasStructureVideo: !!structureVideoPath,
+      amountOfMotion,
+      userLorasCount: userLorasForPhaseConfig.length,
+      numPhases: effectivePhaseConfig.num_phases,
+      stepsPerPhase: effectivePhaseConfig.steps_per_phase,
+      totalLorasPerPhase: effectivePhaseConfig.phases.map(p => p.loras.length)
     });
   }
   
-  // Validate and debug log phase config before sending
-  if (advancedMode && adjustedPhaseConfig) {
-    const phasesLength = adjustedPhaseConfig.phases?.length || 0;
-    const stepsLength = adjustedPhaseConfig.steps_per_phase?.length || 0;
-    const numPhases = adjustedPhaseConfig.num_phases;
+  // Validate phase config before sending (always validate now since we always send it)
+  {
+    const phasesLength = effectivePhaseConfig.phases?.length || 0;
+    const stepsLength = effectivePhaseConfig.steps_per_phase?.length || 0;
+    const numPhases = effectivePhaseConfig.num_phases;
     
     // Final validation check before sending to backend
     if (numPhases !== phasesLength || numPhases !== stepsLength) {
@@ -693,21 +837,28 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         num_phases: numPhases,
         phases_array_length: phasesLength,
         steps_array_length: stepsLength,
+        advancedMode,
         ERROR: 'This WILL cause backend validation errors!',
-        phases_data: adjustedPhaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
-        steps_per_phase: adjustedPhaseConfig.steps_per_phase
+        phases_data: effectivePhaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
+        steps_per_phase: effectivePhaseConfig.steps_per_phase
       });
       toast.error(`Invalid phase configuration: num_phases (${numPhases}) doesn't match arrays (phases: ${phasesLength}, steps: ${stepsLength}). Please reset to defaults.`);
       return { success: false, error: 'Invalid phase configuration' };
     }
     
-    console.log('[PhaseConfigDebug] Preparing to send phase_config:', {
-      num_phases: adjustedPhaseConfig.num_phases,
-      model_switch_phase: adjustedPhaseConfig.model_switch_phase,
+    console.log('[PhaseConfigDebug] ✅ Preparing to send phase_config:', {
+      mode: advancedMode ? 'advanced' : 'basic',
+      num_phases: effectivePhaseConfig.num_phases,
+      model_switch_phase: effectivePhaseConfig.model_switch_phase,
       phases_array_length: phasesLength,
       steps_array_length: stepsLength,
-      phases_data: adjustedPhaseConfig.phases?.map(p => ({ phase: p.phase, guidance_scale: p.guidance_scale, loras_count: p.loras?.length })),
-      steps_per_phase: adjustedPhaseConfig.steps_per_phase,
+      phases_data: effectivePhaseConfig.phases?.map(p => ({ 
+        phase: p.phase, 
+        guidance_scale: p.guidance_scale, 
+        loras_count: p.loras?.length,
+        lora_urls: p.loras?.map(l => l.url.split('/').pop())
+      })),
+      steps_per_phase: effectivePhaseConfig.steps_per_phase,
       VALIDATION: 'PASSED'
     });
   }
@@ -746,8 +897,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     model_name: actualModelName,
     model_type: modelType,
     seed: steerableMotionSettings.seed,
-    // Only include steps if NOT in Advanced Mode (Advanced Mode uses steps_per_phase in phase_config)
-    ...(advancedMode ? {} : { steps: batchVideoSteps }),
+    // Steps are now always in phase_config.steps_per_phase - don't send separately
     debug: steerableMotionSettings.debug ?? DEFAULT_STEERABLE_MOTION_SETTINGS.debug,
     show_input_images: DEFAULT_STEERABLE_MOTION_SETTINGS.show_input_images,
     enhance_prompt: enhancePrompt,
@@ -755,15 +905,14 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     generation_mode: generationMode,
     random_seed: randomSeed,
     turbo_mode: turboMode,
-    // Only include amount_of_motion if NOT in Advanced Mode
-    ...(advancedMode ? {} : { amount_of_motion: amountOfMotion / 100.0 }),
-    // Advanced mode flag and phase config
-    advanced_mode: advancedMode,
-    motion_mode: motionMode, // Motion control mode (basic/presets/advanced)
-    phase_config: advancedMode && adjustedPhaseConfig ? adjustedPhaseConfig : undefined,
-    // Always set regenerate_anchors to false
-    ...(advancedMode ? { regenerate_anchors: false } : {}),
-    // Include selected phase preset ID for UI state restoration
+    // Amount of motion is now embedded in phase_config LoRAs - store for UI restoration only
+    amount_of_motion: amountOfMotion / 100.0,
+    // UNIFIED: Always send phase_config and advanced_mode=true for consistent backend processing
+    advanced_mode: true, // Always true now since we always use phase configs
+    motion_mode: motionMode, // Motion control mode (basic/presets/advanced) - for UI state
+    phase_config: effectivePhaseConfig, // Always send phase config (computed or user-defined)
+    regenerate_anchors: false, // Always false
+    // Include selected phase preset ID for UI state restoration (only if in advanced mode)
     selected_phase_preset_id: advancedMode && selectedPhasePresetId ? selectedPhasePresetId : undefined,
     // Add generation name if provided
     generation_name: variantNameParam.trim() || undefined,
@@ -787,32 +936,10 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   ));
   console.log('[BasePromptsDebug]   image_urls count:', requestBody.image_urls?.length);
   console.log('[BasePromptsDebug]   segment_frames:', requestBody.segment_frames);
+  console.log('[BasePromptsDebug]   phase_config phases:', requestBody.phase_config?.num_phases);
 
-  // Only add regular LoRAs if Advanced Mode is OFF
-  // In Advanced Mode, LoRAs are defined per-phase in phase_config
-  if (!advancedMode) {
-    const loras = [];
-    
-    // Add user-selected LoRAs
-    if (selectedLoras && selectedLoras.length > 0) {
-      loras.push(...selectedLoras.map(l => ({ 
-        path: l.path, 
-        strength: parseFloat(l.strength?.toString() ?? '0') || 0.0 
-      })));
-    }
-    
-    // In basic mode, add the motion control LoRA based on the Amount of Motion slider
-    if (motionMode === 'basic' && amountOfMotion > 0) {
-      loras.push({
-        path: 'https://huggingface.co/peteromallet/random_junk/resolve/main/motion_scale_000006500_high_noise.safetensors',
-        strength: amountOfMotion / 100.0
-      });
-    }
-    
-    if (loras.length > 0) {
-      requestBody.loras = loras;
-    }
-  }
+  // NOTE: LoRAs are now ALWAYS in phase_config (for both basic and advanced mode)
+  // No separate loras array needed - unified backend processing
 
   if (resolution) {
     requestBody.resolution = resolution;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/shared/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
   const [aspectRatio, setAspectRatio] = useState<string>('16:9');
   const { addNewProject, isCreatingProject, projects, selectedProjectId } = useProject();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   
   // Modal styling
   const modal = useMediumModal();
@@ -80,6 +82,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, 
         setProjectName('');
         setAspectRatio(currentProject?.aspectRatio || '16:9');
         onOpenChange(false);
+        navigate('/tools');
       }
     } catch (error) {
       toast.error("An error occurred while creating the project.");

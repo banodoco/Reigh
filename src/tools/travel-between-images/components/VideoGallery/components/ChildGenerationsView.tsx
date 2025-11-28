@@ -682,29 +682,50 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {segmentSlots.map((slot) => (
-                                slot.type === 'child' ? (
-                                    <SegmentCard
-                                        key={slot.child.id}
-                                        child={slot.child}
-                                        index={slot.index}
-                                        projectId={projectId}
-                                        onLightboxOpen={() => setLightboxIndex(slot.index)}
-                                        onMobileTap={handleMobileTap}
-                                        onUpdate={refetch}
-                                        availableLoras={availableLoras}
-                                    />
-                                ) : (
-                                    <SegmentPlaceholder
-                                        key={`placeholder-${slot.index}`}
-                                        index={slot.index}
-                                        expectedFrames={slot.expectedFrames}
-                                        expectedPrompt={slot.expectedPrompt}
-                                        startImage={slot.startImage}
-                                        endImage={slot.endImage}
-                                    />
-                                )
-                            ))}
+                            {segmentSlots.map((slot) => {
+                                if (slot.type === 'child') {
+                                    // Check if child has a location (video output) - if not, show as processing
+                                    const hasOutput = !!slot.child.location;
+                                    
+                                    if (hasOutput) {
+                                        return (
+                                            <SegmentCard
+                                                key={slot.child.id}
+                                                child={slot.child}
+                                                index={slot.index}
+                                                projectId={projectId}
+                                                onLightboxOpen={() => setLightboxIndex(slot.index)}
+                                                onMobileTap={handleMobileTap}
+                                                onUpdate={refetch}
+                                                availableLoras={availableLoras}
+                                            />
+                                        );
+                                    } else {
+                                        // Child exists but still processing - extract info from params
+                                        const childParams = slot.child.params as any;
+                                        return (
+                                            <SegmentPlaceholder
+                                                key={slot.child.id}
+                                                index={slot.index}
+                                                expectedFrames={childParams?.num_frames}
+                                                expectedPrompt={childParams?.base_prompt || childParams?.prompt}
+                                                isProcessing={true}
+                                            />
+                                        );
+                                    }
+                                } else {
+                                    return (
+                                        <SegmentPlaceholder
+                                            key={`placeholder-${slot.index}`}
+                                            index={slot.index}
+                                            expectedFrames={slot.expectedFrames}
+                                            expectedPrompt={slot.expectedPrompt}
+                                            startImage={slot.startImage}
+                                            endImage={slot.endImage}
+                                        />
+                                    );
+                                }
+                            })}
                         </div>
                     )}
                 </div>
@@ -1271,6 +1292,7 @@ interface SegmentPlaceholderProps {
     expectedPrompt?: string;
     startImage?: string;
     endImage?: string;
+    isProcessing?: boolean; // True if child exists but output not ready yet
 }
 
 const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
@@ -1279,9 +1301,10 @@ const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
     expectedPrompt,
     startImage,
     endImage,
+    isProcessing = false,
 }) => {
     return (
-        <Card className="overflow-hidden flex flex-col opacity-70 border-dashed">
+        <Card className={`overflow-hidden flex flex-col border-dashed ${isProcessing ? 'opacity-90 border-primary/50' : 'opacity-70'}`}>
             {/* Placeholder Video Area */}
             <div className="relative aspect-video bg-muted/30 flex items-center justify-center">
                 {/* Show start/end images if available */}
@@ -1311,30 +1334,38 @@ const SegmentPlaceholder: React.FC<SegmentPlaceholderProps> = ({
                 {/* Loading indicator overlay */}
                 <div className="relative z-10 flex flex-col items-center gap-2 text-muted-foreground">
                     <div className="relative">
-                        <Clock className="w-8 h-8 opacity-50" />
-                        <Loader2 className="w-4 h-4 animate-spin absolute -top-1 -right-1 text-primary" />
+                        {isProcessing ? (
+                            <Film className="w-8 h-8 opacity-50 text-primary" />
+                        ) : (
+                            <Clock className="w-8 h-8 opacity-50" />
+                        )}
+                        <Loader2 className={`w-4 h-4 animate-spin absolute -top-1 -right-1 ${isProcessing ? 'text-primary' : 'text-muted-foreground'}`} />
                     </div>
                     <span className="text-xs font-medium">Segment {index + 1}</span>
-                    <span className="text-xs opacity-70">Pending...</span>
+                    <span className={`text-xs ${isProcessing ? 'text-primary font-medium' : 'opacity-70'}`}>
+                        {isProcessing ? 'Processing...' : 'Pending...'}
+                    </span>
                 </div>
             </div>
 
             {/* Placeholder Content */}
             <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
                 <div className="space-y-2 flex-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Expected Prompt</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">
+                        {isProcessing ? 'Prompt' : 'Expected Prompt'}
+                    </Label>
                     <div className="text-xs text-muted-foreground/70 line-clamp-3 italic">
                         {expectedPrompt ? (
                             expectedPrompt.length > 150 ? expectedPrompt.substring(0, 150) + '...' : expectedPrompt
                         ) : (
-                            'Waiting for generation...'
+                            isProcessing ? 'Generating video...' : 'Waiting for generation...'
                         )}
                     </div>
                 </div>
 
                 {expectedFrames && (
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Expected Frames</span>
+                        <span>{isProcessing ? 'Frames' : 'Expected Frames'}</span>
                         <span className="font-medium">{expectedFrames}</span>
                     </div>
                 )}

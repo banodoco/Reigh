@@ -6,6 +6,41 @@ import {
   TaskValidationError
 } from "../taskCreation";
 
+// ============================================================================
+// PHASE CONFIG TYPES FOR JOIN CLIPS
+// ============================================================================
+
+/**
+ * LoRA configuration for a phase
+ */
+interface PhaseLoraConfig {
+  url: string;
+  multiplier: string;
+}
+
+/**
+ * Settings for a single phase
+ */
+interface PhaseSettings {
+  phase: number;
+  guidance_scale: number;
+  loras: PhaseLoraConfig[];
+}
+
+/**
+ * Complete phase configuration
+ */
+interface PhaseConfig {
+  num_phases: number;
+  steps_per_phase: number[];
+  flow_shift: number;
+  sample_solver: string;
+  model_switch_phase: number;
+  phases: PhaseSettings[];
+}
+
+// ============================================================================
+
 /**
  * Describes an individual clip that will participate in the join workflow
  */
@@ -83,6 +118,59 @@ const DEFAULT_JOIN_CLIPS_VALUES = {
   negative_prompt: '',
   priority: 0,
 };
+
+/**
+ * Build phase config for join clips (always uses VACE since we're joining existing videos).
+ * User-selected LoRAs are added to every phase at their specified strength.
+ * 
+ * @param userLoras - User-selected LoRAs to add to every phase
+ * @returns PhaseConfig for VACE model
+ */
+function buildJoinClipsPhaseConfig(
+  userLoras: Array<{ path: string; strength: number }> = []
+): PhaseConfig {
+  // Convert user LoRAs to phase config format
+  const additionalLoras: PhaseLoraConfig[] = userLoras
+    .filter(lora => lora.path)
+    .map(lora => ({
+      url: lora.path,
+      multiplier: lora.strength.toFixed(2)
+    }));
+
+  return {
+    num_phases: 3,
+    steps_per_phase: [2, 2, 2],
+    flow_shift: 5.0,
+    sample_solver: "euler",
+    model_switch_phase: 2,
+    phases: [
+      {
+        phase: 1,
+        guidance_scale: 3.0,
+        loras: [
+          { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "0.75" },
+          ...additionalLoras
+        ]
+      },
+      {
+        phase: 2,
+        guidance_scale: 1.0,
+        loras: [
+          { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/high_noise_model.safetensors", multiplier: "1.0" },
+          ...additionalLoras
+        ]
+      },
+      {
+        phase: 3,
+        guidance_scale: 1.0,
+        loras: [
+          { url: "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-250928/low_noise_model.safetensors", multiplier: "1.0" },
+          ...additionalLoras
+        ]
+      }
+    ]
+  };
+}
 
 /**
  * Builds the ordered clip sequence from the provided parameters.
@@ -176,6 +264,9 @@ function buildJoinClipsPayload(
   runId: string,
   orchestratorTaskId: string
 ): Record<string, unknown> {
+  // Build phase config with user's LoRAs merged in
+  const phaseConfig = buildJoinClipsPhaseConfig(params.loras || []);
+  
   const orchestratorDetails: Record<string, unknown> = {
     orchestrator_task_id: orchestratorTaskId,
     clip_list: clipSequence.map(clip => ({
@@ -195,6 +286,9 @@ function buildJoinClipsPayload(
     negative_prompt: params.negative_prompt ?? DEFAULT_JOIN_CLIPS_VALUES.negative_prompt,
     priority: params.priority ?? DEFAULT_JOIN_CLIPS_VALUES.priority,
     parent_generation_id: params.parent_generation_id,
+    // UNIFIED: Always include phase_config and advanced_mode for consistent backend processing
+    phase_config: phaseConfig,
+    advanced_mode: true,
   };
 
   if (params.resolution) {
@@ -205,6 +299,7 @@ function buildJoinClipsPayload(
     orchestratorDetails.fps = params.fps;
   }
 
+  // Keep additional_loras for backward compatibility, but LoRAs are now primarily in phase_config
   if (params.loras && params.loras.length > 0) {
     orchestratorDetails.additional_loras = mapLorasToRecord(params.loras);
   }
