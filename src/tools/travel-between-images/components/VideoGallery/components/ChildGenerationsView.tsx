@@ -42,40 +42,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
     const isMobile = useIsMobile();
     
-    // Drag detection for parent video to prevent accidental opens on touch devices
-    const parentTouchStartPos = React.useRef<{ x: number; y: number } | null>(null);
-    const parentWasDragging = React.useRef(false);
-    const DRAG_THRESHOLD = 10;
-    
-    const handleParentTouchStart = useCallback((e: React.TouchEvent) => {
-        const touch = e.touches[0];
-        parentTouchStartPos.current = { x: touch.clientX, y: touch.clientY };
-        parentWasDragging.current = false;
-    }, []);
-    
-    const handleParentTouchMove = useCallback((e: React.TouchEvent) => {
-        if (!parentTouchStartPos.current) return;
-        const touch = e.touches[0];
-        const deltaX = Math.abs(touch.clientX - parentTouchStartPos.current.x);
-        const deltaY = Math.abs(touch.clientY - parentTouchStartPos.current.y);
-        if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
-            parentWasDragging.current = true;
-        }
-    }, []);
-    
-    const handleParentTouchEnd = useCallback(() => {
-        setTimeout(() => {
-            parentTouchStartPos.current = null;
-            parentWasDragging.current = false;
-        }, 100);
-    }, []);
-    
-    const handleParentLightboxOpenSafe = useCallback(() => {
-        if (!parentWasDragging.current) {
-            setIsParentLightboxOpen(true);
-        }
-    }, []);
-    
     // Fetch available LoRAs for the motion control
     const publicLorasQuery = useListPublicResources('lora', true);
     const availableLoras: LoraModel[] = React.useMemo(() => {
@@ -359,9 +325,6 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         </div>
                         <div 
                             className="bg-black w-full flex items-center justify-center relative group p-1"
-                            onTouchStart={handleParentTouchStart}
-                            onTouchMove={handleParentTouchMove}
-                            onTouchEnd={handleParentTouchEnd}
                         >
                             <div className="w-full max-w-3xl mx-auto">
                                 <VideoItem
@@ -371,8 +334,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                                     shouldPreload="metadata"
                                     isMobile={isMobile}
                                     projectId={projectId}
-                                    onLightboxOpen={handleParentLightboxOpenSafe}
-                                    onMobileTap={handleParentLightboxOpenSafe}
+                                    onLightboxOpen={() => setIsParentLightboxOpen(true)}
+                                    onMobileTap={() => setIsParentLightboxOpen(true)}
                                     onDelete={() => { }}
                                     deletingVideoId={null}
                                     onHoverStart={() => { }}
@@ -516,42 +479,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
     const [isSaving, setIsSaving] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
-    
-    // Drag detection to prevent accidental opens on touch devices
-    const touchStartPos = React.useRef<{ x: number; y: number } | null>(null);
-    const wasDragging = React.useRef(false);
-    const DRAG_THRESHOLD = 10; // pixels of movement to consider it a drag
-    
-    const handleTouchStart = useCallback((e: React.TouchEvent) => {
-        const touch = e.touches[0];
-        touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-        wasDragging.current = false;
-    }, []);
-    
-    const handleTouchMove = useCallback((e: React.TouchEvent) => {
-        if (!touchStartPos.current) return;
-        const touch = e.touches[0];
-        const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
-        const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
-        if (deltaX > DRAG_THRESHOLD || deltaY > DRAG_THRESHOLD) {
-            wasDragging.current = true;
-        }
-    }, []);
-    
-    const handleTouchEnd = useCallback(() => {
-        // Reset after a small delay to allow click handlers to check wasDragging
-        setTimeout(() => {
-            touchStartPos.current = null;
-            wasDragging.current = false;
-        }, 100);
-    }, []);
-    
-    const handleLightboxOpenSafe = useCallback(() => {
-        // Only open lightbox if we weren't dragging
-        if (!wasDragging.current) {
-            onLightboxOpen();
-        }
-    }, [onLightboxOpen]);
     
     // Motion control state - derived from params
     const [motionMode, setMotionMode] = useState<'basic' | 'presets' | 'advanced'>(() => {
@@ -802,9 +729,6 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
             {/* Video Preview */}
             <div 
                 className="relative aspect-video bg-black group"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
             >
                     <VideoItem
                         video={child}
@@ -813,8 +737,8 @@ const SegmentCard: React.FC<SegmentCardProps> = ({ child, index, projectId, onLi
                         shouldPreload="metadata"
                         isMobile={isMobile}
                         projectId={projectId}
-                        onLightboxOpen={handleLightboxOpenSafe}
-                        onMobileTap={handleLightboxOpenSafe}
+                        onLightboxOpen={onLightboxOpen}
+                        onMobileTap={onLightboxOpen}
                         onDelete={() => { }}
                         deletingVideoId={null}
                         onHoverStart={() => { }}
