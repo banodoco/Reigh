@@ -43,6 +43,7 @@ export interface GeneratedImageWithMetadata {
   isVideo?: boolean;
   unsaved?: boolean;
   createdAt?: string;
+  updatedAt?: string | null;
   starred?: boolean;
   shot_id?: string;
   position?: number | null;

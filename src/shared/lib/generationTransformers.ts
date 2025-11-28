@@ -26,6 +26,7 @@ export interface RawGeneration {
   thumbnail_url?: string | null;
   type?: string | null;
   created_at: string;
+  updated_at?: string | null;
   params?: any;
   starred?: boolean | null;
   tasks?: any[] | any | null;
@@ -156,6 +157,7 @@ export function transformGeneration(
       ...(options.metadata || {}), // Merge any additional metadata
     },
     createdAt: item.created_at,
+    updatedAt: item.updated_at,
     isVideo: item.type?.includes('video') || false,
     starred: item.starred || false,
     based_on: item.based_on, // Top level for easy access
