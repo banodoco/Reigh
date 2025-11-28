@@ -78,6 +78,7 @@ const assistantTools = [
     name: 'Edit Images',
     description: 'Transform and enhance images.',
     descriptionMobile: 'Refine & enhance',
+    subtext: 'Adjust & refine',
     tool: toolsUIManifest.find(t => t.id === 'edit-images'),
     icon: Edit,
     gradient: 'from-wes-yellow via-wes-salmon to-wes-pink',
@@ -88,6 +89,7 @@ const assistantTools = [
     name: 'Join Clips',
     description: 'Seamlessly connect video clips.',
     descriptionMobile: 'Connect seamlesly',
+    subtext: 'Connect together',
     tool: toolsUIManifest.find(t => t.id === 'join-clips'),
     icon: Link2,
     gradient: 'from-wes-dusty-blue via-wes-lavender to-wes-pink',
@@ -98,6 +100,7 @@ const assistantTools = [
     name: 'Characters',
     description: 'Bring characters to life.',
     descriptionMobile: 'Breathe life',
+    subtext: 'Bring them to life',
     tool: toolsUIManifest.find(t => t.id === 'character-animate'),
     icon: Users,
     gradient: 'from-wes-sage via-wes-mint to-wes-lavender',
@@ -260,23 +263,30 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
           </div>
         </div>
       ) : (
-        /* Square layout for Assistant tools - Title | Icon side by side */
-        <div className={`${isSm ? 'px-2 py-1' : 'px-1.5 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-row justify-center items-center gap-2 ${isLg ? 'gap-3' : ''}`}>
-          {/* Title */}
-          <h3 
-            ref={titleRef}
-            className={`font-theme ${titleSizeSquare} font-theme-heading text-primary ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage leading-tight text-right`}
-          >
-            {item.name}
-          </h3>
-          
-          {/* Vertical divider line */}
-          <div className={`w-0.5 ${isLg ? 'h-6' : isSm ? 'h-5' : 'h-4'} bg-gradient-to-b from-${item.accent} to-wes-vintage-gold rounded-full ${!isDisabled ? `${isLg ? 'group-hover:h-7' : isSm ? 'group-hover:h-6' : 'group-hover:h-5'}` : ''} transition-all duration-700 flex-shrink-0`}></div>
-          
-          {/* Mini icon badge */}
-          <div className={`${isLg ? 'w-8 h-8' : isSm ? 'w-6 h-6' : 'w-5 h-5'} bg-gradient-to-br ${item.gradient} rounded-lg flex items-center justify-center shadow-sm ${!isDisabled ? 'group-hover:scale-110 group-hover:shadow-md' : ''} transition-all duration-500 flex-shrink-0`}>
-            <item.icon className={`${isLg ? 'w-4 h-4' : isSm ? 'w-3 h-3' : 'w-2.5 h-2.5'} text-white drop-shadow-sm`} />
+        /* Square layout for Assistant tools - Title | Icon side by side, Subtext below */
+        <div className={`${isSm ? 'px-2 py-1' : 'px-1.5 py-0.5'} ${isLg ? 'px-3 py-1.5' : ''} h-full flex flex-col justify-center gap-1 ${isLg ? 'gap-1.5' : ''}`}>
+          {/* Title and Icon Row */}
+          <div className={`flex flex-row justify-center items-center gap-2 ${isLg ? 'gap-3' : ''}`}>
+            {/* Title */}
+            <h3 
+              ref={titleRef}
+              className={`font-theme ${titleSizeSquare} font-theme-heading text-primary ${!isDisabled ? 'group-hover:text-primary/80' : ''} transition-colors duration-300 text-shadow-vintage leading-tight text-right`}
+            >
+              {item.name}
+            </h3>
+            
+            {/* Mini icon badge */}
+            <div className={`${isLg ? 'w-6 h-6' : isSm ? 'w-5 h-5' : 'w-4 h-4'} bg-gradient-to-br ${item.gradient} rounded-lg flex items-center justify-center shadow-sm ${!isDisabled ? 'group-hover:scale-110 group-hover:shadow-md' : ''} transition-all duration-500 flex-shrink-0`}>
+              <item.icon className={`${isLg ? 'w-3 h-3' : isSm ? 'w-2.5 h-2.5' : 'w-2 h-2'} text-white drop-shadow-sm`} />
+            </div>
           </div>
+          
+          {/* Subtext below title and icon */}
+          {item.subtext && (
+            <p className={`font-theme text-center ${isLg ? 'text-sm' : isSm ? 'text-xs' : 'text-[11px]'} font-theme-body text-muted-foreground leading-tight`}>
+              {item.subtext}
+            </p>
+          )}
         </div>
       )}
 
