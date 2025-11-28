@@ -300,41 +300,60 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         const slots: SegmentSlot[] = [];
         const childrenByOrder = new Map<number, GenerationRow>();
         
-        // Check if children have valid, unique child_order values
-        const childOrders = sortedChildren.map(c => (c as any).child_order);
-        const hasValidOrders = childOrders.every((order, idx) => 
-            typeof order === 'number' && 
-            order >= 0 && 
-            order < expectedSegmentData.count &&
-            childOrders.indexOf(order) === idx // unique
-        );
+        // Map children by their child_order if valid, otherwise track for fallback
+        const childrenWithoutValidOrder: GenerationRow[] = [];
+        const usedOrders = new Set<number>();
         
-        console.log('[SegmentSlots] Child order analysis', {
-            childOrders,
-            hasValidOrders
-        });
-        
-        if (hasValidOrders) {
-            // Map children by their child_order
-            sortedChildren.forEach(child => {
-                const order = (child as any).child_order;
+        sortedChildren.forEach(child => {
+            const order = (child as any).child_order;
+            
+            // Check if this child has a valid, unique order
+            const isValidOrder = typeof order === 'number' && 
+                order >= 0 && 
+                order < expectedSegmentData.count &&
+                !usedOrders.has(order);
+            
+            if (isValidOrder) {
                 console.log('[SegmentSlots] Mapping child by child_order', {
                     childId: child.id?.substring(0, 8),
                     child_order: order
                 });
                 childrenByOrder.set(order, child);
-            });
-        } else {
-            // Fall back to using array index (sorted by child_order already)
-            console.log('[SegmentSlots] Falling back to array index mapping');
-            sortedChildren.forEach((child, index) => {
-                console.log('[SegmentSlots] Mapping child by index', {
+                usedOrders.add(order);
+            } else {
+                console.log('[SegmentSlots] Child has invalid/missing order, will assign to first available slot', {
                     childId: child.id?.substring(0, 8),
-                    index
+                    child_order: order,
+                    reason: typeof order !== 'number' ? 'not a number' : 
+                            order < 0 ? 'negative' : 
+                            order >= expectedSegmentData.count ? 'out of range' : 
+                            'duplicate'
                 });
-                childrenByOrder.set(index, child);
-            });
-        }
+                childrenWithoutValidOrder.push(child);
+            }
+        });
+        
+        // Assign children without valid orders to the first available slots
+        let nextAvailableSlot = 0;
+        childrenWithoutValidOrder.forEach(child => {
+            while (nextAvailableSlot < expectedSegmentData.count && childrenByOrder.has(nextAvailableSlot)) {
+                nextAvailableSlot++;
+            }
+            if (nextAvailableSlot < expectedSegmentData.count) {
+                console.log('[SegmentSlots] Assigning orphan child to slot', {
+                    childId: child.id?.substring(0, 8),
+                    assignedSlot: nextAvailableSlot
+                });
+                childrenByOrder.set(nextAvailableSlot, child);
+                nextAvailableSlot++;
+            }
+        });
+        
+        console.log('[SegmentSlots] Mapping complete', {
+            childrenMapped: childrenByOrder.size,
+            ordersUsed: Array.from(usedOrders),
+            orphansAssigned: childrenWithoutValidOrder.length
+        });
 
         // Fill in slots
         for (let i = 0; i < expectedSegmentData.count; i++) {

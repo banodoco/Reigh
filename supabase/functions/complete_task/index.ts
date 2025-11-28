@@ -646,31 +646,8 @@ serve(async (req) => {
         if (thumbnailUrl) {
           console.log(`[COMPLETE-TASK-DEBUG] Adding thumbnail_url to task parameters: ${thumbnailUrl}`);
           needsParamsUpdate = true;
-
-          // Handle thumbnail URL based on task type and existing parameter structure
-          if (currentTask.task_type === 'travel_stitch') {
-            // For travel_stitch tasks, add to full_orchestrator_payload.thumbnail_url
-            if (!updatedParams.full_orchestrator_payload) {
-              updatedParams.full_orchestrator_payload = {};
-            }
-            updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
-            // Hardcode accelerated to false for all travel_stitch tasks
-            updatedParams.full_orchestrator_payload.accelerated = false;
-          } else if (currentTask.task_type === 'wan_2_2_i2v') {
-            // For wan_2_2_i2v tasks, add to orchestrator_details.thumbnail_url
-            if (!updatedParams.orchestrator_details) {
-              updatedParams.orchestrator_details = {};
-            }
-            updatedParams.orchestrator_details.thumbnail_url = thumbnailUrl;
-          } else if (currentTask.task_type === 'single_image') {
-            // For single_image tasks, add to thumbnail_url
-            updatedParams.thumbnail_url = thumbnailUrl;
-          } else {
-            // For any other task type, add thumbnail_url at the top level
-            // This ensures we don't miss any task types that might need thumbnails
-            updatedParams.thumbnail_url = thumbnailUrl;
-            console.log(`[COMPLETE-TASK-DEBUG] Added thumbnail_url for task type '${currentTask.task_type}' at top level`);
-          }
+          // Use helper to set thumbnail at correct path based on task_type
+          updatedParams = setThumbnailInParams(updatedParams, currentTask.task_type, thumbnailUrl);
         }
         // Update task parameters if needed (before marking as complete)
         if (needsParamsUpdate) {
@@ -690,67 +667,7 @@ serve(async (req) => {
       console.error(`[COMPLETE-TASK-DEBUG] Error during shot validation:`, shotValidationError);
       // Continue anyway - don't fail task completion due to validation errors
     }
-    // 8.6) Handle thumbnail URL if we couldn't update through the main parameter update flow
-    if (thumbnailUrl) {
-      try {
-        // Try a separate update to ensure thumbnail gets added even if shot validation failed
-        console.log(`[COMPLETE-TASK-DEBUG] Ensuring thumbnail_url is added to task parameters`);
-        const { data: currentTask, error: taskFetchError } = await supabaseAdmin.from("tasks").select("params, task_type").eq("id", taskIdString).single();
-        if (!taskFetchError && currentTask) {
-          let updatedParams = {
-            ...currentTask.params || {}
-          };
-          let shouldUpdate = false;
-          if (currentTask.task_type === 'travel_stitch') {
-            if (!updatedParams.full_orchestrator_payload) {
-              updatedParams.full_orchestrator_payload = {};
-            }
-            if (!updatedParams.full_orchestrator_payload.thumbnail_url) {
-              updatedParams.full_orchestrator_payload.thumbnail_url = thumbnailUrl;
-              shouldUpdate = true;
-            }
-            // Always hardcode accelerated to false for travel_stitch tasks
-            if (updatedParams.full_orchestrator_payload.accelerated !== false) {
-              updatedParams.full_orchestrator_payload.accelerated = false;
-              shouldUpdate = true;
-            }
-          } else if (currentTask.task_type === 'wan_2_2_i2v') {
-            if (!updatedParams.orchestrator_details) {
-              updatedParams.orchestrator_details = {};
-            }
-            if (!updatedParams.orchestrator_details.thumbnail_url) {
-              updatedParams.orchestrator_details.thumbnail_url = thumbnailUrl;
-              shouldUpdate = true;
-            }
-          } else if (currentTask.task_type === 'single_image') {
-            if (!updatedParams.thumbnail_url) {
-              updatedParams.thumbnail_url = thumbnailUrl;
-              shouldUpdate = true;
-            }
-          } else {
-            // For any other task type, add thumbnail_url at the top level if not already present
-            if (!updatedParams.thumbnail_url) {
-              updatedParams.thumbnail_url = thumbnailUrl;
-              shouldUpdate = true;
-              console.log(`[COMPLETE-TASK-DEBUG] Fallback: Added thumbnail_url for task type '${currentTask.task_type}' at top level`);
-            }
-          }
-          if (shouldUpdate) {
-            const { error: thumbnailUpdateError } = await supabaseAdmin.from("tasks").update({
-              params: updatedParams
-            }).eq("id", taskIdString);
-            if (thumbnailUpdateError) {
-              console.error(`[COMPLETE-TASK-DEBUG] Failed to update thumbnail in parameters:`, thumbnailUpdateError);
-            } else {
-              console.log(`[COMPLETE-TASK-DEBUG] Successfully ensured thumbnail_url is in task parameters`);
-            }
-          }
-        }
-      } catch (thumbnailParamError) {
-        console.error(`[COMPLETE-TASK-DEBUG] Error adding thumbnail to parameters:`, thumbnailParamError);
-        // Continue anyway - don't fail task completion
-      }
-    }
+
     // 9) Create generation FIRST (so realtime fires when generation is ready)
     const CREATE_GENERATION_IN_EDGE = Deno.env.get("CREATE_GENERATION_IN_EDGE") !== "false"; // Default ON
     if (CREATE_GENERATION_IN_EDGE) {
@@ -769,11 +686,7 @@ serve(async (req) => {
 
       // CRITICAL: Sub-tasks (segments) now create child generations, so we DO NOT skip them anymore.
       // The createGenerationFromTask function handles the parent/child logic.
-      // Check multiple locations for orchestrator reference (travel-between-images nests it in orchestrator_details)
-      const isSubTask = taskData.params?.orchestrator_task_id_ref || 
-        taskData.params?.orchestrator_task_id ||
-        taskData.params?.orchestrator_details?.orchestrator_task_id ||
-        taskData.params?.originalParams?.orchestrator_details?.orchestrator_task_id;
+      const isSubTask = extractOrchestratorTaskId(taskData.params, 'GenMigration');
       if (isSubTask) {
         console.log(`[GenMigration] Task ${taskIdString} is a sub-task of orchestrator ${isSubTask} - proceeding to create child generation`);
       }
@@ -1006,6 +919,196 @@ serve(async (req) => {
     }
     console.log(`[COMPLETE-TASK-DEBUG] Database update successful for task ${taskIdString}`);
 
+    // 10.5) Check if this is a segment task and if all siblings are complete - then mark orchestrator Complete
+    // Supports both travel_segment and join_clips_segment task types
+    try {
+      // Fetch the just-completed task to check if it's a segment
+      const { data: completedTask, error: completedTaskError } = await supabaseAdmin
+        .from("tasks")
+        .select("task_type, params, project_id")
+        .eq("id", taskIdString)
+        .single();
+
+      // Define segment type mappings
+      const segmentTypeConfig: Record<string, { segmentType: string; runIdField: string; expectedCountField: string }> = {
+        'travel_segment': {
+          segmentType: 'travel_segment',
+          runIdField: 'orchestrator_run_id',
+          expectedCountField: 'num_new_segments_to_generate'
+        },
+        'join_clips_segment': {
+          segmentType: 'join_clips_segment',
+          runIdField: 'run_id', // join_clips uses run_id in orchestrator_details
+          expectedCountField: 'num_joins' // join_clips counts joins (clips - 1)
+        }
+      };
+
+      const taskType = completedTask?.task_type;
+      const config = taskType ? segmentTypeConfig[taskType] : null;
+
+      if (!completedTaskError && config) {
+        // Extract orchestrator references using helpers
+        const orchestratorTaskId = extractOrchestratorTaskId(completedTask.params, 'OrchestratorComplete');
+        const orchestratorRunId = extractOrchestratorRunId(completedTask.params, 'OrchestratorComplete');
+
+        if (orchestratorTaskId) {
+          console.log(`[OrchestratorComplete] ${taskType} ${taskIdString} completed. Checking siblings for orchestrator ${orchestratorTaskId} (run_id: ${orchestratorRunId || 'N/A'})`);
+
+          // First, fetch the orchestrator task to get expected segment count and current status
+          const { data: orchestratorTask, error: orchError } = await supabaseAdmin
+            .from("tasks")
+            .select("id, status, params")
+            .eq("id", orchestratorTaskId)
+            .single();
+
+          if (orchError) {
+            console.error(`[OrchestratorComplete] Error fetching orchestrator task ${orchestratorTaskId}:`, orchError);
+          } else if (!orchestratorTask) {
+            console.log(`[OrchestratorComplete] Orchestrator task ${orchestratorTaskId} not found`);
+          } else if (orchestratorTask.status === 'Complete') {
+            console.log(`[OrchestratorComplete] Orchestrator ${orchestratorTaskId} is already Complete`);
+          } else {
+            // Get expected segment count from orchestrator params
+            // For travel: num_new_segments_to_generate
+            // For join_clips: num_joins or (clip_list.length - 1)
+            let expectedSegmentCount: number | null = null;
+            
+            if (taskType === 'travel_segment') {
+              expectedSegmentCount = orchestratorTask.params?.orchestrator_details?.num_new_segments_to_generate ||
+                orchestratorTask.params?.num_new_segments_to_generate ||
+                null;
+            } else if (taskType === 'join_clips_segment') {
+              // For join_clips, expected joins = number of clips - 1
+              const clipList = orchestratorTask.params?.orchestrator_details?.clip_list;
+              if (Array.isArray(clipList) && clipList.length > 1) {
+                expectedSegmentCount = clipList.length - 1;
+              } else {
+                expectedSegmentCount = orchestratorTask.params?.orchestrator_details?.num_joins || null;
+              }
+            }
+
+            console.log(`[OrchestratorComplete] Orchestrator expects ${expectedSegmentCount ?? 'unknown'} segments`);
+
+            // Query all segment tasks that reference this orchestrator
+            // Try multiple strategies to find siblings
+            let allSegments: any[] | null = null;
+            let segmentsError: any = null;
+
+            // Strategy 1: Query by run_id (most reliable if available)
+            if (orchestratorRunId) {
+              console.log(`[OrchestratorComplete] Querying ${config.segmentType} by run_id: ${orchestratorRunId}`);
+              
+              // Build query with multiple JSONB path checks for run_id
+              const runIdQuery = supabaseAdmin
+                .from("tasks")
+                .select("id, status, params")
+                .eq("task_type", config.segmentType)
+                .eq("project_id", completedTask.project_id)
+                .or(`params->>orchestrator_run_id.eq.${orchestratorRunId},params->>run_id.eq.${orchestratorRunId},params->orchestrator_details->>run_id.eq.${orchestratorRunId}`);
+
+              const runIdResult = await runIdQuery;
+              allSegments = runIdResult.data;
+              segmentsError = runIdResult.error;
+              
+              if (allSegments && allSegments.length > 0) {
+                console.log(`[OrchestratorComplete] Found ${allSegments.length} segments via run_id query`);
+              }
+            }
+
+            // Strategy 2: Fallback to query by orchestrator_task_id if run_id query failed or found nothing
+            if ((!allSegments || allSegments.length === 0) && !segmentsError) {
+              console.log(`[OrchestratorComplete] run_id query returned no results, trying orchestrator_task_id: ${orchestratorTaskId}`);
+              
+              const orchIdQuery = supabaseAdmin
+                .from("tasks")
+                .select("id, status, params")
+                .eq("task_type", config.segmentType)
+                .eq("project_id", completedTask.project_id)
+                .or(`params->>orchestrator_task_id.eq.${orchestratorTaskId},params->>orchestrator_task_id_ref.eq.${orchestratorTaskId},params->orchestrator_details->>orchestrator_task_id.eq.${orchestratorTaskId}`);
+
+              const orchIdResult = await orchIdQuery;
+              allSegments = orchIdResult.data;
+              segmentsError = orchIdResult.error;
+              
+              if (allSegments && allSegments.length > 0) {
+                console.log(`[OrchestratorComplete] Found ${allSegments.length} segments via orchestrator_task_id query`);
+              }
+            }
+
+            // Log first segment's params structure for debugging (if found)
+            if (allSegments && allSegments.length > 0) {
+              const sampleParams = allSegments[0].params;
+              console.log(`[OrchestratorComplete] Sample segment params keys: ${Object.keys(sampleParams || {}).join(', ')}`);
+              if (sampleParams?.orchestrator_details) {
+                console.log(`[OrchestratorComplete] Sample segment orchestrator_details keys: ${Object.keys(sampleParams.orchestrator_details).join(', ')}`);
+              }
+            }
+
+            if (segmentsError) {
+              console.error(`[OrchestratorComplete] Error querying segments:`, segmentsError);
+            } else if (!allSegments || allSegments.length === 0) {
+              console.log(`[OrchestratorComplete] No segments found for orchestrator`);
+            } else {
+              const foundSegments = allSegments.length;
+              const completedSegments = allSegments.filter(s => s.status === 'Complete').length;
+              const failedSegments = allSegments.filter(s => s.status === 'Failed' || s.status === 'Cancelled').length;
+              const pendingSegments = foundSegments - completedSegments - failedSegments;
+
+              console.log(`[OrchestratorComplete] ${taskType} status: ${completedSegments} complete, ${failedSegments} failed, ${pendingSegments} pending (found ${foundSegments}, expected ${expectedSegmentCount ?? 'unknown'})`);
+
+              // Validate we have the expected number of segments (if known)
+              if (expectedSegmentCount !== null && foundSegments !== expectedSegmentCount) {
+                console.log(`[OrchestratorComplete] Warning: Found ${foundSegments} segments but expected ${expectedSegmentCount}. Waiting for all segments to be created.`);
+              } else if (pendingSegments > 0) {
+                console.log(`[OrchestratorComplete] Still waiting for ${pendingSegments} segments to complete`);
+              } else if (failedSegments > 0) {
+                // All segments finished but some failed - mark orchestrator as Failed
+                console.log(`[OrchestratorComplete] All segments finished but ${failedSegments} failed. Marking orchestrator ${orchestratorTaskId} as Failed`);
+
+                const { error: updateOrchError } = await supabaseAdmin
+                  .from("tasks")
+                  .update({
+                    status: "Failed",
+                    error_message: `${failedSegments} of ${foundSegments} segments failed`,
+                    generation_processed_at: new Date().toISOString()
+                  })
+                  .eq("id", orchestratorTaskId)
+                  .in("status", ["Queued", "In Progress"]); // Only update if not already terminal
+
+                if (updateOrchError) {
+                  console.error(`[OrchestratorComplete] Failed to mark orchestrator as Failed:`, updateOrchError);
+                } else {
+                  console.log(`[OrchestratorComplete] Marked orchestrator ${orchestratorTaskId} as Failed`);
+                }
+              } else if (completedSegments === foundSegments && (expectedSegmentCount === null || foundSegments === expectedSegmentCount)) {
+                // All segments complete! Mark orchestrator as Complete
+                console.log(`[OrchestratorComplete] All ${foundSegments} segments complete! Marking orchestrator ${orchestratorTaskId} as Complete`);
+
+                const { error: updateOrchError } = await supabaseAdmin
+                  .from("tasks")
+                  .update({
+                    status: "Complete",
+                    output_location: `All ${foundSegments} segments completed successfully`,
+                    generation_processed_at: new Date().toISOString()
+                  })
+                  .eq("id", orchestratorTaskId)
+                  .in("status", ["Queued", "In Progress"]); // Only update if not already terminal
+
+                if (updateOrchError) {
+                  console.error(`[OrchestratorComplete] Failed to mark orchestrator ${orchestratorTaskId} as Complete:`, updateOrchError);
+                } else {
+                  console.log(`[OrchestratorComplete] Successfully marked orchestrator ${orchestratorTaskId} as Complete`);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (orchCompleteErr) {
+      console.error("[OrchestratorComplete] Error checking orchestrator completion:", orchCompleteErr);
+      // Don't fail the main request - orchestrator completion is best-effort
+    }
+
     // 11) Calculate and record task cost (only for service role)
     if (isServiceRole) {
       try {
@@ -1017,10 +1120,7 @@ serve(async (req) => {
           .single();
 
         // Skip cost calculation for sub-tasks - parent orchestrator will be billed instead
-        // Check multiple locations for orchestrator reference (travel-between-images nests it in orchestrator_details)
-        const subTaskOrchestratorRef = taskForCostCheck?.params?.orchestrator_task_id_ref ||
-          taskForCostCheck?.params?.orchestrator_details?.orchestrator_task_id ||
-          taskForCostCheck?.params?.originalParams?.orchestrator_details?.orchestrator_task_id;
+        const subTaskOrchestratorRef = extractOrchestratorTaskId(taskForCostCheck?.params, 'CostCalc');
         if (subTaskOrchestratorRef) {
           console.log(`[COMPLETE-TASK-DEBUG] Task ${taskIdString} is a sub-task of orchestrator ${subTaskOrchestratorRef}, skipping cost calculation`);
         } else {
@@ -1075,6 +1175,100 @@ serve(async (req) => {
     });
   }
 });
+// ===== PARAM EXTRACTION HELPERS =====
+
+/**
+ * Configuration for where thumbnail_url should be stored based on task_type
+ */
+const THUMBNAIL_PATH_CONFIG: Record<string, { path: string[]; extras?: Record<string, any> }> = {
+  'travel_stitch': {
+    path: ['full_orchestrator_payload', 'thumbnail_url'],
+    extras: { accelerated: false } // Always hardcode accelerated=false for travel_stitch
+  },
+  'wan_2_2_i2v': {
+    path: ['orchestrator_details', 'thumbnail_url']
+  },
+  'single_image': {
+    path: ['thumbnail_url']
+  },
+  'default': {
+    path: ['thumbnail_url']
+  }
+};
+
+/**
+ * Set thumbnail URL in params at the correct location based on task_type
+ * @returns Updated params object (does not mutate original)
+ */
+function setThumbnailInParams(
+  params: Record<string, any>,
+  taskType: string,
+  thumbnailUrl: string
+): Record<string, any> {
+  const config = THUMBNAIL_PATH_CONFIG[taskType] || THUMBNAIL_PATH_CONFIG.default;
+  const updatedParams = JSON.parse(JSON.stringify(params || {})); // Deep clone
+
+  // Navigate to parent path and ensure it exists
+  let target = updatedParams;
+  for (let i = 0; i < config.path.length - 1; i++) {
+    const key = config.path[i];
+    if (!target[key]) {
+      target[key] = {};
+    }
+    target = target[key];
+  }
+
+  // Set the thumbnail URL
+  const finalKey = config.path[config.path.length - 1];
+  target[finalKey] = thumbnailUrl;
+
+  // Set any extras (e.g., accelerated=false for travel_stitch)
+  if (config.extras) {
+    for (const [key, value] of Object.entries(config.extras)) {
+      target[key] = value;
+    }
+  }
+
+  return updatedParams;
+}
+
+/**
+ * Extract orchestrator_task_id from task params
+ * Checks multiple possible locations where this field might be stored
+ */
+function extractOrchestratorTaskId(params: any, logTag: string = 'OrchestratorExtract'): string | null {
+  return extractFromParams(
+    params,
+    'orchestrator_task_id',
+    [
+      ['orchestrator_details', 'orchestrator_task_id'],
+      ['originalParams', 'orchestrator_details', 'orchestrator_task_id'],
+      ['orchestrator_task_id_ref'],
+      ['orchestrator_task_id'],
+    ],
+    logTag
+  );
+}
+
+/**
+ * Extract orchestrator run_id from task params
+ * Used for finding sibling segment tasks
+ */
+function extractOrchestratorRunId(params: any, logTag: string = 'OrchestratorExtract'): string | null {
+  return extractFromParams(
+    params,
+    'run_id',
+    [
+      ['orchestrator_run_id'],
+      ['run_id'],
+      ['orchestrator_details', 'run_id'],
+      ['originalParams', 'orchestrator_details', 'run_id'],
+      ['full_orchestrator_payload', 'run_id'],
+    ],
+    logTag
+  );
+}
+
 // ===== GENERATION HELPER FUNCTIONS =====
 
 /**
@@ -1402,11 +1596,7 @@ async function createGenerationFromTask(
     }
 
     // Check if this is a sub-task (segment)
-    // Check multiple locations for orchestrator reference (travel-between-images nests it in orchestrator_details)
-    const orchestratorTaskId = taskData.params?.orchestrator_task_id_ref || 
-      taskData.params?.orchestrator_task_id ||
-      taskData.params?.orchestrator_details?.orchestrator_task_id ||
-      taskData.params?.originalParams?.orchestrator_details?.orchestrator_task_id;
+    const orchestratorTaskId = extractOrchestratorTaskId(taskData.params, 'GenMigration');
     let parentGenerationId: string | null = null;
     let isChild = false;
     let childOrder: number | null = null;
