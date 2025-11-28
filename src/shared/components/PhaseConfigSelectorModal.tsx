@@ -20,9 +20,12 @@ import { toast } from "sonner";
 import { Switch } from "@/shared/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/shared/components/ui/alert-dialog";
-import { Info, X, Layers, Zap, Settings2, Trash2, Pencil } from 'lucide-react';
+import { Info, X, Layers, Zap, Settings2, Trash2, Pencil, RotateCcw, Search, Download } from 'lucide-react';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import { supabase } from '@/integrations/supabase/client';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/shared/components/ui/dropdown-menu";
+import { LoraModel, LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
+import { PREDEFINED_LORAS, getDisplayNameFromUrl } from '@/tools/travel-between-images/utils/loraDisplayUtils';
 import { Badge } from "@/shared/components/ui/badge";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
@@ -41,6 +44,7 @@ interface PhaseConfigSelectorModalProps {
   currentPhaseConfig?: PhaseConfig; // The current config (for "Save Current" feature)
   initialTab?: 'browse' | 'add-new'; // Which tab to open with
   intent?: 'load' | 'overwrite'; // Mode of operation
+  availableLoras?: LoraModel[]; // Available LoRAs for selection
   // Current settings to pre-populate the form
   currentSettings?: {
     textBeforePrompts?: string;
@@ -694,6 +698,7 @@ interface AddNewTabProps {
   editingPreset?: (Resource & { metadata: PhaseConfigMetadata }) | null;
   onClearEdit: () => void;
   isOverwriting?: boolean;
+  availableLoras?: LoraModel[];
   currentSettings?: {
     textBeforePrompts?: string;
     textAfterPrompts?: string;
@@ -757,7 +762,7 @@ const generatePresetName = (
   return parts.join(' - ');
 };
 
-const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false }) => {
+const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, onSwitchToBrowse, currentPhaseConfig, editingPreset, onClearEdit, currentSettings, isOverwriting = false, availableLoras = [] }) => {
   const isEditMode = !!editingPreset;
   
   console.log('[PresetAutoPopulate] AddNewTab received currentSettings:', currentSettings);
@@ -780,7 +785,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       textBeforePrompts: currentSettings?.textBeforePrompts || '',
       textAfterPrompts: currentSettings?.textAfterPrompts || '',
       enhancePrompt: currentSettings?.enhancePrompt ?? true,
-      durationFrames: currentSettings?.durationFrames || 105,
+      durationFrames: currentSettings?.durationFrames || 60,
     };
     console.log('[PresetAutoPopulate] AddNewTab initializing form state:', initialForm);
     return initialForm;
@@ -795,6 +800,39 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   const [initialVideoSample, setInitialVideoSample] = useState<string | null>(null);
   const [initialVideoDeleted, setInitialVideoDeleted] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Editable phase config state
+  const [editablePhaseConfig, setEditablePhaseConfig] = useState<PhaseConfig>(() => {
+    if (editingPreset?.metadata?.phaseConfig && !isOverwriting) {
+      return editingPreset.metadata.phaseConfig;
+    }
+    return currentPhaseConfig || DEFAULT_PHASE_CONFIG;
+  });
+  
+  // LoRA selector modal state
+  const [activePhaseForLoraSelection, setActivePhaseForLoraSelection] = useState<number | null>(null);
+  const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
+  const [focusedLoraInput, setFocusedLoraInput] = useState<string | null>(null);
+  
+  // Phase labels based on number of phases
+  const phaseLabels2 = ["High Noise Sampler", "Low Noise Sampler"];
+  const phaseLabels3 = ["High Noise Sampler 1", "High Noise Sampler 2", "Low Noise Sampler"];
+  const phaseLabels = editablePhaseConfig.num_phases === 2 ? phaseLabels2 : phaseLabels3;
+  
+  // Update editable phase config when editing preset changes or mode changes
+  useEffect(() => {
+    if (editingPreset?.metadata?.phaseConfig) {
+      if (!isOverwriting) {
+        setEditablePhaseConfig(editingPreset.metadata.phaseConfig);
+      } else {
+        setEditablePhaseConfig(currentPhaseConfig || DEFAULT_PHASE_CONFIG);
+      }
+    } else if (currentPhaseConfig) {
+      setEditablePhaseConfig(currentPhaseConfig);
+    } else {
+      setEditablePhaseConfig(DEFAULT_PHASE_CONFIG);
+    }
+  }, [editingPreset, isOverwriting, currentPhaseConfig]);
   
   // Update form from current settings when they change (and not editing)
   useEffect(() => {
@@ -818,7 +856,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         textBeforePrompts: currentSettings.textBeforePrompts || '',
         textAfterPrompts: currentSettings.textAfterPrompts || '',
         enhancePrompt: currentSettings.enhancePrompt ?? true,
-        durationFrames: currentSettings.durationFrames || 105,
+        durationFrames: currentSettings.durationFrames || 60,
       };
       console.log('[PresetAutoPopulate] AddNewTab updating form with:', newFields);
       
@@ -855,7 +893,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           textBeforePrompts: currentSettings.textBeforePrompts || '',
           textAfterPrompts: currentSettings.textAfterPrompts || '',
           enhancePrompt: currentSettings.enhancePrompt ?? true,
-          durationFrames: currentSettings.durationFrames || 105,
+          durationFrames: currentSettings.durationFrames || 60,
         });
         
         // When overwriting, we start with no samples (user can add new ones), 
@@ -886,7 +924,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           textBeforePrompts: metadata.textBeforePrompts || '',
           textAfterPrompts: metadata.textAfterPrompts || '',
           enhancePrompt: metadata.enhancePrompt ?? true,
-          durationFrames: metadata.durationFrames || 105,
+          durationFrames: metadata.durationFrames || 60,
         });
       }
       
@@ -951,16 +989,6 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
     fetchUserName();
   }, []);
   
-  // Calculate total steps from current config
-  const totalSteps = currentPhaseConfig?.steps_per_phase?.reduce((sum, steps) => sum + steps, 0) || 0;
-  
-  // Determine which config to display: preset's config when editing (not overwriting), current config otherwise
-  const displayConfig = (isEditMode && !isOverwriting && editingPreset) 
-    ? editingPreset.metadata.phaseConfig 
-    : currentPhaseConfig;
-  
-  const displayTotalSteps = displayConfig?.steps_per_phase?.reduce((sum, steps) => sum + steps, 0) || 0;
-
   const handleFormChange = (field: string, value: any) => {
     setAddForm(prev => ({ ...prev, [field]: value }));
   };
@@ -971,10 +999,8 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       return;
     }
     
-    // When editing, we can use the existing phase config from the preset
-    // When creating or overwriting, we need a current phase config
-    const phaseConfigToUse = (isEditMode && !isOverwriting) ? (editingPreset?.metadata.phaseConfig || currentPhaseConfig) : currentPhaseConfig;
-    if (!phaseConfigToUse) {
+    // Use the editable phase config (always available)
+    if (!editablePhaseConfig) {
       toast.error("No phase config available to save");
       return;
     }
@@ -1027,7 +1053,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       const presetMetadata: PhaseConfigMetadata = {
         name: addForm.name,
         description: addForm.description,
-        phaseConfig: phaseConfigToUse,
+        phaseConfig: editablePhaseConfig,
         created_by: {
           is_you: addForm.created_by_is_you,
           username: addForm.created_by_is_you ? undefined : addForm.created_by_username,
@@ -1070,8 +1096,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         textBeforePrompts: '',
         textAfterPrompts: '',
         enhancePrompt: true,
-        durationFrames: 105,
+        durationFrames: 60,
       });
+      setEditablePhaseConfig(currentPhaseConfig || DEFAULT_PHASE_CONFIG);
       setSampleFiles([]);
       setDeletedExistingSampleUrls([]);
       setMainGenerationIndex(0);
@@ -1117,8 +1144,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 textBeforePrompts: '',
                 textAfterPrompts: '',
                 enhancePrompt: true,
-                durationFrames: 105,
+                durationFrames: 60,
               });
+              setEditablePhaseConfig(currentPhaseConfig || DEFAULT_PHASE_CONFIG);
               setSampleFiles([]);
               setDeletedExistingSampleUrls([]);
               setMainGenerationIndex(0);
@@ -1161,9 +1189,37 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             />
           </div>
 
-          {/* Prompt Settings */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="created-by-you" 
+                checked={addForm.created_by_is_you}
+                onCheckedChange={(checked) => handleFormChange('created_by_is_you', checked)}
+              />
+              <Label htmlFor="created-by-you" className="font-normal text-sm">This is my creation</Label>
+            </div>
+            {!addForm.created_by_is_you && (
+              <Input 
+                placeholder="Creator's username" 
+                value={addForm.created_by_username} 
+                onChange={e => handleFormChange('created_by_username', e.target.value)} 
+                maxLength={30}
+                className="w-40"
+              />
+            )}
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="is-public" 
+                checked={addForm.is_public}
+                onCheckedChange={(checked) => handleFormChange('is_public', checked)}
+              />
+              <Label htmlFor="is-public" className="font-normal text-sm">Available to others</Label>
+            </div>
+          </div>
+
+          {/* Base Generation Settings */}
           <div className="space-y-3 pt-2 border-t">
-            <Label className="text-base font-semibold">Prompt Settings</Label>
+            <Label className="text-base font-semibold">Base Generation Settings</Label>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -1229,9 +1285,9 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               <div className="flex items-center gap-3">
                 <Slider
                   id="preset-duration"
-                  min={25}
-                  max={300}
-                  step={5}
+                  min={10}
+                  max={81}
+                  step={1}
                   value={[addForm.durationFrames]}
                   onValueChange={([value]) => handleFormChange('durationFrames', value)}
                   className="flex-1"
@@ -1243,10 +1299,383 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             </div>
           </div>
 
-          <div className="space-y-2">
+          {/* Editable Phase Configuration */}
+          <div className="space-y-3 pt-2 border-t">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-semibold">Phase Configuration</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditablePhaseConfig(DEFAULT_PHASE_CONFIG)}
+                className="h-7 text-xs"
+                type="button"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset to Default
+              </Button>
+            </div>
+            
+            {/* Global Settings */}
+            <Card className="bg-muted/20">
+              <CardContent className="pt-4 px-4 pb-4">
+                <p className="text-xs font-medium text-muted-foreground mb-3">Global Settings</p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Number of Phases */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-light">Number of Phases</Label>
+                    <RadioGroup
+                      value={String(editablePhaseConfig.num_phases)}
+                      onValueChange={(value) => {
+                        const newNumPhases = parseInt(value);
+                        const currentPhases = editablePhaseConfig.phases || [];
+                        const currentSteps = editablePhaseConfig.steps_per_phase || [];
+                        
+                        let newPhases = currentPhases.slice(0, newNumPhases);
+                        let newSteps = currentSteps.slice(0, newNumPhases);
+                        
+                        while (newPhases.length < newNumPhases) {
+                          newPhases.push({
+                            phase: newPhases.length + 1,
+                            guidance_scale: 1.0,
+                            loras: []
+                          });
+                        }
+                        
+                        while (newSteps.length < newNumPhases) {
+                          newSteps.push(2);
+                        }
+                        
+                        setEditablePhaseConfig({
+                          ...editablePhaseConfig,
+                          num_phases: newNumPhases,
+                          phases: newPhases,
+                          steps_per_phase: newSteps,
+                          model_switch_phase: newNumPhases === 2 ? 1 : editablePhaseConfig.model_switch_phase
+                        });
+                      }}
+                      className="flex flex-row gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="2" id="preset-phases-2" />
+                        <Label htmlFor="preset-phases-2" className="text-sm">2</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="3" id="preset-phases-3" />
+                        <Label htmlFor="preset-phases-3" className="text-sm">3</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {/* Sample Solver */}
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-light">Sample Solver</Label>
+                    <RadioGroup
+                      value={editablePhaseConfig.sample_solver}
+                      onValueChange={(value) => setEditablePhaseConfig({
+                        ...editablePhaseConfig,
+                        sample_solver: value
+                      })}
+                      className="flex flex-row gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="euler" id="preset-euler" />
+                        <Label htmlFor="preset-euler" className="text-sm">Euler</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="unipc" id="preset-unipc" />
+                        <Label htmlFor="preset-unipc" className="text-sm">UniPC</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="dpm++" id="preset-dpm" />
+                        <Label htmlFor="preset-dpm" className="text-sm">DPM++</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+
+                {/* Flow Shift */}
+                <div className="space-y-1.5 mt-4">
+                  <Label className="text-sm font-light">
+                    Flow Shift: {editablePhaseConfig.flow_shift}
+                  </Label>
+                  <Slider
+                    min={1}
+                    max={10}
+                    step={0.1}
+                    value={[editablePhaseConfig.flow_shift]}
+                    onValueChange={(value) => setEditablePhaseConfig({
+                      ...editablePhaseConfig,
+                      flow_shift: value[0]
+                    })}
+                  />
+                </div>
+
+                {/* Total Steps Display */}
+                <div className="text-sm text-muted-foreground pt-3 mt-3 border-t">
+                  Total Steps: {editablePhaseConfig.steps_per_phase.reduce((a, b) => a + b, 0)}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Per-Phase Settings */}
+            {editablePhaseConfig.phases.map((phase, phaseIdx) => (
+              <Card key={phaseIdx} className="bg-muted/30">
+                <CardContent className="pt-4 px-4 pb-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">
+                    {phaseLabels[phaseIdx] || `Phase ${phase.phase}`}
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Left: Steps and Guidance */}
+                    <div className="space-y-3">
+                      {/* Steps */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-light">
+                          Steps: {editablePhaseConfig.steps_per_phase[phaseIdx]}
+                        </Label>
+                        <Slider
+                          min={1}
+                          max={15}
+                          step={1}
+                          value={[editablePhaseConfig.steps_per_phase[phaseIdx]]}
+                          onValueChange={(value) => {
+                            const newSteps = [...editablePhaseConfig.steps_per_phase];
+                            newSteps[phaseIdx] = value[0];
+                            setEditablePhaseConfig({
+                              ...editablePhaseConfig,
+                              steps_per_phase: newSteps
+                            });
+                          }}
+                        />
+                      </div>
+
+                      {/* Guidance Scale */}
+                      <div className="space-y-1.5">
+                        <Label className="text-sm font-light">Guidance Scale</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          value={phase.guidance_scale}
+                          onChange={(e) => {
+                            const newPhases = [...editablePhaseConfig.phases];
+                            newPhases[phaseIdx] = {
+                              ...newPhases[phaseIdx],
+                              guidance_scale: parseFloat(e.target.value) || 0
+                            };
+                            setEditablePhaseConfig({
+                              ...editablePhaseConfig,
+                              phases: newPhases
+                            });
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right: LoRAs (spans 2 columns) */}
+                    <div className="sm:col-span-2">
+                      <Label className="text-sm font-medium mb-1.5 block">LoRAs</Label>
+                      <div className="grid grid-cols-2 gap-2 mb-1.5 w-full">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setActivePhaseForLoraSelection(phaseIdx);
+                            setIsLoraModalOpen(true);
+                          }}
+                          type="button"
+                        >
+                          <Search className="h-3 w-3 mr-1" /> Search
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              type="button"
+                            >
+                              <Download className="h-3 w-3 mr-1" /> Utility
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-72">
+                            {Object.entries(
+                              PREDEFINED_LORAS.reduce((acc, lora) => {
+                                if (!acc[lora.category]) acc[lora.category] = [];
+                                acc[lora.category].push(lora);
+                                return acc;
+                              }, {} as Record<string, typeof PREDEFINED_LORAS>)
+                            ).map(([category, loras], idx) => (
+                              <React.Fragment key={category}>
+                                {idx > 0 && <DropdownMenuSeparator />}
+                                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
+                                  {category}
+                                </DropdownMenuLabel>
+                                {loras.map((predefinedLora) => (
+                                  <DropdownMenuItem
+                                    key={predefinedLora.url}
+                                    onClick={() => {
+                                      const newPhases = [...editablePhaseConfig.phases];
+                                      newPhases[phaseIdx] = { 
+                                        ...newPhases[phaseIdx],
+                                        loras: newPhases[phaseIdx].loras.filter(l => l.url && l.url.trim() !== "")
+                                      };
+                                      newPhases[phaseIdx].loras.push({
+                                        url: predefinedLora.url,
+                                        multiplier: "1.0"
+                                      });
+                                      setEditablePhaseConfig({
+                                        ...editablePhaseConfig,
+                                        phases: newPhases
+                                      });
+                                    }}
+                                    className="text-xs"
+                                  >
+                                    {predefinedLora.name}
+                                  </DropdownMenuItem>
+                                ))}
+                              </React.Fragment>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      
+                      {phase.loras.map((lora, loraIdx) => {
+                        const inputId = `preset-lora-${phaseIdx}-${loraIdx}`;
+                        const isFocused = focusedLoraInput === inputId;
+                        return (
+                          <div key={loraIdx} className="flex items-center gap-2 mb-1.5">
+                            <div className="relative flex-1 min-w-0">
+                              <Input
+                                placeholder="LoRA URL"
+                                value={isFocused ? lora.url : getDisplayNameFromUrl(lora.url, availableLoras)}
+                                onChange={(e) => {
+                                  const newPhases = [...editablePhaseConfig.phases];
+                                  newPhases[phaseIdx].loras[loraIdx].url = e.target.value;
+                                  setEditablePhaseConfig({
+                                    ...editablePhaseConfig,
+                                    phases: newPhases
+                                  });
+                                }}
+                                onFocus={() => setFocusedLoraInput(inputId)}
+                                onBlur={() => setFocusedLoraInput(null)}
+                                className="pr-8"
+                                title={lora.url}
+                              />
+                              <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={() => {
+                                    const newPhases = [...editablePhaseConfig.phases];
+                                    newPhases[phaseIdx].loras.splice(loraIdx, 1);
+                                    setEditablePhaseConfig({
+                                      ...editablePhaseConfig,
+                                      phases: newPhases
+                                    });
+                                  }}
+                                  type="button"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <Input
+                              type="number"
+                              placeholder="Multiplier"
+                              value={lora.multiplier}
+                              min={0}
+                              max={2}
+                              step={0.1}
+                              onChange={(e) => {
+                                const newPhases = [...editablePhaseConfig.phases];
+                                newPhases[phaseIdx].loras[loraIdx].multiplier = e.target.value;
+                                setEditablePhaseConfig({
+                                  ...editablePhaseConfig,
+                                  phases: newPhases
+                                });
+                              }}
+                              className="w-16 sm:w-20 flex-shrink-0 text-center"
+                            />
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Add LoRA button */}
+                      <button
+                        onClick={() => {
+                          const newPhases = [...editablePhaseConfig.phases];
+                          newPhases[phaseIdx] = { 
+                            ...newPhases[phaseIdx],
+                            loras: newPhases[phaseIdx].loras.filter(l => l.url && l.url.trim() !== "")
+                          };
+                          newPhases[phaseIdx].loras.push({
+                            url: "",
+                            multiplier: "1.0"
+                          });
+                          setEditablePhaseConfig({
+                            ...editablePhaseConfig,
+                            phases: newPhases
+                          });
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground underline cursor-pointer"
+                        type="button"
+                      >
+                        + Add LoRA
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* LoRA Selector Modal */}
+          <LoraSelectorModal
+            isOpen={isLoraModalOpen}
+            onClose={() => {
+              setIsLoraModalOpen(false);
+              setActivePhaseForLoraSelection(null);
+            }}
+            selectedLoras={[]}
+            loras={availableLoras || []}
+            onAddLora={(lora) => {
+              if (activePhaseForLoraSelection !== null) {
+                const loraUrl = ((lora as any).huggingface_url as string) || '';
+                const newPhases = [...editablePhaseConfig.phases];
+                newPhases[activePhaseForLoraSelection] = { 
+                  ...newPhases[activePhaseForLoraSelection],
+                  loras: newPhases[activePhaseForLoraSelection].loras.filter(l => l.url && l.url.trim() !== "")
+                };
+                newPhases[activePhaseForLoraSelection].loras.push({
+                  url: loraUrl,
+                  multiplier: "1.0"
+                });
+                setEditablePhaseConfig({
+                  ...editablePhaseConfig,
+                  phases: newPhases
+                });
+                setIsLoraModalOpen(false);
+                setActivePhaseForLoraSelection(null);
+              }
+            }}
+            onRemoveLora={() => {}}
+            onUpdateLoraStrength={() => {}}
+            lora_type="Wan 2.1 14b"
+          />
+
+          {/* Sample Generations Section */}
+          <div className="space-y-3 pt-2 border-t">
+            <Label className="text-base font-semibold">Sample Generations</Label>
+            <p className="text-sm text-muted-foreground">
+              Add sample images or videos to showcase what this preset can generate.
+            </p>
+            
             {/* Display existing samples when editing */}
             {isEditMode && editingPreset?.metadata.sample_generations && editingPreset.metadata.sample_generations.length > 0 && (
-              <div className="space-y-2 mb-3">
+              <div className="space-y-2">
                 <Label className="text-sm font-light">Existing Samples ({editingPreset.metadata.sample_generations.filter(s => !deletedExistingSampleUrls.includes(s.url)).length})</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {editingPreset.metadata.sample_generations
@@ -1315,7 +1744,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
 
             {/* Display initial video sample from last generation (when not editing OR overwriting) */}
             {(!isEditMode || isOverwriting) && initialVideoSample && !initialVideoDeleted && (
-              <div className="space-y-2 mb-3">
+              <div className="space-y-2">
                 <Label className="text-sm font-light">Last Generated Video (auto-included)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <div className="relative group">
@@ -1367,7 +1796,7 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               }}
               acceptTypes={['image', 'video']}
               multiple={true}
-              label={isEditMode ? "Add more sample images/videos (optional)" : "Upload sample images/videos (optional)"}
+              label={isEditMode ? "Add more sample images/videos" : "Upload sample images/videos"}
             />
             
             {/* Display uploaded files */}
@@ -1464,99 +1893,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
               </div>
             )}
           </div>
-
-          <div className="space-y-2 pt-2 border-t">
-            <Label>
-              {isEditMode && !isOverwriting ? "Preset's Phase Configuration *" : "Current Phase Configuration *"}
-            </Label>
-            {displayConfig ? (
-              <div className="p-3 bg-accent/20 rounded-lg border space-y-2">
-                <p className="text-sm font-medium">
-                  {isOverwriting 
-                    ? "New configuration to be saved:" 
-                    : isEditMode 
-                      ? "This preset contains the following configuration:"
-                      : "This preset will save your current configuration:"}
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Phases:</span>
-                    <span className="ml-1 font-medium">{displayConfig.num_phases}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Total Steps:</span>
-                    <span className="ml-1 font-medium">{displayTotalSteps}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Solver:</span>
-                    <span className="ml-1 font-medium capitalize">{displayConfig.sample_solver}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Flow Shift:</span>
-                    <span className="ml-1 font-medium">{displayConfig.flow_shift}</span>
-                  </div>
-                </div>
-                {displayConfig.phases && displayConfig.phases.length > 0 && (
-                  <div className="pt-2 border-t space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Phase Details:</p>
-                    {displayConfig.phases.map((phase, idx) => (
-                      <div key={idx} className="text-xs flex items-center gap-2">
-                        <span className="font-medium">Phase {phase.phase}:</span>
-                        <span>Guidance {phase.guidance_scale}</span>
-                        <span>• Steps {displayConfig.steps_per_phase?.[idx] || 0}</span>
-                        {phase.loras && phase.loras.length > 0 && (
-                          <span className="text-muted-foreground">• {phase.loras.length} LoRA{phase.loras.length > 1 ? 's' : ''}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-3 bg-muted/30 rounded-lg border border-dashed">
-                <p className="text-sm text-muted-foreground">No phase configuration available. Enable Advanced Mode and configure your phases first.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label>Created By</Label>
-            <div className="flex items-center space-x-2 mb-2">
-              <Checkbox 
-                id="created-by-you" 
-                checked={addForm.created_by_is_you}
-                onCheckedChange={(checked) => handleFormChange('created_by_is_you', checked)}
-              />
-              <Label htmlFor="created-by-you" className="font-normal">This is my creation</Label>
-            </div>
-            {!addForm.created_by_is_you && (
-              <Input 
-                placeholder="Creator's username" 
-                value={addForm.created_by_username} 
-                onChange={e => handleFormChange('created_by_username', e.target.value)} 
-                maxLength={30}
-              />
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="is-public" 
-              checked={addForm.is_public}
-              onCheckedChange={(checked) => handleFormChange('is_public', checked)}
-            />
-            <Label htmlFor="is-public">Available to others</Label>
-          </div>
         </CardContent>
         <ItemCardFooter>
-          <Button 
-            onClick={handleAddPresetFromForm}
-            disabled={
-              isSubmitting || 
-              !addForm.name.trim() || 
-              ((!isEditMode || isOverwriting) && !currentPhaseConfig)
-            }
-          >
+            <Button 
+              onClick={handleAddPresetFromForm}
+              disabled={isSubmitting || !addForm.name.trim()}
+            >
             {isSubmitting 
               ? (isEditMode ? 'Saving Changes...' : 'Creating Preset...') 
               : (isEditMode ? (isOverwriting ? 'Overwrite Preset' : 'Save Changes') : 'Create Preset')
@@ -1577,7 +1919,8 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
   currentPhaseConfig,
   initialTab = 'browse',
   currentSettings,
-  intent = 'load'
+  intent = 'load',
+  availableLoras = []
 }) => {
   console.log('[PresetAutoPopulate] PhaseConfigSelectorModal rendered:', { isOpen, currentSettings });
   
@@ -1726,6 +2069,7 @@ export const PhaseConfigSelectorModal: React.FC<PhaseConfigSelectorModalProps> =
                   onClearEdit={handleClearEdit}
                   currentSettings={currentSettings}
                   isOverwriting={isOverwriting}
+                  availableLoras={availableLoras}
                 />
               </TabsContent>
             </Tabs>

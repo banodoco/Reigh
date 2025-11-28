@@ -592,6 +592,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
         initialTab={presetModalTab}
         currentSettings={currentSettings}
         intent={modalIntent}
+        availableLoras={availableLoras}
       />
     </div>
   );
