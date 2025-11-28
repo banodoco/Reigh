@@ -134,6 +134,7 @@ export async function fetchGenerations(
       thumbnail_url,
       type,
       created_at,
+      updated_at,
       params,
       starred,
       tasks,

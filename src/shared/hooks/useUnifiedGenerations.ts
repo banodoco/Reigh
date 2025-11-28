@@ -13,6 +13,7 @@ export interface GenerationWithTask extends GeneratedImageWithMetadata {
   taskData?: any; // Full task object when fetched
   shotImageEntryId?: string; // For shot-specific operations
   position?: number | null;
+  updatedAt?: string | null; // For timestamp display (prefer over createdAt)
 }
 
 // Hook configuration for different use cases
@@ -123,6 +124,7 @@ async function fetchShotSpecificGenerations({
       thumbnail_url,
       type,
       created_at,
+      updated_at,
       params,
       starred,
       upscaled_url,
@@ -210,6 +212,7 @@ async function fetchShotSpecificGenerations({
         prompt: metadata?.prompt || metadata?.originalParams?.prompt || '',
         metadata,
         createdAt: gen.created_at,
+        updatedAt: gen.updated_at, // Include updated_at for timestamp display
         isVideo,
         starred: gen.starred || false,
         upscaledUrl: gen.upscaled_url,

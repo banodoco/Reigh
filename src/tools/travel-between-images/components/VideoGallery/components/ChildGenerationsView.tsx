@@ -141,6 +141,8 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         }
         
         return items.map((item: any) => {
+            // Use updated_at for timestamp display (when video was generated), fallback to created_at
+            const timestampToShow = item.updatedAt || item.updated_at || item.createdAt || item.created_at;
             const transformed = {
                 ...item,
                 // Map GeneratedImageWithMetadata format to GenerationRow format
@@ -148,7 +150,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                 imageUrl: item.url || item.imageUrl,
                 thumbUrl: item.thumbUrl || item.thumbnail_url || item.url || item.location, // Explicitly map thumbUrl
                 params: item.metadata || item.params, // params are stored in metadata by transformer
-                created_at: item.createdAt || item.created_at,
+                created_at: timestampToShow, // Show when video was generated, not when parent was created
             };
             
             // Debug first transformed item

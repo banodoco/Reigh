@@ -61,7 +61,8 @@ export const transformUnifiedGenerationsData = (items: any[]): GenerationRow[] =
     location: item.url,
     thumbUrl: item.thumbUrl,
     type: item.isVideo ? 'video_travel_output' : 'single_image',
-    created_at: item.createdAt,
+    // Use updated_at for timestamp display (when video was generated), fallback to created_at
+    created_at: item.updatedAt || item.createdAt,
     metadata: item.metadata,
     // Deprecated (backwards compat) - use item.id instead
     shotImageEntryId: item.id,
