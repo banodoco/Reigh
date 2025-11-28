@@ -24,6 +24,7 @@ import { useLoraManager, type LoraModel, type ActiveLora } from '@/shared/hooks/
 import { useListPublicResources } from '@/shared/hooks/useResources';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { usePanes } from '@/shared/contexts/PanesContext';
 import { MotionControl } from '@/tools/travel-between-images/components/MotionControl';
 import { PhaseConfig, DEFAULT_PHASE_CONFIG } from '@/tools/travel-between-images/settings';
 import { createMobileTapHandler, deriveInputImages } from '../utils/gallery-utils';
@@ -52,6 +53,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [isParentLightboxOpen, setIsParentLightboxOpen] = useState(false);
     const isMobile = useIsMobile();
+    const { isTasksPaneLocked, tasksPaneWidth, isShotsPaneLocked, shotsPaneWidth } = usePanes();
     
     // Refs for mobile double-tap detection
     const lastTouchTimeRef = React.useRef<number>(0);
@@ -421,8 +423,18 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
 
     return (
         <div className="w-full min-h-screen">
-            {/* Header */}
-            <div className="sticky top-0 md:top-24 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50 w-[100vw] ml-[calc(50%-50vw)]">
+            {/* Header - sticky with full-width background that respects panes */}
+            <div 
+                className="sticky top-[60px] md:top-24 z-30 bg-background/95 backdrop-blur-sm border-b border-border/50"
+                style={{
+                    // Extend background to edges using negative margins, accounting for panes
+                    marginLeft: `calc(-50vw + 50% + ${isShotsPaneLocked ? shotsPaneWidth / 2 : 0}px)`,
+                    marginRight: `calc(-50vw + 50% + ${isTasksPaneLocked ? tasksPaneWidth / 2 : 0}px)`,
+                    // Pad content back to original position
+                    paddingLeft: `calc(50vw - 50% - ${isShotsPaneLocked ? shotsPaneWidth / 2 : 0}px)`,
+                    paddingRight: `calc(50vw - 50% - ${isTasksPaneLocked ? tasksPaneWidth / 2 : 0}px)`,
+                }}
+            >
                 <div className="max-w-7xl mx-auto px-4 pt-4 pb-3">
                     <div className="flex items-center gap-4">
                         <Button

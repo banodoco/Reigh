@@ -22,6 +22,14 @@ export interface PhaseConfigMetadata {
         alt_text?: string;
     }[];
     main_generation?: string;
+    // Prompt and generation settings
+    basePrompt?: string;
+    negativePrompt?: string;
+    textBeforePrompts?: string;
+    textAfterPrompts?: string;
+    enhancePrompt?: boolean;
+    durationFrames?: number;
+    selectedLoras?: Array<{ id: string; name: string; strength: number }>;
 }
 
 export interface StyleReferenceMetadata {

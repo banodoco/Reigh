@@ -17,6 +17,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/shared/components/ui/radio-group";
 import { toast } from "sonner";
+import { Switch } from "@/shared/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/shared/components/ui/alert-dialog";
 import { Info, X, Layers, Zap, Settings2, Trash2, Pencil } from 'lucide-react';
@@ -26,7 +27,7 @@ import { Badge } from "@/shared/components/ui/badge";
 import FileInput from "@/shared/components/FileInput";
 import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import HoverScrubVideo from '@/shared/components/HoverScrubVideo';
-import { framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
+import { framesToSecondsValue } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 import { Slider } from "@/shared/components/ui/slider";
 
 type SortOption = 'default' | 'newest' | 'oldest' | 'mostUsed' | 'name';
@@ -560,6 +561,35 @@ const BrowsePresetsTab: React.FC<BrowsePresetsTabProps> = ({
                       </div>
                     )}
 
+                    {/* Prompt Preview */}
+                    {(metadata.basePrompt || metadata.textBeforePrompts || metadata.textAfterPrompts || metadata.durationFrames) && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <p className="text-xs font-medium text-muted-foreground">Prompt Settings:</p>
+                        {metadata.basePrompt && (
+                          <div className="text-xs">
+                            <span className="font-medium">Base Prompt: </span>
+                            <span className="text-muted-foreground line-clamp-2">{metadata.basePrompt}</span>
+                          </div>
+                        )}
+                        {(metadata.textBeforePrompts || metadata.textAfterPrompts) && (
+                          <div className="text-xs flex gap-2">
+                            {metadata.textBeforePrompts && (
+                              <span className="text-muted-foreground">Before: "{metadata.textBeforePrompts}"</span>
+                            )}
+                            {metadata.textAfterPrompts && (
+                              <span className="text-muted-foreground">After: "{metadata.textAfterPrompts}"</span>
+                            )}
+                          </div>
+                        )}
+                        {metadata.durationFrames && (
+                          <div className="text-xs">
+                            <span className="font-medium">Suggested duration: </span>
+                            <span className="text-muted-foreground">{metadata.durationFrames} frames ({framesToSecondsValue(metadata.durationFrames).toFixed(1)}s)</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Config Preview */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t">
                       <div className="flex items-center gap-1.5">
@@ -745,6 +775,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       created_by_is_you: true,
       created_by_username: '',
       is_public: true,
+      basePrompt: currentSettings?.basePrompt || '',
+      negativePrompt: currentSettings?.negativePrompt || '',
+      textBeforePrompts: currentSettings?.textBeforePrompts || '',
+      textAfterPrompts: currentSettings?.textAfterPrompts || '',
+      enhancePrompt: currentSettings?.enhancePrompt ?? true,
+      durationFrames: currentSettings?.durationFrames || 105,
     };
     console.log('[PresetAutoPopulate] AddNewTab initializing form state:', initialForm);
     return initialForm;
@@ -777,6 +813,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
       
       const newFields = {
         name: generatedName, // Auto-generate name
+        basePrompt: currentSettings.basePrompt || '',
+        negativePrompt: currentSettings.negativePrompt || '',
+        textBeforePrompts: currentSettings.textBeforePrompts || '',
+        textAfterPrompts: currentSettings.textAfterPrompts || '',
+        enhancePrompt: currentSettings.enhancePrompt ?? true,
+        durationFrames: currentSettings.durationFrames || 105,
       };
       console.log('[PresetAutoPopulate] AddNewTab updating form with:', newFields);
       
@@ -808,6 +850,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           created_by_is_you: metadata.created_by?.is_you ?? true,
           created_by_username: metadata.created_by?.username || '',
           is_public: metadata.is_public ?? true,
+          basePrompt: currentSettings.basePrompt || '',
+          negativePrompt: currentSettings.negativePrompt || '',
+          textBeforePrompts: currentSettings.textBeforePrompts || '',
+          textAfterPrompts: currentSettings.textAfterPrompts || '',
+          enhancePrompt: currentSettings.enhancePrompt ?? true,
+          durationFrames: currentSettings.durationFrames || 105,
         });
         
         // When overwriting, we start with no samples (user can add new ones), 
@@ -833,6 +881,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           created_by_is_you: metadata.created_by?.is_you ?? true,
           created_by_username: metadata.created_by?.username || '',
           is_public: metadata.is_public ?? true,
+          basePrompt: metadata.basePrompt || '',
+          negativePrompt: metadata.negativePrompt || '',
+          textBeforePrompts: metadata.textBeforePrompts || '',
+          textAfterPrompts: metadata.textAfterPrompts || '',
+          enhancePrompt: metadata.enhancePrompt ?? true,
+          durationFrames: metadata.durationFrames || 105,
         });
       }
       
@@ -899,6 +953,13 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
   
   // Calculate total steps from current config
   const totalSteps = currentPhaseConfig?.steps_per_phase?.reduce((sum, steps) => sum + steps, 0) || 0;
+  
+  // Determine which config to display: preset's config when editing (not overwriting), current config otherwise
+  const displayConfig = (isEditMode && !isOverwriting && editingPreset) 
+    ? editingPreset.metadata.phaseConfig 
+    : currentPhaseConfig;
+  
+  const displayTotalSteps = displayConfig?.steps_per_phase?.reduce((sum, steps) => sum + steps, 0) || 0;
 
   const handleFormChange = (field: string, value: any) => {
     setAddForm(prev => ({ ...prev, [field]: value }));
@@ -976,6 +1037,14 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         main_generation: mainGeneration,
         use_count: isEditMode ? (editingPreset?.metadata.use_count || 0) : 0,
         created_at: isEditMode ? (editingPreset?.metadata.created_at || new Date().toISOString()) : new Date().toISOString(),
+        // Prompt and generation settings
+        basePrompt: addForm.basePrompt || undefined,
+        negativePrompt: addForm.negativePrompt || undefined,
+        textBeforePrompts: addForm.textBeforePrompts || undefined,
+        textAfterPrompts: addForm.textAfterPrompts || undefined,
+        enhancePrompt: addForm.enhancePrompt,
+        durationFrames: addForm.durationFrames,
+        selectedLoras: currentSettings?.selectedLoras,
       };
 
       if (isEditMode && editingPreset) {
@@ -996,6 +1065,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
         created_by_is_you: true,
         created_by_username: '',
         is_public: true,
+        basePrompt: '',
+        negativePrompt: '',
+        textBeforePrompts: '',
+        textAfterPrompts: '',
+        enhancePrompt: true,
+        durationFrames: 105,
       });
       setSampleFiles([]);
       setDeletedExistingSampleUrls([]);
@@ -1037,6 +1112,12 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
                 created_by_is_you: true,
                 created_by_username: '',
                 is_public: true,
+                basePrompt: '',
+                negativePrompt: '',
+                textBeforePrompts: '',
+                textAfterPrompts: '',
+                enhancePrompt: true,
+                durationFrames: 105,
               });
               setSampleFiles([]);
               setDeletedExistingSampleUrls([]);
@@ -1080,6 +1161,87 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
             />
           </div>
 
+          {/* Prompt Settings */}
+          <div className="space-y-3 pt-2 border-t">
+            <Label className="text-base font-semibold">Prompt Settings</Label>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="preset-base-prompt">Base Prompt</Label>
+                <Textarea 
+                  id="preset-base-prompt" 
+                  placeholder="Enter the main prompt for this preset..." 
+                  value={addForm.basePrompt} 
+                  onChange={e => handleFormChange('basePrompt', e.target.value)} 
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="preset-negative-prompt">Negative Prompt</Label>
+                <Textarea 
+                  id="preset-negative-prompt" 
+                  placeholder="Enter negative prompt..." 
+                  value={addForm.negativePrompt} 
+                  onChange={e => handleFormChange('negativePrompt', e.target.value)} 
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
+              <Switch 
+                id="preset-enhance" 
+                checked={addForm.enhancePrompt}
+                onCheckedChange={(checked) => handleFormChange('enhancePrompt', checked)}
+              />
+              <div className="flex-1">
+                <Label htmlFor="preset-enhance" className="font-medium">
+                  Enhance/Create Prompts
+                </Label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="preset-text-before">Text Before Prompts</Label>
+                <Input 
+                  id="preset-text-before" 
+                  placeholder="Prefix text..." 
+                  value={addForm.textBeforePrompts} 
+                  onChange={e => handleFormChange('textBeforePrompts', e.target.value)} 
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="preset-text-after">Text After Prompts</Label>
+                <Input 
+                  id="preset-text-after" 
+                  placeholder="Suffix text..." 
+                  value={addForm.textAfterPrompts} 
+                  onChange={e => handleFormChange('textAfterPrompts', e.target.value)} 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="preset-duration">Suggested duration</Label>
+              <div className="flex items-center gap-3">
+                <Slider
+                  id="preset-duration"
+                  min={25}
+                  max={300}
+                  step={5}
+                  value={[addForm.durationFrames]}
+                  onValueChange={([value]) => handleFormChange('durationFrames', value)}
+                  className="flex-1"
+                />
+                <span className="text-sm font-medium w-16 text-right">
+                  {addForm.durationFrames} ({framesToSecondsValue(addForm.durationFrames).toFixed(1)}s)
+                </span>
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-2">
             {/* Display existing samples when editing */}
@@ -1304,38 +1466,44 @@ const AddNewTab: React.FC<AddNewTabProps> = ({ createResource, updateResource, o
           </div>
 
           <div className="space-y-2 pt-2 border-t">
-            <Label>Current Phase Configuration *</Label>
-            {currentPhaseConfig ? (
+            <Label>
+              {isEditMode && !isOverwriting ? "Preset's Phase Configuration *" : "Current Phase Configuration *"}
+            </Label>
+            {displayConfig ? (
               <div className="p-3 bg-accent/20 rounded-lg border space-y-2">
                 <p className="text-sm font-medium">
-                  {isOverwriting ? "New configuration to be saved:" : "This preset will save your current configuration:"}
+                  {isOverwriting 
+                    ? "New configuration to be saved:" 
+                    : isEditMode 
+                      ? "This preset contains the following configuration:"
+                      : "This preset will save your current configuration:"}
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-muted-foreground">Phases:</span>
-                    <span className="ml-1 font-medium">{currentPhaseConfig.num_phases}</span>
+                    <span className="ml-1 font-medium">{displayConfig.num_phases}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Total Steps:</span>
-                    <span className="ml-1 font-medium">{totalSteps}</span>
+                    <span className="ml-1 font-medium">{displayTotalSteps}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Solver:</span>
-                    <span className="ml-1 font-medium capitalize">{currentPhaseConfig.sample_solver}</span>
+                    <span className="ml-1 font-medium capitalize">{displayConfig.sample_solver}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Flow Shift:</span>
-                    <span className="ml-1 font-medium">{currentPhaseConfig.flow_shift}</span>
+                    <span className="ml-1 font-medium">{displayConfig.flow_shift}</span>
                   </div>
                 </div>
-                {currentPhaseConfig.phases && currentPhaseConfig.phases.length > 0 && (
+                {displayConfig.phases && displayConfig.phases.length > 0 && (
                   <div className="pt-2 border-t space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">Phase Details:</p>
-                    {currentPhaseConfig.phases.map((phase, idx) => (
+                    {displayConfig.phases.map((phase, idx) => (
                       <div key={idx} className="text-xs flex items-center gap-2">
                         <span className="font-medium">Phase {phase.phase}:</span>
                         <span>Guidance {phase.guidance_scale}</span>
-                        <span>• Steps {currentPhaseConfig.steps_per_phase?.[idx] || 0}</span>
+                        <span>• Steps {displayConfig.steps_per_phase?.[idx] || 0}</span>
                         {phase.loras && phase.loras.length > 0 && (
                           <span className="text-muted-foreground">• {phase.loras.length} LoRA{phase.loras.length > 1 ? 's' : ''}</span>
                         )}
