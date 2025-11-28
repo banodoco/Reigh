@@ -385,7 +385,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     return (
         <div className="w-full min-h-screen">
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
+            <div className="sticky top-0 md:top-24 z-40 bg-background/95 backdrop-blur-sm border-b border-border/50 w-[100vw] ml-[calc(50%-50vw)]">
                 <div className="max-w-7xl mx-auto px-4 pt-4 pb-3">
                     <div className="flex items-center gap-4">
                         <Button
