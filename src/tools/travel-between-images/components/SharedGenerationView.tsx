@@ -479,7 +479,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                   structureVideoMotionStrength={taskSettings.motion}
                   structureVideoType="flow"
                   onStructureVideoChange={() => {}} // Read-only
-                  autoCreateIndividualPrompts={false}
                   onSelectionChange={() => {}} // Read-only
                 />
               </div>
@@ -532,8 +531,6 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                     selectedPhasePresetId={null}
                     onPhasePresetSelect={() => {}} // No-op
                     onPhasePresetRemove={() => {}} // No-op
-                    autoCreateIndividualPrompts={false}
-                    onAutoCreateIndividualPromptsChange={() => {}} // No-op
                     projectId="shared-project"
                     shotId="shared-shot"
                     isCloudGenerationEnabled={true}

@@ -18,7 +18,7 @@ export interface TravelBetweenImagesTaskParams {
   shot_id?: string;
   image_urls: string[];
   base_prompts: string[];
-  base_prompt?: string; // Singular - the default/base prompt used when autoCreateIndividualPrompts is enabled
+  base_prompt?: string; // Singular - the default/base prompt used for all segments
   negative_prompts?: string[];
   enhanced_prompts?: string[];
   segment_frames: number[];
@@ -75,6 +75,8 @@ export interface TravelBetweenImagesTaskParams {
   // Text before/after prompts
   text_before_prompts?: string;
   text_after_prompts?: string;
+  // Motion control mode (basic/presets/advanced)
+  motion_mode?: 'basic' | 'presets' | 'advanced';
 }
 
 /**
@@ -222,6 +224,8 @@ function buildTravelBetweenImagesPayload(
     // Text before/after prompts
     ...(params.text_before_prompts ? { text_before_prompts: params.text_before_prompts } : {}),
     ...(params.text_after_prompts ? { text_after_prompts: params.text_after_prompts } : {}),
+    // Motion control mode
+    ...(params.motion_mode ? { motion_mode: params.motion_mode } : {}),
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator

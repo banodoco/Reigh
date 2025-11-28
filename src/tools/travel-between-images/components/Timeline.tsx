@@ -143,8 +143,6 @@ export interface TimelineProps {
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => void;
-  // Auto-create individual prompts flag
-  autoCreateIndividualPrompts?: boolean;
   // Image upload handler for empty state
   onImageUpload?: (files: File[]) => Promise<void>;
   isUploadingImage?: boolean;
@@ -198,7 +196,6 @@ const Timeline: React.FC<TimelineProps> = ({
   structureVideoMotionStrength,
   structureVideoType,
   onStructureVideoChange,
-  autoCreateIndividualPrompts,
   onImageUpload,
   isUploadingImage,
   uploadProgress = 0,
@@ -844,7 +841,6 @@ const Timeline: React.FC<TimelineProps> = ({
         structureVideoMotionStrength={structureVideoMotionStrength}
         structureVideoType={structureVideoType}
         onStructureVideoChange={onStructureVideoChange}
-        autoCreateIndividualPrompts={autoCreateIndividualPrompts}
         hasNoImages={hasNoImages}
         readOnly={readOnly}
         isUploadingImage={isUploadingImage}

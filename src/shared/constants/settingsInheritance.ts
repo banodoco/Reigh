@@ -100,7 +100,6 @@ export const TOOL_FIELD_CATEGORIES = {
       'customHeight',
       'steerableMotionSettings', // Motion control settings
       'enhancePrompt',      // Auto-enhance toggle
-      'autoCreateIndividualPrompts',
       'generationMode',     // batch/by-pair/timeline
       'selectedModel',      // Wan 2.1 vs 2.2
       'turboMode',          // Turbo mode toggle

@@ -128,8 +128,6 @@ interface TimelineContainerProps {
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => void;
-  // Auto-create individual prompts flag
-  autoCreateIndividualPrompts?: boolean;
   // Empty state flag for blur effect
   hasNoImages?: boolean;
   // Read-only mode - disables all interactions
@@ -174,7 +172,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   structureVideoMotionStrength = 1.0,
   structureVideoType = 'flow',
   onStructureVideoChange,
-  autoCreateIndividualPrompts,
   hasNoImages = false
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
@@ -1278,7 +1275,6 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
                 hidePairLabel={!!tapToMove.selectedItemId}
-                autoCreateIndividualPrompts={autoCreateIndividualPrompts || false}
                 onClearEnhancedPrompt={onClearEnhancedPrompt}
               />
             );

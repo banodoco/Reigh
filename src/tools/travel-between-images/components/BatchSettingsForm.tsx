@@ -62,10 +62,6 @@ interface BatchSettingsFormProps {
   onAmountOfMotionChange: (value: number) => void;
   // selectedMode removed - now hardcoded to use specific model
   
-  // Auto-create individual prompts toggle
-  autoCreateIndividualPrompts: boolean;
-  onAutoCreateIndividualPromptsChange: (value: boolean) => void;
-  
   // Enhance prompt toggle (AI enhancement of prompts)
   enhancePrompt: boolean;
   onEnhancePromptChange: (value: boolean) => void;
@@ -127,8 +123,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   imageCount = 0,
   amountOfMotion,
   onAmountOfMotionChange,
-  autoCreateIndividualPrompts,
-  onAutoCreateIndividualPromptsChange,
   enhancePrompt,
   onEnhancePromptChange,
   advancedMode,
@@ -157,10 +151,9 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
     const isTurboModeDisabled = hasTooManyImages;
 
     // Debug logging for toggle visibility
-    console.log("[BatchSettingsForm] Auto-Create Individual Prompts toggle visibility:", {
+    console.log("[BatchSettingsForm] Toggle visibility:", {
       isTimelineMode,
       turboMode,
-      autoCreateIndividualPrompts,
       shouldShow: !turboMode,
       imageCount
     });
@@ -210,7 +203,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          {(autoCreateIndividualPrompts && isTimelineMode) || enhancePrompt
+                          {enhancePrompt
                             ? 'This text will be appended after AI-generated individual prompts for each pair.'
                             : 'This prompt guides the style and transition for all video segments.'
                           } <br /> Small changes can have a big impact.
@@ -222,11 +215,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       value={batchVideoPrompt}
                       onChange={(e) => onBatchVideoPromptChange(e.target.value)}
                       onBlur={() => onBlurSave?.()}
-                      placeholder={
-                        autoCreateIndividualPrompts && isTimelineMode
-                          ? "e.g., cinematic style, high quality"
-                          : "Enter a global prompt for all video segments... (e.g., cinematic transition)"
-                      }
+                      placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
                       className="min-h-[70px]"
                       rows={3}
                       clearable
@@ -313,7 +302,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
             </div>
             
 
-            {/* Turbo Mode Toggle - only show when cloud generation is enabled and 2 or fewer images */}
+            {/* Turbo Mode Toggle - DISABLED - keeping code for potential future use
             {isCloudGenerationEnabled && !isTurboModeDisabled && (
               <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
                 <Switch
@@ -337,6 +326,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </div>
               </div>
             )}
+            */}
             
             {/* Frames per pair - shown in both Timeline and Batch modes */}
             <div className="relative">
@@ -351,7 +341,6 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                 </TooltipTrigger>
                 <TooltipContent>
                     <p>Determines the duration of the video segment{imageCount === 1 ? '' : ' for each image'}. <br /> More frames result in a longer segment.
-                    {turboMode && <><br /><br /><strong>Turbo Mode:</strong> Duration is fixed at {framesToSeconds(81)} (81 frames) for optimal speed.</>}
                     </p>
                 </TooltipContent>
               </Tooltip>

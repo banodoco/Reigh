@@ -103,8 +103,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   onPhasePresetSelect,
   onPhasePresetRemove,
   onBlurSave,
-  autoCreateIndividualPrompts,
-  onAutoCreateIndividualPromptsChange,
   generationMode,
   onGenerationModeChange,
   // selectedMode and onModeChange removed - now hardcoded to use specific model
@@ -1310,7 +1308,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       randomSeed,
       turboMode,
       enhancePrompt,
-      autoCreateIndividualPrompts,
       amountOfMotion,
       motionMode,
       advancedMode,
@@ -1360,7 +1357,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     randomSeed,
     turboMode,
     enhancePrompt,
-    autoCreateIndividualPrompts,
     amountOfMotion,
     motionMode,
     advancedMode,
@@ -1670,7 +1666,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             structureVideoMotionStrength={structureVideoMotionStrength}
             structureVideoType={structureVideoType}
             onStructureVideoChange={handleStructureVideoChange}
-            autoCreateIndividualPrompts={autoCreateIndividualPrompts}
             // Shot management for external generation viewing
             allShots={shots}
             onShotChange={handleShotChange}
@@ -1725,8 +1720,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             amountOfMotion={amountOfMotion}
                             onAmountOfMotionChange={onAmountOfMotionChange}
                             imageCount={simpleFilteredImages.length}
-                            autoCreateIndividualPrompts={autoCreateIndividualPrompts}
-                            onAutoCreateIndividualPromptsChange={onAutoCreateIndividualPromptsChange}
                             enhancePrompt={enhancePrompt}
                             onEnhancePromptChange={onEnhancePromptChange}
                             advancedMode={advancedMode}

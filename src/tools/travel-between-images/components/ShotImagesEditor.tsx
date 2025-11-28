@@ -108,8 +108,6 @@ interface ShotImagesEditorProps {
     motionStrength: number,
     structureType: 'flow' | 'canny' | 'depth'
   ) => void;
-  /** Auto-create individual prompts flag */
-  autoCreateIndividualPrompts?: boolean;
   /** Callback when selection state changes */
   onSelectionChange?: (hasSelection: boolean) => void;
   /** Shot management for external generation viewing */
@@ -168,7 +166,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   structureVideoMotionStrength: propStructureVideoMotionStrength = 1.0,
   structureVideoType: propStructureVideoType = 'flow',
   onStructureVideoChange: propOnStructureVideoChange,
-  autoCreateIndividualPrompts,
   onSelectionChange,
   // Shot management for external generation viewing
   allShots,
@@ -223,7 +220,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     structureVideoTreatment: string;
     structureVideoMotionStrength: number;
     structureVideoType: string;
-    autoCreateIndividualPrompts: boolean;
     allShotsLength: number;
   }>({
     selectedShotId: undefined,
@@ -245,7 +241,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     structureVideoTreatment: 'adjust',
     structureVideoMotionStrength: 1.0,
     structureVideoType: 'flow',
-    autoCreateIndividualPrompts: false,
     allShotsLength: 0,
   });
   
@@ -271,7 +266,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       structureVideoTreatment: propStructureVideoTreatment,
       structureVideoMotionStrength: propStructureVideoMotionStrength,
       structureVideoType: propStructureVideoType,
-      autoCreateIndividualPrompts,
       allShotsLength: allShots?.length || 0,
     };
     
@@ -988,7 +982,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 structureVideoMotionStrength={propStructureVideoMotionStrength}
                 structureVideoType={propStructureVideoType}
                 onStructureVideoChange={propOnStructureVideoChange}
-                autoCreateIndividualPrompts={autoCreateIndividualPrompts}
                 // Image upload for empty state
                 onImageUpload={onImageUpload}
                 isUploadingImage={isUploadingImage}

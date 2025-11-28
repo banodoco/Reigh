@@ -72,7 +72,6 @@ export interface VideoTravelSettings {
   customHeight?: number; // DEPRECATED - now using aspect ratios only
   steerableMotionSettings: SteerableMotionSettings;
   enhancePrompt: boolean;
-  autoCreateIndividualPrompts: boolean;
   generationMode: 'batch' | 'by-pair' | 'timeline';
   selectedModel?: 'wan-2.1' | 'wan-2.2';
   turboMode: boolean;
@@ -132,7 +131,6 @@ export const videoTravelSettings = {
     dimensionSource: 'firstImage' as const,
     generationMode: 'timeline' as const,
     enhancePrompt: false,
-    autoCreateIndividualPrompts: true,
     selectedModel: 'wan-2.1' as const,
     turboMode: false,
     amountOfMotion: 50,

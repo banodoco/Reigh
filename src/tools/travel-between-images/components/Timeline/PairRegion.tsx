@@ -28,7 +28,6 @@ interface PairRegionProps {
   defaultPrompt?: string;
   defaultNegativePrompt?: string;
   showLabel: boolean;
-  autoCreateIndividualPrompts?: boolean;
   onClearEnhancedPrompt?: (pairIndex: number) => void;
   /** Hide the pair label (used during tap-to-move selection on tablets) */
   hidePairLabel?: boolean;
@@ -53,7 +52,6 @@ const PairRegion: React.FC<PairRegionProps> = ({
   defaultPrompt,
   defaultNegativePrompt,
   showLabel,
-  autoCreateIndividualPrompts,
   onClearEnhancedPrompt,
   hidePairLabel = false,
 }) => {

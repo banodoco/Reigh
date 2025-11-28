@@ -409,10 +409,6 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettingsRef.current.updateField('enhancePrompt', enhance);
   }, []);
 
-  const handleAutoCreateIndividualPromptsChange = useCallback((autoCreate: boolean) => {
-    shotSettingsRef.current.updateField('autoCreateIndividualPrompts', autoCreate);
-  }, []);
-
   const handleTurboModeChange = useCallback((turbo: boolean) => {
     // When enabling turbo mode, automatically disable advanced mode
     if (turbo && shotSettingsRef.current.settings?.advancedMode) {
@@ -794,7 +790,6 @@ const VideoTravelToolPage: React.FC = () => {
     batchVideoFrames = 60,
     batchVideoSteps = 6,
     enhancePrompt = false,
-    autoCreateIndividualPrompts = true,
     turboMode = false,
     amountOfMotion = 50,
     advancedMode = false,
@@ -2082,8 +2077,6 @@ const VideoTravelToolPage: React.FC = () => {
               availableLoras={availableLoras}
               enhancePrompt={enhancePrompt}
               onEnhancePromptChange={handleEnhancePromptChange}
-              autoCreateIndividualPrompts={autoCreateIndividualPrompts}
-              onAutoCreateIndividualPromptsChange={handleAutoCreateIndividualPromptsChange}
               turboMode={turboMode}
               onTurboModeChange={handleTurboModeChange}
               amountOfMotion={amountOfMotion}

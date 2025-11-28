@@ -24,28 +24,31 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
   const [isHovered, setIsHovered] = React.useState(false);
   const elementRef = React.useRef<HTMLSpanElement>(null);
   
-  if (!createdAt) return null;
-
-  const date = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
-  
-  if (!isValid(date)) return null;
+  // Parse date early (but hooks must be called unconditionally below)
+  const date = React.useMemo(() => {
+    if (!createdAt) return null;
+    const parsed = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
+    return isValid(parsed) ? parsed : null;
+  }, [createdAt]);
 
   // Track visibility for performance (only update visible timestamps)
+  // ⚠️ CRITICAL: All hooks must be called unconditionally (React rules of hooks)
   const isVisible = useTimestampVisibility(elementRef);
   
   // Determine if we should enable updates
-  const shouldUpdate = isVisible && (!isMobile || !showOnHover || isHovered);
+  const shouldUpdate = isVisible && (!isMobile || !showOnHover || isHovered) && !!date;
   
   // Get live-updating timestamp trigger
   const { updateTrigger } = useTimestampUpdater({
     date,
     isVisible: shouldUpdate,
-    disabled: false
+    disabled: !date // Disable if no valid date
   });
   
   // Debug logging for timestamp updates (development only)
+  // ⚠️ Must be before early return to comply with React hooks rules
   React.useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && updateTrigger > 0) {
+    if (process.env.NODE_ENV === 'development' && updateTrigger > 0 && date) {
       console.log('[TimeStamp] Update triggered:', {
         updateTrigger,
         isVisible,
@@ -58,6 +61,9 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
       });
     }
   }, [updateTrigger, isVisible, shouldUpdate, isMobile, showOnHover, isHovered, date]);
+  
+  // Early return AFTER all hooks are called
+  if (!date) return null;
 
   const positionClasses = {
     'top-left': 'top-2 left-2',

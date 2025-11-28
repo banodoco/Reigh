@@ -118,10 +118,14 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
           .filter((p: any) => p?.new?.status === 'Complete')
           .map((p: any) => {
             const newItem = p?.new;
+            // 🎯 Check all possible shot_id locations (matches complete_task extraction logic)
             return newItem?.metadata?.shot_id || 
                    newItem?.metadata?.shotId || 
                    newItem?.params?.shot_id || 
-                   newItem?.params?.orchestrator_details?.shot_id;
+                   newItem?.params?.orchestrator_details?.shot_id ||
+                   // Additional paths for travel-between-images tasks
+                   newItem?.params?.originalParams?.orchestrator_details?.shot_id ||
+                   newItem?.params?.full_orchestrator_payload?.shot_id;
           })
           .filter(Boolean)
       );
@@ -140,13 +144,17 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
 
       // ONLY invalidate generation data if tasks completed
       if (hasCompleteTask) {
-        // Invalidate project-level generation queries (e.g., for upscale in main gallery)
-        queryClient.invalidateQueries({ queryKey: ['generations'] });
-        
         // Invalidate derived generations (edits based on source images)
         queryClient.invalidateQueries({ queryKey: ['derived-generations'] });
         
-        // Invalidate only the specific shots that completed
+        // 🎯 ALWAYS invalidate project-level unified-generations queries
+        // This ensures ChildGenerationsView and other project-wide queries update immediately
+        // Child generations may have shotId but still need project-level invalidation
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'
+        });
+        
+        // Invalidate shot-specific queries for completed shots
         if (completedShotIds.size > 0) {
           completedShotIds.forEach((shotId) => {
             queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
@@ -154,11 +162,7 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
             queryClient.invalidateQueries({ queryKey: ['all-shot-generations', shotId] }); // 🚀 For useAllShotGenerations (single query)
           });
         } else {
-          // Only if we have completed tasks but no shot IDs, invalidate project-level
-          queryClient.invalidateQueries({
-            predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'
-          });
-          // Also invalidate all shot-generations (e.g., for upscale tasks that don't have shotId in metadata)
+          // No shot IDs found - also invalidate all shot-related queries as fallback
           queryClient.invalidateQueries({
             predicate: (query) => query.queryKey[0] === 'shot-generations'
           });
@@ -175,16 +179,28 @@ export function SimpleRealtimeProvider({ children }: SimpleRealtimeProviderProps
       
       const payload = event.detail;
       const isComplete = payload?.new?.status === 'Complete';
-      const shotId = payload?.new?.metadata?.shot_id || payload?.new?.metadata?.shotId;
-      
-      // Removed state update for lastTaskUpdate
+      const newItem = payload?.new;
+      // 🎯 Check all possible shot_id locations (matches complete_task extraction logic)
+      const shotId = newItem?.metadata?.shot_id || 
+                     newItem?.metadata?.shotId ||
+                     newItem?.params?.shot_id ||
+                     newItem?.params?.orchestrator_details?.shot_id ||
+                     newItem?.params?.originalParams?.orchestrator_details?.shot_id ||
+                     newItem?.params?.full_orchestrator_payload?.shot_id;
       
       // Reduced invalidation scope
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['task-status-counts'] });
       
-      if (isComplete && shotId) {
-          queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+      if (isComplete) {
+          // Always invalidate project-level queries for ChildGenerationsView
+          queryClient.invalidateQueries({
+            predicate: (query) => query.queryKey[0] === 'unified-generations' && query.queryKey[1] === 'project'
+          });
+          
+          if (shotId) {
+            queryClient.invalidateQueries({ queryKey: ['unified-generations', 'shot', shotId] });
+          }
       }
     };
 

@@ -67,7 +67,6 @@ export interface ShotSettings {
   enhancePrompt: boolean;
   turboMode: boolean;
   amountOfMotion: number;
-  autoCreateIndividualPrompts: boolean;
   advancedMode: boolean;
   motionMode?: 'basic' | 'presets' | 'advanced'; // Motion control mode
   phaseConfig?: any;
@@ -123,9 +122,6 @@ export interface ShotEditorProps {
   onTurboModeChange?: (turbo: boolean) => void;
   amountOfMotion?: number;
   onAmountOfMotionChange?: (motion: number) => void;
-  // Auto-create individual prompts
-  autoCreateIndividualPrompts?: boolean;
-  onAutoCreateIndividualPromptsChange?: (autoCreate: boolean) => void;
   // Motion mode
   motionMode?: 'basic' | 'presets' | 'advanced';
   onMotionModeChange?: (mode: 'basic' | 'presets' | 'advanced') => void;

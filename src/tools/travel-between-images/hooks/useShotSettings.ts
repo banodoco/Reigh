@@ -15,7 +15,6 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   batchVideoSteps: 6,
   steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
   enhancePrompt: false,
-  autoCreateIndividualPrompts: true,
   turboMode: false,
   amountOfMotion: 50,
   motionMode: 'basic',  // Must be included to prevent reset during loading
@@ -361,7 +360,6 @@ export const useShotSettings = (
     console.log('[EnhancePromptDebug] [useShotSettings] 📥 Loading settings from database:', {
       shotId: shotId.substring(0, 8),
       enhancePrompt: deepClonedSettings.enhancePrompt,
-      autoCreateIndividualPrompts: deepClonedSettings.autoCreateIndividualPrompts,
       advancedMode: deepClonedSettings.advancedMode,
       hasPhaseConfig: !!deepClonedSettings.phaseConfig,
       phaseConfig: deepClonedSettings.phaseConfig,
@@ -404,7 +402,6 @@ export const useShotSettings = (
     console.log('[EnhancePromptDebug] [useShotSettings] 💾 Saving settings to database:', {
       shotId: shotId.substring(0, 8),
       enhancePrompt: toSave.enhancePrompt,
-      autoCreateIndividualPrompts: toSave.autoCreateIndividualPrompts,
       advancedMode: toSave.advancedMode,
       hasPhaseConfig: !!toSave.phaseConfig,
       phaseConfigLoras: toSave.phaseConfig?.phases?.map(p => ({
@@ -444,8 +441,7 @@ export const useShotSettings = (
     console.log('[EnhancePromptDebug] [useShotSettings] 📝 Field updated:', { 
       key, 
       value: key === 'batchVideoPrompt' && typeof value === 'string' ? value.substring(0, 50) : value,
-      isEnhancePrompt: key === 'enhancePrompt',
-      isAutoCreateIndividualPrompts: key === 'autoCreateIndividualPrompts'
+      isEnhancePrompt: key === 'enhancePrompt'
     });
     
     // Mark that user is actively editing
@@ -481,7 +477,6 @@ export const useShotSettings = (
     console.log('[EnhancePromptDebug] [useShotSettings] 📝 Multiple fields updated:', { 
       keys: Object.keys(updates),
       enhancePrompt: updates.enhancePrompt,
-      autoCreateIndividualPrompts: updates.autoCreateIndividualPrompts,
       batchVideoPrompt: updates.batchVideoPrompt ? (typeof updates.batchVideoPrompt === 'string' ? updates.batchVideoPrompt.substring(0, 50) : updates.batchVideoPrompt) : undefined
     });
     

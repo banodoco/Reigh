@@ -48,7 +48,6 @@ export interface GenerateVideoParams {
   randomSeed: boolean;
   turboMode: boolean;
   enhancePrompt: boolean;
-  autoCreateIndividualPrompts?: boolean;
   
   // Motion settings
   amountOfMotion: number;
@@ -111,7 +110,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     randomSeed,
     turboMode,
     enhancePrompt,
-    autoCreateIndividualPrompts,
     amountOfMotion,
     motionMode,
     advancedMode,
@@ -727,7 +725,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       preview: p ? p.substring(0, 30) + '...' : '(empty)'
     })),
     enhancePromptFlag: enhancePrompt,
-    autoCreateIndividualPromptsFlag: autoCreateIndividualPrompts,
     // Show what we're sending for prompt appending
     base_prompt_singular: batchVideoPrompt,
     base_prompts_array: basePrompts,
@@ -739,7 +736,7 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     shot_id: selectedShot.id,
     image_urls: absoluteImageUrls,
     base_prompts: basePrompts,
-    base_prompt: batchVideoPrompt, // Singular - the default/base prompt that gets appended when autoCreateIndividualPrompts is enabled
+    base_prompt: batchVideoPrompt, // Singular - the default/base prompt used for all segments
     segment_frames: segmentFrames,
     frame_overlap: frameOverlap,
     negative_prompts: negativePrompts,
@@ -848,8 +845,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     enhancePrompt_from_props: enhancePrompt,
     requestBody_enhance_prompt: requestBody.enhance_prompt,
     VALUES_MATCH: enhancePrompt === requestBody.enhance_prompt,
-    autoCreateIndividualPrompts,
-    NOTE: 'autoCreateIndividualPrompts is DIFFERENT from enhancePrompt!',
     // CRITICAL: Verify enhanced_prompts is NOT being sent when empty
     enhanced_prompts_included_in_request: 'enhanced_prompts' in requestBody,
     enhanced_prompts_array_length: requestBody.enhanced_prompts?.length || 0,
