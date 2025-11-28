@@ -180,10 +180,17 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       return;
     }
 
+    // Store the mouse X position even if duration is 0, so we can calculate scrubber when metadata loads
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      lastMouseXRef.current = e.clientX - rect.left;
+    }
+
     if (loadOnDemand && !hasLoadedOnDemand) {
       console.log('[SegmentCardPopulation] Load on demand - setting hasLoadedOnDemand');
       setHasLoadedOnDemand(true);
-      return;
+      // Fall through to allow scrubbing on the very first interaction
+      // effectively treating the first hover as the "load trigger" AND the "scrub trigger"
     }
 
     if (!videoRef.current || !containerRef.current) {
@@ -212,14 +219,19 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
-    // Store the mouse X position even if duration is 0, so we can calculate scrubber when metadata loads
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      lastMouseXRef.current = e.clientX - rect.left;
-    }
-
     if (duration === 0) {
       console.log('[SegmentCardPopulation] Duration is 0, skipping scrubbing (mouse position stored for later)');
+      
+      // Force load if video is stuck in HAVE_NOTHING state, even if preload is metadata
+      // This fixes cases where the browser suspended loading or network is slow
+      if (videoRef.current && videoRef.current.readyState === 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[VideoStallFix] Force loading video during scrub because duration is 0 and readyState is 0', {
+            src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src'
+          });
+        }
+        videoRef.current.load();
+      }
       return;
     }
     
@@ -291,13 +303,14 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     console.log('[SegmentCardPopulation] Setting isHoveringRef to true');
     isHoveringRef.current = true;
     if (videoRef.current) {
-      // Fix for video stalling: Prime video loading on first hover for preload="none"
-      // This ensures the video starts loading from a user interaction
-      if (preloadProp === 'none' && videoRef.current.readyState === 0) {
+      // Fix for video stalling: Prime video loading on first hover
+      // This ensures the video starts loading from a user interaction if it hasn't started yet
+      // Removed check for preloadProp === 'none' to handle stalled metadata loads too
+      if (videoRef.current.readyState === 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[VideoStallFix] Priming video load on hover for preload="none"', {
+          console.log('[VideoStallFix] Priming video load on hover (readyState=0)', {
             src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
-            readyState: videoRef.current.readyState,
+            preloadProp,
             timestamp: Date.now()
           });
         }
