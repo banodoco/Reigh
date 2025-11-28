@@ -14,6 +14,8 @@ export interface ActiveLora {
   previewImageUrl?: string;
 }
 
+export type PromptMode = 'managed' | 'automated';
+
 export interface ImageGenerationSettings {
   prompts?: PromptEntry[];
   promptsByShot?: Record<string, PromptEntry[]>; // Prompts organized by shot ID
@@ -26,6 +28,8 @@ export interface ImageGenerationSettings {
   beforeEachPromptText?: string;
   afterEachPromptText?: string;
   associatedShotId?: string | null; // Last associated shot
+  promptMode?: PromptMode;
+  masterPromptText?: string;
 }
 
 export const defaultImageGenerationSettings: ImageGenerationSettings = {
@@ -52,6 +56,8 @@ export const defaultImageGenerationSettings: ImageGenerationSettings = {
   depthStrength: 50,
   softEdgeStrength: 20,
   generationMode: 'wan-local',
+  promptMode: 'automated',
+  masterPromptText: '',
 };
 
 export const imageGenerationSettings = {

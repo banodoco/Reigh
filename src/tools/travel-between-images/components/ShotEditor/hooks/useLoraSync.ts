@@ -220,9 +220,16 @@ export const useLoraSync = ({
       // Also save to localStorage for inheritance to new shots
       if (projectId) {
         try {
+          const loraData = { loras: lorasToSave };
+          
+          // Save to project-specific key (for same-project inheritance)
           const storageKey = STORAGE_KEYS.LAST_ACTIVE_LORA_SETTINGS(projectId);
-          localStorage.setItem(storageKey, JSON.stringify({ loras: lorasToSave }));
-          console.log('[ShotSettingsInherit] 💾 Saved active LoRAs to localStorage for inheritance', {
+          localStorage.setItem(storageKey, JSON.stringify(loraData));
+          
+          // Also save to global key (for cross-project inheritance when creating first shot in new project)
+          localStorage.setItem(STORAGE_KEYS.GLOBAL_LAST_ACTIVE_LORA_SETTINGS, JSON.stringify(loraData));
+          
+          console.log('[ShotSettingsInherit] 💾 Saved active LoRAs to localStorage (project + global)', {
             shotId: selectedShot?.id?.substring(0, 8),
             loraCount: lorasToSave.length
           });

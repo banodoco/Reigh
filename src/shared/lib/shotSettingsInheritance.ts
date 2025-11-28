@@ -43,35 +43,68 @@ export async function getInheritedSettings(
     const stored = localStorage.getItem(mainStorageKey);
     if (stored) {
       mainSettings = JSON.parse(stored);
-      console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from localStorage', {
+      console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from project localStorage', {
         prompt: mainSettings.batchVideoPrompt?.substring(0, 20),
         motionMode: mainSettings.motionMode,
         amountOfMotion: mainSettings.amountOfMotion,
         generationMode: mainSettings.generationMode
       });
     } else {
-      console.warn('[ShotSettingsInherit] ⚠️ No main settings in localStorage');
+      console.warn('[ShotSettingsInherit] ⚠️ No main settings in project localStorage');
     }
     
     const loraStorageKey = STORAGE_KEYS.LAST_ACTIVE_LORA_SETTINGS(projectId);
     const storedLoras = localStorage.getItem(loraStorageKey);
     if (storedLoras) {
       loraSettings = JSON.parse(storedLoras);
-      console.warn('[ShotSettingsInherit] ✅ Inheriting LoRAs from localStorage', {
+      console.warn('[ShotSettingsInherit] ✅ Inheriting LoRAs from project localStorage', {
         loraCount: loraSettings.loras?.length || 0
       });
     } else {
-      console.warn('[ShotSettingsInherit] ⚠️ No LoRAs in localStorage');
+      console.warn('[ShotSettingsInherit] ⚠️ No LoRAs in project localStorage');
     }
     
     const uiStorageKey = STORAGE_KEYS.LAST_ACTIVE_UI_SETTINGS(projectId);
     const storedUI = localStorage.getItem(uiStorageKey);
     if (storedUI) {
       uiSettings = JSON.parse(storedUI);
-      console.warn('[ShotSettingsInherit] ✅ Inheriting UI settings from localStorage');
+      console.warn('[ShotSettingsInherit] ✅ Inheriting UI settings from project localStorage');
     }
   } catch (e) {
-    console.error('[ShotSettingsInherit] ❌ Failed to read localStorage', e);
+    console.error('[ShotSettingsInherit] ❌ Failed to read project localStorage', e);
+  }
+  
+  // 1b. If no project-specific settings AND this is a new project (no shots), try global fallback
+  // This enables cross-project inheritance for the first shot in a new project
+  const isNewProject = !shots || shots.length === 0;
+  if (!mainSettings && isNewProject) {
+    console.warn('[ShotSettingsInherit] 🌍 New project detected, checking global localStorage fallback');
+    try {
+      const globalStored = localStorage.getItem(STORAGE_KEYS.GLOBAL_LAST_ACTIVE_SHOT_SETTINGS);
+      if (globalStored) {
+        mainSettings = JSON.parse(globalStored);
+        console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from GLOBAL localStorage (cross-project)', {
+          prompt: mainSettings.batchVideoPrompt?.substring(0, 20),
+          motionMode: mainSettings.motionMode,
+          amountOfMotion: mainSettings.amountOfMotion,
+          generationMode: mainSettings.generationMode
+        });
+      } else {
+        console.warn('[ShotSettingsInherit] ⚠️ No global settings in localStorage');
+      }
+      
+      if (!loraSettings) {
+        const globalLorasStored = localStorage.getItem(STORAGE_KEYS.GLOBAL_LAST_ACTIVE_LORA_SETTINGS);
+        if (globalLorasStored) {
+          loraSettings = JSON.parse(globalLorasStored);
+          console.warn('[ShotSettingsInherit] ✅ Inheriting LoRAs from GLOBAL localStorage (cross-project)', {
+            loraCount: loraSettings.loras?.length || 0
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[ShotSettingsInherit] ❌ Failed to read global localStorage', e);
+    }
   }
 
   // 2. If not found, fall back to latest created shot from DB

@@ -181,7 +181,11 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
               className="mt-2 group relative p-3 border rounded-md text-center bg-slate-50/50 hover:border-primary/50 cursor-pointer flex items-center justify-center min-h-[60px]" 
               onClick={isMobile ? onOpenPromptModal : onOpenPromptModal}
             >
-              {actionablePromptsCount === prompts.length ? (
+              {prompts.length === 1 && actionablePromptsCount === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Click to add prompts...
+                </p>
+              ) : actionablePromptsCount === prompts.length ? (
                 <p className="text-sm text-muted-foreground">
                   <span className="font-light text-primary">{prompts.length} {prompts.length === 1 ? 'prompt' : 'prompts'}</span> currently active.
                 </p>
@@ -216,8 +220,8 @@ export const PromptsSection: React.FC<PromptsSectionProps> = ({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                {/* Delete All button */}
-                {onDeleteAllPrompts && (
+                {/* Delete All button - hide when there's only one empty prompt */}
+                {onDeleteAllPrompts && !(prompts.length === 1 && actionablePromptsCount === 0) && (
                   <TooltipProvider delayDuration={300}>
                     <Tooltip>
                       <TooltipTrigger asChild>

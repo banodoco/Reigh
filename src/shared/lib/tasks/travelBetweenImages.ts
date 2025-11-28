@@ -72,6 +72,9 @@ export interface TravelBetweenImagesTaskParams {
   // Selected phase config preset ID (for UI state restoration)
   selected_phase_preset_id?: string | null;
   independent_segments?: boolean;
+  // Text before/after prompts
+  text_before_prompts?: string;
+  text_after_prompts?: string;
 }
 
 /**
@@ -216,6 +219,9 @@ function buildTravelBetweenImagesPayload(
     // Include generation_name in orchestrator payload so it flows to child tasks
     generation_name: params.generation_name ?? undefined,
     independent_segments: params.independent_segments ?? true,
+    // Text before/after prompts
+    ...(params.text_before_prompts ? { text_before_prompts: params.text_before_prompts } : {}),
+    ...(params.text_after_prompts ? { text_after_prompts: params.text_after_prompts } : {}),
   };
 
   // Log the enhance_prompt value that will be sent to orchestrator

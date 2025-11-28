@@ -401,6 +401,31 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
   }, [currentReferenceMode]);
 
+  // Sync local state from selectedReference when reference changes
+  // This ensures the UI shows the correct values when switching references or loading
+  const lastSyncedReferenceId = useRef<string | null>(null);
+  useEffect(() => {
+    // Only sync when reference ID actually changes (not on every re-render)
+    if (selectedReference && selectedReference.id !== lastSyncedReferenceId.current) {
+      console.log('[RefSettings] 🔄 Syncing local state from reference:', selectedReference.id, {
+        mode: selectedReference.referenceMode,
+        styleStrength: selectedReference.styleReferenceStrength,
+        subjectStrength: selectedReference.subjectStrength,
+        sceneStrength: selectedReference.inThisSceneStrength,
+      });
+      lastSyncedReferenceId.current = selectedReference.id;
+      
+      // Sync all reference settings to local state
+      setReferenceMode(selectedReference.referenceMode || 'custom');
+      setStyleReferenceStrength(selectedReference.styleReferenceStrength ?? 1.0);
+      setSubjectStrength(selectedReference.subjectStrength ?? 0.0);
+      setSubjectDescription(selectedReference.subjectDescription ?? '');
+      setInThisScene(selectedReference.inThisScene ?? false);
+      setInThisSceneStrength(selectedReference.inThisSceneStrength ?? 0.5);
+      setStyleBoostTerms(selectedReference.styleBoostTerms ?? '');
+    }
+  }, [selectedReference]);
+
   // Generation image (always use processed version)
   const styleReferenceImageGeneration = useMemo(() => {
     if (!rawStyleReferenceImage) return null;

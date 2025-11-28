@@ -1001,7 +1001,11 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = React.memo(({
                 {modal.isMobile && <span className="sr-only">Blank Prompt</span>}
               </Button>
               {internalPrompts.length > 0 && (
-                <Button variant="destructive" onClick={handleRemoveAllPrompts}>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleRemoveAllPrompts}
+                  disabled={internalPrompts.length === 1 && !internalPrompts[0].fullPrompt.trim() && !internalPrompts[0].shortPrompt?.trim()}
+                >
                   <Trash2 className={`h-4 w-4 ${modal.isMobile ? '' : 'mr-2'}`} />
                   <span className={modal.isMobile ? 'hidden' : ''}>Delete Prompts</span>
                   {modal.isMobile && <span className="sr-only">Delete Prompts</span>}

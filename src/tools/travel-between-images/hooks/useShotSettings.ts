@@ -89,15 +89,24 @@ export const useShotSettings = (
 
   // Persist last active settings to localStorage for inheritance
   // This allows new shots to inherit from the *currently edited* shot, not just the last created one
+  // We save to both project-specific AND global keys for cross-project inheritance
   useEffect(() => {
     if (shotId && projectId && status === 'ready' && settings) {
-        const storageKey = STORAGE_KEYS.LAST_ACTIVE_SHOT_SETTINGS(projectId);
         try {
-          localStorage.setItem(storageKey, JSON.stringify(settings));
-          console.log('[ShotSettingsInherit] 💾 Saved active settings to localStorage for inheritance', { 
+          // Save to project-specific key (for same-project inheritance)
+          const projectStorageKey = STORAGE_KEYS.LAST_ACTIVE_SHOT_SETTINGS(projectId);
+          localStorage.setItem(projectStorageKey, JSON.stringify(settings));
+          
+          // Also save to global key (for cross-project inheritance when creating first shot in new project)
+          // Exclude pairConfigs as they're shot-specific and don't make sense cross-project
+          const globalSettings = { ...settings, pairConfigs: [] };
+          localStorage.setItem(STORAGE_KEYS.GLOBAL_LAST_ACTIVE_SHOT_SETTINGS, JSON.stringify(globalSettings));
+          
+          console.log('[ShotSettingsInherit] 💾 Saved active settings to localStorage (project + global)', { 
             shotId: shotId.substring(0, 8),
             prompt: settings.batchVideoPrompt?.substring(0, 20),
-            generationMode: settings.generationMode
+            generationMode: settings.generationMode,
+            motionMode: settings.motionMode
           });
         } catch (e) {
           console.error('Failed to save settings to localStorage', e);
