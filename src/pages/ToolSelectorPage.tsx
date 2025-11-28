@@ -111,6 +111,7 @@ const assistantTools = [
     name: 'More Soon',
     description: "We're adding more tools!",
     descriptionMobile: 'Stay tuned',
+    subtext: "It's on the way!",
     tool: null,
     icon: Sparkles,
     gradient: 'from-wes-dusty-blue via-wes-sage to-wes-mint',
@@ -225,7 +226,7 @@ const ToolCard = memo(({ item, isSquare = false, index, isVisible }: { item: any
       style={rippleStyles}
     >
       {/* Disabled/Coming Soon Badge */}
-      {isDisabled && isSm && (
+      {isDisabled && isSm && item.id !== 'moon-soon' && (
         <div className={`absolute ${isSquare ? 'top-1 right-2' : 'top-2 right-2'} z-10 ${isWiggling ? 'animate-subtle-wiggle' : ''}`}>
           <div className="bg-gradient-to-r from-wes-vintage-gold to-wes-mustard text-primary text-xs font-bold px-2 py-0.5 rounded-md border border-primary/20 shadow-sm">
             {item.id === 'character-animate' ? 'CLOUD MODE' : 'COMING SOON'}
