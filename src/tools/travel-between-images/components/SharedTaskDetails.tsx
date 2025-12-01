@@ -583,7 +583,7 @@ export const SharedTaskDetails: React.FC<SharedTaskDetailsProps> = ({
           {/* Frame Configuration */}
           {(contextFrameCount !== null || gapFrameCount !== null || replaceMode !== null || keepBridgingImages !== null) && (
             <div className={`space-y-2 ${(clipsArray && clipsArray.length > 0) || startingVideoPath || endingVideoPath ? 'pt-2 border-t border-muted-foreground/20' : ''}`}>
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>Frame Configuration</p>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Join Clips Configuration</p>
               <div className="grid grid-cols-2 gap-3">
                 {contextFrameCount !== null && (
                   <div className="space-y-1">
