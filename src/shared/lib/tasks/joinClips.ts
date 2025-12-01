@@ -91,6 +91,7 @@ export interface JoinClipsTaskParams {
   gap_frame_count?: number;
   replace_mode?: boolean; // Replace frames (true) or generate new frames (false)
   keep_bridging_images?: boolean; // Whether to keep anchor images in the bridge
+  enhance_prompt?: boolean; // AI enhancement of prompts
   model?: string;
   num_inference_steps?: number;
   guidance_scale?: number;
@@ -279,6 +280,7 @@ function buildJoinClipsPayload(
     context_frame_count: params.context_frame_count ?? DEFAULT_JOIN_CLIPS_VALUES.context_frame_count,
     replace_mode: params.replace_mode ?? DEFAULT_JOIN_CLIPS_VALUES.replace_mode,
     keep_bridging_images: params.keep_bridging_images, // Optional, defaults to undefined (backend handles default)
+    enhance_prompt: params.enhance_prompt ?? true, // Default to true for AI prompt enhancement
     model: params.model ?? DEFAULT_JOIN_CLIPS_VALUES.model,
     num_inference_steps: params.num_inference_steps ?? DEFAULT_JOIN_CLIPS_VALUES.num_inference_steps,
     guidance_scale: params.guidance_scale ?? DEFAULT_JOIN_CLIPS_VALUES.guidance_scale,

@@ -16,6 +16,7 @@ export const joinClipsSettings = {
     prompt: '', // User's current prompt (persisted per project)
     randomSeed: true,
     useIndividualPrompts: false, // Whether to use per-transition prompts
+    enhancePrompt: true, // AI enhancement of prompts
     // Legacy two-video format (kept for backward compatibility)
     startingVideoUrl: undefined as string | undefined,
     startingVideoPosterUrl: undefined as string | undefined,

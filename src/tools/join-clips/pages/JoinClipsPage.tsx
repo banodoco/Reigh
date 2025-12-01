@@ -340,7 +340,13 @@ const JoinClipsPage: React.FC = () => {
     replaceMode = true,
     keepBridgingImages,
     useIndividualPrompts = false,
+    enhancePrompt = true,
   } = joinSettings.settings;
+  
+  // Debug: Log enhancePrompt value
+  useEffect(() => {
+    console.log('[JoinClipsPage] enhancePrompt from settings:', enhancePrompt, 'raw value:', joinSettings.settings.enhancePrompt);
+  }, [enhancePrompt, joinSettings.settings.enhancePrompt]);
   
   // Track whether settings have completed their initial load
   const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
@@ -925,6 +931,7 @@ const JoinClipsPage: React.FC = () => {
         gap_frame_count: gapFrameCount,
         replace_mode: replaceMode,
         keep_bridging_images: keepBridgingImages ?? true,
+        enhance_prompt: enhancePrompt,
         model: joinSettings.settings.model || 'wan_2_2_vace_lightning_baseline_2_2_2',
         num_inference_steps: joinSettings.settings.numInferenceSteps || 6,
         guidance_scale: joinSettings.settings.guidanceScale || 3.0,
@@ -1159,6 +1166,11 @@ const JoinClipsPage: React.FC = () => {
             setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
             useIndividualPrompts={useIndividualPrompts}
             setUseIndividualPrompts={(val) => joinSettings.updateField('useIndividualPrompts', val)}
+            enhancePrompt={enhancePrompt}
+            setEnhancePrompt={(val) => {
+              console.log('[JoinClipsPage] setEnhancePrompt called with:', val);
+              joinSettings.updateField('enhancePrompt', val);
+            }}
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraPersistenceKey="join-clips"

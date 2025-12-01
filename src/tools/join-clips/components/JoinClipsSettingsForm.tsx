@@ -35,6 +35,10 @@ export interface JoinClipsSettingsFormProps {
     useIndividualPrompts?: boolean;
     setUseIndividualPrompts?: (val: boolean) => void;
     
+    // Enhance prompt toggle
+    enhancePrompt?: boolean;
+    setEnhancePrompt?: (val: boolean) => void;
+    
     // LoRA props
     availableLoras: LoraModel[];
     projectId: string | null;
@@ -483,6 +487,8 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     setNegativePrompt,
     useIndividualPrompts,
     setUseIndividualPrompts,
+    enhancePrompt,
+    setEnhancePrompt,
     availableLoras,
     projectId,
     loraPersistenceKey,
@@ -495,19 +501,22 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     className,
     headerContent
 }) => {
-    // Handle undefined keepBridgingImages (defensive fallback)
+    // Handle undefined values (defensive fallback)
     const keepBridgingImagesValue = keepBridgingImages ?? true;
+    const enhancePromptValue = enhancePrompt ?? true;
     
     // Debug logging for form props
     useEffect(() => {
         console.log('[JoinClips Form] Props updated:', {
             keepBridgingImages,
             keepBridgingImagesValue,
+            enhancePrompt,
+            enhancePromptValue,
             replaceMode,
             gapFrames,
             contextFrames
         });
-    }, [keepBridgingImages, keepBridgingImagesValue, replaceMode, gapFrames, contextFrames]);
+    }, [keepBridgingImages, keepBridgingImagesValue, enhancePrompt, enhancePromptValue, replaceMode, gapFrames, contextFrames]);
     
     // Handle context frames change with auto-adjustment of gap frames
     const handleContextFramesChange = (val: number) => {
@@ -657,6 +666,32 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                                 💡 This will be inserted after each individual prompt
                             </p>
                         )}
+                    </div>
+                    
+                    {/* Enhance Prompt Toggle */}
+                    <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
+                        <Switch
+                            id="join-enhance-prompt"
+                            checked={enhancePromptValue}
+                            onCheckedChange={(val) => {
+                                console.log('[JoinClipsEnhance] 🔄 Toggle clicked!');
+                                console.log('[JoinClipsEnhance] New value:', val);
+                                console.log('[JoinClipsEnhance] setEnhancePrompt exists:', typeof setEnhancePrompt);
+                                console.log('[JoinClipsEnhance] Current enhancePrompt prop:', enhancePrompt);
+                                console.log('[JoinClipsEnhance] Current enhancePromptValue:', enhancePromptValue);
+                                if (setEnhancePrompt) {
+                                    console.log('[JoinClipsEnhance] Calling setEnhancePrompt with:', val);
+                                    setEnhancePrompt(val);
+                                } else {
+                                    console.log('[JoinClipsEnhance] ❌ setEnhancePrompt is undefined!');
+                                }
+                            }}
+                        />
+                        <div className="flex-1">
+                            <Label htmlFor="join-enhance-prompt" className="font-medium cursor-pointer">
+                                Enhance/Create Prompts
+                            </Label>
+                        </div>
                     </div>
 
                     {/* Negative Prompt */}
