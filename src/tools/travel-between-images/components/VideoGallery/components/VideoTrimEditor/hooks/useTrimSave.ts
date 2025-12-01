@@ -18,7 +18,8 @@ interface UseTrimSaveProps {
   sourceVideoUrl: string | null;
   trimState: TrimState;
   sourceVariantId?: string | null;
-  onSuccess?: () => void;
+  /** Called with the new variant ID after successful save */
+  onSuccess?: (newVariantId: string) => void;
 }
 
 export const useTrimSave = ({
@@ -102,7 +103,7 @@ export const useTrimSave = ({
         source_variant_id: sourceVariantId || null,
       };
 
-      const { error: insertError } = await supabase
+      const { data: insertedVariant, error: insertError } = await supabase
         .from('generation_variants')
         .insert({
           generation_id: generationId,
@@ -112,12 +113,17 @@ export const useTrimSave = ({
           is_primary: true, // New trimmed version becomes primary
           variant_type: 'trimmed',
           name: null, // No naming as per user request
-        });
+        })
+        .select('id')
+        .single();
 
-      if (insertError) {
+      if (insertError || !insertedVariant) {
         console.error('[useTrimSave] Failed to create variant:', insertError);
-        throw new Error(`Failed to save variant: ${insertError.message}`);
+        throw new Error(`Failed to save variant: ${insertError?.message || 'No variant returned'}`);
       }
+
+      const newVariantId = insertedVariant.id;
+      console.log('[useTrimSave] Created variant with ID:', newVariantId.substring(0, 8));
 
       // Also directly update the generation's params as a fallback
       // (in case the sync trigger isn't deployed yet)
@@ -150,8 +156,8 @@ export const useTrimSave = ({
       // Force refetch by removing stale data
       queryClient.removeQueries({ queryKey: ['unified-generations'], exact: false });
 
-      // Call success callback
-      onSuccess?.();
+      // Call success callback with the new variant ID
+      onSuccess?.(newVariantId);
 
       // Reset success state after a delay
       setTimeout(() => {

@@ -592,9 +592,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     sourceVideoUrl: effectiveVideoUrl,
     trimState,
     sourceVariantId: activeVariant?.id,
-    onSuccess: () => {
+    onSuccess: (newVariantId) => {
       resetTrim();
       refetchVariants();
+      // Set the newly created variant as the active one
+      setActiveVariantId(newVariantId);
       setIsVideoTrimMode(false);
       onTrimModeChange?.(false);
     },
@@ -635,6 +637,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     });
     return duration;
   }, [media, activeVariant]);
+
+  // For segment videos (showVideoTrimEditor), hide the "Apply These Settings" button
+  const adjustedTaskDetailsData = useMemo(() => {
+    if (!taskDetailsData) return undefined;
+    if (!showVideoTrimEditor) return taskDetailsData;
+    
+    // Strip onApplySettingsFromTask for segment videos
+    const { onApplySettingsFromTask, ...rest } = taskDetailsData;
+    return rest;
+  }, [taskDetailsData, showVideoTrimEditor]);
 
   // Handle entering/exiting video trim mode
   const handleEnterVideoTrimMode = useCallback(() => {
@@ -1664,7 +1676,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
                     
                     <TaskDetailsPanelWrapper
-                      taskDetailsData={taskDetailsData}
+                      taskDetailsData={adjustedTaskDetailsData}
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
@@ -1973,7 +1985,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       </div>
                     
                     <TaskDetailsPanelWrapper
-                      taskDetailsData={taskDetailsData}
+                      taskDetailsData={adjustedTaskDetailsData}
                       generationName={generationName}
                       onGenerationNameChange={handleGenerationNameChange}
                       isEditingGenerationName={isEditingGenerationName}
