@@ -464,7 +464,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
         projectId: projectId || undefined,
         persistenceScope: 'project',
         enableProjectPersistence: true,
-        persistenceKey: 'join-clips-segments',
+        persistenceKey: 'join-clips',
     });
 
     // Handler to clear only the output URL from the parent generation (not delete the generation itself)
@@ -782,7 +782,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                             setNegativePrompt={(val) => joinSettings.updateField('negativePrompt', val)}
                             availableLoras={availableLoras}
                             projectId={projectId}
-                            loraPersistenceKey="join-clips-segments"
+                            loraPersistenceKey="join-clips"
                             onGenerate={handleConfirmJoin}
                             isGenerating={isJoiningClips}
                             generateSuccess={joinClipsSuccess}
