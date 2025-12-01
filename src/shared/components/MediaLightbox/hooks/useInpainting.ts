@@ -1835,9 +1835,9 @@ export const useInpainting = ({
       const maskUrl = await uploadImageToStorage(maskFile);
       console.log('[Inpaint] Mask uploaded:', maskUrl);
 
-      // Get source image URL (prefer upscaled if available)
+      // Get source image URL - location already contains the best version
       // FIX: Use 'url' field which is what the media object actually has
-      const sourceUrl = (media as any).upscaled_url || (media as any).url || media.location || media.imageUrl;
+      const sourceUrl = (media as any).url || media.location || media.imageUrl;
 
       // Create inpaint task
       console.log('[InpaintDebug] 📤 About to call createImageInpaintTask with:', {
@@ -1965,9 +1965,9 @@ export const useInpainting = ({
       const maskUrl = await uploadImageToStorage(maskFile);
       console.log('[AnnotatedEdit] Mask uploaded:', maskUrl);
 
-      // Get source image URL (prefer upscaled if available)
+      // Get source image URL - location already contains the best version
       // FIX: Use 'url' field which is what the media object actually has
-      const sourceUrl = (media as any).upscaled_url || (media as any).url || media.location || media.imageUrl;
+      const sourceUrl = (media as any).url || media.location || media.imageUrl;
 
       // Create annotated image edit task
       console.log('[AnnotatedEdit] 📤 About to call createAnnotatedImageEditTask with:', {

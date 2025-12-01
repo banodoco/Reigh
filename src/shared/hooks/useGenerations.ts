@@ -139,7 +139,6 @@ export async function fetchGenerations(
       starred,
       tasks,
       based_on,
-      upscaled_url,
       shot_data,
       name,
       is_child,
@@ -225,20 +224,6 @@ export async function fetchGenerations(
     return { items: [], total: totalCount, hasMore: false };
   }
 
-  // [UpscaleDebug] ALWAYS log to confirm function is running
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[UpscaleDebug] ===== fetchGenerations called =====', {
-      projectId,
-      totalItems: data?.length || 0,
-      itemsWithUpscaledUrl: data?.filter((item: any) => item.upscaled_url).length || 0,
-      allItemIds: data?.slice(0, 3).map((item: any) => ({
-        id: item.id?.substring(0, 8),
-        hasUpscaledUrl: !!item.upscaled_url,
-        upscaledUrl: item.upscaled_url ? item.upscaled_url.substring(0, 60) + '...' : 'NONE',
-        location: item.location ? item.location.substring(0, 60) + '...' : 'NONE'
-      }))
-    });
-  }
 
   // Calculate hasMore and process results based on count strategy
   let finalData = data || [];
@@ -257,18 +242,9 @@ export async function fetchGenerations(
 
   // Use shared transformer instead of inline transformation logic
   const items = finalData?.map((item: any) => {
-    // [UpscaleDebug] Preserve existing debug logging
-    if (item.upscaled_url && process.env.NODE_ENV === 'development') {
-      console.log('[UpscaleDebug] Processing item with upscaled_url:', {
-        id: item.id?.substring(0, 8),
-        upscaled_url: item.upscaled_url?.substring(0, 60)
-      });
-    }
-
     // Transform using shared function - handles all the complex logic
     return transformGeneration(item as RawGeneration, {
       shotId: filters?.shotId,
-      verbose: !!item.upscaled_url, // Enable verbose logging for upscaled items
     });
   }) || [];
 

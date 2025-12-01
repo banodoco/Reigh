@@ -162,6 +162,16 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                     location: transformed.location?.substring(0, 50),
                     timestamp: Date.now()
                 });
+                // Debug duration for trimmed videos
+                console.log('[TrimDurationFix] ChildGenerationsView transformed item:', {
+                    id: transformed.id?.substring(0, 8),
+                    'params.duration_seconds': transformed.params?.duration_seconds,
+                    'params.trimmed_duration': transformed.params?.trimmed_duration,
+                    'metadata.duration_seconds': item.metadata?.duration_seconds,
+                    'metadata.trimmed_duration': item.metadata?.trimmed_duration,
+                    'raw_params.duration_seconds': item.params?.duration_seconds,
+                    paramsKeys: transformed.params ? Object.keys(transformed.params).slice(0, 10) : [],
+                });
             }
             
             return transformed;
@@ -577,8 +587,10 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
     return (
         <div className="w-full min-h-screen">
             {/* Header - sticky with full-width background that respects panes */}
+            {/* On mobile, GlobalHeader is NOT sticky (scrolls away), so we use top-0 */}
+            {/* On desktop (md+), GlobalHeader is sticky at h-24 (96px), so we use top-24 */}
             <div 
-                className="sticky top-[60px] md:top-24 z-30 bg-background/95 backdrop-blur-sm border-b border-border/50"
+                className="sticky top-0 md:top-24 z-30 bg-background/95 backdrop-blur-sm border-b border-border/50"
                 style={{
                     // Extend background to edges using negative margins, accounting for panes
                     marginLeft: `calc(-50vw + 50% + ${isShotsPaneLocked ? shotsPaneWidth / 2 : 0}px)`,
@@ -809,6 +821,7 @@ export const ChildGenerationsView: React.FC<ChildGenerationsViewProps> = ({
                         starred={(childMedia as { starred?: boolean }).starred ?? false}
                         shotId={undefined}
                         showTaskDetails={true}
+                        showVideoTrimEditor={true}
                         taskDetailsData={{
                             task: segmentTask,
                             isLoading: isLoadingSegmentTask,

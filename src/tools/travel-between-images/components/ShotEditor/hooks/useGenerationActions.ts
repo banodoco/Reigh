@@ -786,7 +786,6 @@ export const useGenerationActions = ({
           type: 'image' as const,
           created_at: new Date().toISOString(),
           starred: false,
-          upscaled_url: null,
           name: file.name,
           based_on: null,
           params: {},

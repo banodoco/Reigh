@@ -32,7 +32,6 @@ export const transformExternalGeneration = (
     metadata: (typeof data.params === 'object' && data.params !== null && !Array.isArray(data.params)) 
       ? data.params as Record<string, unknown> 
       : {},
-    upscaled_url: data.upscaled_url,
     starred: data.starred ?? false,
     all_shot_associations: allAssociations,
     ...(shotGenerations.length > 0 ? {

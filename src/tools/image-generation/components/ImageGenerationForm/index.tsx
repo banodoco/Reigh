@@ -1305,9 +1305,40 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
 
       // Create lightweight pointer to existing resource
+      // Explicitly set subjectDescription and styleBoostTerms to empty strings
+      // so they don't inherit from the resource's metadata
+      // Preserve the current referenceMode and set corresponding strength values
       const newPointer: ReferenceImage = {
         id: nanoid(),
         resourceId: resource.id,
+        subjectDescription: '',
+        styleBoostTerms: '',
+        referenceMode: referenceMode,
+        // Set strength values based on mode (same logic as handleReferenceModeChange)
+        ...(referenceMode === 'style' && {
+          styleReferenceStrength: 1.1,
+          subjectStrength: 0,
+          inThisScene: false,
+          inThisSceneStrength: 0,
+        }),
+        ...(referenceMode === 'subject' && {
+          styleReferenceStrength: 0.3,
+          subjectStrength: 1.0,
+          inThisScene: false,
+          inThisSceneStrength: 0,
+        }),
+        ...(referenceMode === 'scene' && {
+          styleReferenceStrength: 0,
+          subjectStrength: 0,
+          inThisScene: true,
+          inThisSceneStrength: 1.0,
+        }),
+        ...(referenceMode === 'custom' && {
+          styleReferenceStrength: styleReferenceStrength,
+          subjectStrength: subjectStrength,
+          inThisScene: inThisScene,
+          inThisSceneStrength: inThisSceneStrength,
+        }),
       };
       
       console.log('[RefBrowser] 🔗 Linking existing resource:', {
@@ -1362,7 +1393,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       console.error('[RefBrowser] ❌ Failed to link resource:', error);
       toast.error('Failed to add reference');
     }
-  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted, referencePointers, selectedReferenceIdByShot]);
+  }, [effectiveShotId, updateProjectImageSettings, queryClient, selectedProjectId, markAsInteracted, referencePointers, selectedReferenceIdByShot, referenceMode, styleReferenceStrength, subjectStrength, inThisScene, inThisSceneStrength]);
 
   // Handle selecting a reference for the current shot
   const handleSelectReference = useCallback(async (referenceId: string) => {

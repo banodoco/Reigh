@@ -246,7 +246,6 @@ export const useImageGalleryActions = ({
         based_on: image.based_on, // Include based_on in metadata for MediaLightbox
       },
       thumbUrl: image.isVideo ? image.url : undefined, // simple fallback
-      upscaled_url: image.upscaled_url, // Pass through upscaled version URL if available
       based_on: image.based_on, // Include based_on field directly on the GenerationRow
     } as GenerationRow;
     

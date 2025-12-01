@@ -94,6 +94,50 @@ export type Database = {
           },
         ]
       }
+      generation_variants: {
+        Row: {
+          id: string
+          generation_id: string
+          location: string
+          thumbnail_url: string | null
+          params: Json | null
+          is_primary: boolean
+          variant_type: string | null
+          name: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          generation_id: string
+          location: string
+          thumbnail_url?: string | null
+          params?: Json | null
+          is_primary?: boolean
+          variant_type?: string | null
+          name?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          generation_id?: string
+          location?: string
+          thumbnail_url?: string | null
+          params?: Json | null
+          is_primary?: boolean
+          variant_type?: string | null
+          name?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_variants_generation_id_fkey"
+            columns: ["generation_id"]
+            isOneToOne: false
+            referencedRelation: "generations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generations: {
         Row: {
           based_on: string | null
@@ -106,13 +150,13 @@ export type Database = {
           name: string | null
           params: Json | null
           parent_generation_id: string | null
+          primary_variant_id: string | null
           project_id: string
           starred: boolean
           tasks: Json | null
           thumbnail_url: string | null
           type: string | null
           updated_at: string | null
-          upscaled_url: string | null
         }
         Insert: {
           based_on?: string | null
@@ -125,13 +169,13 @@ export type Database = {
           name?: string | null
           params?: Json | null
           parent_generation_id?: string | null
+          primary_variant_id?: string | null
           project_id: string
           starred?: boolean
           tasks?: Json | null
           thumbnail_url?: string | null
           type?: string | null
           updated_at?: string | null
-          upscaled_url?: string | null
         }
         Update: {
           based_on?: string | null
@@ -144,13 +188,13 @@ export type Database = {
           name?: string | null
           params?: Json | null
           parent_generation_id?: string | null
+          primary_variant_id?: string | null
           project_id?: string
           starred?: boolean
           tasks?: Json | null
           thumbnail_url?: string | null
           type?: string | null
           updated_at?: string | null
-          upscaled_url?: string | null
         }
         Relationships: [
           {
@@ -165,6 +209,13 @@ export type Database = {
             columns: ["parent_generation_id"]
             isOneToOne: false
             referencedRelation: "generations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generations_primary_variant_id_fkey"
+            columns: ["primary_variant_id"]
+            isOneToOne: false
+            referencedRelation: "generation_variants"
             referencedColumns: ["id"]
           },
           {

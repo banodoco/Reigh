@@ -242,16 +242,16 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return unsubscribe;
   }, [queryClient]);
   
-  // Enhance media object with starred and upscaled_url fields - subscribe to React Query cache for real-time updates
+  // Enhance media object with starred field - subscribe to React Query cache for real-time updates
   const enhancedMedia = useMemo(() => {
     if (!activeLightboxMedia) return null;
     
     // First, try to find in filteredImages (normal case)
     let foundImage = filteredImages.find(img => img.id === activeLightboxMedia.id);
     
-    // If not found or starred/upscaled_url is undefined, check React Query cache directly
+    // If not found or starred is undefined, check React Query cache directly
     // This ensures we get the latest optimistically-updated values
-    if (!foundImage || foundImage.starred === undefined || !foundImage.upscaled_url) {
+    if (!foundImage || foundImage.starred === undefined) {
       const queries = queryClient.getQueriesData({ queryKey: ['unified-generations'] });
       for (const [, data] of queries) {
         if (data && typeof data === 'object' && 'items' in data) {
@@ -261,7 +261,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
             console.log('[StarPersist] 📦 Found values in React Query cache:', {
               mediaId: activeLightboxMedia.id,
               starred: cacheItem.starred,
-              hasUpscaledUrl: !!cacheItem.upscaled_url,
               source: 'queryCache'
             });
             break;
@@ -271,12 +270,10 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     }
     
     const starred = foundImage?.starred || false;
-    const upscaled_url = foundImage?.upscaled_url || activeLightboxMedia.upscaled_url || null;
     
     console.log('[StarPersist] 🎨 Enhanced media created:', {
       mediaId: activeLightboxMedia.id,
       starred,
-      hasUpscaledUrl: !!upscaled_url,
       foundInFilteredImages: !!filteredImages.find(img => img.id === activeLightboxMedia.id),
       source: foundImage ? 'found' : 'default',
       cacheVersion
@@ -288,7 +285,6 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     return {
       ...activeLightboxMedia,
       starred,
-      upscaled_url,
       metadata: cleanMetadata
     };
   }, [activeLightboxMedia, filteredImages, queryClient, cacheVersion]);
@@ -516,7 +512,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
         const shotGenerations = (data as any).shot_generations || [];
         
         // Database fields: location (full image), thumbnail_url (thumb)
-        const imageUrl = (data as any).location || (data as any).upscaled_url || (data as any).thumbnail_url;
+        const imageUrl = (data as any).location || (data as any).thumbnail_url;
         const thumbUrl = (data as any).thumbnail_url || (data as any).location;
         
         const transformedData: GeneratedImageWithMetadata = {

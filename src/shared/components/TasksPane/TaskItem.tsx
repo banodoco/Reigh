@@ -258,19 +258,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       shotIds: shotIds.map((id: string) => id.substring(0, 8)),
       hasLocation: !!actualGeneration.location,
       hasThumbnailUrl: !!(actualGeneration as any).thumbnail_url,
-      hasUpscaledUrl: !!(actualGeneration as any).upscaled_url,
       locationPreview: (actualGeneration.location || '').substring(0, 80),
       thumbnailUrlPreview: ((actualGeneration as any).thumbnail_url || '').substring(0, 80),
-      upscaledUrlPreview: ((actualGeneration as any).upscaled_url || '').substring(0, 80),
-      finalImageUrl: (actualGeneration.location || (actualGeneration as any).upscaled_url || (actualGeneration as any).thumbnail_url || '').substring(0, 80),
+      finalImageUrl: (actualGeneration.location || (actualGeneration as any).thumbnail_url || '').substring(0, 80),
       finalThumbUrl: ((actualGeneration as any).thumbnail_url || actualGeneration.location || '').substring(0, 80),
       actualGenerationKeys: Object.keys(actualGeneration).join(', '),
       timestamp: Date.now()
     });
     
     // Database fields: location (full image), thumbnail_url (thumb)
-    // Note: Sometimes location might be incomplete, check upscaled_url as fallback
-    const imageUrl = actualGeneration.location || (actualGeneration as any).upscaled_url || (actualGeneration as any).thumbnail_url;
+    const imageUrl = actualGeneration.location || (actualGeneration as any).thumbnail_url;
     const thumbUrl = (actualGeneration as any).thumbnail_url || actualGeneration.location;
     
     return {

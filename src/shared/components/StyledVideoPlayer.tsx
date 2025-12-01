@@ -13,6 +13,10 @@ interface StyledVideoPlayerProps {
   autoPlay?: boolean;
   playsInline?: boolean;
   preload?: 'auto' | 'metadata' | 'none';
+  /** Expected duration in seconds - fallback for WebM files with broken metadata */
+  expectedDuration?: number;
+  /** Callback when video metadata loads */
+  onLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
 }
 
 export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
@@ -24,7 +28,9 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   muted = true,
   autoPlay = true,
   playsInline = true,
-  preload = 'auto'
+  preload = 'auto',
+  expectedDuration,
+  onLoadedMetadata,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -34,7 +40,26 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
 
+  // When expectedDuration changes and is valid, always use it (it's the source of truth from DB)
+  useEffect(() => {
+    console.log('[TrimDurationFix] StyledVideoPlayer expectedDuration prop changed:', {
+      expectedDuration,
+      isFinite: expectedDuration ? Number.isFinite(expectedDuration) : 'N/A',
+      currentDurationState: duration,
+    });
+    
+    // If we have a valid expectedDuration, always use it (DB is source of truth for trimmed videos)
+    if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
+      console.log('[TrimDurationFix] StyledVideoPlayer: setting duration from expectedDuration:', expectedDuration);
+      setDuration(expectedDuration);
+    }
+  }, [expectedDuration]); // Only depend on expectedDuration, not duration (to avoid loops)
+
   const formatTime = (seconds: number): string => {
+    // Handle invalid values (Infinity, NaN, negative)
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return '0:00';
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -86,7 +111,18 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
     if (!video) return;
 
     const updateTime = () => setCurrentTime(video.currentTime);
-    const updateDuration = () => setDuration(video.duration);
+    const updateDuration = () => {
+      // Only use video duration if it's valid (not Infinity for broken WebM)
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        console.log('[TrimDurationFix] StyledVideoPlayer: valid duration from video:', video.duration);
+        setDuration(video.duration);
+      } else if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
+        console.log('[TrimDurationFix] StyledVideoPlayer: using expectedDuration:', expectedDuration);
+        setDuration(expectedDuration);
+      } else {
+        console.log('[TrimDurationFix] StyledVideoPlayer: invalid duration and no fallback:', video.duration);
+      }
+    };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
@@ -101,7 +137,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
     };
-  }, []);
+  }, [expectedDuration]);
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
@@ -144,6 +180,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         className="w-full h-auto object-contain rounded-lg bg-black/5 cursor-pointer video-clickable-area"
         style={{ maxHeight: '100%' }}
         onDoubleClick={toggleFullscreen}
+        onLoadedMetadata={onLoadedMetadata}
       >
         Your browser does not support the video tag.
       </video>

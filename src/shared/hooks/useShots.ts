@@ -361,7 +361,6 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
                 type,
                 created_at,
                 starred,
-                upscaled_url,
                 name,
                 based_on,
                 params
@@ -396,7 +395,6 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
                 type: gen.type || 'image',
                 createdAt: gen.created_at,
                 starred: gen.starred || false,
-                upscaled_url: gen.upscaled_url,
                 name: gen.name,
                 based_on: gen.based_on,
                 params: gen.params,
@@ -668,7 +666,6 @@ export const useAddImageToShot = () => {
             type: 'image',
             created_at: new Date().toISOString(),
             starred: false,
-            upscaled_url: null,
             name: null,
             based_on: null,
             params: {},

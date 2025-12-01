@@ -257,7 +257,6 @@ export const useAllShotGenerations = (
             type,
             created_at,
             starred,
-            upscaled_url,
             name,
             based_on,
             params
@@ -322,7 +321,6 @@ export const useAllShotGenerations = (
           created_at: gen.created_at,
           createdAt: gen.created_at,
           starred: gen.starred,
-          upscaled_url: gen.upscaled_url,
           name: gen.name,
           based_on: gen.based_on,
           params: gen.params,
@@ -416,7 +414,6 @@ export const useAllShotGenerations = (
           type: gen.type,
           createdAt: gen.createdAt,
           starred: gen.starred,
-          upscaled_url: gen.upscaled_url,
           name: gen.name,
           based_on: gen.based_on,
           params: gen.params,

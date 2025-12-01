@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import { isVideoAny } from '@/shared/lib/typeGuards';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -71,6 +71,15 @@ import { FlexContainer, MediaWrapper } from './components/layouts';
 
 // Import utils
 import { downloadMedia } from './utils';
+
+// Import video trim components (conditional for segment videos)
+import {
+  useVariants,
+  useVideoTrimming,
+  useTrimSave,
+  TrimControlsPanel,
+  VariantSelector,
+} from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
 
 interface ShotOption {
   id: string;
@@ -147,6 +156,9 @@ interface MediaLightboxProps {
   // Tasks pane integration (desktop only)
   tasksPaneOpen?: boolean;
   tasksPaneWidth?: number;
+  // Video trim functionality (optional, only for segment videos)
+  showVideoTrimEditor?: boolean;
+  onTrimModeChange?: (isTrimMode: boolean) => void;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({ 
@@ -207,6 +219,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   shotId,
   tasksPaneOpen = false,
   tasksPaneWidth = 320,
+  // Video trim functionality
+  showVideoTrimEditor = false,
+  onTrimModeChange,
 }) => {
   // ========================================
   // REFACTORED: All logic extracted to hooks
@@ -239,6 +254,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const { selectedProjectId } = useProject();
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
+
+  // Video trim mode state (only used when showVideoTrimEditor is true)
+  const [isVideoTrimMode, setIsVideoTrimMode] = useState(false);
 
   // Track component lifecycle and media changes - ALL TOP LEVEL
   useEffect(() => {
@@ -527,6 +545,141 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleAddToShot,
     handleAddToShotWithoutPosition,
   } = shotPositioningHook;
+
+  // ========================================
+  // VIDEO TRIM HOOKS (only when showVideoTrimEditor is true)
+  // ========================================
+
+  // Variants hook - fetch available variants for this generation
+  const variantsHook = useVariants({
+    generationId: showVideoTrimEditor ? media.id : null,
+    enabled: showVideoTrimEditor && isVideo,
+  });
+  const {
+    variants,
+    primaryVariant,
+    activeVariant,
+    isLoading: isLoadingVariants,
+    setActiveVariantId,
+    refetch: refetchVariants,
+    setPrimaryVariant,
+  } = variantsHook;
+
+  // Video trimming hook - manage trim state
+  const trimmingHook = useVideoTrimming();
+  const {
+    trimState,
+    setStartTrim,
+    setEndTrim,
+    resetTrim,
+    setVideoDuration,
+    trimmedDuration,
+    hasTrimChanges,
+  } = trimmingHook;
+
+  // Get the effective video URL (active variant or current media)
+  const effectiveVideoUrl = useMemo(() => {
+    if (showVideoTrimEditor && activeVariant) {
+      return activeVariant.location;
+    }
+    return effectiveImageUrl;
+  }, [showVideoTrimEditor, activeVariant, effectiveImageUrl]);
+
+  // Trim save hook - handle saving trimmed video
+  const trimSaveHook = useTrimSave({
+    generationId: media.id,
+    projectId: selectedProjectId,
+    sourceVideoUrl: effectiveVideoUrl,
+    trimState,
+    sourceVariantId: activeVariant?.id,
+    onSuccess: () => {
+      resetTrim();
+      refetchVariants();
+      setIsVideoTrimMode(false);
+      onTrimModeChange?.(false);
+    },
+  });
+  const {
+    isSaving: isSavingTrim,
+    saveProgress: trimSaveProgress,
+    saveError: trimSaveError,
+    saveSuccess: trimSaveSuccess,
+    saveTrimmedVideo,
+  } = trimSaveHook;
+
+  // Get fallback duration from variant params or media params (for trimmed WebM files with broken metadata)
+  const fallbackDuration = useMemo(() => {
+    // First try active variant's params (when switching variants)
+    if (activeVariant?.params?.duration_seconds) {
+      console.log('[TrimDurationFix] Using activeVariant duration:', activeVariant.params.duration_seconds);
+      return activeVariant.params.duration_seconds;
+    }
+    
+    // Handle case where params might be a JSON string
+    let params = media.params;
+    if (typeof params === 'string') {
+      try {
+        params = JSON.parse(params);
+      } catch (e) {
+        console.log('[TrimDurationFix] Failed to parse params string:', params);
+      }
+    }
+    
+    const duration = params?.duration_seconds || (media as any).metadata?.duration_seconds;
+    console.log('[TrimDurationFix] MediaLightbox fallbackDuration:', {
+      mediaId: media.id?.slice(0, 8),
+      hasActiveVariant: !!activeVariant,
+      activeVariantDuration: activeVariant?.params?.duration_seconds,
+      'params?.duration_seconds': params?.duration_seconds,
+      computedDuration: duration,
+    });
+    return duration;
+  }, [media, activeVariant]);
+
+  // Handle entering/exiting video trim mode
+  const handleEnterVideoTrimMode = useCallback(() => {
+    setIsVideoTrimMode(true);
+    onTrimModeChange?.(true);
+    
+    // Try to capture video duration from already-loaded video element
+    // This handles the case where the video was loaded before entering trim mode
+    setTimeout(() => {
+      const videoElements = document.querySelectorAll('video');
+      let foundValidDuration = false;
+      
+      videoElements.forEach((video) => {
+        // Only use duration if it's a valid finite number (not Infinity for broken WebM files)
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          console.log('[TrimDurationFix] Captured video duration from DOM:', video.duration);
+          setVideoDuration(video.duration);
+          foundValidDuration = true;
+        } else {
+          console.log('[TrimDurationFix] Invalid video duration from DOM:', video.duration, '- will try fallback');
+        }
+      });
+      
+      // If no valid duration from video element, use fallback from params
+      if (!foundValidDuration && fallbackDuration && Number.isFinite(fallbackDuration) && fallbackDuration > 0) {
+        console.log('[TrimDurationFix] Using fallback duration from params:', fallbackDuration);
+        setVideoDuration(fallbackDuration);
+      }
+    }, 100);
+  }, [onTrimModeChange, setVideoDuration, fallbackDuration]);
+
+  const handleExitVideoTrimMode = useCallback(() => {
+    setIsVideoTrimMode(false);
+    resetTrim();
+    onTrimModeChange?.(false);
+  }, [resetTrim, onTrimModeChange]);
+
+  // Track if we're in any special edit mode (including video trim)
+  const isVideoTrimModeActive = showVideoTrimEditor && isVideo && isVideoTrimMode;
+
+  // Combined special edit mode (for hiding certain UI elements)
+  const isAnySpecialEditMode = isSpecialEditMode || isVideoTrimModeActive;
+
+  // Should show side panel (includes video trim mode)
+  const shouldShowSidePanelWithTrim = shouldShowSidePanel || isVideoTrimModeActive;
 
   // ========================================
   // SIMPLE HANDLERS - Just call props
@@ -1058,7 +1211,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             )}
             style={shouldShowSidePanel && tasksPaneOpen && !isMobile ? {
               width: `calc(100vw - ${tasksPaneWidth}px)`
-            } : shouldShowSidePanel ? {
+            } : shouldShowSidePanelWithTrim ? {
               width: '100vw'
             } : undefined}
             onPointerDownOutside={(event) => {
@@ -1116,8 +1269,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               View and interact with {media.type?.includes('video') ? 'video' : 'image'} in full screen. Use arrow keys to navigate, Escape to close.
             </DialogPrimitive.Description>
             
-            {shouldShowSidePanel ? (
-              // Tablet/Desktop layout with side panel (task details, inpaint, or magic edit)
+            {shouldShowSidePanelWithTrim ? (
+              // Tablet/Desktop layout with side panel (task details, inpaint, magic edit, or video trim)
               <div 
                 className="w-full h-full flex bg-black/90"
                 onClick={(e) => {
@@ -1161,8 +1314,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
                   {/* Media Content */}
                   <MediaDisplayWithCanvas
-                    effectiveImageUrl={effectiveImageUrl}
-                    thumbUrl={media.thumbUrl}
+                    effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveImageUrl}
+                    thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
                     isVideo={isVideo}
                     isFlippedHorizontally={isFlippedHorizontally}
                     isSaving={isSaving}
@@ -1173,6 +1326,20 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     displayCanvasRef={displayCanvasRef}
                     maskCanvasRef={maskCanvasRef}
                     onImageLoad={setImageDimensions}
+                    expectedDuration={fallbackDuration}
+                    onVideoLoadedMetadata={(e) => {
+                      const video = e.currentTarget;
+                      // Only set duration if it's a valid finite number (not Infinity for broken WebM files)
+                      if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                        console.log('[TrimDurationFix] MediaLightbox video duration captured:', video.duration);
+                        setVideoDuration(video.duration);
+                      } else if (showVideoTrimEditor && fallbackDuration && Number.isFinite(fallbackDuration) && fallbackDuration > 0) {
+                        console.log('[TrimDurationFix] Using fallback duration:', fallbackDuration);
+                        setVideoDuration(fallbackDuration);
+                      } else if (showVideoTrimEditor) {
+                        console.log('[TrimDurationFix] MediaLightbox video duration invalid and no fallback:', video.duration);
+                      }
+                    }}
                     handlePointerDown={handlePointerDown}
                     handlePointerMove={handlePointerMove}
                     handlePointerUp={handlePointerUp}
@@ -1337,7 +1504,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                   </div>
 
-                {/* Task Details / Inpaint / Magic Edit Panel - Right side (40% width) */}
+                {/* Task Details / Inpaint / Magic Edit / Video Trim Panel - Right side (40% width) */}
                 <div 
                   data-task-details-panel
                   className={cn(
@@ -1346,7 +1513,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
                   style={{ width: '40%' }}
                 >
-                  {isSpecialEditMode ? (
+                  {isVideoTrimModeActive ? (
+                    <TrimControlsPanel
+                      trimState={trimState}
+                      onStartTrimChange={setStartTrim}
+                      onEndTrimChange={setEndTrim}
+                      onResetTrim={resetTrim}
+                      trimmedDuration={trimmedDuration}
+                      hasTrimChanges={hasTrimChanges}
+                      onSave={saveTrimmedVideo}
+                      isSaving={isSavingTrim}
+                      saveProgress={trimSaveProgress}
+                      saveError={trimSaveError}
+                      saveSuccess={trimSaveSuccess}
+                      onClose={handleExitVideoTrimMode}
+                      variant="desktop"
+                      videoUrl={effectiveVideoUrl}
+                    />
+                  ) : isSpecialEditMode ? (
                     <EditModePanel
                       sourceGenerationData={sourceGenerationData}
                       onOpenExternalGeneration={onOpenExternalGeneration}
@@ -1417,7 +1601,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           <div></div>
                         )}
                         
-                        {/* Info | Edit Toggle and Close Button */}
+                        {/* Info | Edit | Trim Toggle and Close Button */}
                         <div className="flex items-center gap-3">
                           {showImageEditTools && !readOnly && !isVideo && (
                             <div className="flex items-center gap-1 bg-muted rounded-md p-1">
@@ -1438,6 +1622,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               </button>
                             </div>
                           )}
+                          {/* Video Trim toggle (only for segment videos with trim editor enabled) */}
+                          {showVideoTrimEditor && isVideo && !readOnly && (
+                            <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                              <button
+                                className="px-3 py-1.5 text-sm rounded transition-colors bg-background text-foreground shadow-sm"
+                                disabled
+                              >
+                                Info
+                              </button>
+                              <button
+                                onClick={handleEnterVideoTrimMode}
+                                className="px-3 py-1.5 text-sm rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-background/50"
+                              >
+                                Trim
+                              </button>
+                            </div>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1448,6 +1649,19 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           </Button>
                         </div>
                       </div>
+
+                    {/* Variant Selector (for videos with multiple variants) */}
+                    {showVideoTrimEditor && isVideo && variants.length > 1 && (
+                      <div className="p-4 border-b border-border">
+                        <VariantSelector
+                          variants={variants}
+                          activeVariantId={activeVariant?.id || null}
+                          onVariantSelect={setActiveVariantId}
+                          onMakePrimary={setPrimaryVariant}
+                          isLoading={isLoadingVariants}
+                        />
+                      </div>
+                    )}
                     
                     <TaskDetailsPanelWrapper
                       taskDetailsData={taskDetailsData}
@@ -1493,14 +1707,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Content - same as above but adapted for mobile */}
                     {isVideo ? (
                       <StyledVideoPlayer
-                        src={effectiveImageUrl}
-                        poster={media.thumbUrl}
+                        src={effectiveVideoUrl}
+                        poster={activeVariant?.thumbnail_url || media.thumbUrl}
                         loop
                         muted
                         autoPlay
                         playsInline
                         preload="auto"
                         className="max-w-full max-h-full shadow-wes border border-border/20"
+                        expectedDuration={fallbackDuration}
+                        onLoadedMetadata={(e) => {
+                          const video = e.currentTarget;
+                          if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                            console.log('[TrimDurationFix] Video duration (mobile):', video.duration);
+                            setVideoDuration(video.duration);
+                          } else if (showVideoTrimEditor && fallbackDuration && Number.isFinite(fallbackDuration)) {
+                            console.log('[TrimDurationFix] Using fallback duration (mobile):', fallbackDuration);
+                            setVideoDuration(fallbackDuration);
+                          }
+                        }}
                       />
                     ) : (
                     <MediaDisplayWithCanvas
@@ -1805,14 +2030,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   {/* Media Display - The wrapper now handles centering */}
                 {isVideo ? (
                   <StyledVideoPlayer
-                    src={effectiveImageUrl}
-                    poster={media.thumbUrl}
+                    src={effectiveVideoUrl}
+                    poster={activeVariant?.thumbnail_url || media.thumbUrl}
                     loop
                     muted
                     autoPlay
                     playsInline
                     preload="auto"
                     className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
+                    expectedDuration={fallbackDuration}
+                    onLoadedMetadata={(e) => {
+                      const video = e.currentTarget;
+                      if (Number.isFinite(video.duration) && video.duration > 0 && showVideoTrimEditor) {
+                        console.log('[TrimDurationFix] Video duration (regular):', video.duration);
+                        setVideoDuration(video.duration);
+                      } else if (showVideoTrimEditor && fallbackDuration && Number.isFinite(fallbackDuration)) {
+                        console.log('[TrimDurationFix] Using fallback duration (regular):', fallbackDuration);
+                        setVideoDuration(fallbackDuration);
+                      }
+                    }}
                   />
                 ) : (
                   <MediaDisplayWithCanvas

@@ -779,30 +779,55 @@ serve(async (req) => {
               return new Response(`Generation creation failed: ${genError.message}`, { status: 500 });
             }
           } else if (taskCategory === 'upscale') {
-            // Special handling for upscale tasks: update existing generation with upscaled_url
+            // Special handling for upscale tasks: create an upscaled variant as the new primary
             console.log(`[ImageUpscale] Processing upscale task ${taskIdString} (task_type: ${taskData.task_type})`);
 
             const generationId = taskData.params?.generation_id;
             if (generationId) {
               try {
-                console.log(`[ImageUpscale] Updating generation ${generationId} with upscaled_url: ${publicUrl}`);
-                const { error: updateError } = await supabaseAdmin
+                console.log(`[ImageUpscale] Creating upscaled variant for generation ${generationId}`);
+                
+                // Fetch the source generation to get its params
+                const { data: sourceGen, error: fetchError } = await supabaseAdmin
                   .from('generations')
-                  .update({ upscaled_url: publicUrl })
-                  .eq('id', generationId);
-
-                if (updateError) {
-                  console.error(`[ImageUpscale] Error updating generation ${generationId}:`, updateError);
-                  // Don't fail the task - the upscaled image is still in output_location
-                } else {
-                  console.log(`[ImageUpscale] Successfully updated generation ${generationId} with upscaled_url`);
+                  .select('params, thumbnail_url')
+                  .eq('id', generationId)
+                  .single();
+                
+                if (fetchError) {
+                  console.error(`[ImageUpscale] Error fetching source generation:`, fetchError);
                 }
+                
+                // Build params for the upscaled variant
+                const upscaleParams = {
+                  ...(sourceGen?.params || {}),
+                  upscale_task_id: taskIdString,
+                  upscaled_from: taskData.params?.image || null,
+                  upscale_model: taskData.params?.model || 'unknown'
+                };
+                
+                // Create the upscaled variant as the NEW primary
+                // The trigger will:
+                // 1. Unset the old primary variant
+                // 2. Sync the upscaled location to generations.location
+                await createVariant(
+                  supabaseAdmin,
+                  generationId,
+                  publicUrl,                          // The upscaled image URL
+                  thumbnailUrl || sourceGen?.thumbnail_url || null,  // Keep existing thumbnail or use new one
+                  upscaleParams,
+                  true,                               // is_primary: upscaled becomes the new primary!
+                  'upscaled',                         // variant_type
+                  'Upscaled'                          // name
+                );
+                
+                console.log(`[ImageUpscale] Successfully created upscaled variant for generation ${generationId}`);
               } catch (updateErr) {
-                console.error(`[ImageUpscale] Exception updating generation:`, updateErr);
-                // Don't fail the task
+                console.error(`[ImageUpscale] Exception creating upscaled variant:`, updateErr);
+                // Don't fail the task - the upscaled image is still in output_location
               }
             } else {
-              console.log(`[ImageUpscale] No generation_id in task params, skipping generation update`);
+              console.log(`[ImageUpscale] No generation_id in task params, skipping upscaled variant creation`);
             }
           } else if (taskCategory === 'inpaint') {
             // Special handling for inpaint tasks: create new generation(s) based on source
@@ -1568,6 +1593,8 @@ async function findExistingGeneration(supabase: any, taskId: string): Promise<an
 
 /**
  * Insert generation record
+ * Note: The database trigger will automatically create a primary variant
+ * when a generation with a location is inserted.
  */
 async function insertGeneration(supabase: any, record: any): Promise<any> {
   const { data, error } = await supabase
@@ -1580,6 +1607,56 @@ async function insertGeneration(supabase: any, record: any): Promise<any> {
     throw new Error(`Failed to insert generation: ${error.message}`);
   }
 
+  return data;
+}
+
+/**
+ * Create a generation variant
+ * Used for upscales, edits, and other alternate versions of a generation.
+ * 
+ * @param supabase - Supabase client
+ * @param generationId - The parent generation ID
+ * @param location - URL to the variant content
+ * @param thumbnailUrl - Thumbnail URL (optional)
+ * @param params - Generation parameters for this variant
+ * @param isPrimary - Whether this should be the primary variant (triggers sync to generation)
+ * @param variantType - Type of variant: 'original', 'upscaled', 'edit', etc.
+ * @param name - Human-readable name (optional)
+ */
+async function createVariant(
+  supabase: any,
+  generationId: string,
+  location: string,
+  thumbnailUrl: string | null,
+  params: any,
+  isPrimary: boolean,
+  variantType: string | null,
+  name?: string | null
+): Promise<any> {
+  const variantRecord = {
+    generation_id: generationId,
+    location,
+    thumbnail_url: thumbnailUrl,
+    params,
+    is_primary: isPrimary,
+    variant_type: variantType,
+    name: name || null,
+    created_at: new Date().toISOString()
+  };
+
+  console.log(`[Variant] Creating variant for generation ${generationId}: type=${variantType}, isPrimary=${isPrimary}`);
+
+  const { data, error } = await supabase
+    .from('generation_variants')
+    .insert(variantRecord)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create variant: ${error.message}`);
+  }
+
+  console.log(`[Variant] Created variant ${data.id} for generation ${generationId}`);
   return data;
 }
 

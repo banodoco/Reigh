@@ -60,7 +60,6 @@ export function useTimelinePositionUtils({ shotId, generations, projectId }: Use
         location: gen.imageUrl || gen.location || undefined,
         type: gen.type || undefined,
         created_at: gen.createdAt || new Date().toISOString(),
-        upscaled_url: gen.upscaled_url || undefined,
         starred: gen.starred ?? undefined,
       }
     }));

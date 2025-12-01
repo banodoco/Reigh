@@ -60,7 +60,6 @@ export interface GenerationRow {
   name?: string; // Optional variant name
   timeline_frame?: number; // Position in timeline (from shot_generations table)
   starred?: boolean; // Whether this generation is starred
-  upscaled_url?: string | null; // URL of upscaled version if available
   derivedCount?: number; // Number of generations based on this one
   based_on?: string | null; // ID of source generation for lineage tracking (magic edits, variations)
   params?: any; // JSON parameters for the generation (prompt, settings, etc.)

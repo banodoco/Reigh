@@ -349,7 +349,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         const shotGenerations = (data as any).shot_generations || [];
         
         // Database fields: location (full image), thumbnail_url (thumb)
-        const imageUrl = (data as any).location || (data as any).upscaled_url || (data as any).thumbnail_url;
+        const imageUrl = (data as any).location || (data as any).thumbnail_url;
         const thumbUrl = (data as any).thumbnail_url || (data as any).location;
         
         const transformedData: GenerationRow = {

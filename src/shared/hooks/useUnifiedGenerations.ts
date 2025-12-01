@@ -127,7 +127,6 @@ async function fetchShotSpecificGenerations({
       updated_at,
       params,
       starred,
-      upscaled_url,
       name,
       shot_data${includeTaskData ? ',tasks' : ''}
     `, { count: 'exact' })
@@ -190,14 +189,6 @@ async function fetchShotSpecificGenerations({
   // Transform data - extract timeline_frame from shot_data JSONB
   let items = (data || [])
     .map((gen: any) => {
-      // [UpscaleDebug] Preserve existing debug logging
-      if (gen?.upscaled_url) {
-        console.log('[UpscaleDebug] useUnifiedGenerations found upscaled_url:', {
-          id: gen.id?.substring(0, 8),
-          upscaled_url: gen.upscaled_url?.substring(0, 60)
-        });
-      }
-      
       // Transform generation data
       const isVideo = gen.type?.toLowerCase().includes('video');
       const metadata = gen.params || {};
@@ -215,7 +206,6 @@ async function fetchShotSpecificGenerations({
         updatedAt: gen.updated_at, // Include updated_at for timestamp display
         isVideo,
         starred: gen.starred || false,
-        upscaledUrl: gen.upscaled_url,
         name: gen.name,
         position: timelineFrame,
         taskId: includeTaskData && gen.tasks ? (Array.isArray(gen.tasks) ? gen.tasks[0] : gen.tasks) : undefined,

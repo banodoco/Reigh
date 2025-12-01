@@ -24,7 +24,15 @@ export interface UseUpscaleReturn {
 
 /**
  * Hook for managing image upscaling functionality
- * Handles upscale task creation, state persistence, and version toggling
+ * 
+ * NOTE: With generation_variants system, upscaled versions become the primary variant.
+ * When upscale completes:
+ * 1. A new variant with variant_type='upscaled' is created as is_primary=true
+ * 2. This syncs to generations.location automatically via trigger
+ * 3. So media.url already IS the upscaled version after upscale completes
+ * 
+ * The toggle functionality is kept for backward compatibility but may need
+ * to be updated to use the variant switching system in the future.
  */
 export const useUpscale = ({
   media,
@@ -32,11 +40,16 @@ export const useUpscale = ({
   isVideo,
 }: UseUpscaleProps): UseUpscaleReturn => {
   const [isUpscaling, setIsUpscaling] = useState(false);
-  const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing upscaled if available
-  const hasUpscaledVersion = !!(media as any).upscaled_url;
-  const upscaledUrl = (media as any).upscaled_url || null;
-  // FIX: The media object uses 'url', not 'imageUrl' or 'location'
-  const originalUrl = (media as any).url || media.imageUrl || media.location || '';
+  const [showingUpscaled, setShowingUpscaled] = useState(true); // Default to showing primary (which is upscaled after upscale)
+  
+  // With variants, the media.url IS already the best version (primary variant)
+  // We can detect if it's been upscaled by checking the name or variant info
+  // For now, check if name includes 'Upscaled' as a heuristic
+  const hasUpscaledVersion = (media as any).name === 'Upscaled' || 
+                             (media as any).variant_type === 'upscaled';
+  
+  // The URL from media is already the primary variant (upscaled if available)
+  const primaryUrl = (media as any).url || media.imageUrl || media.location || '';
   
   // Track pending upscale tasks using localStorage
   const [isPendingUpscale, setIsPendingUpscale] = useState(() => {
@@ -58,21 +71,21 @@ export const useUpscale = ({
     console.log('[ImageUpscale] State update:', {
       mediaId: media.id,
       hasUpscaledVersion,
-      upscaledUrl,
       isPendingUpscale,
       isUpscaling,
       showingUpscaled,
+      mediaName: (media as any).name,
       mediaKeys: Object.keys(media),
       timestamp: Date.now()
     });
-  }, [media.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, showingUpscaled, media, upscaledUrl]);
+  }, [media.id, hasUpscaledVersion, isPendingUpscale, isUpscaling, showingUpscaled, media]);
 
   // Clear pending state when upscaled version becomes available
+  // With variants, we detect this by checking if the media name changed to 'Upscaled'
   useEffect(() => {
     console.log('[ImageUpscale] Checking if should clear pending state:', {
       hasUpscaledVersion,
       isPendingUpscale,
-      upscaledUrl,
       shouldClear: hasUpscaledVersion && isPendingUpscale
     });
     
@@ -90,7 +103,7 @@ export const useUpscale = ({
         reason: !hasUpscaledVersion ? 'no upscaled version yet' : 'not in pending state'
       });
     }
-  }, [hasUpscaledVersion, isPendingUpscale, media.id, upscaledUrl]);
+  }, [hasUpscaledVersion, isPendingUpscale, media.id]);
 
   // Handle upscale
   const handleUpscale = async () => {
@@ -101,15 +114,15 @@ export const useUpscale = ({
 
     setIsUpscaling(true);
     try {
-      // FIX: Use 'url' field which is what the media object actually has
-      const imageUrl = (media as any).url || media.location || media.imageUrl;
+      // Use the current primary URL as the source
+      const imageUrl = primaryUrl;
       if (!imageUrl) {
         throw new Error('No image URL available');
       }
 
       console.log('[ImageUpscale] Starting upscale for generation:', media.id);
 
-      // Create upscale task
+      // Create upscale task - this will create a new variant that becomes primary
       await createImageUpscaleTask({
         project_id: selectedProjectId,
         image_url: imageUrl,
@@ -139,43 +152,38 @@ export const useUpscale = ({
   };
 
   // Handle toggling between upscaled and original
+  // NOTE: With variants, this would need to switch the primary variant
+  // For now, this is a no-op since location already points to the best version
   const handleToggleUpscaled = () => {
+    // TODO: Implement variant switching when UI is ready
+    // For now, just toggle the state (doesn't change the actual image shown)
     setShowingUpscaled(!showingUpscaled);
+    console.log('[ImageUpscale] Toggle requested - variant switching not yet implemented');
   };
 
-  // Compute effective image URL based on upscale state
-  const effectiveImageUrl = (showingUpscaled && upscaledUrl) ? upscaledUrl : originalUrl;
+  // The effective URL is always the primary URL (which is upscaled if that's primary)
+  const effectiveImageUrl = primaryUrl;
   
-  // Debug logging for URL issues - ALL TOP LEVEL
-  console.log('[MediaDisplay] 🖼️ ========== URL COMPUTATION ==========');
-  console.log('[MediaDisplay] mediaId:', media.id.substring(0, 8));
-  console.log('[MediaDisplay] effectiveImageUrl:', effectiveImageUrl);
-  console.log('[MediaDisplay] originalUrl:', originalUrl);
-  console.log('[MediaDisplay] upscaledUrl:', upscaledUrl);
-  console.log('[MediaDisplay] showingUpscaled:', showingUpscaled);
-  console.log('[MediaDisplay] hasUpscaledVersion:', hasUpscaledVersion);
-  console.log('[MediaDisplay] media.url:', (media as any).url);
-  console.log('[MediaDisplay] media.imageUrl:', media.imageUrl);
-  console.log('[MediaDisplay] media.location:', media.location);
-  console.log('[MediaDisplay] media.thumbUrl:', (media as any).thumbUrl);
-  console.log('[MediaDisplay] media.type:', media.type);
-  console.log('[MediaDisplay] isEmpty:', !effectiveImageUrl);
-  console.log('[MediaDisplay] ALL media keys:', Object.keys(media));
-  console.log('[MediaDisplay] ========================================');
+  // Debug logging for URL issues
+  console.log('[MediaDisplay] 🖼️ URL COMPUTATION:', {
+    mediaId: media.id.substring(0, 8),
+    effectiveImageUrl: effectiveImageUrl?.substring(0, 50),
+    hasUpscaledVersion,
+    mediaName: (media as any).name,
+  });
   
-  // Source URL for tasks (always use upscaled if available, otherwise get display URL)
-  const sourceUrlForTasks = upscaledUrl ? getDisplayUrl(upscaledUrl) : getDisplayUrl(originalUrl);
+  // Source URL for tasks is always the current primary
+  const sourceUrlForTasks = getDisplayUrl(primaryUrl);
 
   return {
     isUpscaling,
     showingUpscaled,
     isPendingUpscale,
     hasUpscaledVersion,
-    upscaledUrl,
+    upscaledUrl: hasUpscaledVersion ? primaryUrl : null, // If upscaled is primary, the URL is the upscaled one
     effectiveImageUrl,
     sourceUrlForTasks,
     handleUpscale,
     handleToggleUpscaled,
   };
 };
-

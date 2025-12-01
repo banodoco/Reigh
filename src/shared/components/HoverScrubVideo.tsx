@@ -79,6 +79,11 @@ interface HoverScrubVideoProps extends Omit<React.HTMLAttributes<HTMLDivElement>
    * Callback for video loaded data
    */
   onLoadedData?: React.ReactEventHandler<HTMLVideoElement>;
+  /**
+   * Expected duration in seconds. Overrides video.duration when provided.
+   * Useful for WebM files from MediaRecorder that have broken duration metadata.
+   */
+  expectedDuration?: number;
 }
 
 /**
@@ -106,6 +111,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   onVideoError,
   onLoadStart,
   onLoadedData,
+  expectedDuration,
   ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -117,10 +123,34 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
   // Track the last mouse X position for re-calculating scrubber when metadata loads
   const lastMouseXRef = useRef<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(() => {
+    // Initialize with expectedDuration if provided and valid
+    if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
+      return expectedDuration;
+    }
+    return 0;
+  });
   const [scrubberPosition, setScrubberPosition] = useState<number | null>(null);
   const [scrubberVisible, setScrubberVisible] = useState(true);
   const [hasLoadedOnDemand, setHasLoadedOnDemand] = useState(false);
+
+  // Update duration from expectedDuration prop if video duration is invalid
+  React.useEffect(() => {
+    console.log('[TrimDurationFix] HoverScrubVideo received expectedDuration:', {
+      expectedDuration,
+      currentDuration: duration,
+      isExpectedFinite: expectedDuration ? Number.isFinite(expectedDuration) : 'N/A',
+      isCurrentFinite: Number.isFinite(duration),
+      willUpdate: expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0 && (!Number.isFinite(duration) || duration <= 0),
+    });
+    if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
+      // Only update if current duration is invalid (0, Infinity, or NaN)
+      if (!Number.isFinite(duration) || duration <= 0) {
+        console.log('[TrimDurationFix] Setting duration from expectedDuration:', expectedDuration);
+        setDuration(expectedDuration);
+      }
+    }
+  }, [expectedDuration, duration]);
   // When posterOnlyUntilClick is enabled, defer activation until interaction
   const [isActivated, setIsActivated] = useState<boolean>(() => !posterOnlyUntilClick);
   const speedOptions = [0.25, 0.5, 1, 1.5, 2];
@@ -219,14 +249,14 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
       }
     }
 
-    if (duration === 0) {
-      console.log('[SegmentCardPopulation] Duration is 0, skipping scrubbing (mouse position stored for later)');
+    if (!Number.isFinite(duration) || duration <= 0) {
+      console.log('[SegmentCardPopulation] Duration is invalid, skipping scrubbing (mouse position stored for later)', { duration });
       
       // Force load if video is stuck in HAVE_NOTHING state, even if preload is metadata
       // This fixes cases where the browser suspended loading or network is slow
       if (videoRef.current && videoRef.current.readyState === 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[VideoStallFix] Force loading video during scrub because duration is 0 and readyState is 0', {
+          console.log('[VideoStallFix] Force loading video during scrub because duration is invalid and readyState is 0', {
             src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src'
           });
         }
@@ -249,6 +279,12 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
     
     const progress = Math.max(0, Math.min(1, mouseX / rect.width));
     const targetTime = progress * duration;
+
+    // Validate targetTime before setting currentTime
+    if (!Number.isFinite(targetTime)) {
+      console.warn('[SegmentCardPopulation] Calculated targetTime is not finite, skipping', { targetTime, progress, duration });
+      return;
+    }
 
     // Update scrubber position (percentage) and make it visible
     setScrubberPosition(progress * 100);
@@ -396,16 +432,37 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
         });
       }
 
-      const newDuration = videoRef.current.duration;
+      let newDuration = videoRef.current.duration;
+      
+      // If video duration is not valid, try to use expectedDuration prop
+      if (!Number.isFinite(newDuration) || newDuration <= 0) {
+        if (expectedDuration && Number.isFinite(expectedDuration) && expectedDuration > 0) {
+          console.log('[SegmentCardPopulation] Using expectedDuration instead of invalid video duration:', {
+            videoDuration: newDuration,
+            expectedDuration,
+          });
+          newDuration = expectedDuration;
+        } else {
+          console.log('[SegmentCardPopulation] Duration is invalid and no expectedDuration provided:', newDuration);
+          return;
+        }
+      }
+      
       setDuration(newDuration);
       console.log('[SegmentCardPopulation] Duration set to:', newDuration);
       
       // FIX: Recalculate scrubber position if user was hovering while metadata was loading
       // This fixes the issue where the scrubber doesn't appear on first hover of the first video
-      if (!isMobile && !disableScrubbing && !thumbnailMode && isHoveringRef.current && lastMouseXRef.current !== null && containerRef.current && newDuration > 0) {
+      if (!isMobile && !disableScrubbing && !thumbnailMode && isHoveringRef.current && lastMouseXRef.current !== null && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const progress = Math.max(0, Math.min(1, lastMouseXRef.current / rect.width));
         const targetTime = progress * newDuration;
+        
+        // Validate targetTime
+        if (!Number.isFinite(targetTime)) {
+          console.warn('[ScrubberFix] Calculated targetTime is not finite, skipping seek', { targetTime, progress, newDuration });
+          return;
+        }
         
         console.log('[ScrubberFix] Recalculating scrubber after metadata loaded while hovering', {
           src: src?.substring(src.lastIndexOf('/') + 1) || 'no-src',
@@ -842,7 +899,7 @@ const HoverScrubVideo: React.FC<HoverScrubVideoProps> = ({
           
           {/* Time indicator */}
           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-            {duration > 0 && (
+            {Number.isFinite(duration) && duration > 0 && (
               `${Math.floor((scrubberPosition / 100) * duration)}s / ${Math.floor(duration)}s`
             )}
           </div>

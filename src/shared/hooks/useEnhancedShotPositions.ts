@@ -19,7 +19,6 @@ export interface ShotGeneration {
     location?: string;
     type?: string;
     created_at: string;
-    upscaled_url?: string; // URL of upscaled version if available
     starred?: boolean; // Whether this generation is starred
   };
 }
@@ -86,7 +85,6 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
             location,
             type,
             created_at,
-            upscaled_url,
             starred,
             based_on
           )
@@ -121,7 +119,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
           generation_id: sg.generation_id,
           timeline_frame: sg.timeline_frame,
           metadata: sg.metadata as PositionMetadata,
-          generation: sg.generation as any // Type assertion for upscaled_url
+          generation: sg.generation as any
         }));
 
       setShotGenerations(shotGenerationsData as ShotGeneration[]);
@@ -180,7 +178,7 @@ export const useEnhancedShotPositions = (shotId: string | null, isDragInProgress
     return unsubscribe;
   }, [shotId, queryClient, loadPositions, isPersistingPositions, isDragInProgress]);
 
-  // Realtime: force reload when a generation is updated (e.g., upscaled_url added, location changed)
+  // Realtime: force reload when a generation is updated (e.g., location changed)
   useEffect(() => {
     const handler = (e: any) => {
       if (!shotId) return;

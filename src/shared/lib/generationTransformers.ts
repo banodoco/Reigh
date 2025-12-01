@@ -4,14 +4,18 @@
  * SINGLE SOURCE OF TRUTH for transforming generation data from database to UI format.
  * 
  * This eliminates the need to manually update transformation logic in multiple places
- * when adding new fields (like upscaled_url). Instead, update once here and all
- * consumers automatically get the new field.
+ * when adding new fields. Instead, update once here and all consumers automatically
+ * get the new field.
  * 
  * Architecture Benefits:
  * - DRY: No duplicated transformation logic across hooks/components
  * - Type Safety: Centralized TypeScript types ensure consistency
  * - Maintainability: Add new fields in one place instead of 5+
  * - Testability: Can unit test transformations in isolation
+ * 
+ * NOTE: upscaled_url has been removed - upscaled versions are now stored as
+ * generation_variants with variant_type='upscaled' and become the primary variant,
+ * so `location` already contains the best available URL.
  */
 
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
@@ -31,9 +35,8 @@ export interface RawGeneration {
   starred?: boolean | null;
   tasks?: any[] | any | null;
   based_on?: string | null;
-  upscaled_url?: string | null;
   name?: string | null;
-  // NEW: JSONB column mapping shot_id -> timeline_frame
+  // JSONB column mapping shot_id -> timeline_frame
   shot_data?: Record<string, number | null>;
   // DEPRECATED: Old join format (for backwards compatibility)
   shot_generations?: Array<{
@@ -153,7 +156,6 @@ export function transformGeneration(
       ...(item.params || {}),
       taskId, // Include task ID in metadata for ImageGalleryItem
       based_on: item.based_on, // Include based_on for lineage tracking
-      upscaled_url: item.upscaled_url, // Include upscaled_url for upscale feature
       ...(options.metadata || {}), // Merge any additional metadata
     },
     createdAt: item.created_at,
@@ -161,20 +163,10 @@ export function transformGeneration(
     isVideo: item.type?.includes('video') || false,
     starred: item.starred || false,
     based_on: item.based_on, // Top level for easy access
-    upscaled_url: item.upscaled_url, // Top level for MediaLightbox
     position: null, // Will be set if shot context provided
     timeline_frame: null, // Will be set if shot context provided
     name: item.name || item.params?.name || undefined,
   };
-
-  // [UpscaleDebug] Preserve existing debug logging
-  if (item.upscaled_url && options.verbose) {
-    console.log('[TransformerDebug] Generation with upscaled_url:', {
-      id: baseItem.id?.substring(0, 8),
-      hasUpscaledUrl: !!baseItem.upscaled_url,
-      upscaled_url: baseItem.upscaled_url?.substring(0, 60)
-    });
-  }
 
   // Handle shot associations - prefer JSONB shot_data over JOIN shot_generations
   let shotGenerations: Array<{ shot_id: string; timeline_frame: number | null }> = [];
@@ -332,7 +324,6 @@ export function transformForTimeline(
     createdAt: genData.created_at,
     timeline_frame: shotGen.timeline_frame ?? undefined,
     metadata: shotGen.metadata,
-    upscaled_url: genData.upscaled_url ?? undefined, // 🚀 Pass through upscaled_url
     starred: genData.starred ?? false, // ⭐ Pass through starred status
     based_on: genData.based_on ?? undefined, // 🔗 Pass through based_on for lineage tracking
   };

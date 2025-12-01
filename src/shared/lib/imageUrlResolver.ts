@@ -1,61 +1,50 @@
 /**
- * Utility for resolving image URLs with upscale support
+ * Utility for resolving image URLs
  * 
- * This module provides functions to prioritize upscaled image URLs when available.
- * Use these utilities when preparing image URLs for task creation or display.
+ * NOTE: This module has been simplified. Previously it prioritized upscaled URLs,
+ * but now upscaled versions are stored as the primary variant, so `location` 
+ * already contains the best available URL.
+ * 
+ * These functions are kept for backward compatibility but now simply return the location.
  */
 
 /**
- * Resolves the best available image URL, prioritizing upscaled version if available
+ * Resolves the image URL - simply returns the location
  * 
- * @param location - The original image location/URL
- * @param upscaledUrl - The upscaled image URL (if available)
- * @returns The upscaled URL if available, otherwise the original location
+ * @param location - The image location/URL
+ * @returns The location or null
+ * @deprecated Just use `location` directly - upscaled is now the primary variant
  */
-export function resolveImageUrl(location: string | null | undefined, upscaledUrl?: string | null): string | null {
-  // Prioritize upscaled URL if it exists
-  if (upscaledUrl && upscaledUrl.trim()) {
-    return upscaledUrl;
-  }
-  
-  // Fall back to original location
+export function resolveImageUrl(location: string | null | undefined): string | null {
   return location || null;
 }
 
 /**
- * Resolves the best available image URL from a generation object
+ * Resolves the image URL from a generation object
  * 
- * @param generation - Generation object that may contain location and upscaled_url
- * @returns The upscaled URL if available, otherwise the original location
+ * @param generation - Generation object with location
+ * @returns The location or null
+ * @deprecated Just use `generation.location` directly
  */
 export function resolveGenerationImageUrl(generation: {
   location?: string | null;
-  upscaled_url?: string | null;
   [key: string]: any;
 }): string | null {
-  return resolveImageUrl(generation.location, generation.upscaled_url);
+  return generation.location || null;
 }
 
 /**
- * Resolves best available image URLs from an array of generations
+ * Resolves image URLs from an array of generations
  * 
  * @param generations - Array of generation objects
- * @returns Array of resolved URLs (upscaled when available, otherwise original)
+ * @returns Array of URLs
+ * @deprecated Just map over `generation.location` directly
  */
 export function resolveGenerationImageUrls(generations: Array<{
   location?: string | null;
-  upscaled_url?: string | null;
   [key: string]: any;
 }>): string[] {
   return generations
-    .map(gen => resolveGenerationImageUrl(gen))
+    .map(gen => gen.location)
     .filter((url): url is string => Boolean(url));
 }
-
-/**
- * Type guard to check if an object has upscaled URL support
- */
-export function hasUpscaledUrl(obj: any): obj is { upscaled_url: string } {
-  return obj && typeof obj.upscaled_url === 'string' && obj.upscaled_url.trim().length > 0;
-}
-

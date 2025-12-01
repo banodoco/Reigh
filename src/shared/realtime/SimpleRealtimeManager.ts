@@ -467,7 +467,7 @@ export class SimpleRealtimeManager {
       timestamp: Date.now()
     });
 
-    // Invalidate all generation-related queries to pick up the upscaled_url
+    // Invalidate all generation-related queries to pick up changes
     const queryKeys = [
       ['unified-generations'],
       ['generations'],
@@ -547,8 +547,6 @@ export class SimpleRealtimeManager {
     const newRecord = payload?.new;
     const oldRecord = payload?.old;
     const generationId = newRecord?.id;
-    const upscaledUrl = newRecord?.upscaled_url;
-    const oldUpscaledUrl = oldRecord?.upscaled_url;
     const location = newRecord?.location;
     const oldLocation = oldRecord?.location;
     const thumbnailUrl = newRecord?.thumbnail_url;
@@ -557,8 +555,7 @@ export class SimpleRealtimeManager {
     // Check what changed - IMPORTANT: Only consider it a "real" change if BOTH old and new 
     // have values AND they differ. Supabase realtime's `old` record may not include all columns,
     // so comparing against undefined would incorrectly flag unchanged fields as "changed".
-    const upscaleCompleted = !oldUpscaledUrl && upscaledUrl;
-    // Only true if both have values and they differ
+    // Note: location changes now include when primary variant switches (e.g., upscale completes)
     const locationActuallyChanged = !!(oldLocation && location && location !== oldLocation);
     const thumbnailActuallyChanged = !!(oldThumbnailUrl && thumbnailUrl && thumbnailUrl !== oldThumbnailUrl);
     
@@ -571,13 +568,12 @@ export class SimpleRealtimeManager {
     const timelineFrameChanged = newRecord?.timeline_frame !== oldRecord?.timeline_frame;
     const shotDataChanged = JSON.stringify(newRecord?.shot_data) !== JSON.stringify(oldRecord?.shot_data);
     
-    // If no actual content changed (upscale, location, thumbnail), this is just a shot sync update
-    const hasActualContentChange = upscaleCompleted || locationActuallyChanged || thumbnailActuallyChanged;
+    // If no actual content changed (location, thumbnail), this is just a shot sync update
+    const hasActualContentChange = locationActuallyChanged || thumbnailActuallyChanged;
     const isOnlyShotSyncUpdate = !hasActualContentChange;
     
     console.log('[AddFlicker] 2️⃣ Generation update analysis:', {
       generationId: generationId?.substring(0, 8),
-      upscaleCompleted,
       locationActuallyChanged,
       thumbnailActuallyChanged,
       hasActualContentChange,
@@ -601,9 +597,9 @@ export class SimpleRealtimeManager {
       return;
     }
     
-    // Invalidate queries to pick up any generation changes (location, upscaled_url, thumbnail, etc.)
+    // Invalidate queries to pick up any generation changes (location, thumbnail, etc.)
     console.log('[SimpleRealtime:Batching] 📦 Batching generation update:', generationId.substring(0, 8));
-    this.batchEvent('generation-update', { ...payload, generationId, upscaleCompleted, locationChanged: locationActuallyChanged, thumbnailChanged: thumbnailActuallyChanged });
+    this.batchEvent('generation-update', { ...payload, generationId, locationChanged: locationActuallyChanged, thumbnailChanged: thumbnailActuallyChanged });
   }
 
   private updateGlobalSnapshot(channelState: string, lastEventAt?: number) {

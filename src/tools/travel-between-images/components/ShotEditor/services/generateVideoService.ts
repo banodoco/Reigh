@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getDisplayUrl } from '@/shared/lib/utils';
-import { resolveImageUrl } from '@/shared/lib/imageUrlResolver';
+// NOTE: resolveImageUrl is no longer needed - location already contains the best version
 import { createTravelBetweenImagesTask, type TravelBetweenImagesTaskParams } from '@/shared/lib/tasks/travelBetweenImages';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { DEFAULT_RESOLUTION } from '../utils/dimension-utils';
@@ -313,7 +313,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
         generations:generation_id (
           id,
           location,
-          upscaled_url,
           type
         )
       `)
@@ -326,16 +325,14 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       return { success: false, error: 'Failed to fetch shot data' };
     }
 
-    // Filter and process exactly like simpleFilteredImages does
-    // IMPORTANT: Now prioritizes upscaled_url when available
+    // Filter and process - location already contains the best version (upscaled if available)
     // Uses canonical isVideoShotGenerations from typeGuards
     const freshImages = (freshShotGenerations || [])
       .filter(sg => sg.timeline_frame != null && !isVideoShotGenerations(sg as ShotGenerationsLike))
       .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
       .map(sg => {
         const gen = sg.generations as any;
-        // Prioritize upscaled URL if available
-        return resolveImageUrl(gen?.location, gen?.upscaled_url);
+        return gen?.location;
       })
       .filter((location): location is string => Boolean(location));
 
@@ -343,14 +340,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
       .map((location) => getDisplayUrl(location))
       .filter((url): url is string => Boolean(url) && url !== '/placeholder.svg');
 
-    const upscaledCount = (freshShotGenerations || []).filter(sg => {
-      const gen = sg.generations as any;
-      return gen?.upscaled_url && gen.upscaled_url.trim();
-    }).length;
-
-    console.log('[TaskSubmission] Using fresh image URLs (with upscale priority):', {
+    console.log('[TaskSubmission] Using fresh image URLs:', {
       count: absoluteImageUrls.length,
-      upscaledCount,
       urls: absoluteImageUrls.map(url => url.substring(0, 50) + '...')
     });
   } catch (err) {
@@ -389,7 +380,6 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
           generations:generation_id (
             id,
             location,
-            upscaled_url,
             type
           )
         `)
