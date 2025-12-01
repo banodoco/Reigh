@@ -90,11 +90,33 @@ export const useTrimSave = ({
 
       setSaveProgress(85);
 
-      // Step 2: Create variant record in database
+      // Step 2: Fetch source variant params if we have a source variant ID
+      let sourceVariantParams: Record<string, any> | null = null;
+      if (sourceVariantId) {
+        console.log('[useTrimSave] Fetching source variant params:', sourceVariantId.substring(0, 8));
+        const { data: sourceVariant, error: fetchError } = await supabase
+          .from('generation_variants')
+          .select('params')
+          .eq('id', sourceVariantId)
+          .single();
+
+        if (fetchError) {
+          console.warn('[useTrimSave] Failed to fetch source variant params:', fetchError);
+        } else if (sourceVariant?.params) {
+          // Handle case where params might be a JSON string
+          sourceVariantParams = typeof sourceVariant.params === 'string' 
+            ? JSON.parse(sourceVariant.params) 
+            : sourceVariant.params;
+          console.log('[useTrimSave] Loaded source variant params:', Object.keys(sourceVariantParams));
+        }
+      }
+
+      // Step 3: Create variant record in database
       console.log('[useTrimSave] Creating variant record');
       
-      // Store the actual duration so we can use it instead of the broken WebM metadata
-      const variantParams = {
+      // Merge source variant params with trim-specific params
+      // Trim-specific params take precedence over source params
+      const trimParams = {
         trim_start: startTrim,
         trim_end: endTrim,
         original_duration: videoDuration,
@@ -102,6 +124,12 @@ export const useTrimSave = ({
         duration_seconds: actualDuration, // Store for easy access in UI
         source_variant_id: sourceVariantId || null,
       };
+      
+      const variantParams = sourceVariantParams 
+        ? { ...sourceVariantParams, ...trimParams }
+        : trimParams;
+      
+      console.log('[useTrimSave] Merged params keys:', Object.keys(variantParams));
 
       const { data: insertedVariant, error: insertError } = await supabase
         .from('generation_variants')
