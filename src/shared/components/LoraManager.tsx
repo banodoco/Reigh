@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from './ui/button';
 import { ActiveLoRAsDisplay } from './ActiveLoRAsDisplay';
 import { LoraSelectorModal } from './LoraSelectorModal';
-import { useLoraManager, UseLoraManagerOptions, LoraModel } from '@/shared/hooks/useLoraManager';
+import { useLoraManager, UseLoraManagerOptions, UseLoraManagerReturn, LoraModel } from '@/shared/hooks/useLoraManager';
 
 export interface LoraManagerProps extends UseLoraManagerOptions {
   availableLoras: LoraModel[];
@@ -10,6 +10,8 @@ export interface LoraManagerProps extends UseLoraManagerOptions {
   title?: string;
   addButtonText?: string;
   fullWidth?: boolean;
+  /** Optional external loraManager instance. If provided, uses this instead of creating a new one. */
+  externalLoraManager?: UseLoraManagerReturn;
 }
 
 export const LoraManager: React.FC<LoraManagerProps> = ({
@@ -18,9 +20,12 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
   title = "LoRA Models",
   addButtonText = "Add or Manage LoRAs",
   fullWidth = true,
+  externalLoraManager,
   ...options
 }) => {
-  const loraManager = useLoraManager(availableLoras, options);
+  // Use external manager if provided, otherwise create our own
+  const internalLoraManager = useLoraManager(availableLoras, options);
+  const loraManager = externalLoraManager ?? internalLoraManager;
 
   return (
     <div className={`space-y-4 ${className}`}>

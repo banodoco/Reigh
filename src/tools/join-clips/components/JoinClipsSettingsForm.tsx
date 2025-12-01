@@ -7,7 +7,7 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { Button } from '@/shared/components/ui/button';
 import { Loader2, Check, Film, Info } from 'lucide-react';
 import { LoraManager } from '@/shared/components/LoraManager';
-import type { LoraModel } from '@/shared/hooks/useLoraManager';
+import type { LoraModel, UseLoraManagerReturn } from '@/shared/hooks/useLoraManager';
 import { cn } from '@/shared/lib/utils';
 import {
     Tooltip,
@@ -39,6 +39,8 @@ export interface JoinClipsSettingsFormProps {
     availableLoras: LoraModel[];
     projectId: string | null;
     loraPersistenceKey: string;
+    /** Optional external loraManager. If provided, uses this instead of creating a new one. */
+    loraManager?: UseLoraManagerReturn;
     
     // Actions
     onGenerate: () => void;
@@ -484,6 +486,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
     availableLoras,
     projectId,
     loraPersistenceKey,
+    loraManager,
     onGenerate,
     isGenerating,
     generateSuccess,
@@ -678,6 +681,7 @@ export const JoinClipsSettingsForm: React.FC<JoinClipsSettingsFormProps> = ({
                         persistenceScope="project"
                         enableProjectPersistence={true}
                         persistenceKey={loraPersistenceKey}
+                        externalLoraManager={loraManager}
                         title="LoRA Models (Optional)"
                         addButtonText="Add or Manage LoRAs"
                     />

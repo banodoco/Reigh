@@ -1162,6 +1162,7 @@ const JoinClipsPage: React.FC = () => {
             availableLoras={availableLoras}
             projectId={selectedProjectId}
             loraPersistenceKey="join-clips"
+            loraManager={loraManager}
             onGenerate={handleGenerate}
             isGenerating={generateJoinClipsMutation.isPending}
             generateSuccess={showSuccessState}

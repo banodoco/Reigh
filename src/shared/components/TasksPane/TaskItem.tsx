@@ -112,9 +112,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
   }, [task.params]);
 
   // Consolidated task type detection using content_type from database
+  // With fallback for known video task types (in case DB lookup is loading or missing)
   const taskInfo = useMemo(() => {
     const contentType = taskTypeInfo?.content_type;
-    const isVideoTask = contentType === 'video';
+    
+    // Known video task types as fallback (when DB lookup is still loading or missing)
+    const knownVideoTaskTypes = [
+      'travel_orchestrator', 'travel_segment', 'travel_stitch',
+      'join_clips_orchestrator', 'join_clips_segment',
+      'animate_character'
+    ];
+    const isVideoTask = contentType === 'video' || knownVideoTaskTypes.includes(task.taskType);
+    
     const isImageTask = contentType === 'image';
     const isCompletedVideoTask = isVideoTask && task.status === 'Complete' && !!task.outputLocation;
     const isCompletedImageTask = isImageTask && task.status === 'Complete';
@@ -133,7 +142,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
       isSingleImageTask: isImageTask,
       isCompletedTravelTask: isCompletedVideoTask
     };
-  }, [taskTypeInfo?.content_type, task.status, task.outputLocation]);
+  }, [taskTypeInfo?.content_type, task.status, task.outputLocation, task.taskType]);
 
   // Check if this is a successful Image Generation task with output
   const hasGeneratedImage = React.useMemo(() => {
@@ -1007,7 +1016,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, isNew = false, isActive = fal
         <TooltipContent 
           side="left" 
           className={cn(
-            "p-0 border-0 bg-background/95 backdrop-blur-sm",
+            "p-0 border-0 bg-background/95 backdrop-blur-sm z-[100001]",
             taskInfo.isVideoTask ? "max-w-lg" : "max-w-md"
           )}
           sideOffset={15}
