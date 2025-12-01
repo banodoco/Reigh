@@ -37,11 +37,11 @@ function buildBasicModePhaseConfig(
   // Build additional LoRAs array (motion + user-selected)
   const additionalLoras: PhaseLoraConfig[] = [];
   
-  // Add motion LoRA if motion > 0
+  // Add motion LoRA if motion > 0 (always at 1.0 strength)
   if (amountOfMotion > 0) {
     additionalLoras.push({
       url: MOTION_LORA_URL,
-      multiplier: (amountOfMotion / 100).toFixed(2)
+      multiplier: "1.0"
     });
   }
   
